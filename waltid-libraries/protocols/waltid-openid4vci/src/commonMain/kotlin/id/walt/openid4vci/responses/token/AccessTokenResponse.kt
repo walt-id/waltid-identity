@@ -11,7 +11,10 @@ data class AccessTokenResponse(
 )
 
 sealed class AccessResponseResult {
-    data class Success(val response: AccessTokenResponse) : AccessResponseResult()
+    data class Success(
+        val request: id.walt.openid4vci.requests.token.AccessTokenRequest,
+        val response: AccessTokenResponse,
+    ) : AccessResponseResult()
     data class Failure(val error: OAuthError) : AccessResponseResult()
 
     fun isSuccess(): Boolean = this is Success

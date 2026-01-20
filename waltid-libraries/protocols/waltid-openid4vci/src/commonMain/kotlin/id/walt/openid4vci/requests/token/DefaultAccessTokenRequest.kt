@@ -9,53 +9,37 @@ import kotlin.time.Instant
 data class DefaultAccessTokenRequest(
     override val id: String = generateRequestId(),
     override val requestedAt: Instant = Clock.System.now(),
-    override var client: Client,
+    override val client: Client,
     override val grantTypes: Set<String>,
-    override val handledGrantTypes: MutableSet<String> = mutableSetOf(),
+    override val handledGrantTypes: Set<String> = emptySet(),
     override val requestedScopes: Set<String> = emptySet(),
-    override val grantedScopes: MutableSet<String> = mutableSetOf(),
+    override val grantedScopes: Set<String> = emptySet(),
     override val requestedAudience: Set<String> = emptySet(),
-    override val grantedAudience: MutableSet<String> = mutableSetOf(),
+    override val grantedAudience: Set<String> = emptySet(),
     override val requestForm: Map<String, List<String>> = emptyMap(),
-    override var session: Session? = null,
+    override val session: Session? = null,
     override val issuerId: String? = null,
 ) : AccessTokenRequest {
-    override fun markGrantTypeHandled(grantType: String): AccessTokenRequest {
-        handledGrantTypes.add(grantType)
-        return this
-    }
+    override fun markGrantTypeHandled(grantType: String): AccessTokenRequest =
+        copy(handledGrantTypes = handledGrantTypes + grantType)
 
-    override fun grantScopes(scopes: Collection<String>): AccessTokenRequest {
-        grantedScopes.addAll(scopes)
-        return this
-    }
+    override fun grantScopes(scopes: Collection<String>): AccessTokenRequest =
+        copy(grantedScopes = grantedScopes + scopes)
 
-    override fun withGrantedScopes(scopes: Collection<String>): AccessTokenRequest {
-        grantedScopes.clear()
-        grantedScopes.addAll(scopes)
-        return this
-    }
+    override fun withGrantedScopes(scopes: Collection<String>): AccessTokenRequest =
+        copy(grantedScopes = scopes.toSet())
 
-    override fun grantAudience(audience: Collection<String>): AccessTokenRequest {
-        grantedAudience.addAll(audience)
-        return this
-    }
+    override fun grantAudience(audience: Collection<String>): AccessTokenRequest =
+        copy(grantedAudience = grantedAudience + audience)
 
-    override fun withGrantedAudience(audience: Collection<String>): AccessTokenRequest {
-        grantedAudience.clear()
-        grantedAudience.addAll(audience)
-        return this
-    }
+    override fun withGrantedAudience(audience: Collection<String>): AccessTokenRequest =
+        copy(grantedAudience = audience.toSet())
 
-    override fun withClient(client: Client): AccessTokenRequest {
-        this.client = client
-        return this
-    }
+    override fun withClient(client: Client): AccessTokenRequest =
+        copy(client = client)
 
-    override fun withSession(session: Session?): AccessTokenRequest {
-        this.session = session
-        return this
-    }
+    override fun withSession(session: Session?): AccessTokenRequest =
+        copy(session = session)
 
     override fun withIssuer(id: String?): AccessTokenRequest =
         copy(issuerId = id)

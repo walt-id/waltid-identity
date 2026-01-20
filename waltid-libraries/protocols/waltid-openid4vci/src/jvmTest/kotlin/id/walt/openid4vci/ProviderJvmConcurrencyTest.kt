@@ -101,8 +101,9 @@ internal suspend fun executeAuthorizationCodeFlow(
     val accessResponse = provider.createAccessResponse(accessRequestWithIssuer)
     require(accessResponse is AccessResponseResult.Success)
 
-    assertEquals(expectedSubject, accessRequestWithIssuer.session?.subject)
-    assertEquals(clientId, accessRequestWithIssuer.client.id)
+    val updatedRequest = accessResponse.request
+    assertEquals(expectedSubject, updatedRequest.session?.subject)
+    assertEquals(clientId, updatedRequest.client.id)
     assertEquals(state, authorizeReqWithIssuer.state)
 
     val token = accessResponse.response.accessToken

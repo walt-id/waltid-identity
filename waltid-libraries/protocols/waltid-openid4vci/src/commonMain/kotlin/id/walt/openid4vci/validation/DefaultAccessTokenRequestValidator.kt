@@ -67,11 +67,11 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
 
         val request = DefaultAccessTokenRequest(
             client = client,
-            grantTypes = mutableSetOf(GrantType.AuthorizationCode.value),
-            requestedScopes = requestedScopes.toMutableSet(),
-            requestedAudience = mutableSetOf(),
-            grantedAudience = mutableSetOf(),
-            requestForm = parameters.toMutableMap(),
+            grantTypes = setOf(GrantType.AuthorizationCode.value),
+            requestedScopes = requestedScopes.toSet(),
+            requestedAudience = emptySet(),
+            grantedAudience = emptySet(),
+            requestForm = parameters.toMap(),
             session = session,
         )
 
@@ -106,11 +106,11 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
 
         val request = DefaultAccessTokenRequest(
             client = client,
-            grantTypes = mutableSetOf(GrantType.PreAuthorizedCode.value),
-            requestedScopes = requestedScopes.toMutableSet(),
-            requestedAudience = mutableSetOf(),
-            grantedAudience = mutableSetOf(),
-            requestForm = parameters.toMutableMap(),
+            grantTypes = setOf(GrantType.PreAuthorizedCode.value),
+            requestedScopes = requestedScopes.toSet(),
+            requestedAudience = emptySet(),
+            grantedAudience = emptySet(),
+            requestForm = parameters.toMap(),
             session = session,
         )
 

@@ -49,7 +49,7 @@ class AuthorizationCodeTokenEndpoint(
             }
 
             val session = record.session.copy()
-            var updatedRequest = request
+            val updatedRequest = request
                 .withSession(session)
                 .grantScopes(record.grantedScopes)
                 .grantAudience(record.grantedAudience)
@@ -60,7 +60,7 @@ class AuthorizationCodeTokenEndpoint(
             if (effectiveGrantedScope.isEmpty() && record.grantedScopes.isNotEmpty()) {
                 return AccessResponseResult.Failure(OAuthError("invalid_scope", "Requested scopes exceed the authorized scope"))
             }
-            updatedRequest = updatedRequest.withGrantedScopes(effectiveGrantedScope)
+            val scopedRequest = updatedRequest.withGrantedScopes(effectiveGrantedScope)
 
             val expiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
                 ?: Clock.System.now()
@@ -70,9 +70,9 @@ class AuthorizationCodeTokenEndpoint(
 
             val claims = defaultAccessTokenClaims(
                 subject = subject,
-                issuer = updatedRequest.issuerId ?: client.id,
+                issuer = scopedRequest.issuerId ?: client.id,
                 audience = record.grantedAudience.firstOrNull(),
-                scopes = updatedRequest.grantedScopes,
+                scopes = scopedRequest.grantedScopes,
                 expiresAt = expiresAt,
                 additional = mapOf(
                     "client_id" to client.id,
@@ -82,6 +82,7 @@ class AuthorizationCodeTokenEndpoint(
             val accessToken = tokenService.createAccessToken(claims)
 
             return AccessResponseResult.Success(
+                request = scopedRequest,
                 AccessTokenResponse(
                     accessToken = accessToken,
                     tokenType = id.walt.openid4vci.core.TOKEN_TYPE_BEARER,

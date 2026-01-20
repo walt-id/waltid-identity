@@ -124,7 +124,7 @@ class BuildProviderConfigurationTest {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
             request.grantTypes.contains("custom_grant")
         override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessResponseResult =
-            AccessResponseResult.Success(AccessTokenResponse(accessToken = "custom"))
+            AccessResponseResult.Success(request, AccessTokenResponse(accessToken = "custom"))
     }
 
     private fun stubAuthorizeValidator(): AuthorizationRequestValidator = AuthorizationRequestValidator {

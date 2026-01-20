@@ -76,7 +76,7 @@ class PreAuthorizedCodeTokenEndpoint(
             )
 
         val session = consumed.session.copy()
-        var updatedRequest = request
+        val updatedRequest = request
             .withSession(session)
             .markGrantTypeHandled(GrantType.PreAuthorizedCode.value)
             .grantScopes(consumed.grantedScopes)
@@ -94,7 +94,7 @@ class PreAuthorizedCodeTokenEndpoint(
         } else {
             existingClient
         }
-        updatedRequest = updatedRequest.withClient(clientToUse)
+        val clientRequest = updatedRequest.withClient(clientToUse)
 
         val expiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
             ?: Clock.System.now()
@@ -104,9 +104,9 @@ class PreAuthorizedCodeTokenEndpoint(
 
         val claims = defaultAccessTokenClaims(
             subject = subject,
-            issuer = updatedRequest.issuerId ?: clientId,
+            issuer = clientRequest.issuerId ?: clientId,
             audience = consumed.grantedAudience.firstOrNull(),
-            scopes = updatedRequest.grantedScopes,
+            scopes = clientRequest.grantedScopes,
             expiresAt = expiresAt,
             additional = buildMap {
                 put("client_id", clientId)
@@ -117,8 +117,8 @@ class PreAuthorizedCodeTokenEndpoint(
         val accessToken = tokenService.createAccessToken(claims)
 
         val extra = buildMap<String, Any?> {
-            if (updatedRequest.grantedScopes.isNotEmpty()) {
-                put("scope", updatedRequest.grantedScopes.joinToString(" "))
+            if (clientRequest.grantedScopes.isNotEmpty()) {
+                put("scope", clientRequest.grantedScopes.joinToString(" "))
             }
             consumed.credentialNonce?.let { put("c_nonce", it) }
             consumed.credentialNonceExpiresAt?.let { expiresAt ->
@@ -127,6 +127,7 @@ class PreAuthorizedCodeTokenEndpoint(
         }
 
         return AccessResponseResult.Success(
+            request = clientRequest,
             AccessTokenResponse(
                 accessToken = accessToken,
                 tokenType = id.walt.openid4vci.core.TOKEN_TYPE_BEARER,

@@ -170,11 +170,13 @@ class ProviderCombinedFlowTest {
 
             val accessResponse = provider.createAccessResponse(accessRequest)
             assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
-            val tokenResponse = (accessResponse).response
+            val success = accessResponse as AccessResponseResult.Success
+            val tokenResponse = success.response
+            val updatedRequest = success.request
 
-            assertEquals(subject, accessRequest.session?.subject, "session subject must survive round trip for $clientId")
-            assertEquals(clientId, accessRequest.client.id, "client must be preserved for $clientId")
-            assertEquals(expectedScopes, accessRequest.grantedScopes.toSet(), "granted scopes must match request for $clientId")
+            assertEquals(subject, updatedRequest.session?.subject, "session subject must survive round trip for $clientId")
+            assertEquals(clientId, updatedRequest.client.id, "client must be preserved for $clientId")
+            assertEquals(expectedScopes, updatedRequest.grantedScopes.toSet(), "granted scopes must match request for $clientId")
 
             assertEquals(TOKEN_TYPE_BEARER, tokenResponse.tokenType)
             assertNull(tokenResponse.expiresIn)

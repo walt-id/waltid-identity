@@ -11,15 +11,15 @@ import kotlin.time.Instant
 interface AccessTokenRequest {
     val id: String
     val requestedAt: Instant
-    var client: Client
+    val client: Client
     val grantTypes: Set<String>
-    val handledGrantTypes: MutableSet<String>
+    val handledGrantTypes: Set<String>
     val requestedScopes: Set<String>
-    val grantedScopes: MutableSet<String>
+    val grantedScopes: Set<String>
     val requestedAudience: Set<String>
-    val grantedAudience: MutableSet<String>
+    val grantedAudience: Set<String>
     val requestForm: Map<String, List<String>>
-    var session: Session?
+    val session: Session?
     val issuerId: String?
 
     fun markGrantTypeHandled(grantType: String): AccessTokenRequest
