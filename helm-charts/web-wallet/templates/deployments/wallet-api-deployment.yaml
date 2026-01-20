@@ -36,6 +36,10 @@ spec:
           name: http-api
         volumeMounts:
           - name: wallet-config
+            mountPath: /waltid-wallet-api/config/_features.conf
+            readOnly: true
+            subPath: _features.conf
+          - name: wallet-config
             mountPath: /waltid-wallet-api/config/db.conf
             readOnly: true
             subPath: db.conf
