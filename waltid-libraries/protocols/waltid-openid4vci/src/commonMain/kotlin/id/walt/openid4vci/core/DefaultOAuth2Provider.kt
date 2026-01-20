@@ -114,14 +114,14 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun createAccessRequest(parameters: Map<String, List<String>>, session: Session?): AccessTokenRequestResult {
+    override fun createAccessTokenRequest(parameters: Map<String, List<String>>, session: Session?): AccessTokenRequestResult {
         return config.accessTokenRequestValidator.validate(
             parameters = parameters,
             session = session ?: DefaultSession()
         )
     }
 
-    override suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult {
+    override suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessResponseResult {
         for (handler in config.tokenEndpointHandlers.toList()) {
             if (!handler.canHandleTokenEndpointRequest(request)) {
                 continue
@@ -136,7 +136,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeAccessError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse =
+    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse =
         AccessHttpResponse(
             status = 400,
             payload = buildMap {
@@ -145,7 +145,7 @@ class DefaultOAuth2Provider(
             },
         )
 
-    override fun writeAccessResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse =
+    override fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse =
         AccessHttpResponse(
             status = 200,
             payload = buildMap {

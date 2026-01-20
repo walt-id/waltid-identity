@@ -72,7 +72,7 @@ class TokenServiceTest {
         require(authorizeResponse is AuthorizationResponseResult.Success)
         val code = authorizeResponse.response.code
 
-        val AccessTokenRequestResult = provider.createAccessRequest(
+        val AccessTokenRequestResult = provider.createAccessTokenRequest(
             mapOf(
                 "grant_type" to listOf(GrantType.AuthorizationCode.value),
                 "client_id" to listOf(clientId),
@@ -83,7 +83,7 @@ class TokenServiceTest {
         require(AccessTokenRequestResult is AccessTokenRequestResult.Success)
         val accessRequest = AccessTokenRequestResult.request.withIssuer(issuerId)
 
-        val accessResponse = provider.createAccessResponse(accessRequest)
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
         require(accessResponse is AccessResponseResult.Success)
         val token = accessResponse.response.accessToken
 
@@ -176,7 +176,7 @@ class TokenServiceTest {
             require(authorizeResponse is AuthorizationResponseResult.Success)
             val code = authorizeResponse.response.code
 
-            val AccessTokenRequestResult = provider.createAccessRequest(
+            val AccessTokenRequestResult = provider.createAccessTokenRequest(
                 mapOf(
                     "grant_type" to listOf(GrantType.AuthorizationCode.value),
                     "client_id" to listOf("client-$issuerId"),
@@ -187,7 +187,7 @@ class TokenServiceTest {
             require(AccessTokenRequestResult is AccessTokenRequestResult.Success)
             val accessRequest = AccessTokenRequestResult.request.withIssuer(issuerId)
 
-            val accessResponse = provider.createAccessResponse(accessRequest)
+            val accessResponse = provider.createAccessTokenResponse(accessRequest)
             require(accessResponse is AccessResponseResult.Success)
 
             accessResponse.response.accessToken

@@ -21,7 +21,7 @@ import id.walt.openid4vci.responses.token.AccessHttpResponse
  *   DTOs instead of writing to HTTP primitives.
  * - `writeAuthorizationError`/`writeAuthorizationResponse` encapsulate response-mode formatting for tests
  *   and framework integration.
- * - `createAccessRequest`/`createAccessResponse` cover the token endpoint, and the `write*` variants
+ * - `createAccessTokenRequest`/`createAccessResponse` cover the token endpoint, and the `write*` variants
  *   produce RFC6749-compliant bodies.
  *
  * Parameters will be changed. However, we have to keep the implementation framework-agnostic (Ktor, Spring).
@@ -31,8 +31,8 @@ interface OAuth2Provider {
     suspend fun createAuthorizationResponse(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult
     fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizationResponseHttp
     fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizationResponseHttp
-    fun createAccessRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
-    suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
-    fun writeAccessError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
-    fun writeAccessResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse
+    fun createAccessTokenRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
+    suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessResponseResult
+    fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
+    fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessHttpResponse
 }

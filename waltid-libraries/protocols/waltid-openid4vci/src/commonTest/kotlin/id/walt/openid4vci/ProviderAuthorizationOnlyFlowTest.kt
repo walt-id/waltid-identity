@@ -50,7 +50,7 @@ class ProviderAuthorizationOnlyFlowTest {
         // (Optional) Convert the authorize response into an HTTP response via writeAuthorizeResponse/writeAuthorizeError.
 
         // 3) Parse the token request from the wallet, supplying a fresh session container.
-        val accessResult = provider.createAccessRequest(
+        val accessResult = provider.createAccessTokenRequest(
             mapOf(
                 "grant_type" to listOf(GrantType.AuthorizationCode.value),
                 "client_id" to listOf("demo-client"),
@@ -61,12 +61,12 @@ class ProviderAuthorizationOnlyFlowTest {
         assertTrue(accessResult.isSuccess())
         val accessRequest = (accessResult as AccessTokenRequestResult.Success).request.withIssuer(issuerId)
         // 4) Produce the token response based on the authorization code session.
-        val accessResponse = provider.createAccessResponse(accessRequest)
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
         val tokenResponse = (accessResponse as AccessResponseResult.Success).response
         assertTrue(tokenResponse.accessToken.isNotBlank())
 
-        val preAccessTokenRequestResult = provider.createAccessRequest(
+        val preAccessTokenRequestResult = provider.createAccessTokenRequest(
             mapOf(
                 "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
                 "pre-authorized_code" to listOf("pre-code"),
@@ -76,7 +76,7 @@ class ProviderAuthorizationOnlyFlowTest {
         when (preAccessTokenRequestResult) {
             is AccessTokenRequestResult.Success -> {
                 val requestWithIssuer = preAccessTokenRequestResult.request.withIssuer(issuerId)
-                val preAccessResponse = provider.createAccessResponse(requestWithIssuer)
+                val preAccessResponse = provider.createAccessTokenResponse(requestWithIssuer)
                 val failure = preAccessResponse as? AccessResponseResult.Failure
                     ?: error("Expected pre-authorized flow to be rejected at token endpoint")
                 assertEquals("unsupported_grant_type", failure.error.error)
@@ -128,7 +128,7 @@ class ProviderAuthorizationOnlyFlowTest {
     @Test
     fun `access request rejects unsupported grant_type`() = runTest {
         val provider = buildOAuth2Provider(createTestConfig())
-        val AccessTokenRequestResult = provider.createAccessRequest(
+        val AccessTokenRequestResult = provider.createAccessTokenRequest(
             mapOf("grant_type" to listOf("client_credentials")),
         )
         assertTrue(AccessTokenRequestResult is AccessTokenRequestResult.Failure)
@@ -155,7 +155,7 @@ class ProviderAuthorizationOnlyFlowTest {
             requestForm = mutableMapOf(),
         )
 
-        val response = provider.createAccessResponse(request)
+        val response = provider.createAccessTokenResponse(request)
         assertTrue(response is AccessResponseResult.Failure)
         assertEquals("unsupported_grant_type", response.error.error)
     }

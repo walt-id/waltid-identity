@@ -49,7 +49,7 @@ class ProviderCombinedFlowTest {
         val response = (authorizeResponse as AuthorizationResponseResult.Success).response
         val code = response.code
 
-        val accessResult = provider.createAccessRequest(
+        val accessResult = provider.createAccessTokenRequest(
             mapOf(
                 "grant_type" to listOf(GrantType.AuthorizationCode.value),
                 "client_id" to listOf("demo-client"),
@@ -59,7 +59,7 @@ class ProviderCombinedFlowTest {
         )
         assertTrue(accessResult.isSuccess())
         val accessRequest = (accessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
-        val accessResponse = provider.createAccessResponse(accessRequest)
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
         val tokenResponse = (accessResponse as AccessResponseResult.Success).response
         assertTrue(tokenResponse.accessToken.isNotBlank())
@@ -77,7 +77,7 @@ class ProviderCombinedFlowTest {
         )
         val preCode = issuedCode.code
 
-        val preAccessResult = provider.createAccessRequest(
+        val preAccessResult = provider.createAccessTokenRequest(
             mapOf(
                 "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
                 "pre-authorized_code" to listOf(preCode),
@@ -85,7 +85,7 @@ class ProviderCombinedFlowTest {
         )
         assertTrue(preAccessResult.isSuccess())
         val preAccessRequest = (preAccessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
-        val preAccessResponse = provider.createAccessResponse(preAccessRequest)
+        val preAccessResponse = provider.createAccessTokenResponse(preAccessRequest)
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessResponseResult.Success).response
         assertEquals("nonce-pre", preTokenResponse.extra["c_nonce"])
@@ -153,7 +153,7 @@ class ProviderCombinedFlowTest {
             code: String,
             expectedScopes: Set<String>,
         ): Pair<AccessTokenResponse, AccessTokenRequest> {
-            val accessResult = provider.createAccessRequest(
+            val accessResult = provider.createAccessTokenRequest(
                 mapOf(
                     "grant_type" to listOf(GrantType.AuthorizationCode.value),
                     "client_id" to listOf(clientId),
@@ -168,7 +168,7 @@ class ProviderCombinedFlowTest {
             assertEquals(code, accessRequest.requestForm["code"]?.firstOrNull())
             assertEquals(redirectUri, accessRequest.requestForm["redirect_uri"]?.firstOrNull())
 
-            val accessResponse = provider.createAccessResponse(accessRequest)
+            val accessResponse = provider.createAccessTokenResponse(accessRequest)
             assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
             val success = accessResponse as AccessResponseResult.Success
             val tokenResponse = success.response
@@ -253,7 +253,7 @@ class ProviderCombinedFlowTest {
         val response = authorizeResponse.response
         val code = response.code
 
-            val accessResult = provider.createAccessRequest(
+            val accessResult = provider.createAccessTokenRequest(
                 mapOf(
                     "grant_type" to listOf(GrantType.AuthorizationCode.value),
                     "client_id" to listOf(clientId),
@@ -264,7 +264,7 @@ class ProviderCombinedFlowTest {
             assertTrue(accessResult is AccessTokenRequestResult.Success, "access request failed for $clientId")
             val accessRequest = accessResult.request.withIssuer(issClaim)
 
-            val accessResponse = provider.createAccessResponse(accessRequest)
+            val accessResponse = provider.createAccessTokenResponse(accessRequest)
             assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
             val tokenResponse = (accessResponse).response
 

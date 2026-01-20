@@ -86,7 +86,7 @@ internal suspend fun executeAuthorizationCodeFlow(
     require(authorizeResponse is AuthorizationResponseResult.Success)
     val code = authorizeResponse.response.code
 
-    val AccessTokenRequestResult = provider.createAccessRequest(
+    val AccessTokenRequestResult = provider.createAccessTokenRequest(
         mapOf(
             "grant_type" to listOf(GrantType.AuthorizationCode.value),
             "client_id" to listOf(clientId),
@@ -98,7 +98,7 @@ internal suspend fun executeAuthorizationCodeFlow(
 
     val accessRequestWithIssuer = AccessTokenRequestResult.request.withIssuer(issuerId)
 
-    val accessResponse = provider.createAccessResponse(accessRequestWithIssuer)
+    val accessResponse = provider.createAccessTokenResponse(accessRequestWithIssuer)
     require(accessResponse is AccessResponseResult.Success)
 
     val updatedRequest = accessResponse.request
