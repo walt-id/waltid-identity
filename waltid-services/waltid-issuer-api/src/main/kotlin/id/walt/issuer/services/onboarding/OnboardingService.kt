@@ -63,7 +63,7 @@ object OnboardingService {
             generationRequest = request.ecKeyGenRequestParams.toKeyGenerationRequest(),
         )
 
-        val iacaKey = KeyManager.resolveSerializedKey(request.iacaSigner.iacaKey as JsonObject)
+        val iacaKey = KeyManager.resolveSerializedKey(request.iacaSigner.iacaKey)
 
         val certBundle = dsCertificateBuilder.build(
             profileData = request.certificateData.toDocumentSignerCertificateProfileData(),
@@ -129,7 +129,7 @@ object OnboardingService {
     private fun serializeGeneratedPrivateKeyToJsonObject(
         backend: String,
         key: Key,
-    ): JsonElement {
+    ): JsonObject {
         return KeySerialization.serializeKeyToJson(key).let { serializedKey ->
             when {
                 backend == "jwk" -> {
@@ -144,7 +144,7 @@ object OnboardingService {
                 }
 
                 else -> {
-                    serializedKey
+                    serializedKey.jsonObject
                 }
             }
         }

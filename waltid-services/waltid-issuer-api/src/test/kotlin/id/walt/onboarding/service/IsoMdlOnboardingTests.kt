@@ -15,6 +15,7 @@ import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonObject
 import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -70,7 +71,7 @@ class IsoMdlOnboardingTests {
         private val validIACASigner = IACASignerData(
             certificateData = validIACACertData,
             iacaKey = runBlocking {
-                KeySerialization.serializeKeyToJson(signingKey)
+                KeySerialization.serializeKeyToJson(signingKey).jsonObject
             },
         )
 
@@ -138,11 +139,7 @@ class IsoMdlOnboardingTests {
         val response = OnboardingService.onboardDocumentSigner(dsRequest)
 
         val dsDecodedCert = DocumentSignerCertificateParser().parse(
-            certificate = CertificateDer(
-                bytes = JWKKey.convertDERorPEMtoByteArray(
-                    derOrPem = response.certificatePEM,
-                ).toByteString(),
-            ),
+            certificate = pemToCertificateDer(response.certificatePEM),
         )
 
         assertDoesNotThrow {
