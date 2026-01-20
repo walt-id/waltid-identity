@@ -60,9 +60,7 @@ dependencies {
     api("redis.clients:jedis:5.2.0")
 
     // Testing
-    testApi(kotlin("test"))
-    testApi("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(identityLibs.bundles.waltid.ktortesting)
 }
 
 mavenPublishing {

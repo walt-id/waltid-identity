@@ -2,13 +2,13 @@ package id.walt.policies2.vc
 
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.examples.W3CExamples
-import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
+import id.walt.policies2.vc.policies.RegexPolicy
 import kotlin.test.Test
 
 
 class CredentialDataMatcherPolicyTest : BasePolicyTest() {
 
-    override val policy = CredentialDataMatcherPolicy(
+    override val policy = RegexPolicy(
         path = "$.credentialSubject.degree.name",
         regex = "^Bachelor of Science and Arts$"
     )

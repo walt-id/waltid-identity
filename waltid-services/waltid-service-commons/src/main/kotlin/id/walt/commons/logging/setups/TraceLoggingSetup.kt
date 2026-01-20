@@ -9,46 +9,21 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
     sink("stdout", LogStringManager.selectedRenderString.renderString, STDOUT)
     sink("stderr", LogStringManager.selectedRenderString.renderString, STDERR)
 
-    logging {
-        fromLoggerBase("com.zaxxer.hikari", stopOnMatch = true)
-        fromMinLevel(Level.INFO) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("io.ktor.server.routing", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("io.ktor.server.plugin.c", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("io.ktor.server.plugin", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("io.ktor.server.engine", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("io.ktor.client.plugins", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("io.ktor", stopOnMatch = true)
-        fromMinLevel(Level.TRACE) { toSink("stdout") }
-    }
-    logging {
-        fromLoggerBase("org.sqlite.core.NativeDB", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) {
-            toSink("stdout")
+    fun loggerBaseToMinimum(base: String, minLevel: Level = Level.DEBUG) {
+        logging {
+            fromLoggerBase(base, stopOnMatch = true)
+            fromMinLevel(minLevel) { toSink("stdout") }
         }
     }
-    /*logging {
-        fromLoggerBase("eu.vendeli.rethis", stopOnMatch = true)
-        fromMinLevel(Level.DEBUG) {
-            toSink("stdout")
-        }
-    }*/
+
+    loggerBaseToMinimum("com.zaxxer.hikari", Level.INFO)
+
+    loggerBaseToMinimum("io.ktor.server", Level.DEBUG)
+    loggerBaseToMinimum("io.ktor.client", Level.DEBUG)
+
+    loggerBaseToMinimum("org.sqlite.core.NativeDB", Level.DEBUG)
+    loggerBaseToMinimum("org.mongodb.driver", Level.DEBUG)
+
     logging {
         fromMinLevel(Level.ERROR) {
             toSink("stderr")
