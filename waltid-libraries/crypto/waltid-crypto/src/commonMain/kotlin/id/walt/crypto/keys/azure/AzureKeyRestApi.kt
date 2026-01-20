@@ -96,7 +96,7 @@ class AzureKeyRestApi(
         }
 
     override val hasPrivateKey: Boolean
-        get() = false
+        get() = true
 
     override fun toString(): String = "[Azure ${keyType.name} key @ ${auth.keyVaultUrl} - $id]"
 
