@@ -10,9 +10,9 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessResponseResult
 import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -68,42 +68,42 @@ internal suspend fun executeAuthorizationCodeFlow(
     val state = "state-$iteration-$idx"
     val issuerId = "issuer-$iteration"
     val authorizeParams = mapOf(
-        "response_type" to "code",
-        "client_id" to clientId,
-        "redirect_uri" to "https://client.example/callback",
-        "scope" to "my_scope",
-        "state" to state,
+        "response_type" to listOf("code"),
+        "client_id" to listOf(clientId),
+        "redirect_uri" to listOf("https://client.example/callback"),
+        "scope" to listOf("my_scope"),
+        "state" to listOf(state),
     )
 
     val authorizeRequest = provider.createAuthorizeRequest(authorizeParams)
     require(authorizeRequest is AuthorizeRequestResult.Success)
-    authorizeRequest.request.setIssuerId(issuerId)
+    val authorizeReqWithIssuer = authorizeRequest.request.withIssuer(issuerId)
 
     val authorizeResponse = provider.createAuthorizeResponse(
-        authorizeRequest.request,
+        authorizeReqWithIssuer,
         DefaultSession(subject = expectedSubject),
     )
     require(authorizeResponse is AuthorizeResponseResult.Success)
-    val code = authorizeResponse.response.parameters.getValue("code")
+    val code = authorizeResponse.response.code
 
     val accessRequestResult = provider.createAccessRequest(
         mapOf(
-            "grant_type" to GrantType.AuthorizationCode.value,
-            "client_id" to clientId,
-            "code" to code,
-            "redirect_uri" to "https://client.example/callback",
+            "grant_type" to listOf(GrantType.AuthorizationCode.value),
+            "client_id" to listOf(clientId),
+            "code" to listOf(code),
+            "redirect_uri" to listOf("https://client.example/callback"),
         ),
     )
     require(accessRequestResult is AccessRequestResult.Success)
 
-    accessRequestResult.request.setIssuerId(issuerId)
+    val accessRequestWithIssuer = accessRequestResult.request.withIssuer(issuerId)
 
-    val accessResponse = provider.createAccessResponse(accessRequestResult.request)
+    val accessResponse = provider.createAccessResponse(accessRequestWithIssuer)
     require(accessResponse is AccessResponseResult.Success)
 
-    assertEquals(expectedSubject, accessRequestResult.request.getSession()?.getSubject())
-    assertEquals(clientId, accessRequestResult.request.getClient().id)
-    assertEquals(state, authorizeRequest.request.state)
+    assertEquals(expectedSubject, accessRequestWithIssuer.session?.subject)
+    assertEquals(clientId, accessRequestWithIssuer.client.id)
+    assertEquals(state, authorizeReqWithIssuer.state)
 
     val token = accessResponse.response.accessToken
     assertTrue(token.startsWith("access-$clientId"))

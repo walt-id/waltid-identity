@@ -5,14 +5,16 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.validation.AccessRequestValidator
-import id.walt.openid4vci.validation.AuthorizeRequestValidator
-import id.walt.openid4vci.validation.DefaultAccessRequestValidator
-import id.walt.openid4vci.validation.DefaultAuthorizeRequestValidator
+import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.token.TokenEndpointHandlers
+import id.walt.openid4vci.validation.AccessTokenRequestValidator
+import id.walt.openid4vci.validation.AuthorizationRequestValidator
+import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
+import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 
 internal fun createTestConfig(
-    authorizeRequestValidator: AuthorizeRequestValidator = DefaultAuthorizeRequestValidator(),
-    accessRequestValidator: AccessRequestValidator = DefaultAccessRequestValidator(),
+    authorizeRequestValidator: AuthorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+    accessRequestValidator: AccessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
     tokenService: AccessTokenService = StubTokenService(),
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = defaultAuthorizationCodeRepository()
@@ -20,7 +22,7 @@ internal fun createTestConfig(
     return OAuth2ProviderConfig(
         authorizeRequestValidator = authorizeRequestValidator,
         accessRequestValidator = accessRequestValidator,
-        authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
+        authorizeEndpointHandlers = AuthorizationEndpointHandlers(),
         tokenEndpointHandlers = TokenEndpointHandlers(),
         authorizationCodeRepository = authorizationCodeRepository,
         preAuthorizedCodeRepository = preAuthorizedCodeRepository,

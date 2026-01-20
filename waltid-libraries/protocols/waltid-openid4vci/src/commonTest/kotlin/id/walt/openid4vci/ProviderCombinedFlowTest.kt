@@ -1,22 +1,21 @@
 package id.walt.openid4vci
 
 import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessResponseResult
 import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.core.AccessTokenResponse
+import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
-import id.walt.openid4vci.request.AccessTokenRequest
-import id.walt.openid4vci.request.AuthorizationRequest
+import id.walt.openid4vci.requests.token.AccessTokenRequest
+import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertNotEquals
@@ -34,36 +33,32 @@ class ProviderCombinedFlowTest {
         // Authorization code flow
         val authorizeRequestResult = provider.createAuthorizeRequest(
             mapOf(
-                "response_type" to "code",
-                "client_id" to "demo-client",
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
-                "scope" to "openid",
-                "state" to "abc",
+                "response_type" to listOf("code"),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                "scope" to listOf("openid"),
+                "state" to listOf("abc"),
             ),
         )
         assertTrue(authorizeRequestResult.isSuccess())
-        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.also {
-            it.setIssuerId(issuerId)
-        }
+        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.withIssuer(issuerId)
 
         val session = DefaultSession(subject = "demo-subject")
         val authorizeResponse = provider.createAuthorizeResponse(authorizeRequest, session)
         assertTrue(authorizeResponse.isSuccess())
         val response = (authorizeResponse as AuthorizeResponseResult.Success).response
-        val code = response.parameters.getValue("code")
+        val code = response.code
 
         val accessResult = provider.createAccessRequest(
             mapOf(
-                "grant_type" to GrantType.AuthorizationCode.value,
-                "client_id" to "demo-client",
-                "code" to code,
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("demo-client"),
+                "code" to listOf(code),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
         )
         assertTrue(accessResult.isSuccess())
-        val accessRequest = (accessResult as AccessRequestResult.Success).request.also {
-            it.setIssuerId(issuerId)
-        }
+        val accessRequest = (accessResult as AccessRequestResult.Success).request.withIssuer(issuerId)
         val accessResponse = provider.createAccessResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
         val tokenResponse = (accessResponse as AccessResponseResult.Success).response
@@ -84,14 +79,12 @@ class ProviderCombinedFlowTest {
 
         val preAccessResult = provider.createAccessRequest(
             mapOf(
-                "grant_type" to GrantType.PreAuthorizedCode.value,
-                "pre-authorized_code" to preCode,
+                "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                "pre-authorized_code" to listOf(preCode),
             ),
         )
         assertTrue(preAccessResult.isSuccess())
-        val preAccessRequest = (preAccessResult as AccessRequestResult.Success).request.also {
-            it.setIssuerId(issuerId)
-        }
+        val preAccessRequest = (preAccessResult as AccessRequestResult.Success).request.withIssuer(issuerId)
         val preAccessResponse = provider.createAccessResponse(preAccessRequest)
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessResponseResult.Success).response
@@ -111,30 +104,28 @@ class ProviderCombinedFlowTest {
         suspend fun authorizeFor(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, AuthorizationRequest> {
             val authorizeResult = provider.createAuthorizeRequest(
                 mapOf(
-                    "response_type" to "code",
-                    "client_id" to clientId,
-                    "redirect_uri" to redirectUri,
-                    "scope" to scope,
-                    "state" to state,
+                    "response_type" to listOf("code"),
+                    "client_id" to listOf(clientId),
+                    "redirect_uri" to listOf(redirectUri),
+                    "scope" to listOf(scope),
+                    "state" to listOf(state),
                 ),
             )
             assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
-            val authorizeReq = (authorizeResult).request.also {
-                it.setIssuerId(issuerId)
-            }
+            val authorizeReq = authorizeResult.request.withIssuer(issuerId)
             val expectedScopes = scope.split(" ").filter { it.isNotBlank() }.toSet()
 
             // Request assertions
-            assertEquals(issuerId, authorizeReq.getIssuerId(), "issuer must be set on authorize request")
-            assertEquals(clientId, authorizeReq.getClient().id, "client id must be preserved")
+            assertEquals(issuerId, authorizeReq.issuerId, "issuer must be set on authorize request")
+            assertEquals(clientId, authorizeReq.client.id, "client id must be preserved")
             assertEquals(redirectUri, authorizeReq.redirectUri, "redirect_uri must be set on request")
             assertEquals(state, authorizeReq.state, "state must be preserved")
-            assertEquals(setOf("code"), authorizeReq.getResponseTypes().toSet(), "response_type must be code")
-            assertEquals(expectedScopes, authorizeReq.getRequestedScopes().toSet(), "scopes must be captured from request")
+            assertEquals(setOf("code"), authorizeReq.responseTypes.toSet(), "response_type must be code")
+            assertEquals(expectedScopes, authorizeReq.requestedScopes.toSet(), "scopes must be captured from request")
             assertEquals(ResponseModeType.QUERY, authorizeReq.responseMode)
             assertEquals(ResponseModeType.QUERY, authorizeReq.defaultResponseMode)
-            assertEquals(clientId, authorizeReq.getRequestForm().getFirst("client_id"))
-            assertEquals(redirectUri, authorizeReq.getRequestForm().getFirst("redirect_uri"))
+            assertEquals(clientId, authorizeReq.requestForm["client_id"]?.firstOrNull())
+            assertEquals(redirectUri, authorizeReq.requestForm["redirect_uri"]?.firstOrNull())
 
             val authorizeResponse = provider.createAuthorizeResponse(
                 authorizeReq,
@@ -142,12 +133,16 @@ class ProviderCombinedFlowTest {
             )
             assertTrue(authorizeResponse is AuthorizeResponseResult.Success, "authorize response failed for $clientId")
 
-            val response = (authorizeResponse).response
-            val code = response.parameters["code"] ?: error("missing code for $clientId")
-            assertEquals(state, response.parameters["state"])
+            val response = authorizeResponse.response
+            val code = response.code
+            assertEquals(state, response.state)
             assertEquals(redirectUri, response.redirectUri, "response redirect must match request")
             assertEquals(ResponseModeType.QUERY, response.responseMode)
-            val responseScopes = response.parameters["scope"]?.split(" ")?.filter { it.isNotBlank() }?.toSet().orEmpty()
+            val responseScopes = response.scope
+                ?.split(" ")
+                ?.filter { it.isNotBlank() }
+                ?.toSet()
+                .orEmpty()
             assertEquals(expectedScopes, responseScopes, "granted scopes must be reflected in authorize response")
             return code to authorizeReq
         }
@@ -160,30 +155,26 @@ class ProviderCombinedFlowTest {
         ): Pair<AccessTokenResponse, AccessTokenRequest> {
             val accessResult = provider.createAccessRequest(
                 mapOf(
-                    "grant_type" to GrantType.AuthorizationCode.value,
-                    "client_id" to clientId,
-                    "code" to code,
-                    "redirect_uri" to redirectUri,
+                    "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                    "client_id" to listOf(clientId),
+                    "code" to listOf(code),
+                    "redirect_uri" to listOf(redirectUri),
                 ),
             )
             assertTrue(accessResult is AccessRequestResult.Success, "access request failed for $clientId")
-            val accessRequest = (accessResult).request.also {
-                it.setIssuerId(issuerId)
-            }
-            assertEquals(issuerId, accessRequest.getIssuerId())
-            assertEquals(setOf(GrantType.AuthorizationCode.value), accessRequest.getGrantTypes().toSet())
-            assertEquals(code, accessRequest.getRequestForm().getFirst("code"))
-            assertEquals(redirectUri, accessRequest.getRequestForm().getFirst("redirect_uri"))
+            val accessRequest = accessResult.request.withIssuer(issuerId)
+            assertEquals(issuerId, accessRequest.issuerId)
+            assertEquals(setOf(GrantType.AuthorizationCode.value), accessRequest.grantTypes.toSet())
+            assertEquals(code, accessRequest.requestForm["code"]?.firstOrNull())
+            assertEquals(redirectUri, accessRequest.requestForm["redirect_uri"]?.firstOrNull())
 
             val accessResponse = provider.createAccessResponse(accessRequest)
             assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
             val tokenResponse = (accessResponse).response
 
-            assertTrue(accessRequest.hasHandledGrantType(GrantType.AuthorizationCode.value))
-            assertEquals(subject, accessRequest.getSession()?.getSubject(), "session subject must survive round trip for $clientId")
-            assertEquals(clientId, accessRequest.getClient().id, "client must be preserved for $clientId")
-            assertEquals(expectedScopes, accessRequest.getGrantedScopes().toSet(), "granted scopes must match request for $clientId")
-            assertNotNull(accessRequest.getSession(), "session must be restored on access request")
+            assertEquals(subject, accessRequest.session?.subject, "session subject must survive round trip for $clientId")
+            assertEquals(clientId, accessRequest.client.id, "client must be preserved for $clientId")
+            assertEquals(expectedScopes, accessRequest.grantedScopes.toSet(), "granted scopes must match request for $clientId")
 
             assertEquals(TOKEN_TYPE_BEARER, tokenResponse.tokenType)
             assertNull(tokenResponse.expiresIn)
@@ -242,38 +233,34 @@ class ProviderCombinedFlowTest {
         suspend fun runFlow(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, String> {
             val authorizeResult = provider.createAuthorizeRequest(
                 mapOf(
-                    "response_type" to "code",
-                    "client_id" to clientId,
-                    "redirect_uri" to redirectUri,
-                    "scope" to scope,
-                    "state" to state,
+                    "response_type" to listOf("code"),
+                    "client_id" to listOf(clientId),
+                    "redirect_uri" to listOf(redirectUri),
+                    "scope" to listOf(scope),
+                    "state" to listOf(state),
                 ),
             )
             assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
-            val authorizeReq = (authorizeResult).request.also {
-                it.setIssuerId(issuerId)
-            }
+            val authorizeReq = authorizeResult.request.withIssuer(issuerId)
 
-            val authorizeResponse = provider.createAuthorizeResponse(
-                authorizeReq,
-                DefaultSession(subject = subject),
-            )
-            assertTrue(authorizeResponse is AuthorizeResponseResult.Success, "authorize response failed for $clientId")
-            val response = (authorizeResponse).response
-            val code = response.parameters["code"] ?: error("missing code for $clientId")
+        val authorizeResponse = provider.createAuthorizeResponse(
+            authorizeReq,
+            DefaultSession(subject = subject),
+        )
+        assertTrue(authorizeResponse is AuthorizeResponseResult.Success, "authorize response failed for $clientId")
+        val response = authorizeResponse.response
+        val code = response.code
 
             val accessResult = provider.createAccessRequest(
                 mapOf(
-                    "grant_type" to GrantType.AuthorizationCode.value,
-                    "client_id" to clientId,
-                    "code" to code,
-                    "redirect_uri" to redirectUri,
+                    "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                    "client_id" to listOf(clientId),
+                    "code" to listOf(code),
+                    "redirect_uri" to listOf(redirectUri),
                 ),
             )
             assertTrue(accessResult is AccessRequestResult.Success, "access request failed for $clientId")
-            val accessRequest = (accessResult).request.also {
-                it.setIssuerId(issuerId)
-            }
+            val accessRequest = accessResult.request.withIssuer(issuerId)
 
             val accessResponse = provider.createAccessResponse(accessRequest)
             assertTrue(accessResponse is AccessResponseResult.Success, "access response failed for $clientId")
