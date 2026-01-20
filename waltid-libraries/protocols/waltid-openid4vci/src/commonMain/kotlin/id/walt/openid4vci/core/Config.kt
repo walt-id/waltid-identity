@@ -1,13 +1,13 @@
 package id.walt.openid4vci.core
 
-import id.walt.openid4vci.AuthorizeEndpointHandlers
-import id.walt.openid4vci.TokenEndpointHandlers
+import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.validation.AccessRequestValidator
-import id.walt.openid4vci.validation.AuthorizeRequestValidator
+import id.walt.openid4vci.validation.AccessTokenRequestValidator
+import id.walt.openid4vci.validation.AuthorizationRequestValidator
 
 /**
  * Configuration holds handler registries and injectable objects used by the provider.
@@ -23,9 +23,9 @@ import id.walt.openid4vci.validation.AuthorizeRequestValidator
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
 data class OAuth2ProviderConfig(
-    val authorizeRequestValidator: AuthorizeRequestValidator,
-    val accessRequestValidator: AccessRequestValidator,
-    val authorizeEndpointHandlers: AuthorizeEndpointHandlers,
+    val authorizeRequestValidator: AuthorizationRequestValidator,
+    val accessRequestValidator: AccessTokenRequestValidator,
+    val authorizeEndpointHandlers: AuthorizationEndpointHandlers,
     val tokenEndpointHandlers: TokenEndpointHandlers,
     val authorizationCodeRepository: AuthorizationCodeRepository,
     val preAuthorizedCodeRepository: PreAuthorizedCodeRepository,

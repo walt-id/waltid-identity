@@ -4,16 +4,21 @@ import id.walt.openid4vci.core.AccessRequestResult
 import id.walt.openid4vci.core.AuthorizeRequestResult
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.OAuthError
+import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
-import id.walt.openid4vci.request.AccessTokenRequest
-import id.walt.openid4vci.validation.AccessRequestValidator
-import id.walt.openid4vci.validation.AuthorizeRequestValidator
-import id.walt.openid4vci.validation.DefaultAccessRequestValidator
-import id.walt.openid4vci.validation.DefaultAuthorizeRequestValidator
+import id.walt.openid4vci.requests.token.AccessTokenRequest
+import id.walt.openid4vci.handlers.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.token.TokenEndpointHandlers
+import id.walt.openid4vci.validation.AccessTokenRequestValidator
+import id.walt.openid4vci.validation.AuthorizationRequestValidator
+import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
+import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
+import id.walt.openid4vci.handlers.token.TokenEndpointHandler
+import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -37,7 +42,7 @@ class BuildProviderConfigurationTest {
 
     @Test
     fun `buildProvider surfaces validator failures`() {
-        val failingValidator = AuthorizeRequestValidator {
+        val failingValidator = AuthorizationRequestValidator {
             AuthorizeRequestResult.Failure(OAuthError("invalid_client"))
         }
         val config = createTestConfig(
@@ -46,7 +51,7 @@ class BuildProviderConfigurationTest {
         )
 
         val provider = buildOAuth2Provider(config)
-        val result = provider.createAuthorizeRequest(emptyMap())
+        val result = provider.createAuthorizeRequest(emptyMap<String, List<String>>())
         assertTrue(result is AuthorizeRequestResult.Failure)
         assertEquals("invalid_client", result.error.error)
     }
@@ -61,9 +66,9 @@ class BuildProviderConfigurationTest {
             val duplicateGrantHandlerB = DuplicateGrantHandler()
 
             val config = OAuth2ProviderConfig(
-                authorizeRequestValidator = DefaultAuthorizeRequestValidator(),
-                accessRequestValidator = DefaultAccessRequestValidator(),
-                authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
+                authorizeRequestValidator = DefaultAuthorizationRequestValidator(),
+                accessRequestValidator = DefaultAccessTokenRequestValidator(),
+                authorizeEndpointHandlers = AuthorizationEndpointHandlers(),
                 tokenEndpointHandlers = TokenEndpointHandlers().apply {
                     appendForGrant(GrantType.fromValue("custom_grant"), duplicateGrantHandlerA)
                     appendForGrant(GrantType.fromValue("custom_grant"), duplicateGrantHandlerB)
@@ -88,9 +93,9 @@ class BuildProviderConfigurationTest {
         val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
 
         val config = OAuth2ProviderConfig(
-            authorizeRequestValidator = DefaultAuthorizeRequestValidator(),
-            accessRequestValidator = DefaultAccessRequestValidator(),
-            authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
+            authorizeRequestValidator = DefaultAuthorizationRequestValidator(),
+            accessRequestValidator = DefaultAccessTokenRequestValidator(),
+            authorizeEndpointHandlers = AuthorizationEndpointHandlers(),
             tokenEndpointHandlers = TokenEndpointHandlers().apply {
                 appendForGrant(GrantType.Custom("custom_grant"), CustomGrantHandler())
             },
@@ -111,22 +116,22 @@ class BuildProviderConfigurationTest {
 
     private class DuplicateGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean = true
-        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult =
-            TokenEndpointResult.Failure("unsupported_grant_type")
+        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessResponseResult =
+            AccessResponseResult.Failure(OAuthError("unsupported_grant_type"))
     }
 
     private class CustomGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
-            request.getGrantTypes().contains("custom_grant")
-        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult =
-            TokenEndpointResult.Success(accessToken = "custom")
+            request.grantTypes.contains("custom_grant")
+        override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessResponseResult =
+            AccessResponseResult.Success(AccessTokenResponse(accessToken = "custom"))
     }
 
-    private fun stubAuthorizeValidator(): AuthorizeRequestValidator = AuthorizeRequestValidator {
+    private fun stubAuthorizeValidator(): AuthorizationRequestValidator = AuthorizationRequestValidator {
         AuthorizeRequestResult.Failure(OAuthError("unsupported_response_type"))
     }
 
-    private fun stubAccessValidator(): AccessRequestValidator = AccessRequestValidator { _, _ ->
+    private fun stubAccessValidator(): AccessTokenRequestValidator = AccessTokenRequestValidator { _, _ ->
         AccessRequestResult.Failure(OAuthError("unsupported_grant_type"))
     }
 }

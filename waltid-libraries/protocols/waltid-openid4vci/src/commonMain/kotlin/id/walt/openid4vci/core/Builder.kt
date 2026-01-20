@@ -1,8 +1,8 @@
 package id.walt.openid4vci.core
 
-import id.walt.openid4vci.granttypehandlers.AuthorizationCodeAuthorizeHandler
-import id.walt.openid4vci.granttypehandlers.AuthorizationCodeTokenHandler
-import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
+import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeAuthorizationEndpoint
+import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeTokenEndpoint
+import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCodeTokenEndpoint
 import id.walt.openid4vci.GrantType
 
 /**
@@ -38,8 +38,6 @@ import id.walt.openid4vci.GrantType
  */
 fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
-//    extraTokenEndpointHandlers: List<Pair<GrantType, TokenEndpointHandler>> = emptyList(),
-//    extraAuthorizeHandlers: List<AuthorizeEndpointHandler> = emptyList(),
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
@@ -48,10 +46,6 @@ fun buildOAuth2Provider(
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
     )
-//    extraTokenEndpointHandlers.forEach { (grantType, handler) ->
-//        config.tokenEndpointHandlers.appendForGrant(grantType, handler)
-//    }
-//    extraAuthorizeHandlers.forEach { config.authorizeEndpointHandlers.append(it) }
     return DefaultOAuth2Provider(config)
 }
 
@@ -61,12 +55,12 @@ private fun registerDefaultHandlers(
     includePreAuthorizedCodeDefaultHandlers: Boolean,
 ) {
     if (includeAuthorizationCodeDefaultHandlers) {
-        val authorizeEndpointHandler = AuthorizationCodeAuthorizeHandler(
+        val authorizeEndpointHandler = AuthorizationCodeAuthorizationEndpoint(
             codeRepository = config.authorizationCodeRepository,
         )
         config.authorizeEndpointHandlers.append(authorizeEndpointHandler)
 
-        val authorizeTokenHandler = AuthorizationCodeTokenHandler(
+        val authorizeTokenHandler = AuthorizationCodeTokenEndpoint(
             codeRepository = config.authorizationCodeRepository,
             tokenService = config.tokenService,
         )
@@ -77,7 +71,7 @@ private fun registerDefaultHandlers(
     }
 
     if (includePreAuthorizedCodeDefaultHandlers) {
-        val preAuthorizedTokenHandler = PreAuthorizedCodeTokenHandler(
+        val preAuthorizedTokenHandler = PreAuthorizedCodeTokenEndpoint(
             codeRepository = config.preAuthorizedCodeRepository,
             tokenService = config.tokenService,
         )

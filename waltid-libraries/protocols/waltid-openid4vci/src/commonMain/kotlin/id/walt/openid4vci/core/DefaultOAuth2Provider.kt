@@ -1,11 +1,18 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.ResponseModeType
 import id.walt.openid4vci.Session
-import id.walt.openid4vci.TokenEndpointResult
+import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.platform.urlEncode
-import id.walt.openid4vci.request.AccessTokenRequest
-import id.walt.openid4vci.request.AuthorizationRequest
+import id.walt.openid4vci.requests.token.AccessTokenRequest
+import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.responses.token.AccessHttpResponse
+import id.walt.openid4vci.responses.token.AccessResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.responses.authorization.AuthorizeHttpResponse
+import id.walt.openid4vci.responses.authorization.AuthorizeResponse
+import id.walt.openid4vci.responses.authorization.AuthorizeResponseResult
 
 /**
  * Default implementation of [OAuth2Provider] that handles validators and handler registries.
@@ -25,17 +32,16 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
 
-    override fun createAuthorizeRequest(parameters: Map<String, String>): AuthorizeRequestResult =
+    override fun createAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult =
         config.authorizeRequestValidator.validate(parameters)
 
     override suspend fun createAuthorizeResponse(
-        request: AuthorizationRequest,
+        authorizationRequest: AuthorizationRequest,
         session: Session
     ): AuthorizeResponseResult {
-        request.setSession(session)
         val responses = mutableListOf<AuthorizeResponseResult>()
         for (handler in config.authorizeEndpointHandlers) {
-            responses += handler.handleAuthorizeEndpointRequest(request, session)
+            responses += handler.handleAuthorizeEndpointRequest(authorizationRequest, session)
         }
 
         val success = responses.filterIsInstance<AuthorizeResponseResult.Success>().firstOrNull()
@@ -46,22 +52,22 @@ class DefaultOAuth2Provider(
         val failure = responses.filterIsInstance<AuthorizeResponseResult.Failure>().firstOrNull()
         return failure ?: AuthorizeResponseResult.Failure(
             OAuthError(
-                error = "unsupported_response_type",
-                description = request.getResponseTypes().joinToString(" ")
+                error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
+                description = authorizationRequest.responseTypes.joinToString(" ")
                     .ifBlank { "No authorize handler could handle the requested response type." },
             ),
         )
     }
 
-    override fun writeAuthorizeError(request: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse {
-        val baseRedirect = request.redirectUri
-            ?: request.getClient().redirectUris.firstOrNull()
+    override fun writeAuthorizeError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse {
+        val baseRedirect = authorizationRequest.redirectUri
+            ?: authorizationRequest.client.redirectUris.firstOrNull()
 
         return if (baseRedirect != null) {
             val parameters = buildMap {
                 put("error", error.error)
                 error.description?.let { put("error_description", it) }
-                request.state?.let { put("state", it) }
+                authorizationRequest.state?.let { put("state", it) }
             }
             val location = appendParams(baseRedirect, parameters)
             val headers = mutableMapOf("Location" to location)
@@ -81,21 +87,31 @@ class DefaultOAuth2Provider(
     }
 
     override fun writeAuthorizeResponse(
-        request: AuthorizationRequest,
+        authorizationRequest: AuthorizationRequest,
         response: AuthorizeResponse
     ): AuthorizeHttpResponse {
-        val location = appendParams(response.redirectUri, response.parameters)
-        val headers = response.headers.toMutableMap()
-        headers["Location"] = location
+        val params = buildMap {
+            put("code", response.code)
+            response.state?.let { put("state", it) }
+            response.scope?.let { put("scope", it) }
+            putAll(response.extraParameters)
+        }
+
+        val location = when (response.responseMode) {
+            ResponseModeType.QUERY -> appendParams(response.redirectUri, params)
+            ResponseModeType.FRAGMENT -> appendFragment(response.redirectUri, params)
+        }
+
+        val headers = response.headers.toMutableMap().apply { this["Location"] = location }
         return AuthorizeHttpResponse(
             status = 302,
             redirectUri = location,
-            parameters = response.parameters,
+            parameters = params,
             headers = headers,
         )
     }
 
-    override fun createAccessRequest(parameters: Map<String, String>, session: Session?): AccessRequestResult {
+    override fun createAccessRequest(parameters: Map<String, List<String>>, session: Session?): AccessRequestResult {
         return config.accessRequestValidator.validate(
             parameters = parameters,
             session = session ?: DefaultSession()
@@ -108,22 +124,10 @@ class DefaultOAuth2Provider(
                 continue
             }
 
-            return when (val result = handler.handleTokenEndpointRequest(request)) {
-                is TokenEndpointResult.Success -> AccessResponseResult.Success(
-                    AccessTokenResponse(
-                        tokenType = result.tokenType,
-                        accessToken = result.accessToken,
-                        extra = result.extra,
-                    ),
-                )
-
-                is TokenEndpointResult.Failure -> AccessResponseResult.Failure(
-                    OAuthError(result.error, result.description),
-                )
-            }
+            return handler.handleTokenEndpointRequest(request)
         }
 
-        val description = request.getGrantTypes().joinToString(" ").takeIf { it.isNotBlank() }
+        val description = request.grantTypes.joinToString(" ").takeIf { it.isNotBlank() }
         return AccessResponseResult.Failure(
             OAuthError("unsupported_grant_type", description),
         )
@@ -156,5 +160,15 @@ class DefaultOAuth2Provider(
             "${urlEncode(key)}=${urlEncode(value)}"
         }
         return base + separator + query
+    }
+
+    private fun appendFragment(base: String, parameters: Map<String, String>): String {
+        if (parameters.isEmpty()) return base
+        val fragment = parameters.entries.joinToString("&") { (key, value) ->
+            "${urlEncode(key)}=${urlEncode(value)}"
+        }
+        val hashIndex = base.indexOf("#")
+        val baseWithoutFragment = if (hashIndex >= 0) base.substring(0, hashIndex) else base
+        return "$baseWithoutFragment#$fragment"
     }
 }
