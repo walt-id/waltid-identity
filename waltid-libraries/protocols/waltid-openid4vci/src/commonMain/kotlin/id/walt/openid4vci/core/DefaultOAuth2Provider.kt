@@ -61,7 +61,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeAuthorizeError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse {
+    override fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse {
         val baseRedirect = authorizationRequest.redirectUri
             ?: authorizationRequest.client.redirectUris.firstOrNull()
 
@@ -88,7 +88,7 @@ class DefaultOAuth2Provider(
         }
     }
 
-    override fun writeAuthorizeResponse(
+    override fun writeAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         response: AuthorizationResponse
     ): AuthorizeHttpResponse {

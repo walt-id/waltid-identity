@@ -19,7 +19,7 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
  * Methods follow the structure commonly used by established OAuth servers:
  * - `createAuthorizeRequest`/`createAuthorizationResponseResult` replace helpers by returning domain
  *   DTOs instead of writing to HTTP primitives.
- * - `writeAuthorizeError`/`writeAuthorizationResponseResult` encapsulate response-mode formatting for tests
+ * - `writeAuthorizationError`/`writeAuthorizationResponseResult` encapsulate response-mode formatting for tests
  *   and framework integration.
  * - `createAccessRequest`/`createAccessResponse` cover the token endpoint, and the `write*` variants
  *   produce RFC6749-compliant bodies.
@@ -29,8 +29,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 interface OAuth2Provider {
     fun createAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult
     suspend fun createAuthorizationResponse(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult
-    fun writeAuthorizeError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse
-    fun writeAuthorizeResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizeHttpResponse
+    fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse
+    fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizeHttpResponse
     fun createAccessRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
     suspend fun createAccessResponse(request: AccessTokenRequest): AccessResponseResult
     fun writeAccessError(request: AccessTokenRequest, error: OAuthError): AccessHttpResponse
