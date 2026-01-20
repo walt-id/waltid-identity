@@ -3,7 +3,7 @@ package id.walt.openid4vci
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +76,7 @@ internal suspend fun executeAuthorizationCodeFlow(
     )
 
     val authorizeRequest = provider.createAuthorizationRequest(authorizeParams)
-    require(authorizeRequest is AuthorizeRequestResult.Success)
+    require(authorizeRequest is AuthorizationRequestResult.Success)
     val authorizeReqWithIssuer = authorizeRequest.request.withIssuer(issuerId)
 
     val authorizeResponse = provider.createAuthorizationResponse(

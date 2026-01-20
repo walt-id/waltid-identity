@@ -25,7 +25,7 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.createTestConfig
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 
 class TokenServiceTest {
@@ -62,7 +62,7 @@ class TokenServiceTest {
                 "scope" to listOf(scope),
             ),
         )
-        require(authorizeResult is AuthorizeRequestResult.Success)
+        require(authorizeResult is AuthorizationRequestResult.Success)
         val authorizeRequest = authorizeResult.request.withIssuer(issuerId)
 
         val authorizeResponse = provider.createAuthorizationResponse(
@@ -158,7 +158,7 @@ class TokenServiceTest {
         val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
-            val authorizeRequestResult = provider.createAuthorizationRequest(
+            val AuthorizationRequestResult = provider.createAuthorizationRequest(
                 mapOf(
                     "response_type" to listOf("code"),
                     "client_id" to listOf("client-$issuerId"),
@@ -166,8 +166,8 @@ class TokenServiceTest {
                     "scope" to listOf("openid"),
                 ),
             )
-            require(authorizeRequestResult is AuthorizeRequestResult.Success)
-            val authorizeRequest = authorizeRequestResult.request.withIssuer(issuerId)
+            require(AuthorizationRequestResult is AuthorizationRequestResult.Success)
+            val authorizeRequest = AuthorizationRequestResult.request.withIssuer(issuerId)
 
             val authorizeResponse = provider.createAuthorizationResponse(
                 authorizeRequest,

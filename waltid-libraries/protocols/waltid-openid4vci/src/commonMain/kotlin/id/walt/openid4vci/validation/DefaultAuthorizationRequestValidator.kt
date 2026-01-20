@@ -3,13 +3,13 @@ package id.walt.openid4vci.validation
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.ResponseModeType
 import id.walt.openid4vci.errors.OAuthError
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
 import kotlinx.serialization.SerializationException
 
 class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
 
-    override fun validate(parameters: Map<String, List<String>>): AuthorizeRequestResult {
+    override fun validate(parameters: Map<String, List<String>>): AuthorizationRequestResult {
         return try {
             // RFC6749 §4.1.1: client_id and response_type are required and must be single-valued.
             val clientId = parameters.requireSingle("client_id")
@@ -20,7 +20,7 @@ class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
                 .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
 
             if (responseTypes.isEmpty() || responseTypes.any { it != "code" }) {
-                return AuthorizeRequestResult.Failure(
+                return AuthorizationRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
                         description = "Only response_type=code is supported",
@@ -56,9 +56,9 @@ class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
                 requestForm = parameters.toMutableMap(),
             )
 
-            AuthorizeRequestResult.Success(request)
+            AuthorizationRequestResult.Success(request)
         } catch (e: SerializationException) {
-            AuthorizeRequestResult.Failure(
+            AuthorizationRequestResult.Failure(
                 OAuthError(
                     error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
                     description = e.message,

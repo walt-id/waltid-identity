@@ -15,7 +15,7 @@ import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.token.AccessResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
@@ -43,7 +43,7 @@ class BuildProviderConfigurationTest {
     @Test
     fun `buildProvider surfaces validator failures`() {
         val failingValidator = AuthorizationRequestValidator {
-            AuthorizeRequestResult.Failure(OAuthError("invalid_client"))
+            AuthorizationRequestResult.Failure(OAuthError("invalid_client"))
         }
         val config = createTestConfig(
             authorizeRequestValidator = failingValidator,
@@ -52,7 +52,7 @@ class BuildProviderConfigurationTest {
 
         val provider = buildOAuth2Provider(config)
         val result = provider.createAuthorizationRequest(emptyMap<String, List<String>>())
-        assertTrue(result is AuthorizeRequestResult.Failure)
+        assertTrue(result is AuthorizationRequestResult.Failure)
         assertEquals("invalid_client", result.error.error)
     }
 
@@ -128,7 +128,7 @@ class BuildProviderConfigurationTest {
     }
 
     private fun stubAuthorizeValidator(): AuthorizationRequestValidator = AuthorizationRequestValidator {
-        AuthorizeRequestResult.Failure(OAuthError("unsupported_response_type"))
+        AuthorizationRequestResult.Failure(OAuthError("unsupported_response_type"))
     }
 
     private fun stubAccessValidator(): AccessTokenRequestValidator = AccessTokenRequestValidator { _, _ ->

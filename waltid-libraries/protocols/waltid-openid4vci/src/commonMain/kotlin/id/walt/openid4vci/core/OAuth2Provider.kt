@@ -4,7 +4,7 @@ import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.token.AccessHttpResponse
@@ -27,7 +27,7 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
  * Parameters will be changed. However, we have to keep the implementation framework-agnostic (Ktor, Spring).
  */
 interface OAuth2Provider {
-    fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult
+    fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
     suspend fun createAuthorizationResponse(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult
     fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizeHttpResponse
     fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizeHttpResponse

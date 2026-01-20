@@ -1,6 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -23,7 +23,7 @@ class DefaultAuthorizeRequestValidatorTest {
         )
 
         assertTrue(result.isSuccess())
-        val request = (result as AuthorizeRequestResult.Success).request
+        val request = (result as AuthorizationRequestResult.Success).request
         assertEquals("client-123", request.client.id)
         assertTrue(request.responseTypes.contains("code"))
         assertEquals("https://openid4vci.walt.id/callback", request.redirectUri)
@@ -40,7 +40,7 @@ class DefaultAuthorizeRequestValidatorTest {
         )
 
         assertTrue(!result.isSuccess())
-        val error = (result as AuthorizeRequestResult.Failure).error
+        val error = (result as AuthorizationRequestResult.Failure).error
         assertEquals("invalid_request", error.error)
     }
 
@@ -54,7 +54,7 @@ class DefaultAuthorizeRequestValidatorTest {
         )
 
         assertTrue(!result.isSuccess())
-        val error = (result as AuthorizeRequestResult.Failure).error
+        val error = (result as AuthorizationRequestResult.Failure).error
         assertEquals("unsupported_response_type", error.error)
     }
 }

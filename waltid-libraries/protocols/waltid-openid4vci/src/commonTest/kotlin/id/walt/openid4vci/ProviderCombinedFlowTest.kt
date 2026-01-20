@@ -8,7 +8,7 @@ import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -31,7 +31,7 @@ class ProviderCombinedFlowTest {
         val provider = buildOAuth2Provider(config)
 
         // Authorization code flow
-        val authorizeRequestResult = provider.createAuthorizationRequest(
+        val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf("code"),
                 "client_id" to listOf("demo-client"),
@@ -40,8 +40,8 @@ class ProviderCombinedFlowTest {
                 "state" to listOf("abc"),
             ),
         )
-        assertTrue(authorizeRequestResult.isSuccess())
-        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.withIssuer(issClaim)
+        assertTrue(AuthorizationRequestResult.isSuccess())
+        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request.withIssuer(issClaim)
 
         val session = DefaultSession(subject = "demo-subject")
         val authorizeResponse = provider.createAuthorizationResponse(authorizeRequest, session)
@@ -111,7 +111,7 @@ class ProviderCombinedFlowTest {
                     "state" to listOf(state),
                 ),
             )
-            assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
+            assertTrue(authorizeResult is AuthorizationRequestResult.Success, "authorize request failed for $clientId")
             val authorizeReq = authorizeResult.request.withIssuer(issClaim)
             val expectedScopes = scope.split(" ").filter { it.isNotBlank() }.toSet()
 
@@ -242,7 +242,7 @@ class ProviderCombinedFlowTest {
                     "state" to listOf(state),
                 ),
             )
-            assertTrue(authorizeResult is AuthorizeRequestResult.Success, "authorize request failed for $clientId")
+            assertTrue(authorizeResult is AuthorizationRequestResult.Success, "authorize request failed for $clientId")
             val authorizeReq = authorizeResult.request.withIssuer(issClaim)
 
         val authorizeResponse = provider.createAuthorizationResponse(

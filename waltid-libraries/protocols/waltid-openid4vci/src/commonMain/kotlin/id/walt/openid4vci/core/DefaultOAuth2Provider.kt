@@ -7,7 +7,7 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.platform.urlEncode
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
-import id.walt.openid4vci.requests.authorization.AuthorizeRequestResult
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.token.AccessHttpResponse
 import id.walt.openid4vci.responses.token.AccessResponseResult
@@ -34,7 +34,7 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
 
-    override fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizeRequestResult =
+    override fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         config.authorizeRequestValidator.validate(parameters)
 
     override suspend fun createAuthorizationResponse(
