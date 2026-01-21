@@ -9,7 +9,6 @@ import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerifier
-import id.walt.openid4vp.verifier.annexc.openapi.AnnexCOpenApi
 import id.walt.openid4vp.verifier.data.Verification2Session
 import id.walt.openid4vp.verifier.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
 import id.walt.openid4vp.verifier.verification2.Verifier2PolicyResults
@@ -17,13 +16,7 @@ import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
-import io.github.smiley4.ktoropenapi.get
-import io.github.smiley4.ktoropenapi.post
-import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
-import io.ktor.http.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -472,47 +465,6 @@ object AnnexCService {
             session = Json.encodeToJsonElement(buildInfoResponse(session)).jsonObject
         )
         update.notifySessionUpdate(session.id, null)
-    }
-
-    fun Route.registerRoute() {
-        route(ANNEX_C) {
-            route("", { tags("Annex C (ISO 18013-7)") }) {
-                post<AnnexCCreateRequest>("create", AnnexCOpenApi.createDocs) { request ->
-                    val session = createSession(
-                        docType = request.docType,
-                        requestedElements = request.requestedElements,
-                        policies = request.policies,
-                        origin = request.origin,
-                        ttlSeconds = request.ttlSeconds
-                    )
-                    publishSessionUpdate(session)
-                    call.respond(AnnexCCreateResponse(sessionId = session.id, expiresAt = session.expiresAt.toString()))
-                }
-
-                post<AnnexCRequestRequest>("request", AnnexCOpenApi.requestDocs) { request ->
-                    val session = sessions[request.sessionId]
-                        ?: return@post call.respond(HttpStatusCode.NotFound, "Unknown Annex C session id")
-                    val response = buildRequest(session, request.intentToRetain)
-                    publishSessionUpdate(session)
-                    call.respond(response)
-                }
-
-                post<AnnexCResponseRequest>("response", AnnexCOpenApi.responseDocs) { request ->
-                    val session = sessions[request.sessionId]
-                        ?: return@post call.respond(HttpStatusCode.NotFound, "Unknown Annex C session id")
-                    val ack = acceptResponse(session, request.response)
-                    call.respond(ack)
-                }
-
-                get("info", AnnexCOpenApi.infoDocs) {
-                    val sessionId = call.request.queryParameters["sessionId"]
-                        ?: throw IllegalArgumentException("Missing query parameter: sessionId")
-                    val session = sessions[sessionId]
-                        ?: return@get call.respond(HttpStatusCode.NotFound, "Unknown Annex C session id")
-                    call.respond(buildInfoResponse(session))
-                }
-            }
-        }
     }
 
     private fun isExpired(session: AnnexCSession): Boolean = Clock.System.now() > session.expiresAt

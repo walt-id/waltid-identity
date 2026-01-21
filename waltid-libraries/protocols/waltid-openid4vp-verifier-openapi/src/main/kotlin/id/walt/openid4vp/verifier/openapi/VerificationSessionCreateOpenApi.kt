@@ -1,6 +1,7 @@
 package id.walt.openid4vp.verifier.openapi
 
 import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.DcApiAnnexCFlowSetup
 import id.walt.openid4vp.verifier.data.DcApiFlowSetup
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
