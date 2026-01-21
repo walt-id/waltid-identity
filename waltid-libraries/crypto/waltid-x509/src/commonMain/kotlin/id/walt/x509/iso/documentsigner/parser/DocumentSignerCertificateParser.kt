@@ -1,6 +1,7 @@
 package id.walt.x509.iso.documentsigner.parser
 
 import id.walt.x509.CertificateDer
+import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 
 /**
@@ -17,6 +18,13 @@ class DocumentSignerCertificateParser {
      * Parse a DER-encoded Document Signer X.509 certificate into a decoded representation.
      */
     suspend fun parse(certificate: CertificateDer) = platformParseDocumentSignerCertificate(certificate)
+
+    /**
+     * Blocking variant of [parse].
+     */
+    fun parseBlocking(certificate: CertificateDer): DocumentSignerDecodedCertificate = blockingBridge {
+        parse(certificate)
+    }
 }
 
 /**
