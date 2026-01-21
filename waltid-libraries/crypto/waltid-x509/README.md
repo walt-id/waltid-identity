@@ -30,7 +30,7 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - **Pluggable trust model**: validate against:
     - your **organization trust store** (recommended), or
     - an explicit **pinned root** included in the `x5c` chain (private PKI / pinning).
-- **ISO/IEC 18013-5 X.509 certificate tooling (JVM)**:
+- **[ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (JVM)**:
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
 - **JVM extensions**: helpers for `X500Name`, `KeyUsage`, and `X509Certificate` v3 extension extraction.
@@ -40,7 +40,7 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 
 ## Targets
 
-- **JVM / Android**: Full chain validation, ISO/IEC 18013-5 build/parse/validate, JVM extensions.
+- **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
 - **iOS**: Chain validation stub; ISO tooling not implemented yet.
 - **JS**: Chain validation stub; ISO tooling not implemented yet.
 
@@ -130,7 +130,7 @@ fun anchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
 
 ---
 
-## ISO/IEC 18013-5 X.509 certificate tooling (IACA and Document Signer)
+## [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (IACA and Document Signer)
 
 The `id.walt.x509.iso` package provides the following:
 
@@ -206,7 +206,7 @@ suspend fun buildDocumentSigner(
 
 Parsing yields decoded data only. Validation is explicit via the validators.  
 By default, **all ISO profile constraints are enforced**. Clients can relax checks
-with the validation config classes (see their KDocs for each flag).
+with the validation config classes (more info is provided below).
 
 ```kotlin
 val iacaDecoded = IACACertificateParser().parse(iacaDer) // certificate data decoding only - no validation performed here
@@ -226,6 +226,57 @@ val relaxedDs = DocumentSignerValidationConfig(
 ) //turn-off certificate signature validation and cross-checking of profile data against that of the IACA
 DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
 ```
+
+### Blocking API (JVM)
+
+Blocking variants are available for all ISO builders, parsers, and validators. These call the underlying suspend APIs
+via a platform bridge.
+
+```kotlin
+val iacaBundle = IACACertificateBuilder().buildBlocking(profileData, signingKey)
+val iacaDecoded = IACACertificateParser().parseBlocking(iacaBundle.certificateDer)
+IACAValidator().validateBlocking(iacaDecoded)
+
+val dsBundle = DocumentSignerCertificateBuilder().buildBlocking(dsProfileData, dsPublicKey, iacaSignerSpec)
+val dsDecoded = DocumentSignerCertificateParser().parseBlocking(dsBundle.certificateDer)
+DocumentSignerValidator().validateBlocking(dsDecoded, iacaDecoded)
+```
+
+> Note: blocking APIs are not supported on JS targets. Prefer suspend APIs in asynchronous contexts.
+
+#### Configurable validation system (flags map)
+
+Both `IACAValidator` and `DocumentSignerValidator` accept config objects that toggle
+cohesive groups of ISO/IEC 18013-5 checks. All flags default to `true` (strict profile).
+Failures throw `IllegalArgumentException` with a descriptive message.
+
+IACA validation flags (`IACAValidationConfig`):
+- `keyType`: enforce allowed IACA key types.
+- `principalName`: validate X.500 principal name fields and ISO 3166-1 country code.
+- `serialNo`: enforce ISO serial number size/entropy constraints.
+- `basicConstraints`: require CA=true and pathLengthConstraint=0.
+- `keyUsage`: require key usage set to KeyCertSign + CRLSign.
+- `issuerAlternativeName`: require at least one non-blank IssuerAlternativeName entry.
+- `validityPeriod`: enforce notBefore < notAfter, notAfter > now, and max 20 years.
+- `crlDistributionPointUri`: optional CRL distribution point must be non-blank when present.
+- `requiredCriticalExtensionOIDs`: require ISO-mandated critical extension OIDs.
+- `requiredNonCriticalExtensionOIDs`: require ISO-mandated non-critical extension OIDs.
+- `signature`: verify the certificate signature using the IACA public key.
+
+Document Signer validation flags (`DocumentSignerValidationConfig`):
+- `keyType`: enforce allowed Document Signer public key types.
+- `principalName`: validate X.500 principal name fields and ISO 3166-1 country code.
+- `serialNo`: enforce ISO serial number size/entropy constraints.
+- `basicConstraints`: require CA=false.
+- `keyUsage`: require key usage set to DigitalSignature.
+- `extendedKeyUsage`: require the Document Signer EKU OID to be present.
+- `authorityKeyIdentifier`: require AKI to match the issuing IACA SKI.
+- `validityPeriod`: enforce notBefore < notAfter, notAfter > now, and max 457 days.
+- `crlDistributionPointUri`: require CRL distribution point URI to be non-blank.
+- `profileDataAgainstIACAProfileData`: cross-validate country/state and validity window against the IACA.
+- `requiredCriticalExtensionOIDs`: require ISO-mandated critical extension OIDs.
+- `requiredNonCriticalExtensionOIDs`: require ISO-mandated non-critical extension OIDs.
+- `signature`: verify the certificate signature with the issuing IACA public key.
 
 ---
 
@@ -283,7 +334,7 @@ fun jvmExtensionsExample(cert: X509Certificate) {
 
 - Prefer known trust anchors (system/org CA store) for public PKI.
 - Use pinned roots from `x5c` only for explicit trust scenarios (private PKI / trusted issuer).
-- For ISO/IEC 18013-5 X.509 certificates, **always** validate IACA and Document Signer certificates.
+- For [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificates, **always** validate IACA and Document Signer certificates.
 
 ---
 
