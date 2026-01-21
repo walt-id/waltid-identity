@@ -1,8 +1,8 @@
 import AzureKeyTest.Config.payloadJWS
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.azure.AzureAuth
-import id.walt.crypto.keys.azure.AzureKey
 import id.walt.crypto.keys.azure.AzureKeyMetadata
+import id.walt.crypto.keys.azure.AzureKeyRestApi
 import io.ktor.utils.io.core.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -40,7 +40,7 @@ class AzureKeyTest {
     }.fold(onSuccess = { it }, onFailure = { false })
 
 
-    lateinit var keys: List<AzureKey>
+    lateinit var keys: List<AzureKeyRestApi>
 
 
     @Test
@@ -75,7 +75,7 @@ class AzureKeyTest {
         )
 
         keys = Config.TESTABLE_KEY_TYPES.map {
-            AzureKey.generate(it, azureMetadata).also { key ->
+            AzureKeyRestApi.generate(it, azureMetadata).also { key ->
                 println("Generated key: ${key.keyType} - ${key.getKeyId()}")
                 assertNotNull(key, "Key generation failed for $it")
                 assertNotNull(key.getKeyId(), "Key ID should not be null")

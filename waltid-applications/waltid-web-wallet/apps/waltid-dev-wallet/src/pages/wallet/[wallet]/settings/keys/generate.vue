@@ -187,7 +187,7 @@ const options = ref([
         config: ["roleName", "region"]
     },
     {
-        keyGenerationRequest: ["Azure with Client access key", "azure"],
+      keyGenerationRequest: ["Azure with Client access key", "azure-rest-api"],
         keyType: [
             ["ECDSA_Secp256r1", "secp256r1"],
             ["ECDSA_Secp256k1", "secp256k1"],
@@ -195,6 +195,15 @@ const options = ref([
         ],
         config: ["clientId", "clientSecret", "tenantId", "keyVaultUrl"]
     },
+  {
+    keyGenerationRequest: ["Azure Key Vault and Managed Identity", "azure"],
+    keyType: [
+      ["ECDSA_Secp256r1", "secp256r1"],
+      ["ECDSA_Secp256k1", "secp256k1"],
+      ["RSA", "RSA"]
+    ],
+    config: ["keyVaultUrl"]
+  },
 ]);
 
 const data = reactive<{
@@ -239,13 +248,17 @@ async function generateKey() {
             roleName: config?.roleName,
             region: config?.region,
         };
-    } else if (type === "azure") {
+    } else if (type === "azure-rest-api") {
         body.config.auth = {
             clientId: config?.clientId,
             clientSecret: config?.clientSecret,
             tenantId: config?.tenantId,
             keyVaultUrl: config?.keyVaultUrl,
         };
+    } else if (type === "azure") {
+      body.config.auth = {
+        keyVaultUrl: config?.keyVaultUrl,
+      };
     } else {
         // For other types, just include the config directly
         body.config = {...config};

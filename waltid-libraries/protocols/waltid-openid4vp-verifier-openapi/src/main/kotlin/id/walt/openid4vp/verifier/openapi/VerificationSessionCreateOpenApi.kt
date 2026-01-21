@@ -1,7 +1,6 @@
 package id.walt.openid4vp.verifier.openapi
 
 import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
-import id.walt.openid4vp.verifier.data.DcApiAnnexCFlowSetup
 import id.walt.openid4vp.verifier.data.DcApiFlowSetup
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
@@ -47,15 +46,54 @@ object VerificationSessionCreateOpenApi {
                 required = true
                 description = "Verification session setup with DCQL query and optional policies"
 
-                example("Basic SD-JWT example") { value = Verifier2OpenApiExamples.basicExample }
+                // W3C VC Examples
 
-                example("Cross device flow: mDL or Photo ID") { value = CrossDeviceFlowSetup.EXAMPLE_MDL_OR_PHOTOID }
-                example("Cross device flow: dc+sd-jwt PID") { value = CrossDeviceFlowSetup.EXAMPLE_SDJWT_PID }
-                //example("Same device flow") { value = SameDeviceFlow.EXAMPLE }
-                example("DC API flow: Signed mDL") { value = DcApiFlowSetup.EXAMPLE_SIGNED_MDL }
-                example("DC API flow: Signed & encrypted mDL") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
-                example("DC API flow: Signed Photo ID") { value = DcApiFlowSetup.EXAMPLE_SIGNED_PHOTOID }
-                example("DC API flow: Annex C") {
+                example("[openid4vp-http][w3c vc] default jwt_vc_json") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcDefault }
+                example("[openid4vp-http][w3c vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcBasic }
+                example("[openid4vp-http][w3c vc] credential status for TokenStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusTokenStatusList
+                }
+                example("[openid4vp-http][w3c vc] credential status for BitstringStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusBitstringStatusList
+                }
+                example("[openid4vp-http][w3c vc] credential status for multiple BitstringStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusMultipleBitstringStatusList
+                }
+                example("[openid4vp-http][w3c vc] webhook") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcWebhook }
+
+                example("[openid4vp-http][w3c vc] presentation policies (jwt_vc_json/*)") { value = Verifier2OpenApiExamples.openid4vpHttpW3cVcPresentation }
+
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with path-based claims") { value = Verifier2OpenApiExamples.w3cPlusPath }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with empty meta") { value = Verifier2OpenApiExamples.emptyMeta }
+                example("[openid4vp-http][w3c vc] DCQL: Nested presentation request for W3C credentials") {
+                    value = Verifier2OpenApiExamples.nestedPresentationRequestW3C
+                }
+                example("[openid4vp-http][w3c vc] DCQL: Nested presentation request with multiple claims") {
+                    value = nestedPresentationRequestWithMultipleClaims
+                }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with type values only") { value = Verifier2OpenApiExamples.w3cTypeValues }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential without claims") { value = Verifier2OpenApiExamples.W3CWithoutClaims }
+                example("[openid4vp-http][w3c vc] DCQL: W3C credential with claims and value constraints") {
+                    value = Verifier2OpenApiExamples.W3CWithClaimsAndValues
+                }
+
+                // IETF SD-JWT VC Examples
+                example("[openid4vp-http][ietf sd-jwt vc] default dc+sd-jwt") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcDefault }
+                example("[openid4vp-http][ietf sd-jwt vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcBasic }
+                example("[openid4vp-http][ietf sd-jwt vc] presentation policies (dc+sd-jwt/*)") { value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcPresentation }
+
+                // ISO Examples
+
+                example("[openid4vp-http][iso pid]") { value = CrossDeviceFlowSetup.EXAMPLE_SDJWT_PID }
+                example("[openid4vp-http][iso mdl & photo-id]") { value = CrossDeviceFlowSetup.EXAMPLE_MDL_OR_PHOTOID }
+                example("[openid4vp-http][iso photo-id] vical") { value = Verifier2OpenApiExamples.openid4vpHttpIsoPhotoIdVical }
+
+                example("[openid4vp-dc_api][iso photo-id] signed & unencrypted ") { value = DcApiFlowSetup.EXAMPLE_SIGNED_PHOTOID }
+                example("[openid4vp-dc_api][iso mdl] signed & unencrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_MDL }
+                example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
+
+                // Add Annex-C examples
+                example("[iso-18013-7-dc_api][iso mdl] default") {
                     value = DcApiAnnexCFlowSetup(
                         docType = "org.iso.18013.5.1.mDL",
                         requestedElements = mapOf("org.iso.18013.5.1" to listOf("age_over_18")),
@@ -63,36 +101,6 @@ object VerificationSessionCreateOpenApi {
                         ttlSeconds = 300
                     )
                 }
-
-                example("DCQL example: Basic example") { value = Verifier2OpenApiExamples.basicExample }
-                example("DCQL example: W3C credential with path-based claims") { value = Verifier2OpenApiExamples.w3cPlusPath }
-                example("DCQL example: W3C credential with empty meta") { value = Verifier2OpenApiExamples.emptyMeta }
-                example("DCQL example: Nested presentation request for W3C credentials") {
-                    value = Verifier2OpenApiExamples.nestedPresentationRequestW3C
-                }
-                example("DCQL example: Nested presentation request with multiple claims") {
-                    value = nestedPresentationRequestWithMultipleClaims
-                }
-                example("DCQL example: W3C credential with type values only") { value = Verifier2OpenApiExamples.w3cTypeValues }
-                example("DCQL example: W3C credential without claims") { value = Verifier2OpenApiExamples.W3CWithoutClaims }
-                example("DCQL example: W3C credential with claims and value constraints") {
-                    value = Verifier2OpenApiExamples.W3CWithClaimsAndValues
-                }
-
-                example("Basic example with revoked-status-list policy") {
-                    value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy
-                }
-                example("Basic example with credential-status policy for single BitstringStatusList") {
-                    value = Verifier2OpenApiExamples.basicExampleWithRevokedStatusListPolicy
-                }
-                example("Basic example with credential-status policy for multiple BitstringStatusList") {
-                    value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForMultipleBitstringStatusList
-                }
-                example("Basic example with credential-status policy for TokenStatusList") {
-                    value = Verifier2OpenApiExamples.basicExampleWithStatusPolicyForTokenStatusList
-                }
-
-                example("VICAL: ISO mdocs with VICAL policy (only for ISO mDL/mdoc)") { value = Verifier2OpenApiExamples.VicalPolicyValues }
             }
         }
         response {

@@ -1,7 +1,7 @@
 import io.ktor.plugin.features.*
 
 object Versions {
-    const val KTOR_VERSION = "3.3.3" // also change 1 plugin
+    const val KTOR_VERSION = "3.3.3"
     const val COROUTINES_VERSION = "1.10.2"
     const val HOPLITE_VERSION = "2.9.0"
 }
@@ -72,12 +72,12 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.11.6")
 
     // Test
-    testImplementation(kotlin("test"))
+    testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
     testImplementation("org.bouncycastle:bcprov-lts8on:2.73.9")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
-    testApi(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+    testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
