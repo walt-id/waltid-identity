@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "portal.fullname" . }}
+  labels:
+    {{- include "portal.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "portal.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "portal.labels" . | nindent 8 }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web-portal
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag | default "latest" }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 3000
+              name: http-portal
+          volumeMounts:
+            - mountPath: /app/.env
+              subPath: .env
+              name: wallet-portal-config
+              readOnly: true
+      volumes:
+        - name: wallet-portal-config
+          configMap:
+            name: {{ include "portal.fullname" . }}-config

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-wallet-config
+data:
+  _features.conf: |
+    {{- .Values.walletConfig.featuresConf | nindent 4 }}
+  db.conf: |
+    {{- .Values.walletConfig.dbConf | nindent 4 }}
+  web.conf: |
+    {{- .Values.walletConfig.webConf | nindent 4 }}
+  oidc.conf: |
+    {{- .Values.walletConfig.oidcConf | nindent 4 }}
