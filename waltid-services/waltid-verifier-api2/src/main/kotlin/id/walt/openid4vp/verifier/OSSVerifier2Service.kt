@@ -30,6 +30,7 @@ import io.ktor.server.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.ExperimentalUuidApi
 
 
@@ -40,7 +41,7 @@ private const val VICAL = "vical"
 
 object Verifier2Service {
 
-    val sessions = HashMap<String, Verification2Session>()
+    val sessions = ConcurrentHashMap<String, Verification2Session>()
 
     /**
      * Update data for this session and send session update notifications
