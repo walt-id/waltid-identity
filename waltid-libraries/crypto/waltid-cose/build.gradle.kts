@@ -25,7 +25,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
 
             // Waltid
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
