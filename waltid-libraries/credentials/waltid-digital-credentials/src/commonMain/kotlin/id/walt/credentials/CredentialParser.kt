@@ -207,39 +207,90 @@ object CredentialParser {
         val signedCredentialWithoutDisclosures = credential.substringBefore("~")
         val plainSignature = signedCredentialWithoutDisclosures.substringAfterLast(".")
 
+        val disclosuresPart = signature.substringAfter("~", "")
+        log.trace { "Parsing disclosures: $disclosuresPart" }
         var availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
 
         if (availableDisclosures?.isNotEmpty() == true) {
             log.trace { "${"=== MAPPING ==="}" }
-            // Map disclosures to disclosable locations
-            val mappedDisclosures = ArrayList<SdJwtSelectiveDisclosure>()
+            // Use a Mutable Set to track what we have successfully mapped
+            val mappedDisclosures = HashSet<SdJwtSelectiveDisclosure>()
+
+            // A queue of hashes we expect to find, paired with their parent location
+            val hashesToVerify = ArrayDeque<Pair<String, String>>()
+
+            // 1. Initial population from the main payload
+            containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
+                val loc = sdLocation.removeSuffix("_sd")
+                disclosureHashes.forEach { hash -> hashesToVerify.add(loc to hash) }
+            }
 
             fun findForHash(hash: String) =
                 availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
 
-            containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
-                log.trace { "Trying sd location: $sdLocation\n" }
-                val unsuffixedLocation = sdLocation.removeSuffix("_sd")
-                disclosureHashes.forEach { hash ->
-                    log.trace { "Trying hash: $hash" }
-                    log.trace {
-                        "Available disclosures: ${availableDisclosures?.joinToString("\n") { "Available h: ${it.asHashed()}  –  ${it.asHashed2()} –  ${it.asHashed3()}" }}"
+            // Helper to recursively scan a JSON element for more SD-JWT hashes
+            fun scanForHashes(element: JsonElement, currentPath: String) {
+                when (element) {
+                    is JsonObject -> {
+                        // Check for _sd array in this object
+                        element["_sd"]?.jsonArray?.forEach {
+                            if (it is JsonPrimitive && it.isString) {
+                                hashesToVerify.add(currentPath to it.content)
+                            }
+                        }
+                        // Recurse into properties
+                        element.forEach { (key, value) ->
+                            if (key != "_sd") scanForHashes(value, "$currentPath.$key")
+                        }
                     }
-                    findForHash(hash)?.let { matchingDisclosure ->
-                        mappedDisclosures.add(matchingDisclosure.copy(location = "$unsuffixedLocation${matchingDisclosure.name}"))
-                        log.trace { "Found hash for ${matchingDisclosure.name}: ${matchingDisclosure.asHashed()}" }
+                    is JsonArray -> {
+                        element.forEachIndexed { index, item ->
+                            // Check for Array Disclosure format: { "...": "hash" }
+                            if (item is JsonObject && item.size == 1 && item.containsKey("...")) {
+                                val hash = item["..."]?.jsonPrimitive?.content
+                                if (hash != null) {
+                                    hashesToVerify.add("$currentPath[$index]" to hash)
+                                }
+                            } else {
+                                // Recurse
+                                scanForHashes(item, "$currentPath[$index]")
+                            }
+                        }
                     }
+                    else -> {} // Primitives contain no hashes
+                }
+            }
+
+            // 2. Process the queue until all nested hashes are resolved
+            while (hashesToVerify.isNotEmpty()) {
+                val (loc, hash) = hashesToVerify.removeFirst()
+                log.trace { "Processing hash: $hash at $loc" }
+
+                val matchingDisclosure = findForHash(hash)
+                if (matchingDisclosure != null) {
+                    // Only process if we haven't mapped this specific disclosure instance yet
+                    // (SD-JWT spec says digest MUST NOT appear more than once, but safety check)
+                    if (mappedDisclosures.add(matchingDisclosure)) {
+                        log.trace { "Found hash for ${matchingDisclosure.name ?: "array_element"}" }
+
+                        // Construct the location for the *content* of this disclosure
+                        // If it's an array element, name is null, effectively just passing 'loc' down
+                        val newLoc = if (matchingDisclosure.name != null) "$loc.${matchingDisclosure.name}" else loc
+
+                        // 3. Recursive Step: Scan the *value* of the disclosure for new hashes
+                        scanForHashes(matchingDisclosure.value, newLoc)
+                    }
+                } else {
+                    log.trace { "Hash $hash not found in available disclosures (might be a decoy)" }
                 }
             }
 
             log.trace {
-                mappedDisclosures.mapIndexed { idx, it ->
-                    "$idx: ${it.location} -> $it"
-                }.joinToString("\n")
+                mappedDisclosures.mapIndexed { idx, it -> "$idx: ${it.name} -> $it" }.joinToString("\n")
             }
 
             check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
-            availableDisclosures = mappedDisclosures
+            availableDisclosures = mappedDisclosures.toList()
         }
 
         val fullCredentialData =

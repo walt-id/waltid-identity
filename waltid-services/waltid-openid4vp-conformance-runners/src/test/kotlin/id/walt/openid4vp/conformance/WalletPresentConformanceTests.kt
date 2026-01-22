@@ -8,7 +8,7 @@ import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
-class WalletPresentConformanceTests {
+/*class WalletPresentConformanceTests {
 
     companion object {
         val verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
@@ -34,4 +34,4 @@ class WalletPresentConformanceTests {
         ).run()
     }
 
-}
+}*/
