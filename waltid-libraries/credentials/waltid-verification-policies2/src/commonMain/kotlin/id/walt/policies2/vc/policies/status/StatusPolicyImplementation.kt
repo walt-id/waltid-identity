@@ -1,6 +1,7 @@
 package id.walt.policies2.vc.policies.status
 
 import id.walt.policies2.vc.policies.status.bit.BitValueReaderFactory
+import id.walt.policies2.vc.policies.status.content.CwtParser
 import id.walt.policies2.vc.policies.status.content.JsonElementParser
 import id.walt.policies2.vc.policies.status.content.JwtParser
 import id.walt.policies2.vc.policies.status.entry.IETFEntryExtractor
@@ -9,8 +10,11 @@ import id.walt.policies2.vc.policies.status.entry.W3CEntryExtractor
 import id.walt.policies2.vc.policies.status.expansion.TokenStatusListExpansionAlgorithm
 import id.walt.policies2.vc.policies.status.expansion.W3cStatusListExpansionAlgorithmFactory
 import id.walt.policies2.vc.policies.status.model.*
+import id.walt.policies2.vc.policies.status.reader.IETFCwtStatusValueReader
 import id.walt.policies2.vc.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies2.vc.policies.status.reader.W3CStatusValueReader
+import id.walt.policies2.vc.policies.status.reader.format.CwtFormatMatcher
+import id.walt.policies2.vc.policies.status.reader.format.JwtFormatMatcher
 import id.walt.policies2.vc.policies.status.validator.IETFStatusValidator
 import id.walt.policies2.vc.policies.status.validator.W3CStatusValidator
 import io.ktor.client.*
@@ -48,9 +52,17 @@ object StatusPolicyImplementation {
 
     private val jwtParser = JwtParser()
 
-    private val w3cStatusReader = W3CStatusValueReader(jwtParser)
+    private val cwtParser = CwtParser()
 
-    private val ietfJwtStatusReader = IETFJwtStatusValueReader(jwtParser)
+    private val jwtFormatMatcher = JwtFormatMatcher()
+
+    private val cwtFormatMatcher = CwtFormatMatcher()
+
+    private val w3cStatusReader = W3CStatusValueReader(jwtFormatMatcher, jwtParser)
+
+    private val ietfJwtStatusReader = IETFJwtStatusValueReader(jwtFormatMatcher, jwtParser)
+
+    private val ietfCwtStatusReader = IETFCwtStatusValueReader(cwtFormatMatcher, cwtParser)
 
     private val bitValueReaderFactory = BitValueReaderFactory()
 
@@ -67,7 +79,10 @@ object StatusPolicyImplementation {
         TokenStatusListExpansionAlgorithm(base64UrlHandler)
 
     private val ietfStatusValidator = IETFStatusValidator(
-        credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory, tokenStatusListExpansionAlgorithm
+        fetcher = credentialFetcher,
+        ietfJwtStatusReader, ietfCwtStatusReader,
+        bitValueReaderFactory = bitValueReaderFactory,
+        expansionAlgorithm = tokenStatusListExpansionAlgorithm,
     )
 
     suspend fun verifyWithAttributes(
