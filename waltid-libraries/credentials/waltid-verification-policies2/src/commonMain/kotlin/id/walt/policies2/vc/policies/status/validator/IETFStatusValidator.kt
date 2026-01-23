@@ -11,12 +11,12 @@ import id.walt.policies2.vc.policies.status.reader.StatusValueReader
 
 class IETFStatusValidator(
     fetcher: CredentialFetcher,
-    reader: StatusValueReader<IETFStatusContent>,
+    vararg reader: StatusValueReader<IETFStatusContent>,
     bitValueReaderFactory: BitValueReaderFactory,
     private val expansionAlgorithm: StatusListExpansionAlgorithm,
 ) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(
     fetcher,
-    reader
+    *reader
 ) {
     private val bitValueReader =
         bitValueReaderFactory.new(strategy = LittleEndianRepresentation())
