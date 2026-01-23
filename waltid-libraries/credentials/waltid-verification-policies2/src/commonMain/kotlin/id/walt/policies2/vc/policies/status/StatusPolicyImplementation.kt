@@ -125,12 +125,8 @@ object StatusPolicyImplementation {
             val validationResults: List<Result<Unit>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
                 w3cStatusValidator.validate(entry, attr)
             }
-            if (validationResults.isEmpty()) {
-                throw IllegalArgumentException(emptyResultMessage(attribute))
-            }
-            if (validationResults.any { it.isFailure }) {
-                throw IllegalArgumentException(failResultMessage(validationResults))
-            }
+            require(validationResults.isNotEmpty()) { emptyResultMessage(attribute) }
+            require(validationResults.none { it.isFailure }) { failResultMessage(validationResults) }
         }
 
     private fun failResultMessage(validationResults: List<Result<Unit>>) =
