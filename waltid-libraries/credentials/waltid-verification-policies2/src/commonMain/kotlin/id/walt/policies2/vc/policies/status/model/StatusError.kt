@@ -12,16 +12,16 @@ sealed class StatusError : Throwable() {
 @SerialName("STATUS_RETRIEVAL_ERROR")
 data class StatusRetrievalError(
     override val message: String,
-) : id.walt.policies2.vc.policies.status.model.StatusError()
+) : StatusError()
 
 @Serializable
 @SerialName("STATUS_VERIFICATION_ERROR")
 data class StatusVerificationError(
     override val message: String,
-) : id.walt.policies2.vc.policies.status.model.StatusError()
+) : StatusError()
 
 @Serializable
 @SerialName("STATUS_LIST_LENGTH_ERROR")
 data class StatusLengthError(
     override val message: String,
-) : id.walt.policies2.vc.policies.status.model.StatusError()
+) : StatusError()

@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonElement
 @SerialName("credential-status")
 class StatusPolicy(
     private val argument: StatusPolicyArgument,
-) : id.walt.policies2.vc.policies.CredentialVerificationPolicy2() {
+) : CredentialVerificationPolicy2() {
 
     override val id: String = "credential-status"
 
