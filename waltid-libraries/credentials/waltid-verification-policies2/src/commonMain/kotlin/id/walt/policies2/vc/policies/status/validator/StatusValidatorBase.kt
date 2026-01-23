@@ -10,7 +10,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.policies.status.model.StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
-    private val reader: StatusValueReader<K>,
+    private vararg val reader: StatusValueReader<K>,
 ) : StatusValidator<M, T> {
     protected val logger = KotlinLogging.logger {}
 
@@ -23,8 +23,10 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
                     it.message ?: "Status credential download error"
                 )
             }
-        // parse status list, response is a jwt
-        val statusList = reader.read(statusListContent)
+        val rdr = reader.firstOrNull { it.canHandle(statusListContent) }
+        requireNotNull(rdr) { "No available reader to handle the status list content." }
+        // parse status list
+        val statusList = rdr.read(statusListContent)
             .getOrElse {
                 throw StatusRetrievalError(
                     it.message ?: "Status credential parsing error"
