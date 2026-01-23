@@ -248,7 +248,6 @@ object VerificationSessionCreator {
             )
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
             if (expiration != null) headers["exp"] = JsonPrimitive(expiration.epochSeconds)
-            headers["iat"] = JsonPrimitive(now.epochSeconds)
 
             key.signJws(Json.encodeToString(authorizationRequest).encodeToByteArray(), headers)
         } else null
