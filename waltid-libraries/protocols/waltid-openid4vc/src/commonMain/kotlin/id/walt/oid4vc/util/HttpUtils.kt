@@ -8,4 +8,8 @@ val http = HttpClient {
     install(ContentNegotiation) {
         json()
     }
+    /*install(ContentEncoding) {
+        deflate(1.0F)
+        gzip(0.9F)
+    }*/
 }

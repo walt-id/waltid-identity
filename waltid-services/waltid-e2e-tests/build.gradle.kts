@@ -1,21 +1,11 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.power-assert")
-    id("com.github.ben-manes.versions")
+    id("waltid.jvm.servicelib")
 }
 
 group = "id.walt"
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://maven.waltid.dev/snapshots")
-}
-
 dependencies {
-    val ktorVersion = "3.2.2"
+    val ktorVersion = "3.3.3"
 
     // Testing
     testImplementation(kotlin("test"))
@@ -36,7 +26,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-wallet-api"))
 
     testImplementation("app.softwork:kotlinx-uuid-core:0.1.6")
-    testImplementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
 
@@ -44,22 +34,4 @@ dependencies {
     testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
     testImplementation("org.kotlincrypto.hash:sha2")
 
-}
-
-@OptIn(ExperimentalKotlinGradlePluginApi::class)
-powerAssert {
-    functions = listOf(
-        // kotlin.test
-        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
-
-        // checks
-        "kotlin.require", "kotlin.check"
-    )
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-kotlin {
-    jvmToolchain(21)
 }

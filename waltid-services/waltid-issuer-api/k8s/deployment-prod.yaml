@@ -34,9 +34,19 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: issuer
           image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: issuer-web-config
               mountPath: "/waltid-issuer-api/config/"
@@ -73,9 +83,20 @@ spec:
   tls:
     - hosts:
         - issuer.demo.walt.id
+        - issuer.portal.walt.id
       secretName: issuer-tls-secret
   rules:
     - host: issuer.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  name: http
+    - host: issuer.portal.walt.id
       http:
         paths:
           - path: /

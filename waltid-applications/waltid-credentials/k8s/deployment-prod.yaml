@@ -1,0 +1,73 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+    name: vc-repository-prod
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: vc-repository-prod
+    template:
+        metadata:
+            labels:
+                app: vc-repository-prod
+            annotations:
+                deployment/id: "_DEFAULT_DEPLOYMENT_"
+        spec:
+            securityContext:
+                runAsNonRoot: true
+                runAsUser: 10001
+                seccompProfile:
+                    type: RuntimeDefault
+            containers:
+                - name: vc-repository-prod
+                  image: waltid/vc-repository:latest
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                  ports:
+                      - containerPort: 3000
+                        name: http-api
+---
+kind: Service
+apiVersion: v1
+metadata:
+    name: vc-repository-prod
+spec:
+    ports:
+        - name: http
+          port: 80
+          targetPort: http-api
+          protocol: TCP
+    selector:
+        app: vc-repository-prod
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: credentials-prod-ingress
+    annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        ingress.kubernetes.io/configuration-snippet: |
+            if ($host ~ ^(.+)\.waltid\.org$) {
+              return 301 https://$1.walt-test.cloud$request_uri;
+            }
+spec:
+    ingressClassName: nginx
+    tls:
+        - hosts:
+              - credentials.walt.id
+          secretName: credentials-prod-tls-secret
+    rules:
+        - host: credentials.walt.id
+          http:
+              paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: vc-repository-prod
+                            port:
+                                number: 80

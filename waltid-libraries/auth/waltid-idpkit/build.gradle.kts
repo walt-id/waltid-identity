@@ -1,10 +1,5 @@
 plugins {
-    kotlin("jvm")
-    id("io.ktor.plugin") version "3.2.2"
-    kotlin("plugin.serialization")
-    id("maven-publish")
-
-    id("com.github.ben-manes.versions")
+    id("waltid.ktorbackend")
 }
 
 group = "id.walt"
@@ -12,13 +7,6 @@ version = "0.0.1"
 
 application {
     mainClass.set("id.walt.ApplicationKt")
-
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
-}
-
-repositories {
-    mavenCentral()
 }
 
 dependencies {
@@ -43,13 +31,12 @@ dependencies {
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // OIDC
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     // for Ed25519
     implementation("com.google.crypto.tink:tink:1.16.0") {
         exclude("org.slf4j.simple")
     }
-
 
     // Logging
     implementation("io.klogging:klogging-jvm:0.11.6")

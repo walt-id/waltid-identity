@@ -34,7 +34,7 @@ data class AuthorizationRequest(
      * May include a Client Identifier Prefix as per Section 5.9.
      */
     @SerialName("client_id")
-    val clientId: String,
+    val clientId: String? = null,
 
     /**
      * Conditional. OAuth 2.0 Redirection URI.
@@ -148,12 +148,19 @@ data class AuthorizationRequest(
 ) {
 
     fun toHttpUrl(url: URLBuilder = URLBuilder("openid4vp://authorize")): Url {
-        val values = Json.encodeToJsonElement(this).jsonObject
+        val json = Json { encodeDefaults = false }
+        val values = json.encodeToJsonElement(this).jsonObject
             .entries
             .filterNot { it.value == JsonNull }
 
         values.forEach { (key, value) ->
-            url.parameters.append(key, if (value is JsonPrimitive) value.jsonPrimitive.content else value.toString())
+            val paramValue = when (value) {
+                is JsonPrimitive -> value.content
+                is JsonObject -> json.encodeToString(JsonObject.serializer(), value)
+                is JsonArray -> json.encodeToString(JsonArray.serializer(), value)
+                else -> value.toString()
+            }
+            url.parameters.append(key, paramValue)
         }
         return url.build()
     }
@@ -175,7 +182,7 @@ data class AuthorizationRequest(
         if (requestUriMethod != null && requestUriMethod.method !in listOf("get", "post")) {
             throw IllegalArgumentException("request_uri_method must be 'get' or 'post'.")
         }
-        if (responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT)) {
+        if (responseMode in OpenID4VPResponseMode.DIRECT_POST_RESPONSES) {
             requireNotNull(responseUri) { "response_uri must not be null if response_mode is direct_post / direct_post_jwt" }
         }
     }

@@ -1,5 +1,6 @@
 package id.walt.issuer
 
+import id.walt.commons.config.list.DevModeConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
@@ -29,7 +30,9 @@ object FeatureCatalog : ServiceFeatureCatalog {
 
     val entra = OptionalFeature("entra", "Enable support for Microsoft Entra", default = false)
 
+    val devModeFeature = OptionalFeature("dev-mode", "Development mode", DevModeConfig::class, default = false)
+
     override val baseFeatures = listOf(credentialTypes, issuerService, authenticationService)
-    override val optionalFeatures = listOf(entra)
+    override val optionalFeatures = listOf(entra, devModeFeature)
 
 }

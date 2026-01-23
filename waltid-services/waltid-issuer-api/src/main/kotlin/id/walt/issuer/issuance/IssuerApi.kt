@@ -81,6 +81,8 @@ fun createCredentialOfferUri(
     return offerUri
 }
 
+private const val INVALID_CREDENTIAL_CONFIGURATION_ID = "Invalid Credential Configuration Id"
+
 fun Application.issuerApi() {
     routing {
         route("", {
@@ -115,7 +117,7 @@ fun Application.issuerApi() {
                         val offerUri = createCredentialOfferUri(
                             issuanceRequests = listOf(jwtIssuanceRequest),
                             credentialFormat = getFormatByCredentialConfigurationId(jwtIssuanceRequest.credentialConfigurationId)
-                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                ?: throw IllegalArgumentException(INVALID_CREDENTIAL_CONFIGURATION_ID),
                             callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
@@ -130,7 +132,7 @@ fun Application.issuerApi() {
                         val offerUri = createCredentialOfferUri(
                             issuanceRequests = issuanceRequests,
                             credentialFormat = getFormatByCredentialConfigurationId(issuanceRequests.first().credentialConfigurationId)
-                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                ?: throw IllegalArgumentException(INVALID_CREDENTIAL_CONFIGURATION_ID),
                             callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
@@ -148,7 +150,7 @@ fun Application.issuerApi() {
                         val offerUri = createCredentialOfferUri(
                             issuanceRequests = listOf(sdJwtIssuanceRequest),
                             credentialFormat = getFormatByCredentialConfigurationId(sdJwtIssuanceRequest.credentialConfigurationId)
-                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                ?: throw IllegalArgumentException(INVALID_CREDENTIAL_CONFIGURATION_ID),
                             callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )
@@ -165,7 +167,7 @@ fun Application.issuerApi() {
                             createCredentialOfferUri(
                                 issuanceRequests = sdJwtIssuanceRequests,
                                 credentialFormat = getFormatByCredentialConfigurationId(sdJwtIssuanceRequests.first().credentialConfigurationId)
-                                    ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                    ?: throw IllegalArgumentException(INVALID_CREDENTIAL_CONFIGURATION_ID),
                                 callbackUrl = getCallbackUriHeader(),
                                 sessionTtl = getSessionTtl()
                             )
@@ -185,7 +187,7 @@ fun Application.issuerApi() {
                         val offerUri = createCredentialOfferUri(
                             issuanceRequests = listOf(mdocIssuanceRequest),
                             credentialFormat = getFormatByCredentialConfigurationId(mdocIssuanceRequest.credentialConfigurationId)
-                                ?: throw IllegalArgumentException("Invalid Credential Configuration Id"),
+                                ?: throw IllegalArgumentException(INVALID_CREDENTIAL_CONFIGURATION_ID),
                             callbackUrl = getCallbackUriHeader(),
                             sessionTtl = getSessionTtl()
                         )

@@ -12,6 +12,7 @@ import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.issuer.config.CredentialTypeConfig
@@ -131,9 +132,48 @@ open class CIProvider(
                 }
                 log.trace { "Sent issuance status callback: $callbackUrl, $type, $sessionId; response: ${response.status}" }
             } catch (ex: Exception) {
-                throw IllegalArgumentException("Error sending HTTP POST request to issuer callback url.", ex)
+                // Never break issuance flow due to callback; just log
+                log.warn(ex) { "Failed to send issuance callback to $callbackUrl for session $sessionId (type=$type)" }
             }
         }
+    }
+
+    // -------------------------------
+    // Issuance status & callback helpers
+    private suspend fun emitIssuanceStatus(session: IssuanceSession) {
+        if (session.callbackUrl.isNullOrBlank()) return
+        val credConfId = session.issuanceRequests.firstOrNull()?.credentialConfigurationId
+        val data = buildJsonObject {
+            put("sessionId", JsonPrimitive(session.id))
+            put("status", JsonPrimitive(session.status.name))
+            if (session.statusReason != null) put("reason", JsonPrimitive(session.statusReason))
+            put("closed", JsonPrimitive(session.isClosed))
+            if (credConfId != null) put("credentialConfigurationId", JsonPrimitive(credConfId))
+        }
+        sendCallback(session.id, "issuance_status", data, session.callbackUrl)
+    }
+
+    fun updateSessionStatus(
+        session: IssuanceSession,
+        newStatus: IssuanceSessionStatus,
+        reason: String? = null,
+        close: Boolean = false,
+    ): IssuanceSession {
+        val updated = session.copy(
+            status = newStatus,
+            statusReason = reason,
+            isClosed = session.isClosed || close
+        )
+        val remaining =
+            (updated.expirationTimestamp - Clock.System.now()).let { d -> if (d.isNegative()) 0.minutes else d }
+        putSession(updated.id, updated, remaining)
+        runBlocking {
+            try {
+                emitIssuanceStatus(updated)
+            } catch (_: Exception) {
+            }
+        }
+        return updated
     }
 
     // -------------------------------
@@ -180,6 +220,23 @@ open class CIProvider(
     private fun getVerifiedSession(sessionId: String): IssuanceSession? {
         return getSession(sessionId)?.let {
             if (it.isExpired) {
+                // Mark session as expired, persist, emit callback, then remove
+                val expiredSession = it.copy(
+                    status = IssuanceSessionStatus.EXPIRED,
+                    statusReason = "Issuance session expired",
+                    isClosed = true
+                )
+                val remaining = 0.minutes
+                putSession(sessionId, expiredSession, remaining)
+                runBlocking {
+                    if (!expiredSession.callbackUrl.isNullOrEmpty()) {
+                        try {
+                            emitIssuanceStatus(expiredSession)
+                        } catch (e: Exception) {
+                            // ignore
+                        }
+                    }
+                }
                 removeSession(sessionId)
                 null
             } else {
@@ -267,6 +324,10 @@ open class CIProvider(
 
             val resolvedIssuerKey = KeyManager.resolveSerializedKey(request.issuerKey)
 
+            val x5c = request.x5Chain?.map {
+                X509CertUtils.parse(it).encoded.encodeToBase64()
+            }
+
             request.run {
                 when (credentialFormat) {
                     CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
@@ -279,7 +340,7 @@ open class CIProvider(
                         display = credentialRequest.display ?: vc["display"]?.jsonArray?.map {
                             DisplayProperties.fromJSON(it.jsonObject)
                         },
-                        x5Chain = request.x5Chain
+                        x5Chain = x5c,
                     ).also {
                         if (!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(
@@ -298,7 +359,7 @@ open class CIProvider(
                             ?: throw BadRequestException("Issuer API currently supports only issuer DID for issuer ID property in W3C credentials. Issuer DID was not given in issuance request."),
                         selectiveDisclosure = request.selectiveDisclosure,
                         dataMapping = request.mapping,
-                        x5Chain = request.x5Chain,
+                        x5Chain = x5c,
                         display = credentialRequest.display
 
                     ).also {
@@ -686,12 +747,22 @@ open class CIProvider(
         session: IssuanceSession
     ): CredentialResponse = runBlocking {
         return@runBlocking credentialResult.credential?.let { credential ->
+            // Successful immediate issuance
+            updateSessionStatus(
+                session,
+                IssuanceSessionStatus.SUCCESSFUL,
+                "Credential issued successfully",
+                close = true
+            )
             CredentialResponse.success(
                 format = credentialResult.format,
                 credential = credential,
-                customParameters = credentialResult.customParameters
+                cNonce = session.cNonce,
+                cNonceExpiresIn = (session.expirationTimestamp - Clock.System.now()),
+                customParameters = credentialResult.customParameters,
             )
         } ?: generateProofOfPossessionNonceFor(session).let { updatedSession ->
+            // Deferred issuance: keep session ACTIVE, do not close
             CredentialResponse.deferred(
                 format = credentialResult.format,
                 acceptanceToken = OpenID4VCI.generateDeferredCredentialToken(
@@ -702,7 +773,7 @@ open class CIProvider(
                     tokenKey = CI_TOKEN_KEY
                 ),
                 cNonce = updatedSession.cNonce,
-                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now()).also { it.inWholeSeconds.toInt() }
+                cNonceExpiresIn = (updatedSession.expirationTimestamp - Clock.System.now())
             )
         }
     }
@@ -763,13 +834,16 @@ open class CIProvider(
             )
 
         // issue credential for credential request
-        return@runBlocking createCredentialResponseFor(
+        val response = createCredentialResponseFor(
             credentialResult = getDeferredCredential(
                 credentialID = credentialId,
                 session = session
             ),
             session = session
         )
+        // Mark successful after deferred issuance is actually delivered
+        updateSessionStatus(session, IssuanceSessionStatus.SUCCESSFUL, "Credential issued successfully", close = true)
+        return@runBlocking response
     }
 
     fun processTokenRequest(tokenRequest: TokenRequest): TokenResponse = runBlocking {
@@ -836,6 +910,7 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT13 -> baseUrl
             OpenID4VCIVersion.DRAFT11 -> baseUrlDraft11
+            OpenID4VCIVersion.V1 -> throw IllegalArgumentException("standardVersion v1 is not supported")
         }
     }
 
@@ -860,6 +935,7 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT11 -> metadataDraft11
             OpenID4VCIVersion.DRAFT13 -> metadata
+            OpenID4VCIVersion.V1 -> throw IllegalArgumentException("standardVersion v1 is not supported")
         }
     }
 
@@ -873,6 +949,7 @@ open class CIProvider(
         return when (version) {
             OpenID4VCIVersion.DRAFT11 -> openIdMetadataDraft11
             OpenID4VCIVersion.DRAFT13 -> openIdMetadata
+            OpenID4VCIVersion.V1 -> throw IllegalArgumentException("standardVersion v1 is not supported")
         }
     }
 

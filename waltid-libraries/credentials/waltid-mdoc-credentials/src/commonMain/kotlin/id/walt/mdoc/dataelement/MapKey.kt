@@ -15,6 +15,7 @@ enum class MapKeyType {
  * Map key for CBOR map elements
  * Supports int or string keys
  */
+@ConsistentCopyVisibility
 @Serializable(with = MapKeySerializer::class)
 data class MapKey private constructor(private val key: Any, val type: MapKeyType) {
     constructor(key: String) : this(key, MapKeyType.string)

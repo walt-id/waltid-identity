@@ -1,6 +1,70 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: issuer-dev-klogging-config
+data:
+  klogging.json: |
+    {
+      "sinks": {
+        "stdout": {
+          "renderWith": "RENDER_SIMPLE",
+          "sendTo": "STDOUT"
+        },
+        "stderr": {
+          "renderWith": "RENDER_SIMPLE",
+          "sendTo": "STDERR"
+        }
+      },
+      "logging": [
+        {
+          "comment": "Default loglevel for all loggers except Request/Response logger: INFO",
+          "matchLogger": "^(?!(io\\.ktor\\.client|WebLog)).*$",
+          "levelRanges": [
+            {
+              "fromMinLevel": "ERROR",
+              "toSinks": [
+                "stderr"
+              ]
+            },
+            {
+              "fromMinLevel": "TRACE",
+              "toMaxLevel": "WARN",
+              "toSinks": [
+                "stdout"
+              ]
+            }
+          ]
+        },
+        {
+          "comment": "Loglevel for service request monitoring - set it to INFO if you want enable it",
+          "exactLogger": "WebLog",
+          "levelRanges": [
+            {
+              "fromMinLevel": "DEBUG",
+              "toSinks": [
+                "stdout"
+              ]
+            }
+          ]
+        },
+        {
+          "comment": "Loglevel for http client requests - set it to INFO if you want enable it",
+          "fromLoggerBase": "io.ktor.client",
+          "levelRanges": [
+            {
+              "fromMinLevel": "DEBUG",
+              "toSinks": [
+                "stdout"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: issuer-web-config
 data:
   web.conf: |
@@ -30,14 +94,29 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: issuer
           image: waltid/issuer-api:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: KLOGGING_CONFIG_PATH
+              value: /config/klogging.json
           volumeMounts:
             - name: issuer-web-config
               mountPath: "/waltid-issuer-api/config/"
               readOnly: true
+            - name: dev-klogging-config
+              mountPath: /config
           ports:
             - containerPort: 3000
               name: http-api
@@ -45,6 +124,9 @@ spec:
         - name: issuer-web-config
           configMap:
             name: issuer-web-config
+        - name: dev-klogging-config
+          configMap:
+            name: issuer-dev-klogging-config
 ---
 kind: Service
 apiVersion: v1

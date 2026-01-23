@@ -146,13 +146,15 @@ object WalletPresentFunctionality2 {
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = if (presentationRequestUrl.parameters.contains("request_uri")) {
             val requestUri = presentationRequestUrl.parameters["request_uri"]!!
+            log.trace { "Resolving AuthorizationRequest from URI: $requestUri" }
             val httpResponse = http.get(requestUri)
 
-            check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri" }
+            check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}" }
 
             val authorizationRequestContentType =
                 httpResponse.contentType()
                     ?: throw IllegalArgumentException("AuthorizationRequest does not have HTTP ContentType header set: $requestUri")
+            log.trace { "Retrieved response has content type: $authorizationRequestContentType" }
 
             when {
                 authorizationRequestContentType.match("application/oauth-authz-req+jwt") -> {
@@ -387,7 +389,7 @@ object WalletPresentFunctionality2 {
     internal suspend fun createKeyBindingJwt(
         disclosed: String,
         nonce: String,
-        audience: String,
+        audience: String?,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
         holderKey: Key
     ): String {

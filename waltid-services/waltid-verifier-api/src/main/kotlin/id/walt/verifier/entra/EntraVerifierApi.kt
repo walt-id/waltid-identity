@@ -294,9 +294,9 @@ fun Application.entraVerifierApi() {
     }
 }
 
-fun main() {
+/*fun main() {
     println(
         "entra: " + (System.getenv()["ENTRA_CALLBACK_URL"]
             ?: throw IllegalArgumentException("No ENTRA_CALLBACK_URL environment variable configured!"))
     )
-}
+}*/

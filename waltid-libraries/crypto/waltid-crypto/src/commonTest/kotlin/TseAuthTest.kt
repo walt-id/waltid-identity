@@ -14,7 +14,7 @@ class TseAuthTest {
         )
         val plaintext = "This is a plaintext 123".encodeToByteArray()
 
-        val signed = tseKey.signRaw(plaintext) as String
+        val signed = tseKey.signRaw(plaintext).encodeBase64()
 
         val verified = tseKey.verifyRaw(signed.decodeBase64Bytes(), plaintext)
 

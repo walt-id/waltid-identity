@@ -19,10 +19,17 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.*
-import id.walt.policies2.PolicyList
-import id.walt.policies2.policies.CredentialDataMatcherPolicy
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.openid4vp.verifier.verifierModule
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.RegexPolicy
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
@@ -30,8 +37,8 @@ import io.ktor.client.request.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -74,11 +81,18 @@ class MsoMdocsVerifier2IntegrationTest {
     )
 
     private val mdocsPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy(),
-                CredentialDataMatcherPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")
+                RegexPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")
             )
+        )
+    )
+
+    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = mdocsDcqlQuery,
+            policies = mdocsPolicies
         )
     )
 
@@ -241,12 +255,7 @@ class MsoMdocsVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(
-                        VerificationSessionCreator.VerificationSessionSetup(
-                            dcqlQuery = mdocsDcqlQuery,
-                            policies = mdocsPolicies
-                        )
-                    )
+                    setBody(verificationSessionSetup)
                 }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -287,7 +296,7 @@ class MsoMdocsVerifier2IntegrationTest {
             val presentationResult = testAndReturn("Present with wallet") {
                 WalletPresentFunctionality2.walletPresentHandling(
                     holderKey = holderKey,
-                    holderDid = null, // No DID required for mso_mdocs
+                    holderDid = null, // No DID required for mso_mdoc
                     presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
@@ -302,7 +311,7 @@ class MsoMdocsVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
-                assertTrue { resp["transmission_success"]!!.jsonPrimitive.boolean }
+                assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 

@@ -1,7 +1,12 @@
 package id.walt.oid4vc.data
 
-import id.walt.sdjwt.SDJWTVCTypeMetadata
-import kotlinx.serialization.*
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.KeepGeneratedSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -70,7 +75,9 @@ data class CredentialSupported(
     @SerialName("id") val id: String? = null, // for draft 11
     @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,  // for draft 11
     val types: List<String>? = null, // for draft 11
-    @SerialName("credential_signing_alg_values_supported") val credentialSigningAlgValuesSupported: Set<String>? = null,
+@SerialName("credential_signing_alg_values_supported")
+@Serializable(with = FlexibleAlgSetSerializer::class)
+val credentialSigningAlgValuesSupported: Set<CredSignAlgValues>? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("@context") val context: List<JsonElement>? = null,
@@ -79,7 +86,7 @@ data class CredentialSupported(
     @Serializable(ClaimDescriptorMapSerializer::class) val credentialSubject: Map<String, ClaimDescriptor>? = null,
     @Serializable(ClaimDescriptorNamespacedMapSerializer::class) val claims: Map<String, Map<String, ClaimDescriptor>>? = null,
     val order: List<String>? = null,
-    @SerialName("sdJwtVcTypeMetadata") val sdJwtVcTypeMetadata: SDJWTVCTypeMetadata? = null,
+    @SerialName("sdJwtVcTypeMetadata") val sdJwtVcTypeMetadata: SdJwtVcTypeMetadataDraft04? = null,
     override val customParameters: Map<String, JsonElement>? = mapOf()
 ) : JsonDataObject() {
 
@@ -189,5 +196,70 @@ internal object CredentialSupportedArraySerializer : KSerializer<Map<String, Cre
         }
 
         encoder.encodeJsonElement(JsonArray(jsonArray))
+    }
+}
+
+object FlexibleAlgSetSerializer : KSerializer<Set<CredSignAlgValues>> {
+
+    override val descriptor: SerialDescriptor =
+        buildClassSerialDescriptor("FlexibleAlgSet")
+
+    override fun deserialize(decoder: Decoder): Set<CredSignAlgValues> {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("FlexibleAlgSetSerializer can be used only with Json format")
+
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonArray = element as? JsonArray
+            ?: throw SerializationException("Expected JsonArray for credential_signing_alg_values_supported, got: $element")
+
+        return when {
+            // All strings: ["ES256", "RS256"]
+            jsonArray.all { it is JsonPrimitive && it.isString } -> {
+                jsonArray.map { CredSignAlgValues.Named(it.jsonPrimitive.content) }.toSet()
+            }
+            // All ints: [-7, -9]
+            jsonArray.all { it is JsonPrimitive && it.intOrNull != null } -> {
+                jsonArray.map { CredSignAlgValues.Numeric(it.jsonPrimitive.int) }.toSet()
+            }
+            else -> {
+                throw SerializationException(
+                    "credential_signing_alg_values_supported must be all strings or all integers, " +
+                            "but was: $jsonArray"
+                )
+            }
+        }
+    }
+
+    override fun serialize(encoder: Encoder, value: Set<CredSignAlgValues>) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("FlexibleAlgSetSerializer can be used only with Json format")
+
+        val jsonArray = when {
+            value.all { it is CredSignAlgValues.Numeric } -> {
+                JsonArray(value.map { JsonPrimitive((it as CredSignAlgValues.Numeric).value) })
+            }
+
+            value.all { it is CredSignAlgValues.Named } -> {
+                JsonArray(value.map { JsonPrimitive((it as CredSignAlgValues.Named).name) })
+            }
+
+            else -> throw SerializationException("credential_signing_alg_values_supported must be uniformly named or numeric")
+        }
+
+        jsonEncoder.encodeJsonElement(jsonArray)
+    }
+}
+
+@Serializable
+sealed class CredSignAlgValues {
+    @Serializable
+    data class Named(val name: String) : CredSignAlgValues()
+
+    @Serializable
+    data class Numeric(val value: Int) : CredSignAlgValues()
+
+    override fun toString(): String = when (this) {
+        is Named -> name
+        is Numeric -> value.toString()
     }
 }

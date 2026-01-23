@@ -83,7 +83,7 @@ class VicalUsageExamples {
             println(" - Certificates found: ${receivedVical.vicalData.certificateInfos.size}")
 
             // 7. VERIFY: The client verifies the signature.
-            //   a. Extract the certificate from `receivedVical.coseSign1.unprotected.x5chain`.
+            //   a. Extract the certificate from `receivedVical.getCertificateChain()`.
             //   b. Validate the certificate chain against a trusted root.
             //   c. Call `getPublicKeyFromCertificate(certificateBytes)` to get the public key.
             // For this self-contained example, we already have the public key, so we use it directly.

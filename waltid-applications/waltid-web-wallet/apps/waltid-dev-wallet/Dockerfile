@@ -15,8 +15,14 @@ RUN cd apps/waltid-dev-wallet && npm run build
 FROM node:alpine AS release
 ENV NODE_ENV=production
 
-COPY --from=prerelease /app/apps/waltid-dev-wallet/.output/ .
+# Create non-root user
+RUN addgroup -g 10001 -S appgroup && \
+    adduser -u 10001 -S appuser -G appgroup
 
+WORKDIR /app
+COPY --from=prerelease --chown=appuser:appgroup /app/apps/waltid-dev-wallet/.output/ .
+
+USER appuser
 EXPOSE 7104/tcp
 ENV PORT=7104
 ENTRYPOINT [ "node", "server/index.mjs" ]

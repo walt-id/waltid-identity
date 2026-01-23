@@ -8,7 +8,6 @@ import id.walt.mdoc.cose.COSESign1Serializer
 import id.walt.mdoc.cose.X5_CHAIN
 import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.MapKeyType
-import korlibs.crypto.encoding.Hex
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.cose.java.*
 import java.io.ByteArrayInputStream
@@ -36,18 +35,18 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryp
         val sign1Msg = Sign1Message()
         sign1Msg.addAttribute(HeaderKeys.Algorithm, keyInfo.algorithmID.AsCBOR(), Attribute.PROTECTED)
         if (keyInfo.x5Chain.size == 1) {
-            CBORObject.FromObject(keyInfo.x5Chain.map { it.encoded }.reduceOrNull { acc, bytes -> acc + bytes })?.let {
+            CBORObject.FromByteArray(keyInfo.x5Chain.map { it.encoded }.reduceOrNull { acc, bytes -> acc + bytes })?.let {
                 sign1Msg.addAttribute(
-                    CBORObject.FromObject(X5_CHAIN),
+                    CBORObject.FromInt32(X5_CHAIN),
                     it,
                     Attribute.UNPROTECTED
                 )
             }
         } else {
-            CBORObject.FromObject(keyInfo.x5Chain.map { CBORObject.FromObject(it.encoded) }.toTypedArray<CBORObject?>())
+            CBORObject.FromCBORArray(keyInfo.x5Chain.map { CBORObject.FromByteArray(it.encoded) }.toTypedArray<CBORObject?>())
                 ?.let {
                     sign1Msg.addAttribute(
-                        CBORObject.FromObject(X5_CHAIN),
+                        CBORObject.FromInt32(X5_CHAIN),
                         it,
                         Attribute.UNPROTECTED
                     )
@@ -79,7 +78,6 @@ class SimpleCOSECryptoProvider(keys: List<COSECryptoProviderKeyInfo>) : COSECryp
         sign1Msg.sign(OneKey(keyInfo.publicKey, keyInfo.privateKey))
 
         val cborObj = sign1Msg.EncodeToCBORObject()
-        println("Signed message: " + Hex.encode(cborObj.EncodeToBytes()))
         return Cbor.decodeFromByteArray(COSESign1Serializer, cborObj.EncodeToBytes())
     }
 

@@ -24,8 +24,8 @@ import id.walt.oid4vc.responses.CredentialErrorCode
 import id.walt.oid4vc.responses.PushedAuthorizationResponse
 import id.walt.policies.Verifier
 import id.walt.policies.models.PolicyRequest.Companion.parsePolicyRequests
-import id.walt.sdjwt.JWTVCIssuerMetadata
-import id.walt.sdjwt.SDJWTVCTypeMetadata
+import id.walt.sdjwt.metadata.issuer.JWTVCIssuerMetadata
+import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -110,14 +110,11 @@ object OidcApi : CIProvider(), Klogging {
 
                 call.respond(
                     status = HttpStatusCode.OK,
-                    message = when (vctMetadata.sdJwtVcTypeMetadata != null) {
-                        true -> SDJWTVCTypeMetadata.fromJSON(vctMetadata.sdJwtVcTypeMetadata!!.toJSON())
-                        else -> SDJWTVCTypeMetadata(
-                            vct = vctMetadata.vct!!,
+                    message = (vctMetadata.sdJwtVcTypeMetadata
+                        ?: SdJwtVcTypeMetadataDraft04(
                             name = credType,
                             description = "$credType Verifiable Credential"
-                        )
-                    }
+                        )).toJSON()
                 )
             }
         }
@@ -372,10 +369,13 @@ object OidcApi : CIProvider(), Klogging {
                 val params = call.receiveParameters().toMap()
                 logger.debug { "/direct_post params: $params" }
 
-                if (params["state"]?.get(0) == null || (params[ResponseType.IdToken.value]?.get(0) == null && params[ResponseType.VpToken.value]?.get(0) == null)) {
+                if (params["state"]?.get(0) == null || (params[ResponseType.IdToken.value]?.get(0) == null && params[ResponseType.VpToken.value]?.get(
+                        0
+                    ) == null)
+                ) {
                     call.respond(
                         status = HttpStatusCode.BadRequest,
-                        message ="missing state/id_token/vp_token parameter"
+                        message = "missing state/id_token/vp_token parameter"
                     )
                     throw IllegalArgumentException("missing missing state/id_token/vp_token  parameter")
                 }
@@ -522,9 +522,30 @@ object OidcApi : CIProvider(), Klogging {
                     )
                 } catch (exc: CredentialError) {
                     logger.error(exc) { "Credential error: " }
+                    // Update session status to UNSUCCESSFUL and emit callback
+                    runCatching {
+                        val parsed = OpenID4VC.verifyAndParseToken(
+                            token = accessToken.toString(),
+                            issuer = metadata.issuer!!,
+                            target = TokenTarget.ACCESS,
+                            tokenKey = CI_TOKEN_KEY
+                        )
+                        val sid = parsed[JWTClaims.Payload.subject]?.jsonPrimitive?.content
+                        if (sid != null) {
+                            getSession(sid)?.let {
+                                updateSessionStatus(
+                                    it,
+                                    IssuanceSessionStatus.UNSUCCESSFUL,
+                                    exc.message,
+                                    close = true
+                                )
+                            }
+                        }
+                    }
                     call.respond(
                         status = HttpStatusCode.BadRequest,
-                        message = exc.toCredentialErrorResponse().toJSON())
+                        message = exc.toCredentialErrorResponse().toJSON()
+                    )
                 }
 
             }
@@ -547,9 +568,28 @@ object OidcApi : CIProvider(), Klogging {
                         call.respond(generateDeferredCredentialResponse(accessToken).toJSON())
                     } catch (exc: DeferredCredentialError) {
                         logger.error(exc) { "DeferredCredentialError: " }
+                        // Update session status to UNSUCCESSFUL and emit callback
+                        runCatching {
+                            val accessInfo = OpenID4VC.verifyAndParseToken(
+                                token = accessToken,
+                                issuer = metadata.issuer!!,
+                                target = TokenTarget.DEFERRED_CREDENTIAL,
+                                tokenKey = CI_TOKEN_KEY
+                            )
+                            val sid = accessInfo[JWTClaims.Payload.subject]?.jsonPrimitive?.content
+                            if (sid != null) getSession(sid)?.let {
+                                updateSessionStatus(
+                                    it,
+                                    IssuanceSessionStatus.UNSUCCESSFUL,
+                                    exc.message,
+                                    close = true
+                                )
+                            }
+                        }
                         call.respond(
                             status = HttpStatusCode.BadRequest,
-                            message = exc.toCredentialErrorResponse().toJSON())
+                            message = exc.toCredentialErrorResponse().toJSON()
+                        )
                     }
                 }
             }
@@ -589,9 +629,22 @@ object OidcApi : CIProvider(), Klogging {
 
                     } catch (exc: BatchCredentialError) {
                         logger.error(exc) { "BatchCredentialError: " }
+                        // Update session status to UNSUCCESSFUL and emit callback
+                        runCatching {
+                            val sid = parsedToken.get(JWTClaims.Payload.subject)?.jsonPrimitive?.content
+                            if (sid != null) getSession(sid)?.let {
+                                updateSessionStatus(
+                                    it,
+                                    IssuanceSessionStatus.UNSUCCESSFUL,
+                                    exc.message,
+                                    close = true
+                                )
+                            }
+                        }
                         call.respond(
                             status = HttpStatusCode.BadRequest,
-                            message = exc.toBatchCredentialErrorResponse().toJSON())
+                            message = exc.toBatchCredentialErrorResponse().toJSON()
+                        )
                     }
                 }
             }

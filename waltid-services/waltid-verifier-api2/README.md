@@ -9,11 +9,22 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
+  
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
 </div>
 
 ## What is Verifier API 2?
 
 A production-ready Verifier HTTP service for requesting and validating verifiable presentations from wallets using **OpenID for Verifiable Presentations (OpenID4VP) 1.0**. It exposes REST endpoints to create verification sessions, provide authorization requests to wallets, receive `vp_token` responses, and stream session updates.
+
+Refer to the
+[walt.id documentation](https://docs.walt.id/community-stack/verifier/getting-started)
+for a detailed view on using the verifier service, or learn more about OpenID4VP [here](http://localhost:3000/concepts/data-exchange-protocols/openid4vp)
 
 ### How it differs from the original Verifier API
 
@@ -92,12 +103,23 @@ Run locally (development):
 ./gradlew :waltid-services:waltid-verifier-api2:run
 ```
 
-Docker image:
+Docker images:
 
 ```bash
-./gradlew :waltid-services:waltid-verifier-api2:docker
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-verifier-api2:publishImageToLocalRegistry
 # image: waltid/verifier-api2:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-verifier-api2:publishImage
+# image: docker.io/<DOCKER_USERNAME>/verifier-api2:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 Create a session (example payloads available via OpenAPI helper):
 
@@ -145,8 +167,13 @@ See `config/` for service, web, and feature toggles. SSE and webhook delivery ca
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../assets/walt-banner.png" alt="walt.id banner" />
+</div>

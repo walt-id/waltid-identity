@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.objects.elements
 
@@ -6,6 +6,7 @@ import id.walt.mdoc.credsdata.CredentialManager
 import id.walt.mdoc.encoding.TransformingSerializerTemplate
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.serializer

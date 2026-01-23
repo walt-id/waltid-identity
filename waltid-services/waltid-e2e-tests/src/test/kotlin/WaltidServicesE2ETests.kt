@@ -8,6 +8,7 @@ import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
+import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.oid4vc.OpenID4VCIVersion
@@ -128,7 +129,7 @@ class WaltidServicesE2ETests {
         ),
         init = {
             id.walt.webwallet.webWalletSetup()
-            id.walt.did.helpers.WaltidServices.minimalInit()
+            DidService.minimalInit()
             id.walt.webwallet.db.Db.start()
         },
         module = e2eTestModule,
@@ -227,7 +228,7 @@ class WaltidServicesE2ETests {
         didsApi.get(wallet, did)
         didsApi.default(wallet, did)
         didsApi.list(wallet, DidsApi.DefaultDidOption.Some(did), 1)
-        didsApi.importDid(wallet , importDidRequest)
+        didsApi.importDid(wallet, importDidRequest)
         //endregion -Dids-
 
         //region -Categories-
@@ -415,10 +416,6 @@ class WaltidServicesE2ETests {
         //region -Presentation Definition Policy (Verifier)-
         PresentationDefinitionPolicyTests(e2e).runTests()
         //endregion -Presentation Definition Policy (Verifier)-
-
-        //region -ISO mDL Onboarding Service (Issuer)-
-        IssuerIsoMdlOnboardingServiceTests(e2e).runTests()
-        //endregion -ISO mDL Onboarding Service (Issuer)-
 
         //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
         MDocPreparedWallet(e2e).testWalletSetup()

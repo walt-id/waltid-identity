@@ -31,9 +31,19 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: verifier
           image: waltid/verifier-api:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
             - name: verifier-web-config
               mountPath: "/waltid-verifier-api/config/"
@@ -70,9 +80,20 @@ spec:
   tls:
     - hosts:
         - verifier.demo.walt.id
+        - verifier.portal.walt.id
       secretName: verifier-tls-secret
   rules:
     - host: verifier.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  name: http
+    - host: verifier.portal.walt.id
       http:
         paths:
           - path: /

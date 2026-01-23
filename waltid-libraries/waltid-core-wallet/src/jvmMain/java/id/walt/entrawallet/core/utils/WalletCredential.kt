@@ -48,8 +48,8 @@ data class WalletCredential(
                     CredentialFormat.mso_mdoc -> MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
                     else -> throw IllegalArgumentException("Unknown credential format")
                 }.toMutableMap().also {
-                    it?.putIfAbsent("id", JsonPrimitive(id))
-                }?.let {
+                    it.putIfAbsent("id", JsonPrimitive(id))
+                }.let {
                     JsonObject(it)
                 }
             }.onFailure { it.printStackTrace() }

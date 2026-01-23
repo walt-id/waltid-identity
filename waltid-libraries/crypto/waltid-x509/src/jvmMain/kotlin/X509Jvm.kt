@@ -1,15 +1,14 @@
 package id.walt.x509
 
-import java.io.ByteArrayInputStream
+import com.nimbusds.jose.util.X509CertUtils
+import okio.ByteString.Companion.toByteString
 import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
-import java.util.*
-import kotlin.collections.ArrayList
 
-
-fun CertificateDer.toX509(): X509Certificate =
-    CertificateFactory.getInstance("X.509").generateCertificate(ByteArrayInputStream(this.bytes)) as X509Certificate
+fun CertificateDer.toJcaX509Certificate(): X509Certificate =
+    X509CertUtils.parse(bytes.toByteArray())
+        ?: throw IllegalArgumentException("Failed to parse DER bytes as X.509 certificate")
 
 @Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
@@ -22,8 +21,8 @@ actual fun validateCertificateChain(
 ) {
     try {
 
-        val leafCert = CertificateDer(leaf.bytes).toX509()
-        val all = chain.map { it.toX509() }.toMutableList()
+        val leafCert = CertificateDer(leaf.bytes).toJcaX509Certificate()
+        val all = chain.map { it.toJcaX509Certificate() }.toMutableList()
 
         // Remove leaf if passed both as leaf and in chain
         all.removeIf { it == leafCert }
@@ -85,7 +84,7 @@ private fun buildTrustAnchors(
 
     // Adding provided trust anchors
     trustAnchors?.forEach { der ->
-        anchors.add(TrustAnchor(der.toX509(), null))
+        anchors.add(TrustAnchor(der.toJcaX509Certificate(), null))
     }
 
     // Adding system trust anchors
@@ -96,7 +95,7 @@ private fun buildTrustAnchors(
             System.getProperty("waltid.keystore.password")?.toCharArray()
         )
         loadTrustAnchorsFromKeyStore(keyStore).forEach { der ->
-            anchors.add(TrustAnchor(der.toX509(), null))
+            anchors.add(TrustAnchor(der.toJcaX509Certificate(), null))
         }
     }
 
@@ -118,7 +117,7 @@ fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
     while (aliases.hasMoreElements()) {
         val alias = aliases.nextElement()
         val cert = ks.getCertificate(alias) as? X509Certificate ?: continue
-        list.add(CertificateDer(cert.encoded))
+        list.add(CertificateDer(cert.encoded.toByteString()))
     }
     return list
 }

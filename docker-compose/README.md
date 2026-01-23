@@ -72,7 +72,7 @@ Ensure you have the following tools installed:
 Before building locally, ensure the correct version is specified in the `.env` file.
 Update the `VERSION_TAG` variable to version `1.0.0-SNAPSHOT`
 
-### Build API Services Docker Images Locally
+### Build API Services Docker Images Locally (development)
 
 API Services Docker Images are build with the ktor gradle plugin. This
 requires Java SDK 21 installed. You build the images by
@@ -131,19 +131,25 @@ will start automatically:
 #### Start services using compose profiles
 
 `COMPOSE_PROFILES` environment variable located in the .env file allows the selection of
-profiles to start the services for. Currently, the services are available with 2 profiles:
+profiles to start the services for. The services are available with the following profiles:
 
-- identity - for the waltid-identity services
-- tse - for the Hashicorp vault service, will be initialized with:
+- **identity** - for all waltid-identity services (includes both `services` and `apps` profiles)
+- **services** - for API services (wallet-api, issuer-api, verifier-api, verifier-api2, vc-repo)
+- **apps** - for web applications (waltid-demo-wallet, waltid-dev-wallet, web-portal)
+- **valkey** - for the Valkey/Redis service (required when using valkey for session storage in wallet-api)
+- **tse** - for the Hashicorp vault service, will be initialized with:
     - a transit secrets engine
     - and authentication methods
         - approle - for my-role, where role-id and secret-id will be output in the console<sup>1</sup>
         - userpass - for myuser with mypassword
         - access-token - with dev-only-token
-- opa - for the Open Policy Agent service
+- **opa** - for the Open Policy Agent service
+- **all** - starts all services (equivalent to combining all profiles)
 
-Profiles can be combined, e.g. `COMPOSE_PROFILES=identity,tse` - will start the
-waltid-identity services and the vault (also can be done with the `all` profile).
+Profiles can be combined, e.g.:
+- `COMPOSE_PROFILES=identity,tse` - will start the waltid-identity services and the vault
+- `COMPOSE_PROFILES=identity,valkey` - will start the waltid-identity services with valkey for session storage
+- `COMPOSE_PROFILES=all` - will start all services including vault, valkey, and opa
 
 <sup>1</sup> - example output:
 
@@ -171,6 +177,8 @@ $ docker-compose down -v
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
+- Verifier API2: [http://localhost:7004](http://localhost:7004)
+- Valkey (Redis-compatible): `localhost:6379` (requires `--profile valkey` or `--profile all`)
 - Hashicorp vault: [http://localhost:8200](http://localhost:8200)
 - Open Policy Agent: [http://localhost:8181](http://localhost:8181)
 
@@ -189,6 +197,8 @@ $ docker-compose down -v
     - `issuer-api/config`
 - verifier API:
     - `verifier-api/config`
+- verifier API2:
+  - `verifier-api2/config`
 - ingress:
     - `Caddyfile`
 
@@ -262,6 +272,9 @@ Make sure the ports are also updated in:
 - verifier-api/config
     - verifier-service.conf
     - web.conf
+- verifier-api2/config
+  - verifier-service.conf
+  - web.conf
 - wallet-api/config
     - web.conf
     - db.conf

@@ -39,7 +39,7 @@ object DidsService {
     fun add(wallet: Uuid, did: String, document: String, keyId: String, alias: String? = null) = transaction {
         val now = Clock.System.now()
         val didExists = WalletDids.selectAll()
-            .where { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":")) }
+            .where { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did) }
             .count() > 0L
 
         if (didExists) {
@@ -47,7 +47,7 @@ object DidsService {
         }
         WalletDids.insert {
             it[WalletDids.wallet] = wallet.toJavaUuid()
-            it[WalletDids.did] = did.replace("%3A", ":").replace("%3D", "=")
+            it[WalletDids.did] = did.replace("%3D", "=")
             it[WalletDids.document] = document
             it[WalletDids.keyId] = keyId
             it[WalletDids.alias] = alias ?: "Unnamed from $now"

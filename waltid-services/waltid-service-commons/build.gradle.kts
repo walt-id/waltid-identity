@@ -1,26 +1,20 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.serialization")
-    id("maven-publish")
-
-    id("com.github.ben-manes.versions")
+    id("waltid.jvm.library")
+    id("waltid.publish.maven")
 }
 
 group = "id.walt"
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
-
 object Versions {
-    const val KTOR_VERSION = "3.2.2" // also change 1 plugin
+    const val KTOR_VERSION = "3.3.3"
 }
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))
     // OIDC
     api(project(":waltid-libraries:protocols:waltid-openid4vc"))
+
+    api(project(":waltid-libraries:waltid-did"))
 
     // Ktor
     api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
@@ -66,56 +60,16 @@ dependencies {
     api("redis.clients:jedis:5.2.0")
 
     // Testing
-    testApi(kotlin("test"))
-    testApi("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-    testApi("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(identityLibs.bundles.waltid.ktortesting)
 }
 
-tasks.test {
-    useJUnitPlatform()
-}
-kotlin {
-    jvmToolchain(17)
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            pom {
-                name.set("walt.id service-commons")
-                description.set(
-                    """
-                    Kotlin/Java library for the walt.id services-commons
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
-    }
-
-    repositories {
-        maven {
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
-            credentials {
-                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
-                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
-            }
-        }
+mavenPublishing {
+    pom {
+        name.set("walt.id service-commons")
+        description.set(
+            """
+            Kotlin/Java library for the walt.id services-commons
+            """.trimIndent()
+        )
     }
 }

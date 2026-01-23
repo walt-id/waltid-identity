@@ -16,6 +16,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
+@ConsistentCopyVisibility
 @OptIn(ExperimentalSerializationApi::class)
 @KeepGeneratedSerializer
 @Serializable(with = ProofOfPossessionSerializer::class)
@@ -64,14 +65,35 @@ data class ProofOfPossession private constructor(
         private val trustChain: JsonArray? = null,
         private val audience: String? = null,
     ) : ProofBuilder() {
+
+        // TODO: fix the initial issue of the jwk formatting      
+        fun normalizeKeyOps(jwk: JsonObject): JsonObject {
+            val normalized = jwk.toMutableMap()
+
+            val keyOps = jwk["key_ops"]
+            if (keyOps is JsonPrimitive && keyOps.isString) {
+                val ops = keyOps.content
+                    .removePrefix("[")
+                    .removeSuffix("]")
+                    .split(",")
+                    .map { it.trim() }
+
+                normalized["key_ops"] = JsonArray(
+                    ops.map { JsonPrimitive(it) }
+                )
+            }
+
+            return JsonObject(normalized)
+        }
+
+        val fixedJwk = keyJwk?.let { normalizeKeyOps(it) }
         val headers = buildJsonObject {
             put(JWTClaims.Header.type, JWT_HEADER_TYPE)
             keyId?.let { put(JWTClaims.Header.keyID, it) }
-            keyJwk?.let { put(JWTClaims.Header.jwk, it) }
+            fixedJwk?.let { put(JWTClaims.Header.jwk, it) }
             x5c?.let { put(JWTClaims.Header.x5c, it) }
             trustChain?.let { put("trust_chain", it) }
         }
-
         @OptIn(ExperimentalUuidApi::class)
         val payload = buildJsonObject {
             clientId?.let {
@@ -181,3 +203,6 @@ enum class ProofType {
 data class ProofTypeMetadata(
     @SerialName("proof_signing_alg_values_supported") val proofSigningAlgValuesSupported: Set<String>
 )
+
+object ProofOfPossessionSerializerExternal :
+    JsonDataObjectSerializer<ProofOfPossession>(ProofOfPossession.generatedSerializer())

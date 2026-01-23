@@ -1,6 +1,6 @@
 package id.walt.sdjwt
 
-import id.walt.sdjwt.SdjwtStringUtils.decodeFromBase64Url
+import id.walt.sdjwt.utils.SdjwtStringUtils.decodeFromBase64Url
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
@@ -16,6 +16,7 @@ import kotlin.js.JsExport
  * @param key Field key
  * @param value Field value
  */
+@ConsistentCopyVisibility
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 data class SDisclosure internal constructor(

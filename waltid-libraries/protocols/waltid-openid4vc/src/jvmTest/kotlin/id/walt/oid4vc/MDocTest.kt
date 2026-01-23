@@ -58,7 +58,7 @@ import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
-import java.util.Date
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -89,11 +89,11 @@ class MDocTest: AnnotationSpec() {
     // ### Parse vp_token response
     val tokenResponse = TokenResponse.fromJSON(mdoc_auth_response)
     assertNotNull(tokenResponse.presentationSubmission)
-    assertEquals(expected = VCFormat.mso_mdoc, actual = tokenResponse.presentationSubmission!!.descriptorMap.firstOrNull()?.format)
+    assertEquals(expected = VCFormat.mso_mdoc, actual = tokenResponse.presentationSubmission.descriptorMap.firstOrNull()?.format)
     assertNotNull(tokenResponse.vpToken)
 
     // ### Parse mdoc device response
-    val deviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken!!.jsonPrimitive.content)
+    val deviceResponse = DeviceResponse.fromCBORBase64URL(tokenResponse.vpToken.jsonPrimitive.content)
     assertEquals(1, deviceResponse.documents.size)
   }
 
@@ -268,7 +268,7 @@ class MDocTest: AnnotationSpec() {
     val parsedReaderKey = parsedPresReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
       it.jsonObject.containsKey("use") && it.jsonObject.containsKey("alg") &&
           it.jsonObject["use"]!!.jsonPrimitive.content == "enc" &&
-          it.jsonObject["alg"]!!.jsonPrimitive.content == parsedPresReq.clientMetadata?.authorizationEncryptedResponseAlg
+          it.jsonObject["alg"]!!.jsonPrimitive.content == parsedPresReq.clientMetadata.authorizationEncryptedResponseAlg
     } ?: throw Exception("No ephemeral reader key found")
 
     // 5) Create OID4VP presentation response (Wallet)
@@ -298,12 +298,12 @@ class MDocTest: AnnotationSpec() {
     assertNotNull(oid4vpResponse.vpToken)
     // post as form parameters in direct_post.jwt mode (Wallet)
     val ephemeralWalletKey = runBlocking { KeyManager.createKey(KeyGenerationRequest(keyType = KeyType.secp256r1)) }
-    val encKey = parsedPresReq.clientMetadata?.jwks?.get("keys")?.jsonArray?.first {
+    val encKey = parsedPresReq.clientMetadata.jwks["keys"]?.jsonArray?.first {
       jwk -> JWK.parse(jwk.toString()).keyUse?.equals(KeyUse.ENCRYPTION) ?: false }?.jsonObject ?: throw Exception("No ephemeral reader key found")
 
     val formParams = oid4vpResponse.toDirectPostJWTParameters(encKey,
-      alg = parsedPresReq.clientMetadata?.authorizationEncryptedResponseAlg ?: "ECDH-ES",
-      enc = parsedPresReq.clientMetadata?.authorizationEncryptedResponseEnc ?: "A256GCM",
+      alg = parsedPresReq.clientMetadata.authorizationEncryptedResponseAlg ?: "ECDH-ES",
+      enc = parsedPresReq.clientMetadata.authorizationEncryptedResponseEnc ?: "A256GCM",
       mapOf(
         "epk" to runBlocking{ ephemeralWalletKey.getPublicKey().exportJWKObject() },
         "apu" to JsonPrimitive(Base64URL.encode(mdocNonce).toString()),
@@ -320,7 +320,7 @@ class MDocTest: AnnotationSpec() {
     assertNotNull(parsedResponse.jwsParts)
 
     // 7) Verify presentation response (Verifier)
-    val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(presReq, Base64URL.from(parsedResponse.jwsParts!!.header["apu"]!!.jsonPrimitive.content).decodeToString())
+    val mdocHandoverRestored = OpenID4VP.generateMDocOID4VPHandover(presReq, Base64URL.from(parsedResponse.jwsParts.header["apu"]!!.jsonPrimitive.content).decodeToString())
     val parsedDeviceResponse = DeviceResponse.fromCBORBase64URL(parsedResponse.vpToken!!.jsonPrimitive.content)
     assertEquals(1, parsedDeviceResponse.documents.size)
     val parsedMdoc = parsedDeviceResponse.documents[0]

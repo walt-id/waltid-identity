@@ -50,6 +50,21 @@ services:
     environment:
       OPA_SERVER_URL: "http://opa-server:8181"
 
+  verifier-api2:
+    image: ${IMAGE_PREFIX}waltid/verifier-api2:${VERSION_TAG:-latest}
+    profiles:
+      - services
+      - identity
+      - all
+    pull_policy: missing
+    depends_on:
+      - caddy
+    env_file:
+      - .env
+    volumes:
+      - ./verifier-api2/config:/waltid-verifier-api2/config
+
+
   waltid-demo-wallet:
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
     profiles:
@@ -113,10 +128,31 @@ services:
       - identity
       - all
     pull_policy: missing
+    build:
+      context: ../waltid-applications/waltid-credentials/.
     depends_on:
       - caddy
     environment:
       PORT: $VC_REPO_PORT
+
+  valkey:
+    image: valkey/valkey:${VERSION_VALKEY:-7.2}
+    profiles:
+      - valkey
+      - all
+    container_name: valkey
+    healthcheck:
+      test: [ "CMD", "valkey-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: always
+    command: ["valkey-server", "--bind", "0.0.0.0", "--port", "6379"]
+    ports:
+      - "${VALKEY_PORT:-6379}:6379"
+    volumes:
+      - valkey_data:/data
 
   postgres:
     image: postgres
@@ -210,6 +246,11 @@ services:
         protocol: tcp
         mode: host
 
+      - target: "$VERIFIER_API2_PORT"
+        published: $VERIFIER_API2_PORT # verifier-api2
+        protocol: tcp
+        mode: host
+
       - target: "$DEMO_WALLET_FRONTEND_PORT"
         published: $DEMO_WALLET_FRONTEND_PORT # waltid-demo-wallet
         protocol: tcp
@@ -240,3 +281,4 @@ services:
 volumes:
   wallet-api-db:
   vault_data:
+  valkey_data:

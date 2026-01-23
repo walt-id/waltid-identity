@@ -27,9 +27,19 @@ spec:
       annotations:
         deployment/id: "_DEFAULT_DEPLOYMENT_"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: web-portal
           image: waltid/portal:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: NEXT_PUBLIC_VC_REPO
               value: "https://credentials.walt.id"
@@ -76,9 +86,34 @@ spec:
   tls:
     - hosts:
         - portal.demo.walt.id
+        - portal.walt.id
       secretName: web-portal-tls-secret
   rules:
     - host: portal.demo.walt.id
+      http:
+        paths:
+          - path: /offer
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  number: 80
+          - path: /verify
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal
+                port:
+                  name: http
+    - host: portal.walt.id
       http:
         paths:
           - path: /offer

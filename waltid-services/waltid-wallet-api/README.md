@@ -9,12 +9,19 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
+  
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
 
 
 </div>
 
 Watch the [Intro Video](https://www.youtube.com/watch?v=ILaSAxjoHbw&t=1s) to learn about features and see a demo.
-The [documentation](https://docs.walt.id/community-stack/wallet/api/getting-started) explains how to create and manage identity
+The [documentation](https://docs.walt.id/community-stack/wallet/getting-started) explains how to create and manage identity
 wallets.
 
 # What it provides
@@ -28,6 +35,8 @@ from different blockchain ecosystems like Ethereum, Polygon, and more.
 # Protocol Support
 
 The wallet-api currently supports OpenID4VCI Draft 11 and Draft 13, and OpenID4VP Draft 14 and Draft 20.
+
+**NOTE**: The wallet-api does not support OpenID4VP 1.0 yet, which is used by the new verifier service [waltid-verifier-api2](../waltid-verifier-api2). You should only use this api alongside the original issuer and verifier services which match the same draft specifications.
 
 # How to use it
 
@@ -55,11 +64,23 @@ docker run \
 
 ***Build the container***
 
-Update the wallet-api container by running the following commands from the root folder:
+Update the wallet-api container by running the following commands from the waltid-identity root path:
 
 ```bash
-docker build -t waltid/wallet-api -f waltid-services/waltid-wallet-api/Dockerfile .
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-wallet-api:publishImageToLocalRegistry
+# image: waltid/wallet-api:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-wallet-api:publishImage
+# image: docker.io/<DOCKER_USERNAME>/wallet-api:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 # Database configuration
 
@@ -121,9 +142,14 @@ docker run --name mssql -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=p@ssw0rd" -p 14
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../assets/walt-banner.png" alt="walt.id banner" />
+</div>

@@ -4,6 +4,7 @@ import id.walt.commons.ServiceConfiguration
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
+import id.walt.did.dids.DidService
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuerModule
 import id.walt.oid4vc.OpenID4VCIVersion
@@ -184,10 +185,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         PresentationDefinitionPolicyTests(e2e).runTests()
         //endregion -Presentation Definition Policy (id.walt.test.integration.environment.api.verifier.Verifier)-
 
-        //region -ISO mDL Onboarding Service (Issuer)-
-        IssuerIsoMdlOnboardingServiceTests(e2e).runTests()
-        //endregion -ISO mDL Onboarding Service (Issuer)-
-
         //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
         MDocPreparedWallet(e2e).testWalletSetup()
         //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)
@@ -237,7 +234,7 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         ),
         init = {
             id.walt.webwallet.webWalletSetup()
-            id.walt.did.helpers.WaltidServices.minimalInit()
+            DidService.minimalInit()
             id.walt.webwallet.db.Db.start()
         },
         module = e2eTestModule,
@@ -268,7 +265,7 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
         module = e2eTestModule,
         timeout = defaultTestTimeout
     ) {
-       // ExchangeExternalSignatures(this).executeTestCases()
+        // ExchangeExternalSignatures(this).executeTestCases()
     }
 
     //@Test

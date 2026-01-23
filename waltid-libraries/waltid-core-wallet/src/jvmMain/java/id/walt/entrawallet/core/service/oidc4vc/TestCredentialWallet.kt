@@ -165,11 +165,11 @@ class TestCredentialWallet(
         )
         val result = generatePresentationForVPToken(session, tokenRequest)
         val holderDid = getDidFor(session)
-        val idToken = if (session.authorizationRequest?.responseType?.contains(ResponseType.IdToken) == true) {
+        val idToken = if (session.authorizationRequest.responseType.contains(ResponseType.IdToken)) {
             signToken(TokenTarget.TOKEN, buildJsonObject {
                 put("iss", "https://self-issued.me/v2/openid-vc")
                 put("sub", holderDid)
-                put("aud", session.authorizationRequest!!.clientId)
+                put("aud", session.authorizationRequest.clientId)
                 put("exp", Clock.System.now().plus(5.minutes).epochSeconds)
                 put("iat", Clock.System.now().epochSeconds)
                 put("state", session.id)
@@ -184,14 +184,14 @@ class TestCredentialWallet(
                 result.presentations.first().let { VpTokenParameter.fromJsonElement(it) },
                 if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
-                state = session.authorizationRequest?.state
+                state = session.authorizationRequest.state
             )
         } else {
             TokenResponse.success(
                 JsonArray(result.presentations).let { VpTokenParameter.fromJsonElement(it) },
                 if (idToken == null) result.presentationSubmission else null,
                 idToken = idToken,
-                state = session.authorizationRequest?.state
+                state = session.authorizationRequest.state
             )
         }
     }

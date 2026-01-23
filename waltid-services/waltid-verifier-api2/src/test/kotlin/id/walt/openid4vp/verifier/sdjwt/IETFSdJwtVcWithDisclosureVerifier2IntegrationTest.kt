@@ -24,9 +24,11 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
 import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
-import id.walt.openid4vp.verifier.Verification2Session
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionCreationResponse
-import id.walt.openid4vp.verifier.VerificationSessionCreator.VerificationSessionSetup
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -35,9 +37,9 @@ import io.ktor.client.request.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -70,7 +72,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         Json.decodeFromString<Verification2Session.DefinedVerificationPolicies>(
             """
   {
-    "vcPolicies": [
+    "vc_policies": [
       {
         "policy": "allowed-issuer",
         "allowed_issuer": [
@@ -122,6 +124,13 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
   }
         """.trimIndent()
         )
+
+    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = sdJwtVcDcqlQuery,
+            policies = additionalSdjwtvcPolicies
+        )
+    )
 
     private val walletCredentials = listOf(
         Json.decodeFromString<DigitalCredential>(
@@ -384,12 +393,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(
-                        VerificationSessionSetup(
-                            dcqlQuery = sdJwtVcDcqlQuery,
-                            policies = additionalSdjwtvcPolicies
-                        )
-                    )
+                    setBody(verificationSessionSetup)
                 }.body<VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -445,6 +449,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
+                println("Response: $resp")
                 assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
@@ -483,7 +488,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
 
-                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vcPolicies.policies.size }
+                assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vc_policies?.policies?.size }
             }
         }
     }

@@ -27,27 +27,31 @@ fun Application.onboardingApi() {
                     builder = {
                         summary = "Issue an Issuing Authority Certification Authority (IACA) certificate for mDL."
 
-                        description = "Creates a self-signed X.509 root certificate representing an Issuing Authority Certification Authority (IACA),\n" +
-                                "  compliant with the ISO/IEC 18013-5 specification for mobile driver's licenses (mDL). The generated certificate\n" +
-                                "  serves as a trust anchor in the mDL public key infrastructure.\n" +
-                                "\n" +
-                                "  The certificate includes:\n" +
-                                "  - Basic Constraints: `CA=true`, `pathLenConstraint=0`\n" +
-                                "  - Key Usage: `keyCertSign`, `cRLSign` (marked critical)\n" +
-                                "  - Subject Key Identifier\n" +
-                                "  - Issuer Alternative Name(s) (URI and/or email)\n" +
-                                "  - Optional CRL Distribution Point (URI)\n" +
-                                "\n" +
-                                "  ### Validations:\n" +
-                                "  - `country` must be a valid ISO 3166-1 alpha-2 country code (e.g., `\"US\"`)\n" +
-                                "  - Optional fields (`stateOrProvinceName`, `organizationName`) must not be blank if specified\n" +
-                                "  - If provided, `notBefore` must not be in the past\n" +
-                                "  - `notAfter`, if present, must be later than `notBefore`\n" +
-                                "\n" +
-                                "  ### Defaults:\n" +
-                                "  - A local `secp256r1` signing key will be generated if **no** other backend is specified\n" +
-                                "  - If `notBefore` is not provided, the current system time is used\n" +
-                                "  - If `notAfter` is not provided, it defaults to 15 years after `notBefore`"
+                        description =
+                            "Creates a self-signed X.509 root certificate representing an Issuing Authority Certification Authority (IACA),\n" +
+                                    "  compliant with the ISO/IEC 18013-5 specification for mobile driver's licenses (mDL). The generated certificate\n" +
+                                    "  serves as a trust anchor in the mDL public key infrastructure.\n" +
+                                    "\n" +
+                                    "  The certificate includes:\n" +
+                                    "  - Basic Constraints: `CA=true`, `pathLenConstraint=0`\n" +
+                                    "  - Key Usage: `keyCertSign`, `cRLSign` (marked critical)\n" +
+                                    "  - Subject Key Identifier\n" +
+                                    "  - Issuer Alternative Name(s) (URI and/or email)\n" +
+                                    "  - Optional CRL Distribution Point (URI)\n" +
+                                    "\n" +
+                                    "  ### Validations:\n" +
+                                    "  - `country` must be a valid ISO 3166-1 alpha-2 country code (e.g., `\"US\"`)\n" +
+                                    "  - Optional fields (`stateOrProvinceName`, `organizationName`) must not be blank if specified\n" +
+                                    "  - `notAfter`, if present, must be greater than `notBefore` & the current time\n" +
+                                    "  - The certificate's validity period cannot exceed 20 years\n" +
+                                    "\n" +
+                                    "  ### Defaults:\n" +
+                                    "  - A local `secp256r1` key will be generated if **no** other backend is specified\n" +
+                                    "  - If `notBefore` is not provided, the current system time is used\n" +
+                                    "  - If `notAfter` is not provided, it defaults to 20 years after `notBefore`" +
+                                    "\n" +
+                                    "  ### Notes:\n" +
+                                    "  - Supported keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(IACADocs.requestConfig())
 
@@ -66,8 +70,8 @@ fun Application.onboardingApi() {
 
                         description = ">\n" +
                                 "  Issues an X.509 Document Signer (DS) certificate compliant with ISO/IEC 18013-5 for signing\n" +
-                                "  mobile driver's license (mDL) documents. The certificate is issued by a previously onboarded\n" +
-                                "  IACA (refer to the endpoint above) root certificate and includes all required fields and extensions for mDL conformance.\n" +
+                                "  mobile driver's license (mDL) documents. The certificate is issued by an\n" +
+                                "  IACA and includes all required fields and extensions for mDL conformance.\n" +
                                 "\n" +
                                 "  The certificate includes:\n" +
                                 "  - Key Usage: `digitalSignature` (marked critical)\n" +
@@ -80,16 +84,16 @@ fun Application.onboardingApi() {
                                 "  - `country` and `stateOrProvinceName` (if specified) must match those of the IACA\n" +
                                 "  - `country` must be a valid ISO 3166-1 alpha-2 code\n" +
                                 "  - Optional strings (`organizationName`, `stateOrProvinceName`) must not be blank if provided\n" +
-                                "  - If provided, `notBefore` must not be in the past\n" +
-                                "  - `notAfter`, if present, must be later than `notBefore`\n" +
-                                "  - `crlDistributionPointUri` is required\n" +
+                                "  - `notAfter`, if present, must be greater than `notBefore` & the current time\n" +
                                 "  - The certificate's validity period cannot exceed 457 days\n" +
                                 "\n" +
                                 "  ### Defaults:\n" +
-                                "  - A local `secp256r1` signing key will be generated for the document signer if **no** other backend is specified\n" +
+                                "  - A local `secp256r1` key will be generated if **no** other backend is specified\n" +
                                 "  - If `notBefore` is not provided, the current system time is used\n" +
                                 "  - If `notAfter` is not provided, it defaults to 457 days after `notBefore`\n" +
                                 "\n" +
+                                "  ### Notes:\n" +
+                                "  - Supported keys: `secp256r1`, `secp384r1` and `secp521r1`"
 
                         request(DocumentSignerDocs.requestConfig())
 
@@ -162,6 +166,10 @@ fun Application.onboardingApi() {
                         example(
                             "did:jwk + AWS SDK key  (AWS - Secp256r1)",
                             IssuanceExamples.issuerOnboardingRequestAwsSdkExample
+                        )
+                        example(
+                            "did:jwk + Azure SDK key  (Azure - Secp256r1)",
+                            IssuanceExamples.issuerOnboardingRequestAzureSdkExample
                         )
                         required = true
                     }

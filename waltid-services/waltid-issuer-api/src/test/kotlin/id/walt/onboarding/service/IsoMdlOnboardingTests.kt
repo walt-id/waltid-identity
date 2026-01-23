@@ -2,162 +2,372 @@
 
 package id.walt.onboarding.service
 
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer.services.onboarding.OnboardingService
 import id.walt.issuer.services.onboarding.models.*
+import id.walt.x509.CertificateDer
+import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
+import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
+import id.walt.x509.iso.iaca.parser.IACACertificateParser
+import id.walt.x509.iso.iaca.validate.IACAValidator
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.bouncycastle.asn1.*
-import org.bouncycastle.asn1.x509.*
+import kotlinx.serialization.json.jsonObject
+import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
-import java.io.ByteArrayInputStream
-import java.math.BigInteger
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.util.Base64
+import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
+import kotlin.test.assertFails
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class IsoMdlOnboardingTests {
 
+    companion object {
 
-    private val mdlKeyPurposeDocumentSignerOID = ASN1ObjectIdentifier("1.0.18013.5.1.2")
-    private val iacaOnboardingRequest = IACAOnboardingRequest(
-        certificateData = IACACertificateData(
+        private const val KEY_GEN_BACKEND = "jwk"
+
+        private val signingKey = runBlocking {
+            assertNotNull(
+                JWKKey.importJWK(
+                    """
+                {
+                    "kty": "EC",
+                    "d": "u-UvsghdzpSXv5HmG5ngvm4Dv8yyRYw9fKA6mdp1KWs",
+                    "crv": "P-256",
+                    "kid": "R_E_QZ-Ea6etoAdWfUHSjjexRYz447ffnnfIO9kxn_Y",
+                    "x": "n_b1GmZTSEhioK3z8MGqcb7nxXqyjFaLR-OfKOnspwU",
+                    "y": "nGRVvuHTtEAZ1HjgdLaLZnYxrkiRV_e4V2Wz0qVWa-M"
+                }
+            """.trimIndent()
+                ).getOrNull()
+            )
+        }
+
+        private val validIACACertReqData = IACACertificateRequestData(
             country = "US",
             commonName = "Example IACA",
+            notBefore = Instant.parse("2025-05-28T12:23:01Z"),
+            notAfter = Instant.parse("2040-05-24T12:23:01Z"),
             issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://ca.example.com"),
-            crlDistributionPointUri = "https://ca.example.com/crl"
+            crlDistributionPointUri = "https://ca.example.com/crl",
         )
-    )
 
-    private fun parseCertificate(pem: String): X509Certificate {
-        val base64 = pem
-            .replace("-----BEGIN CERTIFICATE-----", "")
-            .replace("-----END CERTIFICATE-----", "")
-            .replace("\\s".toRegex(), "")
-        val derBytes = Base64.getDecoder().decode(base64)
-        return CertificateFactory.getInstance("X.509")
-            .generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
+        private val validIACACertData = IACACertificateData(
+            country = "US",
+            commonName = "Example IACA",
+            notBefore = Instant.parse("2025-05-28T12:23:01Z"),
+            notAfter = Instant.parse("2040-05-24T12:23:01Z"),
+            issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://ca.example.com"),
+            crlDistributionPointUri = "https://ca.example.com/crl",
+        )
+
+        private val validIACASigner = IACASignerData(
+            certificateData = validIACACertData,
+            iacaKey = runBlocking {
+                KeySerialization.serializeKeyToJson(signingKey).jsonObject
+            },
+        )
+
+        private val iacaOnboardingRequest = IACAOnboardingRequest(
+            certificateData = validIACACertReqData,
+        )
+
+        private val validDSReqData = DocumentSignerCertificateRequestData(
+            country = "US",
+            commonName = "Example DS",
+            crlDistributionPointUri = "https://ca.example.com/crl",
+        )
+
     }
+
+
+    private fun pemToCertificateDer(pem: String) = CertificateDer(
+        bytes = JWKKey.convertDERorPEMtoByteArray(
+            derOrPem = pem,
+        ).toByteString(),
+    )
 
     @Test
     fun `onboard IACA root generates valid certificate`() = runTest {
 
         val response = OnboardingService.onboardIACA(iacaOnboardingRequest)
-        val cert = parseCertificate(response.certificatePEM)
 
-        // === Serial Number checks ===
-        // 1. Must be positive
-        assertTrue(cert.serialNumber.signum() > 0, "Serial number must be positive")
-
-        // 2. Must be non-zero
-        assertTrue(cert.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
-
-        // 3. Must be <= 20 octets (160 bits)
-        assertTrue(cert.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
-
-        // 4. Must contain at least 63 bits (required)
-        assertTrue(cert.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
-
-        // 5. Should contain at least 71 bits (recommended)
-        assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
-
-        assertEquals("US", cert.issuerX500Principal.name.substringAfter("C=").take(2))
-        assertEquals(cert.subjectX500Principal, cert.issuerX500Principal) // self-signed
-        assertEquals(cert.basicConstraints, 0) // Is a CA
-        assertTrue(cert.keyUsage[5]) // keyCertSign
-        assertTrue(cert.keyUsage[6]) // cRLSign
-        assertNotNull(cert.issuerAlternativeNames)
-        assertEquals(cert.issuerAlternativeNames.size, 1)
-        assertTrue(cert.issuerAlternativeNames.any { it[1] == iacaOnboardingRequest.certificateData.issuerAlternativeNameConf.uri })
-
-        // === CRL Distribution Point URI check ===
-        val crlBytes = cert.getExtensionValue(Extension.cRLDistributionPoints.id)
-        val crlOctet = ASN1OctetString.getInstance(crlBytes).octets
-        val crlDist = CRLDistPoint.getInstance(ASN1Primitive.fromByteArray(crlOctet))
-        val distPoints = crlDist.distributionPoints
-        assertTrue(
-            actual = distPoints.isNotEmpty(),
-            message = "CRL distribution point must be present",
+        val iacaDecodedCertificate = IACACertificateParser().parse(
+            certificate = pemToCertificateDer(response.certificatePEM),
         )
-        assertEquals(distPoints.size, 1)
-        val uri = distPoints[0].distributionPoint.name as GeneralNames
-        val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
-        val crlUriValue = (uriName!!.name as DERIA5String).string
-        assertEquals(
-            expected = iacaOnboardingRequest.certificateData.crlDistributionPointUri,
-            actual = crlUriValue,
-            message = "CRL distribution point URI must match expected value",
-        )
+
+        assertDoesNotThrow {
+            IACAValidator().validate(
+                decodedCert = iacaDecodedCertificate,
+            )
+        }
+
     }
 
     @Test
     fun `onboard Document Signer generates valid certificate`() = runTest {
 
+        val now = Clock.System.now()
+
         val iacaResponse = OnboardingService.onboardIACA(iacaOnboardingRequest)
+
+        val iacaDecodedCert = IACACertificateParser().parse(
+            certificate = pemToCertificateDer(iacaResponse.certificatePEM),
+        )
 
         val dsRequest = DocumentSignerOnboardingRequest(
             iacaSigner = IACASignerData(
-                certificateData = iacaOnboardingRequest.certificateData,
+                certificateData = validIACACertData,
                 iacaKey = iacaResponse.iacaKey
             ),
-            certificateData = DocumentSignerCertificateData(
+            certificateData = DocumentSignerCertificateRequestData(
                 country = "US",
                 commonName = "Example DS",
-                crlDistributionPointUri = "https://ca.example.com/crl"
+                crlDistributionPointUri = "https://ca.example.com/crl",
+                notBefore = now.plus(1.days),
             )
         )
 
+
         val response = OnboardingService.onboardDocumentSigner(dsRequest)
-        val cert = parseCertificate(response.certificatePEM)
 
-        // === Serial Number checks ===
-        // 1. Must be positive
-        assertTrue(cert.serialNumber.signum() > 0, "Serial number must be positive")
-
-        // 2. Must be non-zero
-        assertTrue(cert.serialNumber != BigInteger.ZERO, "Serial number must not be zero")
-
-        // 3. Must be <= 20 octets (160 bits)
-        assertTrue(cert.serialNumber.bitLength() <= 160, "Serial number must not exceed 20 bytes (160 bits)")
-
-        // 4. Must contain at least 63 bits (required)
-        assertTrue(cert.serialNumber.bitLength() >= 63, "Serial number must contain at least 63 bits of entropy")
-
-        // 5. Should contain at least 71 bits (recommended)
-        assertTrue(cert.serialNumber.bitLength() >= 71, "Serial number should contain at least 71 bits of entropy")
-
-        assertEquals("US", cert.subjectX500Principal.name.substringAfter("C=").take(2))
-        assertEquals(cert.basicConstraints, -1) // not a CA
-        assertTrue(cert.keyUsage[0]) // digitalSignature
-        assertFalse(cert.keyUsage[5]) // Not a cert signer
-
-        // === Extended Key Usage check ===
-        val ekuBytes = cert.getExtensionValue(Extension.extendedKeyUsage.id)
-        val ekuOctet = ASN1OctetString.getInstance(ekuBytes).octets
-        val eku = ExtendedKeyUsage.getInstance(ASN1Sequence.fromByteArray(ekuOctet))
-        val expectedOID = KeyPurposeId.getInstance(mdlKeyPurposeDocumentSignerOID)
-        assertTrue(eku.hasKeyPurposeId(expectedOID))
-
-        // === CRL Distribution Point URI check ===
-        val crlBytes = cert.getExtensionValue(Extension.cRLDistributionPoints.id)
-        val crlOctet = ASN1OctetString.getInstance(crlBytes).octets
-        val crlDist = CRLDistPoint.getInstance(ASN1Primitive.fromByteArray(crlOctet))
-        val distPoints = crlDist.distributionPoints
-        assertTrue(
-            actual = distPoints.isNotEmpty(),
-            message = "CRL distribution point must be present",
+        val dsDecodedCert = DocumentSignerCertificateParser().parse(
+            certificate = pemToCertificateDer(response.certificatePEM),
         )
-        assertEquals(distPoints.size, 1)
-        val uri = distPoints[0].distributionPoint.name as GeneralNames
-        val uriName = uri.names!!.find { it.tagNo == GeneralName.uniformResourceIdentifier }
-        val crlUriValue = (uriName!!.name as DERIA5String).string
-        assertEquals(
-            expected = dsRequest.certificateData.crlDistributionPointUri,
-            actual = crlUriValue,
-            message = "CRL distribution point URI must match expected value",
-        )
+
+        assertDoesNotThrow {
+            DocumentSignerValidator().validate(
+                dsDecodedCert = dsDecodedCert,
+                iacaDecodedCert = iacaDecodedCert,
+            )
+        }
+
+    }
+
+    @Test
+    fun `onboard IACA does not work with unsupported key types`() = runTest {
+        listOf(
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.Ed25519,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp256k1,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.RSA,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.RSA3072,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.RSA4096,
+                )
+            ),
+        ).forEach { request ->
+            assertFails {
+                OnboardingService.onboardIACA(request)
+            }
+        }
+    }
+
+    @Test
+    fun `onboard IACA works with all supported key types`() = runTest {
+        val iacaCertificateParser = IACACertificateParser()
+        listOf(
+            IACAOnboardingRequest( //ensure by default a valid key is generated
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp256r1,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp384r1,
+                )
+            ),
+            IACAOnboardingRequest(
+                certificateData = validIACACertReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp521r1,
+                )
+            ),
+        ).forEach { request ->
+            val response = assertDoesNotThrow {
+                OnboardingService.onboardIACA(request)
+            }
+
+            val generatedKey = assertDoesNotThrow {
+                KeyManager.resolveSerializedKey(response.iacaKey.toString())
+            }
+
+            assertEquals(
+                expected = request.ecKeyGenRequestParams.keyType,
+                actual = generatedKey.keyType,
+            )
+
+            val iacaDecodedCertificate = iacaCertificateParser.parse(
+                certificate = pemToCertificateDer(response.certificatePEM),
+            )
+
+            assertEquals(
+                expected = request.ecKeyGenRequestParams.keyType,
+                actual = iacaDecodedCertificate.publicKey.keyType,
+            )
+
+        }
+    }
+
+    @Test
+    fun `onboard Document Signer does not work with unsupported key types`() = runTest {
+
+        listOf(
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp256k1,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.Ed25519,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.RSA,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.RSA3072,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.RSA4096,
+                ),
+            ),
+        ).forEach { request ->
+
+            assertFails {
+                OnboardingService.onboardDocumentSigner(request)
+            }
+
+        }
+    }
+
+    @Test
+    fun `onboard Document Signer works with all supported key types`() = runTest {
+
+        val dsCertificateParser = DocumentSignerCertificateParser()
+        listOf(
+            DocumentSignerOnboardingRequest(
+                //ensure by default a valid key is generated
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp256r1,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp384r1,
+                ),
+            ),
+            DocumentSignerOnboardingRequest(
+                iacaSigner = validIACASigner,
+                certificateData = validDSReqData,
+                ecKeyGenRequestParams = KeyGenerationRequestParameters(
+                    backend = KEY_GEN_BACKEND,
+                    keyType = KeyType.secp521r1,
+                ),
+            ),
+        ).forEach { request ->
+
+            val response = assertDoesNotThrow {
+                OnboardingService.onboardDocumentSigner(request)
+            }
+
+            val generatedKey = assertDoesNotThrow {
+                KeyManager.resolveSerializedKey(response.documentSignerKey.toString())
+            }
+
+            assertEquals(
+                expected = request.ecKeyGenRequestParams.keyType,
+                actual = generatedKey.keyType,
+            )
+
+            val dsDecodedCertificate = dsCertificateParser.parse(
+                certificate = pemToCertificateDer(response.certificatePEM),
+            )
+
+            assertEquals(
+                expected = request.ecKeyGenRequestParams.keyType,
+                actual = dsDecodedCertificate.publicKey.keyType,
+            )
+
+        }
+
     }
 }

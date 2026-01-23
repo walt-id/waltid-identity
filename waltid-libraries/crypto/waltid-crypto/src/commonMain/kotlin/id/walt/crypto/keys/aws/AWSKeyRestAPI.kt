@@ -74,7 +74,7 @@ class AWSKeyRestAPI(
         }
 
     override val hasPrivateKey: Boolean
-        get() = false
+        get() = true
 
     override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
 
@@ -628,10 +628,10 @@ $public
 
 
         @JsExport.Ignore
-        override suspend fun generate(type: KeyType, config: AWSKeyMetadata): AWSKeyRestAPI {
+        override suspend fun generate(type: KeyType, metadata: AWSKeyMetadata): AWSKeyRestAPI {
 
-            if (config.auth.accessKeyId.isNullOrBlank() && config.auth.secretAccessKey.isNullOrBlank()) {
-                getAccess(config)
+            if (metadata.auth.accessKeyId.isNullOrBlank() && metadata.auth.secretAccessKey.isNullOrBlank()) {
+                getAccess(metadata)
             }
 
 
@@ -645,9 +645,9 @@ $public
             val headers = buildSigV4Headers(
                 method = HttpMethod.Post,
                 payload = body,
-                config = config
+                config = metadata
             )
-            val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+            val awsKmsUrl = "kms.${metadata.auth.region}.amazonaws.com"
 
             logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
             val key = client.post("https://$awsKmsUrl/") {
@@ -666,10 +666,10 @@ $public
 
             if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
 
-            val publicKey = getPublicKey(config, keyId.toString())
+            val publicKey = getPublicKey(metadata, keyId.toString())
 
             return AWSKeyRestAPI(
-                config = config,
+                config = metadata,
                 id = keyId.toString(),
                 _publicKey = publicKey.exportJWK(),
                 _keyType = awsKeyToKeyTypeMapping(keyType)

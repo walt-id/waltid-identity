@@ -1,17 +1,148 @@
 [versions]
-coroutines = "1.10.2"
-serialization = "1.9.0"
-bcprov = "2.73.8"
+# Build/compilation versions
+kotlin = "2.3.0"
+suspendtransform = "2.3.0-0.13.2"
+
+java-service = "21"
+java-library = "17"
+
+# Plugins
+vanniktech-publish = "0.35.0"
+npm-publish = "3.5.3"
+jib = "3.5.2"
+android-gradle = "8.12.3"
+
+# Plugins / Dependencies
+ktor = "3.3.3"
+
+# ...
+
+
+# Kotlinx
+kotlinx-serialization = "1.9.0"
+kotlinx-datetime = "0.7.1"
+kotlinx-coroutines = "1.10.2"
+
+# Logging
+kotlinlogging = "7.0.14"
+slf4j-simple = "2.0.17"
+
+# Misc
+cache4k = "0.14.0"
+
+# Crypto
+bouncycastle = "2.73.8"
+nimbus-jose = "10.6"
+jose-npm = "5.10.0"
+bcprov = "2.73.10"
+bcpkix = "2.73.10"
+kotlincrypto = "0.6.1"
+tink = "1.16.0"
+
+# Testing
 junit-jupiter = "5.11.4"
-okio = "3.16.0"
-nimbus = "10.0.1"
+mokkery = "3.1.1"
+
+# HTTP
+okio = "3.16.2"
 
 [libraries]
-kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
-kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
-kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serialization" }
+
+# Plugins
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+kotlin-plugin-serialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "kotlin" }
+ktor-gradle-plugin = { module = "io.ktor.plugin:plugin", version.ref = "ktor" }
+benmanes-versions = { module = "com.github.ben-manes.versions:com.github.ben-manes.versions.gradle.plugin", version = "0.53.0" }
+owasp-dependencycheck = { module = "org.owasp.dependencycheck:org.owasp.dependencycheck.gradle.plugin", version = "12.1.9" }
+jib-gradle-plugin = { module = "com.google.cloud.tools:jib-gradle-plugin", version.ref = "jib" }
+vanniktech-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "vanniktech-publish" }
+petuska-npm-publish-plugin = { module = "dev.petuska.npm.publish:dev.petuska.npm.publish.gradle.plugin", version.ref = "npm-publish" }
+loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:love.forte.plugin.suspend-transform.gradle.plugin", version.ref = "suspendtransform" }
+powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref = "kotlin" }
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
+jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
+mokkery-gradle-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
+
+# Libraries
+
+## Kotlin Test
+kotlintest = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+
+## Ktor Client
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-serialization = { module = "io.ktor:ktor-client-serialization", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-encoding = { module = "io.ktor:ktor-client-encoding", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-client-json = { module = "io.ktor:ktor-client-json", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
+
+## Ktor Server
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+
+## Kotlinx
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinx-coroutines" }
+
+## Crypto
 bcprov-lts8on = { group = "org.bouncycastle", name = "bcprov-lts8on", version.ref = "bcprov" }
+bcpkix-lts8on = { group = "org.bouncycastle", name = "bcpkix-lts8on", version.ref = "bcpkix" }
+kotlincrypto-hash-bom = { module = "org.kotlincrypto.hash:bom", version.ref = "kotlincrypto" }
+kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
+kotlincrypto-macs-bom = { module = "org.kotlincrypto.macs:bom", version.ref = "kotlincrypto" }
+kotlincrypto-macs-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
+tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
+bouncycastle-prov = { module = "org.bouncycastle:bcprov-lts8on", version.ref = "bouncycastle" }
+bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "bouncycastle" }
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-jose" }
+
+## Testing
+kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.ref = "kotlin" }
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit-jupiter" }
+junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
+
+## HTTP
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
-nimbus-jose-jwt = { group = "com.nimbusds", name = "nimbus-jose-jwt", version.ref = "nimbus" }
+
+## Logging
+oshai-kotlinlogging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlinlogging" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j-simple" }
+
+
+## Misc
+cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
+
+[bundles]
+waltid-ktor-client = [
+    "ktor-client-core",
+    "ktor-client-serialization",
+    "ktor-client-content-negotiation",
+    "ktor-client-encoding",
+    "ktor-serialization-kotlinx-json",
+    "ktor-client-json",
+    "ktor-client-logging",
+]
+
+waltid-kotlintesting = [
+    "kotlintest",
+    "kotlinx-coroutines-test"
+]
+waltid-ktortesting = [
+    "kotlintest",
+    "kotlinx-coroutines-test",
+    "ktor-server-test-host"
+]
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "android-gradle" }
+android-application = { id = "com.android.application", version.ref = "android-gradle" }

@@ -12,30 +12,31 @@ import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
-import id.walt.dcql.models.meta.W3cCredentialMeta
+import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
-import id.walt.openid4vp.verifier.Verification2Session
-import id.walt.openid4vp.verifier.VerificationSessionCreator
 import id.walt.openid4vp.verifier.OSSVerifier2FeatureCatalog
+import id.walt.openid4vp.verifier.OSSVerifier2ServiceConfig
+import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.GeneralFlowConfig
+import id.walt.openid4vp.verifier.data.Verification2Session
+import id.walt.openid4vp.verifier.data.VerificationSessionSetup
+import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.openid4vp.verifier.verifierModule
-import id.walt.policies2.PolicyList
-import id.walt.policies2.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
-import io.ktor.client.call.body
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.server.application.Application
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.server.application.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -45,12 +46,12 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class)
 class W3CVerifier2IntegrationTest {
 
-    private val sdJwtVcDcqlQuery = DcqlQuery(
+    private val w3cDcqlQuery = DcqlQuery(
         credentials = listOf(
             CredentialQuery(
                 id = "openbadge",
                 format = CredentialFormat.JWT_VC_JSON,
-                meta = W3cCredentialMeta(
+                meta = JwtVcJsonMeta(
                     typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
                 ),
                 claims = listOf(
@@ -62,7 +63,7 @@ class W3CVerifier2IntegrationTest {
             CredentialQuery(
                 id = "universitydegree",
                 format = CredentialFormat.JWT_VC_JSON,
-                meta = W3cCredentialMeta(
+                meta = JwtVcJsonMeta(
                     typeValues = listOf(listOf("VerifiableCredential", "UniversityDegreeCredential"))
                 ),
                 claims = listOf(
@@ -75,10 +76,17 @@ class W3CVerifier2IntegrationTest {
     )
 
     private val w3cPolicies = Verification2Session.DefinedVerificationPolicies(
-        vcPolicies = PolicyList(
+        vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy()
             )
+        )
+    )
+
+    private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = w3cDcqlQuery,
+            policies = w3cPolicies
         )
     )
 
@@ -275,12 +283,7 @@ class W3CVerifier2IntegrationTest {
             // Create the verification session
             val verificationSessionResponse = testAndReturn("Create verification session") {
                 http.post("/verification-session/create") {
-                    setBody(
-                        VerificationSessionCreator.VerificationSessionSetup(
-                            dcqlQuery = sdJwtVcDcqlQuery,
-                            policies = w3cPolicies
-                        )
-                    )
+                    setBody(verificationSessionSetup)
                 }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
             }
             println("Verification Session Response: $verificationSessionResponse")
@@ -336,7 +339,8 @@ class W3CVerifier2IntegrationTest {
                 assertTrue { presentationResult.isSuccess }
 
                 val resp = presentationResult.getOrThrow().jsonObject
-                assertTrue { resp["transmission_success"]!!.jsonPrimitive.boolean }
+                println(resp)
+                assertTrue("Transmission did not succeed") { resp["transmission_success"]!!.jsonPrimitive.boolean }
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 
@@ -356,7 +360,7 @@ class W3CVerifier2IntegrationTest {
                 assertEquals(2, info2.presentedCredentials!!.size)
                 assertNotNull(info2.presentedCredentials!!["openbadge"])
                 assertEquals(1, info2.presentedCredentials!!["openbadge"]!!.size)
-                assertNotNull { info2.presentedCredentials!!["universitydegree"] }
+                assertNotNull(info2.presentedCredentials!!["universitydegree"])
                 assertEquals(1, info2.presentedCredentials!!["universitydegree"]!!.size)
 
                 assertNotNull(info2.policyResults)

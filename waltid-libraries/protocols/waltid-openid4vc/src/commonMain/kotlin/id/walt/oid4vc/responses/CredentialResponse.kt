@@ -18,7 +18,7 @@ import kotlin.time.Duration.Companion.seconds
 @OptIn(ExperimentalSerializationApi::class)
 @KeepGeneratedSerializer
 @Serializable(with = CredentialResponseSerializer::class)
-data class CredentialResponse private constructor(
+data class CredentialResponse(
     val format: CredentialFormat? = null,
     val credential: JsonElement? = null,
     @SerialName("acceptance_token") val acceptanceToken: String? = null,

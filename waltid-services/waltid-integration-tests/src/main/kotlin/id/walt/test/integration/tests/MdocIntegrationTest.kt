@@ -24,6 +24,7 @@ import id.walt.mdoc.doc.VerificationType
 import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VP
+import id.walt.oid4vc.data.CredSignAlgValues
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.test.integration.environment.api.wallet.WalletApi
@@ -146,7 +147,9 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
         )
 
         assertTrue {
-            mDLCredentialConfigurationDraft13.credentialSigningAlgValuesSupported!!.contains("ES256")
+            mDLCredentialConfigurationDraft13.credentialSigningAlgValuesSupported!!.contains(
+                CredSignAlgValues.Named("ES256")
+            )
         }
 
         assertEquals(
@@ -329,8 +332,12 @@ class MdocIntegrationTest : AbstractIntegrationTest() {
                 }
             }
 
-            assertTrue {
+            assertFalse {
                 iacaCertificate.criticalExtensionOIDs.contains(Extension.cRLDistributionPoints.id)
+            }
+
+            assertTrue {
+                iacaCertificate.nonCriticalExtensionOIDs.contains(Extension.cRLDistributionPoints.id)
             }
         }
 

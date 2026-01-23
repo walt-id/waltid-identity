@@ -17,7 +17,7 @@ object DocumentSignerDocs {
             required = true
 
             example(
-                name = "Required fields only & local secp256r1 JWK signing key"
+                name = "Required data fields & local secp256r1 JWK signing key"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -26,6 +26,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -62,6 +64,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -91,7 +95,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "All optional fields & local secp256r1 JWK signing key"
+                name = "All data fields & local secp256r1 JWK signing key"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -138,7 +142,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 TSE signing key with AppRole (Auth)"
+                name = "Required data fields & secp256r1 TSE signing key with AppRole (Auth)"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -147,6 +151,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -184,7 +190,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 TSE signing key with Username & Password (Auth)"
+                name = "Required data fields & secp256r1 TSE signing key with Username & Password (Auth)"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -193,6 +199,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -231,7 +239,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 OCI signing key"
+                name = "Required data fields & secp256r1 OCI signing key"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -240,6 +248,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -274,7 +284,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 OCI REST API signing key"
+                name = "Required data fields & secp256r1 OCI REST API signing key"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -283,6 +293,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -322,7 +334,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 AWS REST API signing key with AccessKey (Auth)"
+                name = "Required data fields & secp256r1 AWS REST API signing key with AccessKey (Auth)"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -331,6 +343,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -368,7 +382,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 AWS REST API signing key with Role (Auth)"
+                name = "Required data fields & secp256r1 AWS REST API signing key with Role (Auth)"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -377,6 +391,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -413,7 +429,7 @@ object DocumentSignerDocs {
             }
 
             example(
-                name = "Required fields only & secp256r1 Azure REST API signing key"
+                name = "Required data fields & secp256r1 Azure REST API signing key"
             ) {
                 value = Json.decodeFromString<DocumentSignerOnboardingRequest>(
                     """
@@ -422,6 +438,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -468,7 +486,7 @@ object DocumentSignerDocs {
             body<DocumentSignerOnboardingResponse> {
 
                 example(
-                    name = "Required fields only & local secp256r1 JWK signing key"
+                    name = "Required data fields & local secp256r1 JWK signing key"
                 ) {
                     value = Json.decodeFromString<DocumentSignerOnboardingResponse>(
                         """
@@ -488,6 +506,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example DS",
+                                "notBefore": "2025-05-29T07:18:39Z",
+                                "notAfter": "2026-05-29T07:18:39Z",                                      
                                 "crlDistributionPointUri": "https://iaca.example.com/crl"
                             }
                         }

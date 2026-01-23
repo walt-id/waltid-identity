@@ -18,7 +18,7 @@ object CredentialQueryMetaPolymorphicSerializer : KSerializer<CredentialQueryMet
         // Delegate to the actual serializer of the concrete type
         when (value) {
             is NoMeta -> encoder.encodeSerializableValue(NoMeta.serializer(), value) // Will serialize as {}
-            is W3cCredentialMeta -> encoder.encodeSerializableValue(W3cCredentialMeta.serializer(), value)
+            is JwtVcJsonMeta -> encoder.encodeSerializableValue(JwtVcJsonMeta.serializer(), value)
             is SdJwtVcMeta -> encoder.encodeSerializableValue(SdJwtVcMeta.serializer(), value)
             is MsoMdocMeta -> encoder.encodeSerializableValue(MsoMdocMeta.serializer(), value)
             is GenericMeta -> encoder.encodeSerializableValue(GenericMeta.serializer(), value)
@@ -44,8 +44,8 @@ object CredentialQueryMetaPolymorphicSerializer : KSerializer<CredentialQueryMet
         // This part needs to be robust or, ideally, guided by the parent 'format' field
         // if this serializer was part of a CredentialQuery custom serializer.
         return when {
-            jsonElement.containsKey(W3cCredentialMeta.TYPE_VALUES_KEY) ->
-                jsonInput.json.decodeFromJsonElement(W3cCredentialMeta.serializer(), jsonElement)
+            jsonElement.containsKey(JwtVcJsonMeta.TYPE_VALUES_KEY) ->
+                jsonInput.json.decodeFromJsonElement(JwtVcJsonMeta.serializer(), jsonElement)
 
             jsonElement.containsKey(SdJwtVcMeta.VCT_VALUES_KEY) ->
                 jsonInput.json.decodeFromJsonElement(SdJwtVcMeta.serializer(), jsonElement)

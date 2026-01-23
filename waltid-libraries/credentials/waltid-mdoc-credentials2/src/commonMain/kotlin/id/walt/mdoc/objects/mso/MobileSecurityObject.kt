@@ -3,6 +3,7 @@ package id.walt.mdoc.objects.mso
 import id.walt.mdoc.encoding.TransformingSerializerTemplate
 import id.walt.mdoc.objects.digest.ValueDigestList
 import io.ktor.http.*
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -41,7 +42,7 @@ data class MobileSecurityObject(
     val digestAlgorithm: String,
 
     @SerialName("valueDigests")
-    val valueDigests: Map<String, ValueDigestList>,
+    val valueDigests: Map<String, @Contextual ValueDigestList>,
 
     @SerialName("deviceKeyInfo")
     val deviceKeyInfo: DeviceKeyInfo,

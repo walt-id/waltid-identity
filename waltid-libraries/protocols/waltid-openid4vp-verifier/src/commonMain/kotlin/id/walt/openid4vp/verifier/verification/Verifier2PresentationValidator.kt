@@ -20,10 +20,15 @@ object Verifier2PresentationValidator {
     suspend fun validatePresentation(
         presentationString: String,
         expectedFormat: CredentialFormat,
-        expectedAudience: String,
+        expectedAudience: String?,
         expectedNonce: String,
         responseUri: String?,
-        originalClaimsQuery: List<ClaimsQuery>?
+        originalClaimsQuery: List<ClaimsQuery>?,
+
+        isDcApi: Boolean,
+        isEncrypted: Boolean,
+        verifierOrigin: String?,
+        jwkThumbprint: String?
     ): Result<PresentationValidationResult> {
         return when (expectedFormat) {
             CredentialFormat.JWT_VC_JSON -> W3CPresentationValidator.validateW3cVpJwt(
@@ -42,12 +47,16 @@ object Verifier2PresentationValidator {
             CredentialFormat.MSO_MDOC -> MdocPresentationValidator.validateMsoMdocPresentation(
                 mdocBase64UrlString = presentationString,
                 expectedNonce = expectedNonce,
-                expectedAudience = expectedAudience,
-                responseUri = responseUri
+                expectedAudience = if (isDcApi) verifierOrigin else expectedAudience,
+                responseUri = responseUri,
+
+                isDcApi = isDcApi,
+                isEncrypted = isEncrypted,
+                jwkThumbprint = jwkThumbprint,
             )
 
             // Future: Implement other formats (e.g. LDP)
-            else -> Result.failure(UnsupportedOperationException("Format $expectedFormat not supported for validation yet."))
+            CredentialFormat.LDP_VC, CredentialFormat.AC_VP -> Result.failure(UnsupportedOperationException("Format $expectedFormat not supported for validation yet."))
         }
     }
 

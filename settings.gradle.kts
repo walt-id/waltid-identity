@@ -19,6 +19,7 @@ val modules = listOfNotNull(
         "waltid-crypto",
         "waltid-crypto-oci",
         "waltid-crypto-aws",
+        "waltid-crypto-azure",
         "waltid-crypto-android" whenEnabled enableAndroidBuild,
         "waltid-crypto-ios" whenEnabled enableIosBuild,
         "waltid-target-ios" whenEnabled enableIosBuild,
@@ -37,6 +38,7 @@ val modules = listOfNotNull(
         "waltid-dcql",
         "waltid-verification-policies",
         "waltid-verification-policies2",
+        "waltid-verification-policies2-vp",
         "waltid-holder-policies",
         "waltid-vical",
         "waltid-mdoc-credentials2"
@@ -44,7 +46,7 @@ val modules = listOfNotNull(
 
     * "$libraries:protocols".group(
         "waltid-openid4vc",
-
+        "waltid-openid4vci",
         "waltid-openid4vp",
         "waltid-openid4vp-verifier",
         "waltid-openid4vp-verifier-openapi",
@@ -65,16 +67,11 @@ val modules = listOfNotNull(
 
     * "$libraries:web".group(
         "waltid-ktor-notifications",
-        "waltid-ktor-notifications-core"
+        "waltid-ktor-notifications-core",
+        "waltid-web-data-fetching"
     ),
 
     "$libraries:waltid-core-wallet",
-
-    /*
-    * "$libraries:util".group(
-        "waltid-reporting"
-    ),
-    */
 
     "$libraries:waltid-did",
     "$libraries:waltid-java-compat",
@@ -107,10 +104,29 @@ val modules = listOfNotNull(
 include(*modules.toTypedArray())
 
 pluginManagement {
+    includeBuild("build-logic")
+
     repositories {
         google()
         mavenCentral()
         gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
+
+    repositories {
+        maven("https://maven.waltid.dev/releases")
+        maven("https://maven.waltid.dev/snapshots")
+        mavenCentral()
+        google()
+    }
+
+    versionCatalogs {
+        create("identityLibs") {
+            from(files("gradle/libs.versions.toml"))
+        }
     }
 }
 

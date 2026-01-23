@@ -4,6 +4,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.security.PasswordHashingAlgorithm
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonObject
 import org.intellij.lang.annotations.Language
 
@@ -24,7 +25,8 @@ data class KtorAuthnzConfig(
     /** Hash algorithm to use for passwords for signing */
     val hashAlgorithm: PasswordHashingAlgorithm,
 
-    val authFlow: AuthFlow = AuthFlow.fromConfig(defaultAuthFlowJson),
+    val authFlow: AuthFlow? = null,
+    val authFlows: List<AuthFlow>? = listOf(AuthFlow.fromConfig(defaultAuthFlowJson)),
 
     /**
      * If previously you used other (older) password hash algorithms, you
@@ -46,7 +48,7 @@ data class KtorAuthnzConfig(
     val cookieDomain: String?,
 
     val valkeyUnixSocket: String? = null,
-    val valkeyHost: String? = "127.0.0.1",
+    val valkeyHost: String? = null,
     val valkeyPort: Int? = 6379,
     val valkeyRetention: String? = "7d",
 
@@ -55,6 +57,17 @@ data class KtorAuthnzConfig(
 ) {
     val configuredSigningKey by lazy { signingKey?.let { KeyManager.resolveSerializedKeyBlocking(it.toString()) } }
     val configuredVerificationKey by lazy { KeyManager.resolveSerializedKeyBlocking(verificationKey.toString()) }
+
+    @Transient
+    val flowConfigs = ArrayList<AuthFlow>().apply {
+        require(authFlow != null || authFlows != null) {
+            "No auth flow was defined"
+        }
+        if (authFlow != null)
+            add(authFlow)
+        if (authFlows != null)
+            addAll(authFlows)
+    }
 
     enum class AuthnzTokens {
         JWT,

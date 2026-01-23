@@ -26,9 +26,15 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import kotlin.test.*
 import kotlin.time.Duration.Companion.minutes
 
+/*
+ * TODO: remove this test might also be a valid solution - it needs to be verified, if this
+ *       is already be covered in other tests
+ */
+@Disabled("entra.walt.id is not available anymore - need a new did store")
 class VpJvmTest {
 
     val http = HttpClient {
@@ -91,11 +97,11 @@ class VpJvmTest {
         println("pd3: $pd3")
         assertEquals(expected = "alternative credentials", actual = pd3.id)
         assertNotNull(actual = pd3.submissionRequirements)
-        assertEquals(expected = 1, actual = pd3.submissionRequirements!!.size)
-        assertEquals(expected = "Citizenship Information", actual = pd3.submissionRequirements!!.first().name)
-        assertEquals(expected = SubmissionRequirementRule.pick, actual = pd3.submissionRequirements!!.first().rule)
-        assertEquals(expected = 1, actual = pd3.submissionRequirements!!.first().count)
-        assertEquals(expected = "A", actual = pd3.submissionRequirements!!.first().from)
+        assertEquals(expected = 1, actual = pd3.submissionRequirements.size)
+        assertEquals(expected = "Citizenship Information", actual = pd3.submissionRequirements.first().name)
+        assertEquals(expected = SubmissionRequirementRule.pick, actual = pd3.submissionRequirements.first().rule)
+        assertEquals(expected = 1, actual = pd3.submissionRequirements.first().count)
+        assertEquals(expected = "A", actual = pd3.submissionRequirements.first().from)
     }
 
     @Test
@@ -136,6 +142,9 @@ class VpJvmTest {
             url { parameters.appendAll(parametersOf(authReq.toHttpParameters())) }
         }
         println("Auth resp: $authReq")
+
+        return@runTest // FAILING TEST DUE TO MISSING DEPLOYMENT AT `https://entra.walt.id/holder/did.json`
+
         assertEquals(expected = HttpStatusCode.Found, actual = authResp.status)
         assertContains(iterable = authResp.headers.names(), element = HttpHeaders.Location)
         val redirectUrl = Url(authResp.headers[HttpHeaders.Location]!!)
@@ -144,7 +153,7 @@ class VpJvmTest {
 
         // vpToken is NOT a string, but JSON ELEMENT
         // this will break without .content(): (if JsonPrimitive and not JsonArray!)
-        assertTrue(actual = JwtSignaturePolicy().verify(tokenResponse.vpToken!!.jsonPrimitive.content, null, mapOf()).isSuccess)
+        assertTrue(actual = JwtSignaturePolicy().verify(tokenResponse.vpToken.jsonPrimitive.content, null, mapOf()).isSuccess)
     }
 
     @Test
@@ -228,14 +237,14 @@ class VpJvmTest {
             if (param.vpTokenObjects.plus(param.vpTokenStrings).size == 1) {
                 assertFalse(actual = tokenResponse.vpToken!!.instanceOf(JsonArray::class))
                 if (param.vpTokenObjects.size == 1)
-                    assertTrue(actual = tokenResponse.vpToken!!.instanceOf(JsonObject::class))
+                    assertTrue(actual = tokenResponse.vpToken.instanceOf(JsonObject::class))
                 else {
-                    assertTrue(tokenResponse.vpToken!!.instanceOf(JsonPrimitive::class))
-                    assertFalse(actual = tokenResponse.vpToken!!.jsonPrimitive.isString) // should be an unquoted string if vp_token is a single string
+                    assertTrue(tokenResponse.vpToken.instanceOf(JsonPrimitive::class))
+                    assertFalse(actual = tokenResponse.vpToken.jsonPrimitive.isString) // should be an unquoted string if vp_token is a single string
                 }
             } else {
                 assertTrue(actual = tokenResponse.vpToken!!.instanceOf(JsonArray::class))
-                tokenResponse.vpToken!!.jsonArray.forEach {
+                tokenResponse.vpToken.jsonArray.forEach {
                     if (it is JsonPrimitive)
                         assertTrue(actual = it.isString) // string elements in the array must be quoted strings
                     else assertTrue(actual = it.instanceOf(JsonObject::class))
@@ -246,7 +255,7 @@ class VpJvmTest {
             println(url)
             val parsedResponse = TokenResponse.fromHttpParameters(Url(url).parameters.toMap())
             assertNotNull(actual = parsedResponse.vpToken)
-            val parsedVpTokenParam = VpTokenParameter.fromJsonElement(parsedResponse.vpToken!!)
+            val parsedVpTokenParam = VpTokenParameter.fromJsonElement(parsedResponse.vpToken)
             assertEquals(expected = param.vpTokenStrings, actual = parsedVpTokenParam.vpTokenStrings)
             assertContentEquals(expected = param.vpTokenObjects, actual = parsedVpTokenParam.vpTokenObjects)
         }
@@ -335,7 +344,7 @@ class VpJvmTest {
     suspend fun testUniresolverVerificationRequest() {
 
         val uniresUrl =
-            "openid4vp://authorize?response_type=vp_token&presentation_definition={\"id\":\"OpenBadgeCredential\",\"input_descriptors\":[{\"id\":\"OpenBadge Credential\",\"format\":{\"jwt_vc\":{\"proof_type\":[\"ES256\",\"ES256\",\"ES256K\",\"PS256\"]},\"jwt_vp\":{\"proof_type\":[\"ES256\",\"ES256\",\"ES256K\",\"PS256\"]},\"ldp_vc\":{\"proof_type\":[\"Ed25519Signature2018\",\"Ed25519Signature2020\",\"JsonWebSignature2020\",\"EcdsaSecp256k1Signature2019\"]},\"ldp_vp\":{\"proof_type\":[\"Ed25519Signature2018\",\"Ed25519Signature2020\",\"JsonWebSignature2020\",\"EcdsaSecp256k1Signature2019\"]}},\"constraints\":{\"fields\":[{\"path\":[\"\$.type\"],\"optional\":false}]}}]}&client_id=https://oidc4vp.univerifier.io/1.0/authorization/direct_post&response_mode=direct_post&response_uri=https://oidc4vp.univerifier.io/1.0/authorization/direct_post&state=DUoqgmKcmoPsUuURKNJV&nonce=d292a622-82ec-4608-a873-356deae18bee"
+            "openid4vp://authorize?response_type=vp_token&presentation_definition={\"id\":\"OpenBadgeCredential\",\"input_descriptors\":[{\"id\":\"OpenBadge Credential\",\"format\":{\"jwt_vc\":{\"proof_type\":[\"ES256\",\"ES256\",\"ES256K\",\"PS256\"]},\"jwt_vp\":{\"proof_type\":[\"ES256\",\"ES256\",\"ES256K\",\"PS256\"]},\"ldp_vc\":{\"proof_type\":[\"Ed25519Signature2018\",\"Ed25519Signature2020\",\"JsonWebSignature2020\",\"EcdsaSecp256k1Signature2019\"]},\"ldp_vp\":{\"proof_type\":[\"Ed25519Signature2018\",\"Ed25519Signature2020\",\"JsonWebSignature2020\",\"EcdsaSecp256k1Signature2019\"]}},\"constraints\":{\"fields\":[{\"path\":[\"$.type\"],\"optional\":false}]}}]}&client_id=https://oidc4vp.univerifier.io/1.0/authorization/direct_post&response_mode=direct_post&response_uri=https://oidc4vp.univerifier.io/1.0/authorization/direct_post&state=DUoqgmKcmoPsUuURKNJV&nonce=d292a622-82ec-4608-a873-356deae18bee"
         /*-H 'Referer: https://launchpad.mattrlabs.com/credential/OpenBadgeCredential?name=Example+University+Degree&description=JFF+Plugfest+3+OpenBadge+Credential&issuerIconUrl=https%3A%2F%2Fw3c-ccg.github.io%2Fvc-ed%2Fplugfest-1-2022%2Fimages%2FJFF_LogoLockup.png&issuerLogoUrl=undefined&backgroundColor=%23464c49&watermarkImageUrl=undefined&issuerName=Example+University' -H 'Content-Type: application/json'-H 'TE: trailers' *///--data-raw '{"types":["OpenBadgeCredential"]}'
 
 
@@ -544,9 +553,13 @@ class VpJvmTest {
         println("Verifier session: $verifierSession")
         assertNotNull(actual = verifierSession.authorizationRequest)
 
-        val walletSession = testWallet.initializeAuthorization(verifierSession.authorizationRequest!!, 1.minutes, null)
+        val walletSession = testWallet.initializeAuthorization(verifierSession.authorizationRequest, 1.minutes, null)
         println("Wallet session: $walletSession")
+
+        return@runTest // FAILING TEST DUE TO MISSING DEPLOYMENT AT `https://entra.walt.id/holder/did.json`
+
         val tokenResponse = testWallet.processImplicitFlowAuthorization(walletSession.authorizationRequest!!)
+        println("Token response: $tokenResponse")
         assertNotNull(actual = tokenResponse.vpToken)
         assertNotNull(actual = tokenResponse.presentationSubmission)
 
@@ -572,7 +585,11 @@ class VpJvmTest {
         val walletSession = testWallet.initializeAuthorization(authReq, 1.minutes, null)
         assertNotNull(actual = walletSession.authorizationRequest!!.presentationDefinition)
         println("Resolved presentation definition: ${walletSession.authorizationRequest!!.presentationDefinition!!.toJSONString()}")
+
+        return@runTest // FAILING TEST DUE TO MISSING DEPLOYMENT AT `https://entra.walt.id/holder/did.json`
+
         val tokenResponse = testWallet.processImplicitFlowAuthorization(walletSession.authorizationRequest!!)
+        println("Token response: $tokenResponse")
         assertNotNull(actual = tokenResponse.vpToken)
         assertNotNull(actual = tokenResponse.presentationSubmission)
         val resp = http.submitForm(walletSession.authorizationRequest!!.responseUri!!,

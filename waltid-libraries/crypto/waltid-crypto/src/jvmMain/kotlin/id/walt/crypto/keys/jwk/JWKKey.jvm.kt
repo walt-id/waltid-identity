@@ -258,6 +258,59 @@ actual class JWKKey actual constructor(
         return customJws
     }
 
+    /**
+     * JWE Encryption using ECDH-ES + A128GCM.
+     * This instance acts as the Recipient Public Key.
+     */
+    actual suspend fun encryptJwe(plaintext: ByteArray): String {
+        // Ensure we are using the correct curve (P-256)
+        check(keyType == KeyType.secp256r1) { "ECDH-ES+A128GCM is currently only supported for secp256r1 (P-256)." }
+
+        // 1. Create the JWE Header
+        val header = JWEHeader(JWEAlgorithm.ECDH_ES, EncryptionMethod.A128GCM)
+
+        // 2. Create the JWE Object
+        val jweObject = JWEObject(header, Payload(plaintext))
+
+        // 3. Create the Encrypter using the underlying Nimbus ECKey (Public)
+        // Nimbus handles the ephemeral key generation internally
+        val encrypter = ECDHEncrypter(_internalJwk.toECKey())
+
+        // 4. Perform Encryption
+        jweObject.encrypt(encrypter)
+
+        // 5. Serialize to compact form (String)
+        return jweObject.serialize()
+    }
+
+    /**
+     * JWE Decryption using ECDH-ES + A128GCM.
+     * This instance acts as the Recipient Private Key.
+     */
+    actual suspend fun decryptJwe(jweString: String): ByteArray {
+        check(hasPrivateKey) { "Private key required for decryption." }
+        check(keyType == KeyType.secp256r1) { "ECDH-ES+A128GCM is currently only supported for secp256r1 (P-256)." }
+
+        // 1. Parse the JWE String
+        val jweObject = JWEObject.parse(jweString)
+
+        // 2. Validate Header (Optional but recommended security check)
+        val alg = jweObject.header.algorithm
+        val enc = jweObject.header.encryptionMethod
+        check(alg == JWEAlgorithm.ECDH_ES && enc == EncryptionMethod.A128GCM) {
+            "Unsupported JWE Algorithm or Encryption Method. Expected ECDH-ES + A128GCM, but got $alg + $enc"
+        }
+
+        // 3. Create the Decrypter using the underlying Nimbus ECKey (Private)
+        val decrypter = ECDHDecrypter(_internalJwk.toECKey())
+
+        // 4. Perform Decryption
+        jweObject.decrypt(decrypter)
+
+        // 5. Return payload
+        return jweObject.payload.toBytes()
+    }
+
     actual override suspend fun verifyRaw(
         signed: ByteArray,
         detachedPlaintext: ByteArray?,
@@ -389,7 +442,7 @@ actual class JWKKey actual constructor(
 //        KeyType.Ed25519 -> decodeEd25519RawPublicKey(_internalJwk.toOctetKeyPair())
 //        KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
         KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toRSAPublicKey()
-        else -> TODO("Not yet supported: $keyType")
+//        else -> TODO("Not yet supported: $keyType")
     }
 
     private fun getSignatureAlgorithm(customSignatureAlgorithm: String? = null): Signature =

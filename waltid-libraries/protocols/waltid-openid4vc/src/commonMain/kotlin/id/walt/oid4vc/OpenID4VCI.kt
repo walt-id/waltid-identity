@@ -122,7 +122,8 @@ object OpenID4VCI {
 
             offerReq.credentialOfferUri != null -> {
                 runCatching {
-                    http.get(offerReq.credentialOfferUri) }.getOrElse { ex ->
+                    http.get(offerReq.credentialOfferUri)
+                }.getOrElse { ex ->
                     throw UnresolvableCredentialOfferException(offerReq.credentialOfferUri, ex)
                 }.bodyAsText().let { text ->
                     runCatching { CredentialOffer.fromJSONString(text) }.getOrElse { ex ->
@@ -550,6 +551,26 @@ object OpenID4VCI {
                 },
                 customParameters = customParameters!!
             )
+
+            OpenID4VCIVersion.V1 -> OpenIDProviderMetadata.Draft13(
+                issuer = baseUrl,
+                authorizationEndpoint = "$baseUrl/authorize",
+                tokenEndpoint = "$baseUrl/token",
+                credentialEndpoint = "$baseUrl/credential",
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
+                jwksUri = "$baseUrl/jwks",
+                grantTypesSupported = setOf(GrantType.authorization_code),
+                credentialIssuer = baseUrl,
+                responseTypesSupported = setOf(
+                    ResponseType.Code.value,
+                ),
+                codeChallengeMethodsSupported = listOf("S256"),
+                credentialConfigurationsSupported = credentialSupported,
+                customParameters = customParameters!!,
+//                authorizationServers = setOf(baseUrl),
+                nonceEndpoint =  "$baseUrl/nonce",
+
+            )
         }
     }
 
@@ -559,7 +580,7 @@ object OpenID4VCI {
             ?.let { payload ->
                 payload.value[MapKey(ProofOfPossession.CWTProofBuilder.LABEL_NONCE)].let {
                     when (it) {
-                        is ByteStringElement -> String(it.value)
+                        is ByteStringElement -> it.value.decodeToString(0, 0 + it.value.size)
                         is StringElement -> it.value
                         else -> throw Error("Invalid nonce type")
                     }
@@ -710,7 +731,14 @@ object OpenID4VCI {
                     errorCode = CredentialErrorCode.invalid_request,
                     message = "VCT must be set on credential request"
                 )
-        ).plus("display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray)
+        ).let { defPayloadProps ->
+            display?.takeIf { it.isNotEmpty() }?.let { dis ->
+                defPayloadProps.plus(
+                    "display" to Json.encodeToJsonElement(dis)
+                )
+            } ?: defPayloadProps
+        }
+
 
         val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
 
@@ -800,12 +828,13 @@ object OpenID4VCI {
 
 enum class OpenID4VCIVersion(val versionString: String) {
     DRAFT11("draft11"),
-    DRAFT13("draft13");
+    DRAFT13("draft13"),
+    V1("v1");
 
     companion object {
         fun from(version: String): OpenID4VCIVersion {
             return entries.find { it.versionString == version }
-                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: DRAFT13 -> draft13 and DRAFT11 -> draft11")
+                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: DRAFT13 -> draft13, DRAFT11 -> draft11, V1 -> v1")
         }
     }
 }

@@ -56,7 +56,7 @@ import kotlinx.serialization.json.*
  * @param opTosUri OPTIONAL. URL that the OpenID Provider provides to the person registering the Client to read about OpenID Provider's terms of service. The registration process SHOULD display this URL to the person registering the Client if it is given.
  */
 @Serializable(with = OpenIDProviderMetadataSerializer::class)
-sealed class OpenIDProviderMetadata() : JsonDataObject() {
+sealed class OpenIDProviderMetadata : JsonDataObject() {
     abstract val issuer: String?
     abstract val authorizationEndpoint: String?
     abstract val pushedAuthorizationRequestEndpoint: String?
@@ -124,7 +124,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
     @OptIn(ExperimentalSerializationApi::class)
     @KeepGeneratedSerializer
     @Serializable(with = Draft11OpenIDProviderMetadataSerializer::class)
-    data class Draft11 private constructor(
+    data class Draft11(
         @SerialName("issuer") override val issuer: String? = null,
         @SerialName("authorization_endpoint") override val authorizationEndpoint: String? = null,
         @SerialName("pushed_authorization_request_endpoint") override val pushedAuthorizationRequestEndpoint: String? = null,
@@ -356,7 +356,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("userinfo_endpoint") override val userinfoEndpoint: String? = null,
         @SerialName("jwks_uri") override val jwksUri: String? = null,
         @SerialName("registration_endpoint") override val registrationEndpoint: String? = null,
-        @EncodeDefault @SerialName("scopes_supported") override val scopesSupported: Set<String> = setOf("openid"),
+        @EncodeDefault @SerialName("scopes_supported") override val scopesSupported: Set<String> = setOf("openid", "org.iso.23220.photoid.1"),
         @SerialName("response_types_supported") override val responseTypesSupported: Set<String>? = null,
         @EncodeDefault @SerialName("response_modes_supported") override val responseModesSupported: Set<ResponseMode> = setOf(
             ResponseMode.query,
@@ -415,6 +415,7 @@ sealed class OpenIDProviderMetadata() : JsonDataObject() {
         @SerialName("credential_configurations_supported") @Serializable(CredentialSupportedMapSerializer::class) val credentialConfigurationsSupported: Map<String, CredentialSupported>? = null,
         @SerialName("authorization_servers") val authorizationServers: Set<String>? = null,
         @SerialName("pre-authorized_grant_anonymous_access_supported") val preAuthorizedGrantAnonymousAccessSupport: Boolean? = null,
+        @SerialName("nonce_endpoint") val nonceEndpoint: String? = null,
 
         override val customParameters: Map<String, JsonElement>? = mapOf()
 

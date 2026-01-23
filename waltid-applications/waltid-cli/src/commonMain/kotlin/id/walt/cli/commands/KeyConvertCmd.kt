@@ -27,7 +27,7 @@ import java.io.File
 import java.io.FileReader
 import java.security.PrivateKey
 import java.security.Security
-import java.util.Base64
+import java.util.*
 import kotlin.io.path.useLines
 
 
@@ -186,11 +186,11 @@ class KeyConvertCmd : CliktCommand(
         lateinit var k: PrivateKey
 
         try {
-            val decipherKey: String
+            val decipherKey: String?
 
 
             if (passphrase == null) {
-                decipherKey = terminal.prompt("Key encrypted. Please, inform the passphrase to decipher it")!!
+                decipherKey = terminal.prompt("Key encrypted. Please, inform the passphrase to decipher it")
                 if (decipherKey == null) { // TODO: Can happen?
                     return Result.failure(BadParameterValue(passphrase!!))
                 }

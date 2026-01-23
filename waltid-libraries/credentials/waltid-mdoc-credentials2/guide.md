@@ -430,7 +430,7 @@ Create a verification session with the `/verification-session/create` endpoint:
     ]
   },
   "policies": {
-    "vcPolicies": [
+    "vc_policies": [
       { "policy": "signature" },
       { "policy": "regex", "path": "$.['org.iso.23220.dtc.1'].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
     ]
@@ -480,7 +480,7 @@ curl -X 'POST' \
     ]
   },
   "policies": {
-    "vcPolicies": [
+    "vc_policies": [
       { "policy": "signature" },
       { "policy": "regex", "path": "$.['\''org.iso.23220.dtc.1'\''].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
     ]
@@ -668,7 +668,7 @@ Response:
   },
   "authorizationRequestUrl": "openid4vp://authorize?response_type=vp_token&client_id=verifier2&state=29026a29-431d-4386-a3c3-4ee48edb0301&response_mode=direct_post&nonce=6d80e6b5-cc19-4dde-b944-a313a1965fed&response_uri=http%3A%2F%2Flocalhost%3A7003%2Fverification-session%2F%2F8939646d-6eb4-4fcc-bb19-6ac3346de241%2Fresponse&dcql_query=%7B%22credentials%22%3A%5B%7B%22id%22%3A%22my_photoid%22%2C%22format%22%3A%22mso_mdoc%22%2C%22meta%22%3A%7B%22doctype_value%22%3A%22org.iso.23220.photoid.1%22%7D%2C%22claims%22%3A%5B%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22family_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22given_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_authority_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22resident_postal_code%22%5D%2C%22values%22%3A%5B1180%2C1190%2C1200%2C1210%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_country%22%5D%2C%22values%22%3A%5B%22AT%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22person_id%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22resident_street%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22administrative_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22travel_document_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_version%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_dg1%22%5D%7D%5D%7D%5D%7D&client_metadata=%7B%22client_name%22%3A%22Verifier2%22%2C%22logo_uri%22%3A%22https%3A%2F%2Fimages.squarespace-cdn.com%2Fcontent%2Fv1%2F609c0ddf94bcc0278a7cbdb4%2F4d493ccf-c893-4882-925f-fda3256c38f4%2FWalt.id_Logo_transparent.png%22%7D",
   "policies": {
-    "vcPolicies": [
+    "vc_policies": [
       {
         "policy": "signature",
         "id": "signature"
@@ -681,10 +681,10 @@ Response:
         "id": "regex"
       }
     ],
-    "specificVcPolicies": {}
+    "specific_vc_policies": {}
   },
   "policyResults": {
-    "vcPolicies": [
+    "vc_policies": [
       {
         "policy": {
           "policy": "signature",
@@ -742,7 +742,7 @@ Response:
         }
       }
     ],
-    "specificVcPolicies": {},
+    "specific_vc_policies": {},
     "overallSuccess": true
   },
   "presentedRawData": {
@@ -876,7 +876,7 @@ curl -X 'POST' \
     ]
   },
   "policies": {
-    "vcPolicies": [
+    "vc_policies": [
       { "policy": "signature" },
       { "policy": "regex", "path": "$.['org.iso.23220.dtc.1'].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
     ]
@@ -925,7 +925,7 @@ curl -X 'POST' \
     ]
   },
   "policies": {
-    "vcPolicies": [
+    "vc_policies": [
       { "policy": "signature" },
       { "policy": "regex", "path": "$.['\''org.iso.23220.dtc.1'\''].dtc_version", "regex": "^(\"[0-9]+\"|-?[0-9]+(\\.[0-9]+)?)$" }
     ]
@@ -1116,7 +1116,7 @@ Response:
     },
     "authorizationRequestUrl": "openid4vp://authorize?response_type=vp_token&client_id=my-client-id&state=5c2c4802-be15-4441-9039-04bed76e3607&response_mode=direct_post&nonce=92698b40-f50d-4be1-97b4-dd1dba9bfe4a&response_uri=https%3A%2F%2Fwaltid.enterprise.mdoc-test.waltid.cloud%2Fv1%2Fwaltid.v2%2Fverifier2-service-api%2F4ec07883-f1d0-4346-8013-cad30e862b56%2Fresponse&dcql_query=%7B%22credentials%22%3A%5B%7B%22id%22%3A%22my_photoid%22%2C%22format%22%3A%22mso_mdoc%22%2C%22meta%22%3A%7B%22doctype_value%22%3A%22org.iso.23220.photoid.1%22%7D%2C%22claims%22%3A%5B%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22family_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22given_name_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_authority_unicode%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22resident_postal_code%22%5D%2C%22values%22%3A%5B1180%2C1190%2C1200%2C1210%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.18013.5.1%22%2C%22issuing_country%22%5D%2C%22values%22%3A%5B%22AT%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22person_id%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22resident_street%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22administrative_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.photoid.1%22%2C%22travel_document_number%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_version%22%5D%7D%2C%7B%22path%22%3A%5B%22org.iso.23220.dtc.1%22%2C%22dtc_dg1%22%5D%7D%5D%7D%5D%7D&client_metadata=%7B%22client_name%22%3A%22Verifier2%22%2C%22logo_uri%22%3A%22https%3A%2F%2Fimages.squarespace-cdn.com%2Fcontent%2Fv1%2F609c0ddf94bcc0278a7cbdb4%2F4d493ccf-c893-4882-925f-fda3256c38f4%2FWalt.id_Logo_transparent.png%22%7D",
     "policies": {
-      "vcPolicies": [
+      "vc_policies": [
         {
           "policy": "signature",
           "id": "signature"
@@ -1129,10 +1129,10 @@ Response:
           "id": "regex"
         }
       ],
-      "specificVcPolicies": {}
+      "specific_vc_policies": {}
     },
     "policyResults": {
-      "vcPolicies": [
+      "vc_policies": [
         {
           "policy": {
             "policy": "signature",
@@ -1189,7 +1189,7 @@ Response:
           }
         }
       ],
-      "specificVcPolicies": {},
+      "specific_vc_policies": {},
       "overallSuccess": true
     },
     "presentedRawData": {

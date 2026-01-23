@@ -1,5 +1,6 @@
 package id.walt.oid4vc.data
 
+@ConsistentCopyVisibility
 data class ClientMetadataParameter private constructor(
     val clientMetadata: OpenIDClientMetadata?,
     val clientMetadataUri: String?

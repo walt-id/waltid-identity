@@ -1,64 +1,18 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.Properties
+import io.ktor.plugin.features.*
 
 plugins {
-    kotlin("jvm")
-    id("io.ktor.plugin") version "3.2.2"
-    kotlin("plugin.serialization")
-    id("maven-publish")
-    id("com.github.ben-manes.versions")
+    id("waltid.ktorbackend")
+    id("waltid.ktordocker")
 }
 
 group = "id.walt"
+
 application {
     mainClass.set("id.walt.webwallet.MainKt")
-    applicationName = "waltid-wallet-api"
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
 }
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://jitpack.io")
-    maven("https://maven.waltid.dev/releases")
-    maven("https://maven.waltid.dev/snapshots")
-}
-
-tasks.withType<KotlinCompile> {
-    compilerOptions {
-        jvmTarget = JvmTarget.JVM_21
-    }
-}
-
-tasks.withType<Zip> {
-    isZip64 = true
-}
-
-tasks.withType<ProcessResources> {
-    doLast {
-        layout.buildDirectory.get().file("resources/main/version.properties").asFile.run {
-            parentFile.mkdirs()
-            Properties().run {
-                setProperty("version", rootProject.version.toString())
-                writer().use { store(it, "walt.id version store") }
-            }
-        }
-    }
-}
-
-/*java {
-    sourceCompatibility = JavaVersion.VERSION_15
-    targetCompatibility = JavaVersion.VERSION_15
-}*/
-
-kotlin {
-    jvmToolchain(21)
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
 }
 
 dependencies {
@@ -66,34 +20,33 @@ dependencies {
 
     /* -- KTOR -- */
 
-    val ktor_version = "3.2.2"
     // Ktor server
-    implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-auth-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-sessions-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-auth-jwt-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-auto-head-response-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-double-receive-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-host-common-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-status-pages-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-compression-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-cors-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-forwarded-header-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-call-logging-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-call-id-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktor_version")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-    implementation("io.ktor:ktor-server-cio-jvm:$ktor_version")
-    implementation("io.ktor:ktor-server-method-override:$ktor_version")
-    implementation("io.ktor:ktor-server-rate-limit:$ktor_version")
+    implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-method-override:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-server-rate-limit:${Versions.KTOR_VERSION}")
 
     // Ktor client
-    implementation("io.ktor:ktor-client-core-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-serialization:$ktor_version")
-    implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-    implementation("io.ktor:ktor-client-json-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
-    implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
+    implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-serialization:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+    implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
 
     /* -- Kotlin -- */
 
@@ -128,6 +81,8 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-oci"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
+    implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
+
 
 
     implementation(project(":waltid-libraries:waltid-did"))
@@ -141,10 +96,10 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 
-    implementation("com.nimbusds:nimbus-jose-jwt:10.0.1")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
 
-    implementation("io.ktor:ktor-client-java:$ktor_version")
+    implementation("io.ktor:ktor-client-java:${Versions.KTOR_VERSION}")
 
     /* -- Misc --*/
 
@@ -182,7 +137,7 @@ dependencies {
 
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
-    implementation("org.slf4j:jul-to-slf4j:2.0.16")
+    implementation("org.slf4j:jul-to-slf4j:2.0.17")
     implementation("io.klogging:klogging-jvm:0.11.6")
     implementation("io.klogging:slf4j-klogging:0.11.6")
 
@@ -191,95 +146,17 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    testImplementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
     testImplementation("io.mockk:mockk:1.13.16")
     testImplementation("io.klogging:klogging-jvm:0.11.6")
 }
 
-// Define publication to allow publishing to local maven repo with the command:  ./gradlew publishToMavenLocal
-// This should not be published to https://maven.waltid.dev/ to save storage
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            pom {
-                name.set("walt.id wallet API REST service")
-                description.set(
-                    """
-                    Kotlin/Java REST service for storing digital credentials
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
-    }
-}
-
-fun waltidPrivateCredentials(repoName:String): Pair<String, String> = let {
-    val envUsername = System.getenv(repoName.uppercase() + "_USERNAME")
-    val envPassword = System.getenv(repoName.uppercase() + "_PASSWORD")
-
-    val usernameFile = File("$rootDir/secret-${repoName.lowercase()}-username.txt")
-    val passwordFile = File("$rootDir/secret-${repoName.lowercase()}-password.txt")
-
-    return Pair(
-        envUsername ?: usernameFile.let { if (it.isFile) it.readLines().first() else "" },
-        envPassword ?: passwordFile.let { if (it.isFile) it.readLines().first() else "" }
-    )
-}
-
 ktor {
     docker {
-        jreVersion.set(JavaVersion.VERSION_21)
-        localImageName.set("waltid/wallet-api")
-        imageTag.set("${project.version}")
-        portMappings.set(listOf(
-            io.ktor.plugin.features.DockerPortMapping(
-                7001,
-                7001,
-                io.ktor.plugin.features.DockerPortMappingProtocol.TCP
-            )
-        ))
-
-        val (username, password) = waltidPrivateCredentials("DOCKER")
-        externalRegistry.set(
-            io.ktor.plugin.features.DockerImageRegistry.dockerHub(
-                appName = provider { "wallet-api" },
-                username = provider { username },
-                password = provider { password }
+        portMappings.set(
+            listOf(
+                DockerPortMapping(7001, 7001, DockerPortMappingProtocol.TCP)
             )
         )
-    }
-    jib {
-        container {
-            workingDirectory = "/waltid-wallet-api"
-        }
-        from {
-            platforms {
-                platform {
-                    architecture = "amd64"
-                    os = "linux"
-                }
-                platform {
-                    architecture = "arm64"
-                    os = "linux"
-                }
-            }
-        }
     }
 }

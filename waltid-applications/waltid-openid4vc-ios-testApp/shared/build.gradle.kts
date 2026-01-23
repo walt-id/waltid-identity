@@ -8,6 +8,10 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
+    object Versions {
+        const val KTOR_VERSION = "3.3.3"
+    }
+
     cocoapods {
         summary = "Some description for the Shared Module"
         homepage = "Link to the Shared Module homepage"
@@ -24,8 +28,6 @@ kotlin {
     }
 
     sourceSets {
-        val ktor_version = "3.2.2"
-
         commonMain.dependencies {
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             implementation(project(":waltid-libraries:waltid-did"))
@@ -33,12 +35,12 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 
-            implementation("io.ktor:ktor-client-core:$ktor_version")
-            implementation("io.ktor:ktor-client-serialization:$ktor_version")
-            implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-            implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-            implementation("io.ktor:ktor-client-json:$ktor_version")
-            implementation("io.ktor:ktor-client-logging:$ktor_version")
+            implementation("io.ktor:ktor-client-core:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-serialization:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-json:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-logging:${Versions.KTOR_VERSION}")
         }
         commonTest.dependencies {
 

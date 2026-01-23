@@ -2,6 +2,7 @@ package id.walt.oid4vc.data
 
 import id.walt.oid4vc.data.dif.PresentationDefinition
 
+@ConsistentCopyVisibility
 data class PresentationDefinitionParameter private constructor(
     val presentationDefinition: PresentationDefinition?,
     val presentationDefinitionUri: String?,

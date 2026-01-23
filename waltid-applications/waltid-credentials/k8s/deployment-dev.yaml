@@ -1,0 +1,76 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+    name: vc-repository-dev
+    namespace: test-identity-main
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            app: vc-repository-dev
+    template:
+        metadata:
+            labels:
+                app: vc-repository-dev
+            annotations:
+                deployment/id: "_DEFAULT_DEPLOYMENT_"
+        spec:
+            securityContext:
+                runAsNonRoot: true
+                runAsUser: 10001
+                seccompProfile:
+                    type: RuntimeDefault
+            containers:
+                - name: vc-repository-dev
+                  image: waltid/vc-repository:latest
+                  securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                          drop:
+                              - ALL
+                  ports:
+                      - containerPort: 3000
+                        name: http-api
+---
+kind: Service
+apiVersion: v1
+metadata:
+    name: vc-repository-dev
+    namespace: test-identity-main
+spec:
+    ports:
+        - name: http
+          port: 80
+          targetPort: http-api
+          protocol: TCP
+    selector:
+        app: vc-repository-dev
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: wallet-dev-ingress
+    namespace: test-identity-main
+    annotations:
+        kubernetes.io/ingress.class: "nginx"
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+        ingress.kubernetes.io/configuration-snippet: |
+            if ($host ~ ^(.+)\.waltid\.org$) {
+              return 301 https://$1.walt-test.cloud$request_uri;
+            }
+spec:
+    tls:
+        - hosts:
+              - credentials.test.waltid.cloud
+          secretName: credentials-tls-secret
+    rules:
+        - host: credentials.test.waltid.cloud
+          http:
+              paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                        service:
+                            name: vc-repository-dev
+                            port:
+                                number: 80

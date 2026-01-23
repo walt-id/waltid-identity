@@ -20,6 +20,7 @@ import kotlin.js.JsExport
  * @see [VerificationRelationship.buildFromVerificationMethod]
  * @see [VerificationMethod]
  */
+@ConsistentCopyVisibility
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 @Serializable(with = VerificationRelationshipSerializer::class)

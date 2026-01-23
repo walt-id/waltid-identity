@@ -1,31 +1,9 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.power-assert")
-    kotlin("plugin.serialization")
-    id("io.ktor.plugin") version "3.2.2"
-    id("maven-publish")
-
-    application
-
-    id("com.github.ben-manes.versions")
+    id("waltid.jvm.servicelib")
+    id("waltid.publish.maven")
 }
 
 group = "id.walt"
-
-application {
-    mainClass.set("id.walt.ApplicationKt")
-
-    val isDevelopment: Boolean = project.ext.has("development")
-    applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
-}
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://maven.waltid.dev/releases")
-}
 
 dependencies {
     // Auth methods
@@ -53,7 +31,7 @@ dependencies {
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-services:waltid-service-commons"))
-    implementation("com.nimbusds:nimbus-jose-jwt:9.48")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
     // Cryptography
     /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
@@ -65,6 +43,7 @@ dependencies {
     implementation("org.kotlincrypto.random:crypto-rand:0.6.0")
 
     // Ktor server
+    implementation(platform("io.ktor:ktor-bom:3.2.2"))
     implementation("io.ktor:ktor-server-core")
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
@@ -120,63 +99,16 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host")
 
     // Kotlin
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
+    testImplementation(kotlin("test"))
 }
 
-kotlin {
-    jvmToolchain(21)
-}
-
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            pom {
-                name.set("walt.id ktor-authnz")
-                description.set(
-                    """
-                    Kotlin/Java library for AuthNZ
-                    """.trimIndent()
-                )
-                url.set("https://walt.id")
-
-                licenses {
-                    license {
-                        name.set("Apache License 2.0")
-                        url.set("https://www.apache.org/licenses/LICENSE-2.0")
-                    }
-                }
-
-                developers {
-                    developer {
-                        id.set("walt.id")
-                        name.set("walt.id")
-                        email.set("office@walt.id")
-                    }
-                }
-            }
-        }
+mavenPublishing {
+    pom {
+        name.set("walt.id ktor-authnz")
+        description.set(
+            """
+            Kotlin/Java library for AuthNZ
+            """.trimIndent()
+        )
     }
-
-    repositories {
-        maven {
-            url = uri(if (version.toString().endsWith("SNAPSHOT")) uri("https://maven.waltid.dev/snapshots") else uri("https://maven.waltid.dev/releases"))
-            credentials {
-                username = System.getenv("MAVEN_USERNAME") ?: File("$rootDir/secret_maven_username.txt").let { if (it.isFile) it.readLines().first() else "" }
-                password = System.getenv("MAVEN_PASSWORD") ?: File("$rootDir/secret_maven_password.txt").let { if (it.isFile) it.readLines().first() else "" }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalKotlinGradlePluginApi::class)
-powerAssert {
-    includedSourceSets = listOf("test")
-    functions = listOf(
-        // kotlin.test
-        "kotlin.assert", "kotlin.test.assertTrue", "kotlin.test.assertEquals", "kotlin.test.assertNull",
-
-        // checks
-        "kotlin.require", "kotlin.check"
-    )
 }

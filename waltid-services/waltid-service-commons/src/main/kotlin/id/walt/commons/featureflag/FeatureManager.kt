@@ -45,7 +45,7 @@ object FeatureManager {
             ConfigManager.loadConfig(ConfigManager.ConfigData(name, config), RunConfiguration.configArgs).onFailure { ex ->
                 return Result.failure(
                     when (ex) {
-                        is ConfigException -> ConfigurationException(ex as ConfigException)
+                        is ConfigException -> ConfigurationException(ex)
                         else -> ex
                     }
                 )

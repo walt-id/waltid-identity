@@ -165,10 +165,10 @@ class SDJwtTestJVM {
         val presentedJwtWithKb = signedJwt.present(true, aud, nonce, cryptoProvider)
         assertNotNull(presentedJwtWithKb.keyBindingJwt)
         assertTrue(presentedJwtWithKb.toString().startsWith(presentedJwtNoKb.toString()))
-        assertTrue(presentedJwtWithKb.keyBindingJwt!!.issuedAt >= issuanceTime.epochSeconds)
-        assertEquals(aud, presentedJwtWithKb.keyBindingJwt!!.audience)
-        assertEquals(nonce, presentedJwtWithKb.keyBindingJwt!!.nonce)
-        assertEquals(SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url, presentedJwtWithKb.keyBindingJwt!!.sdHash)
+        assertTrue(presentedJwtWithKb.keyBindingJwt.issuedAt >= issuanceTime.epochSeconds)
+        assertEquals(aud, presentedJwtWithKb.keyBindingJwt.audience)
+        assertEquals(nonce, presentedJwtWithKb.keyBindingJwt.nonce)
+        assertEquals(SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url, presentedJwtWithKb.keyBindingJwt.sdHash)
 
     }
 }

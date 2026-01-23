@@ -52,13 +52,13 @@ jobs:
           echo "Will use filename $filenameNoExtension for reports"
           echo "dataset_filename=$filenameNoExtension" >> $GITHUB_ENV
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Checkout waltid-identity-postman
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: walt-id/waltid-identity-postman
           ref: main
-          token: ${{ secrets.PAT }}
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
           path: "./postman"
       - name: Install Docker using Docker's official script
         run: |
@@ -93,6 +93,12 @@ jobs:
         with:
           name: verifier-api
           path: ${{ runner.temp }}
+      - name: Download verifier-api2 artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v6
+        with:
+          name: verifier-api2
+          path: ${{ runner.temp }}
       - name: Download wallet-api artifact
         if: ${{ env.use-artifact }}
         uses: actions/download-artifact@v6
@@ -104,12 +110,14 @@ jobs:
         run: |
           gunzip ${{ runner.temp }}/issuer-api.tar.gz
           gunzip ${{ runner.temp }}/verifier-api.tar.gz
+          gunzip ${{ runner.temp }}/verifier-api2.tar.gz
           gunzip ${{ runner.temp }}/wallet-api.tar.gz
       - name: Load Docker images from tarballs
         if: ${{ env.use-artifact }}
         run: |
           docker load --input ${{ runner.temp }}/issuer-api.tar
           docker load --input ${{ runner.temp }}/verifier-api.tar
+          docker load --input ${{ runner.temp }}/verifier-api2.tar
           docker load --input ${{ runner.temp }}/wallet-api.tar
       - name: Run stack
         run: |
