@@ -14,7 +14,7 @@ class IETFStatusValidator(
     reader: StatusValueReader<IETFStatusContent>,
     bitValueReaderFactory: BitValueReaderFactory,
     private val expansionAlgorithm: StatusListExpansionAlgorithm,
-) : id.walt.policies2.vc.policies.status.validator.StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(
+) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(
     fetcher,
     reader
 ) {

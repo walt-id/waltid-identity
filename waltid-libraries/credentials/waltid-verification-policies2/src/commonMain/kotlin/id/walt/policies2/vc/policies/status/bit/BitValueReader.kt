@@ -55,7 +55,7 @@ class BitValueReader(
     }
 
     private fun ByteArray.toBitSequence(): Sequence<Boolean> =
-        this.fold(emptySequence<Boolean>()) { acc, byte ->
+        this.fold(emptySequence()) { acc, byte ->
             acc + bitRepresentationStrategy().map { i -> (byte.toUInt() shr i) and 1u == 1u }.asSequence()
         }
 

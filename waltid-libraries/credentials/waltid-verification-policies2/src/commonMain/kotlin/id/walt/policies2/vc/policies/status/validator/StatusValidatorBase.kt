@@ -11,7 +11,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.policies.status.model.StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
     private val reader: StatusValueReader<K>,
-) : id.walt.policies2.vc.policies.status.validator.StatusValidator<M, T> {
+) : StatusValidator<M, T> {
     protected val logger = KotlinLogging.logger {}
 
     override suspend fun validate(entry: M, attribute: T): Result<Unit> = runCatching {
