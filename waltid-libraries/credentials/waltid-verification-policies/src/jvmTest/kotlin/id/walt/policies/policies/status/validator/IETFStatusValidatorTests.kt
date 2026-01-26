@@ -31,7 +31,7 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
 
     override fun createStatusValidator() = IETFStatusValidator(
         fetcher = mockFetcher,
-        reader = mockStatusReader,
+        mockStatusReader,
         bitValueReaderFactory = mockBitValueReaderFactory,
         expansionAlgorithm = mockExpansionAlgorithm,
     )
