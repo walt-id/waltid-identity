@@ -9,11 +9,13 @@ import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepos
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
+import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
@@ -77,6 +79,8 @@ class BuildProviderConfigurationTest {
                 preAuthorizedCodeRepository = preAuthorizedCodeRepository,
                 preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
                 accessTokenService = StubTokenService(),
+                credentialRequestValidator = DefaultCredentialRequestValidator(),
+                credentialEndpointHandlers = CredentialEndpointHandlers()
             )
 
             buildOAuth2Provider(
@@ -103,6 +107,8 @@ class BuildProviderConfigurationTest {
             preAuthorizedCodeRepository = preAuthorizedCodeRepository,
             preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
             accessTokenService = StubTokenService(),
+            credentialRequestValidator = DefaultCredentialRequestValidator(),
+            credentialEndpointHandlers = CredentialEndpointHandlers()
         )
 
         assertIs<OAuth2Provider>(

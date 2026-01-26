@@ -9,12 +9,18 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.requests.credential.CredentialRequestResult
+import id.walt.openid4vci.responses.credential.CredentialConfiguration
+import id.walt.crypto.keys.Key
+import kotlinx.serialization.json.JsonObject
 
 
 /**
@@ -62,7 +68,10 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizationResponseHttp {
+    override fun writeAuthorizationError(
+        authorizationRequest: AuthorizationRequest,
+        error: OAuthError
+    ): AuthorizationResponseHttp {
         val baseRedirect = authorizationRequest.redirectUri
             ?: authorizationRequest.client.redirectUris.firstOrNull()
 
@@ -114,7 +123,10 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun createAccessTokenRequest(parameters: Map<String, List<String>>, session: Session?): AccessTokenRequestResult {
+    override fun createAccessTokenRequest(
+        parameters: Map<String, List<String>>,
+        session: Session?
+    ): AccessTokenRequestResult {
         return config.accessTokenRequestValidator.validate(
             parameters = parameters,
             session = session ?: DefaultSession()
@@ -145,7 +157,10 @@ class DefaultOAuth2Provider(
             },
         )
 
-    override fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp =
+    override fun writeAccessTokenResponse(
+        request: AccessTokenRequest,
+        response: AccessTokenResponse
+    ): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 200,
             payload = buildMap {
@@ -155,6 +170,41 @@ class DefaultOAuth2Provider(
                 putAll(response.extra)
             },
         )
+
+    override fun createCredentialRequest(
+        parameters: Map<String, List<String>>,
+        session: Session?
+    ): CredentialRequestResult {
+        return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
+    }
+
+    override suspend fun createCredentialResponse(
+        request: CredentialRequest,
+        format: String,
+        issuerKey: Key,
+        issuerId: String,
+        credentialData: JsonObject,
+    ): CredentialResponseResult {
+        val configurationId = request.credentialConfigurationId ?: request.credentialIdentifier
+            ?: return CredentialResponseResult.Failure(
+                OAuthError(
+                    error = "invalid_request",
+                    description = "credential_identifier or credential_configuration_id is required",
+                )
+            )
+        val configuration = CredentialConfiguration(
+            id = configurationId,
+            format = format,
+        )
+        val handler = config.credentialEndpointHandlers.get(format)
+            ?: return CredentialResponseResult.Failure(
+                OAuthError(
+                    error = "unsupported_credential_configuration",
+                    description = "No handler for format $format"
+                )
+            )
+        return handler.sign(request, configuration, issuerKey, issuerId, credentialData)
+    }
 
     private fun appendParams(base: String, parameters: Map<String, String>): String {
         if (parameters.isEmpty()) return base

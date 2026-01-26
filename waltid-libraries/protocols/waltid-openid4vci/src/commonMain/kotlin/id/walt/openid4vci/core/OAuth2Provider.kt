@@ -6,12 +6,17 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.crypto.keys.Key
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Minimal OAuth2 provider contract scoped to the authorization-code/pre-authorized code grants.
@@ -27,12 +32,46 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
  * Parameters will be changed. However, we have to keep the implementation framework-agnostic (Ktor, Spring).
  */
 interface OAuth2Provider {
+    // OAuth2.0 - Authorization Endpoint
     fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
-    suspend fun createAuthorizationResponse(authorizationRequest: AuthorizationRequest, session: Session): AuthorizationResponseResult
-    fun writeAuthorizationError(authorizationRequest: AuthorizationRequest, error: OAuthError): AuthorizationResponseHttp
-    fun writeAuthorizationResponse(authorizationRequest: AuthorizationRequest, response: AuthorizationResponse): AuthorizationResponseHttp
-    fun createAccessTokenRequest(parameters: Map<String, List<String>>, session: Session? = null): AccessTokenRequestResult
+    suspend fun createAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        session: Session
+    ): AuthorizationResponseResult
+
+    fun writeAuthorizationError(
+        authorizationRequest: AuthorizationRequest,
+        error: OAuthError
+    ): AuthorizationResponseHttp
+
+    fun writeAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        response: AuthorizationResponse
+    ): AuthorizationResponseHttp
+
+    // OAuth2.0 - Token Endpoint
+    fun createAccessTokenRequest(
+        parameters: Map<String, List<String>>,
+        session: Session? = null
+    ): AccessTokenRequestResult
+
     suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult
+
     fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp
+
     fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp
+
+    // Issuer API - Credential Endpoint
+    fun createCredentialRequest(
+        parameters: Map<String, List<String>>,
+        session: Session? = null
+    ): CredentialRequestResult
+
+    suspend fun createCredentialResponse(
+        request: CredentialRequest,
+        format: String,
+        issuerKey: Key,
+        issuerId: String,
+        credentialData: JsonObject,
+    ): CredentialResponseResult
 }
