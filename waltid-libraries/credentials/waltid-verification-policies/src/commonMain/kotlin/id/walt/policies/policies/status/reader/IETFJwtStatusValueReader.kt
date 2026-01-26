@@ -12,7 +12,8 @@ class IETFJwtStatusValueReader(
     parser: ContentParser<String, JsonObject>,
 ) : JwtStatusValueReaderBase<IETFStatusContent>(formatMatcher, parser) {
     override fun parseStatusList(payload: JsonObject): IETFStatusContent {
-        val statusList = payload["status_list"]?.jsonObject!!
+        val statusList = payload["status_list"]?.jsonObject
+        requireNotNull(statusList) { "Missing or invalid 'status_list' in JWT payload" }
         logger.debug { "status_list: $statusList" }
         return jsonModule.decodeFromJsonElement<IETFStatusContent>(statusList)
     }
