@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 
 class JsonElementParser<T>(
     private val serializer: KSerializer<T>
-) : id.walt.policies2.vc.policies.status.content.ContentParser<JsonElement, T> {
+) : ContentParser<JsonElement, T> {
     private val jsonModule = Json { ignoreUnknownKeys = true }
 
     override fun parse(response: JsonElement): T = jsonModule.decodeFromJsonElement(serializer, response)

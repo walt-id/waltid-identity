@@ -26,7 +26,7 @@ data class W3CEntry(
     val statuses: List<Status>? = null,
     @SerialName("statusReference")
     val reference: String? = null,
-) : id.walt.policies2.vc.policies.status.model.StatusEntry() {
+) : StatusEntry() {
     @Serializable
     data class Status(
         @SerialName("status")
@@ -39,7 +39,7 @@ data class W3CEntry(
 data class IETFEntry(
     @SerialName("status_list")
     val statusList: StatusListField,
-) : id.walt.policies2.vc.policies.status.model.StatusEntry() {
+) : StatusEntry() {
     override val index: ULong = statusList.index
     override val uri: String = statusList.uri
 

@@ -20,7 +20,7 @@ data class W3CStatusContent(
     val purpose: String? = "revocation",
     @SerialName("encodedList")
     override val list: String,
-) : id.walt.policies2.vc.policies.status.model.StatusContent()
+) : StatusContent()
 
 @Serializable
 @SerialName("IETFStatusContent")
@@ -29,4 +29,4 @@ data class IETFStatusContent(
     val size: Int = 1,
     @SerialName("lst")
     override val list: String,
-) : id.walt.policies2.vc.policies.status.model.StatusContent()
+) : StatusContent()
