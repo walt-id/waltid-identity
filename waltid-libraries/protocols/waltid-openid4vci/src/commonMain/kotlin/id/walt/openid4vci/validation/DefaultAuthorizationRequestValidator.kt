@@ -15,6 +15,7 @@ class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
             val clientId = parameters.requireSingle("client_id")
             val responseTypeRaw = parameters.requireSingle("response_type")
 
+            // RFC6749 §4.1.1: response_type is space-delimited; this implementation only supports "code".
             val responseTypes = responseTypeRaw
                 .split(" ")
                 .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
@@ -42,7 +43,7 @@ class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
                 responseTypes = setOf("code"),
             )
 
-            // RFC6749 §4.1.1: scope is optional, if present may contain multiple space-delimited values.
+            // RFC6749 §3.3 and §4.1.1: scope is optional; if present, space-delimited and case-sensitive.
             val requestedScopes = parameters.optionalAll("scope").toSet()
 
             val request = DefaultAuthorizationRequest(

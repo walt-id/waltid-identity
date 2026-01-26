@@ -12,7 +12,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
 
     override fun validate(parameters: Map<String, List<String>>, session: Session): AccessTokenRequestResult {
         return try {
-            // RFC6749: grant_type is required and must be a single value.
+            // RFC6749 §4.1.3 / §5.2: grant_type is required and must be single-valued.
             val grantTypeRaw = parameters.requireSingle("grant_type")
             val grantType = GrantType.fromValue(grantTypeRaw)
 
@@ -40,7 +40,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
         parameters: Map<String, List<String>>,
         session: Session,
     ): AccessTokenRequestResult {
-        // RFC6749 §4.1.3: client_id is optional here; if present, it must be single-valued.
+        // RFC6749 §4.1.3: client_id is optional; required only if client auth is not used.
         val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() } ?: ""
 
         // RFC6749 §4.1.3: redirect_uri is required only if it was in the authorize request; if supplied, it must be single-valued.
@@ -82,7 +82,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
         parameters: Map<String, List<String>>,
         session: Session,
     ): AccessTokenRequestResult {
-        // OpenID4VCI: pre-authorized_code is required and must be single-valued.
+        // OpenID4VCI (Pre-Authorized Code Flow): pre-authorized_code is required and must be single-valued.
         val code = parameters.requireSingle("pre-authorized_code").takeIf { it.isNotBlank() }
             ?: return AccessTokenRequestResult.Failure(
                 OAuthError(
