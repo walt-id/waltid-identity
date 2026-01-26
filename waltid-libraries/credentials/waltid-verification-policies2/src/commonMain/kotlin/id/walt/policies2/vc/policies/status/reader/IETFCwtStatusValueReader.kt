@@ -24,7 +24,7 @@ class IETFCwtStatusValueReader(
 
     override fun read(response: String): Result<IETFStatusContent> = runCatching {
         val payload = parser.parse(response)
-        logger.debug { "Payload: $payload" }
+        logger.debug { "Payload bytes: ${payload.size}" }
         val statusList = coseCompliantCbor.decodeFromByteArray<StatusList>(payload).statusList
         logger.debug { "EncodedList: ${statusList.list}" }
         statusList
