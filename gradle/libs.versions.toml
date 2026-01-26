@@ -40,7 +40,7 @@ kotlincrypto = "0.6.1"
 tink = "1.16.0"
 
 # Testing
-junit-jupiter = "5.11.4"
+junit-jupiter = "6.0.2"
 mokkery = "3.1.1"
 
 # HTTP
