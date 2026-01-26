@@ -36,7 +36,7 @@ nimbus-jose = "10.6"
 jose-npm = "5.10.0"
 bcprov = "2.73.10"
 bcpkix = "2.73.10"
-kotlincrypto = "0.6.1"
+kotlincrypto = "0.8.0"
 tink = "1.16.0"
 
 # Testing
