@@ -1,5 +1,6 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import kotlin.test.Test
@@ -56,5 +57,36 @@ class DefaultAuthorizeRequestValidatorTest {
         assertTrue(!result.isSuccess())
         val error = (result as AuthorizationRequestResult.Failure).error
         assertEquals("unsupported_response_type", error.error)
+    }
+
+    @Test
+    fun `validate runs issuer_state hook`() {
+        val hookValidator = DefaultAuthorizationRequestValidator { issuerState, _ ->
+            if (issuerState == "blocked") {
+                OAuthError("invalid_request", "issuer_state rejected")
+            } else {
+                null
+            }
+        }
+
+        val rejected = hookValidator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf("code"),
+                "issuer_state" to listOf("blocked"),
+            ),
+        )
+        assertTrue(rejected is AuthorizationRequestResult.Failure)
+        val error = (rejected).error
+        assertEquals("invalid_request", error.error)
+
+        val accepted = hookValidator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf("code"),
+                "issuer_state" to listOf("ok"),
+            ),
+        )
+        assertTrue(accepted is AuthorizationRequestResult.Success)
     }
 }

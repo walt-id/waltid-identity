@@ -6,6 +6,7 @@ import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCod
 import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCodeTokenEndpoint
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 
 /**
  * Entry point for consumers to obtain the OAuth provider.
@@ -46,17 +47,32 @@ fun buildOAuth2Provider(
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
     includeCredentialDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
+    val resolvedConfig = applyIssuerStateValidator(config)
     registerDefaultGrantTypeHandlers(
-        config = config,
+        config = resolvedConfig,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
     )
     registerDefaultCredentialHandlers(
-        config = config,
+        config = resolvedConfig,
         includeCredentialDefaultHandlers = includeCredentialDefaultHandlers,
     )
-    return DefaultOAuth2Provider(config)
+    return DefaultOAuth2Provider(resolvedConfig)
 }
+
+private fun applyIssuerStateValidator(config: OAuth2ProviderConfig): OAuth2ProviderConfig =
+    if (
+        config.issuerStateValidator != null &&
+        config.authorizationRequestValidator is DefaultAuthorizationRequestValidator
+    ) {
+        config.copy(
+            authorizationRequestValidator = DefaultAuthorizationRequestValidator(
+                issuerStateValidator = config.issuerStateValidator,
+            ),
+        )
+    } else {
+        config
+    }
 
 private fun registerDefaultGrantTypeHandlers(
     config: OAuth2ProviderConfig,

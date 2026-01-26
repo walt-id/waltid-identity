@@ -7,7 +7,9 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
 import kotlinx.serialization.SerializationException
 
-class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
+class DefaultAuthorizationRequestValidator(
+    private val issuerStateValidator: IssuerStateValidator? = null,
+) : AuthorizationRequestValidator {
 
     override fun validate(parameters: Map<String, List<String>>): AuthorizationRequestResult {
         return try {
@@ -35,6 +37,8 @@ class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
 
             // RFC6749 §4.1.1: state is optional, but if provided must be single-valued.
             val state = parameters.optionalSingle("state")
+            // issuer_state is issuer-defined correlation data; validate only if a hook is configured.
+            val issuerState = parameters.optionalSingle("issuer_state")
 
             val client = DefaultClient(
                 id = clientId,
@@ -56,6 +60,12 @@ class DefaultAuthorizationRequestValidator : AuthorizationRequestValidator {
                 defaultResponseMode = ResponseModeType.QUERY,
                 requestForm = parameters.toMutableMap(),
             )
+
+            issuerState?.let { value ->
+                issuerStateValidator?.validate(value, request)?.let { error ->
+                    return AuthorizationRequestResult.Failure(error)
+                }
+            }
 
             AuthorizationRequestResult.Success(request)
         } catch (e: SerializationException) {

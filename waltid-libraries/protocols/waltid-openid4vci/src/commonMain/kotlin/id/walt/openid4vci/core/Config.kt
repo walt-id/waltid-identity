@@ -10,6 +10,7 @@ import id.walt.openid4vci.tokens.AccessTokenService
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
+import id.walt.openid4vci.validation.IssuerStateValidator
 
 /**
  * Configuration holds handler registries and injectable objects used by the provider.
@@ -26,6 +27,7 @@ import id.walt.openid4vci.validation.CredentialRequestValidator
  */
 data class OAuth2ProviderConfig(
     val authorizationRequestValidator: AuthorizationRequestValidator,
+    val issuerStateValidator: IssuerStateValidator? = null,
     val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
     val authorizationCodeRepository: AuthorizationCodeRepository,
 
