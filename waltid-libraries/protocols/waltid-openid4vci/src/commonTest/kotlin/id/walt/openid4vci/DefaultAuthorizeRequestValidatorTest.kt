@@ -20,6 +20,7 @@ class DefaultAuthorizeRequestValidatorTest {
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
                 "scope" to listOf("openid offline"),
                 "state" to listOf("xyz"),
+                "issuer_state" to listOf("issuer-state-123"),
             ),
         )
 
@@ -30,6 +31,7 @@ class DefaultAuthorizeRequestValidatorTest {
         assertEquals("https://openid4vci.walt.id/callback", request.redirectUri)
         assertTrue(request.requestedScopes.contains("openid"))
         assertEquals("xyz", request.state)
+        assertEquals("issuer-state-123", request.issuerState)
     }
 
     @Test

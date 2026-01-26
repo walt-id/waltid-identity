@@ -56,6 +56,7 @@ class DefaultAuthorizationRequestValidator(
                 requestedScopes = requestedScopes.toMutableSet(),
                 redirectUri = redirect,
                 state = state,
+                issuerState = issuerState,
                 responseMode = ResponseModeType.QUERY,
                 defaultResponseMode = ResponseModeType.QUERY,
                 requestForm = parameters.toMutableMap(),

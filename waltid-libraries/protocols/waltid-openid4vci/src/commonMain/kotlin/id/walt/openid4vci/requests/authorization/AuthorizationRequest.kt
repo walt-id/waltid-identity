@@ -20,6 +20,7 @@ interface AuthorizationRequest {
     val grantedAudience: Set<String>
     val redirectUri: String?
     val state: String?
+    val issuerState: String?
     val responseMode: ResponseModeType
     val defaultResponseMode: ResponseModeType
     val requestForm: Map<String, List<String>>

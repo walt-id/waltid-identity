@@ -6,6 +6,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.offers.CredentialOffer
+import id.walt.openid4vci.offers.CredentialOfferRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -13,6 +14,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
+import io.ktor.http.Url
+import io.ktor.util.toMap
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.Json
@@ -41,16 +44,21 @@ class ProviderCredentialIssuanceTest {
 
         // Issuer creates an IssuerState, add a validator and then
         // creates credential offer and shares it with the wallet.
-        val offer = CredentialOffer.authCode(
+        val offer = CredentialOffer.withAuthorizationCodeGrant(
             credentialIssuer = "https://issuer.example",
             credentialConfigurationIds = listOf(credentialId),
             issuerState = "issuer-state-123",
         )
 
-        // Wallet extracts the Issuer State
+        // Issuer builds an offer URL and shares it (QR code, link, etc.).
+        val offerRequest = CredentialOfferRequest(credentialOffer = offer)
+        val offerUrlString = offerRequest.toUrl()
+
+        // Wallet reads the URL, extracts the offer, and reads issuer_state.
+        val params = Url(offerUrlString).parameters.toMap()
+        val offerPayload = params["credential_offer"]?.firstOrNull().orEmpty()
         val json = Json { encodeDefaults = false; explicitNulls = false }
-        val offerJson = json.encodeToString(CredentialOffer.serializer(), offer)
-        val decodedOffer = json.decodeFromString(CredentialOffer.serializer(), offerJson)
+        val decodedOffer = json.decodeFromString(CredentialOffer.serializer(), offerPayload)
         val offerIssuerState = decodedOffer.grants?.authorizationCode?.issuerState
 
         // Wallet sends an authorization request.

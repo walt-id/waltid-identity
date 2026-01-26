@@ -1,7 +1,6 @@
 package id.walt.openid4vci.offers
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -11,6 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import id.walt.openid4vci.GrantType
 
 class CredentialOfferTest {
 
@@ -26,17 +26,17 @@ class CredentialOfferTest {
                 credentialIssuer = "https://issuer.example",
                 credentialConfigurationIds = listOf("cred-id-1"),
             ),
-            CredentialOffer.authCode(
+            CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "https://issuer.example",
                 credentialConfigurationIds = listOf("cred-id-1", "cred-id-2"),
                 issuerState = "state-123",
             ),
-            CredentialOffer.authCode(
+            CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "https://issuer.example",
                 credentialConfigurationIds = listOf("cred-id-1"),
                 authorizationServer = "https://as.example",
             ),
-            CredentialOffer.authCode(
+            CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "https://issuer.example",
                 credentialConfigurationIds = listOf("cred-id-1"),
                 issuerState = "state-456",
@@ -92,29 +92,28 @@ class CredentialOfferTest {
     }
 
     @Test
-    fun `credential offer uri encodes correctly`() {
-        val offerUri = CredentialOfferUri("https://issuer.example/offers/123")
-        val encoded = json.encodeToJsonElement(CredentialOfferUri.serializer(), offerUri) as JsonObject
-        assertEquals("https://issuer.example/offers/123", encoded["credential_offer_uri"]?.jsonPrimitive?.content)
-    }
-
-    @Test
     fun `credential offer rejects invalid issuer identifiers`() {
         // OpenID4VCI: issuer identifier must be an https URL without query/fragment components.
         assertFailsWith<IllegalArgumentException> {
-            CredentialOffer.authCode(
+            CredentialOffer.withAuthorizationCodeGrant(
+                credentialIssuer = "",
+                credentialConfigurationIds = listOf("cred-id-1"),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "http://issuer.example",
                 credentialConfigurationIds = listOf("cred-id-1"),
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            CredentialOffer.authCode(
+            CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "https://issuer.example?query=1",
                 credentialConfigurationIds = listOf("cred-id-1"),
             )
         }
         assertFailsWith<IllegalArgumentException> {
-            CredentialOffer.authCode(
+            CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "https://issuer.example#frag",
                 credentialConfigurationIds = listOf("cred-id-1"),
             )
@@ -137,5 +136,46 @@ class CredentialOfferTest {
         assertFailsWith<IllegalArgumentException> {
             json.decodeFromString(CredentialOffer.serializer(), payload)
         }
+    }
+
+    @Test
+    fun `credential offer rejects blank configuration ids`() {
+        // credential_configuration_ids entries must not be blank.
+        val payload = """{"credential_issuer":"https://issuer.example","credential_configuration_ids":[" "]}"""
+        assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString(CredentialOffer.serializer(), payload)
+        }
+    }
+
+    @Test
+    fun `credential offer rejects duplicate configuration ids`() {
+        // credential_configuration_ids must not contain duplicates.
+        val payload =
+            """{"credential_issuer":"https://issuer.example","credential_configuration_ids":["cred-id-1","cred-id-1"]}"""
+        assertFailsWith<IllegalArgumentException> {
+            json.decodeFromString(CredentialOffer.serializer(), payload)
+        }
+    }
+
+    @Test
+    fun `credential offer exposes grant type`() {
+        val noGrant = CredentialOffer(
+            credentialIssuer = "https://issuer.example",
+            credentialConfigurationIds = listOf("cred-id-1"),
+        )
+        assertEquals(null, noGrant.getGrantType())
+
+        val authOffer = CredentialOffer.withAuthorizationCodeGrant(
+            credentialIssuer = "https://issuer.example",
+            credentialConfigurationIds = listOf("cred-id-1"),
+        )
+        assertEquals(GrantType.AuthorizationCode, authOffer.getGrantType())
+
+        val preAuthOffer = CredentialOffer.withPreAuthorizedCodeGrant(
+            credentialIssuer = "https://issuer.example",
+            credentialConfigurationIds = listOf("cred-id-1"),
+            preAuthorizedCode = "pre-auth-123",
+        )
+        assertEquals(GrantType.PreAuthorizedCode, preAuthOffer.getGrantType())
     }
 }

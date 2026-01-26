@@ -18,6 +18,7 @@ data class DefaultAuthorizationRequest(
     override val grantedAudience: Set<String> = emptySet(),
     override val redirectUri: String?,
     override val state: String?,
+    override val issuerState: String? = null,
     override val responseMode: ResponseModeType = ResponseModeType.QUERY,
     override val defaultResponseMode: ResponseModeType = ResponseModeType.QUERY,
     override val requestForm: Map<String, List<String>> = emptyMap(),
