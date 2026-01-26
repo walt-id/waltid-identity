@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
@@ -14,6 +15,7 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -37,14 +39,29 @@ class ProviderCredentialIssuanceTest {
 
         val provider = buildOAuth2Provider(config)
 
-        // Wallet sends an authorization request.
-        val authorizationRequestWallet = mapOf(
-            "response_type" to listOf("code"),
-            "client_id" to listOf("demo-client"),
-            "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
-            "scope" to listOf("openid credential"),
-            "state" to listOf("authorization-request-state")
+        // Issuer creates an IssuerState, add a validator and then
+        // creates credential offer and shares it with the wallet.
+        val offer = CredentialOffer.authCode(
+            credentialIssuer = "https://issuer.example",
+            credentialConfigurationIds = listOf(credentialId),
+            issuerState = "issuer-state-123",
         )
+
+        // Wallet extracts the Issuer State
+        val json = Json { encodeDefaults = false; explicitNulls = false }
+        val offerJson = json.encodeToString(CredentialOffer.serializer(), offer)
+        val decodedOffer = json.decodeFromString(CredentialOffer.serializer(), offerJson)
+        val offerIssuerState = decodedOffer.grants?.authorizationCode?.issuerState
+
+        // Wallet sends an authorization request.
+        val authorizationRequestWallet = buildMap {
+            put("response_type", listOf("code"))
+            put("client_id", listOf("demo-client"))
+            put("redirect_uri", listOf("https://openid4vci.walt.id/callback"))
+            put("scope", listOf("openid credential"))
+            put("state", listOf("authorization-request-state"))
+            offerIssuerState?.let { put("issuer_state", listOf(it)) }
+        }
 
         // Issuer api authenticates the user and call the following:
         val authorizeResult = provider.createAuthorizationRequest(

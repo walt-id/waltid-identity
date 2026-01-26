@@ -1,0 +1,114 @@
+package id.walt.openid4vci.offers
+
+import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
+import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
+import io.ktor.http.URLProtocol
+import io.ktor.http.Url
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class CredentialOffer(
+    @SerialName("credential_issuer") val credentialIssuer: String,
+    @SerialName("credential_configuration_ids") val credentialConfigurationIds: List<String>,
+    val grants: CredentialOfferGrants? = null,
+) {
+    init {
+        require(credentialConfigurationIds.isNotEmpty()) {
+            "Credential offer must include at least one credential configuration id"
+        }
+        require(credentialConfigurationIds.none { it.isBlank() }) {
+            "Credential offer configuration ids must not be blank"
+        }
+        validateCredentialIssuer(credentialIssuer)
+    }
+
+    companion object {
+        fun authCode(
+            credentialIssuer: String,
+            credentialConfigurationIds: List<String>,
+            issuerState: String? = null,
+            authorizationServer: String? = null,
+        ): CredentialOffer =
+            CredentialOffer(
+                credentialIssuer = credentialIssuer,
+                credentialConfigurationIds = credentialConfigurationIds,
+                grants = CredentialOfferGrants(
+                    authorizationCode = AuthorizationCodeGrant(
+                        issuerState = issuerState,
+                        authorizationServer = authorizationServer,
+                    ),
+                ),
+            )
+
+        fun preAuth(
+            credentialIssuer: String,
+            credentialConfigurationIds: List<String>,
+            preAuthorizedCode: String,
+            txCode: TxCode? = null,
+            interval: Long? = null,
+            authorizationServer: String? = null,
+        ): CredentialOffer =
+            CredentialOffer(
+                credentialIssuer = credentialIssuer,
+                credentialConfigurationIds = credentialConfigurationIds,
+                grants = CredentialOfferGrants(
+                    preAuthorizedCode = PreAuthorizedCodeGrant(
+                        preAuthorizedCode = preAuthorizedCode,
+                        txCode = txCode,
+                        interval = interval,
+                        authorizationServer = authorizationServer,
+                    ),
+                ),
+            )
+
+        private fun validateCredentialIssuer(issuer: String) {
+            val url = Url(issuer)
+            require(url.protocol == URLProtocol.HTTPS) {
+                "Credential issuer must use https scheme"
+            }
+            require(url.host.isNotBlank()) {
+                "Credential issuer must include a host"
+            }
+            require(url.parameters.isEmpty()) {
+                "Credential issuer must not include query parameters"
+            }
+            require(url.fragment.isEmpty()) {
+                "Credential issuer must not include fragment components"
+            }
+        }
+    }
+}
+
+@Serializable
+data class CredentialOfferGrants(
+    @SerialName(GRANT_TYPE_AUTHORIZATION_CODE) val authorizationCode: AuthorizationCodeGrant? = null,
+    @SerialName(GRANT_TYPE_PRE_AUTHORIZED_CODE) val preAuthorizedCode: PreAuthorizedCodeGrant? = null,
+) {
+    init {
+        require(!(authorizationCode != null && preAuthorizedCode != null)) {
+            "Credential offer grants must not include both authorization_code and pre-authorized_code"
+        }
+    }
+}
+
+@Serializable
+data class AuthorizationCodeGrant(
+    @SerialName("issuer_state") val issuerState: String? = null,
+    @SerialName("authorization_server") val authorizationServer: String? = null,
+)
+
+@Serializable
+data class PreAuthorizedCodeGrant(
+    @SerialName("pre-authorized_code") val preAuthorizedCode: String,
+    @SerialName("tx_code") val txCode: TxCode? = null,
+    val interval: Long? = null,
+    @SerialName("authorization_server") val authorizationServer: String? = null,
+)
+
+@Serializable
+data class TxCode(
+    @SerialName("input_mode") val inputMode: String? = null,
+    val length: Int? = null,
+    val description: String? = null,
+)
