@@ -76,7 +76,8 @@ object StatusPolicyImplementation {
 
     private val ietfStatusValidator = IETFStatusValidator(
         fetcher = credentialFetcher,
-        ietfJwtStatusReader, ietfCwtStatusReader,
+        ietfJwtStatusReader,
+        ietfCwtStatusReader,
         bitValueReaderFactory = bitValueReaderFactory,
         expansionAlgorithm = tokenStatusListExpansionAlgorithm
     )
