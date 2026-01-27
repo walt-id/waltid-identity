@@ -24,7 +24,7 @@ object Verifier2SessionCredentialPolicyValidation {
         val specificVcPolicies: Map<String, List<CredentialPolicyResult>>
     )
 
-    internal suspend fun validateCredentialPolicies(
+    suspend fun validateCredentialPolicies(
         policies: Verification2Session.DefinedVerificationPolicies,
         validatedCredentials: Map<String, List<DigitalCredential>>
     ): CredentialPolicyResults = coroutineScope {

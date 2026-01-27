@@ -1,6 +1,7 @@
 package id.walt.openid4vp.verifier.openapi
 
 import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
+import id.walt.openid4vp.verifier.data.DcApiAnnexCFlowSetup
 import id.walt.openid4vp.verifier.data.DcApiFlowSetup
 import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator.VerificationSessionCreationResponse
@@ -30,6 +31,7 @@ object VerificationSessionCreateOpenApi {
             - DCQL query allows requesting specific claims from credentials using JSON path notation
             - Sessions expire after 10 minutes if unused and are retained for 10 years by default
             - Session status can be tracked via SSE events endpoint
+            - To receive the unified v2 response envelope, set `?envelope=true`
             
             For more information, see: $DOCUMENTATION_URL_PLACEHOLDER
         """.trimIndent()
@@ -37,6 +39,9 @@ object VerificationSessionCreateOpenApi {
         request {
             headerParameter<String>("X-Request-Id") {
                 description = "Optional request ID for tracing"
+            }
+            queryParameter<Boolean>("envelope") {
+                description = "Set to true to enable the v2 response envelope"
             }
             body<VerificationSessionSetup> {
                 required = true
@@ -88,10 +93,15 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-dc_api][iso mdl] signed & unencrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_MDL }
                 example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
 
-                // TODO: Add Annex-C examples
-                //[iso-18013-7-dc_api][iso mdl] default
-                //[iso-18013-7-dc_api][iso photo-id] default
-
+                // Add Annex-C examples
+                example("[iso-18013-7-dc_api][iso mdl] default") {
+                    value = DcApiAnnexCFlowSetup(
+                        docType = "org.iso.18013.5.1.mDL",
+                        requestedElements = mapOf("org.iso.18013.5.1" to listOf("age_over_18")),
+                        origin = "https://digital-credentials.walt.id",
+                        ttlSeconds = 300
+                    )
+                }
             }
         }
         response {
