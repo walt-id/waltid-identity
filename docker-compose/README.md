@@ -82,7 +82,7 @@ $ cd waltid-identity/
 $
 $ nano docker-compose/.env # set variable VERSION_TAG=1.0.0-SNAPSHOT so the build version is used
 $
-$ ./gradlew publishImageToLocalRegistry # build docker images
+$ ./gradlew jibDockerBuild # build docker images
 $
 $ docker image ls # verify image is build and published in local docker registry
 REPOSITORY            TAG              IMAGE ID       CREATED        SIZE
