@@ -16,7 +16,7 @@ class DefaultAuthorizeRequestValidatorTest {
         val result = validator.validate(
             mapOf(
                 "client_id" to listOf("client-123"),
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
                 "scope" to listOf("openid offline"),
                 "state" to listOf("xyz"),
@@ -74,7 +74,7 @@ class DefaultAuthorizeRequestValidatorTest {
         val rejected = hookValidator.validate(
             mapOf(
                 "client_id" to listOf("client-123"),
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "issuer_state" to listOf("blocked"),
             ),
         )
@@ -85,7 +85,7 @@ class DefaultAuthorizeRequestValidatorTest {
         val accepted = hookValidator.validate(
             mapOf(
                 "client_id" to listOf("client-123"),
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "issuer_state" to listOf("ok"),
             ),
         )

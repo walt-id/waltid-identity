@@ -5,6 +5,7 @@ package id.walt.openid4vci.handlers.granttypes.authorizationcode
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandler
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
+import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
@@ -37,7 +38,7 @@ class AuthorizationCodeAuthorizationEndpoint(
         authorizationRequest: AuthorizationRequest,
         session: Session,
     ): AuthorizationResponseResult {
-        if (!authorizationRequest.responseTypes.contains("code")) {
+        if (!authorizationRequest.responseTypes.contains(ResponseType.CODE.value)) {
             return AuthorizationResponseResult.Failure(
                 OAuthError(
                     error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,

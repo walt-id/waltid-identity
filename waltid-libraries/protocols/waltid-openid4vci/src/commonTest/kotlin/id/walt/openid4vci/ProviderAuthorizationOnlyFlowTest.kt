@@ -29,7 +29,7 @@ class ProviderAuthorizationOnlyFlowTest {
         // 1) Parse the authorize request received from the wallet.
         val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
                 "scope" to listOf("openid name credential"),
@@ -100,7 +100,7 @@ class ProviderAuthorizationOnlyFlowTest {
 
         val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
@@ -170,7 +170,7 @@ class ProviderAuthorizationOnlyFlowTest {
         )
         val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),

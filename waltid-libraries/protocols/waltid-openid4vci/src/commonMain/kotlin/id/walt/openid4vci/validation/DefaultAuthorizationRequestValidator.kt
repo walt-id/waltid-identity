@@ -2,6 +2,7 @@ package id.walt.openid4vci.validation
 
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.ResponseModeType
+import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.authorization.DefaultAuthorizationRequest
@@ -22,7 +23,7 @@ class DefaultAuthorizationRequestValidator(
                 .split(" ")
                 .mapNotNull { it.trim().takeIf(String::isNotEmpty) }
 
-            if (responseTypes.isEmpty() || responseTypes.any { it != "code" }) {
+            if (responseTypes.isEmpty() || responseTypes.any { it != ResponseType.CODE.value }) {
                 return AuthorizationRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
@@ -44,7 +45,7 @@ class DefaultAuthorizationRequestValidator(
                 id = clientId,
                 redirectUris = listOfNotNull(redirect),
                 grantTypes = setOf("authorization_code"),
-                responseTypes = setOf("code"),
+                responseTypes = setOf(ResponseType.CODE.value),
             )
 
             // RFC6749 §3.3 and §4.1.1: scope is optional; if present, space-delimited and case-sensitive.

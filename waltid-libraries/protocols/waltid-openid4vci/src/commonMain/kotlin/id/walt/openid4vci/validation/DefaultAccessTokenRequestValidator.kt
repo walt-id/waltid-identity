@@ -2,6 +2,7 @@ package id.walt.openid4vci.validation
 
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
@@ -49,7 +50,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
         val client = DefaultClient(
             id = clientId,
             redirectUris = listOfNotNull(redirectUri),
-            responseTypes = setOf("code"),
+            responseTypes = setOf(ResponseType.CODE.value),
             grantTypes = setOf(GrantType.AuthorizationCode.value),
         )
 

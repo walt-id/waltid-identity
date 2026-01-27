@@ -33,7 +33,7 @@ class ProviderCombinedFlowTest {
         // Authorization code flow
         val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to listOf("code"),
+                "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
                 "scope" to listOf("openid"),
@@ -104,7 +104,7 @@ class ProviderCombinedFlowTest {
         suspend fun authorizeFor(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, AuthorizationRequest> {
             val authorizeResult = provider.createAuthorizationRequest(
                 mapOf(
-                    "response_type" to listOf("code"),
+                    "response_type" to listOf(ResponseType.CODE.value),
                     "client_id" to listOf(clientId),
                     "redirect_uri" to listOf(redirectUri),
                     "scope" to listOf(scope),
@@ -120,7 +120,7 @@ class ProviderCombinedFlowTest {
             assertEquals(clientId, authorizeReq.client.id, "client id must be preserved")
             assertEquals(redirectUri, authorizeReq.redirectUri, "redirect_uri must be set on request")
             assertEquals(state, authorizeReq.state, "state must be preserved")
-            assertEquals(setOf("code"), authorizeReq.responseTypes.toSet(), "response_type must be code")
+            assertEquals(setOf(ResponseType.CODE.value), authorizeReq.responseTypes.toSet(), "response_type must be code")
             assertEquals(expectedScopes, authorizeReq.requestedScopes.toSet(), "scopes must be captured from request")
             assertEquals(ResponseModeType.QUERY, authorizeReq.responseMode)
             assertEquals(ResponseModeType.QUERY, authorizeReq.defaultResponseMode)
@@ -235,7 +235,7 @@ class ProviderCombinedFlowTest {
         suspend fun runFlow(clientId: String, redirectUri: String, scope: String, state: String): Pair<String, String> {
             val authorizeResult = provider.createAuthorizationRequest(
                 mapOf(
-                    "response_type" to listOf("code"),
+                    "response_type" to listOf(ResponseType.CODE.value),
                     "client_id" to listOf(clientId),
                     "redirect_uri" to listOf(redirectUri),
                     "scope" to listOf(scope),
