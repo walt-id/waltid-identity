@@ -1,12 +1,13 @@
 package id.walt.openid4vci.offers
 
-import id.walt.openid4vci.GRANT_TYPE_AUTHORIZATION_CODE
-import id.walt.openid4vci.GRANT_TYPE_PRE_AUTHORIZED_CODE
 import id.walt.openid4vci.GrantType
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
+private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
 
 @Serializable
 data class CredentialOffer(
@@ -14,6 +15,10 @@ data class CredentialOffer(
     val credentialIssuer: String,
     @SerialName("credential_configuration_ids")
     val credentialConfigurationIds: List<String>,
+    /**
+     * Optional grant hints. If absent or empty, the Wallet should fall back to the
+     * Authorization Server metadata to determine supported grant types.
+     */
     val grants: CredentialOfferGrants? = null,
 ) {
     init {
@@ -111,21 +116,27 @@ data class CredentialOfferGrants(
 
 @Serializable
 data class AuthorizationCodeGrant(
-    @SerialName("issuer_state") val issuerState: String? = null,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName("issuer_state")
+    val issuerState: String? = null,
+    @SerialName("authorization_server")
+    val authorizationServer: String? = null,
 )
 
 @Serializable
 data class PreAuthorizedCodeGrant(
-    @SerialName("pre-authorized_code") val preAuthorizedCode: String,
-    @SerialName("tx_code") val txCode: TxCode? = null,
+    @SerialName("pre-authorized_code")
+    val preAuthorizedCode: String,
+    @SerialName("tx_code")
+    val txCode: TxCode? = null,
     val interval: Long? = null,
-    @SerialName("authorization_server") val authorizationServer: String? = null,
+    @SerialName("authorization_server")
+    val authorizationServer: String? = null,
 )
 
 @Serializable
 data class TxCode(
-    @SerialName("input_mode") val inputMode: String? = null,
+    @SerialName("input_mode")
+    val inputMode: String? = null,
     val length: Int? = null,
     val description: String? = null,
 )
