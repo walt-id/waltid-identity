@@ -41,8 +41,8 @@ object VerificationSessionCreator {
     )
 
     private suspend fun getKid(clientId: String, key: Key): String {
-        if (clientId.isNotEmpty() && clientId.startsWith("decentralized-identifier:")) {
-            return clientId.substringAfter("decentralized-identifier:") + "#" + key.getKeyId()
+        if (clientId.isNotEmpty() && clientId.startsWith("decentralized_identifier:")) {
+            return clientId.substringAfter("decentralized_identifier:") + "#" + key.getKeyId()
         }
         return key.getKeyId()
     }
