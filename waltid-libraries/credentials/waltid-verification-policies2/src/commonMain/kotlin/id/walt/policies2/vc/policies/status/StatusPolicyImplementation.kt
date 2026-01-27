@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.policies.status
 
+import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.policies.status.bit.BitValueReaderFactory
 import id.walt.policies2.vc.policies.status.content.CwtParser
 import id.walt.policies2.vc.policies.status.content.JsonElementParser
@@ -87,7 +88,7 @@ object StatusPolicyImplementation {
     )
 
     suspend fun verifyWithAttributes(
-        data: JsonObject,
+        data: DigitalCredential,
         attributes: StatusPolicyArgument
     ): Result<JsonElement> =
         getStatusEntryElementExtractor(attributes).extract(data)?.let { processStatusEntry(it, attributes) }
