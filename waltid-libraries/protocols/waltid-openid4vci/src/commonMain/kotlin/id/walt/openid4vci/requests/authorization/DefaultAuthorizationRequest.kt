@@ -1,7 +1,7 @@
 package id.walt.openid4vci.requests.authorization
 
 import id.walt.openid4vci.Client
-import id.walt.openid4vci.ResponseModeType
+import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.requests.generateRequestId
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -19,8 +19,8 @@ data class DefaultAuthorizationRequest(
     override val redirectUri: String?,
     override val state: String?,
     override val issuerState: String? = null,
-    override val responseMode: ResponseModeType = ResponseModeType.QUERY,
-    override val defaultResponseMode: ResponseModeType = ResponseModeType.QUERY,
+    override val responseMode: ResponseMode = ResponseMode.QUERY,
+    override val defaultResponseMode: ResponseMode = ResponseMode.QUERY,
     override val requestForm: Map<String, List<String>> = emptyMap(),
     override val issClaim: String? = null,
 ) : AuthorizationRequest {

@@ -1,7 +1,7 @@
 package id.walt.openid4vci.validation
 
 import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.ResponseModeType
+import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -58,8 +58,8 @@ class DefaultAuthorizationRequestValidator(
                 redirectUri = redirect,
                 state = state,
                 issuerState = issuerState,
-                responseMode = ResponseModeType.QUERY,
-                defaultResponseMode = ResponseModeType.QUERY,
+                responseMode = ResponseMode.QUERY,
+                defaultResponseMode = ResponseMode.QUERY,
                 requestForm = parameters.toMutableMap(),
             )
 

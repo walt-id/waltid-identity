@@ -1,13 +1,12 @@
 package id.walt.openid4vci.requests.authorization
 
 import id.walt.openid4vci.Client
-import id.walt.openid4vci.ResponseModeType
+import id.walt.openid4vci.ResponseMode
 import kotlin.time.Instant
 
 /**
  * Authorization Request for the Authorization Endpoint (interface for extensibility).
 **/
-
 interface AuthorizationRequest {
     val id: String
     val requestedAt: Instant
@@ -21,8 +20,8 @@ interface AuthorizationRequest {
     val redirectUri: String?
     val state: String?
     val issuerState: String?
-    val responseMode: ResponseModeType
-    val defaultResponseMode: ResponseModeType
+    val responseMode: ResponseMode
+    val defaultResponseMode: ResponseMode
     val requestForm: Map<String, List<String>>
     val issClaim: String?
 

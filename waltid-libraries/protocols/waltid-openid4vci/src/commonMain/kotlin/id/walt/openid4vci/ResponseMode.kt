@@ -1,9 +1,9 @@
 package id.walt.openid4vci
 
 /**
- * OAuth 2.0 response modes used when returning authorization responses RFC 6749
+ * OAuth 2.0 (RFC 6749) response modes used when returning authorization responses.
  */
-enum class ResponseModeType {
-    QUERY,
-    FRAGMENT,
+enum class ResponseMode(val value: String) {
+    QUERY("query"),
+    FRAGMENT("fragment"),
 }

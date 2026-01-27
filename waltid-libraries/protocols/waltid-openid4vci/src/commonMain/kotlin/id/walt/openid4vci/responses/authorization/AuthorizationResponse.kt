@@ -1,13 +1,13 @@
 package id.walt.openid4vci.responses.authorization
 
-import id.walt.openid4vci.ResponseModeType
+import id.walt.openid4vci.ResponseMode
 
 data class AuthorizationResponse(
     val redirectUri: String,
     val code: String,
     val state: String? = null,
     val scope: String? = null,
-    val responseMode: ResponseModeType = ResponseModeType.QUERY,
+    val responseMode: ResponseMode = ResponseMode.QUERY,
     val extraParameters: Map<String, String> = emptyMap(),
     val headers: Map<String, String> = emptyMap(),
 )

@@ -122,8 +122,8 @@ class ProviderCombinedFlowTest {
             assertEquals(state, authorizeReq.state, "state must be preserved")
             assertEquals(setOf(ResponseType.CODE.value), authorizeReq.responseTypes.toSet(), "response_type must be code")
             assertEquals(expectedScopes, authorizeReq.requestedScopes.toSet(), "scopes must be captured from request")
-            assertEquals(ResponseModeType.QUERY, authorizeReq.responseMode)
-            assertEquals(ResponseModeType.QUERY, authorizeReq.defaultResponseMode)
+            assertEquals(ResponseMode.QUERY, authorizeReq.responseMode)
+            assertEquals(ResponseMode.QUERY, authorizeReq.defaultResponseMode)
             assertEquals(clientId, authorizeReq.requestForm["client_id"]?.firstOrNull())
             assertEquals(redirectUri, authorizeReq.requestForm["redirect_uri"]?.firstOrNull())
 
@@ -137,7 +137,7 @@ class ProviderCombinedFlowTest {
             val code = response.code
             assertEquals(state, response.state)
             assertEquals(redirectUri, response.redirectUri, "response redirect must match request")
-            assertEquals(ResponseModeType.QUERY, response.responseMode)
+            assertEquals(ResponseMode.QUERY, response.responseMode)
             val responseScopes = response.scope
                 ?.split(" ")
                 ?.filter { it.isNotBlank() }

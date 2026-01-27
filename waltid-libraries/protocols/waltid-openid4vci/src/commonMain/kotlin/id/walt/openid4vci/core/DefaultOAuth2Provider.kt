@@ -1,7 +1,7 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.ResponseModeType
+import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.platform.urlEncode
@@ -110,8 +110,8 @@ class DefaultOAuth2Provider(
         }
 
         val location = when (response.responseMode) {
-            ResponseModeType.QUERY -> appendParams(response.redirectUri, params)
-            ResponseModeType.FRAGMENT -> appendFragment(response.redirectUri, params)
+            ResponseMode.QUERY -> appendParams(response.redirectUri, params)
+            ResponseMode.FRAGMENT -> appendFragment(response.redirectUri, params)
         }
 
         val headers = response.headers.toMutableMap().apply { this["Location"] = location }
