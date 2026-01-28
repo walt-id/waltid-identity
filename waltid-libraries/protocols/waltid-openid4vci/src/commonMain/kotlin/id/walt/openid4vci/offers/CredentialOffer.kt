@@ -6,8 +6,6 @@ import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
-private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
 
 @Serializable
 data class CredentialOffer(
@@ -140,3 +138,6 @@ data class TxCode(
     val length: Int? = null,
     val description: String? = null,
 )
+
+private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
+private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"

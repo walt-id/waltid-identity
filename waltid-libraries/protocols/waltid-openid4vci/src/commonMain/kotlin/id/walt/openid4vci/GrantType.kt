@@ -1,9 +1,6 @@
 package id.walt.openid4vci
 
 
-private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
-private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
-
 /**
  * OAuth 2.0 (RFC 6749) grant types and OID4VCI extensions.
  * Wrapper that contains built-in values and supports custom extensions.
@@ -22,3 +19,6 @@ sealed class GrantType(open val value: String) {
     }
 
 }
+
+private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
+private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"

@@ -1,7 +1,7 @@
 package id.walt.openid4vci
 
 /**
- * Credential format identifiers for the OpenID4VCI credential endpoint.
+ * OpenID4VCI 1.0 Credential Format identifiers.
  */
 enum class CredentialFormat(val value: String) {
     JWT_VC_JSON("jwt_vc_json"),
