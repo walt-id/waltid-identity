@@ -11,8 +11,8 @@ data:
   verifier-service.conf: |
     clientId: "verifier2"
     clientMetadata: {}
-    urlPrefix: "https://verifier2.portal.test.waltid.cloud/verification-session"
-    baseUrl = "https://verifier2.portal.test.waltid.cloud"
+    urlPrefix: "https://verifier2.demo.walt.id/verification-session"
+    baseUrl = "https://verifier2.demo.walt.id"
     urlHost: "openid4vp://authorize"
     key: {"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}
     x5c: ["MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNjI0MjBaFw0yNjEwMTQwNjI0MjBaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSQAwRgIhAOu0RGM6BjVQUepeLBogw+ZD3MQ9vFppbPIGMPjtn/qdAiEAttfdfyXHfzJ2tr+Pczyckzv3NlM43461cvP96sIzOQA="]
@@ -90,10 +90,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - verifier2.portal.test.waltid.cloud
+        - verifier2.demo.walt.id
       secretName: verifier2-tls-secret
   rules:
-    - host: verifier2.portal.test.waltid.cloud
+    - host: verifier2.demo.walt.id
       http:
         paths:
           - path: /
