@@ -11,9 +11,9 @@ import id.walt.policies2.vc.policies.status.reader.StatusValueReader
 
 class IETFStatusValidator(
     fetcher: CredentialFetcher,
-    vararg reader: StatusValueReader<IETFStatusContent>,
     bitValueReaderFactory: BitValueReaderFactory,
     private val expansionAlgorithm: StatusListExpansionAlgorithm,
+    vararg reader: StatusValueReader<IETFStatusContent>,
 ) : StatusValidatorBase<IETFStatusContent, IETFEntry, IETFStatusPolicyAttribute>(
     fetcher,
     *reader
