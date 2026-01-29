@@ -13,10 +13,6 @@ data class CredentialOffer(
     val credentialIssuer: String,
     @SerialName("credential_configuration_ids")
     val credentialConfigurationIds: List<String>,
-    /**
-     * Optional grant hints. If absent or empty, the Wallet should fall back to the
-     * Authorization Server metadata to determine supported grant types.
-     */
     val grants: CredentialOfferGrants? = null,
 ) {
     init {

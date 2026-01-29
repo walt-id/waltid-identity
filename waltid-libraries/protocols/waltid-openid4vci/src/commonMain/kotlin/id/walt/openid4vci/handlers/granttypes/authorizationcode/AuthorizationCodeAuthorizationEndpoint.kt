@@ -49,7 +49,7 @@ class AuthorizationCodeAuthorizationEndpoint(
 
 //         Redirect URI rules (RFC6749 §4.1.1/§4.1.2):
 //         - Client must have at least one registered redirect URI.
-//         - If the client has multiple, the request must include redirect_uri and it must match a registered one.
+//         - If the client has multiple, the request must include redirect_uri and, it must match a registered one.
 //         - If the client has exactly one registered URI and the request omits redirect_uri, we may use the registered one.
 //         - If redirect_uri is present, it must be one of the registered URIs; otherwise reject.
         val redirectUri = authorizationRequest.redirectUri

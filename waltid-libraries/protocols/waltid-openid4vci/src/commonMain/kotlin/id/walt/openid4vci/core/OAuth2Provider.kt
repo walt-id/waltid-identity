@@ -34,6 +34,7 @@ import kotlinx.serialization.json.JsonObject
 interface OAuth2Provider {
     // OAuth2.0 - Authorization Endpoint
     fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+
     suspend fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         session: Session
