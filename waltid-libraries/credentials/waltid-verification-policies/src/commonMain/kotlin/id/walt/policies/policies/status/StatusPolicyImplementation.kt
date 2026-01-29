@@ -76,10 +76,10 @@ object StatusPolicyImplementation {
 
     private val ietfStatusValidator = IETFStatusValidator(
         fetcher = credentialFetcher,
-        ietfJwtStatusReader,
-        ietfCwtStatusReader,
         bitValueReaderFactory = bitValueReaderFactory,
-        expansionAlgorithm = tokenStatusListExpansionAlgorithm
+        expansionAlgorithm = tokenStatusListExpansionAlgorithm,
+        ietfJwtStatusReader,
+        ietfCwtStatusReader
     )
 
     suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<Any> =
