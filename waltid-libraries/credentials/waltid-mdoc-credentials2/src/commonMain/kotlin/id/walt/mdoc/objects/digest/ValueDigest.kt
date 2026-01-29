@@ -73,6 +73,34 @@ data class ValueDigest(
             return ValueDigest(item.digestId, digestValue)
         }
 
+        /**
+         * Factory method to create a [ValueDigest] from already-serialized `IssuerSignedItemBytes` content.
+         *
+         * Use this when you have the original on-the-wire encoding of the IssuerSignedItem (the bytes inside
+         * the bstr/tag 24 wrapper). This avoids re-serializing the IssuerSignedItem which can differ between
+         * issuers (e.g., different CBOR map key ordering) and would otherwise break digest verification.
+         *
+         * @param digestId The DigestID of the issuer-signed item.
+         * @param issuerSignedItemBytesCbor The CBOR-encoded IssuerSignedItem (the inner bytes, not the outer bstr/tag).
+         * @param digestAlgorithm The algorithm specified in the MSO (e.g., "SHA-256").
+         */
+        fun fromIssuerSignedItemBytes(
+            digestId: UInt,
+            issuerSignedItemBytesCbor: ByteArray,
+            digestAlgorithm: String
+        ): ValueDigest {
+            // 1. Encode the CBOR bytes as a CBOR byte string (bstr).
+            val cborBstr = coseCompliantCbor.encodeToByteArray(ByteArraySerializer(), issuerSignedItemBytesCbor)
+
+            // 2. Wrap the bstr in tag #24, as required for IssuerSignedItemBytes.
+            val taggedBytes = cborBstr.wrapInCborTag(24)
+
+            // 3. Compute the digest using the specified algorithm.
+            val digestValue = taggedBytes.digest(digestAlgorithm)
+
+            return ValueDigest(digestId, digestValue)
+        }
+
         private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
             coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
     }
