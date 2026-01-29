@@ -25,6 +25,7 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
     fun setup() {
         coEvery { mockFetcher.fetch(uri) } returns Result.success(statusListContent)
         every { mockBitValueReaderFactory.new(strategy = ofType(LittleEndianRepresentation::class)) } returns mockBitValueReader
+        every { mockStatusReader.canHandle(statusListContent) } returns true
         sut = createStatusValidator()
     }
 
@@ -32,9 +33,9 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
 
     override fun createStatusValidator() = IETFStatusValidator(
         fetcher = mockFetcher,
-        reader = mockStatusReader,
         bitValueReaderFactory = mockBitValueReaderFactory,
         expansionAlgorithm = mockExpansionAlgorithm,
+        mockStatusReader,
     )
 
     override fun createEntry(scenario: TestScenario, size: Int) = IETFEntry(
