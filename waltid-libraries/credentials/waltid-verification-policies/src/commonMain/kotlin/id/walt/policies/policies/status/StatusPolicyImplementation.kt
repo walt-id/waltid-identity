@@ -2,6 +2,7 @@ package id.walt.policies.policies.status
 
 import id.walt.policies.policies.Base64UrlHandler
 import id.walt.policies.policies.status.bit.BitValueReaderFactory
+import id.walt.policies.policies.status.content.CwtParser
 import id.walt.policies.policies.status.content.JsonElementParser
 import id.walt.policies.policies.status.content.JwtParser
 import id.walt.policies.policies.status.entry.IETFEntryExtractor
@@ -10,8 +11,11 @@ import id.walt.policies.policies.status.entry.W3CEntryExtractor
 import id.walt.policies.policies.status.expansion.TokenStatusListExpansionAlgorithm
 import id.walt.policies.policies.status.expansion.W3cStatusListExpansionAlgorithmFactory
 import id.walt.policies.policies.status.model.*
+import id.walt.policies.policies.status.reader.IETFCwtStatusValueReader
 import id.walt.policies.policies.status.reader.IETFJwtStatusValueReader
 import id.walt.policies.policies.status.reader.W3CStatusValueReader
+import id.walt.policies.policies.status.reader.format.CwtFormatMatcher
+import id.walt.policies.policies.status.reader.format.JwtFormatMatcher
 import id.walt.policies.policies.status.validator.IETFStatusValidator
 import id.walt.policies.policies.status.validator.W3CStatusValidator
 import io.ktor.client.*
@@ -44,11 +48,19 @@ object StatusPolicyImplementation {
 
     private val ietfEntryContentParser = JsonElementParser(serializer<IETFEntry>())
 
+    private val cwtParser = CwtParser()
+
     private val jwtParser = JwtParser()
 
-    private val w3cStatusReader = W3CStatusValueReader(jwtParser)
+    private val jwtFormatMatcher = JwtFormatMatcher()
 
-    private val ietfJwtStatusReader = IETFJwtStatusValueReader(jwtParser)
+    private val cwtFormatMatcher = CwtFormatMatcher()
+
+    private val w3cStatusReader = W3CStatusValueReader(jwtFormatMatcher, jwtParser)
+
+    private val ietfJwtStatusReader = IETFJwtStatusValueReader(jwtFormatMatcher, jwtParser)
+
+    private val ietfCwtStatusReader = IETFCwtStatusValueReader(cwtFormatMatcher, cwtParser)
 
     private val bitValueReaderFactory = BitValueReaderFactory()
 
@@ -63,7 +75,11 @@ object StatusPolicyImplementation {
     private val tokenStatusListExpansionAlgorithm = TokenStatusListExpansionAlgorithm(base64UrlHandler)
 
     private val ietfStatusValidator = IETFStatusValidator(
-        credentialFetcher, ietfJwtStatusReader, bitValueReaderFactory, tokenStatusListExpansionAlgorithm
+        fetcher = credentialFetcher,
+        bitValueReaderFactory = bitValueReaderFactory,
+        expansionAlgorithm = tokenStatusListExpansionAlgorithm,
+        ietfJwtStatusReader,
+        ietfCwtStatusReader
     )
 
     suspend fun verifyWithAttributes(data: JsonObject, attributes: StatusPolicyArgument): Result<Any> =
@@ -92,12 +108,8 @@ object StatusPolicyImplementation {
             val validationResults: List<Result<Unit>> = sortedEntries.zip(sortedAttributes) { entry, attr ->
                 w3cStatusValidator.validate(entry, attr)
             }
-            if (validationResults.isEmpty()) {
-                throw IllegalArgumentException(emptyResultMessage(attribute))
-            }
-            if (validationResults.any { it.isFailure }) {
-                throw IllegalArgumentException(failResultMessage(validationResults))
-            }
+            require(validationResults.isNotEmpty()) { emptyResultMessage(attribute) }
+            require(validationResults.none { it.isFailure }) { failResultMessage(validationResults) }
         }
 
     private fun failResultMessage(validationResults: List<Result<Unit>>) =
