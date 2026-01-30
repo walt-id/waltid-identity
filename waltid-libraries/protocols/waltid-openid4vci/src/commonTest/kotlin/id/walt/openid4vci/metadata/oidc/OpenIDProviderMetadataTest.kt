@@ -1,9 +1,8 @@
-package id.walt.openid4vci.metadata
+package id.walt.openid4vci.metadata.oidc
 
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
-import id.walt.openid4vci.metadata.oidc.OpenIDProviderMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

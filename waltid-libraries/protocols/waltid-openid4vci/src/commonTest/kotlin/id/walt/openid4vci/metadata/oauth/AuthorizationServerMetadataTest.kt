@@ -1,4 +1,4 @@
-package id.walt.openid4vci.metadata
+package id.walt.openid4vci.metadata.oauth
 
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode

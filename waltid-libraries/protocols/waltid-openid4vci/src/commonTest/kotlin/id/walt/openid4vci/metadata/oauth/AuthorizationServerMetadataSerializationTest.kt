@@ -1,30 +1,25 @@
-package id.walt.openid4vci.metadata
+package id.walt.openid4vci.metadata.oauth
 
 import id.walt.openid4vci.ResponseType
-import id.walt.openid4vci.metadata.oidc.OpenIDProviderMetadata
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 
-class OpenIDProviderMetadataSerializationTest {
+class AuthorizationServerMetadataSerializationTest {
 
-    private val json = Json {
-        encodeDefaults = false
-        explicitNulls = false
-    }
+    private val json = Json
 
     @Test
     fun `rejects empty collections`() {
         assertFailsWith<IllegalArgumentException> {
-            OpenIDProviderMetadata(
+            AuthorizationServerMetadata(
                 issuer = "https://issuer.example",
                 authorizationEndpoint = "https://issuer.example/authorize",
                 tokenEndpoint = "https://issuer.example/token",
-                jwksUri = "https://issuer.example/jwks",
                 responseTypesSupported = setOf(ResponseType.CODE.value),
-                subjectTypesSupported = setOf("public"),
-                idTokenSigningAlgValuesSupported = setOf("RS256"),
                 responseModesSupported = emptySet(),
             )
         }
@@ -32,22 +27,19 @@ class OpenIDProviderMetadataSerializationTest {
 
     @Test
     fun `omits null collections from json output`() {
-        val metadata = OpenIDProviderMetadata(
+        val metadata = AuthorizationServerMetadata(
             issuer = "https://issuer.example",
             authorizationEndpoint = "https://issuer.example/authorize",
             tokenEndpoint = "https://issuer.example/token",
-            jwksUri = "https://issuer.example/jwks",
             responseTypesSupported = setOf(ResponseType.CODE.value),
-            subjectTypesSupported = setOf("public"),
-            idTokenSigningAlgValuesSupported = setOf("RS256"),
+            responseModesSupported = null,
             scopesSupported = null,
         )
 
         val encoded = json.encodeToString(metadata)
 
-        assertFalse(encoded.contains("scopes_supported"))
         assertFalse(encoded.contains("response_modes_supported"))
-        assertFalse(encoded.contains("claims_supported"))
+        assertFalse(encoded.contains("scopes_supported"))
     }
 
     @Test
@@ -57,18 +49,14 @@ class OpenIDProviderMetadataSerializationTest {
               "issuer": "https://issuer.example",
               "authorization_endpoint": "https://issuer.example/authorize",
               "token_endpoint": "https://issuer.example/token",
-              "jwks_uri": "https://issuer.example/jwks",
-              "response_types_supported": ["${ResponseType.CODE.value}"],
-              "subject_types_supported": ["public"],
-              "id_token_signing_alg_values_supported": ["RS256"]
+              "response_types_supported": ["code"]
             }
         """.trimIndent()
 
-        val decoded = json.decodeFromString<OpenIDProviderMetadata>(payload)
+        val decoded = json.decodeFromString<AuthorizationServerMetadata>(payload)
 
-        assertFalse(decoded.scopesSupported != null)
-        assertFalse(decoded.responseModesSupported != null)
-        assertFalse(decoded.claimsSupported != null)
+        assertEquals(decoded.responseModesSupported, null)
+        assertEquals(decoded.scopesSupported, null)
     }
 
     @Test
@@ -78,16 +66,13 @@ class OpenIDProviderMetadataSerializationTest {
               "issuer": "https://issuer.example",
               "authorization_endpoint": "https://issuer.example/authorize",
               "token_endpoint": "https://issuer.example/token",
-              "jwks_uri": "https://issuer.example/jwks",
-              "response_types_supported": ["${ResponseType.CODE.value}"],
-              "subject_types_supported": ["public"],
-              "id_token_signing_alg_values_supported": ["RS256"],
-              "claims_supported": []
+              "response_types_supported": ["code"],
+              "response_modes_supported": []
             }
         """.trimIndent()
 
         assertFailsWith<IllegalArgumentException> {
-            json.decodeFromString<OpenIDProviderMetadata>(payload)
+            json.decodeFromString<AuthorizationServerMetadata>(payload)
         }
     }
 }
