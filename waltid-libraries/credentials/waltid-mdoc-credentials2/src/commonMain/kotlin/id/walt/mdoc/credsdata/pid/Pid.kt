@@ -7,6 +7,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.cbor.ByteString
 
 /**
@@ -32,6 +33,7 @@ data class Pid(
     /** The country as an alpha-2 country code as specified in ISO 3166-1, or the state, province, district, or local area or the municipality, city, town, or village where the user to whom the person identification data relates was born. */
     @SerialName("birth_place")
     val birthPlace: String? = null, // Could also be a data class?
+    //val birthPlace: PlaceOfBirth? = null, // Could also be a data class?
 
     /** One or more alpha-2 country codes as specified in ISO 3166-1, representing the nationality of the user to whom the person identification data relates. */
     @SerialName("nationality")
@@ -142,6 +144,10 @@ data class Pid(
     @SerialName("trust_anchor")
     val trustAnchor: String? = null,
 
+    /** This attribute indicates that a PID has indeed been issued as a PID. Note: According to Annex V point a) and Annex VII point a) of the [European Digital Identity Regulation] an indication, at least in a form suitable for automated processing, that the attestation has been issued as a QEAA or Pub-EAA SHALL be defined. This PID Rulebook adds this as an optional attribute for PIDs as well, so PID Providers are able to ensure that PIDs can be validated by Relying Parties in the same manner as QEAAs. */
+    @SerialName("attestation_legal_category")
+    val attestationLegalCategory: String? = null,
+
     ) : MdocData {
     enum class PidSex(val code: UInt) {
         NOT_KNOWN(0u),
@@ -154,6 +160,24 @@ data class Pid(
         NOT_APPLICABLE(9u)
     }
 
+    /** See: https://github.com/eu-digital-identity-wallet/eudi-doc-attestation-rulebooks-catalog/blob/main/rulebooks/pid/pid-rulebook.md#315-attribute-place_of_birth */
+    @Serializable
+    @SerialName("place_of_birth")
+    data class PlaceOfBirth(
+        /** a single alpha-2 country code as specified in ISO 3166-1 */
+        val country: String? = null,
+
+        /** the name of a state, province, district, or local area */
+        val region: String? = null,
+
+        /** the name of a municipality, city, town, or village */
+        val locality: String? = null,
+    ) {
+        init {
+            require(country != null || region != null || locality != null) { "place_of_birth requires at least 'country' or 'region' or 'locality'" }
+        }
+    }
+
     companion object : MdocCompanion {
         override fun registerSerializationTypes() {
             MdocsCborSerializer.register(
@@ -161,6 +185,7 @@ data class Pid(
                     "birth_date" to LocalDate.serializer(),
                     "issuance_date" to LocalDate.serializer(),
                     "issuance_date" to LocalDate.serializer(),
+                    "portrait" to ByteArraySerializer()
                 ), "eu.europa.ec.eudi.pid.1"
             )
         }
