@@ -4,7 +4,6 @@ package id.walt.mdoc.objects.elements
 
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ByteStringWrapper
-import id.walt.mdoc.objects.wrapInCborTag
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 
@@ -40,8 +39,11 @@ data class IssuerSignedList(
         /**
          * Factory method to create an [IssuerSignedList] from a list of [IssuerSignedItem] objects.
          *
-         * This method correctly serializes each [IssuerSignedItem] into its `IssuerSignedItemBytes`
-         * representation, which is a bytestring of the item's CBOR encoding, wrapped in CBOR Tag 24.
+         * This method serializes each [IssuerSignedItem] into its CBOR map encoding and stores those
+         * bytes in the [ByteStringWrapper.serialized] field.
+         *
+         * Note: The *on-the-wire* representation (`IssuerSignedItemBytes`) is `#6.24(bstr.cbor IssuerSignedItem)`
+         * and is applied by the [IssuerSignedListSerializer] when the list is serialized.
          *
          * @see ISO/IEC 18013-5:xxxx(E), 8.3.2.1.2.3 (CDDL for IssuerSignedItemBytes)
          *
@@ -53,7 +55,7 @@ data class IssuerSignedList(
             IssuerSignedList(items.map { item ->
                 ByteStringWrapper(
                     item,
-                    coseCompliantCbor.encodeToByteArray(item.serialize(namespace)).wrapInCborTag(24)
+                    item.serialize(namespace)
                 )
             })
 

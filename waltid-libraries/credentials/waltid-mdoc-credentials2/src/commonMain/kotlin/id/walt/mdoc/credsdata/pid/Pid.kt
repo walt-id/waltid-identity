@@ -160,7 +160,7 @@ data class Pid(
                 mapOf(
                     "birth_date" to LocalDate.serializer(),
                     "issuance_date" to LocalDate.serializer(),
-                    "issuance_date" to LocalDate.serializer(),
+                    "expiry_date" to LocalDate.serializer(),
                 ), "eu.europa.ec.eudi.pid.1"
             )
         }

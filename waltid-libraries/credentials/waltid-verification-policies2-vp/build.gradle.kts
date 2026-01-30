@@ -51,6 +51,7 @@ kotlin {
         jvmTest.dependencies {
             implementation("org.slf4j:slf4j-simple:2.0.17")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
             implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
             implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")

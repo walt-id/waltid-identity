@@ -315,7 +315,6 @@ class MsoMdocsVerifier2IntegrationTest {
                 assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 
-
             // View session that was presented to
             val info2 = testAndReturn("View presented session") {
                 http.get("/verification-session/$sessionId/info")
