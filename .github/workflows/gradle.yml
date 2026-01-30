@@ -64,7 +64,7 @@ jobs:
             "$FILE"
       - name: Clean and build with all tests
         if: ${{ runner.os != 'macos' }}
-        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel --max-workers=3 --continue
+        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel --max-workers=2 --continue
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
