@@ -1,6 +1,6 @@
 package id.walt.openid4vci.resolvers
 
-import id.walt.openid4vci.responses.credential.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 
 /**
  * Resolves credential configurations by credential_configuration_id.

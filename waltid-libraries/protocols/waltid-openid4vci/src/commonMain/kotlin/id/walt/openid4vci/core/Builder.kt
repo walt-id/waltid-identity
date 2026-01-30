@@ -113,7 +113,7 @@ private fun registerDefaultCredentialHandlers(
     includeCredentialDefaultHandlers: Boolean,
 ) {
     if (!includeCredentialDefaultHandlers) return
-    val sdJwtVcFormat = CredentialFormat.SD_JWT_VC.value
+    val sdJwtVcFormat = CredentialFormat.SD_JWT_VC
     if (config.credentialEndpointHandlers.get(sdJwtVcFormat) == null) {
         config.credentialEndpointHandlers.register(sdJwtVcFormat, SdJwtVcCredentialHandler())
     }

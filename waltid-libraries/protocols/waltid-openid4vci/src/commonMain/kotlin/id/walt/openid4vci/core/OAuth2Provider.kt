@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
@@ -70,7 +71,7 @@ interface OAuth2Provider {
 
     suspend fun createCredentialResponse(
         request: CredentialRequest,
-        format: String,
+        format: CredentialFormat,
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,

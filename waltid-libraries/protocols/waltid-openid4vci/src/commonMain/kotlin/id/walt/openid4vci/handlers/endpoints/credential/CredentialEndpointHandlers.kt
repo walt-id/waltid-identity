@@ -1,11 +1,13 @@
 package id.walt.openid4vci.handlers.endpoints.credential
 
+import id.walt.openid4vci.CredentialFormat
+
 class CredentialEndpointHandlers(
-    private val handlersByFormat: MutableMap<String, CredentialEndpointHandler> = mutableMapOf(),
+    private val handlersByFormat: MutableMap<CredentialFormat, CredentialEndpointHandler> = mutableMapOf(),
 ) {
-    fun register(format: String, handler: CredentialEndpointHandler) {
+    fun register(format: CredentialFormat, handler: CredentialEndpointHandler) {
         handlersByFormat[format] = handler
     }
 
-    fun get(format: String): CredentialEndpointHandler? = handlersByFormat[format]
+    fun get(format: CredentialFormat): CredentialEndpointHandler? = handlersByFormat[format]
 }

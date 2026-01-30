@@ -1,5 +1,6 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
@@ -18,7 +19,7 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
-import id.walt.openid4vci.responses.credential.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.crypto.keys.Key
 import kotlinx.serialization.json.JsonObject
 
@@ -180,7 +181,7 @@ class DefaultOAuth2Provider(
 
     override suspend fun createCredentialResponse(
         request: CredentialRequest,
-        format: String,
+        format: CredentialFormat,
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
@@ -200,7 +201,7 @@ class DefaultOAuth2Provider(
             ?: return CredentialResponseResult.Failure(
                 OAuthError(
                     error = "unsupported_credential_configuration",
-                    description = "No handler for format $format"
+                    description = "No handler for format ${format.value}"
                 )
             )
         return handler.sign(request, configuration, issuerKey, issuerId, credentialData)

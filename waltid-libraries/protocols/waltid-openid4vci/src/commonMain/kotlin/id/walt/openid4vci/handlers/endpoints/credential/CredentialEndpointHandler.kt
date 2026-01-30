@@ -2,7 +2,7 @@ package id.walt.openid4vci.handlers.endpoints.credential
 
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.requests.credential.CredentialRequest
-import id.walt.openid4vci.responses.credential.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import kotlinx.serialization.json.JsonObject
 

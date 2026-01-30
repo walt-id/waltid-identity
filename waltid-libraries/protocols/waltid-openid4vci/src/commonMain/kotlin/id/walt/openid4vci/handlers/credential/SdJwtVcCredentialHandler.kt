@@ -4,7 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.requests.credential.CredentialRequest
-import id.walt.openid4vci.responses.credential.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -28,16 +28,13 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         credentialData: JsonObject,
     ): CredentialResponseResult {
         return try {
-            val credentialFormat = CredentialFormat.fromValue(configuration.format)
-                ?: return CredentialResponseResult.Failure(
-                    OAuthError("unsupported_credential_format", "Unsupported format ${configuration.format}"),
-                )
-
-            val oid4vcFormat = when (credentialFormat) {
+            val oid4vcFormat = when (configuration.format) {
                 CredentialFormat.JWT_VC_JSON -> Oid4vcCredentialFormat.jwt_vc_json
                 CredentialFormat.JWT_VC -> Oid4vcCredentialFormat.jwt_vc
                 CredentialFormat.SD_JWT_VC -> Oid4vcCredentialFormat.sd_jwt_vc
                 CredentialFormat.MSO_MDOC -> Oid4vcCredentialFormat.mso_mdoc
+                CredentialFormat.JWT_VC_JSON_LD -> Oid4vcCredentialFormat.jwt_vc_json_ld
+                CredentialFormat.LDP_VC -> Oid4vcCredentialFormat.ldp_vc
             }
 
             val proofJwt = request.proofs?.jwt?.firstOrNull()

@@ -142,7 +142,7 @@ class ProviderCredentialIssuanceTest {
 
         val credentialResponse = provider.createCredentialResponse(
             request = credentialRequest,
-            format = CredentialFormat.SD_JWT_VC.value,
+            format = CredentialFormat.SD_JWT_VC,
             issuerKey = issuerKey,
             issuerId = issuerId,
             credentialData = credentialData,

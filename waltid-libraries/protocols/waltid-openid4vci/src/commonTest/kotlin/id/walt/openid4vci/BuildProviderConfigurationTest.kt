@@ -129,6 +129,7 @@ class BuildProviderConfigurationTest {
     private class CustomGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
             request.grantTypes.contains("custom_grant")
+
         override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult =
             AccessTokenResponseResult.Success(request, AccessTokenResponse(accessToken = "custom"))
     }
