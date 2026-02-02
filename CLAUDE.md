@@ -86,6 +86,28 @@ docker compose --profile identity build
 **Note:** The `--profile` flag is required. Setting `COMPOSE_PROFILES` in `.env` does not
 automatically activate profiles - you must use `docker compose --profile <name>` explicitly.
 
+### Building Local Service Images
+
+The docker-compose.yaml uses `VERSION_TAG` from `.env` (default: `stable`) for service images.
+Gradle's jib plugin builds to the `latest` tag. To use locally built images:
+
+```bash
+# Build a service image (from repo root)
+./gradlew :waltid-services:waltid-issuer-api:jibDockerBuild
+
+# Tag as stable (or whatever VERSION_TAG is set to in .env)
+docker tag waltid/issuer-api:latest waltid/issuer-api:stable
+
+# Restart the service
+cd docker-compose
+docker compose --profile identity up -d issuer-api
+```
+
+**Image Tags:**
+- `latest` / `1.0.0-SNAPSHOT`: Built by `./gradlew jibDockerBuild`
+- `stable`: Used by docker-compose (VERSION_TAG in .env)
+- Always tag locally built images to match VERSION_TAG before restarting services
+
 **Service Ports:**
 - Wallet API: 7001
 - Issuer API: 7002

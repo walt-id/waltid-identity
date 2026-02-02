@@ -212,7 +212,8 @@ class OpenId4VciTest {
         }.let { JsonPrimitive(it) }
 
         assertNotNull(generatedCredential)
-        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, generatedCredential)
+        assertNotNull(credReq.format)
+        val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format!!, generatedCredential)
 
         println("// -------- WALLET ----------")
         assertTrue(actual = credentialResponse.isSuccess)

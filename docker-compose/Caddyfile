@@ -10,6 +10,11 @@
 
 # Issuer API
 :{$ISSUER_API_PORT} {
+    # Rewrite malformed EUDI wallet URL (puts path after .well-known instead of before)
+    rewrite /.well-known/openid-credential-issuer/draft13 /draft13/.well-known/openid-credential-issuer
+    rewrite /.well-known/oauth-authorization-server/draft13 /draft13/.well-known/oauth-authorization-server
+    # Rewrite root well-known to draft13 version for EUDI wallet compatibility
+    rewrite /.well-known/openid-credential-issuer /draft13/.well-known/openid-credential-issuer
     reverse_proxy http://issuer-api:{$ISSUER_API_PORT}
 }
 
