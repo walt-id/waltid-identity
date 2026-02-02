@@ -4,7 +4,7 @@ object CredentialManager {
 
 
     val credentials: List<MdocCompanion> = listOf(
-        Mdl, PhotoId
+        Mdl, PhotoId, BoardingPass, BookingOrder
     )
 
     fun init() {
