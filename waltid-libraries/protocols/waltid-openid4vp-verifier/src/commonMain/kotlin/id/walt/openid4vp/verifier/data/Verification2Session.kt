@@ -101,6 +101,18 @@ data class Verification2Session(
     var statusReason: String? = null,
 ) {
 
+    fun deletePII() {
+        presentedRawData = null
+        presentedPresentations = null
+        presentedCredentials = null
+        policyResults?.vpPolicies?.forEach { (_, policyResults) ->
+            policyResults.forEach { (_, policyResult) ->
+                policyResult.results = emptyMap()
+            }
+        }
+
+    }
+
     @Serializable
     data class VerificationSessionNotifications(
         val webhook: VerificationSessionWebhookNotification? = null
@@ -138,9 +150,9 @@ data class Verification2Session(
     @Serializable
     data class VerificationSessionRedirects(
         @SerialName("success_redirect_uri")
-        val successRedirectUri: String? = null,
+        var successRedirectUri: String? = null,
         @SerialName("error_redirect_uri")
-        val errorRedirectUri: String? = null
+        val errorRedirectUri: String? = null,
     )
 
 
