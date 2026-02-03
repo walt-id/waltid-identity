@@ -10,7 +10,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 
 abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.policies.status.model.StatusEntry, T : StatusPolicyAttribute>(
     private val fetcher: CredentialFetcher,
-    private val reader: StatusValueReader<K>,
+    private vararg val reader: StatusValueReader<K>,
 ) : StatusValidator<M, T> {
     protected val logger = KotlinLogging.logger {}
 
@@ -18,18 +18,12 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         logger.debug { "Credential URL: ${entry.uri}" }
         // download status credential
         val statusListContent = fetcher.fetch(entry.uri)
-            .getOrElse {
-                throw StatusRetrievalError(
-                    it.message ?: "Status credential download error"
-                )
-            }
-        // parse status list, response is a jwt
-        val statusList = reader.read(statusListContent)
-            .getOrElse {
-                throw StatusRetrievalError(
-                    it.message ?: "Status credential parsing error"
-                )
-            }
+            .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
+        val matchingReader = reader.firstOrNull { it.canHandle(statusListContent) }
+        requireNotNull(matchingReader) { "No available reader to handle the status list content." }
+        // parse status list
+        val statusList = matchingReader.read(statusListContent)
+            .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential parsing error") }
         val bitValue = getBitValue(statusList, entry)
         logger.debug { "EncodedList[${entry.index}] = $bitValue" }
         customValidations(statusList, attribute)
