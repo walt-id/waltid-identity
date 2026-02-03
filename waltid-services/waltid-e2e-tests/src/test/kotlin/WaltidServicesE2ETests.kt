@@ -437,6 +437,20 @@ class WaltidServicesE2ETests {
         )
         batchIssuance.runTests()
         //endregion -Batch Issuance Test Suite-
+
+        //region -EUDI Wallet Compatibility Tests-
+        val eudiPidMdoc = id.walt.eudi.EudiPidMdocE2ETest(e2e, client)
+        eudiPidMdoc.testPidMdocIssuance()
+        eudiPidMdoc.testInvalidCredentialConfiguration()
+
+        val eudiPidSdJwt = id.walt.eudi.EudiPidSdJwtE2ETest(e2e, client)
+        eudiPidSdJwt.testPidSdJwtIssuance()
+        eudiPidSdJwt.testVctMatching()
+
+        val eudiMdl = id.walt.eudi.EudiMdlE2ETest(e2e, client)
+        eudiMdl.testMdlIssuance()
+        eudiMdl.testMdlDrivingPrivileges()
+        //endregion -EUDI Wallet Compatibility Tests-
     }
 }
 
