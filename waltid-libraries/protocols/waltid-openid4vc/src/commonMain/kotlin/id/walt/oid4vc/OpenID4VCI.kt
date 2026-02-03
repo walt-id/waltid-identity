@@ -592,33 +592,37 @@ object OpenID4VCI {
     }
 
     suspend fun validateProofOfPossession(credentialRequest: CredentialRequest, nonce: String): Boolean {
-        log.debug { "VALIDATING: ${credentialRequest.proof} with nonce $nonce" }
+        log.info { "=== PROOF DEBUG ===" }
+        log.info { "credentialRequest.proof: ${credentialRequest.proof}" }
+        log.info { "credentialRequest.proofs: ${credentialRequest.proofs}" }
+        val proof = credentialRequest.getEffectiveProof()
+        log.info { "getEffectiveProof() returned: $proof" }
+        log.debug { "VALIDATING: $proof with nonce $nonce" }
         log.debug { "VERIFYING ITS SIGNATURE" }
 
-        if (credentialRequest.proof == null) return false
+        if (proof == null) return false
 
         return when {
-            credentialRequest.proof.isJwtProofType -> {
+            proof.isJwtProofType -> {
                 val signatureValid = OpenID4VC.verifyTokenSignature(
                     target = TokenTarget.PROOF_OF_POSSESSION,
-                    token = credentialRequest.proof.jwt!!
+                    token = proof.jwt!!
                 )
-                val proofNonce = getNonceFromProof(credentialRequest.proof)
-                
-                // EUDI wallet SDK doesn't include nonce - allow for compatibility
-                if (signatureValid && proofNonce == null) {
-                    log.warn { "Proof JWT missing nonce - allowing for EUDI compatibility" }
-                    true
-                } else {
-                    signatureValid && proofNonce == nonce
-                }
+                val proofNonce = getNonceFromProof(proof)
+                val nonceValid = proofNonce == null || proofNonce == nonce  // Allow missing nonce for EUDI wallet compatibility
+                log.info { "JWT proof validation: signature=$signatureValid, proofNonce=$proofNonce, expectedNonce=$nonce, nonceValid=$nonceValid" }
+                signatureValid && nonceValid
             }
 
-            credentialRequest.proof.isCwtProofType -> {
-                OpenID4VC.verifyCOSESign1Signature(
+            proof.isCwtProofType -> {
+                val signatureValid = OpenID4VC.verifyCOSESign1Signature(
                     target = TokenTarget.PROOF_OF_POSSESSION,
-                    token = credentialRequest.proof.cwt!!
-                ) && getNonceFromProof(credentialRequest.proof) == nonce
+                    token = proof.cwt!!
+                )
+                val proofNonce = getNonceFromProof(proof)
+                val nonceValid = proofNonce == null || proofNonce == nonce  // Allow missing nonce for EUDI wallet compatibility
+                log.info { "CWT proof validation: signature=$signatureValid, proofNonce=$proofNonce, expectedNonce=$nonce, nonceValid=$nonceValid" }
+                signatureValid && nonceValid
             }
 
             else -> false
@@ -631,7 +635,7 @@ object OpenID4VCI {
         openIDProviderMetadata: OpenIDProviderMetadata
     ): CredentialRequestValidationResult {
         log.debug { "Credential request to validate: $credentialRequest" }
-        if (credentialRequest.proof == null || !validateProofOfPossession(credentialRequest, nonce)) {
+        if (credentialRequest.getEffectiveProof() == null || !validateProofOfPossession(credentialRequest, nonce)) {
             return CredentialRequestValidationResult(
                 success = false,
                 errorCode = CredentialErrorCode.invalid_or_missing_proof,
@@ -639,15 +643,38 @@ object OpenID4VCI {
             )
         }
 
-        val supportedCredentialFormats = when (openIDProviderMetadata) {
-            is OpenIDProviderMetadata.Draft13 -> openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }
-                ?.toSet() ?: setOf()
-
-            is OpenIDProviderMetadata.Draft11 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }
-                ?.toSet() ?: setOf()
+        // For draft 13+, validate by credential_configuration_id or credential_identifier if format is not provided
+        val formatValid = when {
+            // If format is provided, validate it against supported formats
+            credentialRequest.format != null -> {
+                val supportedCredentialFormats = when (openIDProviderMetadata) {
+                    is OpenIDProviderMetadata.Draft13 -> openIDProviderMetadata.credentialConfigurationsSupported?.values?.map { it.format }
+                        ?.toSet() ?: setOf()
+                    is OpenIDProviderMetadata.Draft11 -> openIDProviderMetadata.credentialSupported?.values?.map { it.format }
+                        ?.toSet() ?: setOf()
+                }
+                supportedCredentialFormats.contains(credentialRequest.format)
+            }
+            // If credential_configuration_id is provided (draft 13), validate it exists
+            credentialRequest.credentialConfigurationId != null -> {
+                when (openIDProviderMetadata) {
+                    is OpenIDProviderMetadata.Draft13 ->
+                        openIDProviderMetadata.credentialConfigurationsSupported?.containsKey(credentialRequest.credentialConfigurationId) ?: false
+                    is OpenIDProviderMetadata.Draft11 -> false // Draft 11 doesn't support credential_configuration_id
+                }
+            }
+            // If credential_identifier is provided (draft 14+/EUDI wallet), validate it exists
+            credentialRequest.credentialIdentifier != null -> {
+                when (openIDProviderMetadata) {
+                    is OpenIDProviderMetadata.Draft13 ->
+                        openIDProviderMetadata.credentialConfigurationsSupported?.containsKey(credentialRequest.credentialIdentifier) ?: false
+                    is OpenIDProviderMetadata.Draft11 -> false
+                }
+            }
+            else -> false
         }
 
-        if (!supportedCredentialFormats.contains(credentialRequest.format))
+        if (!formatValid)
             return CredentialRequestValidationResult(
                 success = false,
                 errorCode = CredentialErrorCode.unsupported_credential_format,

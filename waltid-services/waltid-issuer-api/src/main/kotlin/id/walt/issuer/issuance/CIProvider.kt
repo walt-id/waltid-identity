@@ -253,9 +253,18 @@ open class CIProvider(
         log.debug { "CREDENTIAL REQUEST JSON -------:" }
         log.debug { Json.encodeToString(credentialRequest) }
 
+        // Resolve format from credential_identifier or credential_configuration_id if not provided directly
+        // This supports Draft 14+ / EUDI wallet which sends credential_identifier instead of format
+        val resolvedFormat = credentialRequest.format
+            ?: credentialRequest.credentialConfigurationId?.let { getFormatByCredentialConfigurationId(it) }
+            ?: credentialRequest.credentialIdentifier?.let { getFormatByCredentialConfigurationId(it) }
+            ?: CredentialFormat.jwt_vc_json
+
+        log.debug { "Resolved format: $resolvedFormat (from request.format=${credentialRequest.format}, credentialConfigurationId=${credentialRequest.credentialConfigurationId}, credentialIdentifier=${credentialRequest.credentialIdentifier})" }
+
         if (session.issuanceRequests.firstOrNull()?.issuanceType != null && session.issuanceRequests.firstOrNull()!!.issuanceType == "DEFERRED") {
             return CredentialResult(
-                format = credentialRequest.format,
+                format = resolvedFormat,
                 credential = null,
                 credentialId = randomUUIDString()
             ).also {
@@ -263,7 +272,7 @@ open class CIProvider(
             }
         }
 
-        return when (credentialRequest.format) {
+        return when (resolvedFormat) {
             CredentialFormat.mso_mdoc -> runBlocking { doGenerateMDoc(credentialRequest, session) }
             else -> doGenerateCredential(credentialRequest, session)
         }
@@ -294,7 +303,9 @@ open class CIProvider(
             errorCode = CredentialErrorCode.unsupported_credential_format
         )
 
-        val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
+        // Use getEffectiveProof() to support both Draft 13 'proofs' (batch) and legacy 'proof' (singular) formats
+        val effectiveProof = credentialRequest.getEffectiveProof()
+        val proofHeader = effectiveProof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
                 credentialRequest = credentialRequest,
                 errorCode = CredentialErrorCode.invalid_or_missing_proof,
@@ -376,7 +387,7 @@ open class CIProvider(
         })
 
         return CredentialResult(
-            format = credentialRequest.format,
+            format = request.credentialFormat ?: credentialRequest.format ?: CredentialFormat.jwt_vc_json,
             credential = credential
         )
     }
@@ -410,7 +421,8 @@ open class CIProvider(
         credentialRequest: CredentialRequest,
         issuanceSession: IssuanceSession
     ): CredentialResult {
-        val proof = credentialRequest.proof ?: throw CredentialError(
+        // Use getEffectiveProof() to support both Draft 13 'proofs' (batch) and legacy 'proof' (singular) formats
+        val proof = credentialRequest.getEffectiveProof() ?: throw CredentialError(
             credentialRequest = credentialRequest,
             errorCode = CredentialErrorCode.invalid_or_missing_proof,
             message = "No proof found on credential request"
@@ -421,10 +433,10 @@ open class CIProvider(
             message = "No holder key could be extracted from proof"
         )
 
-        val nonce = OpenID4VCI.getNonceFromProof(credentialRequest.proof!!) ?: throw CredentialError(
+        val nonce = OpenID4VCI.getNonceFromProof(proof) ?: issuanceSession.cNonce ?: throw CredentialError(
             credentialRequest = credentialRequest,
             errorCode = CredentialErrorCode.invalid_or_missing_proof,
-            message = "No nonce found on proof"
+            message = "No nonce found on proof or session"
         )
 
         log.debug { "RETRIEVING ISSUANCE REQUEST FOR CREDENTIAL REQUEST: $nonce" }
@@ -498,10 +510,11 @@ open class CIProvider(
                     callbackUrl = issuanceSession.callbackUrl
                 )
         }
+        // Return full mdoc (docType + issuerSigned) as base64url-encoded CBOR
+        // EUDI wallet expects the complete mdoc structure, not just issuerSigned
         return CredentialResult(
             format = CredentialFormat.mso_mdoc,
-            credential = JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
-            customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
+            credential = JsonPrimitive(mdoc.toCBOR().encodeToBase64Url())
         )
     }
 
@@ -512,7 +525,7 @@ open class CIProvider(
         val credentialRequestFormats = batchCredentialRequest.credentialRequests
             .map { it.format }
 
-        require(credentialRequestFormats.distinct().size < 2) { "Credential requests don't have the same format: ${credentialRequestFormats.joinToString { it.value }}" }
+        require(credentialRequestFormats.distinct().size < 2) { "Credential requests don't have the same format: ${credentialRequestFormats.joinToString { it?.value ?: "unknown" }}" }
 
         val keyIdsDistinct = batchCredentialRequest.credentialRequests.map { credReq ->
             credReq.proof?.jwt?.let { jwt -> JwtUtils.parseJWTHeader(jwt) }
@@ -590,13 +603,33 @@ open class CIProvider(
             val credentialFormat = getFormatByCredentialConfigurationId(credentialConfigurationId)
             log.debug {
                 "Checking format - Request format: ${credentialRequest.format}, " +
-                        "Session format: $credentialFormat"
+                        "Request credentialConfigurationId: ${credentialRequest.credentialConfigurationId}, " +
+                        "Session format: $credentialFormat, " +
+                        "Session credentialConfigurationId: $credentialConfigurationId"
             }
 
-            require(credentialFormat == credentialRequest.format) { "Format does not match" }
+            // Draft 13+ sends credential_configuration_id or credential_identifier instead of format
+            // Match by credential_configuration_id/credential_identifier if provided, otherwise by format
+            val formatMatches = when {
+                // Draft 13: match by credential configuration ID
+                credentialRequest.credentialConfigurationId != null -> {
+                    credentialConfigurationId == credentialRequest.credentialConfigurationId
+                }
+                // Draft 14+ / EUDI wallet: match by credential identifier
+                credentialRequest.credentialIdentifier != null -> {
+                    credentialConfigurationId == credentialRequest.credentialIdentifier
+                }
+                // Legacy: match by format
+                else -> {
+                    credentialFormat == credentialRequest.format
+                }
+            }
+            require(formatMatches) { "Format/credentialConfigurationId does not match" }
+
             // Depending on the format, perform specific checks
+            // Use the session's format since credentialRequest.format may be null in Draft 13
             val additionalMatches =
-                when (credentialRequest.format) {
+                when (credentialFormat) {
                     CredentialFormat.jwt_vc_json, CredentialFormat.jwt_vc -> {
                         val types = getTypesByCredentialConfigurationId(credentialConfigurationId)
                         // same order, same elements

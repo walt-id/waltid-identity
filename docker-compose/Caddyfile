@@ -16,6 +16,8 @@
     rewrite /.well-known/openid-credential-issuer/draft13 /draft13/.well-known/openid-credential-issuer
     rewrite /.well-known/openid-configuration/draft13 /draft13/.well-known/openid-configuration
     rewrite /.well-known/oauth-authorization-server/draft13 /draft13/.well-known/oauth-authorization-server
+    # Rewrite root well-known to draft13 version for EUDI wallet compatibility
+    rewrite /.well-known/openid-credential-issuer /draft13/.well-known/openid-credential-issuer
 
     reverse_proxy http://issuer-api:{$ISSUER_API_PORT}
 }
