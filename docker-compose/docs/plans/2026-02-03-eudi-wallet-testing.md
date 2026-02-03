@@ -14,8 +14,28 @@
 
 Before running any tests, ensure:
 1. You are in the correct worktree: `/Users/adambradley/Projects/Mastercard/India/waltid-identity/.worktrees/eudi-compatibility`
-2. Docker services are running: `docker compose --profile identity ps` (from `docker-compose/` directory)
-3. Java 21 is available: `java -version`
+2. **CRITICAL:** You must use the **custom-built Docker image** (standard Docker Hub images do NOT work)
+3. Docker services are running: `docker compose --profile identity ps` (from `docker-compose/` directory)
+4. Java 21 is available: `java -version`
+
+### Building the Custom Issuer Image
+
+```bash
+# From the worktree root (NOT docker-compose directory)
+cd /Users/adambradley/Projects/Mastercard/India/waltid-identity/.worktrees/eudi-compatibility
+
+# Build the custom issuer image
+./gradlew :waltid-services:waltid-issuer-api:jibDockerBuild
+
+# Tag to match docker-compose VERSION_TAG (default: stable)
+docker tag waltid/issuer-api:latest waltid/issuer-api:stable
+
+# Force recreate the container with the new image
+cd docker-compose
+docker compose up -d --force-recreate issuer-api
+```
+
+**Why custom image is required:** The EUDI wallet compatibility fixes (dc+sd-jwt format support, VCT handling, credential request processing) are NOT in the upstream walt.id Docker Hub images.
 
 ---
 

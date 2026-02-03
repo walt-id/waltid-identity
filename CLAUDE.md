@@ -146,6 +146,46 @@ docker compose --profile identity up -d issuer-api
 - `waltid-verifier-api2` is the modern verifier using OpenID4VP 1.0 + DCQL
 - `waltid-verifier-api` is legacy (draft protocols)
 
+## EUDI Wallet Compatibility
+
+**IMPORTANT:** EUDI wallet support requires a **custom-built Docker image** - the standard Docker Hub images do NOT include these fixes.
+
+### Building and Deploying the Custom Issuer
+
+```bash
+# 1. Build the custom issuer image (from repo root)
+./gradlew :waltid-services:waltid-issuer-api:jibDockerBuild
+
+# 2. Tag to match docker-compose VERSION_TAG
+docker tag waltid/issuer-api:latest waltid/issuer-api:stable
+
+# 3. Force recreate the container with the new image
+cd docker-compose
+docker compose up -d --force-recreate issuer-api
+```
+
+### Verified EUDI Credential Formats
+
+| Credential | Config ID | Format | VCT/DocType |
+|------------|-----------|--------|-------------|
+| PID mDoc | `eu.europa.ec.eudi.pid.1` | `mso_mdoc` | `eu.europa.ec.eudi.pid.1` |
+| mDL | `org.iso.18013.5.1.mDL` | `mso_mdoc` | `org.iso.18013.5.1.mDL` |
+| PID SD-JWT | `eu.europa.ec.eudi.pid_vc_sd_jwt` | `dc+sd-jwt` | `urn:eudi:pid:1` |
+
+### Key Requirements
+
+- **Format:** Use `dc+sd-jwt` (NOT `vc+sd-jwt`) for SD-JWT credentials
+- **Proofs:** Use JWT proofs (NOT CWT) for all EUDI credentials
+- **VCT:** SD-JWT PID must use VCT `urn:eudi:pid:1`
+- **Keys:** Use valid P-256 EC keys with correct curve coordinates
+
+### Portal Format Selection
+
+| Portal Option | API Format |
+|---------------|------------|
+| DC+SD-JWT (EUDI) | `dc+sd-jwt` |
+| mDoc (ISO 18013-5) | `mso_mdoc` |
+
 ## Platform-Specific Builds
 
 ```bash
