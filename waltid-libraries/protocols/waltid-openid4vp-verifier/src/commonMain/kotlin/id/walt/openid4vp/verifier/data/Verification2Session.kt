@@ -17,6 +17,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -105,12 +108,35 @@ data class Verification2Session(
         presentedRawData = null
         presentedPresentations = null
         presentedCredentials = null
-        policyResults?.vpPolicies?.forEach { (_, policyResults) ->
-            policyResults.forEach { (_, policyResult) ->
+
+        policyResults?.vpPolicies?.values?.forEach { innerMap ->
+            innerMap.values.forEach { policyResult ->
                 policyResult.results = emptyMap()
             }
         }
 
+        policyResults?.vcPolicies?.forEach { policyResult ->
+            policyResult.result?.let { resultElement ->
+                policyResult.result = redactCredentialSubject(resultElement)
+            }
+        }
+    }
+
+    private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {
+        val resultObj = resultElement.jsonObject
+
+        val resultBlacklist = setOf("signed_credential")
+        val vcBlacklist = setOf("credentialSubject")
+
+        var redactedObj = JsonObject(resultObj.filterKeys { it !in resultBlacklist })
+
+        val verifiedData = redactedObj["verified_data"]?.jsonObject ?: return redactedObj
+        val vc = verifiedData["vc"]?.jsonObject ?: return redactedObj
+
+        val redactedVc = JsonObject(vc.filterKeys { it !in vcBlacklist })
+        val redactedVerifiedData = JsonObject(verifiedData + ("vc" to redactedVc))
+
+        return JsonObject(redactedObj + ("verified_data" to redactedVerifiedData))
     }
 
     @Serializable
