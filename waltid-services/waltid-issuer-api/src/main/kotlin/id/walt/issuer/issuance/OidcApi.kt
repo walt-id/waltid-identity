@@ -453,11 +453,75 @@ object OidcApi : CIProvider(), Klogging {
                 logger.debug { "/token params: $params" }
 
                 val tokenReq = TokenRequest.fromHttpParameters(params)
+
+                // Check for Client Attestation headers (attest_jwt_client_auth)
+                val clientAttestationHeader = call.request.header("OAuth-Client-Attestation")
+                val clientAttestationPopHeader = call.request.header("OAuth-Client-Attestation-PoP")
+
+                if (clientAttestationHeader != null && clientAttestationPopHeader != null) {
+                    logger.info { "Client attestation headers present, validating..." }
+                    val tokenEndpointUri = "${metadata.issuer}/${call.parameters["standardVersion"]}/token"
+
+                    when (val result = ClientAttestationHandler.validateClientAttestation(
+                        attestationJwt = clientAttestationHeader,
+                        attestationPopJwt = clientAttestationPopHeader,
+                        expectedAudience = tokenEndpointUri
+                    )) {
+                        is ClientAttestationHandler.AttestationValidationResult.Success -> {
+                            logger.info { "Client attestation validated for client: ${result.clientId}" }
+                        }
+                        is ClientAttestationHandler.AttestationValidationResult.Error -> {
+                            logger.warn { "Client attestation validation failed: ${result.message}" }
+                            call.respond(
+                                status = HttpStatusCode.Unauthorized,
+                                message = buildJsonObject {
+                                    put("error", JsonPrimitive(result.errorCode))
+                                    put("error_description", JsonPrimitive(result.message))
+                                }
+                            )
+                            return@post
+                        }
+                    }
+                }
                 logger.debug { "/token tokenReq from params: $tokenReq" }
 
+                // Check for DPoP header
+                val dpopHeader = call.request.header("DPoP")
+                var dpopThumbprint: String? = null
+
+                if (dpopHeader != null) {
+                    logger.info { "DPoP header present, validating..." }
+                    val tokenEndpointUri = "${metadata.issuer}/token"
+                    
+                    when (val result = DPoPHandler.validateDPoPProof(
+                        dpopProof = dpopHeader,
+                        httpMethod = "POST",
+                        httpUri = tokenEndpointUri
+                    )) {
+                        is DPoPHandler.DPoPValidationResult.Success -> {
+                            dpopThumbprint = result.thumbprint
+                            logger.info { "DPoP validation successful, thumbprint: $dpopThumbprint" }
+                        }
+                        is DPoPHandler.DPoPValidationResult.Error -> {
+                            logger.warn { "DPoP validation failed: ${result.message}" }
+                            call.respond(
+                                status = HttpStatusCode.BadRequest,
+                                message = buildJsonObject {
+                                    put("error", JsonPrimitive("invalid_dpop_proof"))
+                                    put("error_description", JsonPrimitive(result.message))
+                                }
+                            )
+                            return@post
+                        }
+                    }
+                }
+
                 try {
-                    val tokenResp = processTokenRequest(tokenReq)
+                    val tokenResp = processTokenRequest(tokenReq, dpopThumbprint)
                     logger.debug { "/token tokenResp: $tokenResp" }
+                    logger.info { "=== TOKEN RESPONSE ===" }
+                    logger.info { "Token response c_nonce: ${tokenResp.cNonce}" }
+                    logger.info { "Token response c_nonce_expires_in: ${tokenResp.cNonceExpiresIn}" }
                     call.respond(tokenResp.toJSON())
                 } catch (exc: TokenError) {
                     logger.error(exc) { "Token error: " }
@@ -517,20 +581,21 @@ object OidcApi : CIProvider(), Klogging {
                         val format = credConfig?.format?.value ?: "mso_mdoc"
                         val docType = credConfig?.docType ?: credConfigId
 
-                        val vct = credConfig?.vct ?: credConfigId
+                        // For SD-JWT formats, use VCT instead of docType
+                        val vct = credConfig?.vct
                         logger.info { "Draft 13+ request - credential_configuration_id: $credConfigId, resolved format: $format, docType: $docType, vct: $vct" }
 
                         // Build a request with the format field added
                         // Also convert Draft 13+ "proofs" to legacy "proof" format
                         buildJsonObject {
                             put("format", JsonPrimitive(format))
-                            // For SD-JWT formats, use vct; for mDoc, use doctype
+                            // For SD-JWT formats (dc+sd-jwt, vc+sd-jwt), set vct; for mDoc, set doctype
                             if (format == "dc+sd-jwt" || format == "vc+sd-jwt") {
                                 rawRequest["vct"]?.let { put("vct", it) } ?: vct?.let { put("vct", JsonPrimitive(it)) }
                             } else {
                                 rawRequest["doctype"]?.let { put("doctype", it) } ?: docType?.let { put("doctype", JsonPrimitive(it)) }
                             }
-
+                            
                             // Convert proofs (Draft 13+) to proof (legacy)
                             // Draft 13+ format: { "proofs": { "jwt": ["..."] } }
                             // Legacy format: { "proof": { "proof_type": "jwt", "jwt": "..." } }
@@ -555,7 +620,7 @@ object OidcApi : CIProvider(), Klogging {
                                     }
                                 }
                             }
-
+                            
                             rawRequest.forEach { (key, value) ->
                                 if (key != "credential_configuration_id" && key != "proofs") {
                                     put(key, value)
@@ -576,30 +641,91 @@ object OidcApi : CIProvider(), Klogging {
                             message = "Session not found for access token"
                         )
 
+                    // DPoP verification for credential endpoint
+                    // If the token was issued with DPoP binding, verify the DPoP proof
+                    if (session.dpopThumbprint != null) {
+                        val dpopHeader = call.request.header("DPoP")
+                        if (dpopHeader == null) {
+                            logger.warn { "DPoP-bound token used without DPoP proof header" }
+                            call.respond(
+                                status = HttpStatusCode.Unauthorized,
+                                message = buildJsonObject {
+                                    put("error", JsonPrimitive("invalid_dpop_proof"))
+                                    put("error_description", JsonPrimitive("DPoP proof required for DPoP-bound token"))
+                                }
+                            )
+                            return@post
+                        }
+
+                        // Build the credential endpoint URI for DPoP validation
+                        val credentialEndpointUri = "${metadata.issuer}/${call.parameters["standardVersion"]}/credential"
+                        val accessTokenHash = DPoPHandler.calculateAccessTokenHash(accessToken.toString())
+
+                        when (val result = DPoPHandler.validateDPoPProof(
+                            dpopProof = dpopHeader,
+                            httpMethod = "POST",
+                            httpUri = credentialEndpointUri,
+                            accessTokenHash = accessTokenHash
+                        )) {
+                            is DPoPHandler.DPoPValidationResult.Success -> {
+                                // Verify the thumbprint matches the one from token issuance
+                                if (result.thumbprint != session.dpopThumbprint) {
+                                    logger.warn { "DPoP thumbprint mismatch: expected ${session.dpopThumbprint}, got ${result.thumbprint}" }
+                                    call.respond(
+                                        status = HttpStatusCode.Unauthorized,
+                                        message = buildJsonObject {
+                                            put("error", JsonPrimitive("invalid_dpop_proof"))
+                                            put("error_description", JsonPrimitive("DPoP key binding mismatch"))
+                                        }
+                                    )
+                                    return@post
+                                }
+                                logger.info { "DPoP proof verified successfully for credential request" }
+                            }
+                            is DPoPHandler.DPoPValidationResult.Error -> {
+                                logger.warn { "DPoP validation failed: ${result.message}" }
+                                call.respond(
+                                    status = HttpStatusCode.Unauthorized,
+                                    message = buildJsonObject {
+                                        put("error", JsonPrimitive("invalid_dpop_proof"))
+                                        put("error_description", JsonPrimitive(result.message))
+                                    }
+                                )
+                                return@post
+                            }
+                        }
+                    }
+
                     val credentialResponse = generateCredentialResponse(
                         credentialRequest = credentialRequest,
                         session = session,
                     )
-                    
-                    // Draft 13+ uses "credentials" array format
-                    val isDraft13Plus = rawRequest.containsKey("credential_configuration_id")
-                    val responseJson = if (isDraft13Plus) {
-                        // Convert to Draft 13+ format: { "credentials": [{ "credential": "..." }] }
-                        val legacyJson = credentialResponse.toJSON()
+
+                    // Convert to Draft 13+ format with "credentials" array
+                    // See: https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#name-credential-response
+                    val standardVersion = call.parameters["standardVersion"] ?: "draft13"
+                    val responseJson = if (standardVersion.contains("13") || standardVersion.contains("14") || standardVersion.contains("15")) {
+                        // Draft 13+ uses "credentials" array format
                         buildJsonObject {
-                            put("credentials", buildJsonArray {
-                                add(buildJsonObject {
-                                    legacyJson["credential"]?.let { put("credential", it) }
+                            credentialResponse.credential?.let { cred ->
+                                put("credentials", buildJsonArray {
+                                    add(buildJsonObject {
+                                        put("credential", cred)
+                                    })
                                 })
-                            })
-                            legacyJson["c_nonce"]?.let { put("c_nonce", it) }
-                            legacyJson["c_nonce_expires_in"]?.let { put("c_nonce_expires_in", it) }
+                            }
+                            credentialResponse.acceptanceToken?.let {
+                                // For deferred issuance, use transaction_id instead of acceptance_token
+                                put("transaction_id", JsonPrimitive(it))
+                            }
+                            credentialResponse.cNonce?.let { put("c_nonce", JsonPrimitive(it)) }
+                            credentialResponse.cNonceExpiresIn?.let { put("c_nonce_expires_in", JsonPrimitive(it.inWholeSeconds.toInt())) }
                         }
                     } else {
+                        // Legacy format for older drafts
                         credentialResponse.toJSON()
                     }
-                    
-                    logger.info { "Credential response: $responseJson" }
+
                     call.respond(responseJson)
                 } catch (exc: CredentialError) {
                     logger.error(exc) { "Credential error: " }

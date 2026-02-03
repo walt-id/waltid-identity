@@ -43,7 +43,7 @@ fun createCredentialOfferUri(
     val overwrittenIssuanceRequests = issuanceRequests.map {
         it.copy(
             credentialFormat = credentialFormat,
-            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc)
+            vct = if (credentialFormat == CredentialFormat.sd_jwt_vc || credentialFormat == CredentialFormat.sd_jwt_dc)
                 OidcApi.metadata.getVctByCredentialConfigurationId(
                     it.credentialConfigurationId
                 ) ?: throw IllegalArgumentException("VCT not found") else null

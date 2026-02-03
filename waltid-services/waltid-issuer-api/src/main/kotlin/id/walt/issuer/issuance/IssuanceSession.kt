@@ -32,4 +32,5 @@ data class IssuanceSession(
     val status: IssuanceSessionStatus = IssuanceSessionStatus.ACTIVE,
     val statusReason: String? = null,
     val isClosed: Boolean = false,
+    val dpopThumbprint: String? = null, // DPoP JWK thumbprint for token binding
 ) : AuthorizationSession()

@@ -211,7 +211,7 @@ suspend fun main() {
     val generatedCredential = doGenerateCredential(credReq).credential
     check(generatedCredential != null)
 
-    val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format, credential = generatedCredential)
+    val credentialResponse: CredentialResponse = CredentialResponse.success(credReq.format ?: CredentialFormat.jwt_vc_json, credential = generatedCredential)
     println("Credential response: $credentialResponse")
 
     println("// -------- WALLET ----------")
