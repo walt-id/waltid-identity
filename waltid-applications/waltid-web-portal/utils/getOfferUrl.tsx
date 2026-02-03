@@ -50,7 +50,82 @@ const getOfferUrl = async (
         credentialData: offer,
       };
 
-      if (c.selectedFormat === 'SD-JWT + IETF SD-JWT VC') {
+      if (c.selectedFormat === 'mDoc (ISO 18013-5)') {
+        // mDoc format - uses mdocData instead of credentialData
+        // Look for matching mDoc credential configuration
+        payload.credentialConfigurationId = Object.keys(
+          credential_configurations_supported
+        ).find((key) => {
+          const config = credential_configurations_supported[key];
+          return config.format === 'mso_mdoc' &&
+                 (key.toLowerCase().includes(c.id.toLowerCase().replace(/\s+/g, '_')) ||
+                  key === 'org.iso.18013.5.1.mDL' ||
+                  key === 'eu.europa.ec.eudi.pid_mso_mdoc' ||
+                  key === 'eu.europa.ec.eudi.pid.1');
+        }) as string;
+
+        // For mDoc, the offer data should already be in namespace format
+        // Convert credentialData to mdocData format
+        const mdocData: any = {};
+        const docType = credential_configurations_supported[payload.credentialConfigurationId]?.docType || 'org.iso.18013.5.1.mDL';
+
+        // If offer already has namespace format, use it directly
+        if (offer[docType]) {
+          Object.assign(mdocData, offer);
+        } else if (offer.credentialSubject) {
+          // Convert W3C-style to mDoc namespace format
+          mdocData[docType] = { ...offer.credentialSubject };
+        } else {
+          // Use offer as-is for the namespace
+          mdocData[docType] = { ...offer };
+          delete mdocData[docType].id;
+        }
+
+        // Replace credentialData with mdocData
+        delete (payload as any).credentialData;
+        (payload as any).mdocData = mdocData;
+
+        // Remove mapping for mDoc
+        delete (payload as any).mapping;
+
+      } else if (c.selectedFormat === 'DC+SD-JWT (EUDI)') {
+        // DC+SD-JWT format for EUDI wallet
+        payload.mapping = {
+          iat: '<timestamp-seconds>',
+          nbf: '<timestamp-seconds>',
+          exp: '<timestamp-in-seconds:365d>',
+        };
+
+        // Remove W3C-specific fields
+        delete payload.credentialData['@context'];
+        delete payload.credentialData['type'];
+        delete payload.credentialData['validFrom'];
+        delete payload.credentialData['expirationDate'];
+        delete payload.credentialData['issuanceDate'];
+        delete payload.credentialData['issued'];
+        delete payload.credentialData['issuer'];
+        delete payload.credentialData['id'];
+
+        // Find matching DC+SD-JWT credential configuration
+        payload.credentialConfigurationId = Object.keys(
+          credential_configurations_supported
+        ).find((key) => {
+          const config = credential_configurations_supported[key];
+          return config.format === 'dc+sd-jwt' ||
+                 key === 'urn:eudi:pid:1';
+        }) as string;
+
+        payload.selectiveDisclosure = { fields: {} };
+        // Flatten credentialSubject for DC+SD-JWT
+        const subjectData = offer.credentialSubject || offer;
+        for (const key in subjectData) {
+          if (typeof subjectData[key] === 'string' || typeof subjectData[key] === 'boolean') {
+            payload.selectiveDisclosure.fields[key] = {
+              sd: true,
+            };
+          }
+        }
+      } else if (c.selectedFormat === 'SD-JWT + IETF SD-JWT VC') {
         payload.mapping = {
           id: '<uuid>',
           iat: '<timestamp-seconds>',
@@ -122,7 +197,7 @@ const getOfferUrl = async (
         payload.vpProfile = vpProfile;
       }
 
-      if (c.selectedFormat === 'SD-JWT + IETF SD-JWT VC') {
+      if (c.selectedFormat === 'SD-JWT + IETF SD-JWT VC' || c.selectedFormat === 'DC+SD-JWT (EUDI)') {
         const { credentialSubject, ...restOfCredentialData } =
           payload.credentialData; // Destructure credentialSubject and the rest
         return {
@@ -132,15 +207,30 @@ const getOfferUrl = async (
             ...credentialSubject, // Spread fields from credentialSubject to the top level of credentialData
           },
         };
+      } else if (c.selectedFormat === 'mDoc (ISO 18013-5)') {
+        // mDoc payload already has mdocData instead of credentialData
+        return payload;
       } else {
         return payload;
       }
     })
   );
 
+  // Determine the issue endpoint based on format
+  const selectedFormat = credentials[0].selectedFormat;
+  let issueEndpoint: string;
+
+  if (selectedFormat === 'mDoc (ISO 18013-5)') {
+    issueEndpoint = 'mdoc';
+  } else if (selectedFormat === 'SD-JWT + W3C VC' || selectedFormat === 'SD-JWT + IETF SD-JWT VC' || selectedFormat === 'DC+SD-JWT (EUDI)') {
+    issueEndpoint = 'sdjwt';
+  } else {
+    issueEndpoint = 'jwt';
+  }
+
   const issueUrl =
     NEXT_PUBLIC_ISSUER +
-    `/openid4vc/${credentials[0].selectedFormat === 'SD-JWT + W3C VC' || credentials[0].selectedFormat === 'SD-JWT + IETF SD-JWT VC' ? 'sdjwt' : 'jwt'}/${payload.length > 1 ? 'issueBatch' : 'issue'}`;
+    `/openid4vc/${issueEndpoint}/${payload.length > 1 ? 'issueBatch' : 'issue'}`;
   return axios.post(issueUrl, payload.length > 1 ? payload : payload[0]);
 };
 

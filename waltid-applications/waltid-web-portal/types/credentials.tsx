@@ -9,9 +9,9 @@ export type AvailableCredential = {
 export const CredentialFormats = [
   'JWT + W3C VC',
   'SD-JWT + W3C VC',
-  'SD-JWT + IETF SD-JWT VC'
-  // 'Data Integrity/JSON-LD+ VCDM',
-  // 'mdoc / mdl (IEC/ISO 18013-5) ',
+  'SD-JWT + IETF SD-JWT VC',
+  'DC+SD-JWT (EUDI)',
+  'mDoc (ISO 18013-5)',
 ];
 
 // Get Value
@@ -22,6 +22,10 @@ export function mapFormat(format: string): string {
       return 'jwt_vc_json';
     case 'SD-JWT + IETF SD-JWT VC':
       return 'vc+sd-jwt';
+    case 'DC+SD-JWT (EUDI)':
+      return 'dc+sd-jwt';
+    case 'mDoc (ISO 18013-5)':
+      return 'mso_mdoc';
     default:
       throw new Error(`Unsupported format: ${format}`);
   }
