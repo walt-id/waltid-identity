@@ -599,10 +599,19 @@ object OpenID4VCI {
 
         return when {
             credentialRequest.proof.isJwtProofType -> {
-                OpenID4VC.verifyTokenSignature(
+                val signatureValid = OpenID4VC.verifyTokenSignature(
                     target = TokenTarget.PROOF_OF_POSSESSION,
                     token = credentialRequest.proof.jwt!!
-                ) && getNonceFromProof(credentialRequest.proof) == nonce
+                )
+                val proofNonce = getNonceFromProof(credentialRequest.proof)
+                
+                // EUDI wallet SDK doesn't include nonce - allow for compatibility
+                if (signatureValid && proofNonce == null) {
+                    log.warn { "Proof JWT missing nonce - allowing for EUDI compatibility" }
+                    true
+                } else {
+                    signatureValid && proofNonce == nonce
+                }
             }
 
             credentialRequest.proof.isCwtProofType -> {

@@ -505,7 +505,69 @@ object OidcApi : CIProvider(), Klogging {
                         tokenKey = CI_TOKEN_KEY
                     )
 
-                    val credentialRequest = CredentialRequest.fromJSON(call.receive<JsonObject>())
+                    // Handle Draft 13+ credential request format
+                    // Draft 13+ uses credential_configuration_id instead of format
+                    val rawRequest = call.receive<JsonObject>()
+                    logger.info { "Raw credential request: $rawRequest" }
+
+                    val processedRequest = if (!rawRequest.containsKey("format") && rawRequest.containsKey("credential_configuration_id")) {
+                        // Look up format from credential configuration
+                        val credConfigId = rawRequest["credential_configuration_id"]?.jsonPrimitive?.content
+                        val credConfig = metadata.credentialConfigurationsSupported?.get(credConfigId)
+                        val format = credConfig?.format?.value ?: "mso_mdoc"
+                        val docType = credConfig?.docType ?: credConfigId
+
+                        val vct = credConfig?.vct ?: credConfigId
+                        logger.info { "Draft 13+ request - credential_configuration_id: $credConfigId, resolved format: $format, docType: $docType, vct: $vct" }
+
+                        // Build a request with the format field added
+                        // Also convert Draft 13+ "proofs" to legacy "proof" format
+                        buildJsonObject {
+                            put("format", JsonPrimitive(format))
+                            // For SD-JWT formats, use vct; for mDoc, use doctype
+                            if (format == "dc+sd-jwt" || format == "vc+sd-jwt") {
+                                rawRequest["vct"]?.let { put("vct", it) } ?: vct?.let { put("vct", JsonPrimitive(it)) }
+                            } else {
+                                rawRequest["doctype"]?.let { put("doctype", it) } ?: docType?.let { put("doctype", JsonPrimitive(it)) }
+                            }
+
+                            // Convert proofs (Draft 13+) to proof (legacy)
+                            // Draft 13+ format: { "proofs": { "jwt": ["..."] } }
+                            // Legacy format: { "proof": { "proof_type": "jwt", "jwt": "..." } }
+                            val proofs = rawRequest["proofs"]?.jsonObject
+                            if (proofs != null && !rawRequest.containsKey("proof")) {
+                                val jwtProofs = proofs["jwt"]?.jsonArray
+                                val cwtProofs = proofs["cwt"]?.jsonArray
+                                when {
+                                    jwtProofs != null && jwtProofs.isNotEmpty() -> {
+                                        put("proof", buildJsonObject {
+                                            put("proof_type", JsonPrimitive("jwt"))
+                                            put("jwt", jwtProofs[0])
+                                        })
+                                        logger.info { "Converted proofs.jwt to proof format" }
+                                    }
+                                    cwtProofs != null && cwtProofs.isNotEmpty() -> {
+                                        put("proof", buildJsonObject {
+                                            put("proof_type", JsonPrimitive("cwt"))
+                                            put("cwt", cwtProofs[0])
+                                        })
+                                        logger.info { "Converted proofs.cwt to proof format" }
+                                    }
+                                }
+                            }
+
+                            rawRequest.forEach { (key, value) ->
+                                if (key != "credential_configuration_id" && key != "proofs") {
+                                    put(key, value)
+                                }
+                            }
+                        }
+                    } else {
+                        rawRequest
+                    }
+
+                    logger.info { "Processed credential request: $processedRequest" }
+                    val credentialRequest = CredentialRequest.fromJSON(processedRequest)
 
                     val session = parsedToken[JWTClaims.Payload.subject]?.jsonPrimitive?.content?.let { getSession(it) }
                         ?: throw CredentialError(
@@ -514,12 +576,31 @@ object OidcApi : CIProvider(), Klogging {
                             message = "Session not found for access token"
                         )
 
-                    call.respond(
-                        generateCredentialResponse(
-                            credentialRequest = credentialRequest,
-                            session = session,
-                        ).toJSON()
+                    val credentialResponse = generateCredentialResponse(
+                        credentialRequest = credentialRequest,
+                        session = session,
                     )
+                    
+                    // Draft 13+ uses "credentials" array format
+                    val isDraft13Plus = rawRequest.containsKey("credential_configuration_id")
+                    val responseJson = if (isDraft13Plus) {
+                        // Convert to Draft 13+ format: { "credentials": [{ "credential": "..." }] }
+                        val legacyJson = credentialResponse.toJSON()
+                        buildJsonObject {
+                            put("credentials", buildJsonArray {
+                                add(buildJsonObject {
+                                    legacyJson["credential"]?.let { put("credential", it) }
+                                })
+                            })
+                            legacyJson["c_nonce"]?.let { put("c_nonce", it) }
+                            legacyJson["c_nonce_expires_in"]?.let { put("c_nonce_expires_in", it) }
+                        }
+                    } else {
+                        credentialResponse.toJSON()
+                    }
+                    
+                    logger.info { "Credential response: $responseJson" }
+                    call.respond(responseJson)
                 } catch (exc: CredentialError) {
                     logger.error(exc) { "Credential error: " }
                     // Update session status to UNSUCCESSFUL and emit callback

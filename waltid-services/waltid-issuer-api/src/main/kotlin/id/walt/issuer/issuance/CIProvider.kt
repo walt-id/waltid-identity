@@ -330,7 +330,7 @@ open class CIProvider(
 
             request.run {
                 when (credentialFormat) {
-                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+                    CredentialFormat.sd_jwt_vc, CredentialFormat.sd_jwt_dc -> OpenID4VCI.generateSdJwtVC(
                         credentialRequest = credentialRequest,
                         credentialData = vc,
                         issuerId = issuerDid ?: baseUrl,
@@ -603,7 +603,7 @@ open class CIProvider(
                         (types == credentialRequest.credentialDefinition?.type) || (types == credentialRequest.types)
                     }
 
-                    CredentialFormat.sd_jwt_vc -> {
+                    CredentialFormat.sd_jwt_vc, CredentialFormat.sd_jwt_dc -> {
                         val vct = metadata.getVctByCredentialConfigurationId(credentialConfigurationId)
                         vct == credentialRequest.vct
                     }
