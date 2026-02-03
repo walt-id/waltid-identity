@@ -1,0 +1,24 @@
+# Docker Compose override for local builds
+#
+# Use with: docker compose -f docker-compose.yaml -f docker-compose.local.yaml --profile identity up
+# Or via:   ./local-build.sh
+#
+# This file overrides images to use locally-built versions from Jib (waltid/{service}:latest)
+# instead of pulling from the registry.
+
+services:
+  wallet-api:
+    image: waltid/wallet-api:latest
+    pull_policy: never
+
+  issuer-api:
+    image: waltid/issuer-api:latest
+    pull_policy: never
+
+  verifier-api:
+    image: waltid/verifier-api:latest
+    pull_policy: never
+
+  verifier-api2:
+    image: waltid/verifier-api2:latest
+    pull_policy: never

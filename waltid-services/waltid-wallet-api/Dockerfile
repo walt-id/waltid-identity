@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # NOTE: Prefer Gradle Ktor/Jib tasks (publishImageToLocalRegistry/publishImage) for builds.
 # This Dockerfile is for manual/custom Docker workflows.
 FROM gradle:latest AS pre-cache
@@ -14,7 +15,8 @@ RUN mkdir -p /home/gradle/cache_home
 ENV GRADLE_USER_HOME=/home/gradle/cache_home
 COPY --from=pre-cache /home/app/ /home/gradle/app/
 WORKDIR /home/gradle/app/waltid-services/waltid-wallet-api
-RUN gradle dependencies --no-daemon
+RUN --mount=type=cache,target=/home/gradle/cache_home \
+    gradle dependencies --no-daemon
 
 # Stage 2: Build Application
 FROM gradle:latest AS build
@@ -23,7 +25,8 @@ COPY --chown=gradle:gradle . /home/gradle/src
 WORKDIR /home/gradle/src/waltid-services/waltid-wallet-api
 # Build the fat JAR, Gradle also supports shadow
 # and boot JAR by default.
-RUN gradle buildFatJar --no-daemon
+RUN --mount=type=cache,target=/home/gradle/.gradle \
+    gradle buildFatJar --no-daemon
 
 # Stage 3: Create the Runtime Image
 FROM amazoncorretto:22 AS runtime
