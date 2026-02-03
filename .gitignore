@@ -188,3 +188,4 @@ iOSInjectionProject/
 /waltid-openid4vc/root-ca-pub.pem
 /waltid-services/waltid-issuer-api/k8s/cert-device-potential.pem
 /waltid-services/waltid-issuer-api/k8s/ec_device_key.pem
+.worktrees/
