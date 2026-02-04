@@ -1,12 +1,17 @@
 package id.walt.openid4vci.metadata.oauth
 
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseType
-import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class AuthorizationServerMetadataSerializationTest {
 
@@ -34,12 +39,14 @@ class AuthorizationServerMetadataSerializationTest {
             responseTypesSupported = setOf(ResponseType.CODE.value),
             responseModesSupported = null,
             scopesSupported = null,
+            authorizationDetailsTypesSupported = null,
         )
 
         val encoded = json.encodeToString(metadata)
 
         assertFalse(encoded.contains("response_modes_supported"))
         assertFalse(encoded.contains("scopes_supported"))
+        assertFalse(encoded.contains("authorization_details_types_supported"))
     }
 
     @Test
@@ -74,5 +81,69 @@ class AuthorizationServerMetadataSerializationTest {
         assertFailsWith<IllegalArgumentException> {
             json.decodeFromString<AuthorizationServerMetadata>(payload)
         }
+    }
+
+    @Test
+    fun `serializes grant types with custom values`() {
+        val metadata = AuthorizationServerMetadata(
+            issuer = "https://issuer.example",
+            authorizationEndpoint = "https://issuer.example/authorize",
+            tokenEndpoint = "https://issuer.example/token",
+            responseTypesSupported = setOf(ResponseType.CODE.value),
+            grantTypesSupported = setOf(
+                GrantType.AuthorizationCode.value,
+                GrantType.Custom("urn:example:grant").value,
+            ),
+            authorizationDetailsTypesSupported = setOf("openid_credential"),
+            preAuthorizedGrantAnonymousAccessSupported = true,
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val decoded = json.decodeFromString<AuthorizationServerMetadata>(encoded)
+
+        assertEquals(
+            setOf(GrantType.AuthorizationCode.value, "urn:example:grant"),
+            decoded.grantTypesSupported,
+        )
+        assertEquals(setOf("openid_credential"), decoded.authorizationDetailsTypesSupported)
+        assertEquals(true, decoded.preAuthorizedGrantAnonymousAccessSupported)
+    }
+
+    @Test
+    fun `serialized metadata encodes collections as json arrays`() {
+        val metadata = AuthorizationServerMetadata(
+            issuer = "https://issuer.example",
+            authorizationEndpoint = "https://issuer.example/authorize",
+            tokenEndpoint = "https://issuer.example/token",
+            responseTypesSupported = setOf(ResponseType.CODE.value),
+            grantTypesSupported = setOf(
+                GrantType.AuthorizationCode.value,
+                GrantType.Custom("urn:example:grant").value,
+            ),
+            authorizationDetailsTypesSupported = setOf("openid_credential"),
+            preAuthorizedGrantAnonymousAccessSupported = true,
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val jsonObject = json.parseToJsonElement(encoded).jsonObject
+
+        val responseTypes = jsonObject["response_types_supported"] as? JsonArray
+        val grantTypes = jsonObject["grant_types_supported"] as? JsonArray
+        val authDetails = jsonObject["authorization_details_types_supported"] as? JsonArray
+
+        assertTrue(responseTypes != null)
+        assertTrue(grantTypes != null)
+        assertTrue(authDetails != null)
+
+        assertEquals(listOf(ResponseType.CODE.value), responseTypes.map { it.jsonPrimitive.content })
+        assertEquals(
+            listOf(GrantType.AuthorizationCode.value, "urn:example:grant"),
+            grantTypes.map { it.jsonPrimitive.content },
+        )
+        assertEquals(listOf("openid_credential"), authDetails.map { it.jsonPrimitive.content })
+        assertEquals(
+            true,
+            jsonObject["pre-authorized_grant_anonymous_access_supported"]?.jsonPrimitive?.booleanOrNull,
+        )
     }
 }

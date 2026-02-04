@@ -26,6 +26,8 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * OAuth 2.0 Authorization Server Metadata (RFC 8414).
+ *
+ * Includes OID4VCI 1.0 extensions
  */
 @Serializable(with = AuthorizationServerMetadataSerializer::class)
 data class AuthorizationServerMetadata(
@@ -77,6 +79,10 @@ data class AuthorizationServerMetadata(
     val introspectionEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
     @SerialName("code_challenge_methods_supported")
     val codeChallengeMethodsSupported: List<String>? = null,
+    @SerialName("authorization_details_types_supported")
+    val authorizationDetailsTypesSupported: Set<String>? = null,
+    @SerialName("pre-authorized_grant_anonymous_access_supported")
+    val preAuthorizedGrantAnonymousAccessSupported: Boolean? = null,
 ) {
     init {
         // RFC 8414 §2: issuer is REQUIRED
@@ -122,6 +128,7 @@ data class AuthorizationServerMetadata(
             introspectionEndpointAuthSigningAlgValuesSupported,
         )
         requireNotEmptyIfPresent("code_challenge_methods_supported", codeChallengeMethodsSupported)
+        requireNotEmptyIfPresent("authorization_details_types_supported", authorizationDetailsTypesSupported)
 
         // RFC 8414 §2: authorization_endpoint REQUIRED unless no grant type uses it.
         if (grantTypesSupported == null || grantTypesSupported.contains(GrantType.AuthorizationCode.value)) {
@@ -250,6 +257,11 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 ?.let { put("introspection_endpoint_auth_signing_alg_values_supported", it.toJsonArray()) }
             value.codeChallengeMethodsSupported?.takeIf { it.isNotEmpty() }
                 ?.let { put("code_challenge_methods_supported", it.toJsonArray()) }
+            value.authorizationDetailsTypesSupported?.takeIf { it.isNotEmpty() }
+                ?.let { put("authorization_details_types_supported", it.toJsonArray()) }
+            value.preAuthorizedGrantAnonymousAccessSupported?.let {
+                put("pre-authorized_grant_anonymous_access_supported", JsonPrimitive(it))
+            }
         }
         jsonEncoder.encodeJsonElement(element)
     }
@@ -288,6 +300,9 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             introspectionEndpointAuthSigningAlgValuesSupported =
                 element.stringSet("introspection_endpoint_auth_signing_alg_values_supported"),
             codeChallengeMethodsSupported = element.stringList("code_challenge_methods_supported"),
+            authorizationDetailsTypesSupported = element.stringSet("authorization_details_types_supported"),
+            preAuthorizedGrantAnonymousAccessSupported =
+                element.bool("pre-authorized_grant_anonymous_access_supported"),
         )
     }
 }

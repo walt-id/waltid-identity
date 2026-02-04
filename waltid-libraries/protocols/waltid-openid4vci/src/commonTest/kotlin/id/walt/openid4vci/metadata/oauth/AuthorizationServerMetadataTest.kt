@@ -3,7 +3,6 @@ package id.walt.openid4vci.metadata.oauth
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
-import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -130,6 +129,8 @@ class AuthorizationServerMetadataTest {
             introspectionEndpointAuthMethodsSupported = setOf("client_secret_basic"),
             introspectionEndpointAuthSigningAlgValuesSupported = setOf("RS256"),
             codeChallengeMethodsSupported = listOf("S256", "plain"),
+            authorizationDetailsTypesSupported = setOf("openid_credential"),
+            preAuthorizedGrantAnonymousAccessSupported = true,
         )
 
         assertEquals("https://issuer.example", metadata.issuer)
@@ -156,5 +157,7 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("client_secret_basic"), metadata.introspectionEndpointAuthMethodsSupported)
         assertEquals(setOf("RS256"), metadata.introspectionEndpointAuthSigningAlgValuesSupported)
         assertEquals(listOf("S256", "plain"), metadata.codeChallengeMethodsSupported)
+        assertEquals(setOf("openid_credential"), metadata.authorizationDetailsTypesSupported)
+        assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
     }
 }
