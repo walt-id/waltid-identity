@@ -38,8 +38,15 @@ class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
         val credentials =
             vp["verifiableCredential"]?.jsonArray ?: throw IllegalArgumentException("No \"verifiableCredential\" field in \"vp\"!")
 
-        val credentialSubjects = credentials.map {
-            it.jsonPrimitive.content.decodeJws().payload["sub"]!!.jsonPrimitive.content.split("#").first()
+        val credentialSubjects = credentials.map { vc ->
+            val payload = vc.jsonPrimitive.content.decodeJws().payload
+
+            payload["credentialSubject"]
+                ?.jsonObject
+                ?.get("id")
+                ?.jsonPrimitive
+                ?.content
+                ?: throw IllegalArgumentException("credentialSubject.id missing in VC")
         }
 
         return when {
