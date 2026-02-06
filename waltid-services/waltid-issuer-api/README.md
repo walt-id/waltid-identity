@@ -155,6 +155,12 @@ Or, run with local config directory:
 docker run -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config -t waltid/issuer-api
 ```
 
+### Distributed Deployments
+
+In order to run multiple issuer instances, you must configure perisistence to use a shared redis instance. You must also configure the `ciTokenKey` to be the same for all instances.
+
+**Important**: Multiple instances require a shared `ciTokenKey` configuration to properly verify tokens across the cluster.
+
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
