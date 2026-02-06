@@ -68,7 +68,7 @@ Update the wallet-api container by running the following commands from the walti
 
 ```bash
 # Development (local Docker daemon, single-arch)
-./gradlew :waltid-services:waltid-wallet-api:publishImageToLocalRegistry
+./gradlew :waltid-services:waltid-wallet-api:jibDockerBuild
 # image: waltid/wallet-api:<version>
 ```
 
@@ -76,7 +76,7 @@ Update the wallet-api container by running the following commands from the walti
 # Production (multi-arch push to your registry)
 export DOCKER_USERNAME=<your-dockerhub-namespace>
 export DOCKER_PASSWORD=<your-dockerhub-token>
-./gradlew :waltid-services:waltid-wallet-api:publishImage
+./gradlew :waltid-services:waltid-wallet-api:jib
 # image: docker.io/<DOCKER_USERNAME>/wallet-api:<version>
 ```
 

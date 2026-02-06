@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "issuer.fullname" . }}
+  labels:
+    {{- include "issuer.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: issuer
+      {{- include "issuer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: issuer
+      {{- include "issuer.labels" . | nindent 8 }}
+      annotations:
+        deployment/id: _DEFAULT_DEPLOYMENT_    
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: issuer
+        image: {{ .Values.api.issuerApi.image.repository }}:{{ .Values.api.issuerApi.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.issuerApi.image.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        ports:
+          - name: http-api
+            containerPort: 3000
+        volumeMounts:
+        - mountPath: /waltid-issuer-api/config/
+          name: issuer-web-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: {{ include "issuer.fullname" . }}-web-config
+        name: issuer-web-config

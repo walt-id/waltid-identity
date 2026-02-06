@@ -3,6 +3,7 @@
 package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
+import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
@@ -47,6 +48,21 @@ class DocumentSignerCertificateBuilder {
             iacaProfileData = iacaSignerSpec.profileData,
         )
         return platformSignDocumentSignerCertificate(
+            profileData = profileData,
+            publicKey = publicKey,
+            iacaSignerSpec = iacaSignerSpec,
+        )
+    }
+
+    /**
+     * Blocking variant of [build].
+     */
+    fun buildBlocking(
+        profileData: DocumentSignerCertificateProfileData,
+        publicKey: Key,
+        iacaSignerSpec: IACASignerSpecification,
+    ): DocumentSignerCertificateBundle = blockingBridge {
+        build(
             profileData = profileData,
             publicKey = publicKey,
             iacaSignerSpec = iacaSignerSpec,

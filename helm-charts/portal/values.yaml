@@ -1,0 +1,21 @@
+api:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http-portal
+  replicas: 1
+  type: ClusterIP
+
+env:
+  NEXT_PUBLIC_VC_REPO: "https://credentials.walt.id"
+  NEXT_PUBLIC_ISSUER: "https://issuer.portal.waltid.cloud"
+  NEXT_PUBLIC_VERIFIER: "https://verifier.portal.waltid.cloud"
+  NEXT_PUBLIC_WALLET: "https://wallet.waltid.cloud"
+image:
+  repository: "waltid/portal"
+  tag: "latest"
+
+ingress:
+  host: "portal.waltid.cloud"
+  ingressClassName: "nginx"
