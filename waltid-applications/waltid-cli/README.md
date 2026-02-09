@@ -494,7 +494,7 @@ accordingly and save it in a file called `openbadgecredential_sample.json`.
     }
   },
   "credentialSchema": {
-    "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+    "id": "https://raw.githubusercontent.com/walt-id/waltid-identity/refs/heads/main/waltid-libraries/credentials/waltid-verification-policies2/src/commonTest/resources/ob_v3p0_achievementcredential_schema.json",
     "type": "FullJsonSchemaValidator2021"
   }
 }

@@ -6,6 +6,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
@@ -568,9 +569,9 @@ object OpenID4VCI {
                 credentialConfigurationsSupported = credentialSupported,
                 customParameters = customParameters!!,
 //                authorizationServers = setOf(baseUrl),
-                nonceEndpoint =  "$baseUrl/nonce",
+                nonceEndpoint = "$baseUrl/nonce",
 
-            )
+                )
         }
     }
 
@@ -679,22 +680,30 @@ object OpenID4VCI {
                 message = "Proof must be JWT proof"
             )
 
-        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+        val holderKey = when {
 
-        val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
+            JWTClaims.Header.jwk in proofHeader -> {
+                val holderJwk = requireNotNull(proofHeader[JWTClaims.Header.jwk])
+                JWKKey.importJWK(holderJwk.toString()).getOrThrow()
+            }
 
-        if (holderKey.isNullOrEmpty() && holderKid.isNullOrEmpty()) throw CredentialError(
-            credentialRequest = credentialRequest,
-            errorCode = CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof JWT header must contain kid or jwk claim"
-        )
+            JWTClaims.Header.keyID in proofHeader -> {
+                val holderKid = requireNotNull(proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive).content
+                require(DidUtils.isDidUrl(holderKid))
+                DidService.resolveToKey(holderKid.substringBefore("#")).getOrThrow()
 
-        val holderDid =
-            if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+            }
 
-        val holderKeyJWK = JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()
-            ?.plus(JWTClaims.Header.keyID to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())
-            ?.toJsonObject()
+            else -> throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_or_missing_proof,
+                message = "Proof JWT header must contain kid or jwk claim"
+            )
+        }
+
+        val holderDid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content.let {
+            if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
+        }
 
         val sdPayload = SDPayload.createSDPayload(
             fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
@@ -718,13 +727,15 @@ object OpenID4VCI {
             disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
         )
 
-        val cnf = holderDid?.let { buildJsonObject { put(JWTClaims.Header.keyID, holderDid) } }
-            ?: holderKeyJWK?.let { buildJsonObject { put("jwk", holderKeyJWK) } }
-            ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
+        val holderKeyJson = holderKey.exportJWKObject().plus(
+            JWTClaims.Header.keyID to holderKey.getKeyId().toJsonElement()
+        ).toJsonObject()
 
         val defaultPayloadProperties = defaultPayloadProperties(
             issuerId = issuerId,
-            cnf = cnf,
+            cnf = buildJsonObject {
+                put("jwk", holderKeyJson)
+            },
             vct = credentialRequest.vct
                 ?: throw CredentialError(
                     credentialRequest = credentialRequest,

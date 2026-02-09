@@ -9,6 +9,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.fail
 
 class CoseSerializationTests {
 
@@ -39,23 +40,30 @@ class CoseSerializationTests {
 
     @Test
     fun `Check serialization to ByteArray`() = runTest {
-        val payload = "abc 123".encodeToByteArray()
 
-        val cose = CoseSign1.createAndSign(
-            protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.RS256),
-            unprotectedHeaders = CoseHeaders(),
-            payload = payload,
-            signer = key().toCoseSigner()
-        )
-        println("Signed COSE: $cose")
+        runCatching {
+            val payload = "abc 123".encodeToByteArray()
 
-        val encoded = cose.toTagged()
-        println("Encoded to JSON: $encoded")
+            val cose = CoseSign1.createAndSign(
+                protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.RS256),
+                unprotectedHeaders = CoseHeaders(),
+                payload = payload,
+                signer = key().toCoseSigner()
+            )
+            println("Signed COSE: $cose")
 
-        val decoded = CoseSign1.fromTagged(encoded)
-        println("Decoded from JSON: $decoded")
+            val encoded = cose.toTagged()
+            println("Encoded to JSON: $encoded")
 
-        assertEquals(cose, decoded)
+            val decoded = CoseSign1.fromTagged(encoded)
+            println("Decoded from JSON: $decoded")
+
+            assertEquals(cose, decoded)
+        }.getOrElse { error ->
+            println("Serialization failed !!")
+            println(error.stackTraceToString())
+            fail(error.message)
+        }
     }
 
 

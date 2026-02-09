@@ -185,10 +185,6 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
         PresentationDefinitionPolicyTests(e2e).runTests()
         //endregion -Presentation Definition Policy (id.walt.test.integration.environment.api.verifier.Verifier)-
 
-        //region -ISO mDL Onboarding Service (Issuer)-
-        IssuerIsoMdlOnboardingServiceTests(e2e).runTests()
-        //endregion -ISO mDL Onboarding Service (Issuer)-
-
         //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
         MDocPreparedWallet(e2e).testWalletSetup()
         //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)

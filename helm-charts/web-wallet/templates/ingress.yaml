@@ -1,0 +1,105 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-ingress
+  {{- if .Values.ingress.clusterIssuer }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- if .Values.ingress.tls }}
+  tls: 
+    {{- .Values.ingress.tls | toYaml | nindent 4 }}
+  {{- end }}
+  rules:
+  - host: {{ quote .Values.web.demoUi.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /wallet-api/
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /swagger
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /livez
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /features/
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /debug/
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-demo-ui'
+            port:
+              name: http
+        path: /
+        pathType: Prefix
+  - host: {{ quote .Values.web.devUi.host }}
+    http:
+      paths:
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /wallet-api/
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /swagger
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /livez
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /features/
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /debug/
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-dev-ui'
+            port:
+              name: http
+        path: /
+        pathType: Prefix

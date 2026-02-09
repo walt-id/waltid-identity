@@ -5,7 +5,7 @@ import korlibs.io.compression.deflate.GZIP
 import korlibs.io.compression.uncompress
 
 
-class StatusList2021ExpansionAlgorithm : id.walt.policies2.vc.policies.status.expansion.StatusListExpansionAlgorithm {
+class StatusList2021ExpansionAlgorithm : StatusListExpansionAlgorithm {
     override suspend operator fun invoke(bitstring: String): ByteArray =
         GZIP.uncompress(bitstring.base64Decode())
 }
