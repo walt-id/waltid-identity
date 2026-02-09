@@ -48,7 +48,7 @@ data class KtorAuthnzConfig(
     val cookieDomain: String?,
 
     val valkeyUnixSocket: String? = null,
-    val valkeyHost: String? = "127.0.0.1",
+    val valkeyHost: String? = null,
     val valkeyPort: Int? = 6379,
     val valkeyRetention: String? = "7d",
 

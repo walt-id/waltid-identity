@@ -50,19 +50,19 @@ class OpenId4VciTest {
     val ISSUER_BASE_URL = "https://test"
     val ISSUER_METADATA = (OpenID4VCI.createDefaultProviderMetadata(
         baseUrl =  ISSUER_BASE_URL,
-        credentialSupported = mapOf(
-            "VerifiableId" to CredentialSupported(
-                format = CredentialFormat.jwt_vc_json,
-                cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported = setOf("ES256K"),
-                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
-                customParameters = mapOf("foo" to JsonPrimitive("bar"))
-            ),
-            "VerifiableDiploma" to CredentialSupported(
-                format = CredentialFormat.jwt_vc_json,
-                cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported = setOf("ES256K"),
-                credentialDefinition = CredentialDefinition(
+                credentialSupported = mapOf(
+                    "VerifiableId" to CredentialSupported(
+                        format = CredentialFormat.jwt_vc_json,
+                        cryptographicBindingMethodsSupported = setOf("did"),
+                        credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
+                        credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
+                        customParameters = mapOf("foo" to JsonPrimitive("bar"))
+                    ),
+                    "VerifiableDiploma" to CredentialSupported(
+                        format = CredentialFormat.jwt_vc_json,
+                        cryptographicBindingMethodsSupported = setOf("did"),
+                        credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
+                        credentialDefinition = CredentialDefinition(
                     type = listOf(
                         "VerifiableCredential",
                         "VerifiableAttestation",

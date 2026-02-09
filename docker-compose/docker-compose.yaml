@@ -135,6 +135,25 @@ services:
     environment:
       PORT: $VC_REPO_PORT
 
+  valkey:
+    image: valkey/valkey:${VERSION_VALKEY:-7.2}
+    profiles:
+      - valkey
+      - all
+    container_name: valkey
+    healthcheck:
+      test: [ "CMD", "valkey-cli", "ping" ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: always
+    command: ["valkey-server", "--bind", "0.0.0.0", "--port", "6379"]
+    ports:
+      - "${VALKEY_PORT:-6379}:6379"
+    volumes:
+      - valkey_data:/data
+
   postgres:
     image: postgres
     healthcheck:
@@ -262,3 +281,4 @@ services:
 volumes:
   wallet-api-db:
   vault_data:
+  valkey_data:

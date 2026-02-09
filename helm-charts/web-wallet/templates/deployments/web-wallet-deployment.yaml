@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-dev-ui
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "wallet-api.fullname" . }}-dev-ui
+      {{- include "wallet-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "wallet-api.fullname" . }}-dev-ui
+        {{- include "wallet-api.selectorLabels" . | nindent 8 }}
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: waltid-dev-wallet
+          image: {{ .Values.web.devUi.image.repository }}:{{ .Values.web.devUi.image.tag }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+              value: https://{{ .Values.web.devUi.host }}
+            - name: NUXT_PUBLIC_DEMO_WALLET_URL
+              value: https://{{ .Values.web.demoUi.host }}
+          ports:
+            - containerPort: 7104
+              name: http-api
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-demo-ui
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "wallet-api.fullname" . }}-demo-ui
+      {{- include "wallet-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "wallet-api.fullname" . }}-demo-ui
+        {{- include "wallet-api.selectorLabels" . | nindent 8 }}
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: waltid-demo-wallet
+          image: {{ .Values.web.demoUi.image.repository }}:{{ .Values.web.demoUi.image.tag }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: NUXT_PUBLIC_ISSUER_CALLBACK_URL
+              value: https://{{ .Values.web.demoUi.host }}
+            - name: NUXT_PUBLIC_DEV_WALLET_URL
+              value: https://{{ .Values.web.devUi.host }}
+            - name: NUXT_PUBLIC_CREDENTIALS_REPOSITORY_URL
+              value: https://{{ .Values.web.credentialsRepository.host }}
+          ports:
+            - containerPort: 7101
+              name: http-api

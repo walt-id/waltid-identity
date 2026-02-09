@@ -83,9 +83,20 @@ spec:
   tls:
     - hosts:
         - issuer.demo.walt.id
+        - issuer.portal.walt.id
       secretName: issuer-tls-secret
   rules:
     - host: issuer.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  name: http
+    - host: issuer.portal.walt.id
       http:
         paths:
           - path: /

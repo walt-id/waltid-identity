@@ -5,5 +5,5 @@ import id.walt.crypto.keys.KeyType
 
 interface AzureKeyCreator {
 
-    suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKey
+    suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKeyRestApi
 }
