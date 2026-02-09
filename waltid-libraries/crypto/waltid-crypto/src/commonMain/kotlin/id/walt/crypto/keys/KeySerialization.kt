@@ -1,12 +1,13 @@
 package id.walt.crypto.keys
 
 import id.walt.crypto.keys.aws.AWSKeyRestAPI
-import id.walt.crypto.keys.azure.AzureKey
+import id.walt.crypto.keys.azure.AzureKeyRestApi
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.oci.OCIKeyRestApi
 import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -31,7 +32,7 @@ object KeySerialization {
             subclass(TSEKey::class)
             subclass(OCIKeyRestApi::class)
             subclass(AWSKeyRestAPI::class)
-            subclass(AzureKey::class)
+            subclass(AzureKeyRestApi::class)
         }
 
     }
@@ -41,22 +42,33 @@ object KeySerialization {
             keySerializationModule
     }
 
+    private val registeredExternalKeyTypes = mutableSetOf<KClass<out Key>>()
+
     @OptIn(InternalSerializationApi::class)
-    fun <T : Key> registerExternalKeyType(keyClass: KClass<T>) {
+    private fun updateKeySerialization() {
         keySerializationModule = SerializersModule {
             polymorphic(Key::class) {
                 subclass(JWKKey::class)
                 subclass(TSEKey::class)
                 subclass(OCIKeyRestApi::class)
                 subclass(AWSKeyRestAPI::class)
-                subclass(AzureKey::class)
-                subclass(keyClass, keyClass.serializer())
+                subclass(AzureKeyRestApi::class)
+                registeredExternalKeyTypes.forEach {
+                    @Suppress("UNCHECKED_CAST")
+                    subclass(it as KClass<Key>, it.serializer() as KSerializer<Key>)
+                }
             }
         }
 
         keySerializationJson = Json {
             serializersModule = keySerializationModule
         }
+    }
+
+    @OptIn(InternalSerializationApi::class)
+    fun <T : Key> registerExternalKeyType(keyClass: KClass<T>) {
+        registeredExternalKeyTypes.add(keyClass)
+        updateKeySerialization()
     }
 
     fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)

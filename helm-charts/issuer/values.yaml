@@ -1,0 +1,31 @@
+api:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http-api
+  replicas: 1
+  type: ClusterIP
+  issuerApi:
+    image:
+      repository: waltid/issuer-api
+      tag: latest
+      imagePullPolicy: Always
+
+featConf: |-
+  enabledFeatures = [
+      entra
+  ]
+webConfig:
+  webConf: |-
+    webHost = "0.0.0.0"
+    webPort = 3000
+authServiceConf: |-
+  name = "keycloak"
+  authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
+  accessTokenUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token"
+  clientId = "issuer_api"
+
+ingress:
+  ingressClassName: nginx # or traefik
+  host: issuer.portal.waltid.cloud

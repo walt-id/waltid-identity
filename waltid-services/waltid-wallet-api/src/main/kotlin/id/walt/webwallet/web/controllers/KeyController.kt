@@ -56,7 +56,7 @@ fun Application.keys() = walletRoute {
                         )
                     }
 
-                    example("OCI key generation request") {
+                    example("OCI key generation request SDK") {
                         value = KeyGenerationRequest(
                             backend = "oci",
                             keyType = KeyType.secp256r1,
@@ -103,7 +103,7 @@ fun Application.keys() = walletRoute {
                             }
                         )
                     }
-                    example("AWS key generation request") {
+                    example("AWS API key generation request") {
                         value = KeyGenerationRequest(
                             backend = "aws-rest-api",
                             keyType = KeyType.secp256r1,
@@ -112,20 +112,6 @@ fun Application.keys() = walletRoute {
                                     put("accessKeyId", JsonPrimitive("accessKey"))
                                     put("secretAccessKey", JsonPrimitive("secretKey"))
                                     put("region", JsonPrimitive("eu-central-1"))
-                                }
-                            }
-                        )
-                    }
-                    example("Azure key generation request") {
-                        value = KeyGenerationRequest(
-                            backend = "azure",
-                            keyType = KeyType.secp256r1,
-                            config = buildJsonObject {
-                                putJsonObject("auth") {
-                                    put("clientId", JsonPrimitive("clientId"))
-                                    put("clientSecret", JsonPrimitive("clientSecret"))
-                                    put("tenantId", JsonPrimitive("tenantId"))
-                                    put("keyVaultUrl", JsonPrimitive("keyVaultUrl"))
                                 }
                             }
                         )
@@ -139,6 +125,32 @@ fun Application.keys() = walletRoute {
                             }
                         )
                     }
+                    example("Azure API key generation request") {
+                        value = KeyGenerationRequest(
+                            backend = "azure-rest-api",
+                            keyType = KeyType.secp256r1,
+                            config = buildJsonObject {
+                                putJsonObject("auth") {
+                                    put("clientId", JsonPrimitive("clientId"))
+                                    put("clientSecret", JsonPrimitive("clientSecret"))
+                                    put("tenantId", JsonPrimitive("tenantId"))
+                                    put("keyVaultUrl", JsonPrimitive("keyVaultUrl"))
+                                }
+                            }
+                        )
+                    }
+                    example("Azure key generation request SDK") {
+                        value = KeyGenerationRequest(
+                            backend = "azure",
+                            keyType = KeyType.secp256r1,
+                            config = buildJsonObject {
+                                putJsonObject("auth") {
+                                    put("keyVaultUrl", JsonPrimitive("keyVaultUrl"))
+                                }
+                            }
+                        )
+                    }
+
                 }
             }
             response {

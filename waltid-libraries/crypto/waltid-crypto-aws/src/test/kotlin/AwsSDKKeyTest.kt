@@ -1,6 +1,7 @@
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.aws.AWSKey
 import id.walt.crypto.keys.aws.AWSKeyMetadataSDK
+import id.walt.crypto.keys.aws.AwsSDKAuth
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -40,7 +41,10 @@ class AwsSDKKeyTest {
             AWSKey.generateKey(
                 it,
                 AWSKeyMetadataSDK(
-                    region = "eu-central-1",
+
+                    auth = AwsSDKAuth(
+                        region = "eu-central-1",
+                    )
                 )
             ).also {
                 println("Generated key: ${it.keyType} - ${it.getKeyId()}")

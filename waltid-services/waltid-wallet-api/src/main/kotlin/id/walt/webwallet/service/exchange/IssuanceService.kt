@@ -47,8 +47,20 @@ object IssuanceService : IssuanceServiceBase() {
                 credentialWallet = credentialWallet
             )
         } else {
+            // 1) Try cache first (keyed by the original offer string)
+            val cachedOffer = CredentialOfferCache.get(offer)?.also { CredentialOfferCache.remove(offer) }
+
+            // 2) Prefer already-resolved credential offer JSON (to avoid re-fetching credential_offer_uri)
+            val resolvedOffer = cachedOffer ?: runCatching {
+                val json = Json.parseToJsonElement(offer).jsonObject
+                CredentialOffer.fromJSON(json)
+            }.getOrNull()
+
+            // 3) Fallback to resolving from URI (legacy behavior)
+            val credentialOffer = resolvedOffer ?: OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offer)
+
             processCredentialOffer(
-                credentialOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(offer),
+                credentialOffer = credentialOffer,
                 credentialWallet = credentialWallet,
                 pinOrTxCode = pinOrTxCode,
             )
