@@ -24,6 +24,7 @@ import id.walt.mdoc.issuersigned.IssuerSignedItem
 import id.walt.mdoc.mdocauth.DeviceAuthentication
 import id.walt.oid4vc.OpenID4VCIVersion
 import id.walt.oid4vc.OpenID4VP
+import id.walt.oid4vc.data.CredSignAlgValues
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.ResponseMode
@@ -159,7 +160,9 @@ class MDocTestSuite(
             )
 
             assertTrue {
-                mDLCredentialConfigurationDraft13.credentialSigningAlgValuesSupported!!.contains("ES256")
+                mDLCredentialConfigurationDraft13.credentialSigningAlgValuesSupported!!.contains(
+                    CredSignAlgValues.Named("ES256")
+                )
             }
 
             assertEquals(

@@ -898,8 +898,16 @@ object IssuanceExamples {
                     "keyType": "secp256r1",
                     "config":
                     {
-                        "region": "eu-central-1"
-                      
+                        "auth": {
+                            "region": "eu-central-1"
+                       },
+                       "keyName" : "waltid-key",
+                        "tags": {
+                         
+                            "project": "waltid",
+                            "owner": "identity-team"
+                       
+                            }
                     }
                 },
                 "did":
@@ -941,7 +949,7 @@ object IssuanceExamples {
             {
                 "key":
                 {
-                    "backend": "azure",
+                    "backend": "azure-rest-api",
                     "keyType": "secp256r1",
                     "config":
                     {
@@ -952,6 +960,35 @@ object IssuanceExamples {
                             "keyVaultUrl": "url to the vault"
                        }
                       
+                    }
+                },
+                "did":
+                {
+                    "method": "jwk"
+                }
+            }
+        """.trimIndent()
+    )
+
+    //language=JSON
+    val issuerOnboardingRequestAzureSdkExample = typedValueExampleDescriptorDsl<OnboardingRequest>(
+        """
+              {
+                "key":
+                {
+                    "backend": "azure",
+                    "keyType": "secp256r1",
+                    "config":
+                    {
+                      "auth": {
+                         "keyVaultUrl" : "url to the vault"
+                      },
+                      "tags": {
+                         
+                            "project": "waltid",
+                            "owner": "identity-team"
+                       
+                            }
                     }
                 },
                 "did":

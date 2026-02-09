@@ -46,7 +46,7 @@ import kotlin.time.Instant
 @OptIn(ExperimentalTime::class)
 class W3CVerifier2IntegrationTest {
 
-    private val sdJwtVcDcqlQuery = DcqlQuery(
+    private val w3cDcqlQuery = DcqlQuery(
         credentials = listOf(
             CredentialQuery(
                 id = "openbadge",
@@ -85,7 +85,7 @@ class W3CVerifier2IntegrationTest {
 
     private val verificationSessionSetup: VerificationSessionSetup = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
-            dcqlQuery = sdJwtVcDcqlQuery,
+            dcqlQuery = w3cDcqlQuery,
             policies = w3cPolicies
         )
     )

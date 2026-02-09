@@ -52,6 +52,11 @@ Multiplatform library implementing OpenID for Verifiable Credentials specificati
 
 **Use when:** You're building issuers, verifiers, or wallets that need to support OpenID4VC draft specifications, or you need multiplatform protocol implementations.
 
+### [🟢 waltid-openid4vci](./waltid-openid4vci)
+OpenID4VCI 1.0 issuer implementation. Provides integration-ready components for building issuer services that issue verifiable credentials using OpenID4VCI 1.0.
+
+**Use when:** You're building an issuer service that needs to issue verifiable credentials using OpenID4VCI 1.0.
+
 ### [🟢 waltid-openid4vp-verifier](./waltid-openid4vp-verifier)
 OpenID4VP 1.0 verifier implementation. Provides integration-ready components for building verifier services that request verifiable presentations from wallets using OpenID4VP 1.0.
 
@@ -91,7 +96,7 @@ OpenAPI schema generation for OpenID4VP verifier endpoints. Provides tools for g
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 * Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License

@@ -11,11 +11,11 @@ on:
         description: "release version"
         required: true
         type: string
-      tag:
-        description: "desired tag, e.g. latest, dev (defaults to dev)"
+      tags:
+        description: 'JSON array of desired tags, e.g. ["stable"]'
         required: false
         type: string
-        default: "dev"
+        default: '["dev"]'
       publish:
         description: "Specifies whether to publish the images (defaults to false)"
         required: false
@@ -63,6 +63,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Generate Docker tags
+        id: tags
+        run: |
+          TAGS="waltid/${{ matrix.image }}:${{ inputs.version }}, waltid/${{ matrix.image }}:latest"
+          for tag in $(echo '${{ inputs.tags }}' | jq -r '.[]'); do
+            TAGS="$TAGS, waltid/${{ matrix.image }}:$tag"
+          done
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
       - name: Build and push Docker images (${{ matrix.image }})
         uses: docker/build-push-action@v6
         with:
@@ -70,7 +78,7 @@ jobs:
           push: ${{ inputs.publish }}
           file: ${{ matrix.folder }}/Dockerfile
           context: ${{ matrix.context }}
-          tags: waltid/${{ matrix.image }}:${{ inputs.tag }}, waltid/${{ matrix.image }}:${{ inputs.version }}
+          tags: ${{ steps.tags.outputs.tags }}
           load: ${{ inputs.artifact }}
           build-args: |
             --progress=plain

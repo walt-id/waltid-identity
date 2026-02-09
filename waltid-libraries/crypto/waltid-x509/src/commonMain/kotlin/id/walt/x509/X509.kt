@@ -1,19 +1,20 @@
 package id.walt.x509
 
+import okio.ByteString
+import kotlin.io.encoding.Base64
+
 /**
  * DER encoded X.509 certificate as platform-agnostic wrapper.
  */
-data class CertificateDer(val bytes: ByteArray) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other == null || this::class != other::class) return false
-        if (other !is CertificateDer) return false
-        return bytes.contentEquals(other.bytes)
-    }
-
-    override fun hashCode(): Int {
-        return bytes.contentHashCode()
-    }
+data class CertificateDer(
+    val bytes: ByteString,
+) {
+    /**
+    * Convert certificate DER bytes to PEM-encoded string.
+    */
+    fun toPEMEncodedString() = "-----BEGIN CERTIFICATE-----\r\n" +
+            Base64.Pem.encode(bytes.toByteArray()) +
+            "\r\n-----END CERTIFICATE-----"
 }
 
 /**
