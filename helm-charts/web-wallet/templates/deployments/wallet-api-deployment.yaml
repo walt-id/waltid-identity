@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: wallet-api
+      {{- include "wallet-api.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: wallet-api
+        {{- include "wallet-api.selectorLabels" . | nindent 8 }}
+      annotations:
+        deployment/id: _DEFAULT_DEPLOYMENT_
+    spec:
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: wallet-api
+        image: {{ .Values.api.walletApi.image.repository }}:{{ .Values.api.walletApi.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.walletApi.image.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+              - ALL
+        ports:
+        - containerPort: 4545
+          name: http-api
+        volumeMounts:
+          - name: wallet-config
+            mountPath: /waltid-wallet-api/config/_features.conf
+            readOnly: true
+            subPath: _features.conf
+          - name: wallet-config
+            mountPath: /waltid-wallet-api/config/db.conf
+            readOnly: true
+            subPath: db.conf
+          - name: wallet-config
+            mountPath: /waltid-wallet-api/config/web.conf
+            readOnly: true
+            subPath: web.conf
+          - name: wallet-config
+            mountPath: /waltid-wallet-api/config/oidc.conf
+            readOnly: true
+            subPath: oidc.conf
+          - name: wallet-auth-secret
+            mountPath: /waltid-wallet-api/config/auth.conf
+            readOnly: true
+            subPath: auth.conf
+          - mountPath: "/waltid-wallet-api/data/"
+            name: wallet-data
+      volumes:
+        - name: wallet-config
+          configMap:
+            name: {{ include "wallet-api.fullname" . }}-wallet-config
+        - name: wallet-auth-secret
+          secret:
+            secretName: {{ include "wallet-api.fullname" . }}-wallet-auth-secret
+        - name: wallet-data
+          persistentVolumeClaim:
+            claimName: {{ include "wallet-api.fullname" . }}-data-volume-claim

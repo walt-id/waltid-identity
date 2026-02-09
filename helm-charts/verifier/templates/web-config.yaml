@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "verifier.fullname" . }}-web-config
+  labels:
+    {{- include "verifier.labels" . | nindent 4 }}
+data:
+  _features.conf: |
+    {{ .Values.webConfig.featuresConf | nindent 4 }}
+  web.conf: |
+    {{ .Values.webConfig.webConf | nindent 4 }}
+  verifier-service.conf: |
+    baseUrl = "https://{{ .Values.ingress.host }}"
+  entra.conf: |
+    callbackUrl = "https://{{ .Values.ingress.host }}/entra/verification-callback/"

@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "issuer.fullname" . }}-ingress
+  labels:
+    {{- include "issuer.labels" . | nindent 4 }}
+  {{- if .Values.ingress.clusterIssuer }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- if .Values.ingress.tls }}
+  tls: 
+    {{- .Values.ingress.tls | toYaml | nindent 4 }}
+  {{- end }}
+  rules:
+  - host: {{ quote .Values.ingress.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: '{{ include "issuer.fullname" . }}-service'
+            port:
+              name: http

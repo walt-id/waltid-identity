@@ -9,6 +9,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.time.*
+import kotlin.time.Duration.Companion.days
 
 class DocumentSignerValidityPeriodTest {
 
@@ -16,7 +17,7 @@ class DocumentSignerValidityPeriodTest {
         validUntil: Instant,
     ) = runBlocking {
         val request = IACAOnboardingRequest(
-            certificateData = IACACertificateData(
+            certificateData = IACACertificateRequestData(
                 country = "US",
                 commonName = "Test IACA",
                 issuerAlternativeNameConf = IssuerAlternativeNameConfiguration(uri = "https://iaca.example.com"),
@@ -42,19 +43,19 @@ class DocumentSignerValidityPeriodTest {
                 notAfter = iacaResponse.certificateData.notAfter,
                 crlDistributionPointUri = "https://iaca.example.com/crl"
             ),
-            iacaKey = iacaResponse.iacaKey
+            iacaKey = iacaResponse.iacaKey,
         )
 
         // Valid: DS certificate is fully within IACA period
         OnboardingService.onboardDocumentSigner(
             DocumentSignerOnboardingRequest(
                 iacaSigner = iacaSigner,
-                certificateData = DocumentSignerCertificateData(
+                certificateData = DocumentSignerCertificateRequestData(
                     country = "US",
                     commonName = "Valid DSC",
                     crlDistributionPointUri = "https://iaca.example.com/crl",
-                    notBefore = timeNow.plus((30L).toDuration(DurationUnit.DAYS)),
-                    notAfter = timeNow.plus((365L).toDuration(DurationUnit.DAYS))
+                    notBefore = timeNow.plus(30.days),
+                    notAfter = timeNow.plus(364.days),
                 )
             )
         )
@@ -64,7 +65,7 @@ class DocumentSignerValidityPeriodTest {
             OnboardingService.onboardDocumentSigner(
                 DocumentSignerOnboardingRequest(
                     iacaSigner = iacaSigner,
-                    certificateData = DocumentSignerCertificateData(
+                    certificateData = DocumentSignerCertificateRequestData(
                         country = "US",
                         commonName = "DSC starting before IACA",
                         crlDistributionPointUri = "https://iaca.example.com/crl",
@@ -80,7 +81,7 @@ class DocumentSignerValidityPeriodTest {
             OnboardingService.onboardDocumentSigner(
                 DocumentSignerOnboardingRequest(
                     iacaSigner = iacaSigner,
-                    certificateData = DocumentSignerCertificateData(
+                    certificateData = DocumentSignerCertificateRequestData(
                         country = "US",
                         commonName = "DSC ending after IACA",
                         crlDistributionPointUri = "https://iaca.example.com/crl",

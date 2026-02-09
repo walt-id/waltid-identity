@@ -224,7 +224,9 @@ data class DcApiFlowSetup(
                                 )
                             )
                         )
-                    )
+                    ),
+                signedRequest = true,
+                encryptedResponse = false,
             )
         )
     }

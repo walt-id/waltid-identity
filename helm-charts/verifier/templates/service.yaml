@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "verifier.fullname" . }}-service
+  labels:
+    {{- include "verifier.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.api.type }}
+  selector:
+    {{- include "verifier.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- .Values.api.ports | toYaml | nindent 4 }}
