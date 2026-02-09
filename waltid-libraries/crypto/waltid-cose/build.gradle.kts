@@ -19,13 +19,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
 
             // Waltid
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -41,8 +41,6 @@ kotlin {
             implementation(kotlin("test-common"))
             implementation(kotlin("test-annotations-common"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
         }
         jvmMain.dependencies {
 
@@ -70,7 +68,7 @@ kotlin {
 
 mavenPublishing {
     pom {
-        name.set("walt.id Holder Policies")
-        description.set("walt.id Kotlin/Java library for Holder Policies")
+        name.set("walt.id COSE library")
+        description.set("walt.id Kotlin/Java library for COSE")
     }
 }

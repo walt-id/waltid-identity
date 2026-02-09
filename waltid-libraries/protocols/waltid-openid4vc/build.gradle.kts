@@ -6,8 +6,11 @@ plugins {
 
 group = "id.walt.openid4vc"
 
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
+
 kotlin {
-    val ktor_version = "3.3.3"
 
     sourceSets {
         all {
@@ -20,7 +23,7 @@ kotlin {
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
 
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
@@ -52,7 +55,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         jvmMain.dependencies {
-            implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+            implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             implementation("com.nimbusds:nimbus-jose-jwt:10.6")
         }
@@ -66,19 +69,19 @@ kotlin {
             implementation("org.bouncycastle:bcprov-lts8on:2.73.8") // for secp256k1 (which was removed with Java 17)
             implementation("org.bouncycastle:bcpkix-lts8on:2.73.8") // PEM import
 
-            implementation("io.ktor:ktor-server-core-jvm:$ktor_version")
-            implementation("io.ktor:ktor-server-netty-jvm:$ktor_version")
-            implementation("io.ktor:ktor-server-status-pages-jvm:$ktor_version")
-            implementation("io.ktor:ktor-server-default-headers-jvm:$ktor_version")
-            implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
-            implementation("io.ktor:ktor-client-core:$ktor_version")
-            implementation("io.ktor:ktor-client-cio:$ktor_version")
-            implementation("io.ktor:ktor-client-auth:$ktor_version")
-            implementation("io.ktor:ktor-client-content-negotiation:$ktor_version")
-            implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
-            implementation("io.ktor:ktor-client-logging-jvm:$ktor_version")
+            implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-netty-jvm:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-default-headers-jvm:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-core:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-cio:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-auth:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
+            implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.2")
-            implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+            implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
 
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
@@ -87,7 +90,7 @@ kotlin {
         }
         jsMain.dependencies {
             implementation(npm("jose", "5.10.0"))
-            implementation("io.ktor:ktor-client-js:$ktor_version")
+            implementation("io.ktor:ktor-client-js:${Versions.KTOR_VERSION}")
         }
     }
 }
