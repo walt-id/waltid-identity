@@ -32,7 +32,7 @@ cache4k = "0.14.0"
 
 # Crypto
 bouncycastle = "2.73.8"
-nimbus-jose = "10.6"
+nimbus-jose = "10.7"
 jose-npm = "5.10.0"
 bcprov = "2.73.10"
 bcpkix = "2.73.10"
