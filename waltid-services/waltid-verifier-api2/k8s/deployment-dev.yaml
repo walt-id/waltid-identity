@@ -43,7 +43,7 @@ spec:
           args:
             - "-l"
             - "trace"
-          image: waltid/verifier-api2
+          image: waltid/verifier-api2:__DEFAULT_IMAGE_TAG__
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false

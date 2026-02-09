@@ -129,7 +129,7 @@ Run the following commands from the waltid-identity root path:
 
 ```bash
 # Development (local Docker daemon, single-arch)
-./gradlew :waltid-services:waltid-issuer-api:publishImageToLocalRegistry
+./gradlew :waltid-services:waltid-issuer-api:jibDockerBuild
 # image: waltid/issuer-api:<version>
 ```
 
@@ -137,7 +137,7 @@ Run the following commands from the waltid-identity root path:
 # Production (multi-arch push to your registry)
 export DOCKER_USERNAME=<your-dockerhub-namespace>
 export DOCKER_PASSWORD=<your-dockerhub-token>
-./gradlew :waltid-services:waltid-issuer-api:publishImage
+./gradlew :waltid-services:waltid-issuer-api:jib
 # image: docker.io/<DOCKER_USERNAME>/issuer-api:<version>
 ```
 
