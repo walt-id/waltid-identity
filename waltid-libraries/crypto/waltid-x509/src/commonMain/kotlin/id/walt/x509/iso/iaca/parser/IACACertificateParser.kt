@@ -1,6 +1,7 @@
 package id.walt.x509.iso.iaca.parser
 
 import id.walt.x509.CertificateDer
+import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 
 /**
@@ -17,6 +18,13 @@ class IACACertificateParser {
      * Parse a DER-encoded IACA X.509 certificate into a decoded representation.
      */
     suspend fun parse(certificate: CertificateDer) = platformParseIACACertificate(certificate)
+
+    /**
+     * Blocking variant of [parse].
+     */
+    fun parseBlocking(certificate: CertificateDer): IACADecodedCertificate = blockingBridge {
+        parse(certificate)
+    }
 }
 
 /**

@@ -26,6 +26,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -62,10 +64,11 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
-                                },
-                                "notBefore": "2025-01-01T00:00:00Z"
+                                }
                             },
                             "iacaKey": {
                                 "type": "jwk",
@@ -148,6 +151,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -194,6 +199,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -241,6 +248,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -284,6 +293,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -332,6 +343,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -378,6 +391,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -423,6 +438,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example IACA",
+                                "notBefore": "2025-05-28T12:23:01Z",
+                                "notAfter": "2040-05-24T12:23:01Z",                                
                                 "issuerAlternativeNameConf": {
                                     "uri": "https://iaca.example.com"
                                 }
@@ -489,6 +506,8 @@ object DocumentSignerDocs {
                             "certificateData": {
                                 "country": "US",
                                 "commonName": "Example DS",
+                                "notBefore": "2025-05-29T07:18:39Z",
+                                "notAfter": "2026-05-29T07:18:39Z",                                      
                                 "crlDistributionPointUri": "https://iaca.example.com/crl"
                             }
                         }

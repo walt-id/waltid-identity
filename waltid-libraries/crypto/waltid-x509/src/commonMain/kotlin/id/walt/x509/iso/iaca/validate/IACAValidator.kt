@@ -10,6 +10,7 @@ import id.walt.x509.X509V3ExtensionOID
 import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.IssuerAlternativeName
+import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
@@ -68,6 +69,15 @@ class IACAValidator(
             decodedCert.verifySignature(decodedCert.publicKey)
         }
 
+    }
+
+    /**
+     * Blocking variant of [validate].
+     */
+    fun validateBlocking(
+        decodedCert: IACADecodedCertificate,
+    ) = blockingBridge {
+        validate(decodedCert)
     }
 
     /**

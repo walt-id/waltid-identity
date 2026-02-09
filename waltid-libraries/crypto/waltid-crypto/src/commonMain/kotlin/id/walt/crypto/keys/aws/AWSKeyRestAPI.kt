@@ -74,7 +74,7 @@ class AWSKeyRestAPI(
         }
 
     override val hasPrivateKey: Boolean
-        get() = false
+        get() = true
 
     override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
 
