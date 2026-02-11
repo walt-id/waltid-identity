@@ -14,6 +14,7 @@ import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
@@ -158,10 +159,15 @@ object WalletPresentFunctionality2 {
         selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
 
         holderPoliciesToRun: Flow<HolderPolicy>?,
-        runPolicies: Boolean?
+        runPolicies: Boolean?,
 
         // TODO: selected credentials
 
+        /**
+         *  Fallback for ancient legacy tests, wrong integration tests, and various other stuff that should have long been removed
+         *  Use: `OldWalletPresentFunctionality.oldWalletPresentHandling(walletService, presentationRequestUrl, request)` for this
+         */
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
 
@@ -221,8 +227,17 @@ object WalletPresentFunctionality2 {
 
                         val result = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)
                         when (result) {
-                            is ClientValidationResult.Failure -> throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")
-                            is ClientValidationResult.Success -> Json {}.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                            is ClientValidationResult.Failure -> {
+                                if (result.error is ClientIdError.PreRegisteredClientNotFound && legacyFallbackCallback != null) {
+                                    val fallbackResult = runCatching { legacyFallbackCallback(presentationRequestUrl) }
+                                    if (fallbackResult.isSuccess && fallbackResult.getOrThrow().isSuccess)
+                                        return Result.success(WalletPresentResult(transmissionSuccess = true, verifierResponse = fallbackResult.getOrThrow().getOrThrow()))
+                                }
+
+                                throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")
+                            }
+
+                            is ClientValidationResult.Success -> Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
                         }
                     }
 

@@ -268,17 +268,20 @@ object CredentialParser {
 
                 val matchingDisclosure = findForHash(hash)
                 if (matchingDisclosure != null) {
+                    // Construct the location for the *content* of this disclosure first
+                    val newLoc = if (matchingDisclosure.name != null) "$loc.${matchingDisclosure.name}" else loc
+
+                    // Create a copy of the disclosure with the populated location
+                    val updatedDisclosure = matchingDisclosure.copy(location = newLoc)
+
                     // Only process if we haven't mapped this specific disclosure instance yet
                     // (SD-JWT spec says digest MUST NOT appear more than once, but safety check)
-                    if (mappedDisclosures.add(matchingDisclosure)) {
-                        log.trace { "Found hash for ${matchingDisclosure.name ?: "array_element"}" }
-
-                        // Construct the location for the *content* of this disclosure
-                        // If it's an array element, name is null, effectively just passing 'loc' down
-                        val newLoc = if (matchingDisclosure.name != null) "$loc.${matchingDisclosure.name}" else loc
+                    // Add the UPDATED disclosure to the set, not the raw one
+                    if (mappedDisclosures.add(updatedDisclosure)) {
+                        log.trace { "Found hash for ${updatedDisclosure.name ?: "array_element"}" }
 
                         // 3. Recursive Step: Scan the *value* of the disclosure for new hashes
-                        scanForHashes(matchingDisclosure.value, newLoc)
+                        scanForHashes(updatedDisclosure.value, newLoc)
                     }
                 } else {
                     log.trace { "Hash $hash not found in available disclosures (might be a decoy)" }
