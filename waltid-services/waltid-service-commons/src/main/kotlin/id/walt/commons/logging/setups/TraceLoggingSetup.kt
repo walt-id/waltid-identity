@@ -22,7 +22,7 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
     loggerBaseToMinimum("io.ktor.client", Level.DEBUG)
 
     loggerBaseToMinimum("org.sqlite.core.NativeDB", Level.DEBUG)
-    loggerBaseToMinimum("org.mongodb.driver", Level.DEBUG)
+    loggerBaseToMinimum("org.mongodb.driver", Level.INFO)
 
     logging {
         fromMinLevel(Level.ERROR) {

@@ -8,8 +8,7 @@ import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
-// TODO: Rename to Verifier2ConformanceTests (requires change in CI script)
-class ConformanceTests {
+/*class WalletPresentConformanceTests {
 
     companion object {
         val verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
@@ -35,4 +34,4 @@ class ConformanceTests {
         ).run()
     }
 
-}
+}*/

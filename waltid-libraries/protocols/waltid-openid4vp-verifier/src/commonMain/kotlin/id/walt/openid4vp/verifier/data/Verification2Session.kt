@@ -17,6 +17,9 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -101,6 +104,41 @@ data class Verification2Session(
     var statusReason: String? = null,
 ) {
 
+    fun deletePII() {
+        presentedRawData = null
+        presentedPresentations = null
+        presentedCredentials = null
+
+        policyResults?.vpPolicies?.values?.forEach { innerMap ->
+            innerMap.values.forEach { policyResult ->
+                policyResult.results = emptyMap()
+            }
+        }
+
+        policyResults?.vcPolicies?.forEach { policyResult ->
+            policyResult.result?.let { resultElement ->
+                policyResult.result = redactCredentialSubject(resultElement)
+            }
+        }
+    }
+
+    private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {
+        val resultObj = resultElement.jsonObject
+
+        val resultBlacklist = setOf("signed_credential")
+        val vcBlacklist = setOf("credentialSubject")
+
+        var redactedObj = JsonObject(resultObj.filterKeys { it !in resultBlacklist })
+
+        val verifiedData = redactedObj["verified_data"]?.jsonObject ?: return redactedObj
+        val vc = verifiedData["vc"]?.jsonObject ?: return redactedObj
+
+        val redactedVc = JsonObject(vc.filterKeys { it !in vcBlacklist })
+        val redactedVerifiedData = JsonObject(verifiedData + ("vc" to redactedVc))
+
+        return JsonObject(redactedObj + ("verified_data" to redactedVerifiedData))
+    }
+
     @Serializable
     data class VerificationSessionNotifications(
         val webhook: VerificationSessionWebhookNotification? = null
@@ -138,9 +176,9 @@ data class Verification2Session(
     @Serializable
     data class VerificationSessionRedirects(
         @SerialName("success_redirect_uri")
-        val successRedirectUri: String? = null,
+        var successRedirectUri: String? = null,
         @SerialName("error_redirect_uri")
-        val errorRedirectUri: String? = null
+        val errorRedirectUri: String? = null,
     )
 
 
