@@ -17,6 +17,7 @@ import kotlinx.serialization.json.*
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
+@JsonIgnoreUnknownKeys
 data class AuthorizationRequest(
     // OAuth 2.0 Parameters (Section 5 and 5.2)
     /**

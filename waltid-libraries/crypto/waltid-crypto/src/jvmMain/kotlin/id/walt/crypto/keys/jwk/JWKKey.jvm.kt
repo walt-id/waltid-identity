@@ -262,24 +262,46 @@ actual class JWKKey actual constructor(
      * JWE Encryption using ECDH-ES + A128GCM.
      * This instance acts as the Recipient Public Key.
      */
-    actual suspend fun encryptJwe(plaintext: ByteArray): String {
-        // Ensure we are using the correct curve (P-256)
-        check(keyType == KeyType.secp256r1) { "ECDH-ES+A128GCM is currently only supported for secp256r1 (P-256)." }
+    actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
+        check(keyType == KeyType.secp256r1 || keyType == KeyType.secp384r1 || keyType == KeyType.secp521r1) {
+            "ECDH-ES is currently only supported for EC keys (P-256, P-384, P-521). Current key type: $keyType"
+        }
 
-        // 1. Create the JWE Header
-        val header = JWEHeader(JWEAlgorithm.ECDH_ES, EncryptionMethod.A128GCM)
+        // 1. Resolve Encryption Method (enc)
+        val encryptionMethod = when (encAlg) {
+            "A128GCM" -> EncryptionMethod.A128GCM
+            "A192GCM" -> EncryptionMethod.A192GCM
+            "A256GCM" -> EncryptionMethod.A256GCM
+            "A128CBC-HS256" -> EncryptionMethod.A128CBC_HS256
+            "A192CBC-HS384" -> EncryptionMethod.A192CBC_HS384
+            "A256CBC-HS512" -> EncryptionMethod.A256CBC_HS512
+            else -> throw IllegalArgumentException("Unsupported encryption algorithm: $encAlg")
+        }
 
-        // 2. Create the JWE Object
+        // 2. Build JWE Header
+        // The algorithm (alg) is fixed to ECDH-ES for this flow
+        val headerBuilder = JWEHeader.Builder(JWEAlgorithm.ECDH_ES, encryptionMethod)
+            .type(JOSEObjectType.JWT) // Common practice to set 'typ' to JWT
+
+        // OpenID4VP Requirement: If the key has a Key ID, it MUST be included in the header
+        _internalJwk.keyID?.let { kid ->
+            headerBuilder.keyID(kid)
+        }
+
+        val header = headerBuilder.build()
+
+        // 3. Create JWE Object
         val jweObject = JWEObject(header, Payload(plaintext))
 
-        // 3. Create the Encrypter using the underlying Nimbus ECKey (Public)
-        // Nimbus handles the ephemeral key generation internally
+        // 4. Create Encrypter
+        // This instance (_internalJwk) represents the Verifier's Public Key.
+        // Nimbus automatically generates the ephemeral key pair (EPK) internally.
         val encrypter = ECDHEncrypter(_internalJwk.toECKey())
 
-        // 4. Perform Encryption
+        // 5. Encrypt
         jweObject.encrypt(encrypter)
 
-        // 5. Serialize to compact form (String)
+        // 6. Serialize
         return jweObject.serialize()
     }
 
@@ -289,22 +311,26 @@ actual class JWKKey actual constructor(
      */
     actual suspend fun decryptJwe(jweString: String): ByteArray {
         check(hasPrivateKey) { "Private key required for decryption." }
-        check(keyType == KeyType.secp256r1) { "ECDH-ES+A128GCM is currently only supported for secp256r1 (P-256)." }
 
-        // 1. Parse the JWE String
+        // 1. Parse JWE
         val jweObject = JWEObject.parse(jweString)
+        val header = jweObject.header
 
-        // 2. Validate Header (Optional but recommended security check)
         val alg = jweObject.header.algorithm
         val enc = jweObject.header.encryptionMethod
-        check(alg == JWEAlgorithm.ECDH_ES && enc == EncryptionMethod.A128GCM) {
-            "Unsupported JWE Algorithm or Encryption Method. Expected ECDH-ES + A128GCM, but got $alg + $enc"
+        check(alg == JWEAlgorithm.ECDH_ES)
+
+        // 2. Validate Key Type
+        // ECDH-ES requires EC keys
+        check(keyType == KeyType.secp256r1 || keyType == KeyType.secp384r1 || keyType == KeyType.secp521r1) {
+            "Decryption key must be an EC key (P-256, P-384, P-521)."
         }
 
-        // 3. Create the Decrypter using the underlying Nimbus ECKey (Private)
+        // 3. Create Decrypter
+        // We pass our private key to unwrap the secret
         val decrypter = ECDHDecrypter(_internalJwk.toECKey())
 
-        // 4. Perform Decryption
+        // 4. Decrypt
         jweObject.decrypt(decrypter)
 
         // 5. Return payload

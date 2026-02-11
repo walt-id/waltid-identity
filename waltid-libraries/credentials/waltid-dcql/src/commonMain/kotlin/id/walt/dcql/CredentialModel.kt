@@ -18,7 +18,7 @@ interface DcqlCredential {
 }
 
 data class DcqlDisclosure(
-    val name: String,
+    val name: String?,
     val value: JsonElement,
 
     // A place to pass a reference to the original (using which this class was created)

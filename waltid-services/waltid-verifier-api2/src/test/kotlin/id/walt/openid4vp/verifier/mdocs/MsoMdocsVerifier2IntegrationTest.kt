@@ -310,9 +310,9 @@ class MsoMdocsVerifier2IntegrationTest {
             test("Verify presentation result") {
                 assertTrue { presentationResult.isSuccess }
 
-                val resp = presentationResult.getOrThrow().jsonObject
-                assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
-                assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                val resp = presentationResult.getOrThrow()
+                assertTrue("Transmission success is false") { resp.transmissionSuccess == true }
+                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 
 

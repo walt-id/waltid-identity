@@ -165,8 +165,8 @@ object OpenID4VCI {
         }.buildString()
     }
 
-    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) =
-        resolveCIProviderMetadata(credOffer.credentialIssuer)
+    suspend fun resolveCIProviderMetadata(credentialOffer: CredentialOffer) =
+        resolveCIProviderMetadata(credentialOffer.credentialIssuer)
 
     suspend fun resolveCIProviderMetadata(issuerBaseUrl: String) =
         http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {

@@ -58,11 +58,11 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             return ClientValidationResult.Failure(ClientIdError.SanDnsMismatch(clientId.dnsName, sans))
         }
 
-        val metadataJson = context.clientMetadataJson
+        val metadataJson = context.clientMetadata
             ?: return ClientValidationResult.Failure(ClientIdError.MissingClientMetadata)
 
 
-        return runCatching { ClientMetadata.fromJson(metadataJson).getOrThrow() }
+        return runCatching { metadataJson }
             .fold(
                 onSuccess = { ClientValidationResult.Success(it) },
                 onFailure = { ClientValidationResult.Failure(ClientIdError.InvalidSignature) }
