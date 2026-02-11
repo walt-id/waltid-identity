@@ -10,11 +10,13 @@ import kotlinx.serialization.json.*
 /**
  * Represents the 'client_metadata' parameter.
  * See: Section 5.1 and RFC 7591 for internationalized metadata support.
- * 
+ *
  * Supports RFC 7591 language-tagged metadata fields (e.g., `client_name#fr-FR`, `logo_uri#en`).
  * Language tags follow BCP 47 format and are case-insensitive.
  */
+@ExperimentalSerializationApi
 @Serializable(with = ClientMetadataSerializer::class)
+@JsonIgnoreUnknownKeys
 data class ClientMetadata(
     /**
      * OPTIONAL. A JSON Web Key Set [RFC7517] that contains one or more public keys,
@@ -117,7 +119,11 @@ data class ClientMetadata(
 
     companion object {
         private val jsonParser = Json { ignoreUnknownKeys = true }
-        fun fromJson(jsonString: String): Result<ClientMetadata> {
+        fun fromJson(jsonString: JsonElement): Result<ClientMetadata> {
+            return runCatching {
+                jsonParser.decodeFromJsonElement<ClientMetadata>(jsonString)
+            }
+        }fun fromJson(jsonString: String): Result<ClientMetadata> {
             return runCatching {
                 jsonParser.decodeFromString<ClientMetadata>(jsonString)
             }
@@ -127,14 +133,14 @@ data class ClientMetadata(
 
 /**
  * Custom serializer for ClientMetadata that handles RFC 7591 internationalized metadata fields.
- * 
+ *
  * Language-tagged fields follow the pattern: `field_name#language-tag` (e.g., `client_name#fr-FR`).
  * The language tag is separated from the field name by a `#` character.
  */
 object ClientMetadataSerializer : KSerializer<ClientMetadata> {
     // Fields that support internationalization per RFC 7591
     private val i18nFields = setOf("client_name", "logo_uri", "tos_uri", "policy_uri", "client_uri")
-    
+
     // Regular (non-i18n) fields
     private val regularFields = setOf(
         "jwks",
@@ -155,7 +161,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
 
     override fun deserialize(decoder: Decoder): ClientMetadata {
         require(decoder is JsonDecoder) { "ClientMetadata can only be deserialized from JSON" }
-        
+
         val json = decoder.decodeJsonElement().jsonObject
         val jsonParser = Json { ignoreUnknownKeys = true }
 
@@ -187,7 +193,7 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
                 if (parts.size == 2) {
                     val fieldName = parts[0]
                     val languageTag = parts[1]
-                    
+
                     when (fieldName) {
                         "client_name" -> {
                             (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { clientNameI18n[languageTag] = it }
@@ -236,20 +242,20 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
 
     override fun serialize(encoder: Encoder, value: ClientMetadata) {
         require(encoder is JsonEncoder) { "ClientMetadata can only be serialized to JSON" }
-        
+
         val jsonObject = buildJsonObject {
             // Regular fields
             value.jwks?.let { put("jwks", Json.encodeToJsonElement(it)) }
             value.vpFormatsSupported?.let { put("vp_formats_supported", Json.encodeToJsonElement(it)) }
             value.encryptedResponseEncValuesSupported?.let { put("encrypted_response_enc_values_supported", Json.encodeToJsonElement(it)) }
-            
+
             // Base i18n fields (without language tags)
             value.clientName?.let { put("client_name", it) }
             value.logoUri?.let { put("logo_uri", it) }
             value.tosUri?.let { put("tos_uri", it) }
             value.policyUri?.let { put("policy_uri", it) }
             value.clientUri?.let { put("client_uri", it) }
-            
+
             // Language-tagged fields
             value.clientNameI18n.forEach { (lang, name) ->
                 put("client_name#$lang", name)
@@ -266,13 +272,13 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
             value.clientUriI18n.forEach { (lang, uri) ->
                 put("client_uri#$lang", uri)
             }
-            
+
             // Additional fields (including unknown i18n fields)
             value.additionalFields.forEach { (key, element) ->
                 put(key, element)
             }
         }
-        
+
         encoder.encodeJsonElement(jsonObject)
     }
 }

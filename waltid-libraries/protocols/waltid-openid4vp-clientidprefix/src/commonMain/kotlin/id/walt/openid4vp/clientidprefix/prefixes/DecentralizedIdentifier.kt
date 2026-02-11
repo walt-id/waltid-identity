@@ -45,10 +45,9 @@ data class DecentralizedIdentifier(val did: String, override val rawValue: Strin
             // 3. Verify the JWS signature with that key.
             verificationKey.verifyJws(jws).getOrThrow()
 
-            val metadataJson = context.clientMetadataJson
+            val metadataJson = context.clientMetadata
                 ?: throw IllegalStateException("client_metadata parameter is required.")
-
-            ClientMetadata.fromJson(metadataJson).getOrThrow()
+            metadataJson
         }.fold(
             onSuccess = { ClientValidationResult.Success(it) },
             onFailure = { ClientValidationResult.Failure(ClientIdError.DidResolutionFailed(it.message!!)) }

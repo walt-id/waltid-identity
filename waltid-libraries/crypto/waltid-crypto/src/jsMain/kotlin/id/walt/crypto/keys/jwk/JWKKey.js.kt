@@ -478,12 +478,45 @@ actual class JWKKey actual constructor(
     @JsPromise
     @JsExport.Ignore
     actual suspend fun decryptJwe(jweString: String): ByteArray {
+        check(hasPrivateKey) { "Private key required for decryption." }
+
+        // 1. Decrypt using jose.compactDecrypt
+        // _internalKey (private) unwraps the content encryption key
+       /* val result = PromiseUtils.await(
+            jose.compactDecrypt(jweString, _internalKey)
+        )*/
+
+        // 2. result.plaintext is a Uint8Array. Convert to Kotlin ByteArray (Int8Array).
+        // We create a new Int8Array view/copy from the Uint8Array to satisfy Kotlin's type system.
+        //  return Int8Array(result.plaintext.unsafeCast<Int8Array>()).unsafeCast<ByteArray>()
         TODO("Not yet implemented")
     }
 
     @JsPromise
     @JsExport.Ignore
-    actual suspend fun encryptJwe(plaintext: ByteArray): String {
+    actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
+        // 1. Convert Kotlin ByteArray to JS Uint8Array
+        val content = Uint8Array(plaintext.toTypedArray())
+
+        // 2. Construct the JWE Protected Header
+        val header = json(
+            "alg" to "ECDH-ES",
+            "enc" to encAlg,
+            "typ" to "JWT"
+        )
+
+        // Spec Requirement: Include 'kid' if present in the key
+        if (_internalJwk.kid != null) {
+            header["kid"] = _internalJwk.kid
+        }
+
+        // 3. Encrypt using jose.CompactEncrypt
+        // _internalKey (public) is used to encrypt the content encryption key (ECDH-ES)
+        /*return PromiseUtils.await(
+            jose.CompactEncrypt(content)
+                .setProtectedHeader(header)
+                .encrypt(_internalKey)
+        )*/
         TODO("Not yet implemented")
     }
 
