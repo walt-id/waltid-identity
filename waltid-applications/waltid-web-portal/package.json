@@ -21,7 +21,7 @@
     "autoprefixer": "10.4.19",
     "axios": "^1.7.2",
     "eslint": "9.39.2",
-    "eslint-config-next": "14.2.4",
+    "eslint-config-next": "14.2.35",
     "next": "16.1.5",
     "postcss": "8.4.38",
     "react": "18.3.1",
