@@ -81,8 +81,8 @@ dependencies {
 
     implementation(identityLibs.kotlintest)
     testImplementation(identityLibs.kotlinx.coroutines.test)
-    testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
-    testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+    implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
     implementation(project(":waltid-services:waltid-verifier-api2"))
