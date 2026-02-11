@@ -28,6 +28,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     fun setup() {
         coEvery { mockFetcher.fetch(uri) } returns Result.success(statusListContent)
         every { mockBitValueReaderFactory.new(strategy = ofType(BigEndianRepresentation::class)) } returns mockBitValueReader
+        every { mockStatusReader.canHandle(statusListContent) } returns true
         sut = createStatusValidator()
     }
 

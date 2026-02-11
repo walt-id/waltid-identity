@@ -20,12 +20,13 @@ data class RedirectUri(val uri: Url, override val rawValue: String) : ClientId {
         if (context.requestObjectJws != null) {
             return ClientValidationResult.Failure(ClientIdError.DoesNotSupportSignature)
         }
-        val metadataJson = context.clientMetadataJson
+        val metadataJson = context.clientMetadata
             ?: return ClientValidationResult.Failure(ClientIdError.MissingClientMetadata)
 
-        return ClientMetadata.fromJson(metadataJson).fold(
+        return ClientValidationResult.Success(metadataJson)
+        /*return ClientMetadata.fromJson(metadataJson).fold(
             onSuccess = { ClientValidationResult.Success(it) },
             onFailure = { ClientValidationResult.Failure(ClientIdError.InvalidMetadata(it.message!!)) }
-        )
+        )*/
     }
 }
