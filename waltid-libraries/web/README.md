@@ -9,8 +9,8 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
-  
-  <h2>Statuses Explained</h2>
+
+<h2>Statuses Explained</h2>
   <table>
     <tr>
       <td align="center" width="50%">
@@ -41,29 +41,48 @@
 
 ## Overview
 
-This directory contains libraries for web server functionality, specifically focused on session notifications and real-time updates for Ktor-based applications.
+This directory contains libraries for web server functionality, specifically focused on session
+notifications and real-time updates for Ktor-based applications.
 
 ## Libraries
 
-### [🟢 waltid-ktor-notifications-core](./waltid-ktor-notifications-core)
-Core library for Ktor server notifications. Provides multiplatform (JVM/JS/iOS) abstractions for publishing session updates and managing notification channels. Supports both Server-Sent Events (SSE) and webhook-based notifications.
+### [🟢 waltid-web-data-fetching](./waltid-web-data-fetching)
 
-**Use when:** You need the core notification functionality and want to build custom notification implementations, or you're building multiplatform applications that need notification support.
+Configurable data fetcher for web resources, e.g. did:web resolving, JSON schema retrieval, OpenID
+metadata viewing.
+
+**Use when:** You need to fetch a piece of data from (possibly user-provided) URLs, and want to be
+able to configure the HTTP client at runtime.
+
+### [🟢 waltid-ktor-notifications-core](./waltid-ktor-notifications-core)
+
+Core library for Ktor server notifications. Provides multiplatform (JVM/JS/iOS) abstractions for
+publishing session updates and managing notification channels. Supports both Server-Sent Events (
+SSE) and webhook-based notifications.
+
+**Use when:** You need the core notification functionality and want to build custom notification
+implementations, or you're building multiplatform applications that need notification support.
 
 ### [🟢 waltid-ktor-notifications](./waltid-ktor-notifications)
-Ktor plugin for session notifications. Provides ready-to-use Ktor routes and plugins for implementing SSE endpoints and webhook notifications in Ktor applications.
 
-**Use when:** You're building a Ktor-based service that needs to notify clients about session updates via SSE or webhooks.
+Ktor plugin for session notifications. Provides ready-to-use Ktor routes and plugins for
+implementing SSE endpoints and webhook notifications in Ktor applications.
+
+**Use when:** You're building a Ktor-based service that needs to notify clients about session
+updates via SSE or webhooks.
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Connect and get the latest
+  updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report
+  bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 * Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License
 
-Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+Licensed under
+the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
 
 <div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />

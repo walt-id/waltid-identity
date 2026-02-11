@@ -16,7 +16,9 @@ import org.kotlincrypto.hash.sha2.SHA256
 @Serializable
 data class SdJwtSelectiveDisclosure(
     val salt: String,
-    val name: String,
+    /** claim name */
+    val name: String?,
+    /** claim value */
     val value: JsonElement,
 
     val location: String? = null,
@@ -24,14 +26,22 @@ data class SdJwtSelectiveDisclosure(
     var encoded: String = makeEncoded(salt, name, value)
 ) {
     companion object {
-        fun makeJsonArray(salt: String, name: String, value: JsonElement) =
-            JsonArray(listOf(JsonPrimitive(salt), JsonPrimitive(name), value))
+        // If name is null, creates [salt, value] (size 2).
+        // If name is present, creates [salt, name, value] (size 3).
+        fun makeJsonArray(salt: String, name: String?, value: JsonElement): JsonArray {
+            val content = mutableListOf<JsonElement>(JsonPrimitive(salt))
+            if (name != null) {
+                content.add(JsonPrimitive(name))
+            }
+            content.add(value)
+            return JsonArray(content)
+        }
 
         fun encodeJsonArray(jsonArray: JsonArray) = jsonArray.toString().encodeToByteArray().encodeToBase64Url()
-        fun makeEncoded(salt: String, name: String, value: JsonElement) = encodeJsonArray(makeJsonArray(salt, name, value))
+        fun makeEncoded(salt: String, name: String?, value: JsonElement) = encodeJsonArray(makeJsonArray(salt, name, value))
 
         fun encodeJsonArray2(jsonArray: JsonArray) = jsonArray.toString().encodeToByteArray().encodeToBase64()
-        fun makeEncoded2(salt: String, name: String, value: JsonElement) = encodeJsonArray2(makeJsonArray(salt, name, value))
+        fun makeEncoded2(salt: String, name: String?, value: JsonElement) = encodeJsonArray2(makeJsonArray(salt, name, value))
     }
 
     fun asJsonArray() = makeJsonArray(salt, name, value)
@@ -41,10 +51,11 @@ data class SdJwtSelectiveDisclosure(
     fun asHashed2() = SHA256().digest(asEncoded2().encodeToByteArray()).encodeToBase64Url()
     fun asHashed3() = SHA256().digest(encoded.encodeToByteArray().encodeToBase64Url().encodeToByteArray()).encodeToBase64Url()
 
+    // Secondary constructor used by parser
     constructor(jsonArray: JsonArray, encoded: String) : this(
         salt = jsonArray[0].jsonPrimitive.content,
-        name = jsonArray[1].jsonPrimitive.content,
-        value = jsonArray[2],
+        name = if (jsonArray.size == 3) jsonArray[1].jsonPrimitive.content else null,
+        value = if (jsonArray.size == 3) jsonArray[2] else jsonArray[1],
         encoded = encoded
     )
 }

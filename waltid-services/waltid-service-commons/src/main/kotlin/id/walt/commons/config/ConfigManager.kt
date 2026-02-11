@@ -21,12 +21,27 @@ object ConfigManager {
     val preloadedConfigurations = HashMap<Pair<String, KClass<out WaltConfig>>, WaltConfig>()
 
     val configLoaders = HashMap<String, ConfigLoader>()
+    
+    /**
+     * Custom decoders that can be registered by services before config loading.
+     * These are added to all config loaders.
+     */
+    private val customDecoders = mutableListOf<com.sksamuel.hoplite.decoder.Decoder<*>>()
+    
+    /**
+     * Register a custom Hoplite decoder that will be used for all config loading.
+     * Should be called before configs are loaded (e.g., in service initialization).
+     */
+    fun registerCustomDecoder(decoder: com.sksamuel.hoplite.decoder.Decoder<*>) {
+        customDecoders.add(decoder)
+    }
 
     fun preclear() {
         registeredConfigurations.clear()
         loadedConfigurations.clear()
         preloadedConfigurations.clear()
         configLoaders.clear()
+        customDecoders.clear()
     }
 
     fun preloadAndRegisterConfig(id: String, config: WaltConfig) {
@@ -64,6 +79,10 @@ object ConfigManager {
                 .addDefaultParsers()
 
                 .addDecoder(JsonElementDecoder())
+                .apply {
+                    // Add any custom decoders registered by services
+                    customDecoders.forEach { addDecoder(it) }
+                }
                 .addCommandLineSource(args)
                 .addDefaultParsers()
                 .addEnvironmentSource(allowUppercaseNames = false)

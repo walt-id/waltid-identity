@@ -15,7 +15,7 @@ class W3CStatusValidator(
     reader: StatusValueReader<W3CStatusContent>,
     private val bitValueReaderFactory: BitValueReaderFactory,
     private val expansionAlgorithmFactory: StatusListExpansionAlgorithmFactory<W3CStatusContent>,
-) : id.walt.policies2.vc.policies.status.validator.StatusValidatorBase<W3CStatusContent, W3CEntry, W3CStatusPolicyAttribute>(
+) : StatusValidatorBase<W3CStatusContent, W3CEntry, W3CStatusPolicyAttribute>(
     fetcher,
     reader
 ) {

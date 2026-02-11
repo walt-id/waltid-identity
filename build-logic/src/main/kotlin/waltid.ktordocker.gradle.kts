@@ -1,12 +1,8 @@
 import com.google.cloud.tools.jib.gradle.JibExtension
-import io.ktor.plugin.features.DockerImageRegistry.Companion.dockerHub
 
 plugins {
-    id("io.ktor.plugin")
-
     id("com.google.cloud.tools.jib") // Automatically applied by ktor, applying it here just so that IntelliJ knows what's going on
 }
-
 
 fun getDockerCredentials(rootDir: File): Pair<String, String> {
     val envUsername = providers.environmentVariable("DOCKER_USERNAME").getOrNull()
@@ -15,34 +11,14 @@ fun getDockerCredentials(rootDir: File): Pair<String, String> {
     val passwordFile = File(rootDir, "secret-docker-password.txt")
 
     return Pair(
-        envUsername ?: if (usernameFile.isFile) usernameFile.readLines().first() else "",
-        envPassword ?: if (passwordFile.isFile) passwordFile.readLines().first() else ""
+        envUsername ?: if (usernameFile.isFile) usernameFile.readLines().first() else "DOCKER_IS_UNAUTHENTICATED",
+        envPassword ?: if (passwordFile.isFile) passwordFile.readLines().first() else "DOCKER_IS_UNAUTHENTICATED"
     )
 }
 
-// 2. Configure Ktor Docker extension
-ktor {
-    docker {
-        jreVersion.set(JavaVersion.VERSION_21)
-
-        localImageName.set(project.name.replaceFirst("waltid-", "waltid/")) // waltid-verifier-api2 -> waltid/verifier-api2
-        imageTag.set("${project.version}")
-
-        val (user, pass) = getDockerCredentials(rootDir)
-
-        externalRegistry.set(
-            dockerHub(
-                appName = provider { project.name.removePrefix("waltid-") },
-                username = provider { user },
-                password = provider { pass }
-            )
-        )
-    }
-}
-
-
-
 configure<JibExtension> {
+    val (user, pass) = getDockerCredentials(rootDir)
+
     container {
         workingDirectory = "/${project.name}"
     }
@@ -56,6 +32,14 @@ configure<JibExtension> {
                 architecture = "arm64"
                 os = "linux"
             }
+        }
+    }
+    to {
+        image = project.name.replaceFirst("waltid-", "waltid/") // waltid-verifier-api2 -> waltid/verifier-api2
+        tags = setOf("${project.version}", "latest")
+        auth {
+            username = user
+            password = pass
         }
     }
 }
