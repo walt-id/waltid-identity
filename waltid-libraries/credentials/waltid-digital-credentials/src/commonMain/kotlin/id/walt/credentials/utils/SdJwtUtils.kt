@@ -2,9 +2,12 @@ package id.walt.credentials.utils
 
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
 
 object SdJwtUtils {
+
+    private val log = KotlinLogging.logger { }
 
     /**
      * Finds all JsonArray attributes named "_sd" recursively within this JsonObject.
@@ -100,14 +103,27 @@ object SdJwtUtils {
     fun parseDisclosureString(disclosures: String) =
         if (disclosures.isBlank()) null else
             disclosures.split("~").mapNotNull {
+                log.trace { "Parsing disclosure part: $it" }
                 if (it.isNotBlank()) {
                     val jsonArrayString = it.base64UrlDecode().decodeToString()
                     val jsonArray = Json.decodeFromString<JsonArray>(jsonArrayString)
 
+                    // Check the size of the array to determine the type of disclosure
+                    val (name, value) = when (jsonArray.size) {
+                        // Object Property Disclosure: [salt, name, value]
+                        3 -> Pair(jsonArray[1].jsonPrimitive.content, jsonArray[2])
+
+                        // Array Element Disclosure: [salt, value]
+                        // Name is null (or empty) because array elements don't have keys
+                        2 -> Pair(null, jsonArray[1])
+
+                        else -> throw IllegalArgumentException("Invalid disclosure format: size ${jsonArray.size}")
+                    }
+
                     SdJwtSelectiveDisclosure(
                         salt = jsonArray[0].jsonPrimitive.content,
-                        name = jsonArray[1].jsonPrimitive.content,
-                        value = jsonArray[2],
+                        name = name, // Ensure your data class accepts String? here
+                        value = value,
                         encoded = jsonArrayString
                     )
                 } else null
