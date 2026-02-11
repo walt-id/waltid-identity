@@ -67,7 +67,7 @@ class Verifier2RemoteSchemaTest {
         vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy(),
-                JsonSchemaPolicy(schemaUrl = Url("https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json"))
+                JsonSchemaPolicy(schemaUrl = Url("https://raw.githubusercontent.com/walt-id/waltid-identity/refs/heads/main/waltid-libraries/credentials/waltid-verification-policies2/src/commonTest/resources/ob_v3p0_achievementcredential_schema.json"))
             )
         )
     )
@@ -327,10 +327,10 @@ class Verifier2RemoteSchemaTest {
             test("Verify presentation result") {
                 assertTrue { presentationResult.isSuccess }
 
-                val resp = presentationResult.getOrThrow().jsonObject
+                val resp = presentationResult.getOrThrow()
                 println(resp)
-                assertTrue("Transmission did not succeed") { resp["transmission_success"]!!.jsonPrimitive.boolean }
-                assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                assertTrue("Transmission did not succeed") { resp.transmissionSuccess == true }
+                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 
 

@@ -54,7 +54,7 @@ object SdJwtVcPresenter {
         )
 
         // Use the disclose method from the interface, then append the KB-JWT
-        val finalPresentationString = "$disclosed~$kbJwtString"
+        val finalPresentationString = "$disclosed${if (!disclosed.endsWith("~")) "~" else ""}$kbJwtString"
         log.trace { "Final presentation string for dc+sd-jwt is: $finalPresentationString" }
 
         return JsonPrimitive(finalPresentationString)

@@ -40,6 +40,15 @@ object VerificationSessionCreator {
         val creationTarget: String? = null
     )
 
+    private suspend fun getKid(clientId: String, key: Key): String {
+        val prefix = "decentralized_identifier:"
+        val keyId = key.getKeyId()
+
+        return clientId.takeIf { it.startsWith(prefix) }
+            ?.let { "${it.substringAfter(prefix)}#$keyId" }
+            ?: keyId
+    }
+
     suspend fun createVerificationSession(
         setup: VerificationSessionSetup,
 
@@ -232,10 +241,13 @@ object VerificationSessionCreator {
         val signedAuthorizationRequest = if (isSignedRequest) {
             requireNotNull(key)
 
-            val headers = hashMapOf<String, JsonElement>("typ" to JsonPrimitive("oauth-authz-req+jwt"))
+            val headers = hashMapOf<String, JsonElement>(
+                "typ" to JsonPrimitive("oauth-authz-req+jwt"),
+                "iat" to JsonPrimitive(now.epochSeconds),
+                "kid" to JsonPrimitive(getKid(clientId, key))
+            )
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
             if (expiration != null) headers["exp"] = JsonPrimitive(expiration.epochSeconds)
-            headers["iat"] = JsonPrimitive(now.epochSeconds)
 
             key.signJws(Json.encodeToString(authorizationRequest).encodeToByteArray(), headers)
         } else null
