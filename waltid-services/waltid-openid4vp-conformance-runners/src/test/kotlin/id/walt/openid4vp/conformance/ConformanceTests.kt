@@ -8,6 +8,7 @@ import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
+// TODO: Rename to Verifier2ConformanceTests (requires change in CI script)
 class ConformanceTests {
 
     companion object {
@@ -28,7 +29,7 @@ class ConformanceTests {
 
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun runConformanceTests() = runTest(timeout = 5.minutes) {
+    fun runVerifier2ConformanceTests() = runTest(timeout = 5.minutes) {
         ConformanceTestRunner(
             verifier2UrlPrefix, conformanceHost, conformancePort
         ).run()

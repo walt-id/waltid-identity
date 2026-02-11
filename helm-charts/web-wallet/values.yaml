@@ -1,0 +1,92 @@
+api:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http-api
+  replicas: 1
+  type: ClusterIP
+  walletApi:
+    image:
+      repository: waltid/wallet-api
+      tag: latest
+      imagePullPolicy: Always
+
+pvc:
+  dataVolumeClaim:
+    accessMode: ReadWriteOnce
+    storageClass: azure-managed-standardssd-retain
+    storageRequest: 1Gi
+
+walletConfig:
+  featuresConf: |-
+    enabledFeatures = []
+  dbConf: |-
+    dataSource {
+        jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"
+        driverClassName = "org.sqlite.JDBC"
+        username = ""
+        password = ""
+        transactionIsolation = "TRANSACTION_SERIALIZABLE"
+        maximumPoolSize = 5
+        autoCommit = false
+        dataSource {
+            journalMode = "WAL"
+            fullColumnNames = false
+        }
+    }
+    recreateDatabaseOnStart = false
+  webConf: |-
+    webHost = "0.0.0.0"
+    webPort = 4545
+  oidcConf: |-
+    publicBaseUrl = "https://wallet-dev.waltid.cloud"
+    providerName = keycloak
+    oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+    oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+    authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+    accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+    logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+    clientId = "wallet_backend_prod"
+    clientSecret = "__DEFAULT_KEYCLOAK_CLIENT_SECRET__"
+    keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
+    jwksCache = {
+        cacheSize = 10
+        cacheExpirationHours = 24
+        rateLimit: {
+            bucketSize: 10
+            refillRateMinutes: 1
+        }
+    }
+  authConf: |-
+    encryptionKey = "<128 bit -- key>"
+    signKey = "<128 bit -- key>"
+    tokenKey = "<a - longer 256+ bit key or rsa private key in jwk format- here>"
+    tokenLifetime = "30"
+    audTokenClaim = "audience value"
+    issTokenClaim = "issuer value"
+
+web:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http-api
+  type: ClusterIP
+  credentialsRepository:
+    host: credentials.walt.id
+  devUi:
+    host: wallet-dev.waltid.cloud
+    image:
+      repository: waltid/waltid-dev-wallet
+      tag: latest
+      imagePullPolicy: Always
+  demoUi:
+    host: wallet.waltid.cloud
+    image:
+      repository: waltid/waltid-demo-wallet
+      tag: latest
+      imagePullPolicy: Always
+
+ingress:
+  ingressClassName: "nginx"

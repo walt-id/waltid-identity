@@ -5,15 +5,18 @@ plugins {
 
 group = "id.walt.wallet"
 
+object Versions {
+    const val KTOR_VERSION = "3.3.3"
+}
+
 kotlin {
     sourceSets {
-        val ktor_version = "3.3.3"
 
         commonMain.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
@@ -38,7 +41,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation("io.ktor:ktor-client-okhttp-jvm:$ktor_version")
+            implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

@@ -129,7 +129,7 @@ Run the following commands from the waltid-identity root path:
 
 ```bash
 # Development (local Docker daemon, single-arch)
-./gradlew :waltid-services:waltid-issuer-api:publishImageToLocalRegistry
+./gradlew :waltid-services:waltid-issuer-api:jibDockerBuild
 # image: waltid/issuer-api:<version>
 ```
 
@@ -137,7 +137,7 @@ Run the following commands from the waltid-identity root path:
 # Production (multi-arch push to your registry)
 export DOCKER_USERNAME=<your-dockerhub-namespace>
 export DOCKER_PASSWORD=<your-dockerhub-token>
-./gradlew :waltid-services:waltid-issuer-api:publishImage
+./gradlew :waltid-services:waltid-issuer-api:jib
 # image: docker.io/<DOCKER_USERNAME>/issuer-api:<version>
 ```
 
@@ -155,10 +155,16 @@ Or, run with local config directory:
 docker run -p 7002:7002 -v $PWD/waltid-services/waltid-issuer-api/config:/waltid-issuer-api/config -t waltid/issuer-api
 ```
 
+### Distributed Deployments
+
+In order to run multiple issuer instances, you must configure perisistence to use a shared redis instance. You must also configure the `ciTokenKey` to be the same for all instances.
+
+**Important**: Multiple instances require a shared `ciTokenKey` configuration to properly verify tokens across the cluster.
+
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 * Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 

@@ -43,6 +43,9 @@ jobs:
           - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s
             name: verifier
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-services/waltid-verifier-api2/k8s
+            name: verifier2
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-wallet-api/k8s
             name: web-wallet
             namespace: ${{ inputs.oss }}
@@ -56,6 +59,9 @@ jobs:
           - k8s: waltid-identity-enterprise/k8s
             name: waltid-enterprise
             namespace: ${{ inputs.enterprise }}
+          - k8s: waltid-identity-enterprise/k8s
+            name: waltid-enterprise-sandbox
+            namespace: sandbox-enterprise-main
 
     steps:
       - name: Checkout all repos with ref fallback
@@ -77,6 +83,12 @@ jobs:
         if: matrix.services.name == 'waltid-enterprise'
         run: |
           sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | 
+          sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" |
+          sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
+      - name: Prepare CD
+        if: matrix.services.name == 'waltid-enterprise-sandbox' && inputs.deployment == 'prod'
+        run: |
+          sed "s/_DEFAULT_DEPLOYMENT_/${GITHUB_SHA}/g" ${{ matrix.services.k8s }}/sandbox-aks.yaml | 
           sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g" |
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 

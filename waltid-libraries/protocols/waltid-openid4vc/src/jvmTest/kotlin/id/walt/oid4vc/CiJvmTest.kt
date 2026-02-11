@@ -51,7 +51,7 @@ class CiJvmTest {
             "UniversityDegreeCredential_jwt_vc_json" to CredentialSupported(
                 format = CredentialFormat.jwt_vc_json,
                 cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported = setOf("ES256K"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
                 display = listOf(
                     DisplayProperties(
                         name = "University Credential",
@@ -90,7 +90,7 @@ class CiJvmTest {
             "VerifiableId_ldp_vc" to CredentialSupported(
                 format = CredentialFormat.ldp_vc,
                 cryptographicBindingMethodsSupported = setOf("did"),
-                credentialSigningAlgValuesSupported = setOf("ES256K"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
                 display = listOf(DisplayProperties("Verifiable ID")),
                 credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
                 context = listOf(

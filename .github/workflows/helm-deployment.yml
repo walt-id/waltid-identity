@@ -26,12 +26,6 @@ jobs:
         with:
           repository: walt-id/waltid-identity
           ref: ${{ github.ref_name }}
-      - name: Checkout waltid-helm-charts
-        uses: actions/checkout@v6
-        with:
-          repository: walt-id/waltid-helm-charts
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
-          path: "waltid-helm-charts"
 
       - name: Create namespace if not exists
         uses: actions-hub/kubectl@master
@@ -74,11 +68,11 @@ jobs:
         run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
       - name: Helm Dependency Build
         run: |
-          helm dependency build waltid-helm-charts/waltid
+          helm dependency build ./helm-charts/waltid
       - name: Helm Deploy
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig
         run: |
-          helm upgrade --install waltid-helm-release waltid-helm-charts/waltid \
+          helm upgrade --install waltid-helm-release ./helm-charts/waltid \
             --namespace ${{ inputs.namespace }} \
             -f helm-values.json

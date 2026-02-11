@@ -4,7 +4,7 @@ import io.ktor.plugin.features.*
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 object Versions {
-    const val KTOR_VERSION = "3.3.3" // also change 1 plugin
+    const val KTOR_VERSION = "3.3.3"
     const val COROUTINES_VERSION = "1.10.2"
     const val HOPLITE_VERSION = "2.9.0"
 }
@@ -79,10 +79,10 @@ dependencies {
 
     implementation("com.nimbusds:nimbus-jose-jwt:10.6")
 
-    testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    testApi(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
-    testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
+    implementation(identityLibs.kotlintest)
+    testImplementation(identityLibs.kotlinx.coroutines.test)
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+    implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
     implementation(project(":waltid-services:waltid-verifier-api2"))

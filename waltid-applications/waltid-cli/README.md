@@ -494,7 +494,7 @@ accordingly and save it in a file called `openbadgecredential_sample.json`.
     }
   },
   "credentialSchema": {
-    "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+    "id": "https://raw.githubusercontent.com/walt-id/waltid-identity/refs/heads/main/waltid-libraries/credentials/waltid-verification-policies2/src/commonTest/resources/ob_v3p0_achievementcredential_schema.json",
     "type": "FullJsonSchemaValidator2021"
   }
 }
@@ -785,7 +785,7 @@ This project is still a work in progress. As such, not all features are already 
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 * Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 

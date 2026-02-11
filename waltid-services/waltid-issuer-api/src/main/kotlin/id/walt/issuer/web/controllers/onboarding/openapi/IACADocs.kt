@@ -283,6 +283,8 @@ object IACADocs {
                           "certificateData": {
                             "country": "US",
                             "commonName": "Example IACA",
+                            "notBefore": "2025-05-28T12:23:01Z",
+                            "notAfter": "2040-05-24T12:23:01Z",
                             "issuerAlternativeNameConf": {
                               "uri": "https://iaca.example.com"
                             }
