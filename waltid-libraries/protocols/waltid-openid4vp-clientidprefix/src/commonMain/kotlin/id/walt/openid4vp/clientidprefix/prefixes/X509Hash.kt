@@ -45,10 +45,10 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
                 throw IllegalArgumentException("Provided hash does not match certificate hash.")
             }
 
-            val metadataJson = context.clientMetadataJson
+            val metadataJson = context.clientMetadata
                 ?: throw IllegalStateException("client_metadata parameter is required.")
 
-            ClientMetadata.fromJson(metadataJson).getOrThrow()
+            metadataJson
         }.fold(
             onSuccess = { ClientValidationResult.Success(it) },
             onFailure = { ClientValidationResult.Failure(ClientIdError.X509HashMismatch) }

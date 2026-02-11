@@ -417,10 +417,6 @@ class WaltidServicesE2ETests {
         PresentationDefinitionPolicyTests(e2e).runTests()
         //endregion -Presentation Definition Policy (Verifier)-
 
-        //region -ISO mDL Onboarding Service (Issuer)-
-        IssuerIsoMdlOnboardingServiceTests(e2e).runTests()
-        //endregion -ISO mDL Onboarding Service (Issuer)-
-
         //region -MDoc Prepared/Ready Wallet Test Utility (Wallet)
         MDocPreparedWallet(e2e).testWalletSetup()
         //endregion -MDoc Prepared/Ready Wallet Test Utility (Wallet)

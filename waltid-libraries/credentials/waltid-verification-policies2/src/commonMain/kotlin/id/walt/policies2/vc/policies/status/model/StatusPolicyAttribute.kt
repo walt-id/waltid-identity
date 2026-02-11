@@ -14,7 +14,7 @@ sealed class StatusPolicyArgument
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @JsonClassDiscriminator("discriminator")
-sealed class StatusPolicyAttribute : id.walt.policies2.vc.policies.status.model.StatusPolicyArgument() {
+sealed class StatusPolicyAttribute : StatusPolicyArgument() {
     abstract val value: UInt
 }
 
@@ -24,19 +24,19 @@ data class W3CStatusPolicyAttribute(
     override val value: UInt,
     val purpose: String,
     val type: String,
-) : id.walt.policies2.vc.policies.status.model.StatusPolicyAttribute()
+) : StatusPolicyAttribute()
 
 @Serializable
 @SerialName("ietf")
 data class IETFStatusPolicyAttribute(
     override val value: UInt,
-) : id.walt.policies2.vc.policies.status.model.StatusPolicyAttribute()
+) : StatusPolicyAttribute()
 
 @Serializable
 @SerialName("w3c-list")
 data class W3CStatusPolicyListArguments(
-    val list: List<id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute>,
-) : id.walt.policies2.vc.policies.status.model.StatusPolicyArgument() {
+    val list: List<W3CStatusPolicyAttribute>,
+) : StatusPolicyArgument() {
     init {
         require(list.isNotEmpty()) { "List cannot be empty" }
         require(list.all { it.type == BITSTRING_STATUS_LIST }) {

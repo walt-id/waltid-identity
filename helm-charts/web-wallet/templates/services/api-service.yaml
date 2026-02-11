@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wallet-api.fullname" . }}-api
+spec:
+  type: {{ .Values.api.type }}
+  selector:
+    app: wallet-api
+    {{- include "wallet-api.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- .Values.api.ports | toYaml | nindent 4 }}

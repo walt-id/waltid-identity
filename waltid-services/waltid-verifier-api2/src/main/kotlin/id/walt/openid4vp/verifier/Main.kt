@@ -3,9 +3,11 @@ package id.walt.openid4vp.verifier
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.openid4vp.verifier.config.ClientMetadataHopliteDecoder
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -19,6 +21,9 @@ import io.ktor.server.sse.*
 import org.slf4j.event.Level
 
 suspend fun main(args: Array<String>) {
+    // Register custom decoder for ClientMetadata before config loading
+    ConfigManager.registerCustomDecoder(ClientMetadataHopliteDecoder())
+    
     ServiceMain(
         ServiceConfiguration("verifier"), ServiceInitialization(
             features = OSSVerifier2FeatureCatalog,

@@ -16,7 +16,7 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")

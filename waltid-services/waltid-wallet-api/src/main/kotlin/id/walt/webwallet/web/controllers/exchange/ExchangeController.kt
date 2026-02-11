@@ -7,6 +7,7 @@ import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.webwallet.db.models.WalletOperationHistory
 import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.WalletServiceManager
+import id.walt.webwallet.service.exchange.CredentialOfferCache
 import id.walt.webwallet.web.controllers.auth.getUserUUID
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
@@ -197,6 +198,9 @@ fun Application.exchange() = walletRoute {
             val request = call.receiveText()
             val reqParams = Url(request).parameters.toMap()
             val parsedOffer = wallet.resolveCredentialOffer(CredentialOfferRequest.fromHttpParameters(reqParams))
+
+            // Cache resolved offer against the original request to avoid re-fetching on accept
+            CredentialOfferCache.put(request, parsedOffer)
 
             val serializedOffer = parsedOffer.toJSONString()
 
