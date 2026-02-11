@@ -64,11 +64,23 @@ docker run \
 
 ***Build the container***
 
-Update the wallet-api container by running the following commands from the root folder:
+Update the wallet-api container by running the following commands from the waltid-identity root path:
 
 ```bash
-docker build -t waltid/wallet-api -f waltid-services/waltid-wallet-api/Dockerfile .
+# Development (local Docker daemon, single-arch)
+./gradlew :waltid-services:waltid-wallet-api:jibDockerBuild
+# image: waltid/wallet-api:<version>
 ```
+
+```bash
+# Production (multi-arch push to your registry)
+export DOCKER_USERNAME=<your-dockerhub-namespace>
+export DOCKER_PASSWORD=<your-dockerhub-token>
+./gradlew :waltid-services:waltid-wallet-api:jib
+# image: docker.io/<DOCKER_USERNAME>/wallet-api:<version>
+```
+
+Note: multi-arch images require a registry push. Local tar output is single-arch only.
 
 # Database configuration
 
@@ -130,7 +142,7 @@ docker run --name mssql -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=p@ssw0rd" -p 14
 ## Join the community
 
 * Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues ](https://github.com/walt-id/waltid-identity/issues)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
 * Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 

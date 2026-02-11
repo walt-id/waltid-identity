@@ -121,7 +121,7 @@ class TSEKey(
     )
 
     override val hasPrivateKey: Boolean
-        get() = TODO("Not yet implemented")
+        get() = true
 
     @JvmBlocking
     @JvmAsync

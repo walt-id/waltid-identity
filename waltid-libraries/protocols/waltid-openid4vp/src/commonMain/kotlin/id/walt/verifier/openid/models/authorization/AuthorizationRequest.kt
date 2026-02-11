@@ -17,6 +17,7 @@ import kotlinx.serialization.json.*
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
+@JsonIgnoreUnknownKeys
 data class AuthorizationRequest(
     // OAuth 2.0 Parameters (Section 5 and 5.2)
     /**
@@ -148,12 +149,19 @@ data class AuthorizationRequest(
 ) {
 
     fun toHttpUrl(url: URLBuilder = URLBuilder("openid4vp://authorize")): Url {
-        val values = Json.encodeToJsonElement(this).jsonObject
+        val json = Json { encodeDefaults = false }
+        val values = json.encodeToJsonElement(this).jsonObject
             .entries
             .filterNot { it.value == JsonNull }
 
         values.forEach { (key, value) ->
-            url.parameters.append(key, if (value is JsonPrimitive) value.jsonPrimitive.content else value.toString())
+            val paramValue = when (value) {
+                is JsonPrimitive -> value.content
+                is JsonObject -> json.encodeToString(JsonObject.serializer(), value)
+                is JsonArray -> json.encodeToString(JsonArray.serializer(), value)
+                else -> value.toString()
+            }
+            url.parameters.append(key, paramValue)
         }
         return url.build()
     }

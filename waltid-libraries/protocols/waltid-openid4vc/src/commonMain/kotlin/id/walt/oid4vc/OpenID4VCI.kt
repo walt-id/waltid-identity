@@ -6,6 +6,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.ByteStringElement
@@ -122,7 +123,8 @@ object OpenID4VCI {
 
             offerReq.credentialOfferUri != null -> {
                 runCatching {
-                    http.get(offerReq.credentialOfferUri) }.getOrElse { ex ->
+                    http.get(offerReq.credentialOfferUri)
+                }.getOrElse { ex ->
                     throw UnresolvableCredentialOfferException(offerReq.credentialOfferUri, ex)
                 }.bodyAsText().let { text ->
                     runCatching { CredentialOffer.fromJSONString(text) }.getOrElse { ex ->
@@ -163,8 +165,8 @@ object OpenID4VCI {
         }.buildString()
     }
 
-    suspend fun resolveCIProviderMetadata(credOffer: CredentialOffer) =
-        resolveCIProviderMetadata(credOffer.credentialIssuer)
+    suspend fun resolveCIProviderMetadata(credentialOffer: CredentialOffer) =
+        resolveCIProviderMetadata(credentialOffer.credentialIssuer)
 
     suspend fun resolveCIProviderMetadata(issuerBaseUrl: String) =
         http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {
@@ -550,6 +552,26 @@ object OpenID4VCI {
                 },
                 customParameters = customParameters!!
             )
+
+            OpenID4VCIVersion.V1 -> OpenIDProviderMetadata.Draft13(
+                issuer = baseUrl,
+                authorizationEndpoint = "$baseUrl/authorize",
+                tokenEndpoint = "$baseUrl/token",
+                credentialEndpoint = "$baseUrl/credential",
+                deferredCredentialEndpoint = "$baseUrl/credential_deferred",
+                jwksUri = "$baseUrl/jwks",
+                grantTypesSupported = setOf(GrantType.authorization_code),
+                credentialIssuer = baseUrl,
+                responseTypesSupported = setOf(
+                    ResponseType.Code.value,
+                ),
+                codeChallengeMethodsSupported = listOf("S256"),
+                credentialConfigurationsSupported = credentialSupported,
+                customParameters = customParameters!!,
+//                authorizationServers = setOf(baseUrl),
+                nonceEndpoint = "$baseUrl/nonce",
+
+                )
         }
     }
 
@@ -658,22 +680,30 @@ object OpenID4VCI {
                 message = "Proof must be JWT proof"
             )
 
-        val holderKid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content
+        val holderKey = when {
 
-        val holderKey = proofHeader[JWTClaims.Header.jwk]?.jsonObject
+            JWTClaims.Header.jwk in proofHeader -> {
+                val holderJwk = requireNotNull(proofHeader[JWTClaims.Header.jwk])
+                JWKKey.importJWK(holderJwk.toString()).getOrThrow()
+            }
 
-        if (holderKey.isNullOrEmpty() && holderKid.isNullOrEmpty()) throw CredentialError(
-            credentialRequest = credentialRequest,
-            errorCode = CredentialErrorCode.invalid_or_missing_proof,
-            message = "Proof JWT header must contain kid or jwk claim"
-        )
+            JWTClaims.Header.keyID in proofHeader -> {
+                val holderKid = requireNotNull(proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive).content
+                require(DidUtils.isDidUrl(holderKid))
+                DidService.resolveToKey(holderKid.substringBefore("#")).getOrThrow()
 
-        val holderDid =
-            if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
+            }
 
-        val holderKeyJWK = JWKKey.importJWK(holderKey.toString()).getOrNull()?.exportJWKObject()
-            ?.plus(JWTClaims.Header.keyID to JWKKey.importJWK(holderKey.toString()).getOrThrow().getKeyId())
-            ?.toJsonObject()
+            else -> throw CredentialError(
+                credentialRequest = credentialRequest,
+                errorCode = CredentialErrorCode.invalid_or_missing_proof,
+                message = "Proof JWT header must contain kid or jwk claim"
+            )
+        }
+
+        val holderDid = proofHeader[JWTClaims.Header.keyID]?.jsonPrimitive?.content.let {
+            if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
+        }
 
         val sdPayload = SDPayload.createSDPayload(
             fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
@@ -697,13 +727,15 @@ object OpenID4VCI {
             disclosureMap = selectiveDisclosure ?: SDMap(mapOf())
         )
 
-        val cnf = holderDid?.let { buildJsonObject { put(JWTClaims.Header.keyID, holderDid) } }
-            ?: holderKeyJWK?.let { buildJsonObject { put("jwk", holderKeyJWK) } }
-            ?: throw IllegalArgumentException("Either holderKey or holderDid must be given")
+        val holderKeyJson = holderKey.exportJWKObject().plus(
+            JWTClaims.Header.keyID to holderKey.getKeyId().toJsonElement()
+        ).toJsonObject()
 
         val defaultPayloadProperties = defaultPayloadProperties(
             issuerId = issuerId,
-            cnf = cnf,
+            cnf = buildJsonObject {
+                put("jwk", holderKeyJson)
+            },
             vct = credentialRequest.vct
                 ?: throw CredentialError(
                     credentialRequest = credentialRequest,
@@ -807,12 +839,13 @@ object OpenID4VCI {
 
 enum class OpenID4VCIVersion(val versionString: String) {
     DRAFT11("draft11"),
-    DRAFT13("draft13");
+    DRAFT13("draft13"),
+    V1("v1");
 
     companion object {
         fun from(version: String): OpenID4VCIVersion {
             return entries.find { it.versionString == version }
-                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: DRAFT13 -> draft13 and DRAFT11 -> draft11")
+                ?: throw IllegalArgumentException("Unsupported version: $version. Supported Versions are: DRAFT13 -> draft13, DRAFT11 -> draft11, V1 -> v1")
         }
     }
 }

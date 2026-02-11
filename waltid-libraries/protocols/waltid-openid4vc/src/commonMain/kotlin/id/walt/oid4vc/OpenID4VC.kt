@@ -73,12 +73,10 @@ object OpenID4VC {
 
         val requiredClaims = setOf(
             JWTClaims.Payload.subject,
-            JWTClaims.Payload.audience,
             JWTClaims.Payload.issuer
         )
 
         val isValid = requiredClaims.all { it in payload } &&
-                payload[JWTClaims.Payload.audience]?.jsonPrimitive?.content == target.name &&
                 payload[JWTClaims.Payload.issuer]?.jsonPrimitive?.content == issuer
 
         return if (isValid) payload else throw IllegalStateException("Invalid token")

@@ -1,17 +1,26 @@
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package id.waltid.openid4vp.wallet
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
+import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
+import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
+import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
+import id.walt.openid4vp.clientidprefix.ClientValidationResult
+import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
@@ -31,6 +40,9 @@ import io.ktor.util.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -121,6 +133,24 @@ object WalletPresentFunctionality2 {
         return Json.encodeToString(JsonObject(vpTokenMapContents))
     }
 
+    @Serializable
+    data class WalletPresentResult(
+        @SerialName("get_url")
+        val getUrl: String? = null,
+
+        @SerialName("form_post_html")
+        val formPostHtml: String? = null,
+
+
+        @SerialName("transmission_success")
+        val transmissionSuccess: Boolean? = null,
+        @SerialName("verifier_response")
+        val verifierResponse: JsonElement? = null,
+
+        @SerialName("redirect_to")
+        val redirectTo: String? = null
+    )
+
     suspend fun walletPresentHandling(
         holderKey: Key,
         holderDid: String?,
@@ -134,11 +164,11 @@ object WalletPresentFunctionality2 {
         // TODO: selected credentials
 
         /**
-         *  TEMPORARY: Fallback for application/oauth-authz-req+jwt
+         *  Fallback for ancient legacy tests, wrong integration tests, and various other stuff that should have long been removed
          *  Use: `OldWalletPresentFunctionality.oldWalletPresentHandling(walletService, presentationRequestUrl, request)` for this
          */
-        temporaryFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null
-    ): Result<JsonElement> {
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null
+    ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
 
         log.trace { "Wallet presentation will use key $holderKey, and did $holderDid" }
@@ -156,18 +186,61 @@ object WalletPresentFunctionality2 {
                     ?: throw IllegalArgumentException("AuthorizationRequest does not have HTTP ContentType header set: $requestUri")
             log.trace { "Retrieved response has content type: $authorizationRequestContentType" }
 
-            when {
+
+            val retrievedAuthorizationRequest = when {
                 authorizationRequestContentType.match("application/oauth-authz-req+jwt") -> {
-                    // Fallback for E2E test
-                    if (temporaryFallbackCallback != null) {
-                        return temporaryFallbackCallback(presentationRequestUrl)
+
+                    val authReqJwt = httpResponse.bodyAsText()
+                    require(authReqJwt.isJwt()) { "Response for AuthorizationRequest should be JWT, but is not a valid JWT" }
+                    val authReqJws = authReqJwt.decodeJws()
+                    val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.content
+                    log.trace { "JWT AuthorizationRequest algorithm: $jwtAlg" }
+
+                    if (jwtAlg.equals("none", true)) {
+                        Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                    } else {
+                        val authReqBody = authReqJws.payload
+
+                        val clientId = authReqBody["client_id"]?.jsonPrimitive?.contentOrNull
+                        log.trace { "AuthorizationRequest is signed, authentication with client ID: $clientId" }
+                        require(clientId != null) { "Missing client_id for signed AuthorizationRequest authentication" }
+
+                        val clientIdPrefix = ClientIdPrefixParser.parse(clientId)
+                            .getOrElse { e -> throw IllegalArgumentException("Could not parse client id prefix: $clientId", e) }
+                        log.trace { "Parsed client id prefix: $clientIdPrefix" }
+
+                        val clientMetadata = authReqBody["client_metadata"]?.let {
+                            ClientMetadata.fromJson(it)
+                                .getOrElse { e -> throw IllegalArgumentException("Could not parse client metadata: $it", e) }
+                        }
+
+                        val redirectUri = authReqBody["redirect_uri"]?.jsonPrimitive?.contentOrNull
+                        val responseUri = authReqBody["response_uri"]?.jsonPrimitive?.contentOrNull
+
+                        val context = RequestContext(
+                            clientId = clientId,
+                            clientMetadata = clientMetadata,
+                            requestObjectJws = authReqJwt,
+                            redirectUri = redirectUri,
+                            responseUri = responseUri
+                        )
+
+                        val result = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)
+                        when (result) {
+                            is ClientValidationResult.Failure -> {
+                                if (result.error is ClientIdError.PreRegisteredClientNotFound && legacyFallbackCallback != null) {
+                                    val fallbackResult = runCatching { legacyFallbackCallback(presentationRequestUrl) }
+                                    if (fallbackResult.isSuccess && fallbackResult.getOrThrow().isSuccess)
+                                        return Result.success(WalletPresentResult(transmissionSuccess = true, verifierResponse = fallbackResult.getOrThrow().getOrThrow()))
+                                }
+
+                                throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")
+                            }
+
+                            is ClientValidationResult.Success -> Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                        }
                     }
-                    TODO("Handle signed AuthorizationRequest (JWT)")
 
-                    // 1. Fetching the JWT string from
-                    // httpResponse.bodyAsText().
-
-                    // 2. Parse the JWT
 
                     // 3. Verifying the JWT's signature The key for verification depends on the client_id prefix used by the Verifier (e.g., from DID document if client_id is a DID, from X.509 if x509_san_dns, from OpenID Federation metadata).
 
@@ -180,8 +253,9 @@ object WalletPresentFunctionality2 {
                     }.getOrThrow()
                 }
 
-                else -> throw IllegalArgumentException("Invalid ContentType \"$authorizationRequestContentType\" for AuthorizationRequest retrieved from: $presentationRequestUrl")
+                else -> throw IllegalArgumentException("Invalid ContentType \"$authorizationRequestContentType\" for AuthorizationRequest retrieved from \"$presentationRequestUrl\", content is: ${runCatching { httpResponse.bodyAsText() }.getOrElse { "(could not read http response body)" }}")
             }
+            retrievedAuthorizationRequest
         } else {
             val parsedParameters = JsonObject(presentationRequestUrl.parameters.flattenEntries().associate { (k, v) ->
                 k to Json.parseToJsonElement(v)
@@ -273,9 +347,11 @@ object WalletPresentFunctionality2 {
                 log.trace { "Responding with fragment redirect to: $redirectUrl" }
 
                 // We return the URL for the client to handle the redirect.
-                return Result.success(buildJsonObject {
-                    put("get_url", JsonPrimitive(redirectUrl))
-                })
+                return Result.success(
+                    WalletPresentResult(
+                        getUrl = redirectUrl
+                    )
+                )
             }
 
             OpenID4VPResponseMode.QUERY -> {
@@ -302,9 +378,11 @@ object WalletPresentFunctionality2 {
                 log.trace { "Responding with query redirect to: $redirectUrl" }
 
                 // We return the URL for the client to handle the redirect.
-                return Result.success(buildJsonObject {
-                    put("get_url", JsonPrimitive(redirectUrl))
-                })
+                return Result.success(
+                    WalletPresentResult(
+                        getUrl = redirectUrl
+                    )
+                )
             }
 
             OpenID4VPResponseMode.FORM_POST -> {
@@ -337,9 +415,11 @@ object WalletPresentFunctionality2 {
                 log.trace { "Responding with self-submitting HTML form to post to: ${authorizationRequest.redirectUri}" }
 
                 // For a pure API, we return the HTML for the client to render in a WebView.
-                return Result.success(buildJsonObject {
-                    put("form_post_html", JsonPrimitive(htmlContent))
-                })
+                return Result.success(
+                    WalletPresentResult(
+                        formPostHtml = htmlContent
+                    )
+                )
             }
 
             // authorizationRequest.responseUri
@@ -355,25 +435,81 @@ object WalletPresentFunctionality2 {
 
                 log.trace { "Submitting direct_post form to Verifier: ${authorizationRequest.responseUri}" }
                 val response = http.submitForm(authorizationRequest.responseUri!!, parameters)
+                log.trace { "Verifier direct_post response: $response" }
 
                 val responseBody = response.bodyAsText()
+                log.trace { "Verifier direct_post response body: $responseBody" }
 
                 val responseBodyJson = runCatching { Json.decodeFromString<JsonObject>(responseBody) }
 
-                return Result.success(buildJsonObject {
-                    put("transmission_success", JsonPrimitive(response.status.isSuccess()))
-                    put(
-                        "verifier_response", Json.parseToJsonElement(responseBody)
+                return Result.success(
+                    WalletPresentResult(
+                        transmissionSuccess = response.status.isSuccess(),
+                        verifierResponse = Json.parseToJsonElement(responseBody),
+                        redirectTo = responseBodyJson.getOrThrow()["redirect_uri"]?.jsonPrimitive?.content
                     )
-                    if (responseBodyJson.getOrNull()?.containsKey("redirect_uri") == true) {
-                        put("redirect_to", responseBodyJson.getOrThrow()["redirect_uri"] ?: JsonNull)
-                    }
-                })
+                )
             }
 
             OpenID4VPResponseMode.DIRECT_POST_JWT -> {
                 // Encrypt the vp_token and state into a JWE, then POST response=<JWE_string>.
-                TODO()
+                require(authorizationRequest.responseUri != null) {
+                    "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post.jwt'."
+                }
+
+                // 1. Get Encryption Metadata
+                val clientMetadata = authorizationRequest.clientMetadata
+                    ?: throw IllegalArgumentException("client_metadata is required for direct_post.jwt to obtain encryption keys")
+
+                // 2. Select Verifier's Public Key
+                // We prefer a key explicitly marked for encryption ('use': 'enc'), otherwise fall back to the first available key.
+                val verifierJwkData = clientMetadata.jwks?.keys?.firstOrNull { it["use"]?.jsonPrimitive?.content == "enc" }
+                    ?: clientMetadata.jwks?.keys?.firstOrNull()
+                    ?: throw IllegalArgumentException("No suitable encryption key found in client_metadata jwks")
+
+                // Import into JWKKey
+                val verifierKey = JWKKey.importJWK(verifierJwkData.toString()).getOrThrow()
+
+                // 3. Select Encryption Algorithm (enc)
+                // Spec says default is A128GCM if not specified
+                val encAlg = clientMetadata.encryptedResponseEncValuesSupported?.firstOrNull() ?: "A128GCM"
+
+                // 4. Construct Payload
+                // 'vpToken' is currently a JSON String. We parse it to JsonElement to embed it correctly in the JSON Object.
+                val vpTokenElement = Json.parseToJsonElement(vpToken)
+
+                val payloadJson = buildJsonObject {
+                    put("vp_token", vpTokenElement)
+                    authorizationRequest.state?.let { put("state", it) }
+                }
+
+                // 5. Encrypt
+                // Uses the Verifier's public key to encrypt the payload
+                val jweString = verifierKey.encryptJwe(payloadJson.toString().encodeToByteArray(), encAlg)
+
+                // 6. Send Response
+                // The body contains a single 'response' parameter with the JWE
+                val parameters = ParametersBuilder().apply {
+                    append("response", jweString)
+                }.build()
+
+                log.trace { "Submitting direct_post.jwt (encrypted) to Verifier: ${authorizationRequest.responseUri}" }
+                val response = http.submitForm(authorizationRequest.responseUri!!, parameters)
+
+                log.trace { "Verifier direct_post.jwt response status: ${response.status}" }
+
+                // 7. Process Response (Same as direct_post)
+                val responseBody = response.bodyAsText()
+                val responseBodyJson = runCatching { Json.decodeFromString<JsonObject>(responseBody) }
+
+                return Result.success(
+                    WalletPresentResult(
+                        transmissionSuccess = response.status.isSuccess(),
+                        verifierResponse = Json.parseToJsonElement(responseBody),
+                        redirectTo = responseBodyJson.getOrThrow()["redirect_uri"]?.jsonPrimitive?.content
+                    )
+                )
+
             }
 
             // DC API

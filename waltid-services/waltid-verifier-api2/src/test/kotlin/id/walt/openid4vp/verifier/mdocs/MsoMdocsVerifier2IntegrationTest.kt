@@ -28,7 +28,7 @@ import id.walt.openid4vp.verifier.data.VerificationSessionSetup
 import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.openid4vp.verifier.verifierModule
 import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialDataMatcherPolicy
+import id.walt.policies2.vc.policies.RegexPolicy
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
@@ -84,7 +84,7 @@ class MsoMdocsVerifier2IntegrationTest {
         vc_policies = VCPolicyList(
             listOf(
                 CredentialSignaturePolicy(),
-                CredentialDataMatcherPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")
+                RegexPolicy(path = "$.['org.iso.23220.dtc.1'].dtc_version", regex = """^("[0-9]+"|-?[0-9]+(\.[0-9]+)?)$""")
             )
         )
     )
@@ -310,9 +310,9 @@ class MsoMdocsVerifier2IntegrationTest {
             test("Verify presentation result") {
                 assertTrue { presentationResult.isSuccess }
 
-                val resp = presentationResult.getOrThrow().jsonObject
-                assertTrue("Transmission success is false") { resp["transmission_success"]!!.jsonPrimitive.boolean }
-                assertTrue { resp["verifier_response"]!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
+                val resp = presentationResult.getOrThrow()
+                assertTrue("Transmission success is false") { resp.transmissionSuccess == true }
+                assertTrue { resp.verifierResponse!!.jsonObject["status"]!!.jsonPrimitive.content == "received" }
             }
 
 

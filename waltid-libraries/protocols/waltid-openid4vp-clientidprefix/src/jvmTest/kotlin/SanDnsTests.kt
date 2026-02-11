@@ -19,7 +19,7 @@ class SanDnsTests {
         // 2. Context: Client claims to be 'verifier.example.com'
         val context = RequestContext(
             clientId = "x509_san_dns:verifier.example.com",
-            clientMetadataJson = validMetadataJson,
+            clientMetadataString = validMetadataJson,
             requestObjectJws = signedJws
         )
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
@@ -44,7 +44,7 @@ class SanDnsTests {
         // 2. Context: Client claims to be 'wrong.example.com'
         val context = RequestContext(
             clientId = "x509_san_dns:wrong.example.com",
-            clientMetadataJson = validMetadataJson,
+            clientMetadataString = validMetadataJson,
             requestObjectJws = signedJws
         )
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()

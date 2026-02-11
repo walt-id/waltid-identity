@@ -43,7 +43,7 @@ expect class JWKKey(jwk: String?, _keyId: String? = null) : Key {
     override suspend fun verifyJws(signedJws: String): Result<JsonElement>
 
     suspend fun decryptJwe(jweString: String): ByteArray
-    suspend fun encryptJwe(plaintext: ByteArray): String
+    suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String
 
     /*
     /**
