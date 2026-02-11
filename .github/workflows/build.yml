@@ -9,9 +9,9 @@ concurrency:
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@5eed6553d3d796a4230c0e662d631f428c2c7717
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@6f15f719a6820cf631bce0399a89b3f060302d3d
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@b13b88e7430f57946d065ea875352b2586d01246
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@dc1fe980edefa8711c265113325a1ace3cd5e73d
     secrets: inherit
     needs: version
     with:
@@ -43,14 +43,14 @@ jobs:
   ebsi-ct-v3:
     # disabled job because of ebsi certificate issues (expired certificate)
     if: false
-    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@70e59bbea44de0b3511bb6bd72faa553e92f7bcf
+    uses: walt-id/waltid-identity/.github/workflows/ebsictv3.yml@f7b6a96ba6391317d5ad07b0d4589dfbad1770bf
     needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
       artifact: issuer-api
       tag: "waltid/issuer-api:${{ needs.version.outputs.release_version }}"
   compose-test:
-    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@e01a65dfa72a3615f8273cadeb4e86f723129cba
+    uses: walt-id/waltid-identity/.github/workflows/docker-compose-testing.yml@f7b6a96ba6391317d5ad07b0d4589dfbad1770bf
     needs: [ version, docker, api-docker ]
     secrets: inherit
     with:
