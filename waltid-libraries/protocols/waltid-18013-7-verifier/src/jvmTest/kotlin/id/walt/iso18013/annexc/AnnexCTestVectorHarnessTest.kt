@@ -1,7 +1,9 @@
 package id.walt.iso18013.annexc
 
-import id.walt.iso18013.annexc.cbor.Base64UrlNoPad
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.iso18013.annexc.TestResources.createJwkKeyFromRawHex
 import id.walt.mdoc.objects.sha256
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -41,9 +43,9 @@ class AnnexCTestVectorHarnessTest {
     fun `ANNEXC-REAL-001 loads and is structurally sane`() {
         val v = loadVector("annex-c/ANNEXC-REAL-001.json")
 
-        Base64UrlNoPad.decode(v.deviceRequestB64)
-        Base64UrlNoPad.decode(v.encryptionInfoB64)
-        Base64UrlNoPad.decode(v.encryptedResponseB64)
+        v.deviceRequestB64.base64UrlDecode()
+        v.encryptionInfoB64.base64UrlDecode()
+        v.encryptedResponseB64.base64UrlDecode()
 
         assertTrue(v.origin.startsWith("http"), "origin must be a serialized origin string")
     }
@@ -71,15 +73,15 @@ class AnnexCTestVectorHarnessTest {
     }
 
     @Test
-    fun `ANNEXC-REAL-001 decrypt hash matches expected (if provided)`() {
+    fun `ANNEXC-REAL-001 decrypt hash matches expected (if provided)`() = runTest {
         val v = loadVector("annex-c/ANNEXC-REAL-001.json")
-        if (v.expected.deviceResponseCborSha256Hex.isBlank()) return
+        if (v.expected.deviceResponseCborSha256Hex.isBlank()) return@runTest
 
         val plaintext = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
             encryptedResponseB64 = v.encryptedResponseB64,
             encryptionInfoB64 = v.encryptionInfoB64,
             origin = v.origin,
-            recipientPrivateKey = hexToBytes(v.recipientPrivateKeyHex),
+            recipientPrivateKey = createJwkKeyFromRawHex(v.recipientPrivateKeyHex)
         )
         val hashHex = plaintext.sha256().joinToString("") { "%02x".format(it.toInt() and 0xff) }
         assertEquals(v.expected.deviceResponseCborSha256Hex, hashHex)

@@ -5,7 +5,7 @@ package id.walt.iso18013.annexc
 import id.walt.cose.Cose
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
-import id.walt.iso18013.annexc.cbor.Base64UrlNoPad
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
 import kotlin.test.Test
@@ -32,8 +32,8 @@ class AnnexCRequestBuilderTest {
             intentToRetain = false
         )
 
-        val deviceRequestCbor = Base64UrlNoPad.decode(req.deviceRequestB64)
-        val encryptionInfoCbor = Base64UrlNoPad.decode(req.encryptionInfoB64)
+        val deviceRequestCbor = req.deviceRequestB64.base64UrlDecode()
+        val encryptionInfoCbor = req.encryptionInfoB64.base64UrlDecode()
 
         val deviceRequest = coseCompliantCbor.decodeFromByteArray(DeviceRequest.serializer(), deviceRequestCbor)
         assertEquals("1.0", deviceRequest.version)

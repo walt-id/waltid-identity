@@ -4,7 +4,7 @@ package id.walt.iso18013.annexc
 
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
-import id.walt.iso18013.annexc.cbor.Base64UrlNoPad
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionParameters
@@ -21,7 +21,7 @@ data class AnnexCRequest(
 
 object AnnexCRequestBuilder {
     private const val DCAPI = "dcapi"
-    private const val DEVICE_REQUEST_VERSION = "1.0"
+    const val DEVICE_REQUEST_VERSION = "1.0"
 
     fun build(
         docType: String,
@@ -40,8 +40,8 @@ object AnnexCRequestBuilder {
         )
 
         return AnnexCRequest(
-            deviceRequestB64 = Base64UrlNoPad.encode(deviceRequestCbor),
-            encryptionInfoB64 = Base64UrlNoPad.encode(encryptionInfoCbor),
+            deviceRequestB64 = deviceRequestCbor.encodeToBase64Url(),
+            encryptionInfoB64 = encryptionInfoCbor.encodeToBase64Url(),
         )
     }
 

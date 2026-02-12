@@ -11,7 +11,7 @@ object Versions {
 }
 
 kotlin {
-  
+
     sourceSets {
         commonMain.dependencies {
             // Coroutines
@@ -34,7 +34,7 @@ kotlin {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.cbor)
 
             /*
              * walt.id:
@@ -45,6 +45,12 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:web:waltid-ktor-notifications-core"))
+
+            implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
+        }
+
+        jvmMain.dependencies {
+            implementation(project(":waltid-libraries:crypto:waltid-cose"))
         }
 
         commonTest.dependencies {

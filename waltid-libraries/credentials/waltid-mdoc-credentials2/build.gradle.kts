@@ -29,7 +29,7 @@ kotlin {
 
             // CBOR
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.cbor)
             implementation("net.orandja.obor:obor:2.1.3")
 
             // Crypto

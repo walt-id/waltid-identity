@@ -43,7 +43,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         jvmMain.dependencies {
-
+            implementation(identityLibs.nimbus.jose.jwt)
         }
         jvmTest.dependencies {
             // Logging

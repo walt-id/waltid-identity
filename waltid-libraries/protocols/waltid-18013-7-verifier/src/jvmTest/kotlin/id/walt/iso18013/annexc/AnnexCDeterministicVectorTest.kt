@@ -2,11 +2,20 @@
 
 package id.walt.iso18013.annexc
 
+import com.nimbusds.jose.jwk.Curve
+import com.nimbusds.jose.jwk.ECKey
+import com.nimbusds.jose.util.Base64URL
 import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.iso18013.annexc.TestResources.createJwkKeyFromRawHex
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.bouncycastle.jce.ECNamedCurveTable
+import org.bouncycastle.util.encoders.Hex
+import java.math.BigInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -34,8 +43,9 @@ class AnnexCDeterministicVectorTest {
 
     private val json = Json { ignoreUnknownKeys = true }
 
+
     @Test
-    fun `ANNEXC-DETERMINISTIC-001 transcript hash and HPKE decrypt match`() {
+    fun `ANNEXC-DETERMINISTIC-001 transcript hash and HPKE decrypt match`() = runTest {
         val v = loadVector("annex-c/ANNEXC-DETERMINISTIC-001.json")
 
         val hpkeInfo = AnnexCTranscriptBuilder.computeHpkeInfo(v.encryptionInfoB64, v.origin)
@@ -46,7 +56,7 @@ class AnnexCDeterministicVectorTest {
             encryptedResponseB64 = v.encryptedResponseB64,
             encryptionInfoB64 = v.encryptionInfoB64,
             origin = v.origin,
-            recipientPrivateKey = hexToBytes(v.recipientPrivateKeyHex),
+            recipientPrivateKey = createJwkKeyFromRawHex(v.recipientPrivateKeyHex)
         )
         assertEquals(v.expected.deviceResponseCborSha256Hex, plaintext.sha256().toHex())
 

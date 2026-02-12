@@ -1,5 +1,7 @@
 package id.walt.iso18013.annexc
 
+import id.walt.crypto.keys.jwk.JWKKey
+
 /**
  * Implementations must:
  * - parse CBOR EncryptedResponse = ["dcapi",{enc,cipherText}]
@@ -7,11 +9,11 @@ package id.walt.iso18013.annexc
  * - HPKE-decrypt to DeviceResponse CBOR bytes
  */
 interface AnnexCResponseVerifier {
-    fun decryptToDeviceResponse(
+    suspend fun decryptToDeviceResponse(
         encryptedResponseB64: String,
         encryptionInfoB64: String,
         origin: String,
-        recipientPrivateKey: ByteArray
+        recipientPrivateKey: JWKKey
     ): ByteArray
 }
 

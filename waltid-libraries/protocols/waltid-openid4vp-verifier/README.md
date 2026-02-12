@@ -102,7 +102,7 @@ Here's a step-by-step guide to integrating the verifier library into your applic
 Create a `Verification2Session` when you need to request credentials. Define your requirements using DCQL.
 
 ```kotlin
-import id.walt.openid4vp.verifier.Verifier2Manager
+import id.walt.verifier2.Verifier2Manager
 import id.walt.dcql.models.*
 
 // 1. Define your credential requirements using DCQL
@@ -161,8 +161,8 @@ This is where the Wallet POSTs the `vp_token`. This is where validation happens 
 When the Wallet POSTs the presentation, parse it and validate each credential.
 
 ```kotlin
-import id.walt.openid4vp.verifier.Verifier2PresentationValidator
-import id.walt.openid4vp.verifier.Verifier2Response
+import id.walt.verifier2.Verifier2PresentationValidator
+import id.walt.verifier2.Verifier2Response
 
 // Example using Ktor
 post("/api/v2/verification/{sessionId}/response") {

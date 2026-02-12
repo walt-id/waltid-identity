@@ -36,8 +36,10 @@ data class AnnexCEncryptedResponseData(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AnnexCEncryptedResponseData) return false
+
         if (!enc.contentEquals(other.enc)) return false
         if (!cipherText.contentEquals(other.cipherText)) return false
+
         return true
     }
 
