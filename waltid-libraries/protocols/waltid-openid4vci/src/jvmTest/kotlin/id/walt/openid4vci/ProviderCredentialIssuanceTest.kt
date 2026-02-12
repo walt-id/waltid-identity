@@ -5,6 +5,8 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -140,9 +142,22 @@ class ProviderCredentialIssuanceTest {
             put("family_name", "Doe")
         }
 
+        val credentialConfigurations = mapOf(
+            credentialId to CredentialConfiguration(
+                format = CredentialFormat.SD_JWT_VC,
+                vct = credentialId,
+            )
+        )
+        val issuerMetadata = CredentialIssuerMetadata(
+            credentialIssuer = "https://issuer.example",
+            credentialEndpoint = "https://issuer.example/credential",
+            credentialConfigurationsSupported = credentialConfigurations,
+        )
+        val configuration = issuerMetadata.getCredentialConfiguration(credentialId)
+            ?: error("Missing credential configuration for $credentialId")
         val credentialResponse = provider.createCredentialResponse(
             request = credentialRequest,
-            format = CredentialFormat.SD_JWT_VC,
+            configuration = configuration,
             issuerKey = issuerKey,
             issuerId = issuerId,
             credentialData = credentialData,

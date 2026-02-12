@@ -42,11 +42,15 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                     OAuthError("invalid_request", "Missing JWT proof in proofs"),
                 )
             val proof = ProofOfPossession.JWTProofBuilder(issuerId).build(proofJwt)
+            val vct = configuration.vct
+                ?: return CredentialResponseResult.Failure(
+                    OAuthError("invalid_request", "Missing vct for SD-JWT VC credential configuration"),
+                )
             val sdJwt = OpenID4VCI.generateSdJwtVC(
                 credentialRequest = id.walt.oid4vc.requests.CredentialRequest(
                     format = oid4vcFormat,
                     proof = proof,
-                    vct = configuration.id,
+                    vct = vct,
                 ),
                 credentialData = credentialData,
                 issuerId = issuerId,

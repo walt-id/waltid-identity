@@ -1,6 +1,5 @@
 package id.walt.openid4vci.core
 
-import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
@@ -181,27 +180,16 @@ class DefaultOAuth2Provider(
 
     override suspend fun createCredentialResponse(
         request: CredentialRequest,
-        format: CredentialFormat,
+        configuration: CredentialConfiguration,
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
     ): CredentialResponseResult {
-        val configurationId = request.credentialConfigurationId ?: request.credentialIdentifier
-            ?: return CredentialResponseResult.Failure(
-                OAuthError(
-                    error = "invalid_request",
-                    description = "credential_identifier or credential_configuration_id is required",
-                )
-            )
-        val configuration = CredentialConfiguration(
-            id = configurationId,
-            format = format,
-        )
-        val handler = config.credentialEndpointHandlers.get(format)
+        val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
                 OAuthError(
                     error = "unsupported_credential_configuration",
-                    description = "No handler for format ${format.value}"
+                    description = "No handler for format ${configuration.format.value}"
                 )
             )
         return handler.sign(request, configuration, issuerKey, issuerId, credentialData)

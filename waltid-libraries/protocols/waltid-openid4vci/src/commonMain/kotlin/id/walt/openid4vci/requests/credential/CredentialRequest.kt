@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
  * - proofs: proof object from the wallet (only JWT proofs are handled for now)
  * - session: subject and any issuance context
  * - issClaim: issuer identifier (DID/base URL) to use for signing
- * - format is supplied when calling createCredentialResponse for now
+ * - credential configuration is supplied when calling createCredentialResponse for now
  */
 interface CredentialRequest {
     val id: String
