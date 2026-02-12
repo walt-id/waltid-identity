@@ -4,22 +4,24 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.*
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.policies2.vp.policies.VPPolicy2
+import id.walt.policies2.vp.policies.VPPolicyRunner
+import id.walt.policies2.vp.policies.VerificationSessionContext
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import id.walt.verifier2.verification.Verifier2PresentationValidator
-import id.walt.policies2.vp.policies.VPPolicy2
-import id.walt.policies2.vp.policies.VPPolicyRunner
-import id.walt.policies2.vp.policies.VerificationSessionContext
-import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 object PresentationVerificationEngine {
 
@@ -60,7 +62,9 @@ object PresentationVerificationEngine {
             responseMode = responseMode!!,
             isSigned = session.signedAuthorizationRequestJwt != null,
             isEncrypted = isEncrypted,
-            jwkThumbprint = jwkThumbprint
+            jwkThumbprint = jwkThumbprint,
+            isAnnexC = session.setup is DcApiAnnexCFlowSetup,
+            customData = session.data as? JsonObject
         )
 
         return VPPolicyRunner.verifyPresentation(
@@ -290,6 +294,10 @@ object PresentationVerificationEngine {
 
         val presentationValidationResult = verifyAllPresentations(parsedPresentations, session)
 
+        session.updateSession(SessionEvent.presentation_validation_available) {
+            presentationValidationResults = presentationValidationResult
+        }
+
         val anyError = presentationValidationResult.any { it.value.any { it.value.errors.isNotEmpty() } }
 
         if (anyError) {
@@ -303,7 +311,8 @@ object PresentationVerificationEngine {
                 }
             }
 
-            val firstError = presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
+            val firstError =
+                presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
             log.warn { "First error: $firstError" }
 
             session.failSession(SessionEvent.presentation_validation_failed)
@@ -372,7 +381,7 @@ object PresentationVerificationEngine {
             specificVcPolicies = credentialPolicyResults.specificVcPolicies,
         )
 
-        session.updateSession(SessionEvent.policy_results_available) {
+        session.updateSession(SessionEvent.credential_policy_results_available) {
             this.policyResults = verificationSessionPolicyResults
             this.status = when {
                 verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL

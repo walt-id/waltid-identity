@@ -77,7 +77,7 @@ class AnnexCTestVectorHarnessTest {
         val v = loadVector("annex-c/ANNEXC-REAL-001.json")
         if (v.expected.deviceResponseCborSha256Hex.isBlank()) return@runTest
 
-        val plaintext = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+        val plaintext = AnnexCResponseVerifier.decryptToDeviceResponse(
             encryptedResponseB64 = v.encryptedResponseB64,
             encryptionInfoB64 = v.encryptionInfoB64,
             origin = v.origin,

@@ -9,7 +9,6 @@ import id.walt.crypto.keys.jwk.JWKKey
  * - HPKE-decrypt to DeviceResponse CBOR bytes
  */
 
-@Suppress("KotlinNoActualForExpect") // HPKE JS
 expect object AnnexCResponseVerifier {
     suspend fun decryptToDeviceResponse(
         encryptedResponseB64: String,

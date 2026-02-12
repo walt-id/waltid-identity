@@ -7,6 +7,7 @@ import id.walt.credentials.presentations.formats.VerifiablePresentation
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
@@ -94,7 +95,10 @@ data class Verification2Session(
      * Policies
      */
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
+    @SerialName("policy_results")
     var policyResults: Verifier2PolicyResults? = null,
+    @SerialName("presentation_validation_results")
+    var presentationValidationResults: Map<String, Map<String, VPPolicy2.PolicyRunResult>>? = null,
 
     val redirects: VerificationSessionRedirects? = null,
 

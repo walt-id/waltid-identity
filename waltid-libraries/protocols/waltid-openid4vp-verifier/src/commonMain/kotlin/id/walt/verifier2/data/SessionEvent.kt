@@ -7,7 +7,8 @@ enum class SessionEvent {
     parsed_presentation_available,
     validated_credentials_available,
     presentation_fulfils_dcql_query,
-    policy_results_available,
+    presentation_validation_available,
+    credential_policy_results_available,
     dcql_fulfillment_check_failed,
     presentation_validation_failed,
     data_retention_purge

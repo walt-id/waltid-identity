@@ -95,7 +95,7 @@ class AnnexCHpkeDecryptTest {
         )
         val encryptedResponseB64 = encryptedResponseCbor.encodeToBase64Url()
 
-        val decrypted = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+        val decrypted = AnnexCResponseVerifier.decryptToDeviceResponse(
             encryptedResponseB64 = encryptedResponseB64,
             encryptionInfoB64 = encryptionInfoB64,
             origin = origin,
@@ -142,7 +142,7 @@ class AnnexCHpkeDecryptTest {
         val encryptedResponseB64 = encryptedResponseCbor.encodeToBase64Url()
 
         assertFailsWith<IllegalArgumentException> {
-            AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+            AnnexCResponseVerifier.decryptToDeviceResponse(
                 encryptedResponseB64 = encryptedResponseB64,
                 encryptionInfoB64 = encryptionInfoB64,
                 origin = origin,

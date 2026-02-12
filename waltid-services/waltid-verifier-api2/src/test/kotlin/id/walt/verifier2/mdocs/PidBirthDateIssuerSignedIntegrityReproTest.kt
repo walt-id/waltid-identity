@@ -102,5 +102,6 @@ class PidBirthDateIssuerSignedIntegrityReproTest {
         isSigned = true,
         isEncrypted = false,
         jwkThumbprint = null,
+        isAnnexC = false
     )
 }

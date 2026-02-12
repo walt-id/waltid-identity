@@ -52,7 +52,7 @@ class AnnexCDeterministicVectorTest {
         val transcriptHashHex = hpkeInfo.sha256().toHex()
         assertEquals(v.expected.sessionTranscriptCborSha256Hex, transcriptHashHex)
 
-        val plaintext = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+        val plaintext = AnnexCResponseVerifier.decryptToDeviceResponse(
             encryptedResponseB64 = v.encryptedResponseB64,
             encryptionInfoB64 = v.encryptionInfoB64,
             origin = v.origin,
