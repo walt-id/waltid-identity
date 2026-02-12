@@ -73,9 +73,9 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-openapi:5.3.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.3.0")
-    implementation("io.github.smiley4:ktor-redoc:5.3.0")
+    implementation("io.github.smiley4:ktor-openapi:5.5.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.5.0")
+    implementation("io.github.smiley4:ktor-redoc:5.5.0")
 
     // JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
