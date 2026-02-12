@@ -14,6 +14,25 @@ class DcApiTest {
     val request1 = """
     {
       "id": "610965bb-3b17-4e70-90c7-45bd4c26b282",
+      "setup": {
+        "flow_type": "dc_api",
+        "core": {
+          "dcql_query": {
+            "credentials": [
+              {
+                "id": "my_mdl",
+                "format": "mso_mdoc",
+                "multiple": false,
+                "meta": {
+                  "doctype_value": "org.iso.18013.5.1.mDL",
+                  "format": "mso_mdoc"
+                }
+              }
+            ]
+          }
+        },
+        "expectedOrigins": [ ]
+      },
       "creationDate": "2025-11-25T10:06:42.799351130Z",
       "expirationDate": "2025-11-25T10:11:42.799351130Z",
       "retentionDate": "2035-11-25T10:06:42.799351130Z",
@@ -59,7 +78,7 @@ class DcApiTest {
             }
           ]
         },
-        "client_metadata": {},
+        "client_metadata": { },
         "expected_origins": [
           "https://digital-credentials.walt.id"
         ]
@@ -94,7 +113,7 @@ class DcApiTest {
             "id": "signature"
           }
         ],
-        "specific_vc_policies": {}
+        "specific_vc_policies": { }
       }
     }
     """.trimIndent()
