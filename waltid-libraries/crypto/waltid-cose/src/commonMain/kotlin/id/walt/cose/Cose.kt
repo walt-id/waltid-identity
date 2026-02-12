@@ -3,7 +3,6 @@
 package id.walt.cose
 
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

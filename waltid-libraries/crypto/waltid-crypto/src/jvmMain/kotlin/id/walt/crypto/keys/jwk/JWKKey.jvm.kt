@@ -600,7 +600,7 @@ actual class JWKKey actual constructor(
      * Decrypts a payload using HPKE (RFC 9180) Base Mode.
      * Expects input to be [encapsulated_key][ciphertext].
      */
-    suspend fun decryptHpke(cipherTextWithEnc: ByteArray, info: ByteArray?, aad: ByteArray?): ByteArray {
+    fun decryptHpke(cipherTextWithEnc: ByteArray, info: ByteArray?, aad: ByteArray?): ByteArray {
         check(hasPrivateKey) { "Private key required for decryption." }
 
         // 1. Configure HPKE

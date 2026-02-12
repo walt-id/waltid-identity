@@ -1,7 +1,6 @@
 package id.walt.mdoc.verification
 
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * A data class to hold the context required for a specific verification transaction.

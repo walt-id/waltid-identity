@@ -2,8 +2,6 @@
 
 package id.walt.iso18013.annexc
 
-import id.walt.cose.Cose
-import id.walt.cose.CoseKey
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.KeyType
