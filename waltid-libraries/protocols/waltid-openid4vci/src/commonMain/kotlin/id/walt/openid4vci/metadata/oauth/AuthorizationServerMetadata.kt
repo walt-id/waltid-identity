@@ -3,7 +3,6 @@ package id.walt.openid4vci.metadata.oauth
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
-import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KeepGeneratedSerializer
@@ -96,7 +95,7 @@ data class AuthorizationServerMetadata(
             "Authorization server issuer must not be blank"
         }
 
-        // RFC 8414 §2: issuer must be a valid https URL without query/fragment.
+        // RFC 8414 §2: issuer must be a valid URL without query/fragment.
         validateIssuerUrl(issuer)
 
         // RFC 8414 §2: response_types_supported is REQUIRED.
@@ -153,8 +152,8 @@ data class AuthorizationServerMetadata(
             }
         }
 
-        // RFC 8414 §2: Validate HTTPS scheme in the jwks_uri
-        jwksUri?.let { validateHttpsUrl("jwks_uri", it) }
+        // RFC 8414 §2: Validate jwks_uri if present
+        jwksUri?.let { validateUrl("jwks_uri", it) }
 
         customParameters?.let { params ->
             require(params.keys.none { it in AuthorizationServerMetadataSerializer.knownKeys }) {
@@ -195,9 +194,6 @@ data class AuthorizationServerMetadata(
 
         private fun validateIssuerUrl(issuer: String) {
             val url = Url(issuer)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "Authorization server issuer must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "Authorization server issuer must include a host"
             }
@@ -215,11 +211,8 @@ data class AuthorizationServerMetadata(
             }
         }
 
-        private fun validateHttpsUrl(fieldName: String, value: String) {
+        private fun validateUrl(fieldName: String, value: String) {
             val url = Url(value)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "Authorization server $fieldName must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "Authorization server $fieldName must include a host"
             }

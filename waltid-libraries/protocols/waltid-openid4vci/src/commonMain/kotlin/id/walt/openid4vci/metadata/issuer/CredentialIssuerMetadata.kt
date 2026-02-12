@@ -1,6 +1,5 @@
 package id.walt.openid4vci.metadata.issuer
 
-import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KeepGeneratedSerializer
@@ -146,9 +145,6 @@ data class CredentialIssuerMetadata(
 
         private fun validateIssuerUrl(issuer: String) {
             val url = Url(issuer)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "Credential issuer must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "Credential issuer must include a host"
             }
@@ -165,9 +161,6 @@ data class CredentialIssuerMetadata(
                 "Credential issuer $fieldName must not be blank"
             }
             val url = Url(value)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "Credential issuer $fieldName must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "Credential issuer $fieldName must include a host"
             }

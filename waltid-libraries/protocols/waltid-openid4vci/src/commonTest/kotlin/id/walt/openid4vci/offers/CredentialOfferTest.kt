@@ -93,16 +93,10 @@ class CredentialOfferTest {
 
     @Test
     fun `credential offer rejects invalid issuer identifiers`() {
-        // OpenID4VCI: issuer identifier must be an https URL without query/fragment components.
+        // issuer identifier must be a URL without query/fragment components.
         assertFailsWith<IllegalArgumentException> {
             CredentialOffer.withAuthorizationCodeGrant(
                 credentialIssuer = "",
-                credentialConfigurationIds = listOf("cred-id-1"),
-            )
-        }
-        assertFailsWith<IllegalArgumentException> {
-            CredentialOffer.withAuthorizationCodeGrant(
-                credentialIssuer = "http://issuer.example",
                 credentialConfigurationIds = listOf("cred-id-1"),
             )
         }

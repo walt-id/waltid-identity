@@ -3,7 +3,6 @@ package id.walt.openid4vci.metadata.oidc
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
-import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KeepGeneratedSerializer
@@ -106,7 +105,7 @@ data class OpenIDProviderMetadata(
     val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
-        // OpenID Connect Discovery §3: issuer is REQUIRED and must be https without query/fragment.
+        // OpenID Connect Discovery §3: issuer is REQUIRED and must be a URL without query/fragment.
         require(issuer.isNotBlank()) { "OpenID issuer must not be blank" }
         validateIssuerUrl(issuer)
         validateEndpointUrl("authorization_endpoint", authorizationEndpoint)
@@ -230,9 +229,6 @@ data class OpenIDProviderMetadata(
 
         private fun validateIssuerUrl(issuer: String) {
             val url = Url(issuer)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "OpenID issuer must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "OpenID issuer must include a host"
             }
@@ -249,9 +245,6 @@ data class OpenIDProviderMetadata(
                 "OpenID $fieldName must not be blank"
             }
             val url = Url(value)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "OpenID $fieldName must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "OpenID $fieldName must include a host"
             }

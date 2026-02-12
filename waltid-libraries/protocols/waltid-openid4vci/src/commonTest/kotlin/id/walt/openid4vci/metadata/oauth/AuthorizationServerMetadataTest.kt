@@ -10,15 +10,7 @@ import kotlin.test.assertFailsWith
 class AuthorizationServerMetadataTest {
 
     @Test
-    fun `issuer must be https without query or fragment`() {
-        assertFailsWith<IllegalArgumentException> {
-            AuthorizationServerMetadata(
-                issuer = "http://issuer.example",
-                authorizationEndpoint = "https://issuer.example/authorize",
-                tokenEndpoint = "https://issuer.example/token",
-                responseTypesSupported = setOf(ResponseType.CODE.value),
-            )
-        }
+    fun `issuer must not include query or fragment`() {
         assertFailsWith<IllegalArgumentException> {
             AuthorizationServerMetadata(
                 issuer = "https://issuer.example?x=1",
@@ -73,19 +65,7 @@ class AuthorizationServerMetadataTest {
         }
     }
 
-    @Test
-    fun `jwks uri must be https if present`() {
-        assertFailsWith<IllegalArgumentException> {
-            AuthorizationServerMetadata(
-                issuer = "https://issuer.example",
-                authorizationEndpoint = "https://issuer.example/authorize",
-                tokenEndpoint = "https://issuer.example/token",
-                responseTypesSupported = setOf("code"),
-                jwksUri = "http://issuer.example/jwks",
-            )
-        }
-    }
-
+    // jwks_uri can be any scheme; validation only ensures host and no fragment
     @Test
     fun `fromBaseUrl populates required defaults`() {
         val metadata = AuthorizationServerMetadata.fromBaseUrl("https://issuer.example")

@@ -14,16 +14,7 @@ import kotlin.test.assertFailsWith
 class CredentialIssuerMetadataTest {
 
     @Test
-    fun `credential issuer must be https without query or fragment`() {
-        assertFailsWith<IllegalArgumentException> {
-            CredentialIssuerMetadata(
-                credentialIssuer = "http://issuer.example",
-                credentialEndpoint = "https://issuer.example/credential",
-                credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
-                ),
-            )
-        }
+    fun `credential issuer must not include query or fragment`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialIssuerMetadata(
                 credentialIssuer = "https://issuer.example?x=1",
@@ -44,18 +35,7 @@ class CredentialIssuerMetadataTest {
         }
     }
 
-    @Test
-    fun `credential endpoint must be https`() {
-        assertFailsWith<IllegalArgumentException> {
-            CredentialIssuerMetadata(
-                credentialIssuer = "https://issuer.example",
-                credentialEndpoint = "http://issuer.example/credential",
-                credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
-                ),
-            )
-        }
-    }
+    // credential_endpoint can be any scheme; validation only ensures host is present
 
     @Test
     fun `credential configurations supported must not be empty`() {
@@ -69,7 +49,7 @@ class CredentialIssuerMetadataTest {
     }
 
     @Test
-    fun `authorization servers must be https and non-empty when provided`() {
+    fun `authorization servers must be non-empty and without query or fragment when provided`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
@@ -87,7 +67,7 @@ class CredentialIssuerMetadataTest {
                 credentialConfigurationsSupported = mapOf(
                     "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
-                authorizationServers = listOf("http://auth.example"),
+                authorizationServers = listOf("https://auth.example?x=1"),
             )
         }
     }

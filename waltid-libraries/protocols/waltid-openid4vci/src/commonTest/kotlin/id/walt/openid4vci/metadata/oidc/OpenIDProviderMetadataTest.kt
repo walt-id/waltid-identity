@@ -10,18 +10,7 @@ import kotlin.test.assertFailsWith
 class OpenIDProviderMetadataTest {
 
     @Test
-    fun `issuer must be https without query or fragment`() {
-        assertFailsWith<IllegalArgumentException> {
-            OpenIDProviderMetadata(
-                issuer = "http://issuer.example",
-                authorizationEndpoint = "https://issuer.example/authorize",
-                tokenEndpoint = "https://issuer.example/token",
-                jwksUri = "https://issuer.example/jwks",
-                responseTypesSupported = setOf(ResponseType.CODE.value),
-                subjectTypesSupported = setOf("public"),
-                idTokenSigningAlgValuesSupported = setOf("RS256"),
-            )
-        }
+    fun `issuer must not include query or fragment`() {
         assertFailsWith<IllegalArgumentException> {
             OpenIDProviderMetadata(
                 issuer = "https://issuer.example?x=1",
@@ -92,19 +81,7 @@ class OpenIDProviderMetadataTest {
     }
 
     @Test
-    fun `jwks uri must be https`() {
-        assertFailsWith<IllegalArgumentException> {
-            OpenIDProviderMetadata(
-                issuer = "https://issuer.example",
-                authorizationEndpoint = "https://issuer.example/authorize",
-                tokenEndpoint = "https://issuer.example/token",
-                jwksUri = "http://issuer.example/jwks",
-                responseTypesSupported = setOf(ResponseType.CODE.value),
-                subjectTypesSupported = setOf("public"),
-                idTokenSigningAlgValuesSupported = setOf("RS256"),
-            )
-        }
-    }
+    // jwks_uri can be any scheme; validation only ensures host is present
 
     @Test
     fun `subject types must be public or pairwise`() {

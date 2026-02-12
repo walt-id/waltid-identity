@@ -1,7 +1,6 @@
 package id.walt.openid4vci.offers
 
 import id.walt.openid4vci.GrantType
-import io.ktor.http.URLProtocol
 import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -78,9 +77,6 @@ data class CredentialOffer(
                 "Credential issuer must not be blank"
             }
             val url = Url(issuer)
-            require(url.protocol == URLProtocol.HTTPS) {
-                "Credential issuer must use https scheme"
-            }
             require(url.host.isNotBlank()) {
                 "Credential issuer must include a host"
             }
