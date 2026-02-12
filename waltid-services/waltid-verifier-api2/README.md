@@ -107,7 +107,7 @@ Docker images:
 
 ```bash
 # Development (local Docker daemon, single-arch)
-./gradlew :waltid-services:waltid-verifier-api2:publishImageToLocalRegistry
+./gradlew :waltid-services:waltid-verifier-api2:jibDockerBuild
 # image: waltid/verifier-api2:<version>
 ```
 
@@ -115,7 +115,7 @@ Docker images:
 # Production (multi-arch push to your registry)
 export DOCKER_USERNAME=<your-dockerhub-namespace>
 export DOCKER_PASSWORD=<your-dockerhub-token>
-./gradlew :waltid-services:waltid-verifier-api2:publishImage
+./gradlew :waltid-services:waltid-verifier-api2:jib
 # image: docker.io/<DOCKER_USERNAME>/verifier-api2:<version>
 ```
 

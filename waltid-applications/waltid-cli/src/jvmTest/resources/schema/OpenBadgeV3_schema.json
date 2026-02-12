@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2019-09/schema#",
-  "$id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+  "$id": "https://raw.githubusercontent.com/walt-id/waltid-identity/refs/heads/main/waltid-libraries/credentials/waltid-verification-policies2/src/commonTest/resources/ob_v3p0_achievementcredential_schema.json",
   "title": "JSON Schema for the AchievementCredential class.",
   "description": "AchievementCredentials are representations of an awarded achievement, used to share information about a achievement belonging to one earner. Maps to a Verifiable Credential as defined in the [[VC-DATA-MODEL]]. As described in [[[#data-integrity]]], at least one proof mechanism, and the details necessary to evaluate that proof, MUST be expressed for a credential to be a verifiable credential. In the case of an embedded proof, the credential MUST append the proof in the `proof` property.",
   "type": "object",

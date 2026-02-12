@@ -47,11 +47,11 @@ sealed class VPPolicy2() {
         val policyExecuted: VPPolicy2,
 
         val success: Boolean,
-        val results: Map<String, JsonElement>,
+        var results: Map<String, JsonElement>,
         val errors: List<PolicyRunError>,
 
         @SerialName("execution_time")
-        val executionTime: Duration
+        val executionTime: Duration,
     )
 
     internal suspend fun runPolicy(

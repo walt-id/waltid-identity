@@ -7,7 +7,7 @@ import korlibs.io.compression.uncompress
 
 class BitstringStatusListExpansionAlgorithm(
     private val base64UrlHandler: Base64UrlHandler,
-) : id.walt.policies2.vc.policies.status.expansion.StatusListExpansionAlgorithm {
+) : StatusListExpansionAlgorithm {
     override suspend operator fun invoke(bitstring: String): ByteArray {
         val base64UrlResult = base64UrlHandler.decodeBase64Url(bitstring)
         require(base64UrlResult.type == Base64UrlType.Multibase) { "Expecting multibase base64-url, got regular base64-url: $bitstring" }

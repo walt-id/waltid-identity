@@ -79,6 +79,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
+    testImplementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))

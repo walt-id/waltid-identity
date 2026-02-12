@@ -52,14 +52,6 @@ data class GeneralFlowConfig(
     init {
         // Verify if DCQL Query is correct
         dcqlQuery.precheck()
-
-        if (signedRequest) {
-            requireNotNull(key) { "Requested signed request, but did not provide a key (to sign request with)!" }
-        }
-
-        if (encryptedResponse) {
-            requireNotNull(key) { "Requested encrypted response, but did not provide a key (to decrypt response with)!" }
-        }
     }
 }
 

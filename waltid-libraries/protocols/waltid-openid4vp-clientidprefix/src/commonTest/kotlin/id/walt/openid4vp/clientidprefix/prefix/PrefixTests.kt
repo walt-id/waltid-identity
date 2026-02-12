@@ -48,7 +48,7 @@ class PrefixTests {
     fun `redirect_uri should succeed for unsigned request with metadata`() = runTest {
         val context = RequestContext(
             clientId = "redirect_uri:https://app.example.com/callback",
-            clientMetadataJson = validMetadataJson,
+            clientMetadataString = validMetadataJson,
             requestObjectJws = null // Unsigned
         )
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
@@ -63,7 +63,7 @@ class PrefixTests {
     fun `redirect_uri should fail if request is signed`() = runTest {
         val context = RequestContext(
             clientId = "redirect_uri:https://app.example.com/callback",
-            clientMetadataJson = validMetadataJson,
+            clientMetadataString = validMetadataJson,
             requestObjectJws = "dummy.jws.string" // Signed request is not allowed
         )
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
@@ -96,7 +96,7 @@ class PrefixTests {
         // Create context and authenticate
         val context = RequestContext(
             clientId = "decentralized_identifier:did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiUEJ2M1R4djZ0YVhOczEwWTVHMjltZFJhYjMwTFVpYzdtbmxTUjlMamlVTSIsIngiOiJXeGREdFJJVHYxdW9LU2V5bTg3d3FyTnRtV2ZuNEptVkhsdHNCMEctUFRzIiwieSI6IjBPUmZjNGwyYV9wSWJtUXlTTU13eDF2cVNoRW9lVmpnQnpsUWRJQW5IbkkifQ",
-            clientMetadataJson = validMetadataJson,
+            clientMetadataString = validMetadataJson,
             requestObjectJws = signedJws
         )
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()

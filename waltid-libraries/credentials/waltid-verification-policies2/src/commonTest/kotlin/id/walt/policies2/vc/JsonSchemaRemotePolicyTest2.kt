@@ -10,7 +10,7 @@ import kotlin.test.Test
 class JsonSchemaRemotePolicyTest2 : BasePolicyTest() {
 
     companion object {
-        private val SCHEMA_URL = Url("https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json")
+        private val SCHEMA_URL = Url("https://raw.githubusercontent.com/walt-id/waltid-identity/refs/heads/main/waltid-libraries/credentials/waltid-verification-policies2/src/commonTest/resources/ob_v3p0_achievementcredential_schema.json")
     }
 
     override val policy = JsonSchemaPolicy(schemaUrl = SCHEMA_URL)

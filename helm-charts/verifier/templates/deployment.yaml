@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "verifier.fullname" . }}
+  labels:
+    {{- include "verifier.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: verifier
+    {{- include "verifier.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: verifier
+      {{- include "verifier.labels" . | nindent 8 }}
+      annotations:
+        deployment/id: _DEFAULT_DEPLOYMENT_    
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: verifier
+        image: {{ .Values.api.verifierApi.image.repository }}:{{ .Values.api.verifierApi.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.verifierApi.image.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        ports:
+          - name: http-api
+            containerPort: 3000
+        volumeMounts:
+        - mountPath: /waltid-verifier-api/config/
+          name: verifier-web-config
+          readOnly: true
+      volumes:
+      - configMap:
+          name: {{ include "verifier.fullname" . }}-web-config
+        name: verifier-web-config

@@ -1,0 +1,86 @@
+issuer:
+  ingress:
+    ingressClassName: "nginx"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - issuer.portal.test.waltid.cloud
+        secretName: issuer-portal-tls
+    host: issuer.portal.test.waltid.cloud
+
+verifier:
+  webConfig:
+    verifierServiceConf: baseUrl = "https://verifier.portal.test.waltid.cloud"
+    entraConf:  callbackUrl = "https://verifier.portal.test.waltid.cloud/entra/verification-callback/"
+  ingress:
+    ingressClassName: "nginx"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - verifier.portal.test.waltid.cloud
+        secretName: verifier-portal-tls
+    host: verifier.portal.test.waltid.cloud
+
+portal:
+  env:
+    NEXT_PUBLIC_VC_REPO: "https://credentials.walt.id"
+    NEXT_PUBLIC_ISSUER: "https://issuer.portal.test.waltid.cloud"
+    NEXT_PUBLIC_VERIFIER: "https://verifier.portal.test.waltid.cloud"
+    NEXT_PUBLIC_WALLET: "https://wallet.test.waltid.cloud"
+  ingress:
+    ingressClassName: "nginx"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - portal.test.waltid.cloud
+        secretName: portal-tls
+    host: portal.test.waltid.cloud
+
+web-wallet:
+  pvc:
+    dataVolumeClaim:
+      accessMode: ReadWriteOnce
+      storageClass: azure-managed-standardssd-retain
+      storageRequest: 1Gi
+  walletConfig:
+    oidcConf: |-
+      publicBaseUrl = "https://wallet-dev.test.waltid.cloud"
+      providerName = keycloak
+      oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
+      oidcJwks = "${oidcRealm}/protocol/openid-connect/certs"
+      authorizeUrl = "${oidcRealm}/protocol/openid-connect/auth"
+      accessTokenUrl = "${oidcRealm}/protocol/openid-connect/token"
+      logoutUrl = "${oidcRealm}/protocol/openid-connect/logout"
+      clientId = "wallet_backend_prod"
+      clientSecret = "__DEFAULT_KEYCLOAK_CLIENT_SECRET__"
+      keycloakUserApi = "https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users"
+      jwksCache = {
+          cacheSize = 10
+          cacheExpirationHours = 24
+          rateLimit: {
+              bucketSize: 10
+              refillRateMinutes: 1
+          }
+      }
+    authConf: |-
+      encryptionKey = "oshaaddgtwcqvcsg"
+      signKey = "gyccmrunkqwnzswl"
+      tokenKey = "bsbybnzroezpsttdeerwjiymkqzzlxqz"
+      tokenLifetime = "30"
+      audTokenClaim = "https://wallet.walt.id"
+      issTokenClaim = "https://wallet.walt.id"
+  web:
+    credentialsRepository:
+      host: credentials.walt.id
+    devUi:
+      host: wallet-dev.test.waltid.cloud
+    demoUi:
+      host: wallet.test.waltid.cloud
+  ingress:
+    ingressClassName: "nginx"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - wallet-dev.test.waltid.cloud
+          - wallet.test.waltid.cloud
+        secretName: web-wallet-tls

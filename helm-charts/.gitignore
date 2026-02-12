@@ -1,0 +1,70 @@
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine metadata, swingui
+.vmoptions
+
+# Gradle files
+.gradle
+/build/
+
+# Maven files
+/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.backup
+pom.xml.bak
+
+# Intellij IDEA
+.idea/
+*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+/nbproject/private/
+/build/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# VS Code
+.vscode/
+
+# Emacs and other editor backups
+*~
+\#*\#
+.*.un~
+.project.bak
+.classpath.bak
+
+# Temporary files
+*.tmp
+*.bak
+
+# OS generated files #
+.DS_Store
+ehthumbs.db
+Thumbs.db
+
+# Other
+/.history/

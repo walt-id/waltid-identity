@@ -73,7 +73,7 @@ private inline fun <reified T> jsonElement(value: T): JsonElement =
 
 object Verifier2Service {
 
-    val sessions = HashMap<String, Verification2Session>()
+    val sessions = ConcurrentHashMap<String, Verification2Session>()
     private val sessionFlowTypes = ConcurrentHashMap<String, String>()
 
     /**

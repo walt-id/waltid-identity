@@ -9,5 +9,6 @@ enum class SessionEvent {
     presentation_fulfils_dcql_query,
     policy_results_available,
     dcql_fulfillment_check_failed,
-    presentation_validation_failed
+    presentation_validation_failed,
+    data_retention_purge
 }
