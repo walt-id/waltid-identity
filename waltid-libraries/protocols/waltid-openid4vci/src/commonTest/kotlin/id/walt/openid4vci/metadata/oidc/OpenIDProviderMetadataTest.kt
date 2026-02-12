@@ -81,9 +81,6 @@ class OpenIDProviderMetadataTest {
     }
 
     @Test
-    // jwks_uri can be any scheme; validation only ensures host is present
-
-    @Test
     fun `subject types must be public or pairwise`() {
         assertFailsWith<IllegalArgumentException> {
             OpenIDProviderMetadata(
