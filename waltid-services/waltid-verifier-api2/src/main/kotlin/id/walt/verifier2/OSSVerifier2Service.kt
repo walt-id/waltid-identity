@@ -36,7 +36,6 @@ import kotlin.uuid.ExperimentalUuidApi
 
 private val log = logger("Verifier2Service")
 private const val VERIFICATION_SESSION = "verification-session"
-private const val SESSION_ID = "sessionId"
 private const val VICAL = "vical"
 private const val ENVELOPE_QUERY_PARAM = "envelope"
 
@@ -155,7 +154,7 @@ object Verifier2Service {
                                 body<String> { description = "" /* TODO */ }
                             }
                         }) { body ->
-                        val sessionId = call.parameters.getOrFail(SESSION_ID)
+                        val sessionId = call.parameters.getOrFail(VERIFICATION_SESSION)
                         log.trace { "Received verification session response to session: $sessionId" }
                         val verificationSession = sessions[sessionId]
 

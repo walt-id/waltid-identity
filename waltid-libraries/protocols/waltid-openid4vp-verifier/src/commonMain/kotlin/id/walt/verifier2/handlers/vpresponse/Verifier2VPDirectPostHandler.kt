@@ -1,18 +1,26 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.iso18013.annexc.AnnexCResponseVerifier
+import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
+import id.walt.mdoc.objects.sha256
+import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verifier2Response
 import id.walt.verifier2.utils.JsonUtils.parseAsJsonObject
 import id.walt.verifier2.verification2.PresentationVerificationEngine
-import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -24,47 +32,78 @@ object Verifier2VPDirectPostHandler {
 
     suspend fun parseResponseBody(
         responseMode: OpenID4VPResponseMode?,
-
         responseData: DirectPostResponse,
-
+        session: Verification2Session,
         ephemeralDecryptionKey: DirectSerializedKey?
     ): Pair<String, String?> = when (responseData) {
-
         is DcApiJsonDirectPostResponse -> {
-            require(responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) { "Used body response, but responseMode is not for DC API" }
-            val bodyJson = responseData.jsonBody
-            //val protocol = bodyJson["protocol"].jsonPrimitive.content
+            if (session.setup is DcApiAnnexCFlowSetup) {
+                // Annex C handling
 
-            /*when (protocol) {
-                "openid4vp-v1-signed"
-                else -> NotImplementedError("Protocol \"$protocol\" is not supported.")
-            }*/
+                log.debug { "ANNEX C HANDLING: $responseData" }
 
-            val bodyData = bodyJson["data"] ?: bodyJson["credential"]?.jsonObject["data"]
-            ?: throw IllegalArgumentException("Missing $.data/$.credential.data in posted JSON body of DC API response")
+                val encryptionInfoB64 = session.data?.jsonObject["data"]?.jsonObject["encryptionInfo"]?.jsonPrimitive?.content
+                    ?: throw IllegalArgumentException("Missing encryption info data")
 
-            val vpToken = bodyData.jsonObject["vp_token"]?.jsonObject?.toString()
-            val response = bodyData.jsonObject["response"]?.jsonPrimitive?.content
+                val hpkeInfo = AnnexCTranscriptBuilder.computeHpkeInfo(encryptionInfoB64, session.setup.origin)
+                val transcriptHashHex = hpkeInfo.sha256().toHexString()
+                log.debug { "Transcript hash: $transcriptHashHex" }
 
-            if (vpToken == null && response == null) {
-                throw IllegalArgumentException("Missing $.data.vp_token or response in posted JSON body of DC API response")
-            }
-
-            if (vpToken != null) {
-                vpToken to null
-            } else if (response != null) {
-                val (vpToken, state) = parseResponseBody(
-                    responseMode = responseMode,
-                    responseData = EncryptedResponseStringDirectPostResponse(response),
-                    ephemeralDecryptionKey = ephemeralDecryptionKey
+                val plaintext = AnnexCResponseVerifier.decryptToDeviceResponse(
+                    encryptedResponseB64 = responseData.jsonBody["response"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing 'response' attribute in Annex C JSON response from wallet"),
+                    encryptionInfoB64 = encryptionInfoB64,
+                    origin = session.setup.origin,
+                    recipientPrivateKey = ephemeralDecryptionKey?.key as? JWKKey
+                        ?: error("Missing ephemeral decryption key for Annex C")
                 )
-                vpToken to state
+
+                val virtualVpToken = mapOf("annex_c" to listOf(plaintext.encodeToBase64Url()))
+                //val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(plaintext)
+                //require("1.0" == deviceResponse.version)
+                //require(0u == deviceResponse.status)
+                //println("Device response: $deviceResponse")
+
+
+                Json.encodeToString(virtualVpToken) to null
             } else {
-                throw IllegalArgumentException("Missing any response content")
+                require(responseMode in OpenID4VPResponseMode.DC_API_RESPONSES) { "Used body response, but responseMode is not for DC API" }
+                val bodyJson = responseData.jsonBody
+                //val protocol = bodyJson["protocol"].jsonPrimitive.content
+
+                /*when (protocol) {
+                    "openid4vp-v1-signed"
+                    else -> NotImplementedError("Protocol \"$protocol\" is not supported.")
+                }*/
+
+                val bodyData = bodyJson["data"] ?: bodyJson["credential"]?.jsonObject["data"]
+                ?: throw IllegalArgumentException("Missing $.data/$.credential.data in posted JSON body of DC API response")
+
+                val vpToken = bodyData.jsonObject["vp_token"]?.jsonObject?.toString()
+                val response = bodyData.jsonObject["response"]?.jsonPrimitive?.content
+
+                if (vpToken == null && response == null) {
+                    throw IllegalArgumentException("Missing $.data.vp_token or response in posted JSON body of DC API response")
+                }
+
+                if (vpToken != null) {
+                    vpToken to null
+                } else if (response != null) {
+                    val (vpToken, state) = parseResponseBody(
+                        responseMode = responseMode,
+                        responseData = EncryptedResponseStringDirectPostResponse(response),
+                        session = session,
+                        ephemeralDecryptionKey = ephemeralDecryptionKey
+                    )
+                    vpToken to state
+                } else {
+                    throw IllegalArgumentException("Missing any response content")
+                }
             }
+
         }
 
         is EncryptedResponseStringDirectPostResponse -> {
+
             require(responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
                 "Called encrypted flow, but responseMode is not for encrypted response"
             }
@@ -184,10 +223,12 @@ object Verifier2VPDirectPostHandler {
 
         val session = verificationSession
         val responseMode = session.authorizationRequest.responseMode
+        val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
         val (vpTokenString, receivedState) = parseResponseBody(
             responseMode = responseMode,
             responseData = responseData,
+            session = session,
             ephemeralDecryptionKey = session.ephemeralDecryptionKey
         )
 

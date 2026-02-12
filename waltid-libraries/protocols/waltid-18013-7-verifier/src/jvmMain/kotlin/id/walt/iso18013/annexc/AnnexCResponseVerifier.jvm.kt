@@ -1,5 +1,3 @@
-@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
-
 package id.walt.iso18013.annexc
 
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
@@ -8,9 +6,8 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 
-object AnnexCResponseVerifierJvm : AnnexCResponseVerifier {
-
-    override suspend fun decryptToDeviceResponse(
+actual object AnnexCResponseVerifier {
+    actual suspend fun decryptToDeviceResponse(
         encryptedResponseB64: String,
         encryptionInfoB64: String,
         origin: String,
@@ -50,5 +47,4 @@ object AnnexCResponseVerifierJvm : AnnexCResponseVerifier {
             throw IllegalArgumentException("HPKE decryption failed (wrong key, origin/encryptionInfo mismatch, or corrupted response)", e)
         }
     }
-
 }

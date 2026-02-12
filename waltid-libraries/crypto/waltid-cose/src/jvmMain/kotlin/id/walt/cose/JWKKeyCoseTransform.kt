@@ -9,7 +9,7 @@ object JWKKeyCoseTransform {
     /**
      * Exports the public key as a COSE Key object for HPKE usage.
      */
-    suspend fun JWKKey.getCosePublicKey(): CoseKey {
+    fun JWKKey.getCosePublicKey(): CoseKey {
         return when (keyType) {
             KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> {
                 val ecKey = _internalJwk.toECKey()

@@ -200,7 +200,7 @@ object AnnexCService {
             session.status = AnnexCSessionStatus.processing
 //            publishSessionUpdate(session)
 
-            val deviceResponseBytes = AnnexCResponseVerifierJvm.decryptToDeviceResponse(
+            val deviceResponseBytes = AnnexCResponseVerifier.decryptToDeviceResponse(
                 encryptedResponseB64 = context.responseB64,
                 encryptionInfoB64 = context.encryptionInfoB64,
                 origin = context.origin,
