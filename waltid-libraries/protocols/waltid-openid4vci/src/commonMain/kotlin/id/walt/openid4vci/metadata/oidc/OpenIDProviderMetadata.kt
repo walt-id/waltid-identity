@@ -5,14 +5,17 @@ import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,6 +29,8 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * OpenID Provider Metadata (OpenID Connect Discovery 1.0).
  */
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
 @Serializable(with = OpenIDProviderMetadataSerializer::class)
 data class OpenIDProviderMetadata(
     @SerialName("issuer")
@@ -97,7 +102,8 @@ data class OpenIDProviderMetadata(
     @SerialName("op_policy_uri")
     val opPolicyUri: String? = null,
     @SerialName("op_tos_uri")
-    val opTosUri: String? = null
+    val opTosUri: String? = null,
+    val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
         // OpenID Connect Discovery §3: issuer is REQUIRED and must be https without query/fragment.
@@ -184,6 +190,12 @@ data class OpenIDProviderMetadata(
                 "OpenID token_endpoint_auth_signing_alg_values_supported is required when using JWT auth methods"
             }
         }
+
+        customParameters?.let { params ->
+            require(params.keys.none { it in OpenIDProviderMetadataSerializer.knownKeys }) {
+                "customParameters must not override standard OpenID provider metadata fields"
+            }
+        }
     }
 
     companion object {
@@ -254,12 +266,17 @@ data class OpenIDProviderMetadata(
 }
 
 internal object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMetadata> {
-    override val descriptor = buildClassSerialDescriptor("OpenIDProviderMetadata") {}
+    override val descriptor = OpenIDProviderMetadata.generatedSerializer().descriptor
+
+    internal val knownKeys =
+        descriptor.elementNames
+            .filter { it != "customParameters" }
+            .toSet()
 
     override fun serialize(encoder: Encoder, value: OpenIDProviderMetadata) {
         val jsonEncoder = encoder as? JsonEncoder
             ?: error("OpenIDProviderMetadataSerializer only supports JSON")
-        val element = buildJsonObject {
+        val base = buildJsonObject {
             put("issuer", JsonPrimitive(value.issuer))
             put("authorization_endpoint", JsonPrimitive(value.authorizationEndpoint))
             put("token_endpoint", JsonPrimitive(value.tokenEndpoint))
@@ -313,7 +330,13 @@ internal object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMet
             value.opPolicyUri?.let { put("op_policy_uri", JsonPrimitive(it)) }
             value.opTosUri?.let { put("op_tos_uri", JsonPrimitive(it)) }
         }
-        jsonEncoder.encodeJsonElement(element)
+        val merged = value.customParameters?.let { extras ->
+            buildJsonObject {
+                base.forEach { (key, jsonValue) -> put(key, jsonValue) }
+                extras.forEach { (key, jsonValue) -> put(key, jsonValue) }
+            }
+        } ?: base
+        jsonEncoder.encodeJsonElement(merged)
     }
 
     override fun deserialize(decoder: Decoder): OpenIDProviderMetadata {
@@ -326,6 +349,7 @@ internal object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMet
             ?: error("OpenID subject_types_supported is required")
         val idTokenSigningAlgorithms = element.stringSet("id_token_signing_alg_values_supported")
             ?: error("OpenID id_token_signing_alg_values_supported is required")
+        val customParameters = element.filterKeys { it !in knownKeys }.takeIf { it.isNotEmpty() }
         return OpenIDProviderMetadata(
             issuer = element.string("issuer") ?: error("OpenID issuer is required"),
             authorizationEndpoint = element.string("authorization_endpoint")
@@ -365,6 +389,7 @@ internal object OpenIDProviderMetadataSerializer : KSerializer<OpenIDProviderMet
             requireRequestUriRegistration = element.bool("require_request_uri_registration"),
             opPolicyUri = element.string("op_policy_uri"),
             opTosUri = element.string("op_tos_uri"),
+            customParameters = customParameters,
         )
     }
 }

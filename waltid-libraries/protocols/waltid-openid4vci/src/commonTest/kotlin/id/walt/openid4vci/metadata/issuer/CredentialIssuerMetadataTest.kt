@@ -20,7 +20,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "http://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
             )
         }
@@ -29,7 +29,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example?x=1",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
             )
         }
@@ -38,7 +38,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example#frag",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
             )
         }
@@ -51,7 +51,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "http://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
             )
         }
@@ -69,26 +69,13 @@ class CredentialIssuerMetadataTest {
     }
 
     @Test
-    fun `credential configuration ids must match their map key`() {
-        assertFailsWith<IllegalArgumentException> {
-            CredentialIssuerMetadata(
-                credentialIssuer = "https://issuer.example",
-                credentialEndpoint = "https://issuer.example/credential",
-                credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-2", format = CredentialFormat.SD_JWT_VC),
-                ),
-            )
-        }
-    }
-
-    @Test
     fun `authorization servers must be https and non-empty when provided`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialIssuerMetadata(
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 authorizationServers = emptyList(),
             )
@@ -98,7 +85,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 authorizationServers = listOf("http://auth.example"),
             )
@@ -126,7 +113,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 credentialRequestEncryption = CredentialRequestEncryption(
                     jwks = jwks,
@@ -153,7 +140,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 credentialRequestEncryption = CredentialRequestEncryption(
                     jwks = jwksWithoutKid,
@@ -171,7 +158,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 credentialResponseEncryption = CredentialResponseEncryption(
                     algValuesSupported = emptySet(),
@@ -185,7 +172,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 credentialResponseEncryption = CredentialResponseEncryption(
                     algValuesSupported = setOf("RSA-OAEP-256"),
@@ -221,7 +208,7 @@ class CredentialIssuerMetadataTest {
             credentialIssuer = "https://issuer.example",
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
             credentialRequestEncryption = CredentialRequestEncryption(
                 jwks = jwks,
@@ -245,7 +232,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 batchCredentialIssuance = BatchCredentialIssuance(batchSize = 1),
             )
@@ -258,7 +245,7 @@ class CredentialIssuerMetadataTest {
             credentialIssuer = "https://issuer.example",
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
             batchCredentialIssuance = BatchCredentialIssuance(batchSize = 10),
         )
@@ -271,7 +258,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 display = emptyList(),
             )
@@ -281,7 +268,7 @@ class CredentialIssuerMetadataTest {
                 credentialIssuer = "https://issuer.example",
                 credentialEndpoint = "https://issuer.example/credential",
                 credentialConfigurationsSupported = mapOf(
-                    "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
                 ),
                 display = listOf(
                     IssuerDisplay(name = "Issuer", locale = "en"),
@@ -297,7 +284,7 @@ class CredentialIssuerMetadataTest {
             credentialIssuer = "https://issuer.example",
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
             display = listOf(
                 IssuerDisplay(
@@ -318,7 +305,7 @@ class CredentialIssuerMetadataTest {
             credentialIssuer = "https://issuer.example",
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -333,7 +320,6 @@ class CredentialIssuerMetadataTest {
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
                 "cred-id-1" to CredentialConfiguration(
-                    id = "cred-id-1",
                     format = CredentialFormat.SD_JWT_VC
                 ),
             ),
@@ -362,7 +348,6 @@ class CredentialIssuerMetadataTest {
         }
 
         val configuration = CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.JWT_VC_JSON,
             scope = "UniversityDegree",
             credentialDefinition = CredentialDefinition(
@@ -433,7 +418,6 @@ class CredentialIssuerMetadataTest {
         }
 
         val configuration = CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.MSO_MDOC,
             doctype = "org.iso.18013.5.1.mDL",
         )
@@ -458,7 +442,6 @@ class CredentialIssuerMetadataTest {
     @Test
     fun `fromBaseUrl supports full credential configurations`() {
         val configurationJwt = CredentialConfiguration(
-            id = "cred-jwt",
             format = CredentialFormat.JWT_VC_JSON,
             scope = "UniversityDegree",
             credentialDefinition = CredentialDefinition(
@@ -470,13 +453,11 @@ class CredentialIssuerMetadataTest {
             ),
         )
         val configurationSdJwt = CredentialConfiguration(
-            id = "cred-sd",
             format = CredentialFormat.SD_JWT_VC,
             scope = "SD_JWT_VC_example_in_OpenID4VCI",
             vct = "SD_JWT_VC_example_in_OpenID4VCI",
         )
         val configurationMdoc = CredentialConfiguration(
-            id = "cred-mdoc",
             format = CredentialFormat.MSO_MDOC,
             doctype = "org.iso.18013.5.1.mDL",
         )
@@ -506,7 +487,7 @@ class CredentialIssuerMetadataTest {
         val issuerMetadata = CredentialIssuerMetadata.fromBaseUrl(
             baseUrl = "https://issuer.example",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
         assertEquals("https://issuer.example/credential", issuerMetadata.credentialEndpoint)

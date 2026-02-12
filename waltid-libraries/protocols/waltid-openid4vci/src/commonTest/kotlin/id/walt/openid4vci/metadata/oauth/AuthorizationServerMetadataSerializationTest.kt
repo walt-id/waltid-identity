@@ -4,6 +4,8 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -145,5 +147,62 @@ class AuthorizationServerMetadataSerializationTest {
             true,
             jsonObject["pre-authorized_grant_anonymous_access_supported"]?.jsonPrimitive?.booleanOrNull,
         )
+    }
+
+    @Test
+    fun `custom parameters are serialized and deserialized`() {
+        val metadata = AuthorizationServerMetadata(
+            issuer = "https://issuer.example",
+            authorizationEndpoint = "https://issuer.example/authorize",
+            tokenEndpoint = "https://issuer.example/token",
+            responseTypesSupported = setOf(ResponseType.CODE.value),
+            customParameters = mapOf(
+                "custom_string" to JsonPrimitive("value"),
+                "custom_object" to JsonObject(mapOf("nested" to JsonPrimitive("ok"))),
+            ),
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val jsonObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals("value", jsonObject["custom_string"]?.jsonPrimitive?.content)
+        assertEquals("ok", jsonObject["custom_object"]?.jsonObject?.get("nested")?.jsonPrimitive?.content)
+
+        val decoded = json.decodeFromString<AuthorizationServerMetadata>(encoded)
+        assertEquals("value", decoded.customParameters?.get("custom_string")?.jsonPrimitive?.content)
+        assertEquals(
+            "ok",
+            decoded.customParameters?.get("custom_object")?.jsonObject?.get("nested")?.jsonPrimitive?.content,
+        )
+    }
+
+    @Test
+    fun `custom parameters are captured from json input`() {
+        val payload = """
+            {
+              "issuer": "https://issuer.example",
+              "authorization_endpoint": "https://issuer.example/authorize",
+              "token_endpoint": "https://issuer.example/token",
+              "response_types_supported": ["code"],
+              "custom_flag": true
+            }
+        """.trimIndent()
+
+        val decoded = json.decodeFromString<AuthorizationServerMetadata>(payload)
+
+        assertEquals(true, decoded.customParameters?.get("custom_flag")?.jsonPrimitive?.booleanOrNull)
+    }
+
+    @Test
+    fun `custom parameters must not override standard fields`() {
+        assertFailsWith<IllegalArgumentException> {
+            AuthorizationServerMetadata(
+                issuer = "https://issuer.example",
+                authorizationEndpoint = "https://issuer.example/authorize",
+                tokenEndpoint = "https://issuer.example/token",
+                responseTypesSupported = setOf(ResponseType.CODE.value),
+                customParameters = mapOf("issuer" to JsonPrimitive("https://override.example")),
+            )
+        }
     }
 }

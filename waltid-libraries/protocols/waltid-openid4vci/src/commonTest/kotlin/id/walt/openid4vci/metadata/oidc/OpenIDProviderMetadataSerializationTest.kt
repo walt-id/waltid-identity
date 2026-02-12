@@ -4,6 +4,9 @@ import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -146,5 +149,71 @@ class OpenIDProviderMetadataSerializationTest {
             listOf(GrantType.AuthorizationCode.value, "urn:example:grant"),
             grantTypes.map { it.jsonPrimitive.content },
         )
+    }
+
+    @Test
+    fun `custom parameters are serialized and deserialized`() {
+        val metadata = OpenIDProviderMetadata(
+            issuer = "https://issuer.example",
+            authorizationEndpoint = "https://issuer.example/authorize",
+            tokenEndpoint = "https://issuer.example/token",
+            jwksUri = "https://issuer.example/jwks",
+            responseTypesSupported = setOf(ResponseType.CODE.value),
+            subjectTypesSupported = setOf("public"),
+            idTokenSigningAlgValuesSupported = setOf("RS256"),
+            customParameters = mapOf(
+                "custom_string" to JsonPrimitive("value"),
+                "custom_object" to JsonObject(mapOf("nested" to JsonPrimitive("ok"))),
+            ),
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val jsonObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals("value", jsonObject["custom_string"]?.jsonPrimitive?.content)
+        assertEquals("ok", jsonObject["custom_object"]?.jsonObject?.get("nested")?.jsonPrimitive?.content)
+
+        val decoded = json.decodeFromString<OpenIDProviderMetadata>(encoded)
+        assertEquals("value", decoded.customParameters?.get("custom_string")?.jsonPrimitive?.content)
+        assertEquals(
+            "ok",
+            decoded.customParameters?.get("custom_object")?.jsonObject?.get("nested")?.jsonPrimitive?.content,
+        )
+    }
+
+    @Test
+    fun `custom parameters are captured from json input`() {
+        val payload = """
+            {
+              "issuer": "https://issuer.example",
+              "authorization_endpoint": "https://issuer.example/authorize",
+              "token_endpoint": "https://issuer.example/token",
+              "jwks_uri": "https://issuer.example/jwks",
+              "response_types_supported": ["${ResponseType.CODE.value}"],
+              "subject_types_supported": ["public"],
+              "id_token_signing_alg_values_supported": ["RS256"],
+              "custom_flag": true
+            }
+        """.trimIndent()
+
+        val decoded = json.decodeFromString<OpenIDProviderMetadata>(payload)
+
+        assertEquals(true, decoded.customParameters?.get("custom_flag")?.jsonPrimitive?.booleanOrNull)
+    }
+
+    @Test
+    fun `custom parameters must not override standard fields`() {
+        assertFailsWith<IllegalArgumentException> {
+            OpenIDProviderMetadata(
+                issuer = "https://issuer.example",
+                authorizationEndpoint = "https://issuer.example/authorize",
+                tokenEndpoint = "https://issuer.example/token",
+                jwksUri = "https://issuer.example/jwks",
+                responseTypesSupported = setOf(ResponseType.CODE.value),
+                subjectTypesSupported = setOf("public"),
+                idTokenSigningAlgValuesSupported = setOf("RS256"),
+                customParameters = mapOf("issuer" to JsonPrimitive("https://override.example")),
+            )
+        }
     }
 }

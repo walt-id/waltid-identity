@@ -7,12 +7,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -31,7 +33,7 @@ class CredentialIssuerMetadataSerializationTest {
             credentialIssuer = "https://issuer.example",
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -50,7 +52,7 @@ class CredentialIssuerMetadataSerializationTest {
             credentialEndpoint = "https://issuer.example/credential",
             authorizationServers = listOf("https://auth.example"),
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -69,7 +71,7 @@ class CredentialIssuerMetadataSerializationTest {
             credentialEndpoint = "https://issuer.example/credential",
             authorizationServers = listOf("https://auth.example", "https://auth2.example"),
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -93,7 +95,7 @@ class CredentialIssuerMetadataSerializationTest {
             notificationEndpoint = "https://issuer.example/notification",
             nonceEndpoint = "https://issuer.example/nonce",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -126,7 +128,7 @@ class CredentialIssuerMetadataSerializationTest {
                 encryptionRequired = true,
             ),
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -157,7 +159,7 @@ class CredentialIssuerMetadataSerializationTest {
             credentialEndpoint = "https://issuer.example/credential",
             batchCredentialIssuance = BatchCredentialIssuance(batchSize = 10),
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -182,7 +184,7 @@ class CredentialIssuerMetadataSerializationTest {
                 ),
             ),
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
         )
 
@@ -202,7 +204,6 @@ class CredentialIssuerMetadataSerializationTest {
     @Test
     fun `serializes credential configurations with format specific fields`() {
         val configurationJwt = CredentialConfiguration(
-            id = "cred-jwt",
             format = CredentialFormat.JWT_VC_JSON,
             credentialDefinition = CredentialDefinition(
                 type = listOf("VerifiableCredential", "UniversityDegreeCredential"),
@@ -227,7 +228,6 @@ class CredentialIssuerMetadataSerializationTest {
             ),
         )
         val configurationMdoc = CredentialConfiguration(
-            id = "cred-mdoc",
             format = CredentialFormat.MSO_MDOC,
             doctype = "org.iso.18013.5.1.mDL",
             credentialSigningAlgValuesSupported = setOf(
@@ -252,7 +252,6 @@ class CredentialIssuerMetadataSerializationTest {
             ),
         )
         val configurationSdJwt = CredentialConfiguration(
-            id = "cred-sd",
             format = CredentialFormat.SD_JWT_VC,
             vct = "SD_JWT_VC_example_in_OpenID4VCI",
             cryptographicBindingMethodsSupported = setOf(
@@ -417,7 +416,7 @@ class CredentialIssuerMetadataSerializationTest {
             credentialIssuer = "https://issuer.example",
             credentialEndpoint = "https://issuer.example/credential",
             credentialConfigurationsSupported = mapOf(
-                "cred-id-1" to CredentialConfiguration(id = "cred-id-1", format = CredentialFormat.SD_JWT_VC),
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
             ),
             authorizationServers = null,
             display = null,
@@ -427,6 +426,66 @@ class CredentialIssuerMetadataSerializationTest {
 
         assertFalse(encoded.contains("authorization_servers"))
         assertFalse(encoded.contains("display"))
+    }
+
+    @Test
+    fun `custom parameters are serialized and deserialized`() {
+        val metadata = CredentialIssuerMetadata(
+            credentialIssuer = "https://issuer.example",
+            credentialEndpoint = "https://issuer.example/credential",
+            credentialConfigurationsSupported = mapOf(
+                "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
+            ),
+            customParameters = mapOf(
+                "custom_string" to JsonPrimitive("value"),
+                "custom_object" to JsonObject(mapOf("nested" to JsonPrimitive("ok"))),
+            ),
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val jsonObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals("value", jsonObject["custom_string"]?.jsonPrimitive?.content)
+        assertEquals("ok", jsonObject["custom_object"]?.jsonObject?.get("nested")?.jsonPrimitive?.content)
+
+        val decoded = json.decodeFromString<CredentialIssuerMetadata>(encoded)
+        assertEquals("value", decoded.customParameters?.get("custom_string")?.jsonPrimitive?.content)
+        assertEquals(
+            "ok",
+            decoded.customParameters?.get("custom_object")?.jsonObject?.get("nested")?.jsonPrimitive?.content,
+        )
+    }
+
+    @Test
+    fun `custom parameters are captured from json input`() {
+        val payload = """
+            {
+              "credential_issuer": "https://issuer.example",
+              "credential_endpoint": "https://issuer.example/credential",
+              "credential_configurations_supported": {
+                "cred-id-1": { "format": "dc+sd-jwt" }
+              },
+              "custom_flag": true
+            }
+        """.trimIndent()
+
+        val decoded = json.decodeFromString<CredentialIssuerMetadata>(payload)
+
+        assertEquals(true, decoded.customParameters?.get("custom_flag")?.jsonPrimitive?.booleanOrNull)
+    }
+
+    @Test
+    fun `custom parameters must not override standard fields`() {
+        assertFailsWith<IllegalArgumentException> {
+            CredentialIssuerMetadata(
+                credentialIssuer = "https://issuer.example",
+                credentialEndpoint = "https://issuer.example/credential",
+                credentialConfigurationsSupported = mapOf(
+                    "cred-id-1" to CredentialConfiguration(format = CredentialFormat.SD_JWT_VC),
+                ),
+                customParameters = mapOf("credential_issuer" to JsonPrimitive("https://override.example")),
+            )
+        }
     }
 
     private fun jwksWithKid(kid: String): JsonObject =

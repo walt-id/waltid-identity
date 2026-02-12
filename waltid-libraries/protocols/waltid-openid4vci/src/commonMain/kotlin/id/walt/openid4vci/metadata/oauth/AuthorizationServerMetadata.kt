@@ -5,14 +5,17 @@ import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
 import io.ktor.http.URLProtocol
 import io.ktor.http.Url
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.descriptors.buildClassSerialDescriptor
+import kotlinx.serialization.descriptors.elementNames
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonEncoder
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -29,6 +32,8 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  * Includes OID4VCI 1.0 extensions
  */
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
 @Serializable(with = AuthorizationServerMetadataSerializer::class)
 data class AuthorizationServerMetadata(
     @SerialName("issuer")
@@ -83,6 +88,7 @@ data class AuthorizationServerMetadata(
     val authorizationDetailsTypesSupported: Set<String>? = null,
     @SerialName("pre-authorized_grant_anonymous_access_supported")
     val preAuthorizedGrantAnonymousAccessSupported: Boolean? = null,
+    val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
         // RFC 8414 §2: issuer is REQUIRED
@@ -149,6 +155,12 @@ data class AuthorizationServerMetadata(
 
         // RFC 8414 §2: Validate HTTPS scheme in the jwks_uri
         jwksUri?.let { validateHttpsUrl("jwks_uri", it) }
+
+        customParameters?.let { params ->
+            require(params.keys.none { it in AuthorizationServerMetadataSerializer.knownKeys }) {
+                "customParameters must not override standard authorization server metadata fields"
+            }
+        }
     }
 
     companion object {
@@ -219,12 +231,17 @@ data class AuthorizationServerMetadata(
 }
 
 internal object AuthorizationServerMetadataSerializer : KSerializer<AuthorizationServerMetadata> {
-    override val descriptor = buildClassSerialDescriptor("AuthorizationServerMetadata") {}
+    override val descriptor = AuthorizationServerMetadata.generatedSerializer().descriptor
+
+    internal val knownKeys =
+        descriptor.elementNames
+            .filter { it != "customParameters" }
+            .toSet()
 
     override fun serialize(encoder: Encoder, value: AuthorizationServerMetadata) {
         val jsonEncoder = encoder as? JsonEncoder
             ?: error("AuthorizationServerMetadataSerializer only supports JSON")
-        val element = buildJsonObject {
+        val base = buildJsonObject {
             put("issuer", JsonPrimitive(value.issuer))
             value.authorizationEndpoint?.let { put("authorization_endpoint", JsonPrimitive(it)) }
             value.tokenEndpoint?.let { put("token_endpoint", JsonPrimitive(it)) }
@@ -263,7 +280,13 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 put("pre-authorized_grant_anonymous_access_supported", JsonPrimitive(it))
             }
         }
-        jsonEncoder.encodeJsonElement(element)
+        val merged = value.customParameters?.let { extras ->
+            buildJsonObject {
+                base.forEach { (key, jsonValue) -> put(key, jsonValue) }
+                extras.forEach { (key, jsonValue) -> put(key, jsonValue) }
+            }
+        } ?: base
+        jsonEncoder.encodeJsonElement(merged)
     }
 
     override fun deserialize(decoder: Decoder): AuthorizationServerMetadata {
@@ -272,6 +295,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
         val element = jsonDecoder.decodeJsonElement().jsonObject
         val responseTypes = element.stringSet("response_types_supported")
             ?: error("Authorization server response_types_supported is required")
+        val customParameters = element.filterKeys { it !in knownKeys }.takeIf { it.isNotEmpty() }
         return AuthorizationServerMetadata(
             issuer = element.string("issuer") ?: error("Authorization server issuer is required"),
             authorizationEndpoint = element.string("authorization_endpoint"),
@@ -303,6 +327,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             authorizationDetailsTypesSupported = element.stringSet("authorization_details_types_supported"),
             preAuthorizedGrantAnonymousAccessSupported =
                 element.bool("pre-authorized_grant_anonymous_access_supported"),
+            customParameters = customParameters,
         )
     }
 }
