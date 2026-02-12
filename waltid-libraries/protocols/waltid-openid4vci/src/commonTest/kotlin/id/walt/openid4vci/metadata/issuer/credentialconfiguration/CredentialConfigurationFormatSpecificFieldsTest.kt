@@ -15,7 +15,6 @@ class CredentialConfigurationFormatSpecificFieldsTest {
         )
 
         val configuration = CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.JWT_VC_JSON,
             credentialDefinition = definition,
         )
@@ -31,7 +30,6 @@ class CredentialConfigurationFormatSpecificFieldsTest {
         )
 
         val configuration = CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.LDP_VC,
             credentialDefinition = definition,
         )
@@ -42,7 +40,6 @@ class CredentialConfigurationFormatSpecificFieldsTest {
     @Test
     fun `supports doctype for mso mdoc`() {
         val configuration = CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.MSO_MDOC,
             doctype = "org.iso.18013.5.1.mDL",
         )
@@ -53,7 +50,6 @@ class CredentialConfigurationFormatSpecificFieldsTest {
     @Test
     fun `supports vct for sd jwt vc`() {
         val configuration = CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             vct = "SD_JWT_VC_example_in_OpenID4VCI",
         )

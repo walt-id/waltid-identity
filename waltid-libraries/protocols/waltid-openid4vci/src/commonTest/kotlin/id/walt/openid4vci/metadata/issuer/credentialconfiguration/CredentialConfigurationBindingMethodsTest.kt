@@ -14,7 +14,6 @@ class CredentialConfigurationBindingMethodsTest {
     fun `cryptographic binding methods must not be empty when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 cryptographicBindingMethodsSupported = emptySet(),
             )
@@ -25,7 +24,6 @@ class CredentialConfigurationBindingMethodsTest {
     fun `did binding method must not include method specific id`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 cryptographicBindingMethodsSupported = setOf(
                     CryptographicBindingMethod.fromValue("did:example:123"),
@@ -40,7 +38,6 @@ class CredentialConfigurationBindingMethodsTest {
     @Test
     fun `accepts custom did method`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             cryptographicBindingMethodsSupported = setOf(
                 CryptographicBindingMethod.fromValue("did:example"),
@@ -68,7 +65,6 @@ class CredentialConfigurationBindingMethodsTest {
     @Test
     fun `accepts supported did binding methods`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             cryptographicBindingMethodsSupported = setOf(
                 CryptographicBindingMethod.DidKey,
@@ -85,7 +81,6 @@ class CredentialConfigurationBindingMethodsTest {
     @Test
     fun `accepts mixed binding methods`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             cryptographicBindingMethodsSupported = setOf(
                 CryptographicBindingMethod.Jwk,

@@ -15,7 +15,6 @@ class CredentialConfigurationProofTypesTest {
     fun `proof signing algorithms must not be empty`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 proofTypesSupported = mapOf(
                     ProofTypeId.JWT.value to ProofType(proofSigningAlgValuesSupported = emptySet()),
@@ -28,7 +27,6 @@ class CredentialConfigurationProofTypesTest {
     fun `proof types must be present when cryptographic binding methods are set`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
                 proofTypesSupported = null,
@@ -40,7 +38,6 @@ class CredentialConfigurationProofTypesTest {
     fun `cryptographic binding methods must be present when proof types are set`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 proofTypesSupported = mapOf(
                     ProofTypeId.JWT.value to ProofType(proofSigningAlgValuesSupported = setOf("ES256")),
@@ -54,7 +51,6 @@ class CredentialConfigurationProofTypesTest {
     fun `proof types must not be empty when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
                 proofTypesSupported = emptyMap(),
@@ -66,7 +62,6 @@ class CredentialConfigurationProofTypesTest {
     fun `proof type identifiers must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
                 proofTypesSupported = mapOf(
@@ -79,7 +74,6 @@ class CredentialConfigurationProofTypesTest {
     @Test
     fun `accepts proof types with key attestation requirements`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             cryptographicBindingMethodsSupported = setOf(CryptographicBindingMethod.Jwk),
             proofTypesSupported = mapOf(

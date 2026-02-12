@@ -2,15 +2,38 @@ package id.walt.openid4vci.metadata.issuer
 
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KeepGeneratedSerializer
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.SetSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.descriptors.elementNames
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonEncoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Representation of a credential_configuration_supported entry (OpenID4VCI 1.0).
  */
-@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+@KeepGeneratedSerializer
+@Serializable(with = CredentialConfigurationSerializer::class)
 data class CredentialConfiguration(
-    val id: String,
     val format: CredentialFormat,
     @SerialName("scope")
     val scope: String? = null,
@@ -31,9 +54,9 @@ data class CredentialConfiguration(
     val credentialMetadata: CredentialMetadata? = null,
     @SerialName("display")
     val display: List<CredentialDisplay>? = null,
+    val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
-        require(id.isNotBlank()) { "credential configuration id must not be blank" }
         scope?.let { value ->
             require(value.isNotBlank()) { "scope must not be blank" }
         }
@@ -94,8 +117,109 @@ data class CredentialConfiguration(
                     }
             }
         }
+        customParameters?.let { params ->
+            require(params.keys.none { it in CredentialConfigurationSerializer.knownKeys }) {
+                "customParameters must not override standard credential configuration fields"
+            }
+        }
     }
 }
+
+internal object CredentialConfigurationSerializer : KSerializer<CredentialConfiguration> {
+    private val lenientJson = Json { ignoreUnknownKeys = true }
+
+    override val descriptor: SerialDescriptor =
+        CredentialConfiguration.generatedSerializer().descriptor
+
+    internal val knownKeys =
+        descriptor.elementNames
+            .filter { it != "customParameters" }
+            .toSet() + "id"
+
+    override fun serialize(encoder: Encoder, value: CredentialConfiguration) {
+        val jsonEncoder = encoder as? JsonEncoder
+            ?: throw SerializationException("CredentialConfigurationSerializer can only be used with JSON")
+
+        val base = buildJsonObject {
+            put("format", Json.encodeToJsonElement(CredentialFormat.serializer(), value.format))
+            value.scope?.let { put("scope", JsonPrimitive(it)) }
+            value.credentialDefinition?.let {
+                put("credential_definition", Json.encodeToJsonElement(CredentialDefinition.serializer(), it))
+            }
+            value.doctype?.let { put("doctype", JsonPrimitive(it)) }
+            value.vct?.let { put("vct", JsonPrimitive(it)) }
+            value.credentialSigningAlgValuesSupported?.let {
+                put("credential_signing_alg_values_supported", Json.encodeToJsonElement(SigningAlgIdSetSerializer, it))
+            }
+            value.cryptographicBindingMethodsSupported?.let {
+                val serializer = SetSerializer(CryptographicBindingMethod.serializer())
+                put("cryptographic_binding_methods_supported", Json.encodeToJsonElement(serializer, it))
+            }
+            value.proofTypesSupported?.let {
+                val serializer = MapSerializer(String.serializer(), ProofType.serializer())
+                put("proof_types_supported", Json.encodeToJsonElement(serializer, it))
+            }
+            value.credentialMetadata?.let {
+                put("credential_metadata", Json.encodeToJsonElement(CredentialMetadata.serializer(), it))
+            }
+            value.display?.let {
+                val serializer = ListSerializer(CredentialDisplay.serializer())
+                put("display", Json.encodeToJsonElement(serializer, it))
+            }
+        }
+        val merged = value.customParameters?.let { extras ->
+            buildJsonObject {
+                base.forEach { (key, jsonValue) -> put(key, jsonValue) }
+                extras.forEach { (key, jsonValue) -> put(key, jsonValue) }
+            }
+        } ?: base
+
+        jsonEncoder.encodeJsonElement(merged)
+    }
+
+    override fun deserialize(decoder: Decoder): CredentialConfiguration {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("CredentialConfigurationSerializer can only be used with JSON")
+        val jsonObject = jsonDecoder.decodeJsonElement().jsonObject
+
+        val customParameters = jsonObject.filterKeys { it !in knownKeys }.takeIf { it.isNotEmpty() }
+        val formatElement = jsonObject["format"]
+            ?: throw SerializationException("credential configuration format is required")
+        val format = lenientJson.decodeFromJsonElement(CredentialFormat.serializer(), formatElement)
+
+        return CredentialConfiguration(
+            format = format,
+            scope = jsonObject.string("scope"),
+            credentialDefinition = jsonObject["credential_definition"]?.let {
+                lenientJson.decodeFromJsonElement(CredentialDefinition.serializer(), it)
+            },
+            doctype = jsonObject.string("doctype"),
+            vct = jsonObject.string("vct"),
+            credentialSigningAlgValuesSupported = jsonObject["credential_signing_alg_values_supported"]?.let {
+                lenientJson.decodeFromJsonElement(SigningAlgIdSetSerializer, it)
+            },
+            cryptographicBindingMethodsSupported = jsonObject["cryptographic_binding_methods_supported"]?.let {
+                val serializer = SetSerializer(CryptographicBindingMethod.serializer())
+                lenientJson.decodeFromJsonElement(serializer, it)
+            },
+            proofTypesSupported = jsonObject["proof_types_supported"]?.let {
+                val serializer = MapSerializer(String.serializer(), ProofType.serializer())
+                lenientJson.decodeFromJsonElement(serializer, it)
+            },
+            credentialMetadata = jsonObject["credential_metadata"]?.let {
+                lenientJson.decodeFromJsonElement(CredentialMetadata.serializer(), it)
+            },
+            display = jsonObject["display"]?.let {
+                val serializer = ListSerializer(CredentialDisplay.serializer())
+                lenientJson.decodeFromJsonElement(serializer, it)
+            },
+            customParameters = customParameters,
+        )
+    }
+}
+
+private fun JsonObject.string(name: String): String? =
+    this[name]?.jsonPrimitive?.contentOrNull
 
 /**
  * Format-specific credential definition metadata.

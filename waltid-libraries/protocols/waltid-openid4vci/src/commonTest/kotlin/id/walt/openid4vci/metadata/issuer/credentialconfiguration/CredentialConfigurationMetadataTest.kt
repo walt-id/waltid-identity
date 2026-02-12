@@ -43,7 +43,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display must not be empty when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(display = emptyList()),
             )
@@ -54,7 +53,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display locales must be unique`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(
                     display = listOf(
@@ -70,7 +68,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display locale must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(
                     display = listOf(
@@ -85,7 +82,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display logo uri must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(
                     display = listOf(
@@ -103,7 +99,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display logo uri must include a scheme`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(
                     display = listOf(
@@ -121,7 +116,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display background image uri must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(
                     display = listOf(
@@ -139,7 +133,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata display background image uri must include a scheme`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(
                     display = listOf(
@@ -157,7 +150,6 @@ class CredentialConfigurationMetadataTest {
     fun `credential metadata claims must not be empty when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialMetadata = CredentialMetadata(claims = emptyList()),
             )
@@ -167,7 +159,6 @@ class CredentialConfigurationMetadataTest {
     @Test
     fun `credential metadata accepts claims when non-empty`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             credentialMetadata = CredentialMetadata(
                 claims = listOf(
@@ -241,7 +232,6 @@ class CredentialConfigurationMetadataTest {
     @Test
     fun `accepts full credential metadata example`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.SD_JWT_VC,
             credentialMetadata = CredentialMetadata(
                 display = listOf(

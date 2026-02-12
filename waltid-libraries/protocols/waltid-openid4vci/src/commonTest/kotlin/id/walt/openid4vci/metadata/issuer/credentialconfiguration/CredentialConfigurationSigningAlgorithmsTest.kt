@@ -12,7 +12,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
     fun `credential signing algorithms must not be empty when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialSigningAlgValuesSupported = emptySet(),
             )
@@ -23,7 +22,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
     fun `credential signing algorithms must not contain blank entries`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 credentialSigningAlgValuesSupported = setOf(
                     SigningAlgId.jose(""),
@@ -36,7 +34,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
     fun `jwt formats require jose algorithm identifiers`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.JWT_VC_JSON,
                 credentialSigningAlgValuesSupported = setOf(
                     SigningAlgId.coseValue(-7),
@@ -48,7 +45,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
     @Test
     fun `mso_mdoc allows cose numeric and cose name identifiers`() {
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.MSO_MDOC,
             credentialSigningAlgValuesSupported = setOf(
                 SigningAlgId.coseValue(-7),
@@ -61,7 +57,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
     fun `mso_mdoc rejects jose and ld suite identifiers`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.MSO_MDOC,
                 credentialSigningAlgValuesSupported = setOf(
                     SigningAlgId.jose("ES256"),
@@ -70,7 +65,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
         }
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.MSO_MDOC,
                 credentialSigningAlgValuesSupported = setOf(
                     SigningAlgId.ldSuite("Ed25519Signature2018"),
@@ -83,7 +77,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
     fun `ldp_vc requires ld suite identifiers`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.LDP_VC,
                 credentialSigningAlgValuesSupported = setOf(
                     SigningAlgId.jose("ES256"),
@@ -91,7 +84,6 @@ class CredentialConfigurationSigningAlgorithmsTest {
             )
         }
         CredentialConfiguration(
-            id = "cred-id-1",
             format = CredentialFormat.LDP_VC,
             credentialSigningAlgValuesSupported = setOf(
                 SigningAlgId.ldSuite("Ed25519Signature2018"),

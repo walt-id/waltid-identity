@@ -27,7 +27,6 @@ class CredentialConfigurationFormatScopeTest {
     fun `scope must not be blank when present`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 scope = " ",
             )

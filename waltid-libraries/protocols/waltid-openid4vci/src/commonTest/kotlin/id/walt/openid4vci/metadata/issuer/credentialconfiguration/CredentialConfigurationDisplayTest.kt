@@ -12,7 +12,6 @@ class CredentialConfigurationDisplayTest {
     fun `display locales must be unique`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 display = listOf(
                     CredentialDisplay(name = "Credential", locale = "en"),
@@ -26,7 +25,6 @@ class CredentialConfigurationDisplayTest {
     fun `display name must not be blank`() {
         assertFailsWith<IllegalArgumentException> {
             CredentialConfiguration(
-                id = "cred-id-1",
                 format = CredentialFormat.SD_JWT_VC,
                 display = listOf(
                     CredentialDisplay(name = " "),
