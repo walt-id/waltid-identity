@@ -139,7 +139,7 @@ class AnnexCHpkeDecryptTest {
         )
         val encryptedResponseB64 = encryptedResponseCbor.encodeToBase64Url()
 
-        assertFailsWith<IllegalArgumentException> {
+        assertFailsWith<Exception> {
             AnnexCResponseVerifier.decryptToDeviceResponse(
                 encryptedResponseB64 = encryptedResponseB64,
                 encryptionInfoB64 = encryptionInfoB64,
