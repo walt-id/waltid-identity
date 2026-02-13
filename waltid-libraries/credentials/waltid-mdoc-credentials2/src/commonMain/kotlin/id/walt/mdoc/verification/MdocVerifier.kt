@@ -21,6 +21,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
 import kotlin.time.ExperimentalTime
 
@@ -34,6 +36,7 @@ object MdocVerifier {
     private val log = KotlinLogging.logger {}
 
     fun buildSessionTranscriptForContext(context: MdocVerificationContext): SessionTranscript = when {
+        context.isAnnexC -> MdocCryptoHelper.reconstructAnnexCSessionTranscript(context, context.data?.get("data")?.jsonObject["encryptionInfo"]?.jsonPrimitive?.content ?: throw IllegalStateException("No encryption info to verify Annex C for, custom data is: ${context.data}"))
         context.isDcApi -> MdocCryptoHelper.reconstructDcApiOid4vpSessionTranscript(context)
         else -> MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
     }

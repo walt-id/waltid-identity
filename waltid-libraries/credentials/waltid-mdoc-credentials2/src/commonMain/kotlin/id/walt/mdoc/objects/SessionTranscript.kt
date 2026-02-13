@@ -104,14 +104,13 @@ data class SessionTranscript private constructor(
         )
 
         /** Creates a SessionTranscript for a DCAPI Handover flow. */
-        /* Can share handover?
         fun forDcApi(
             handover: DCAPIHandover,
         ): SessionTranscript = SessionTranscript(
             deviceEngagementBytesOid = null,
             eReaderKeyBytesOid = null,
             dcapiHandover = handover
-        )*/
+        )
 
         /** Creates a SessionTranscript for a QR Code Handover flow (where the Handover element is null). */
         fun forQr(

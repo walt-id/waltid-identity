@@ -206,5 +206,7 @@ class IssuerSignedDataMdocVpPolicyTest {
         isSigned = true,
         isEncrypted = false,
         jwkThumbprint = null,
+        isAnnexC = false,
+        customData = null
     )
 }
