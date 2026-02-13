@@ -286,7 +286,7 @@ object VerificationSessionCreator {
         val newSession = Verification2Session(
             id = sessionId,
             setup = setup,
-            data = customData?.let { Json.encodeToJsonElement(it) },
+            data = Json.encodeToJsonElement(customData),
 
             creationDate = now,
             expirationDate = expiration,
