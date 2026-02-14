@@ -22,7 +22,7 @@ data class VerificationSessionContext(
     val isSigned: Boolean,
     val isEncrypted: Boolean,
     val jwkThumbprint: String?,
-    val customData: JsonObject?,
+    val customData: JsonObject? = null,
     val isAnnexC: Boolean,
 ) {
     val isDcApi
