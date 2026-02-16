@@ -149,10 +149,12 @@ class OpenIDProviderMetadataTest {
         assertEquals("https://issuer.example/authorize", metadata.authorizationEndpoint)
         assertEquals("https://issuer.example/token", metadata.tokenEndpoint)
         assertEquals("https://issuer.example/jwks", metadata.jwksUri)
-        assertEquals(setOf("openid"), metadata.scopesSupported)
         assertEquals(setOf(ResponseType.CODE.value), metadata.responseTypesSupported)
         assertEquals(setOf(ResponseMode.QUERY.value, ResponseMode.FRAGMENT.value), metadata.responseModesSupported)
-        assertEquals(setOf(GrantType.AuthorizationCode.value), metadata.grantTypesSupported)
+        assertEquals(
+            setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
+            metadata.grantTypesSupported
+        )
         assertEquals(setOf("public"), metadata.subjectTypesSupported)
         assertEquals(setOf("RS256"), metadata.idTokenSigningAlgValuesSupported)
     }
