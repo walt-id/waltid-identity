@@ -104,7 +104,7 @@ object Verifier2Service {
                         summary = "Receive update events via SSE about the verification session"
                         request { pathParameter<String>(VERIFICATION_SESSION) }
                     }) {
-                        sse("$VERIFICATION_SESSION/events", serialize = { typeInfo, it ->
+                        sse("events", serialize = { typeInfo, it ->
                             val serializer = httpJson.serializersModule.serializer(typeInfo.kotlinType!!)
                             httpJson.encodeToString(serializer, it)
                         }) {
