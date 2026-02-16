@@ -79,7 +79,7 @@ data class Verification2Session(
      * OpenID4VP Authorization Request used for this Verification Session
      */
     val authorizationRequest: AuthorizationRequest,
-    val authorizationRequestUrl: Url,
+    val authorizationRequestUrl: Url?,
 
     val signedAuthorizationRequestJwt: String? = null,
     val ephemeralDecryptionKey: DirectSerializedKey? = null,
