@@ -18,6 +18,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -30,12 +31,16 @@ import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
+import org.bouncycastle.crypto.hpke.HPKE
+import org.bouncycastle.crypto.params.*
 import org.bouncycastle.jce.ECNamedCurveTable
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.util.io.pem.PemObject
 import org.bouncycastle.util.io.pem.PemWriter
 import java.io.ByteArrayOutputStream
 import java.security.*
+import java.security.interfaces.ECPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import kotlin.math.max
 import kotlin.math.min
@@ -86,8 +91,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun exportJWKObject(): JsonObject =
         JsonObject(_internalJwk.toJSONObject().mapValues {
-            val value = it.value
-            when (value) {
+            when (val value = it.value) {
                 is String -> JsonPrimitive(value)
                 is Number -> JsonPrimitive(value)
                 is ArrayList<*> -> JsonPrimitive(value.toString())
@@ -262,24 +266,46 @@ actual class JWKKey actual constructor(
      * JWE Encryption using ECDH-ES + A128GCM.
      * This instance acts as the Recipient Public Key.
      */
-    actual suspend fun encryptJwe(plaintext: ByteArray): String {
-        // Ensure we are using the correct curve (P-256)
-        check(keyType == KeyType.secp256r1) { "ECDH-ES+A128GCM is currently only supported for secp256r1 (P-256)." }
+    actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
+        check(keyType == KeyType.secp256r1 || keyType == KeyType.secp384r1 || keyType == KeyType.secp521r1) {
+            "ECDH-ES is currently only supported for EC keys (P-256, P-384, P-521). Current key type: $keyType"
+        }
 
-        // 1. Create the JWE Header
-        val header = JWEHeader(JWEAlgorithm.ECDH_ES, EncryptionMethod.A128GCM)
+        // 1. Resolve Encryption Method (enc)
+        val encryptionMethod = when (encAlg) {
+            "A128GCM" -> EncryptionMethod.A128GCM
+            "A192GCM" -> EncryptionMethod.A192GCM
+            "A256GCM" -> EncryptionMethod.A256GCM
+            "A128CBC-HS256" -> EncryptionMethod.A128CBC_HS256
+            "A192CBC-HS384" -> EncryptionMethod.A192CBC_HS384
+            "A256CBC-HS512" -> EncryptionMethod.A256CBC_HS512
+            else -> throw IllegalArgumentException("Unsupported encryption algorithm: $encAlg")
+        }
 
-        // 2. Create the JWE Object
+        // 2. Build JWE Header
+        // The algorithm (alg) is fixed to ECDH-ES for this flow
+        val headerBuilder = JWEHeader.Builder(JWEAlgorithm.ECDH_ES, encryptionMethod)
+            .type(JOSEObjectType.JWT) // Common practice to set 'typ' to JWT
+
+        // OpenID4VP Requirement: If the key has a Key ID, it MUST be included in the header
+        _internalJwk.keyID?.let { kid ->
+            headerBuilder.keyID(kid)
+        }
+
+        val header = headerBuilder.build()
+
+        // 3. Create JWE Object
         val jweObject = JWEObject(header, Payload(plaintext))
 
-        // 3. Create the Encrypter using the underlying Nimbus ECKey (Public)
-        // Nimbus handles the ephemeral key generation internally
+        // 4. Create Encrypter
+        // This instance (_internalJwk) represents the Verifier's Public Key.
+        // Nimbus automatically generates the ephemeral key pair (EPK) internally.
         val encrypter = ECDHEncrypter(_internalJwk.toECKey())
 
-        // 4. Perform Encryption
+        // 5. Encrypt
         jweObject.encrypt(encrypter)
 
-        // 5. Serialize to compact form (String)
+        // 6. Serialize
         return jweObject.serialize()
     }
 
@@ -289,22 +315,26 @@ actual class JWKKey actual constructor(
      */
     actual suspend fun decryptJwe(jweString: String): ByteArray {
         check(hasPrivateKey) { "Private key required for decryption." }
-        check(keyType == KeyType.secp256r1) { "ECDH-ES+A128GCM is currently only supported for secp256r1 (P-256)." }
 
-        // 1. Parse the JWE String
+        // 1. Parse JWE
         val jweObject = JWEObject.parse(jweString)
+        jweObject.header
 
-        // 2. Validate Header (Optional but recommended security check)
         val alg = jweObject.header.algorithm
-        val enc = jweObject.header.encryptionMethod
-        check(alg == JWEAlgorithm.ECDH_ES && enc == EncryptionMethod.A128GCM) {
-            "Unsupported JWE Algorithm or Encryption Method. Expected ECDH-ES + A128GCM, but got $alg + $enc"
+        jweObject.header.encryptionMethod
+        check(alg == JWEAlgorithm.ECDH_ES)
+
+        // 2. Validate Key Type
+        // ECDH-ES requires EC keys
+        check(keyType == KeyType.secp256r1 || keyType == KeyType.secp384r1 || keyType == KeyType.secp521r1) {
+            "Decryption key must be an EC key (P-256, P-384, P-521)."
         }
 
-        // 3. Create the Decrypter using the underlying Nimbus ECKey (Private)
+        // 3. Create Decrypter
+        // We pass our private key to unwrap the secret
         val decrypter = ECDHDecrypter(_internalJwk.toECKey())
 
-        // 4. Perform Decryption
+        // 4. Decrypt
         jweObject.decrypt(decrypter)
 
         // 5. Return payload
@@ -423,7 +453,7 @@ actual class JWKKey actual constructor(
         return (pubPrim.getObjectAt(1) as ASN1BitString).octets
     }
 
-    private fun getECPublicKeyBytes(key: java.security.interfaces.ECPublicKey): ByteArray {
+    private fun getECPublicKeyBytes(key: ECPublicKey): ByteArray {
         val curveName = Curve.forECParameterSpec(key.params).name
         return ECNamedCurveTable.getParameterSpec(curveName)
             .curve.createPoint(key.w.affineX, key.w.affineY)
@@ -515,6 +545,166 @@ actual class JWKKey actual constructor(
             metadata: JwkKeyMeta?
         ): Key =
             JvmJWKKeyCreator.importRawPublicKey(type, rawPublicKey, metadata)
+    }
+
+    @Serializable
+    data class HPKEResponseData(
+        @ByteString
+        @SerialName(value = "enc") val enc: ByteArray,
+        @ByteString
+        @SerialName(value = "cipherText") val cipherText: ByteArray
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is HPKEResponseData) return false
+
+            if (!enc.contentEquals(other.enc)) return false
+            if (!cipherText.contentEquals(other.cipherText)) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = enc.contentHashCode()
+            result = 31 * result + cipherText.contentHashCode()
+            return result
+        }
+    }
+
+    /**
+     * Encrypts a payload using HPKE (RFC 9180) Base Mode.
+     * @return A byte array containing [encapsulated_key][ciphertext]
+     */
+    fun encryptHpke(plaintext: ByteArray, info: ByteArray?, aad: ByteArray?): HPKEResponseData {
+        // 1. Configure HPKE
+        val (kem, kdf, aead) = getHpkeConfig()
+        val hpke = HPKE(HPKE.mode_base, kem, kdf, aead)
+
+        // 2. Prepare Keys
+        val receiverPubKeyParams = getBcPublicKeyParams()
+
+        // 3. Setup Base Mode (Sender)
+        val senderContext = hpke.setupBaseS(receiverPubKeyParams, info ?: ByteArray(0))
+
+        // 4. Get the Encapsulation (enc)
+        val enc = senderContext.getEncapsulation()
+
+        // 5. Encrypt (Seal)
+        val ciphertext = senderContext.seal(aad ?: ByteArray(0), plaintext, 0, plaintext.size)
+
+        // 6. Return 'enc' + 'ciphertext'
+        return HPKEResponseData(enc, ciphertext)
+    }
+
+    /**
+     * Decrypts a payload using HPKE (RFC 9180) Base Mode.
+     * Expects input to be [encapsulated_key][ciphertext].
+     */
+    fun decryptHpke(cipherTextWithEnc: ByteArray, info: ByteArray?, aad: ByteArray?): ByteArray {
+        check(hasPrivateKey) { "Private key required for decryption." }
+
+        // 1. Configure HPKE
+        val (kem, kdf, aead) = getHpkeConfig()
+        val hpke = HPKE(HPKE.mode_base, kem, kdf, aead)
+
+        // 2. Parse Input
+        val encLength = getEncLength(kem)
+        check(cipherTextWithEnc.size > encLength) { "Ciphertext too short" }
+
+        val enc = cipherTextWithEnc.copyOfRange(0, encLength)
+        val ciphertext = cipherTextWithEnc.copyOfRange(encLength, cipherTextWithEnc.size)
+
+        // 3. Prepare Receiver Key Pair (Required for setupBaseR)
+        val myPrivateKeyParams = getBcPrivateKeyParams() // existing private key param
+        val myPublicKeyParams = getBcPublicKeyParams()   // existing public key param
+
+        // Bundle them into a pair - HPKE requires both for the receiver.
+        val receiverKeyPair = AsymmetricCipherKeyPair(myPublicKeyParams, myPrivateKeyParams)
+
+        // 4. Setup Base Mode (Receiver)
+        // Now passing the KeyPair instead of just the private key param
+        val receiverContext = hpke.setupBaseR(enc, receiverKeyPair, info ?: ByteArray(0))
+
+        // 5. Decrypt (Open)
+        return receiverContext.open(aad ?: ByteArray(0), ciphertext, 0, ciphertext.size)
+    }
+
+    // --- HPKE Helpers ---
+
+    private fun getHpkeConfig(): Triple<Short, Short, Short> {
+        // Returns (KEM, KDF, AEAD)
+        // Defaulting to AES-128-GCM for P-256 and AES-256-GCM for larger curves, matching common profiles.
+        return when (keyType) {
+            KeyType.secp256r1 -> Triple(HPKE.kem_P256_SHA256, HPKE.kdf_HKDF_SHA256, HPKE.aead_AES_GCM128)
+            KeyType.secp384r1 -> Triple(HPKE.kem_P384_SHA348, HPKE.kdf_HKDF_SHA384, HPKE.aead_AES_GCM256)
+            KeyType.secp521r1 -> Triple(HPKE.kem_P521_SHA512, HPKE.kdf_HKDF_SHA512, HPKE.aead_AES_GCM256)
+            KeyType.Ed25519 -> Triple(HPKE.kem_X25519_SHA256, HPKE.kdf_HKDF_SHA256, HPKE.aead_AES_GCM128)
+            // Using Ed25519 keys for HPKE (encryption) usually implies converting them to X25519 or using them as X25519.
+            else -> throw IllegalArgumentException("HPKE not supported for key type: $keyType")
+        }
+    }
+
+    private fun getEncLength(kemId: Short): Int {
+        return when (kemId) {
+            HPKE.kem_P256_SHA256 -> 65 // Uncompressed point (0x04 + 32 + 32)
+            HPKE.kem_P384_SHA348 -> 97 // Uncompressed point (0x04 + 48 + 48)
+            HPKE.kem_P521_SHA512 -> 133 // Uncompressed point (0x04 + 66 + 66)
+            HPKE.kem_X25519_SHA256 -> 32
+            else -> throw IllegalArgumentException("Unknown KEM ID enc length")
+        }
+    }
+
+    /**
+     * Converts the internal Nimbus JWK to a Bouncy Castle Public Key Parameter.
+     */
+    private fun getBcPublicKeyParams(): AsymmetricKeyParameter {
+        return when (keyType) {
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> {
+                val ecKey = _internalJwk.toECKey()
+                val ecSpec = ECNamedCurveTable.getParameterSpec(keyType.jwkCurve)
+                val domainParams = ECDomainParameters(ecSpec.curve, ecSpec.g, ecSpec.n, ecSpec.h)
+
+                // Decode raw X and Y from JWK
+                val x = ecKey.x.decodeToBigInteger()
+                val y = ecKey.y.decodeToBigInteger()
+                val point = ecSpec.curve.createPoint(x, y)
+
+                ECPublicKeyParameters(point, domainParams)
+            }
+
+            KeyType.Ed25519 -> {
+                // Assuming the underlying bytes are X25519 compatible or intended for it
+                val octKey = _internalJwk.toOctetKeyPair()
+                X25519PublicKeyParameters(octKey.x.decode(), 0)
+            }
+
+            else -> throw IllegalArgumentException("Unsupported key type for HPKE: $keyType")
+        }
+    }
+
+    /**
+     * Converts the internal Nimbus JWK to a Bouncy Castle Private Key Parameter.
+     */
+    private fun getBcPrivateKeyParams(): AsymmetricKeyParameter {
+        return when (keyType) {
+            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> {
+                val ecKey = _internalJwk.toECKey()
+                val ecSpec = ECNamedCurveTable.getParameterSpec(keyType.jwkCurve)
+                val domainParams = ECDomainParameters(ecSpec.curve, ecSpec.g, ecSpec.n, ecSpec.h)
+
+                // Decode 'd' (private scalar)
+                val d = ecKey.d.decodeToBigInteger()
+
+                ECPrivateKeyParameters(d, domainParams)
+            }
+
+            KeyType.Ed25519 -> {
+                val octKey = _internalJwk.toOctetKeyPair()
+                X25519PrivateKeyParameters(octKey.d.decode(), 0)
+            }
+
+            else -> throw IllegalArgumentException("Unsupported key type for HPKE: $keyType")
+        }
     }
 }
 

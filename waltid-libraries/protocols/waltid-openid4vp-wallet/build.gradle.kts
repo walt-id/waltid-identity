@@ -29,12 +29,13 @@ kotlin {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.cbor)
 
             /*
              * walt.id:
              */
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))

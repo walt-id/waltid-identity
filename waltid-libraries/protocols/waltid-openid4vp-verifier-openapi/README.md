@@ -34,7 +34,7 @@ This library helps Verifier developers by providing:
 ### Generate OpenAPI Schema
 
 ```kotlin
-import id.walt.openid4vp.verifier.openapi.VerificationSessionCreateOpenApi
+import id.walt.verifier2.openapi.VerificationSessionCreateOpenApi
 
 val schema = VerificationSessionCreateOpenApi.generateOpenApiSchema()
 println(schema.toJsonString())
@@ -43,7 +43,7 @@ println(schema.toJsonString())
 ### Use Pre-built Examples
 
 ```kotlin
-import id.walt.openid4vp.verifier.openapi.Verifier2OpenApiExamples
+import id.walt.verifier2.openapi.Verifier2OpenApiExamples
 
 // SD-JWT VC example
 val sdJwtExample = Verifier2OpenApiExamples.basicExample
@@ -71,7 +71,7 @@ val mdocExample = Verifier2OpenApiExamples.exampleOf(
 ### Integration Example
 
 ```kotlin
-import id.walt.openid4vp.verifier.openapi.Verifier2OpenApiExamples
+import id.walt.verifier2.openapi.Verifier2OpenApiExamples
 
 // Use in API documentation
 post("/api/v2/verification/session") {

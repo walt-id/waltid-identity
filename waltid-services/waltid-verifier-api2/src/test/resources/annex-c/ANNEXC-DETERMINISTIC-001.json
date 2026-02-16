@@ -1,0 +1,14 @@
+{
+  "id": "ANNEXC-DETERMINISTIC-001",
+  "origin": "https://verifier.example",
+  "deviceRequestB64": "omd2ZXJzaW9uYzEuMGtkb2NSZXF1ZXN0c4GhbGl0ZW1zUmVxdWVzdNgYWEuiZ2RvY1R5cGV1b3JnLmlzby4xODAxMy41LjEubURMam5hbWVTcGFjZXOhcW9yZy5pc28uMTgwMTMuNS4xoWthZ2Vfb3Zlcl8xOPQ",
+  "encryptionInfoB64": "gmVkY2FwaaJlbm9uY2VQAAECAwQFBgcICQoLDA0OD3JyZWNpcGllbnRQdWJsaWNLZXmkAQIgASFYILO0LJXwA8VAp7-rI9YIJvj1wfEQ122YdEjwxUFeYAFEIlgg0u68CgTFZk_nslWFmYhDMQQ6vdBNf2vwy3QHKI_80Js",
+  "encryptedResponseB64": "gmVkY2FwaaJjZW5jWEEEG5gvoNUFmbbhxRtSl075PExgPLGtxDb9Hxu_VnVe03aaHuJ-vW219YofqLJJGUHZKgrrjcEmoLYT0ur35BJCBGpjaXBoZXJUZXh0WCXUGzq3WpzY3INchUZw8cbzbz8bWJueKZ4PLW0LEvhDmmQPAKOa",
+  "recipientPrivateKeyHex": "9baeb7b14495d7b69cbe751a98c7ee4ad36b41053da880fe00baa4bb5ce31372",
+  "expected": {
+    "sessionTranscriptCborSha256Hex": "564a34efc36b9b5a5ccafb6bf2e923cd96cc4a9c3712407f887d1e84d3bb58e4",
+    "deviceResponseCborSha256Hex": "61ddbf1dd2e26100520b569946be8415790ec2e35a789172436ed4ac15445581",
+    "docType": "org.iso.18013.5.1.mDL",
+    "requestedElement": "age_over_18"
+  }
+}

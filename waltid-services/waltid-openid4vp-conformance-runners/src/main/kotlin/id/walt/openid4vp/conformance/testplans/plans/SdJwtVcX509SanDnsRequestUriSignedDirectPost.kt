@@ -2,11 +2,11 @@ package id.walt.openid4vp.conformance.testplans.plans
 
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
-import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
-import id.walt.openid4vp.verifier.data.GeneralFlowConfig
-import id.walt.openid4vp.verifier.data.UrlConfig
-import id.walt.openid4vp.verifier.data.Verification2Session
-import id.walt.openid4vp.verifier.data.Verification2Session.VerificationSessionRedirects
+import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.UrlConfig
+import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.Verification2Session.VerificationSessionRedirects
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
