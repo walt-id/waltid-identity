@@ -298,7 +298,7 @@ object VerificationSessionCreator {
             bootstrapAuthorizationRequestUrl = if (!isAnnexC) bootstrapAuthorizationRequestUrl else null,
 
             authorizationRequest = authorizationRequest,
-            authorizationRequestUrl = authorizationRequestUrl,
+            authorizationRequestUrl = if (!isAnnexC) authorizationRequestUrl else null,
             signedAuthorizationRequestJwt = signedAuthorizationRequest,
             ephemeralDecryptionKey = ephemeralKey?.let { DirectSerializedKey(it) },
             jwkThumbprint = ephemeralKey?.getPublicKey()?.getThumbprint(),
