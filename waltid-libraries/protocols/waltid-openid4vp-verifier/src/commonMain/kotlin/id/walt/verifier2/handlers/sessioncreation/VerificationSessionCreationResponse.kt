@@ -8,8 +8,8 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class VerificationSessionCreationResponse(
     val sessionId: String,
-    val bootstrapAuthorizationRequestUrl: Url?,
-    val fullAuthorizationRequestUrl: Url,
+    val bootstrapAuthorizationRequestUrl: Url? = null,
+    val fullAuthorizationRequestUrl: Url? = null,
     val creationTarget: String? = null,
 
     // Custom data:
