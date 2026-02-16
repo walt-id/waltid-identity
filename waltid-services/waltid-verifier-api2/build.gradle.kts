@@ -73,7 +73,9 @@ dependencies {
 
     // Test
     testImplementation(identityLibs.bundles.waltid.ktortesting)
-
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+    testImplementation("org.bouncycastle:bcprov-lts8on:2.73.9")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
@@ -82,10 +84,12 @@ dependencies {
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+    api(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
     api(project(":waltid-libraries:credentials:waltid-vical"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
+    implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
 

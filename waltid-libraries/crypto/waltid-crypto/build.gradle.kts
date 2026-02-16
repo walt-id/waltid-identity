@@ -52,6 +52,7 @@ kotlin {
             implementation(identityLibs.bouncycastle.pkix) // PEM import
 
             implementation(identityLibs.nimbus.jose.jwt)
+            implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Ktor client
             implementation(identityLibs.ktor.client.okhttp)

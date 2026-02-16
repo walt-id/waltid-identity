@@ -1,5 +1,6 @@
 package id.walt.mdoc.objects.dcapi
 
+import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -30,6 +31,20 @@ data class DCAPIEncryptionInfo(
     init {
         require(type == "dcapi")
     }
+
+    fun encodeToBase64Url(): String = coseCompliantCbor.encodeToByteArray(this).encodeToBase64Url()
+
+    companion object {
+        const val TYPE = "dcapi"
+    }
+
+    constructor(nonce: ByteArray, recipientPublicKey: CoseKey) : this(
+        type = TYPE,
+        encryptionParameters = DCAPIEncryptionParameters(
+            nonce = nonce,
+            recipientPublicKey = recipientPublicKey
+        )
+    )
 
     /**
      * Custom serializer to handle the specific CBOR array structure `["dcapi", EncryptionParameters]`.

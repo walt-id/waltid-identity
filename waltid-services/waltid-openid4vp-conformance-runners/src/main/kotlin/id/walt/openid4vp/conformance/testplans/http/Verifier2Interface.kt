@@ -1,9 +1,10 @@
 package id.walt.openid4vp.conformance.testplans.http
 
-import id.walt.openid4vp.verifier.data.CrossDeviceFlowSetup
-import id.walt.openid4vp.verifier.data.Verification2Session
-import id.walt.openid4vp.verifier.data.VerificationSessionSetup
-import id.walt.openid4vp.verifier.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.VerificationSessionSetup
+import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
+import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -27,7 +28,7 @@ class Verifier2Interface(
                     )
                 else verificationSessionSetup
             )
-        }.body<VerificationSessionCreator.VerificationSessionCreationResponse>()
+        }.body<VerificationSessionCreationResponse>()
 
     /** Create verification session information from Verifier2 */
     suspend fun getVerificationSessionInfo(sessionId: String) =
