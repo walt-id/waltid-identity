@@ -13,7 +13,6 @@ import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.util.*
 
 
 internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
@@ -37,12 +36,6 @@ internal fun getJcaSigningAlgorithmNameFromKeyType(
     }
 }
 
-
-internal actual fun isValidIsoCountryCode(countryCode: String): Boolean {
-    return Locale.getISOCountries().find { it == countryCode }?.let {
-        true
-    } ?: false
-}
 
 internal fun issuerAlternativeNameToGeneralNameArray(
     issuerAlternativeName: IssuerAlternativeName,
