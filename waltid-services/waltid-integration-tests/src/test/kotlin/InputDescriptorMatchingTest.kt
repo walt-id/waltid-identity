@@ -76,12 +76,10 @@ class InputDescriptorMatchingTest(
         // Request: $.credentialSubject.degree.type: "UniversityDegree",
         // --> match should return 0, presentation should be rejected
         verifyCredential(getPresentationRequestByDegreeType("UniversityDegree"), wallet, did, newCredential1, false)
-        
-        // Issue a credential with type array containing "DataspaceParticipantCredential"
-        val dataspaceCredential = issueCredential(dataspaceParticipantIssuanceRequest, wallet, false)
+
         // Request: $.vc.type with contains filter for array type
         // --> match should return 1, presentation should be accepted
-        verifyCredential(getPresentationRequestWithContainsFilter("DataspaceParticipantCredential"), wallet, did, dataspaceCredential, true)
+        verifyCredential(getPresentationRequestWithContainsFilter("UniversityDegree"), wallet, did, newCredential1, true)
     }
 
     @OptIn(ExperimentalUuidApi::class)
@@ -319,53 +317,6 @@ class InputDescriptorMatchingTest(
     }
   """.trimIndent()
 
-    val dataspaceParticipantIssuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(buildJsonObject {
-        put("issuerKey", Json.decodeFromString<JsonElement>(WaltidServicesIntegrationTests.issuerKey))
-        put("issuerDid", WaltidServicesIntegrationTests.issuerDid)
-        put("credentialConfigurationId", "UniversityDegree_jwt_vc_json")
-        put(
-            "credentialData", Json.decodeFromString<JsonElement>(
-                """
-      {
-        "@context": [
-          "https://www.w3.org/2018/credentials/v1",
-          "https://www.w3.org/2018/credentials/examples/v1"
-        ],
-        "id": "http://example.gov/credentials/dataspace-participant",
-        "type": [
-          "VerifiableCredential",
-          "DataspaceParticipantCredential"
-        ],
-        "issuer": {
-          "id": "did:web:vc.transmute.world"
-        },
-        "issuanceDate": "2020-03-10T04:24:12.164Z",
-        "credentialSubject": {
-          "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
-          "participantId": "participant-123"
-        }
-      }
-    """.trimIndent()
-            )
-        )
-        put(
-            "mapping", Json.decodeFromString<JsonElement>(
-                """
-      {
-        "id": "<uuid>",
-        "issuer": {
-          "id": "<issuerDid>"
-        },
-        "credentialSubject": {
-          "id": "<subjectDid>"
-        },
-        "issuanceDate": "<timestamp>",
-        "expirationDate": "<timestamp-in:365d>"
-      }
-    """.trimIndent()
-            )
-        )
-    })
 
     /**
      * Creates a presentation request with contains.const filter structure.
