@@ -19,7 +19,7 @@ data class W3CEntry(
     @SerialName("statusListIndex")
     override val index: ULong,
     @SerialName("statusSize")
-    val size: Int,
+    val size: Int = 1,
     @SerialName("statusListCredential")
     override val uri: String,
     @SerialName("statusMessage")
