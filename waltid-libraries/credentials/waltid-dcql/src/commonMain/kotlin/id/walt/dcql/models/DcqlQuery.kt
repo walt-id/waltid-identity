@@ -127,7 +127,7 @@ data class DcqlQuery(
                         ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name")),
                         ClaimsQuery(path = listOf("org.iso.18013.5.1", "birth_date")),
                         ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_birth_year")),
-                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_birth_year")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_18")),
                         ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_21")),
                         ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name_birth")),
                         ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name_birth")),
