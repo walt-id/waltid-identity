@@ -29,8 +29,6 @@ class IACACertificateInfoVectorsMPTest {
                 actual = info.issuingAuthority,
             )
 
-            println(info.issuingAuthority)
-
             val issuer = assertNotNull(info.issuer)
             val subject = assertNotNull(info.subject)
 
