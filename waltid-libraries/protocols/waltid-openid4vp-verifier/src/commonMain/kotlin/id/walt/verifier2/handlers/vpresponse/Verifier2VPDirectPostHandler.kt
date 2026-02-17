@@ -50,7 +50,10 @@ object Verifier2VPDirectPostHandler {
                 log.debug { "Transcript hash: $transcriptHashHex" }
 
                 val plaintext = AnnexCResponseVerifier.decryptToDeviceResponse(
-                    encryptedResponseB64 = responseData.jsonBody["response"]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing 'response' attribute in Annex C JSON response from wallet"),
+                    encryptedResponseB64 = (responseData.jsonBody["response"]
+                        ?: responseData.jsonBody["data"]?.jsonObject["response"])?.jsonPrimitive?.content ?: throw IllegalArgumentException(
+                        "Missing 'response' attribute in Annex C JSON response from wallet"
+                    ),
                     encryptionInfoB64 = encryptionInfoB64,
                     origin = session.setup.origin,
                     recipientPrivateKey = ephemeralDecryptionKey?.key as? JWKKey
