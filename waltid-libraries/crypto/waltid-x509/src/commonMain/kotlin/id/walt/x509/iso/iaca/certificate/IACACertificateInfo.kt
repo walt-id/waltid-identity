@@ -31,5 +31,4 @@ internal data class IACACertificateInfoExtras(
 
 internal expect suspend fun platformExtractIacaCertificateInfoExtras(
     certificateHandle: X509CertificateHandle,
-    principalName: IACAPrincipalName,
 ): IACACertificateInfoExtras

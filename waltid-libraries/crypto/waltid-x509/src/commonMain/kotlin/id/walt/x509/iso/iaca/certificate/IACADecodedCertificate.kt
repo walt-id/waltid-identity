@@ -51,7 +51,6 @@ data class IACADecodedCertificate internal constructor(
     suspend fun toIacaCertificateInfo(): IACACertificateInfo {
         val extras = platformExtractIacaCertificateInfoExtras(
             certificateHandle = certificate,
-            principalName = principalName,
         )
         return IACACertificateInfo(
             certificate = certificate.getCertificateDer().bytes,

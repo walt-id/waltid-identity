@@ -4,7 +4,6 @@ import id.walt.x509.X509CertificateHandle
 
 internal actual suspend fun platformExtractIacaCertificateInfoExtras(
     certificateHandle: X509CertificateHandle,
-    principalName: IACAPrincipalName,
 ): IACACertificateInfoExtras {
     TODO("Not yet implemented")
 }
