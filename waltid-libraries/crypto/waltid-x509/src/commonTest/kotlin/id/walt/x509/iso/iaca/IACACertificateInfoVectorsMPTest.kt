@@ -1,12 +1,10 @@
 package id.walt.x509.iso.iaca
 
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
 import okio.ByteString.Companion.decodeHex
-import okio.ByteString.Companion.toByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -16,11 +14,9 @@ class IACACertificateInfoVectorsMPTest {
     @Test
     fun `certificate info extras match known PEM vectors`() = runTest {
         vectors.forEach { vector ->
-            val derEncodedCertificate = JWKKey.convertDERorPEMtoByteArray(vector.pem)
+
             val decodedCertificate = parser.parse(
-                certificate = CertificateDer(
-                    bytes = derEncodedCertificate.toByteString(),
-                ),
+                certificate = CertificateDer.fromPEMEncodedString(vector.pem),
             )
 
             //just to make sure that an invalid PEM encoded certificate is not added by mistake
