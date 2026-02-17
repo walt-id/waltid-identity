@@ -8,6 +8,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.cbor.ByteString
 
 /**
@@ -29,6 +30,50 @@ data class Pid(
     /** Day, month, and year on which the user to whom the person identification data relates was born. */
     @SerialName("birth_date")
     val birthDate: LocalDate,
+
+    /** Age attestation: Over 12 years old? */
+    @SerialName("age_over_12")
+    val ageOver12: Boolean? = null,
+
+    /** Age attestation: Over 13 years old? */
+    @SerialName("age_over_13")
+    val ageOver13: Boolean? = null,
+
+    /** Age attestation: Over 14 years old? */
+    @SerialName("age_over_14")
+    val ageOver14: Boolean? = null,
+
+    /** Age attestation: Over 16 years old? */
+    @SerialName("age_over_16")
+    val ageOver16: Boolean? = null,
+
+    /** Age attestation: Over 18 years old? */
+    @SerialName("age_over_18")
+    val ageOver18: Boolean? = null,
+
+    /** Age attestation: Over 21 years old? */
+    @SerialName("age_over_21")
+    val ageOver21: Boolean? = null,
+
+    /** Age attestation: Over 25 years old? */
+    @SerialName("age_over_25")
+    val ageOver25: Boolean? = null,
+
+    /** Age attestation: Over 60 years old? */
+    @SerialName("age_over_60")
+    val ageOver60: Boolean? = null,
+
+    /** Age attestation: Over 62 years old? */
+    @SerialName("age_over_62")
+    val ageOver62: Boolean? = null,
+
+    /** Age attestation: Over 65 years old? */
+    @SerialName("age_over_65")
+    val ageOver65: Boolean? = null,
+
+    /** Age attestation: Over 68 years old? */
+    @SerialName("age_over_68")
+    val ageOver68: Boolean? = null,
 
     /** The country as an alpha-2 country code as specified in ISO 3166-1, or the state, province, district, or local area or the municipality, city, town, or village where the user to whom the person identification data relates was born. */
     @SerialName("birth_place")
@@ -180,12 +225,29 @@ data class Pid(
 
     companion object : MdocCompanion {
         override fun registerSerializationTypes() {
+            val localDate = LocalDate.serializer()
+            val uint = UInt.serializer()
+            val boolean = Boolean.serializer()
+
             MdocsCborSerializer.register(
                 mapOf(
-                    "birth_date" to LocalDate.serializer(),
-                    "issuance_date" to LocalDate.serializer(),
-                    "expiry_date" to LocalDate.serializer(),
-                    "portrait" to ByteArraySerializer()
+                    "birth_date" to localDate,
+                    "issuance_date" to localDate,
+                    "expiry_date" to localDate,
+
+                    "age_over_12" to boolean,
+                    "age_over_13" to boolean,
+                    "age_over_14" to boolean,
+                    "age_over_16" to boolean,
+                    "age_over_18" to boolean,
+                    "age_over_21" to boolean,
+                    "age_over_25" to boolean,
+                    "age_over_60" to boolean,
+                    "age_over_62" to boolean,
+                    "age_over_65" to boolean,
+                    "age_over_68" to boolean,
+
+                    "portrait" to ByteArraySerializer(),
                 ), "eu.europa.ec.eudi.pid.1"
             )
         }
