@@ -5,7 +5,7 @@ import id.walt.x509.toJcaX509Certificate
 import okio.ByteString.Companion.toByteString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 
-internal actual suspend fun platformExtractIacaCertificateInfoExtras(
+internal actual suspend fun platformExtractIACACertificateInfoExtras(
     certificateHandle: X509CertificateHandle,
 ): IACACertificateInfoExtras {
     val certificate = certificateHandle.getCertificateDer().toJcaX509Certificate()

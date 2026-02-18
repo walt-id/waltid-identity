@@ -29,6 +29,6 @@ internal data class IACACertificateInfoExtras(
     val subject: ByteString?,
 )
 
-internal expect suspend fun platformExtractIacaCertificateInfoExtras(
+internal expect suspend fun platformExtractIACACertificateInfoExtras(
     certificateHandle: X509CertificateHandle,
 ): IACACertificateInfoExtras

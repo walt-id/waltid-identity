@@ -49,7 +49,7 @@ data class IACADecodedCertificate internal constructor(
      * Extract from the IACA certificate data related to the CertificateInfo VICAL structure.
      */
     suspend fun toIacaCertificateInfo(): IACACertificateInfo {
-        val extras = platformExtractIacaCertificateInfoExtras(
+        val extras = platformExtractIACACertificateInfoExtras(
             certificateHandle = certificate,
         )
         return IACACertificateInfo(
