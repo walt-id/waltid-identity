@@ -44,6 +44,43 @@ class CertificateDerMPTest {
     }
 
     @Test
+    fun `toPEMEncodedString includes header footer and CRLF separators`() {
+        val der = CertificateDer.fromPEMEncodedString(
+            pemEncodedCertificate = examplePem,
+        )
+
+        val pem = der.toPEMEncodedString()
+
+        assertEquals(
+            expected = true,
+            actual = pem.startsWith("$pemHeader\r\n"),
+        )
+        assertEquals(
+            expected = true,
+            actual = pem.endsWith("\r\n$pemFooter"),
+        )
+    }
+
+    @Test
+    fun `toPEMEncodedString uses 64 character lines`() {
+        val der = CertificateDer.fromPEMEncodedString(
+            pemEncodedCertificate = examplePem,
+        )
+
+        val pem = der.toPEMEncodedString()
+        val base64Payload = pem
+            .removePrefix("$pemHeader\r\n")
+            .removeSuffix("\r\n$pemFooter")
+
+        base64Payload.split("\r\n").forEach { line ->
+            assertEquals(
+                expected = true,
+                actual = line.length in 1..64,
+            )
+        }
+    }
+
+    @Test
     fun `fromPEMEncodedString fails when header is missing`() {
         val pem = """
             $minimalBase64Payload
