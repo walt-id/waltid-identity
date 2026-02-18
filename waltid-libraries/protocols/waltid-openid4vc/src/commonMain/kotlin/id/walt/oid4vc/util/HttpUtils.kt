@@ -13,6 +13,7 @@ val http = HttpClient {
 
         // default seems to be 5s
         connectTimeoutMillis = 500
+        socketTimeoutMillis = 250
     }
     install(ContentNegotiation) {
         json()

@@ -249,7 +249,7 @@ object OpenID4VCI {
             )
         }
         if (duration.minus(300.milliseconds).isPositive()) {
-            log.warn { "Requesting token from '${tokenEndpoint}' took more than 300ms" }
+            log.warn { "Requesting token from '${tokenEndpoint}' took '${duration}' which is more than expected 300ms" }
         }
         if (!response.status.isSuccess()) {
             throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
