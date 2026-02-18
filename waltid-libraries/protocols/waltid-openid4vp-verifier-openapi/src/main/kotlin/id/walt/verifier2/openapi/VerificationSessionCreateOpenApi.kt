@@ -104,9 +104,10 @@ object VerificationSessionCreateOpenApi {
 
                 example("[openid4vp-dc_api][iso mdl] unsigned & unencrypted ") { value = DcApiFlowSetup.EXAMPLE_UNSIGNED_UNENCRYPTED_MDL }
                 example("[openid4vp-dc_api][iso mdl] unsigned & encrypted") { value = DcApiFlowSetup.EXAMPLE_UNSIGNED_ENCRYPTED_MDL }
-                example("[openid4vp-dc_api][iso photo-id] signed & unencrypted ") { value = DcApiFlowSetup.EXAMPLE_SIGNED_PHOTOID }
                 example("[openid4vp-dc_api][iso mdl] signed & unencrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_MDL }
                 example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
+                example("[openid4vp-dc_api][iso photo-id] signed & encrypted ") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PHOTOID }
+                example("[openid4vp-dc_api][iso pid] signed & encrypted ") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PID }
 
                 // Annex-C examples
                 example("[iso-18013-7-dc_api][iso mdl]") { value = DcApiAnnexCFlowSetup.EXTENDED_MDL_EXAMPLE }

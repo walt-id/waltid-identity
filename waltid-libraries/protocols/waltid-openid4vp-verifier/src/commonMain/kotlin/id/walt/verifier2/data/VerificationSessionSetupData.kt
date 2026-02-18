@@ -18,7 +18,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Defines all properties common to every flow.
@@ -172,12 +171,21 @@ data class DcApiFlowSetup(
                             )
                         )
                     )
-                ), signedRequest = false, encryptedResponse = false, clientId = "x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A",
+                ),
+                signedRequest = false,
+                encryptedResponse = false,
+                clientId = "x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A",
 
                 key = DirectSerializedKey(KeyManager.resolveSerializedKeyBlocking("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""))
-            ), expectedOrigins = listOf("https://digital-credentials.walt.id"), haip = false
+            ),
+            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            haip = false
         )
-        val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.copy(core = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.core.copy(encryptedResponse = true))
+        val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.copy(
+            core = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.core.copy(
+                encryptedResponse = true
+            )
+        )
 
         val EXAMPLE_SIGNED_MDL = DcApiFlowSetup(
             core = GeneralFlowConfig(
@@ -194,14 +202,38 @@ data class DcApiFlowSetup(
                             )
                         )
                     )
-                ), signedRequest = true, encryptedResponse = false, clientId = "x509_hash:abc-xyz-base64url-sha256-hash-of-der-x509-leaf",
+                ),
+                signedRequest = true,
+                encryptedResponse = false,
+                clientId = "x509_hash:kZ5SI3MAFaLDPRxza8xguw-o6b8LYfmP2ZvrqVSRWng",
+                x5c = listOf(
+                    "MIIB7TCCAZOgAwIBAgIUXrHFKoaAx6+CFOOHp6fZ7Rs2EzgwCgYIKoZIzj0EAwIwHTEbMBkGA1UEAwwSQ3VzdG9tSW50ZXJtZWRpYXRlMB4XDTI2MDEyMjE1NTY0OFoXDTI3MDEyMjE1NTY0OFowEzERMA8GA1UEAwwIVmVyaWZpZXIwgZswEAYHKoZIzj0CAQYFK4EEACMDgYYABAD1oOE9xUCHiQ/8UDdJGqeTM6e5SdewrYP0/BstuJcDqfxCIQ8wSvTKArn0iCE0aJVpXIxU4908vdQva3LU7kn9BQBJxQyonnLqp2fFzCoLe3RWVkX5szxa4EJmrsJW1wwtJBwmYVe+lToAqFnc30i3oCyhp/pyDQCEaj0fZ9ij6UMCp6N4MHYwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwFgYDVR0RBA8wDYILZXhhbXBsZS5jb20wHQYDVR0OBBYEFFAdasyU1haLdvQdEizJEaAO+cmWMB8GA1UdIwQYMBaAFGVh3m3K6y5gABHGIuD7ibTR+AG6MAoGCCqGSM49BAMCA0gAMEUCIQDT9GYMvTTyEOmKDvilHmgejcbLWQ6ACUzlmbZDk67ztAIge2kWDxRetz6xIDtnfg4vlCW6pLbdBWasMrfm1eppDww=",
+                    "MIIBlzCCAT2gAwIBAgIUZFEF4iwIsLuJO7pJ9bU7vo9Dg3kwCgYIKoZIzj0EAwIwFTETMBEGA1UEAwwKQ3VzdG9tUm9vdDAeFw0yNjAxMjIxNTU1NDJaFw0zNjAxMjAxNTU1NDJaMB0xGzAZBgNVBAMMEkN1c3RvbUludGVybWVkaWF0ZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABAvlBFSSRWetJJSj5rvGoXtPnfw97YRHbJj4/kspQbSwxVN3RtofsSu0DevrISGx2MCPqqxHXdfSeu9SKgen6IOjYzBhMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBRlYd5tyusuYAARxiLg+4m00fgBujAfBgNVHSMEGDAWgBQ+D1YkeDpF+qaxAhlnb3XSkGZWCTAKBggqhkjOPQQDAgNIADBFAiEA789kIQsGTa/GJEgYaOID9VVoO0PyeeYEwub7P0a1+ZICIHI9bYi72XTca9e8rqGJuYmKz8qEQodLvaXdgwCfQ4KZ"
+                ),
 
-                key = DirectSerializedKey(KeyManager.resolveSerializedKeyBlocking("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""))
-            ), expectedOrigins = listOf("http://localhost:7003"), haip = false
+                key = DirectSerializedKey(
+                    KeyManager.resolveSerializedKeyBlocking(
+                        """{"type":"jwk","jwk":{
+                    "kty": "EC",
+                    "crv": "P-521",
+                    "x": "APWg4T3FQIeJD_xQN0kap5Mzp7lJ17Ctg_T8Gy24lwOp_EIhDzBK9MoCufSIITRolWlcjFTj3Ty91C9rctTuSf0F",
+                    "y": "AEnFDKiecuqnZ8XMKgt7dFZWRfmzPFrgQmauwlbXDC0kHCZhV76VOgCoWdzfSLegLKGn-nINAIRqPR9n2KPpQwKn",
+                    "d": "AZT9f0qOOSMQl25qXwvFs23rq0PIUOV1R8YcG1iqRNKEYYs5k8gXNNuud4W6amuItCGWCrKSXRoHmgj6C5NUDzhA"
+                  }}"""
+                    )
+                )
+            ),
+            expectedOrigins = listOf("https://digital-credentials.walt.id"),
+            haip = false
         )
-        val EXAMPLE_SIGNED_ENCRYPTED_MDL = EXAMPLE_SIGNED_MDL.copy(core = EXAMPLE_SIGNED_MDL.core.copy(encryptedResponse = true))
-        val EXAMPLE_SIGNED_PHOTOID = EXAMPLE_SIGNED_MDL.copy(
+        val EXAMPLE_SIGNED_ENCRYPTED_MDL = EXAMPLE_SIGNED_MDL.copy(
             core = EXAMPLE_SIGNED_MDL.core.copy(
+                encryptedResponse = true
+            )
+        )
+
+        val EXAMPLE_SIGNED_ENCRYPTED_PHOTOID = EXAMPLE_SIGNED_ENCRYPTED_MDL.copy(
+            core = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.copy(
                 dcqlQuery = DcqlQuery(
                     credentials = listOf(
                         CredentialQuery(
@@ -215,7 +247,43 @@ data class DcApiFlowSetup(
                     )
                 ),
                 signedRequest = true,
-                encryptedResponse = false,
+                encryptedResponse = true,
+                key = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.key,
+                x5c = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.x5c
+            )
+        )
+
+        val EXAMPLE_SIGNED_ENCRYPTED_PID = EXAMPLE_SIGNED_ENCRYPTED_MDL.copy(
+            core = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.copy(
+                dcqlQuery = DcqlQuery(
+                    credentials = listOf(
+                        CredentialQuery(
+                            id = "my_pid",
+                            format = CredentialFormat.MSO_MDOC,
+                            meta = MsoMdocMeta(doctypeValue = "eu.europa.ec.eudi.pid.1"),
+                            claims = listOf(
+                                "family_name",
+                                "given_name",
+                                "birth_date",
+                                "age_birth_year",
+                                "age_over_18",
+                                "age_over_21",
+                                "family_name_birth",
+                                "given_name_birth",
+                                "birth_place",
+                                "birth_country",
+                                "issuance_date",
+                                "expiry_date",
+                                "issuing_authority",
+                                "issuing_country"
+                            ).map { ClaimsQuery(path = listOf("eu.europa.ec.eudi.pid.1", it)) }
+                        )
+                    )
+                ),
+                signedRequest = true,
+                encryptedResponse = true,
+                key = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.key,
+                x5c = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.x5c
             )
         )
     }
@@ -291,7 +359,7 @@ data class DcApiAnnexCFlowSetup(
                     "nationality"
                 )
             ),
-            origin = "https://digital-credentials.walt.id",
+            origin = "https://digital-credentials.walt.id"
         )
 
         val EXTENDED_PHOTOID_EXAMPLE = DcApiAnnexCFlowSetup(
