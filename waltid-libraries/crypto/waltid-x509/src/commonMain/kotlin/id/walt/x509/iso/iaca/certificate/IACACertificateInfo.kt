@@ -25,8 +25,8 @@ data class IACACertificateInfo(
 
 internal data class IACACertificateInfoExtras(
     val issuingAuthority: String,
-    val issuer: ByteString?,
-    val subject: ByteString?,
+    val issuer: ByteString,
+    val subject: ByteString,
 )
 
 internal expect suspend fun platformExtractIACACertificateInfoExtras(
