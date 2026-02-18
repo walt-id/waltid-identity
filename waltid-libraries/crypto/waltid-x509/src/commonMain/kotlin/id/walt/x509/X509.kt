@@ -27,11 +27,10 @@ data class CertificateDer(
             val base64Payload = extractPemBase64Payload(
                 pemEncodedCertificate = pemEncodedCertificate,
             )
-            val decodedPayload = Base64.Pem.decode(
-                source = base64Payload,
-            )
             return CertificateDer(
-                bytes = decodedPayload.toByteString(),
+                bytes = Base64.Pem.decode(
+                    source = base64Payload,
+                ).toByteString(),
             )
         }
 
@@ -40,13 +39,15 @@ data class CertificateDer(
         ): String {
             val trimmedPem = pemEncodedCertificate.trim()
             require(
-                value = trimmedPem.startsWith(PEM_HEADER),
-                lazyMessage = { "PEM header not found." },
-            )
+                trimmedPem.startsWith(PEM_HEADER)
+            ) {
+                "PEM header not found."
+            }
             require(
-                value = trimmedPem.endsWith(PEM_FOOTER),
-                lazyMessage = { "PEM footer not found." },
-            )
+                trimmedPem.endsWith(PEM_FOOTER)
+            ) {
+                "PEM footer not found."
+            }
 
             val base64Payload = trimmedPem
                 .removePrefix(PEM_HEADER)
@@ -56,9 +57,10 @@ data class CertificateDer(
                 )
 
             require(
-                value = base64Payload.isNotBlank(),
-                lazyMessage = { "PEM payload is empty." },
-            )
+                base64Payload.isNotBlank()
+            ) {
+                "PEM payload is empty."
+            }
 
             return base64Payload
         }
