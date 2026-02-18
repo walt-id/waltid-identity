@@ -13,6 +13,12 @@ kotlin {
         outputModuleName = "crypto"
     }
 
+    applyDefaultHierarchyTemplate()
+    if(enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
+
     sourceSets {
         commonMain.dependencies {
             // Kotlinx.serialization
@@ -78,23 +84,12 @@ kotlin {
         jsTest.dependencies {
             implementation(kotlin("test-js"))
         }
+
         if (enableIosBuild) {
-            val iosMain by creating {
-                dependsOn(commonMain.get())
-                dependencies {
-                    implementation(project(":waltid-libraries:crypto:waltid-target-ios"))
-                }
+            iosMain.dependencies {
+                implementation(project(":waltid-libraries:crypto:waltid-target-ios"))
             }
-
-            val iosTest by creating {
-                dependsOn(commonTest.get())
-            }
-
-            val iosArm64Main by getting { dependsOn(iosMain) }
-            val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
-
-            val iosArm64Test by getting { dependsOn(iosTest) }
-            val iosSimulatorArm64Test by getting { dependsOn(iosTest) }
+            iosTest.dependencies {}
         }
     }
 }
