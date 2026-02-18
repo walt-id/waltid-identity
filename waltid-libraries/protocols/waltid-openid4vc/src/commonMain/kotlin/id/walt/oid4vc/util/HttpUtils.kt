@@ -12,8 +12,7 @@ val http = HttpClient {
         // private val maxEndpointIdleTime: Long = 2 * config.endpoint.connectTimeout
 
         // default seems to be 5s
-        connectTimeoutMillis = 500
-        socketTimeoutMillis = 250
+        connectTimeoutMillis = 250
     }
     install(ContentNegotiation) {
         json()
