@@ -157,6 +157,28 @@ data class DcApiFlowSetup(
     }
 
     companion object {
+        val EXAMPLE_UNSIGNED_UNENCRYPTED_MDL = DcApiFlowSetup(
+            core = GeneralFlowConfig(
+                dcqlQuery = DcqlQuery(
+                    credentials = listOf(
+                        CredentialQuery(
+                            id = "my_mdl",
+                            format = CredentialFormat.MSO_MDOC,
+                            meta = MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL"),
+                            claims = listOf(
+                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name")),
+                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name")),
+                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_21"))
+                            )
+                        )
+                    )
+                ), signedRequest = false, encryptedResponse = false, clientId = "x509_hash:OPpTDyXlg6WRu2-Qn4rpQcA9uVqSrNExCS8kCYUe09A",
+
+                key = DirectSerializedKey(KeyManager.resolveSerializedKeyBlocking("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""))
+            ), expectedOrigins = listOf("https://digital-credentials.walt.id"), haip = false
+        )
+        val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.copy(core = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.core.copy(encryptedResponse = true))
+
         val EXAMPLE_SIGNED_MDL = DcApiFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = DcqlQuery(
@@ -187,19 +209,7 @@ data class DcApiFlowSetup(
                             format = CredentialFormat.MSO_MDOC,
                             meta = MsoMdocMeta(doctypeValue = "org.iso.23220.photoid.1"),
                             claims = listOf(
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "resident_postal_code")),
-                                ClaimsQuery(
-                                    path = listOf("org.iso.18013.5.1", "issuing_country"), values = listOf(JsonPrimitive("AT"))
-                                ),
-                                ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "person_id")),
-                                ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "resident_street")),
-                                ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "administrative_number")),
-                                ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "travel_document_number")),
-                                ClaimsQuery(path = listOf("org.iso.23220.dtc.1", "dtc_version")),
-                                ClaimsQuery(path = listOf("org.iso.23220.dtc.1", "dtc_dg1")),
+                                ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "person_id"))
                             )
                         )
                     )
