@@ -1,11 +1,16 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.objects.deviceretrieval
 
 import id.walt.cose.CoseSign1
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.mdoc.encoding.ByteStringWrapper
+import kotlinx.serialization.*
 
 /**
- * Represents the top-level request from an mdoc reader to an mdoc.
+ * Represents the top-level request from a mdoc reader to a mdoc.
  * It encapsulates one or more specific document requests.
  *
  * @see ISO/IEC 18013-5:2021, 8.3.2.1.2.1
@@ -27,5 +32,49 @@ data class DeviceRequest(
 
     //@SerialName("deviceRequestInfo")
     //val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
-)
+) {
+    companion object {
+        const val VERSION = "1.0"
+
+        fun decodeFromBase64Url(base64Url: String): DeviceRequest {
+            return coseCompliantCbor.decodeFromByteArray<DeviceRequest>(base64Url.decodeFromBase64Url())
+        }
+    }
+
+    fun print() {
+        println("[DeviceRequest]")
+        docRequests.forEach { docRequest ->
+            docRequest.itemsRequest.value.let { itemRequests ->
+                println("> ItemRequest for \"${itemRequests.docType}\" - requestInfo=${itemRequests.requestInfo}")
+                itemRequests.namespaces.forEach { namespace ->
+                    println(">> Namespace ${namespace.key}")
+                    namespace.value.entries.forEachIndexed { idx, itemRequest ->
+                        println(">>> ${idx + 1}/${namespace.value.entries.size}: Item \"${itemRequest.key}\" - ${itemRequest.value}")
+                    }
+                }
+            }
+        }
+    }
+
+    fun encodeToBase64Url(): String = coseCompliantCbor.encodeToByteArray(this).encodeToBase64Url()
+
+    constructor(docType: String, requestedElements: Map<String, List<String>>, intentToRetain: Boolean = false) : this(
+        version = VERSION,
+        docRequests = listOf(
+            DocRequest(
+                itemsRequest = ByteStringWrapper(
+                    value = ItemsRequest(
+                        docType = docType,
+                        namespaces = requestedElements
+                            .filterValues { it.isNotEmpty() }
+                            .mapValues { (_, elems) ->
+                                ItemsRequestList(elems.distinct().map { ItemRequest(it, intentToRetain) })
+                            }
+                    )
+                )
+            )
+        )
+    )
+
+}
 

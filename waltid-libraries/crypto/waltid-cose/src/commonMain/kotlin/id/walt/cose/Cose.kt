@@ -2,6 +2,7 @@
 
 package id.walt.cose
 
+import id.walt.crypto.keys.KeyType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -618,6 +619,15 @@ object Cose {
 
         /** SECG secp256k1 curve */
         const val secp256k1 = 8
+
+        fun ellipticCurveForKeyType(keyType: KeyType) = when (keyType) {
+            KeyType.secp256r1 -> P_256
+            KeyType.secp384r1 -> P_384
+            KeyType.secp521r1 -> P_521
+            KeyType.secp256k1 -> secp256k1
+            KeyType.Ed25519 -> Ed25519
+            else -> throw IllegalArgumentException("Unsupported/unknown key type for COSE elliptic curve conversion: $keyType")
+        }
     }
 
 }

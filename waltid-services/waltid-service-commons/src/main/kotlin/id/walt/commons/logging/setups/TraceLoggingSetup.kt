@@ -17,12 +17,13 @@ data object TraceLoggingSetup : LoggingSetup("trace", {
     }
 
     loggerBaseToMinimum("com.zaxxer.hikari", Level.INFO)
+    loggerBaseToMinimum("reactor.util", Level.INFO)
 
     loggerBaseToMinimum("io.ktor.server", Level.DEBUG)
     loggerBaseToMinimum("io.ktor.client", Level.DEBUG)
 
     loggerBaseToMinimum("org.sqlite.core.NativeDB", Level.DEBUG)
-    loggerBaseToMinimum("org.mongodb.driver", Level.DEBUG)
+    loggerBaseToMinimum("org.mongodb.driver", Level.INFO)
 
     logging {
         fromMinLevel(Level.ERROR) {

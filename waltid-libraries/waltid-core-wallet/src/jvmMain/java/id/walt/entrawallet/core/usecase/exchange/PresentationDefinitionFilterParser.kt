@@ -2,6 +2,8 @@ package id.walt.webwallet.usecase.exchange
 
 import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class PresentationDefinitionFilterParser {
@@ -26,12 +28,30 @@ class PresentationDefinitionFilterParser {
     // TODO: Don't just match on the types
     private fun createTypeFilter(inputDescriptorField: InputDescriptorField): TypeFilter? = let {
         val paths = inputDescriptorField.path.map { prefixRegex.replace(it, "") }
-        val filterType = inputDescriptorField.filter?.get("type")?.jsonPrimitive?.content
 
-        val filterPattern = inputDescriptorField.filter?.get("const")?.jsonPrimitive?.content
-            ?: inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
-                ?.removePrefix("^")
-                ?.removeSuffix("$")
+        val filterType = inputDescriptorField.filter?.get("type")?.let {
+            when (it) {
+                is JsonPrimitive -> it.content
+                else -> null
+            }
+        }
+
+        val filterPattern = inputDescriptorField.filter?.get("const")?.let {
+            when (it) {
+                is JsonPrimitive -> it.content
+                else -> null
+            }
+        } ?: inputDescriptorField.filter?.get("contains")?.jsonObject?.get("const")?.let {
+            when (it) {
+                is JsonPrimitive -> it.content
+                else -> null
+            }
+        } ?: inputDescriptorField.filter?.get("pattern")?.let {
+            when (it) {
+                is JsonPrimitive -> it.content.removePrefix("^").removeSuffix("$")
+                else -> null
+            }
+        }
 
         /*val filterPattern = inputDescriptorField.filter?.get("pattern")?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("No filter pattern in presentation definition constraint")*/

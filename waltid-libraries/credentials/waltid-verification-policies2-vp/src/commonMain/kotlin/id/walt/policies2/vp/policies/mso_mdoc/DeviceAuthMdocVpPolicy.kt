@@ -101,6 +101,8 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
         responseUri = responseUri,
         isEncrypted = isEncrypted,
         isDcApi = isDcApi,
+        isAnnexC = isAnnexC,
+        data = customData,
 
         jwkThumbprint = jwkThumbprint
     )
