@@ -9,7 +9,10 @@ class CertificateDerMPTest {
     @Test
     fun `fromPEMEncodedString parses LF and CRLF line endings`() {
         val pemLf = examplePem
-        val pemCrLf = examplePem.replace("\n", "\r\n")
+        val pemCrLf = examplePem.replace(
+            oldValue = "\n",
+            newValue = "\r\n",
+        )
 
         val derFromLf = CertificateDer.fromPEMEncodedString(
             pemEncodedCertificate = pemLf,
@@ -41,6 +44,128 @@ class CertificateDerMPTest {
     }
 
     @Test
+    fun `fromPEMEncodedString fails when header is missing`() {
+        val pem = """
+            $minimalBase64Payload
+            $pemFooter
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `fromPEMEncodedString fails when footer is missing`() {
+        val pem = """
+            $pemHeader
+            $minimalBase64Payload
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `fromPEMEncodedString fails when footer appears before header`() {
+        val pem = """
+            $pemFooter
+            $minimalBase64Payload
+            $pemHeader
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `fromPEMEncodedString fails when content precedes header`() {
+        val pem = """
+            not-a-header
+            $pemHeader
+            $minimalBase64Payload
+            $pemFooter
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `fromPEMEncodedString fails when content follows footer`() {
+        val pem = """
+            $pemHeader
+            $minimalBase64Payload
+            $pemFooter
+            trailing-content
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `fromPEMEncodedString fails when multiple PEM blocks are present`() {
+        val pem = """
+            $pemHeader
+            $minimalBase64Payload
+            $pemFooter
+            $pemHeader
+            $minimalBase64Payload
+            $pemFooter
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
+    fun `fromPEMEncodedString fails when payload is empty`() {
+        val pem = """
+            $pemHeader
+
+            $pemFooter
+        """.trimIndent()
+
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
+    }
+
+    @Test
     fun `fromPEMEncodedString fails with single symbol payload`() {
         val pem = """
             -----BEGIN CERTIFICATE-----
@@ -48,11 +173,13 @@ class CertificateDerMPTest {
             -----END CERTIFICATE-----
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException> {
-            CertificateDer.fromPEMEncodedString(
-                pemEncodedCertificate = pem,
-            )
-        }
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
     }
 
     @Test
@@ -63,16 +190,22 @@ class CertificateDerMPTest {
             -----END CERTIFICATE-----
         """.trimIndent()
 
-        assertFailsWith<IllegalArgumentException> {
-            CertificateDer.fromPEMEncodedString(
-                pemEncodedCertificate = pem,
-            )
-        }
+        assertFailsWith<IllegalArgumentException>(
+            block = {
+                CertificateDer.fromPEMEncodedString(
+                    pemEncodedCertificate = pem,
+                )
+            },
+        )
     }
 
     private companion object {
+        private const val pemHeader = "-----BEGIN CERTIFICATE-----"
+        private const val pemFooter = "-----END CERTIFICATE-----"
+        private const val minimalBase64Payload = "AQ=="
+
         private val examplePem = """
-            -----BEGIN CERTIFICATE-----
+            $pemHeader
             MIIBtDCCAVqgAwIBAgIUTEBApuzyNump/cYzKXVdgubtZIwwCgYIKoZIzj0EAwIw
             JDELMAkGA1UEBhMCVVMxFTATBgNVBAMMDEV4YW1wbGUgSUFDQTAeFw0yNTA1Mjgx
             MjIzMDFaFw00MDA1MjQxMjIzMDFaMCQxCzAJBgNVBAYTAlVTMRUwEwYDVQQDDAxF
@@ -83,7 +216,7 @@ class CertificateDerMPTest {
             b20wDgYDVR0PAQH/BAQDAgEGMAoGCCqGSM49BAMCA0gAMEUCIQCN8SX5ojwspuyL
             W/XZBSTYpFj3bqpAOWthCLoxW29pNAIgSYLq8sE43y2Bf1pDvKu5cYjtkJ8hel53
             z4eL4VJvD1A=
-            -----END CERTIFICATE-----
+            $pemFooter
         """.trimIndent()
     }
 }
