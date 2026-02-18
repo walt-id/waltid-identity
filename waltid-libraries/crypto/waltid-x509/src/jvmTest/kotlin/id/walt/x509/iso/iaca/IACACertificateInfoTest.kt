@@ -26,8 +26,8 @@ class IACACertificateInfoTest {
         )
 
         val decodedCertificate = bundle.decodedCertificate
-        val infoBlocking = decodedCertificate.toIacaCertificateInfoBlocking()
-        val infoSuspend = decodedCertificate.toIacaCertificateInfo()
+        val infoBlocking = decodedCertificate.toIACACertificateInfoBlocking()
+        val infoSuspend = decodedCertificate.toIACACertificateInfo()
 
         assertEquals(
             expected = infoBlocking,

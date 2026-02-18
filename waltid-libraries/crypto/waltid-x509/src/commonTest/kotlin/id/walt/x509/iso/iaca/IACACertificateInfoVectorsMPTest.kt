@@ -22,7 +22,7 @@ class IACACertificateInfoVectorsMPTest {
             //just to make sure that an invalid PEM encoded certificate is not added by mistake
             validator.validate(decodedCertificate)
 
-            val info = decodedCertificate.toIacaCertificateInfo()
+            val info = decodedCertificate.toIACACertificateInfo()
 
             assertEquals(
                 expected = vector.issuingAuthority,

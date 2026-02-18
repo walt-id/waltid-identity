@@ -48,7 +48,7 @@ data class IACADecodedCertificate internal constructor(
     /**
      * Extract from the IACA certificate data related to the CertificateInfo VICAL structure.
      */
-    suspend fun toIacaCertificateInfo(): IACACertificateInfo {
+    suspend fun toIACACertificateInfo(): IACACertificateInfo {
         val extras = platformExtractIACACertificateInfoExtras(
             certificateHandle = certificate,
         )
@@ -67,10 +67,10 @@ data class IACADecodedCertificate internal constructor(
     }
 
     /**
-     * Blocking variant of [toIacaCertificateInfo].
+     * Blocking variant of [toIACACertificateInfo].
      */
-    fun toIacaCertificateInfoBlocking(): IACACertificateInfo = blockingBridge {
-        toIacaCertificateInfo()
+    fun toIACACertificateInfoBlocking(): IACACertificateInfo = blockingBridge {
+        toIACACertificateInfo()
     }
 
     /**
