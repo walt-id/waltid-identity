@@ -1,19 +1,14 @@
 package id.walt.oid4vc.util
 
 import io.ktor.client.*
-import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 
 val http = HttpClient {
 
-    install( HttpTimeout) {
-        // For CI/CD a low maxEndpointIdleTime seems to be needed. For the CIO client the time is calculated:
-        // private val maxEndpointIdleTime: Long = 2 * config.endpoint.connectTimeout
-
-        // default seems to be 5s
-        connectTimeoutMillis = 250
-    }
+    // For CI/CD OkHttp client should be used. CIO client seems to have some issues with timeouts when connecting to
+    // localhost in CI/CD pipelines,
+    // which can lead to hanging tests. OkHttp is more robust in these environments.
     install(ContentNegotiation) {
         json()
     }
