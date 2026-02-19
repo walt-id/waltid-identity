@@ -12,7 +12,7 @@ import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import io.ktor.client.*
-import io.ktor.client.engine.cio.*
+import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -40,8 +40,12 @@ class E2ETest(
     private val e2eHost = this.host
     private val e2ePort = this.port
 
-    fun testHttpClient(bearerToken: String? = null, doFollowRedirects: Boolean = true, block: HttpClientConfig<*>.() -> Unit = {}) =
-        HttpClient(CIO) {
+    fun testHttpClient(
+        bearerToken: String? = null,
+        doFollowRedirects: Boolean = true,
+        block: HttpClientConfig<*>.() -> Unit = {}
+    ) =
+        HttpClient(OkHttp) {
             install(ContentNegotiation) {
                 json()
             }
