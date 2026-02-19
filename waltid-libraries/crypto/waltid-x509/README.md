@@ -137,6 +137,7 @@ The `id.walt.x509.iso` package provides the following:
 - Builder classes for IACA (via `IACACertificateBuilder`) and Document Signer (via `DocumentSignerCertificateBuilder`) X.509 certificates.
 - Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validated** by the parsers; use the validator classes for validation.
 - Validator classes for IACA (via `IACAValidator`) and Document Signer (via `DocumentSignerValidator`) decoded certificate instances (`IACADecodedCertificate` and `DocumentSignerDecodedCertificate` respectively) with a simple and flexible validation configuration tuning (refer to `IACAValidationConfig` and `DocumentSignerValidationConfig` for the respective configuration options).
+- VICAL-aligned IACA certificate info extraction (via `IACADecodedCertificate.toIacaCertificateInfo()`), returning structured certificate info data required for VICALs, including issuer/subject DER and issuing authority string (JVM).
 
 ### IACA X.509 Certificate Generation
 
@@ -225,6 +226,18 @@ val relaxedDs = DocumentSignerValidationConfig(
     profileDataAgainstIACAProfileData = false,
 ) //turn-off certificate signature validation and cross-checking of profile data against that of the IACA
 DocumentSignerValidator(relaxedDs).validate(dsDecoded, iacaDecoded)
+```
+
+### IACA certificate info extraction (JVM)
+
+You can extract structured certificate info data required for VICALs from a decoded IACA certificate.
+The data uses `okio.ByteString` for binary fields and exposes a blocking variant for JVM callers.
+
+```kotlin
+val iacaDecoded = IACACertificateParser().parse(iacaDer)
+
+val info = iacaDecoded.toIacaCertificateInfo()
+val infoBlocking = iacaDecoded.toIacaCertificateInfoBlocking()
 ```
 
 ### Blocking API (JVM)

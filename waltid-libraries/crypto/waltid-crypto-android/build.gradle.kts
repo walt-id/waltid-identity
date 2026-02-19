@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.androidLibrary
+
 plugins {
     id("waltid.android.library")
     id("waltid.publish.maven")
@@ -5,44 +7,43 @@ plugins {
 
 group = "id.walt.crypto"
 
-android {
-    namespace = "id.walt.crypto"
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-
-    defaultConfig {
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    packaging {
-        resources {
-            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
-        }
-    }
-}
-
 kotlin {
-    androidTarget {
-        publishLibraryVariants("release")
+    androidLibrary {
+        namespace = group.toString()
+        compileSdk = 34
+        minSdk = 30
+
+        withJava()
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "test"
+        }
+
+        packaging {
+            resources {
+                excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            }
+        }
     }
 
     sourceSets {
         androidMain.dependencies {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.oshai.kotlinlogging)
         }
         androidInstrumentedTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
             implementation("androidx.test.ext:junit:1.2.1")
             implementation("androidx.test:runner:1.6.1")
             implementation("androidx.test:rules:1.6.1")
         }
         androidUnitTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.params)
         }
     }
 }

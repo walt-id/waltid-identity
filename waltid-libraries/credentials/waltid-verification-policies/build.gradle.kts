@@ -10,16 +10,25 @@ object Versions {
     const val KTOR_VERSION = "3.3.3"
 }
 
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableIosBuild = getSetting("enableIosBuild")
+
 kotlin {
     js(IR) {
         outputModuleName = "verification-policies"
     }
-    
+
+    applyDefaultHierarchyTemplate()
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
+
     sourceSets {
         commonMain.dependencies {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
@@ -30,7 +39,7 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-cose"))
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation(identityLibs.kotlinx.datetime)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -39,26 +48,24 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-
-            
-            
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             implementation("com.soywiz:korlibs-io:6.0.2")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("org.slf4j:slf4j-simple:2.0.17")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.junit.jupiter.params)
             implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
             implementation("io.mockk:mockk:1.14.2")
         }
+        iosMain.dependencies {}
     }
 }
 

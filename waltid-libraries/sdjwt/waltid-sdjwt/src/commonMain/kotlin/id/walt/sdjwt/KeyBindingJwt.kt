@@ -3,7 +3,7 @@
 package id.walt.sdjwt
 
 import korlibs.crypto.SHA256
-import korlibs.crypto.encoding.ASCII
+import korlibs.encoding.ASCII
 import kotlinx.serialization.json.*
 import kotlin.js.ExperimentalJsExport
 import kotlin.time.Clock

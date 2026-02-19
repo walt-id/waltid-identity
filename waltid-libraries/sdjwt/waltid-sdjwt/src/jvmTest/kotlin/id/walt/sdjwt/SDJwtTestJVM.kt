@@ -7,7 +7,7 @@ import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
 import korlibs.crypto.SHA256
-import korlibs.crypto.encoding.ASCII
+import korlibs.encoding.ASCII
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi

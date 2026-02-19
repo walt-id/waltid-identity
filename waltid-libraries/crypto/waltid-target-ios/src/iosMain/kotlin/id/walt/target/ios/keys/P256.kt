@@ -2,6 +2,7 @@ package id.walt.target.ios.keys
 
 import id.walt.platform.utils.ios.DS_Operations
 import id.walt.platform.utils.ios.ECKeyUtils
+import id.walt.platform.utils.ios.SignResult
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -27,6 +28,38 @@ sealed class P256 {
 
             fun deleteFromKeychain(kid: String) {
                 KeychainOperations.P256.delete(kid)
+            }
+
+            fun importInKeychain(
+                kid: String,
+                externalRepresentation: ByteArray,
+                inSecureEnclave: Boolean): PrivateKey =
+                KeychainOperations.P256.createPrivateKeyFrom(externalRepresentation) { privateKey ->
+                    ExistingP256KeychainPrivateKey(kid, inSecureEnclave, privateKey)
+                }
+
+            fun publicKeyJwkFrom(externalRepresentation: ByteArray): JsonObject {
+                val jwk = KeychainOperations.usePublicKeyFrom(externalRepresentation) { publicKey ->//.publicKeyFrom(externalRepresentation) { publicKey ->
+                    ECKeyUtils.exportJwkWithPublicKey(publicKey, null)!!
+                }.let { Json.parseToJsonElement(it).jsonObject }
+                return jwk
+            }
+
+            fun signJwsUsing(externalRepresentation: ByteArray, plainText: ByteArray, headers: Map<String, JsonElement>): String {
+                return KeychainOperations.P256.createPrivateKeyFrom(externalRepresentation) { privateKey ->
+                    val result = DS_Operations.signWithBody(
+                        plainText.toNSData(),
+                        "ES256",
+                        privateKey,
+                        headersData = JsonObject(headers).toString().toNSData()
+                    )
+
+                    check(result.success()) {
+                        result.errorMessage()!!
+                    }
+
+                    result.data()!!
+                }
             }
         }
 
@@ -179,5 +212,11 @@ internal class P256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean) : P
         KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { key ->
             block(key)
         }
+    }
+}
+
+internal class ExistingP256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean, private val secKeyRef: SecKeyRef?) : P256.PrivateKey(kid, inSecureEnclave) {
+    override fun <T> loadPrivateSecKey(kid: String, block: (privateSecKey: SecKeyRef?) -> T) {
+        block(secKeyRef)
     }
 }

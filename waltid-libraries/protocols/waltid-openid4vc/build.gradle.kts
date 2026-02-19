@@ -10,7 +10,15 @@ object Versions {
     const val KTOR_VERSION = "3.3.3"
 }
 
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableIosBuild = getSetting("enableIosBuild")
+
 kotlin {
+    applyDefaultHierarchyTemplate()
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
+    }
 
     sourceSets {
         all {
@@ -18,7 +26,7 @@ kotlin {
         }
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -26,7 +34,7 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -41,7 +49,7 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // Multiplatform / Date & time
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation(identityLibs.kotlinx.datetime)
 
             // Multiplatform / Hashes
             implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
@@ -52,7 +60,7 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
@@ -86,7 +94,7 @@ kotlin {
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
 
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
         }
         jsMain.dependencies {
             implementation(npm("jose", "5.10.0"))
