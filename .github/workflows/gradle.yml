@@ -76,6 +76,7 @@ jobs:
           name: test-reports
           path: |
             **/build/reports/tests/test/
+            **/build/reports/tests/allTests/
           retention-days: 30
 
       - name: Build iOS Simulator Framework (ARM64)
