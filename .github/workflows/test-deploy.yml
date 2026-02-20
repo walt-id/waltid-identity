@@ -12,7 +12,7 @@ jobs:
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@dc1fe980edefa8711c265113325a1ace3cd5e73d
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@7fee4b3609961f456f054e04f4d92ddb58b34913
     secrets: inherit
     needs: version
     with:
