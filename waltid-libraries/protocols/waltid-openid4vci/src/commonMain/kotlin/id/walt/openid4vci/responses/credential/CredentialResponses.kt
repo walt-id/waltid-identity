@@ -18,6 +18,12 @@ data class IssuedCredential(
     val credential: JsonElement,
 )
 
+data class CredentialResponseHttp(
+    val status: Int,
+    val payload: Map<String, Any?>,
+    val headers: Map<String, String> = emptyMap(),
+)
+
 sealed class CredentialResponseResult {
     data class Success(
         val response: CredentialResponse,
