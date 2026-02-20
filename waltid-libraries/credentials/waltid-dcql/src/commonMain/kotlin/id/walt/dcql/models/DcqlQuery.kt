@@ -115,6 +115,32 @@ data class DcqlQuery(
                 )
             )
         )
+
+        val EXAMPLE_ISO_PID = DcqlQuery(
+            credentials = listOf(
+                CredentialQuery(
+                    id = "pid",
+                    format = CredentialFormat.MSO_MDOC,
+                    meta = MsoMdocMeta("eu.europa.ec.eudi.pid.1"),
+                    claims = listOf(
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "birth_date")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_birth_year")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_18")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_21")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name_birth")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name_birth")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "birth_place")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "birth_country")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "issuance_date")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "expiry_date")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "issuing_authority")),
+                        ClaimsQuery(path = listOf("org.iso.18013.5.1", "issuing_country")),
+                    )
+                )
+            )
+        )
     }
 
 }

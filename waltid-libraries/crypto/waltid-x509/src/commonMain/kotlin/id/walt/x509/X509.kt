@@ -1,6 +1,7 @@
 package id.walt.x509
 
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import kotlin.io.encoding.Base64
 
 /**
@@ -10,11 +11,60 @@ data class CertificateDer(
     val bytes: ByteString,
 ) {
     /**
-    * Convert certificate DER bytes to PEM-encoded string.
-    */
-    fun toPEMEncodedString() = "-----BEGIN CERTIFICATE-----\r\n" +
+     * Convert certificate DER bytes to PEM-encoded string.
+     */
+    fun toPEMEncodedString() = "$PEM_HEADER\r\n" +
             Base64.Pem.encode(bytes.toByteArray()) +
-            "\r\n-----END CERTIFICATE-----"
+            "\r\n$PEM_FOOTER"
+
+    companion object {
+        private const val PEM_HEADER = "-----BEGIN CERTIFICATE-----"
+        private const val PEM_FOOTER = "-----END CERTIFICATE-----"
+
+        fun fromPEMEncodedString(
+            pemEncodedCertificate: String,
+        ): CertificateDer {
+            val base64Payload = extractPemBase64Payload(
+                pemEncodedCertificate = pemEncodedCertificate,
+            )
+            return CertificateDer(
+                bytes = Base64.Pem.decode(
+                    source = base64Payload,
+                ).toByteString(),
+            )
+        }
+
+        private fun extractPemBase64Payload(
+            pemEncodedCertificate: String,
+        ): String {
+            val trimmedPem = pemEncodedCertificate.trim()
+            require(
+                trimmedPem.startsWith(PEM_HEADER)
+            ) {
+                "PEM header not found."
+            }
+            require(
+                trimmedPem.endsWith(PEM_FOOTER)
+            ) {
+                "PEM footer not found."
+            }
+
+            val base64Payload = trimmedPem
+                .removePrefix(PEM_HEADER)
+                .removeSuffix(PEM_FOOTER)
+                .filterNot(
+                    predicate = { it.isWhitespace() },
+                )
+
+            require(
+                base64Payload.isNotBlank()
+            ) {
+                "PEM payload is empty."
+            }
+
+            return base64Payload
+        }
+    }
 }
 
 /**

@@ -13,6 +13,6 @@ internal expect fun generateIsoCompliantX509CertificateSerialNo(): ByteString
 /**
  * Validate that a country code is a valid ISO 3166-1 alpha-2 code.
  */
-internal expect fun isValidIsoCountryCode(
+internal fun isValidIsoCountryCode(
     countryCode: String,
-) : Boolean
+): Boolean = IsoCountryCodes.alpha2.contains(countryCode)
