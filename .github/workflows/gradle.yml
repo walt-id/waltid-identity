@@ -69,6 +69,15 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/test/
+          retention-days: 30
+
       - name: Build iOS Simulator Framework (ARM64)
         if: ${{ runner.os == 'macos'}}
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@d3aa55fb102dadb48032778d6e1df9a8f9155261
