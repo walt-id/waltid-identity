@@ -197,6 +197,15 @@ class DefaultOAuth2Provider(
         return handler.sign(request, configuration, issuerKey, issuerId, credentialData)
     }
 
+    override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
+        CredentialResponseHttp(
+            status = 400,
+            payload = buildMap {
+                put("error", error.error)
+                error.description?.let { put("error_description", it) }
+            },
+        )
+
     override fun writeCredentialResponse(
         request: CredentialRequest,
         response: CredentialResponse
@@ -224,6 +233,7 @@ class DefaultOAuth2Provider(
                 response.notificationId?.let { put("notification_id", it) }
             }
         )
+
     private fun appendParams(base: String, parameters: Map<String, String>): String {
         if (parameters.isEmpty()) return base
         val separator = if (base.contains("?")) "&" else "?"

@@ -79,5 +79,7 @@ interface OAuth2Provider {
         credentialData: JsonObject,
     ): CredentialResponseResult
 
+    fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
+
     fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
 }
