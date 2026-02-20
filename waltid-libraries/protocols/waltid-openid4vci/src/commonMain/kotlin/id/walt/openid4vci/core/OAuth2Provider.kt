@@ -16,6 +16,8 @@ import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.crypto.keys.Key
 import kotlinx.serialization.json.JsonObject
 
@@ -76,4 +78,6 @@ interface OAuth2Provider {
         issuerId: String,
         credentialData: JsonObject,
     ): CredentialResponseResult
+
+    fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp
 }

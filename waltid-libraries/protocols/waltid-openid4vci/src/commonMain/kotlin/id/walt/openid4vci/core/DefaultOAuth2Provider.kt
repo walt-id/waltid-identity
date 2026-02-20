@@ -16,6 +16,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.credential.CredentialResponse
+import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
@@ -195,6 +197,33 @@ class DefaultOAuth2Provider(
         return handler.sign(request, configuration, issuerKey, issuerId, credentialData)
     }
 
+    override fun writeCredentialResponse(
+        request: CredentialRequest,
+        response: CredentialResponse
+    ): CredentialResponseHttp =
+        CredentialResponseHttp(
+            status = 200,
+            payload = buildMap {
+                response.credentials?.let { issued ->
+                    put(
+                        "credentials",
+                        issued.map { credentialEntry ->
+                            val credentialValue = credentialEntry.credential.let { element ->
+                                if (element is kotlinx.serialization.json.JsonPrimitive && element.isString) {
+                                    element.content
+                                } else {
+                                    element.toString()
+                                }
+                            }
+                            mapOf("credential" to credentialValue)
+                        }
+                    )
+                }
+                response.transactionId?.let { put("transaction_id", it) }
+                response.interval?.let { put("interval", it) }
+                response.notificationId?.let { put("notification_id", it) }
+            }
+        )
     private fun appendParams(base: String, parameters: Map<String, String>): String {
         if (parameters.isEmpty()) return base
         val separator = if (base.contains("?")) "&" else "?"
