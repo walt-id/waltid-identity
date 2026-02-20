@@ -10,15 +10,17 @@ object Versions {
 }
 
 dependencies {
+
+    configurations.all {
+        exclude(group = "io.ktor", module = "ktor-client-cio")
+    }
+
     api(project(":waltid-services:waltid-service-commons"))
+    api("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
 
     // Testing
     implementation(kotlin("test"))
-    implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}") {
-        exclude(group = "io.ktor", module = "ktor-client-cio")
-    }
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-
     implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
     implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
