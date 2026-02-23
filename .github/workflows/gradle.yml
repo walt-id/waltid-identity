@@ -124,7 +124,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: test-reports
+          name: integration-test-reports
           path: |
             **/build/reports/tests/test/
             **/build/reports/tests/allTests/
