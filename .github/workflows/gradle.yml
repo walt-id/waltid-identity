@@ -64,7 +64,7 @@ jobs:
             "$FILE"
       - name: Clean and build with all tests
         if: ${{ runner.os != 'macos' }}
-        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --max-workers=3
+        run: ./gradlew clean build -x :waltid-enterprise-integration-tests:test --rerun-tasks --no-daemon --parallel
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
@@ -96,3 +96,36 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
         run: ./gradlew publish --no-daemon
+
+  integration-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # macos-latest disabled until all multiplatform modules set up properly
+        # currently configured on workflow dispatch as a separate workflow (gradle-macos)
+        os: [ ubuntu-latest ]
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@6bad7de2c6de9bc3faa68333de8b00be02613f4d
+
+      - name: Integration tests
+        if: ${{ runner.os != 'macos' }}
+        run: ./gradlew clean :waltid-enterprise-integration-tests:test --rerun-tasks --no-daemon
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/test/
+            **/build/reports/tests/allTests/
+          retention-days: 30
