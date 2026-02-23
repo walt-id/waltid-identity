@@ -118,6 +118,13 @@ internal object KeychainOperations {
         return nsData.toByteArray()
     }
 
+    internal fun <T> usePublicKeyFrom(externalRepresentation: ByteArray, block: (SecKeyRef?) -> T) =
+        createSecKeyWithData(externalRepresentation, kSecAttrKeyClassPrivate) { key ->
+            usePublicKey(key) { publicKey ->
+                block(publicKey)
+            }
+        }
+
     private fun <T> createSecKeyWithData(
         externalRepresentation: ByteArray, keyClass: CFStringRef?, block: MemScope.(SecKeyRef?) -> T
     ): T {

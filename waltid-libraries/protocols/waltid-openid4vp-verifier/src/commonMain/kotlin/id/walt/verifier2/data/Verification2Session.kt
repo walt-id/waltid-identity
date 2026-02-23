@@ -95,8 +95,10 @@ data class Verification2Session(
      * Policies
      */
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
+
     @SerialName("policy_results")
     var policyResults: Verifier2PolicyResults? = null,
+
     @SerialName("presentation_validation_results")
     var presentationValidationResults: Map<String, Map<String, VPPolicy2.PolicyRunResult>>? = null,
 
@@ -105,9 +107,15 @@ data class Verification2Session(
     /**
      * Presented data
      */
+    @SerialName("presented_raw_data")
     var presentedRawData: PresentedRawData? = null,
+
+    @SerialName("presented_presentations")
     var presentedPresentations: Map<String, VerifiablePresentation>? = null,
+
+    @SerialName("presented_credentials")
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
+
     var statusReason: String? = null,
 ) {
 
