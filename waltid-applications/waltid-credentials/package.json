@@ -8,23 +8,23 @@
     "preview": "nuxt preview"
   },
   "devDependencies": {
-    "@nuxt/content": "^2.13.0",
-    "@nuxt/devtools": "^2.6.2",
+    "@nuxt/content": "^3.11.2",
+    "@nuxt/devtools": "^3.2.1",
     "@unocss/nuxt": "^66.4.2",
-    "nuxt": "^3.10.0",
-    "@nuxt/icon": "^1.11.0",
-    "nuxt-security": "2.3.0",
+    "nuxt": "^4.3.1",
+    "@nuxt/icon": "^2.2.1",
+    "nuxt-security": "2.5.1",
     "tailwindcss": "^4.1.11",
-    "vue-router": "^4.5.1"
+    "vue-router": "^5.0.3"
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
     "@heroicons/vue": "^2.2.0",
     "@julr/unocss-preset-forms": "^2.0.0",
-    "@nuxt/image": "^1.11.0",
-    "@nuxt/kit": "^3.10.0",
+    "@nuxt/image": "^2.0.0",
+    "@nuxt/kit": "^4.3.1",
     "@unocss/reset": "^66.4.2",
-    "@vueuse/nuxt": "^13.6.0",
+    "@vueuse/nuxt": "^14.2.1",
     "better-sqlite3": "^12.2.0"
   }
 }
