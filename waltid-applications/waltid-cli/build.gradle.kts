@@ -34,13 +34,13 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("com.google.code.gson:gson:2.12.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+            implementation("com.google.code.gson:gson:2.13.2")
 
             // CLI
-            implementation("com.github.ajalt.clikt:clikt:5.0.3")
-            implementation("com.github.ajalt.clikt:clikt-markdown:5.0.3")
+            implementation("com.github.ajalt.clikt:clikt:5.1.0")
+            implementation("com.github.ajalt.clikt:clikt-markdown:5.1.0")
             implementation("com.github.ajalt.mordant:mordant:3.0.2")
             implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
 
@@ -59,16 +59,16 @@ kotlin {
             implementation("org.slf4j:slf4j-simple:2.0.17")
 
             // JOSE
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation("com.nimbusds:nimbus-jose-jwt:10.8")
 
             // BouncyCastle for PEM import
-            implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+            implementation("org.bouncycastle:bcpkix-lts8on:2.73.10")
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+            implementation("com.wolpl.clikt-testkit:clikt-testkit:3.1.1")
 
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter-params:6.0.3")
 
             // Ktor server
             implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")

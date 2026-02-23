@@ -19,26 +19,26 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+            implementation("app.softwork:kotlinx-uuid-core:0.1.7")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
             implementation(identityLibs.kotlinx.serialization.cbor)
             implementation("net.orandja.obor:obor:2.1.3")
 
             // Crypto
-            implementation("org.kotlincrypto.random:crypto-rand:0.5.2") // SecureRandom
+            implementation("org.kotlincrypto.random:crypto-rand:0.6.0") // SecureRandom
 
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.7.1"))
+            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
             implementation("org.kotlincrypto.hash:sha2") // SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/t, SHA-512/224, SHA-512/256
 
-            implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.7.1"))
+            implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.8.0"))
             implementation("org.kotlincrypto.macs:hmac-sha2")
 
             /*

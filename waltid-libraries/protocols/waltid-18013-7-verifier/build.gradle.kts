@@ -7,7 +7,7 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    val ktor_version = "3.2.2"
+    val ktor_version = "3.4.0"
 
     sourceSets {
         commonMain.dependencies {
@@ -18,16 +18,16 @@ kotlin {
             implementation("io.ktor:ktor-server-core:$ktor_version")
 
             // Logging
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation("io.github.oshai:kotlin-logging:8.0.01")
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
+            implementation("app.softwork:kotlinx-uuid-core:0.1.7")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
-            implementation("io.github.optimumcode:json-schema-validator:0.5.2")
+            implementation("io.github.optimumcode:json-schema-validator:0.5.3")
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR

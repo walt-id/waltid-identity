@@ -39,7 +39,7 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
 
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
             implementation("org.kotlincrypto.hash:sha2")
         }
         commonTest.dependencies {

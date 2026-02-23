@@ -5,7 +5,7 @@ plugins {
 group = "id.walt"
 
 dependencies {
-    val ktorVersion = "3.3.3"
+    val ktorVersion = "3.4.0"
 
     // Testing
     testImplementation(kotlin("test"))
@@ -25,13 +25,13 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("app.softwork:kotlinx-uuid-core:0.1.6")
-    testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    testImplementation("app.softwork:kotlinx-uuid-core:0.1.7")
+    testImplementation("com.nimbusds:nimbus-jose-jwt:10.8")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+    testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.10")
 
     // Multiplatform / Hashes
-    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+    testImplementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
     testImplementation("org.kotlincrypto.hash:sha2")
 
 }

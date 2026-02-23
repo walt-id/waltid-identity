@@ -5,7 +5,7 @@ plugins {
 group = "id.walt"
 
 dependencies {
-    val ktorVersion = "3.3.3"
+    val ktorVersion = "3.4.0"
 
     // Testing
     implementation(kotlin("test"))
@@ -25,19 +25,19 @@ dependencies {
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
 
-    implementation("app.softwork:kotlinx-uuid-core:0.1.4")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation("app.softwork:kotlinx-uuid-core:0.1.7")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.8")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+    implementation("org.bouncycastle:bcpkix-lts8on:2.73.10")
 
-    implementation("org.junit.jupiter:junit-jupiter-engine:5.12.2")
-    implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
-    implementation("org.junit.platform:junit-platform-launcher:1.12.2")
-    implementation("org.junit.platform:junit-platform-console:1.12.2")
+    implementation("org.junit.jupiter:junit-jupiter-engine:6.0.3")
+    implementation("org.junit.jupiter:junit-jupiter-params:6.0.3")
+    implementation("org.junit.platform:junit-platform-launcher:6.0.3")
+    implementation("org.junit.platform:junit-platform-console:6.0.3")
 
 
     // Multiplatform / Hashes
-    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
     implementation("org.kotlincrypto.hash:sha2")
 
 }
