@@ -21,7 +21,7 @@ kotlin {
             implementation("io.github.oshai:kotlin-logging:7.0.13")
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // JSON
