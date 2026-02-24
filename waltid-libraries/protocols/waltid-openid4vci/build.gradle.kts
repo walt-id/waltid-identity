@@ -34,7 +34,7 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // Multiplatform / Date & time
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
 
             // Multiplatform / Hashes
             implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
