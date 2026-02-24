@@ -60,7 +60,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
 
     // Uuid
-    implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+    implementation("app.softwork:kotlinx-uuid-core:0.1.7")
 
     /* -- Misc --*/
 
@@ -71,13 +71,13 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.17")
-    implementation("io.klogging:klogging-jvm:0.11.6")
-    implementation("io.klogging:slf4j-klogging:0.11.6")
-    implementation("io.ktor:ktor-client-encoding:3.2.2")
+    implementation("io.klogging:klogging-jvm:0.11.7")
+    implementation("io.klogging:slf4j-klogging:0.11.7")
+    implementation("io.ktor:ktor-client-encoding:3.4.0")
 
     // Test
 
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.8")
 
     implementation(identityLibs.kotlintest)
     testImplementation(identityLibs.kotlinx.coroutines.test)

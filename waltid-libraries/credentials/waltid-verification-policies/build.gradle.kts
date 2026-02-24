@@ -29,7 +29,7 @@ kotlin {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+            implementation("io.github.optimumcode:json-schema-validator:0.5.3")
 
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
@@ -63,7 +63,7 @@ kotlin {
             implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
-            implementation("io.mockk:mockk:1.14.2")
+            implementation("io.mockk:mockk:1.14.9")
         }
         iosMain.dependencies {}
     }

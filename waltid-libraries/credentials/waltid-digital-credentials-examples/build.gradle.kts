@@ -45,7 +45,7 @@ kotlin {
             api(project(":waltid-libraries:waltid-did"))
 
             // Hashing
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
             implementation("org.kotlincrypto.hash:sha2")
         }
         commonTest.dependencies {

@@ -13,19 +13,19 @@ dependencies {
     api(project(":waltid-libraries:crypto:waltid-crypto"))
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
     // AWS
-    implementation("aws.sdk.kotlin:kms-jvm:1.5.103")
+    implementation("aws.sdk.kotlin:kms-jvm:1.6.23")
 
     // JOSE
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.8")
 
     // Hashing with SHA-2
-    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
     implementation("org.kotlincrypto.hash:sha2")
 }
 

@@ -22,16 +22,16 @@ dependencies {
         exclude("org.apache.mina:mina-core") // Manually updated due to security CVE
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
-    implementation("org.apache.mina:mina-core:2.2.4")
-    implementation("org.apache.commons:commons-lang3:3.19.0")
+    implementation("org.apache.mina:mina-core:2.2.5")
+    implementation("org.apache.commons:commons-lang3:3.20.0")
 
     // TOTP/HOTP
-    implementation("com.atlassian:onetime:2.1.2")
+    implementation("com.atlassian:onetime:2.2.0")
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-services:waltid-service-commons"))
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation("com.nimbusds:nimbus-jose-jwt:10.8")
 
     // Cryptography
     /*implementation(platform("dev.whyoleg.cryptography:cryptography-bom:0.4.0"))
@@ -43,7 +43,7 @@ dependencies {
     implementation("org.kotlincrypto.random:crypto-rand:0.6.0")
 
     // Ktor server
-    implementation(platform("io.ktor:ktor-bom:3.2.2"))
+    implementation(platform("io.ktor:ktor-bom:3.4.0"))
     implementation("io.ktor:ktor-server-core")
     implementation("io.ktor:ktor-server-auth")
     implementation("io.ktor:ktor-server-auth-jwt")
@@ -72,22 +72,22 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-openapi:5.3.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.3.0")
-    implementation("io.github.smiley4:ktor-redoc:5.3.0")
+    implementation("io.github.smiley4:ktor-openapi:5.5.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.5.0")
+    implementation("io.github.smiley4:ktor-redoc:5.5.0")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
     // Logging
-    implementation("io.klogging:klogging:0.11.6")
-    implementation("io.klogging:slf4j-klogging:0.11.6")
+    implementation("io.klogging:klogging:0.11.7")
+    implementation("io.klogging:slf4j-klogging:0.11.7")
 
     // Redis
     //implementation("eu.vendeli:rethis:0.3.3")
-    implementation("io.github.domgew:kedis:0.0.11")
+    implementation("io.github.domgew:kedis:0.0.12")
 
     /* --- Testing --- */
     testImplementation("io.ktor:ktor-client-logging")

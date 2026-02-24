@@ -9,13 +9,13 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
             // Coroutines
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 
             // Crypto
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
             implementation("org.kotlincrypto.hash:sha2")
 
             // Logging
@@ -34,16 +34,16 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2")
 
             // OCI
-            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.57.1")
+            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.80.2")
 
             // JOSE
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation("com.nimbusds:nimbus-jose-jwt:10.8")
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
             // Logging
             implementation("org.slf4j:slf4j-simple:2.0.17")

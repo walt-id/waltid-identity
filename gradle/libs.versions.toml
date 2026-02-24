@@ -1,13 +1,13 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.3.0"
-suspendtransform = "2.3.0-0.13.2"
+kotlin = "2.3.10"
+suspendtransform = "2.3.10-0.13.2"
 
 java-service = "21"
 java-library = "17"
 
 # Plugins
-vanniktech-publish = "0.35.0"
+vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.2"
 android-gradle = "8.12.3"
@@ -19,7 +19,7 @@ ktor = "3.3.3"
 
 
 # Kotlinx
-kotlinx-serialization = "1.9.0"
+kotlinx-serialization = "1.10.0"
 kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 
@@ -32,19 +32,19 @@ cache4k = "0.14.0"
 
 # Crypto
 bouncycastle = "2.73.8"
-nimbus-jose = "10.7"
+nimbus-jose = "10.8"
 jose-npm = "5.10.0"
 bcprov = "2.73.10"
 bcpkix = "2.73.10"
 kotlincrypto = "0.8.0"
-tink = "1.16.0"
+tink = "1.20.0"
 
 # Testing
 junit-jupiter = "5.11.4"
-mokkery = "3.1.1"
+mokkery = "3.2.0"
 
 # HTTP
-okio = "3.16.2"
+okio = "3.16.4"
 
 [libraries]
 
