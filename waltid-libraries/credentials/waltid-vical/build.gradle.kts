@@ -21,7 +21,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.cbor)
             implementation(identityLibs.kotlinx.coroutines.core)
 
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1-0.6.x-compat")
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
