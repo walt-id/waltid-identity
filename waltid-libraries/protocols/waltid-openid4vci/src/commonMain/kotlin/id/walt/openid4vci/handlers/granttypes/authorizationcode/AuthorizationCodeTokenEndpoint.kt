@@ -11,6 +11,7 @@ import id.walt.openid4vci.tokens.AccessTokenService
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlinx.serialization.SerializationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Token endpoint handler for the authorization-code code grant.
@@ -63,7 +64,7 @@ class AuthorizationCodeTokenEndpoint(
             val scopedRequest = updatedRequest.withGrantedScopes(effectiveGrantedScope)
 
             val expiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
-                ?: Clock.System.now()
+                ?: (Clock.System.now() + 3600.seconds)
 
             val subject = session.subject?.takeIf { it.isNotBlank() }
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))

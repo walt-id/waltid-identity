@@ -12,6 +12,7 @@ import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.tokens.AccessTokenService
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 /**
@@ -97,7 +98,7 @@ class PreAuthorizedCodeTokenEndpoint(
         val clientRequest = updatedRequest.withClient(clientToUse)
 
         val expiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
-            ?: Clock.System.now()
+            ?: (Clock.System.now() + 3600.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
             ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
