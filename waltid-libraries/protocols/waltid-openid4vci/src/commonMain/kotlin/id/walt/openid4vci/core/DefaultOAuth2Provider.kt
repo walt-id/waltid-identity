@@ -22,6 +22,7 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.crypto.keys.Key
+import id.walt.openid4vci.tokens.AccessTokenContext
 import kotlinx.serialization.json.JsonObject
 
 
@@ -173,10 +174,26 @@ class DefaultOAuth2Provider(
             },
         )
 
-    override fun createCredentialRequest(
+    override suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,
-        session: Session?
+        session: Session?,
+        accessTokenContext: AccessTokenContext?
     ): CredentialRequestResult {
+        if (accessTokenContext != null) {
+            val verifier = config.accessTokenVerifier
+                ?: return CredentialRequestResult.Failure(
+                    OAuthError("invalid_request", "access token verifier not configured")
+                )
+            try {
+                verifier.verify(
+                    token = accessTokenContext.token,
+                    expectedIssuer = accessTokenContext.expectedIssuer,
+                    expectedAudience = accessTokenContext.expectedAudience,
+                )
+            } catch (e: Exception) {
+                return CredentialRequestResult.Failure(OAuthError("invalid_request", e.message))
+            }
+        }
         return config.credentialRequestValidator.validate(parameters, session ?: DefaultSession())
     }
 

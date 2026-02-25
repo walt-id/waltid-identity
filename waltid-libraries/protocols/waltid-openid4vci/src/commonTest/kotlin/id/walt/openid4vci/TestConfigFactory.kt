@@ -5,6 +5,7 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.tokens.AccessTokenService
+import id.walt.openid4vci.tokens.AccessTokenVerifier
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
@@ -21,6 +22,7 @@ internal fun createTestConfig(
     accessRequestValidator: AccessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
     credentialRequestValidator: CredentialRequestValidator = DefaultCredentialRequestValidator(),
     accessTokenService: AccessTokenService = StubTokenService(),
+    accessTokenVerifier: AccessTokenVerifier? = null,
     issuerStateValidator: IssuerStateValidator? = null,
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = defaultAuthorizationCodeRepository()
@@ -35,6 +37,7 @@ internal fun createTestConfig(
         preAuthorizedCodeRepository = preAuthorizedCodeRepository,
         preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
         accessTokenService = accessTokenService,
+        accessTokenVerifier = accessTokenVerifier,
         credentialRequestValidator = credentialRequestValidator,
         credentialEndpointHandlers = CredentialEndpointHandlers(),
     )

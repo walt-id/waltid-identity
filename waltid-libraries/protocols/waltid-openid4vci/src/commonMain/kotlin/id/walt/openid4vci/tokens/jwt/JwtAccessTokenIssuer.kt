@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 /**
  * Default JWT-based access token service (RFC 9068). Uses a signer resolved via callback.
  */
-class JwtAccessTokenService(
+class JwtAccessTokenIssuer(
     private val signer: JwtAccessTokenSigner,
 ) : AccessTokenService {
 
