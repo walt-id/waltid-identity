@@ -16,5 +16,6 @@ fun interface CredentialEndpointHandler {
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
+        dataMapping: JsonObject?,
     ): CredentialResponseResult
 }

@@ -26,6 +26,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
+        dataMapping: JsonObject?,
     ): CredentialResponseResult {
         return try {
             val oid4vcFormat = when (configuration.format) {
@@ -55,6 +56,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                 credentialData = credentialData,
                 issuerId = issuerId,
                 issuerKey = issuerKey,
+                dataMapping = dataMapping,
             )
 
             CredentialResponseResult.Success(

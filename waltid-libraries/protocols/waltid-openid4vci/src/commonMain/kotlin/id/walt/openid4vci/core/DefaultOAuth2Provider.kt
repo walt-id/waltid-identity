@@ -203,6 +203,7 @@ class DefaultOAuth2Provider(
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
+        dataMapping: JsonObject?,
     ): CredentialResponseResult {
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
@@ -211,7 +212,14 @@ class DefaultOAuth2Provider(
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
-        return handler.sign(request, configuration, issuerKey, issuerId, credentialData)
+        return handler.sign(
+            request = request,
+            configuration = configuration,
+            issuerKey = issuerKey,
+            issuerId = issuerId,
+            credentialData = credentialData,
+            dataMapping = dataMapping,
+        )
     }
 
     override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
