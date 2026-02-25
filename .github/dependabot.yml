@@ -8,13 +8,14 @@ updates:
     groups:
       all-dependencies:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     ignore:
-      - dependency-name: "walt-id/waltid-identity"
+      - dependency-name: "walt-id/waltid-identity/*"
     groups:
       all-dependencies:
         patterns: ["*"]
@@ -27,12 +28,4 @@ updates:
     groups:
       all-dependencies:
         patterns: ["*"]
-
-  - package-ecosystem: "docker"
-    directories:
-      - "**/*"
-    schedule:
-      interval: "monthly"
-    groups:
-      all-dependencies:
-        patterns: ["*"]
+        update-types: ["minor", "patch"]
