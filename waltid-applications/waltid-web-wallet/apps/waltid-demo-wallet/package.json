@@ -29,7 +29,7 @@
     "@unocss/transformer-variant-group": "66.5.0",
     "@vite-pwa/nuxt": "^1.0.4",
     "@vueuse/core": "^13.6.0",
-    "@vueuse/nuxt": "13.6.0",
+    "@vueuse/nuxt": "14.2.1",
     "nuxt": "3.19.0",
     "nuxt-icon": "^1.0.0-beta.7",
     "typescript": "5.8.3"
