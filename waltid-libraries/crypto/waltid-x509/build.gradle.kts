@@ -44,6 +44,9 @@ kotlin {
             // Logging
             implementation(identityLibs.slf4j.simple)
 
+            // Ktor client
+            implementation(identityLibs.ktor.client.okhttp)
+
             // Test
             implementation(kotlin("test"))
             implementation(identityLibs.junit.jupiter.api)

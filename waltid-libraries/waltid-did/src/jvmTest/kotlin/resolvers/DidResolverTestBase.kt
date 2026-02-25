@@ -8,6 +8,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.LocalResolverMethod
 import io.ktor.client.network.sockets.*
+import io.ktor.client.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import resolvers.DidResolverTestBase.Companion.didDocAssertions
@@ -30,7 +31,7 @@ abstract class DidResolverTestBase {
     private fun allowFailWithSocketTimeout(block: () -> Unit) = runCatching {
         block.invoke()
     }.getOrElse { ex ->
-        if (ex is SocketTimeoutException) {
+        if (ex is SocketTimeoutException || ex is HttpRequestTimeoutException) {
             println("A resolver URL is timing out: ${ex.message}")
         } else throw ex
     }

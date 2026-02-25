@@ -60,9 +60,6 @@ kotlin {
             implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.kotlinx.serialization.cbor)
 
-            // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
-
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.jdk8)
         }
@@ -71,6 +68,9 @@ kotlin {
 
             // Logging
             implementation(identityLibs.slf4j.simple)
+
+            // Ktor client
+            implementation(identityLibs.ktor.client.okhttp)
 
             // Test
             implementation(identityLibs.junit.jupiter.api)

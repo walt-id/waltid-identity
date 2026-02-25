@@ -47,13 +47,13 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         jvmMain.dependencies {
-            // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
-
             // Json canonicalization
             implementation("io.github.erdtman:java-json-canonicalization:1.1")
         }
         jvmTest.dependencies {
+            // Ktor client
+            implementation(identityLibs.ktor.client.okhttp)
+
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }

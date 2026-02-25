@@ -53,6 +53,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.measureTimedValue
 
 object OpenID4VCI {
     private val log = KotlinLogging.logger { }
@@ -168,10 +170,18 @@ object OpenID4VCI {
     suspend fun resolveCIProviderMetadata(credentialOffer: CredentialOffer) =
         resolveCIProviderMetadata(credentialOffer.credentialIssuer)
 
-    suspend fun resolveCIProviderMetadata(issuerBaseUrl: String) =
-        http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {
-            OpenIDProviderMetadata.fromJSONString(it)
+    suspend fun resolveCIProviderMetadata(issuerBaseUrl: String): OpenIDProviderMetadata {
+        log.debug { "Resolving OpenID Provider Metadata from '$issuerBaseUrl'" }
+        val (response, duration) = measureTimedValue {
+            http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {
+                OpenIDProviderMetadata.fromJSONString(it)
+            }
         }
+        if (duration.minus(300.milliseconds).isPositive()) {
+            log.warn { "Resolving OpenID Provider Metadata from '$issuerBaseUrl' took more than 300ms" }
+        }
+        return response
+    }
 
     fun resolveOfferedCredentials(
         credentialOffer: CredentialOffer,
@@ -231,11 +241,16 @@ object OpenID4VCI {
 
         }
 
-        val response = http.submitForm(
-            url = tokenEndpoint,
-            formParameters = parametersOf(tokenRequest.toHttpParameters())
-        )
-
+        log.debug { "Sending token request to '${tokenEndpoint}'" }
+        val (response, duration) = measureTimedValue {
+            http.submitForm(
+                url = tokenEndpoint,
+                formParameters = parametersOf(tokenRequest.toHttpParameters())
+            )
+        }
+        if (duration.minus(300.milliseconds).isPositive()) {
+            log.warn { "Requesting token from '${tokenEndpoint}' took '${duration}' which is more than expected 300ms" }
+        }
         if (!response.status.isSuccess()) {
             throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
         }
