@@ -39,7 +39,7 @@ data class CredentialOfferRequest(
      * Builds the shareable offer URL by encoding this request as query parameters.
      *
      * Use the default `openid-credential-offer://` scheme for cross-device offers or provide
-     * a HTTPS endpoint when hosting the offer request on a web URL.
+     * an HTTPS endpoint when hosting the offer request on a web URL.
      */
     fun toUrl(credentialOfferEndpoint: String = CROSS_DEVICE_CREDENTIAL_OFFER_URL): String {
         val params = parametersOf(toHttpParameters())
