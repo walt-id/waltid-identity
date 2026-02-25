@@ -20,6 +20,8 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.oid4vc.data.DisplayProperties
+import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -80,6 +82,9 @@ interface OAuth2Provider {
         issuerId: String,
         credentialData: JsonObject,
         dataMapping: JsonObject? = null,
+        selectiveDisclosure: SDMap? = null,
+        x5Chain: List<String>? = null,
+        display: List<DisplayProperties>? = null,
     ): CredentialResponseResult
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp

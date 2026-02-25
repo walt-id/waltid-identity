@@ -10,8 +10,10 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.oid4vc.OpenID4VCI
+import id.walt.oid4vc.data.DisplayProperties
 import id.walt.oid4vc.data.CredentialFormat as Oid4vcCredentialFormat
 import id.walt.oid4vc.data.ProofOfPossession
+import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -27,6 +29,9 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
         issuerId: String,
         credentialData: JsonObject,
         dataMapping: JsonObject?,
+        selectiveDisclosure: SDMap?,
+        x5Chain: List<String>?,
+        display: List<DisplayProperties>?,
     ): CredentialResponseResult {
         return try {
             val oid4vcFormat = when (configuration.format) {
@@ -53,7 +58,10 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
                 credentialData = credentialData,
                 issuerId = issuerId,
                 issuerKey = issuerKey,
+                selectiveDisclosure = selectiveDisclosure,
                 dataMapping = dataMapping,
+                x5Chain = x5Chain,
+                display = display,
             )
 
             CredentialResponseResult.Success(

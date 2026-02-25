@@ -23,6 +23,8 @@ import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.crypto.keys.Key
 import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.oid4vc.data.DisplayProperties
+import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
 
 
@@ -203,7 +205,10 @@ class DefaultOAuth2Provider(
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
-        dataMapping: JsonObject?,
+        dataMapping: JsonObject? ,
+        selectiveDisclosure: SDMap?,
+        x5Chain: List<String>?,
+        display: List<DisplayProperties>?,
     ): CredentialResponseResult {
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
@@ -219,6 +224,9 @@ class DefaultOAuth2Provider(
             issuerId = issuerId,
             credentialData = credentialData,
             dataMapping = dataMapping,
+            selectiveDisclosure = selectiveDisclosure,
+            x5Chain = x5Chain,
+            display = display,
         )
     }
 
