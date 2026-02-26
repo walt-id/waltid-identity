@@ -46,7 +46,7 @@ actual fun validateCertificateChain(
 
         val params = PKIXBuilderParameters(anchors, selector).apply {
             addCertStore(store)
-            isRevocationEnabled = enableRevocation // requires JVM flags for OCSP/CRL.
+            isRevocationEnabled = enableRevocation
         }
 
         val builder = CertPathBuilder.getInstance("PKIX")
