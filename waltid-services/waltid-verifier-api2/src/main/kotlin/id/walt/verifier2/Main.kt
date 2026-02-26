@@ -21,6 +21,11 @@ import io.ktor.server.sse.*
 import org.slf4j.event.Level
 
 suspend fun main(args: Array<String>) {
+    // Enable CRL Distribution Point support for certificate revocation checking
+    // This allows the PKIX validator to fetch CRLs from the CRLDistributionPoint
+    // extension in X.509 certificates when enableRevocation is true in vICAL policies
+    System.setProperty("com.sun.security.enableCRLDP", "true")
+
     // Register custom decoder for ClientMetadata before config loading
     ConfigManager.registerCustomDecoder(ClientMetadataHopliteDecoder())
 
