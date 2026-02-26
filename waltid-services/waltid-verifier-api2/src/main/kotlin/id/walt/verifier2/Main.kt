@@ -42,7 +42,7 @@ fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
 }
-K
+
 fun Application.verifierModule(withPlugins: Boolean = true) {
 
     // Enable CRL Distribution Point support for certificate revocation checking
