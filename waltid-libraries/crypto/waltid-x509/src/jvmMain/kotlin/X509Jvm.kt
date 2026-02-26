@@ -21,6 +21,13 @@ actual fun validateCertificateChain(
 ) {
     try {
 
+        // Enable CRL Distribution Point support when revocation checking is enabled
+        // This allows the PKIX validator to fetch CRLs from the CRLDistributionPoint
+        // extension in the certificates
+        if (enableRevocation) {
+            System.setProperty("com.sun.security.enableCRLDP", "true")
+        }
+
         val leafCert = CertificateDer(leaf.bytes).toJcaX509Certificate()
         val all = chain.map { it.toJcaX509Certificate() }.toMutableList()
 
@@ -46,7 +53,7 @@ actual fun validateCertificateChain(
 
         val params = PKIXBuilderParameters(anchors, selector).apply {
             addCertStore(store)
-            isRevocationEnabled = enableRevocation // requires JVM flags for OCSP/CRL.
+            isRevocationEnabled = enableRevocation
         }
 
         val builder = CertPathBuilder.getInstance("PKIX")
