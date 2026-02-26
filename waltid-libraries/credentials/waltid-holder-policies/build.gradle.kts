@@ -18,8 +18,8 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+            implementation("io.github.optimumcode:json-schema-validator:0.5.3")
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // Coroutines

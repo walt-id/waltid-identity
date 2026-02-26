@@ -39,7 +39,7 @@ kotlin {
             implementation(identityLibs.kotlinx.datetime)
 
             // Uuid
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation("app.softwork:kotlinx-uuid-core:0.1.7")
 
             // Crypto
             api(project(":waltid-libraries:crypto:waltid-crypto"))
