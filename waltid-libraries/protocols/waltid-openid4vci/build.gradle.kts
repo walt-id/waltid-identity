@@ -19,6 +19,8 @@ kotlin {
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+            implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)

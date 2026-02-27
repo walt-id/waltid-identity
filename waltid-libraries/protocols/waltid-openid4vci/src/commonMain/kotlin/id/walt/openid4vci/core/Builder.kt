@@ -1,9 +1,13 @@
 package id.walt.openid4vci.core
 
-import id.walt.openid4vci.granttypehandlers.AuthorizationCodeAuthorizeHandler
-import id.walt.openid4vci.granttypehandlers.AuthorizationCodeTokenHandler
-import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
+import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.credential.W3cJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeAuthorizationEndpoint
+import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeTokenEndpoint
+import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCodeTokenEndpoint
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 
 /**
  * Entry point for consumers to obtain the OAuth provider.
@@ -35,55 +39,93 @@ import id.walt.openid4vci.GrantType
  *   factory/strategy bundles, these arguments can become some kind of wrappers.
  * - `includeAuthorizationCodeDefaultHandlers` / `includePreAuthorizedCodeDefaultHandlers` give flags for
  *   composing providers (handy for tests) until the handler factory story evolves, needs revisited.
+ * - Credential handlers are registered with defaults for SD-JWT VC formats unless disabled. In a future major
+ *   release we may drop these defaults and require explicit handler registration for credential formats.
  */
 fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
-//    extraTokenEndpointHandlers: List<Pair<GrantType, TokenEndpointHandler>> = emptyList(),
-//    extraAuthorizeHandlers: List<AuthorizeEndpointHandler> = emptyList(),
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
+    includeCredentialDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
-    registerDefaultHandlers(
-        config = config,
+    val resolvedConfig = applyIssuerStateValidator(config)
+    registerDefaultGrantTypeHandlers(
+        config = resolvedConfig,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
     )
-//    extraTokenEndpointHandlers.forEach { (grantType, handler) ->
-//        config.tokenEndpointHandlers.appendForGrant(grantType, handler)
-//    }
-//    extraAuthorizeHandlers.forEach { config.authorizeEndpointHandlers.append(it) }
-    return DefaultOAuth2Provider(config)
+    registerDefaultCredentialHandlers(
+        config = resolvedConfig,
+        includeCredentialDefaultHandlers = includeCredentialDefaultHandlers,
+    )
+    return DefaultOAuth2Provider(resolvedConfig)
 }
 
-private fun registerDefaultHandlers(
+private fun applyIssuerStateValidator(config: OAuth2ProviderConfig): OAuth2ProviderConfig =
+    if (
+        config.issuerStateValidator != null &&
+        config.authorizationRequestValidator is DefaultAuthorizationRequestValidator
+    ) {
+        config.copy(
+            authorizationRequestValidator = DefaultAuthorizationRequestValidator(
+                issuerStateValidator = config.issuerStateValidator,
+            ),
+        )
+    } else {
+        config
+    }
+
+private fun registerDefaultGrantTypeHandlers(
     config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean,
     includePreAuthorizedCodeDefaultHandlers: Boolean,
 ) {
     if (includeAuthorizationCodeDefaultHandlers) {
-        val authorizeEndpointHandler = AuthorizationCodeAuthorizeHandler(
+        val authorizationCodeAuthorizationEndpointHandler = AuthorizationCodeAuthorizationEndpoint(
             codeRepository = config.authorizationCodeRepository,
         )
-        config.authorizeEndpointHandlers.append(authorizeEndpointHandler)
+        config.authorizationEndpointHandlers.append(authorizationCodeAuthorizationEndpointHandler)
 
-        val authorizeTokenHandler = AuthorizationCodeTokenHandler(
+        val authorizationCodeTokenEndpointHandler = AuthorizationCodeTokenEndpoint(
             codeRepository = config.authorizationCodeRepository,
-            tokenService = config.tokenService,
+            tokenService = config.accessTokenService,
         )
+
         config.tokenEndpointHandlers.appendForGrant(
             grantType = GrantType.AuthorizationCode,
-            handler = authorizeTokenHandler,
+            handler = authorizationCodeTokenEndpointHandler,
         )
     }
 
     if (includePreAuthorizedCodeDefaultHandlers) {
-        val preAuthorizedTokenHandler = PreAuthorizedCodeTokenHandler(
+        val preAuthorizedTokenHandler = PreAuthorizedCodeTokenEndpoint(
             codeRepository = config.preAuthorizedCodeRepository,
-            tokenService = config.tokenService,
+            tokenService = config.accessTokenService,
         )
         config.tokenEndpointHandlers.appendForGrant(
             grantType = GrantType.PreAuthorizedCode,
             handler = preAuthorizedTokenHandler,
         )
+    }
+}
+
+private fun registerDefaultCredentialHandlers(
+    config: OAuth2ProviderConfig,
+    includeCredentialDefaultHandlers: Boolean,
+) {
+    if (!includeCredentialDefaultHandlers) return
+    val sdJwtVcFormat = CredentialFormat.SD_JWT_VC
+    if (config.credentialEndpointHandlers.get(sdJwtVcFormat) == null) {
+        config.credentialEndpointHandlers.register(sdJwtVcFormat, SdJwtVcCredentialHandler())
+    }
+
+    val jwtVcJsonFormat = CredentialFormat.JWT_VC_JSON
+    if (config.credentialEndpointHandlers.get(jwtVcJsonFormat) == null) {
+        config.credentialEndpointHandlers.register(jwtVcJsonFormat, W3cJwtVcCredentialHandler())
+    }
+
+    val jwtVcFormat = CredentialFormat.JWT_VC
+    if (config.credentialEndpointHandlers.get(jwtVcFormat) == null) {
+        config.credentialEndpointHandlers.register(jwtVcFormat, W3cJwtVcCredentialHandler())
     }
 }

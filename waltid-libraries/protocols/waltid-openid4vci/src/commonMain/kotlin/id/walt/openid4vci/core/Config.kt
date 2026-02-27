@@ -1,21 +1,25 @@
 package id.walt.openid4vci.core
 
-import id.walt.openid4vci.AuthorizeEndpointHandlers
-import id.walt.openid4vci.TokenEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.validation.AccessRequestValidator
-import id.walt.openid4vci.validation.AuthorizeRequestValidator
+import id.walt.openid4vci.tokens.AccessTokenVerifier
+import id.walt.openid4vci.validation.AccessTokenRequestValidator
+import id.walt.openid4vci.validation.AuthorizationRequestValidator
+import id.walt.openid4vci.validation.CredentialRequestValidator
+import id.walt.openid4vci.validation.IssuerStateValidator
 
 /**
  * Configuration holds handler registries and injectable objects used by the provider.
  *
  * Roadmap (mirrors the bullets in Builder.kt):
- * - authorizeRequestValidator → parse/validate authorize endpoint input
- * - accessRequestValidator → parse/validate token endpoint input
- * - authorizeEndpointHandlers / tokenEndpointHandlers → the handlers
+ * - authorizationRequestValidator → parse/validate authorize endpoint input
+ * - accessTokenRequestValidator → parse/validate token endpoint input
+ * - authorizationEndpointHandlers / tokenEndpointHandlers → the handlers
  * - repository → placeholder storage until implementation
  * - builder adaptability → expose knobs so advanced callers can replace validators or strategies
  *
@@ -23,12 +27,19 @@ import id.walt.openid4vci.validation.AuthorizeRequestValidator
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
 data class OAuth2ProviderConfig(
-    val authorizeRequestValidator: AuthorizeRequestValidator,
-    val accessRequestValidator: AccessRequestValidator,
-    val authorizeEndpointHandlers: AuthorizeEndpointHandlers,
-    val tokenEndpointHandlers: TokenEndpointHandlers,
+    val authorizationRequestValidator: AuthorizationRequestValidator,
+    val issuerStateValidator: IssuerStateValidator? = null,
+    val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
     val authorizationCodeRepository: AuthorizationCodeRepository,
+
+    val accessTokenRequestValidator: AccessTokenRequestValidator,
+    val tokenEndpointHandlers: TokenEndpointHandlers,
+    val accessTokenService: AccessTokenService,
+    val accessTokenVerifier: AccessTokenVerifier? = null,
+
     val preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
-    val tokenService: AccessTokenService,
+
+    val credentialRequestValidator: CredentialRequestValidator,
+    val credentialEndpointHandlers: CredentialEndpointHandlers,
 )
