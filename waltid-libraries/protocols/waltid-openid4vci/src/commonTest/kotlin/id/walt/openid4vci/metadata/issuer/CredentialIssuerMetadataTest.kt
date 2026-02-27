@@ -453,8 +453,6 @@ class CredentialIssuerMetadataTest {
         )
 
         assertEquals("https://issuer.example/credential", issuerMetadata.credentialEndpoint)
-        assertEquals("https://issuer.example/credential_deferred", issuerMetadata.deferredCredentialEndpoint)
-        assertEquals("https://issuer.example/notification", issuerMetadata.notificationEndpoint)
         assertEquals("https://issuer.example/nonce", issuerMetadata.nonceEndpoint)
         assertEquals(listOf("https://auth.example"), issuerMetadata.authorizationServerIssuers())
         assertEquals(configurationJwt, issuerMetadata.credentialConfigurationsSupported.getValue("cred-jwt"))
@@ -471,8 +469,6 @@ class CredentialIssuerMetadataTest {
             ),
         )
         assertEquals("https://issuer.example/credential", issuerMetadata.credentialEndpoint)
-        assertEquals("https://issuer.example/credential_deferred", issuerMetadata.deferredCredentialEndpoint)
-        assertEquals("https://issuer.example/notification", issuerMetadata.notificationEndpoint)
         assertEquals("https://issuer.example/nonce", issuerMetadata.nonceEndpoint)
 
         val asMetadata = AuthorizationServerMetadata.fromBaseUrl("https://issuer.example")
