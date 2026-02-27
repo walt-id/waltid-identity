@@ -57,6 +57,12 @@ data class AuthorizationServerMetadata(
     val tokenEndpointAuthMethodsSupported: Set<String>? = null,
     @SerialName("token_endpoint_auth_signing_alg_values_supported")
     val tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+    @SerialName("client_attestation_signing_alg_values_supported")
+    val clientAttestationSigningAlgValuesSupported: Set<String>? = null,
+    @SerialName("client_attestation_pop_signing_alg_values_supported")
+    val clientAttestationPopSigningAlgValuesSupported: Set<String>? = null,
+    @SerialName("dpop_signing_alg_values_supported")
+    val dpopSigningAlgValuesSupported: Set<String>? = null,
     @SerialName("pushed_authorization_request_endpoint")
     val pushedAuthorizationRequestEndpoint: String? = null,
     @SerialName("require_pushed_authorization_requests")
@@ -115,6 +121,18 @@ data class AuthorizationServerMetadata(
             "token_endpoint_auth_signing_alg_values_supported",
             tokenEndpointAuthSigningAlgValuesSupported,
         )
+        requireNotEmptyIfPresent(
+            "client_attestation_signing_alg_values_supported",
+            clientAttestationSigningAlgValuesSupported,
+        )
+        requireNotEmptyIfPresent(
+            "client_attestation_pop_signing_alg_values_supported",
+            clientAttestationPopSigningAlgValuesSupported,
+        )
+        requireNotEmptyIfPresent(
+            "dpop_signing_alg_values_supported",
+            dpopSigningAlgValuesSupported,
+        )
         requireNotEmptyIfPresent("ui_locales_supported", uiLocalesSupported)
         requireNotEmptyIfPresent(
             "revocation_endpoint_auth_methods_supported",
@@ -155,6 +173,21 @@ data class AuthorizationServerMetadata(
         // RFC 8414 §2: Validate jwks_uri if present
         jwksUri?.let { validateUrl("jwks_uri", it) }
 
+        // RFC 8414 §2: "none" is not a valid JWS alg for token endpoint JWT auth.
+        tokenEndpointAuthSigningAlgValuesSupported?.let { algorithms ->
+            require(!algorithms.contains("none")) {
+                "Authorization server token_endpoint_auth_signing_alg_values_supported must not include none"
+            }
+        }
+
+        // RFC 8414 §2: signing algs are required for private_key_jwt and client_secret_jwt.
+        tokenEndpointAuthMethodsSupported?.let { methods ->
+            val requiresSigningAlgs = methods.contains("private_key_jwt") || methods.contains("client_secret_jwt")
+            require(!requiresSigningAlgs || !tokenEndpointAuthSigningAlgValuesSupported.isNullOrEmpty()) {
+                "Authorization server token_endpoint_auth_signing_alg_values_supported is required when using JWT auth methods"
+            }
+        }
+
         customParameters?.let { params ->
             require(params.keys.none { it in AuthorizationServerMetadataSerializer.knownKeys }) {
                 "customParameters must not override standard authorization server metadata fields"
@@ -174,6 +207,11 @@ data class AuthorizationServerMetadata(
                 GrantType.AuthorizationCode.value,
                 GrantType.PreAuthorizedCode.value,
             ),
+            tokenEndpointAuthMethodsSupported: Set<String>? = setOf("attest_jwt_client_auth"),
+            tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
+            clientAttestationSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
+            clientAttestationPopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
+            dpopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             requirePushedAuthorizationRequests: Boolean? = null,
             pushedAuthorizationRequestEndpointPath: String? = null,
         ): AuthorizationServerMetadata {
@@ -187,6 +225,11 @@ data class AuthorizationServerMetadata(
                 responseTypesSupported = responseTypesSupported,
                 responseModesSupported = responseModesSupported,
                 grantTypesSupported = grantTypesSupported,
+                tokenEndpointAuthMethodsSupported = tokenEndpointAuthMethodsSupported,
+                tokenEndpointAuthSigningAlgValuesSupported = tokenEndpointAuthSigningAlgValuesSupported,
+                clientAttestationSigningAlgValuesSupported = clientAttestationSigningAlgValuesSupported,
+                clientAttestationPopSigningAlgValuesSupported = clientAttestationPopSigningAlgValuesSupported,
+                dpopSigningAlgValuesSupported = dpopSigningAlgValuesSupported,
                 requirePushedAuthorizationRequests = requirePushedAuthorizationRequests,
                 pushedAuthorizationRequestEndpoint = parEndpoint,
             )
@@ -247,6 +290,12 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             value.grantTypesSupported?.takeIf { it.isNotEmpty() }?.let { put("grant_types_supported", it.toJsonArray()) }
             value.tokenEndpointAuthSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
                 ?.let { put("token_endpoint_auth_signing_alg_values_supported", it.toJsonArray()) }
+            value.clientAttestationSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
+                ?.let { put("client_attestation_signing_alg_values_supported", it.toJsonArray()) }
+            value.clientAttestationPopSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
+                ?.let { put("client_attestation_pop_signing_alg_values_supported", it.toJsonArray()) }
+            value.dpopSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
+                ?.let { put("dpop_signing_alg_values_supported", it.toJsonArray()) }
             value.pushedAuthorizationRequestEndpoint?.let { put("pushed_authorization_request_endpoint", JsonPrimitive(it)) }
             value.registrationEndpoint?.let { put("registration_endpoint", JsonPrimitive(it)) }
             value.requirePushedAuthorizationRequests?.let { put("require_pushed_authorization_requests", JsonPrimitive(it)) }
@@ -302,6 +351,11 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             tokenEndpointAuthMethodsSupported = element.stringSet("token_endpoint_auth_methods_supported"),
             tokenEndpointAuthSigningAlgValuesSupported =
                 element.stringSet("token_endpoint_auth_signing_alg_values_supported"),
+            clientAttestationSigningAlgValuesSupported =
+                element.stringSet("client_attestation_signing_alg_values_supported"),
+            clientAttestationPopSigningAlgValuesSupported =
+                element.stringSet("client_attestation_pop_signing_alg_values_supported"),
+            dpopSigningAlgValuesSupported = element.stringSet("dpop_signing_alg_values_supported"),
             pushedAuthorizationRequestEndpoint = element.string("pushed_authorization_request_endpoint"),
             requirePushedAuthorizationRequests = element.bool("require_pushed_authorization_requests"),
             serviceDocumentation = element.string("service_documentation"),
