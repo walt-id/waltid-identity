@@ -136,7 +136,13 @@ Below is a flow configuration that matches what we setup with Keycloak above:
     "clientSecret": "fzYFC6oAgbjozv8NoaXuOIfPxmT4XoVM",
     "pkceEnabled": true,
     "callbackUri": "http://authnz-example.localhost:8088/auth/flows/oidc-example/oidc/callback",
-    "redirectAfterLogin": "http://authnz-example.localhost:8088/protected"
+    "redirectAfterLogin": "http://authnz-example.localhost:8088/protected",
+    "externalRoleExtraction": {
+      "enabled": true,
+      "realmRolesClaimPath": "realm_access.roles",
+      "clientRolesClaimPath": "resource_access",
+      "clientId": "waltid_ktor_authnz"
+    }
   },
   "success": true
 }
@@ -154,6 +160,11 @@ Explanation of config values:
 - `callbackUri`: the callback URL of the ktor-authnz backend, which your IDP will redirect the user
   to
 - `redirectAfterLogin`: where the ktor-authnz backend will redirect the user from the callback page
+- `externalRoleExtraction` (optional): extract roles from ID token claims for downstream IAM mapping
+  - `enabled` (default: `false`)
+  - `realmRolesClaimPath` (default: `realm_access.roles`)
+  - `clientRolesClaimPath` (default: `resource_access`)
+  - `clientId` (optional; defaults to the OIDC `clientId`)
 
 ## Request flow
 

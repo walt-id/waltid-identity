@@ -8,6 +8,14 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class OidcExternalRoleExtractionConfiguration(
+    val enabled: Boolean = false,
+    val realmRolesClaimPath: String = "realm_access.roles",
+    val clientRolesClaimPath: String = "resource_access",
+    val clientId: String? = null,
+)
+
+@Serializable
 @SerialName("oidc-config")
 data class OidcAuthConfiguration(
     /** EITHER provide the discovery URL for automatic configuration, e.g., "https://idp.example.com/realms/my-realm/.well-known/openid-configuration" */
@@ -32,6 +40,9 @@ data class OidcAuthConfiguration(
 
     /** The claim in the user info response to use for the unique account identifier. 'sub' is the standard. */
     val accountIdentifierClaim: String = "sub",
+
+    /** Optional extraction of external roles from OIDC ID token claims (e.g. Keycloak realm/client roles). */
+    val externalRoleExtraction: OidcExternalRoleExtractionConfiguration = OidcExternalRoleExtractionConfiguration(),
 ) : AuthMethodConfiguration {
 
     @kotlinx.serialization.Transient
