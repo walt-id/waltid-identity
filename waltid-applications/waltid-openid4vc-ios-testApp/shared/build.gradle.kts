@@ -33,7 +33,7 @@ kotlin {
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
             implementation("io.ktor:ktor-client-core:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-client-serialization:${Versions.KTOR_VERSION}")
@@ -55,7 +55,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation("io.ktor:ktor-client-darwin:3.2.3")
+                implementation("io.ktor:ktor-client-darwin:3.4.0")
             }
         }
     }

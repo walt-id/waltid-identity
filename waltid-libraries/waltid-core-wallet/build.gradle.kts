@@ -13,7 +13,7 @@ kotlin {
     sourceSets {
 
         commonMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
             implementation(identityLibs.oshai.kotlinlogging)
@@ -32,11 +32,11 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Bouncy Castle
-            implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
-            implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+            implementation("org.bouncycastle:bcprov-lts8on:2.73.10")
+            implementation("org.bouncycastle:bcpkix-lts8on:2.73.10")
 
             // Problematic libraries:
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation("com.nimbusds:nimbus-jose-jwt:10.8")
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
         }
         jvmMain.dependencies {
@@ -49,7 +49,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }
     }
