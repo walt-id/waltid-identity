@@ -10,7 +10,7 @@ java-library = "17"
 vanniktech-publish = "0.35.0"
 npm-publish = "3.5.3"
 jib = "3.5.2"
-android-gradle = "8.12.3"
+android-gradle = "9.0.1"
 
 # Plugins / Dependencies
 ktor = "3.3.3"
