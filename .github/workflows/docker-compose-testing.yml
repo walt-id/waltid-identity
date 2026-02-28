@@ -83,25 +83,25 @@ jobs:
         continue-on-error: false
       - name: Download issuer-api artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: issuer-api
           path: ${{ runner.temp }}
       - name: Download verifier-api artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: verifier-api
           path: ${{ runner.temp }}
       - name: Download verifier-api2 artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: verifier-api2
           path: ${{ runner.temp }}
       - name: Download wallet-api artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: wallet-api
           path: ${{ runner.temp }}

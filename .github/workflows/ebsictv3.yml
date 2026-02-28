@@ -43,7 +43,7 @@ jobs:
 
       - name: Download artifact
         if: ${{ env.use-artifact }}
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: ${{ inputs.artifact }}
           path: ${{ runner.temp }}
