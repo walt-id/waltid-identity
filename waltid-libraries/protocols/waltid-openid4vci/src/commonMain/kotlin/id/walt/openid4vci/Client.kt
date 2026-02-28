@@ -8,17 +8,17 @@ package id.walt.openid4vci
 interface Client {
     val id: String
     val redirectUris: List<String>
-    val grantTypes: Arguments
-    val responseTypes: Arguments
-    val scopes: Arguments
-    val audience: Arguments
+    val grantTypes: Set<String>
+    val responseTypes: Set<String>
+    val scopes: Set<String>
+    val audience: Set<String>
 }
 
 data class DefaultClient(
-    override val id: String = "",
-    override val redirectUris: List<String> = emptyList(),
-    override val grantTypes: Arguments = argumentsOf("authorization_code"),
-    override val responseTypes: Arguments = argumentsOf("code"),
-    override val scopes: Arguments = newArguments(),
-    override val audience: Arguments = newArguments(),
+    override val id: String,
+    override val redirectUris: List<String>,
+    override val grantTypes: Set<String>,
+    override val responseTypes: Set<String>,
+    override val scopes: Set<String> = emptySet(),
+    override val audience: Set<String> = emptySet(),
 ) : Client

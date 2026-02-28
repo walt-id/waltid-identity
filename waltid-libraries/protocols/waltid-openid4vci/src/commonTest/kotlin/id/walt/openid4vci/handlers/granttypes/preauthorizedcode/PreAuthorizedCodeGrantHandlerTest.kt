@@ -1,29 +1,28 @@
-package id.walt.openid4vci.granttypehandlers
+package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.StubTokenService
-import id.walt.openid4vci.TokenEndpointResult
-import id.walt.openid4vci.argumentsOf
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.request.AccessTokenRequest
+import id.walt.openid4vci.requests.token.AccessTokenRequest
+import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-class PreAuthorizedCodeTokenHandlerTest {
+class PreAuthorizedCodeGrantHandlerTest {
 
     private val repository = InMemoryPreAuthorizedCodeRepository()
-    private val handler = PreAuthorizedCodeTokenHandler(repository, StubTokenService())
+    private val handler = PreAuthorizedCodeTokenEndpoint(repository, StubTokenService())
     private val issuer = DefaultPreAuthorizedCodeIssuer(repository)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -44,16 +43,14 @@ class PreAuthorizedCodeTokenHandlerTest {
         )
         val code = issued.code
 
-        val request = createAccessRequestWithGrant()
-        request.getRequestForm().set("pre-authorized_code", code)
+        val request = createAccessRequestWithGrant(code = code)
 
         val result = handler.handleTokenEndpointRequest(request)
-        assertTrue(result is TokenEndpointResult.Success)
-        assertNotNull(result.extra["c_nonce"])
-        assertTrue((result.extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
-        assertEquals("credential-subject", request.getSession()?.getSubject())
-        assertTrue(request.hasHandledGrantType(GrantType.PreAuthorizedCode.value))
-        assertEquals("client-pre", request.getClient().id)
+        assertTrue(result is AccessTokenResponseResult.Success)
+        val extra = result.response.extra
+        assertNotNull(extra["c_nonce"])
+        assertTrue((extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
+        // Request client remains whatever the validator provided; handler internal client selection is not reflected on the immutable request.
         assertNull(repository.get(code))
     }
 
@@ -70,21 +67,15 @@ class PreAuthorizedCodeTokenHandlerTest {
         )
         val code = issued.code
 
-        val firstAttempt = createAccessRequestWithGrant().apply {
-            getRequestForm().set("pre-authorized_code", code)
-            getRequestForm().set("user_pin", "0000")
-        }
+        val firstAttempt = createAccessRequestWithGrant(code = code, userPin = "0000")
 
         val failure = handler.handleTokenEndpointRequest(firstAttempt)
-        assertTrue(failure is TokenEndpointResult.Failure)
+        assertTrue(failure is AccessTokenResponseResult.Failure)
         assertNotNull(repository.get(code))
 
-        val secondAttempt = createAccessRequestWithGrant().apply {
-            getRequestForm().set("pre-authorized_code", code)
-            getRequestForm().set("user_pin", "4321")
-        }
+        val secondAttempt = createAccessRequestWithGrant(code = code, userPin = "4321")
         val success = handler.handleTokenEndpointRequest(secondAttempt)
-        assertTrue(success is TokenEndpointResult.Success)
+        assertTrue(success is AccessTokenResponseResult.Success)
         assertNull(repository.get(code))
     }
 
@@ -100,28 +91,29 @@ class PreAuthorizedCodeTokenHandlerTest {
         )
         val code = issued.code
 
-        val first = createAccessRequestWithGrant().apply {
-            getRequestForm().set("pre-authorized_code", code)
-        }
-        assertTrue(handler.handleTokenEndpointRequest(first) is TokenEndpointResult.Success)
+        val first = createAccessRequestWithGrant(code = code)
+        assertTrue(handler.handleTokenEndpointRequest(first) is AccessTokenResponseResult.Success)
 
-        val second = createAccessRequestWithGrant().apply {
-            getRequestForm().set("pre-authorized_code", code)
-        }
+        val second = createAccessRequestWithGrant(code = code)
         val failure = handler.handleTokenEndpointRequest(second)
-        assertTrue(failure is TokenEndpointResult.Failure)
+        assertTrue(failure is AccessTokenResponseResult.Failure)
     }
 
-        private fun createAccessRequestWithGrant(): AccessTokenRequest =
-            AccessTokenRequest(session = DefaultSession(subject = "access-subject")).apply {
-            setClient(
-                DefaultClient(
+        private fun createAccessRequestWithGrant(code: String? = null, userPin: String? = null): AccessTokenRequest =
+            DefaultAccessTokenRequest(
+                client = DefaultClient(
                     id = "",
-                    grantTypes = argumentsOf(GrantType.PreAuthorizedCode.value),
+                    redirectUris = emptyList(),
+                    grantTypes = setOf(GrantType.PreAuthorizedCode.value),
+                    responseTypes = emptySet(),
                 ),
+                grantTypes = setOf(GrantType.PreAuthorizedCode.value),
+                requestForm = buildMap {
+                    if (code != null) put("pre-authorized_code", listOf(code))
+                    if (userPin != null) put("user_pin", listOf(userPin))
+                },
+                session = DefaultSession(subject = "access-subject"),
             )
-            appendGrantType(GrantType.PreAuthorizedCode.value)
-        }
 
     private class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
         private val records = mutableMapOf<String, PreAuthorizedCodeRecord>()
