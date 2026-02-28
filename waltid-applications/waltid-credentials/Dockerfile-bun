@@ -5,7 +5,7 @@ RUN pnpm install
 COPY ./ /build
 RUN pnpm run build
 # RUN
-FROM docker.io/node:20-alpine
+FROM docker.io/node:25-alpine
 
 # Create non-root user
 RUN addgroup -g 10001 -S appgroup && \
