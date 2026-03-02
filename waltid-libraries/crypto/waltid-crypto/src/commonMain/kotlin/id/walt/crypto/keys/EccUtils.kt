@@ -19,16 +19,17 @@ object EccUtils {
      * component sizes are unsupported.
      */
     fun convertDERtoIEEEP1363(derSignature: ByteArray): ByteArray {
+        // Check if already in IEEE P1363 format (raw R||S)
+        // P1363 signatures have fixed lengths: 64 bytes (P-256/k1), 96 bytes (P-384), or 132 bytes (P-521)
+        // This check must come FIRST because P1363 signatures can start with any byte (including 0x30)
+        if (derSignature.size in p1363Lengths) {
+            // Signature is already in IEEE P1363 format
+            return derSignature
+        }
+
         // A DER-encoded signature is an ASN.1 SEQUENCE.
         // It must start with 0x30.
         if (derSignature.isEmpty() || derSignature[0] != 0x30.toByte()) {
-            // Passed data might already be in IEEE P1363 format, or it might just be invalid.
-
-            if (derSignature.size in p1363Lengths) {
-                // Signature is already in IEEE P1363 format
-                return derSignature
-            }
-
             throw IllegalArgumentException("Signature is not a valid DER sequence.")
         }
 

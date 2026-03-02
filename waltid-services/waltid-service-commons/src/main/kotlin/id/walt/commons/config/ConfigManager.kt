@@ -86,7 +86,16 @@ object ConfigManager {
                 .addCommandLineSource(args)
                 .addDefaultParsers()
                 .addEnvironmentSource(allowUppercaseNames = false)
-                .addFileSource("config/$id.conf", optional = true)
+                // Check for system property config.file.<id> first, then fall back to default path
+                .apply {
+                    val configFileProperty = System.getProperty("config.file.$id")
+                    if (configFileProperty != null) {
+                        log.trace { "Loading config '$id' from system property path: $configFileProperty" }
+                        addFileSource(configFileProperty, optional = false)
+                    } else {
+                        addFileSource("config/$id.conf", optional = true)
+                    }
+                }
                 .withExplicitSealedTypes()
                 .build().also { loader -> configLoaders[id] = loader }
                 .loadConfigOrThrow(type, emptyList())

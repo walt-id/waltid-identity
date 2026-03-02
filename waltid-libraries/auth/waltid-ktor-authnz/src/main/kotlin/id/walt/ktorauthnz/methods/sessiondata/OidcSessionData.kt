@@ -14,10 +14,20 @@ data class OidcSessionAuthenticationStepData(
 ) : SessionData
 
 @Serializable
+@SerialName("oidc-external-roles")
+data class OidcExternalRoles(
+    val issuer: String,
+    val subject: String,
+    val realmRoles: Set<String> = emptySet(),
+    val clientRoles: Map<String, Set<String>> = emptyMap(),
+)
+
+@Serializable
 @SerialName("oidc-authenticated")
 data class OidcSessionAuthenticatedData(
     val tokenValidationData: TokenValidationData,
-    val oidcIdentifier: OIDCIdentifier
+    val oidcIdentifier: OIDCIdentifier,
+    val externalRoles: OidcExternalRoles? = null,
 ) : SessionData {
 
     @Serializable

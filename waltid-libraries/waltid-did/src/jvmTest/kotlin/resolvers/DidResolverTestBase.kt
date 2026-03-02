@@ -31,8 +31,15 @@ abstract class DidResolverTestBase {
     private fun allowFailWithSocketTimeout(block: () -> Unit) = runCatching {
         block.invoke()
     }.getOrElse { ex ->
-        if (ex is SocketTimeoutException || ex is HttpRequestTimeoutException) {
-            println("A resolver URL is timing out: ${ex.message}")
+        // Check if this is a timeout exception (directly thrown or wrapped in assertion failure)
+        val isTimeoutException = ex is SocketTimeoutException ||
+                                  ex is HttpRequestTimeoutException ||
+                                  ex.cause is SocketTimeoutException ||
+                                  ex.cause is HttpRequestTimeoutException
+        
+        if (isTimeoutException) {
+            println("A resolver URL is timing out: ${ex.cause?.message ?: ex.message}")
+            println("Skipping test due to external API unavailability")
         } else throw ex
     }
 
@@ -43,6 +50,13 @@ abstract class DidResolverTestBase {
     ) {
         allowFailWithSocketTimeout {
             val result = runBlocking { resolver.resolve(did) }
+            if (result.isFailure) {
+                val ex = result.exceptionOrNull()
+                if (ex is SocketTimeoutException || ex is HttpRequestTimeoutException) {
+                    println("Resolver timeout for $did: ${ex.message}")
+                    return@allowFailWithSocketTimeout // Skip test gracefully
+                }
+            }
             resolverAssertion(did, key, result)
         }
     }
@@ -54,6 +68,13 @@ abstract class DidResolverTestBase {
     ) {
         allowFailWithSocketTimeout {
             val result = runBlocking { resolver.resolveToKey(did) }
+            if (result.isFailure) {
+                val ex = result.exceptionOrNull()
+                if (ex is SocketTimeoutException || ex is HttpRequestTimeoutException) {
+                    println("Resolver timeout for $did: ${ex.message}")
+                    return@allowFailWithSocketTimeout // Skip test gracefully
+                }
+            }
             resolverAssertion(did, key, result)
         }
     }
@@ -65,6 +86,13 @@ abstract class DidResolverTestBase {
     ) {
         allowFailWithSocketTimeout {
             val result = runBlocking { resolver.resolveToKeys(did) }
+            if (result.isFailure) {
+                val ex = result.exceptionOrNull()
+                if (ex is SocketTimeoutException || ex is HttpRequestTimeoutException) {
+                    println("Resolver timeout for $did: ${ex.message}")
+                    return@allowFailWithSocketTimeout // Skip test gracefully
+                }
+            }
             resolverAssertion(did, key, result)
         }
     }
