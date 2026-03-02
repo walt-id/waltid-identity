@@ -116,7 +116,6 @@ object VerificationSessionCreator {
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
                     "mso_mdoc" to JsonObject(
-                        //if (isDcApiHaip) mapOf(
                         if (isDcApiHaip) mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
                             "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
@@ -129,20 +128,14 @@ object VerificationSessionCreator {
                 encryptedResponseEncValuesSupported = listOf("A128GCM")
             )
         } else {
-            clientMetadata
-
             val baseMetadata = clientMetadata ?: ClientMetadata()
             baseMetadata.copy(
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
                     "mso_mdoc" to JsonObject(
-                        //if (isDcApiHaip) mapOf(
                          mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
                             "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
-                            /*"alg_values_supported" to JsonArray(
-                                listOf(JsonPrimitive("ES256"))
-                            )*/
                         )
                     )
                 )
