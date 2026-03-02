@@ -104,7 +104,7 @@ class MdocIssuanceTest {
         // For each received item, calculate its digest and verify it matches the one in the MSO
         for (signedItemWrapper in receivedIssuerItems) {
             val signedItem = signedItemWrapper.value
-            val expectedDigest = ValueDigest.fromIssuerSignedItem(signedItem, namespaceToCheck, "SHA-256")
+            val expectedDigest = ValueDigest.fromIssuerSignedItem(signedItem, namespaceToCheck, decodedMso.digestAlgorithm)
             val receivedDigest = receivedDigests.find { it.key == signedItem.digestId }
 
             requireNotNull(receivedDigest, { "Digest with ID ${signedItem.digestId} not found in MSO" })
