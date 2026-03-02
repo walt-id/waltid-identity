@@ -2,7 +2,7 @@
 
 package id.walt.mdoc.credsdata
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
@@ -32,7 +32,7 @@ sealed interface MdocData {
     fun toNamespacesJson(): Map<String, JsonObject> =
         toNamespaces().mapValues { (_, namespaceData) ->
             JsonObject(namespaceData.mapValues { (_, elementValue) ->
-                elementValue.toJsonElement()
+                elementValue.toSerializedJsonElement()
             })
         }
 

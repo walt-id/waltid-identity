@@ -1,6 +1,6 @@
 package id.walt.mdoc.objects.elements
 
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
@@ -32,7 +32,7 @@ data class DeviceNameSpaces(
                         ?.runCatching {
                             Json.encodeToJsonElement(this as KSerializer<Any?>, item.value)
                         }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
-                        ?: item.value.toJsonElement()
+                        ?: item.value.toSerializedJsonElement()
 
                     put(item.key, serialized)
                 }

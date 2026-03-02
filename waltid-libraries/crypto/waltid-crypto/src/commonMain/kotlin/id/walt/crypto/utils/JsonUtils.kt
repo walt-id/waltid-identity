@@ -34,6 +34,30 @@ object JsonUtils {
             is List<*> -> JsonArray(map { it.toJsonElement() })
             is Array<*> -> JsonArray(map { it.toJsonElement() })
             is Collection<*> -> JsonArray(map { it.toJsonElement() })
+            is Enum<*> -> JsonPrimitive(this.toString())
+            is Unit -> JsonPrimitive("null")
+            else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.simpleName}, was: $this")
+        }
+    fun javaToJsonElement(any: Any?) = any.toJsonElement()
+
+    @OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)
+    fun Any?.toSerializedJsonElement(): JsonElement =
+        when (this) {
+            is JsonElement -> this
+            null -> JsonNull
+            is String -> JsonPrimitive(this)
+            is Boolean -> JsonPrimitive(this)
+            is Number -> JsonPrimitive(this)
+
+            is UByte -> JsonPrimitive(this)
+            is UInt -> JsonPrimitive(this)
+            is ULong -> JsonPrimitive(this)
+            is UShort -> JsonPrimitive(this)
+
+            is Map<*, *> -> JsonObject(map { Pair(it.key.toString(), it.value.toSerializedJsonElement()) }.toMap())
+            is List<*> -> JsonArray(map { it.toSerializedJsonElement() })
+            is Array<*> -> JsonArray(map { it.toSerializedJsonElement() })
+            is Collection<*> -> JsonArray(map { it.toSerializedJsonElement() })
             is Unit -> JsonPrimitive("null")
             else -> {
                 val serializer = this::class.serializerOrNull()
@@ -43,12 +67,11 @@ object JsonUtils {
                     Json.encodeToJsonElement(serializer as KSerializer<Any>, this)
                 } else when (this) {
                     is Enum<*> -> JsonPrimitive(this.toString())
-                    else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.qualifiedName}, was: $this")
+                    else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.simpleName}, was: $this")
                 }
             }
         }
 
-    fun javaToJsonElement(any: Any?) = any.toJsonElement()
 
     @JsName("listToJsonElement")
     fun List<*>.toJsonElement(): JsonElement {

@@ -3,7 +3,7 @@ package id.walt.mdoc.objects.document
 import id.walt.cose.CoseSign1
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
@@ -76,7 +76,7 @@ data class IssuerSigned private constructor(
                         ?.runCatching {
                             Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                         }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
-                        ?: item.elementValue.toJsonElement()
+                        ?: item.elementValue.toSerializedJsonElement()
 
                     put(item.elementIdentifier, serialized)
                 }
