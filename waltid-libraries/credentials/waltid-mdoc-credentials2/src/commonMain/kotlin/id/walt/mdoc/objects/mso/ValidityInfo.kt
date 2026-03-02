@@ -55,4 +55,8 @@ data class ValidityInfo(
         require(validFrom <= now) { "MSO is not yet valid" }
         require(validUntil >= now) { "MSO is no longer valid" }
     }
+
+    fun precheck() {
+        require(validUntil >= validFrom) { "validFrom cannot be lower than validUntil" }
+    }
 }

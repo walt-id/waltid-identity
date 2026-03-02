@@ -55,7 +55,11 @@ data class MobileSecurityObject(
 
     @SerialName("status")
     val status: Status? = null
-)
+) {
+    fun precheck() {
+        validityInfo.precheck()
+    }
+}
 
 /**
  * A container for credential status information, typically referencing an external Status List.

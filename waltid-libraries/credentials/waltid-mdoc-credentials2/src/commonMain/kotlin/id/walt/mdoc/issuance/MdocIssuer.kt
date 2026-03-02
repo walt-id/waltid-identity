@@ -43,7 +43,7 @@ object MdocIssuer {
         docType: String,
 
         validFrom: Instant = Clock.System.now(),
-        validUntil: Instant = Clock.System.now().plus(100.days * 365 * 10),
+        validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"
     ): IssuerSigned {
@@ -68,6 +68,12 @@ object MdocIssuer {
             ),
             status = status
         )
+
+        runCatching {
+            mso.precheck()
+        }.onFailure { ex ->
+            throw IllegalArgumentException("Could not create valid MSO for issued mdoc: ${ex.message}", ex)
+        }
 
         // The MSO is wrapped in a tagged bytestring to become the payload
         val msoBytes = coseCompliantCbor.encodeToByteArray(mso)
@@ -109,7 +115,7 @@ object MdocIssuer {
         data: MdocUniversalIssuanceData,
 
         validFrom: Instant = Clock.System.now(),
-        validUntil: Instant = Clock.System.now().plus(100.days * 365 * 10),
+        validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
 
@@ -156,7 +162,7 @@ object MdocIssuer {
         typesafeData: MdocData,
 
         validFrom: Instant = Clock.System.now(),
-        validUntil: Instant = Clock.System.now().plus(100.days * 365 * 10),
+        validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"
     ): IssuerSigned {
