@@ -24,8 +24,10 @@ class AudienceCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> {
+        requireNotNull(verificationContext) { "Verification context needs to be provided for AudienceCheck JwtVcJson VP Policy" }
+
         addResult("presentation_audience", presentation.audience)
         addResult("expected_audience", verificationContext.expectedAudience)
         presentationRequire(

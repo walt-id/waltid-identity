@@ -3,13 +3,8 @@ package id.walt.cose
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 
-object JWKKeyCoseTransform {
-
-
-    /**
-     * Exports the public key as a COSE Key object for HPKE usage.
-     */
-    fun JWKKey.getCosePublicKey(): CoseKey {
+actual object JWKKeyCoseTransform {
+    actual fun JWKKey.getCosePublicKey(): CoseKey {
         return when (keyType) {
             KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> {
                 val ecKey = _internalJwk.toECKey()
@@ -31,5 +26,4 @@ object JWKKeyCoseTransform {
             else -> throw IllegalArgumentException("Key type $keyType not supported for COSE conversion")
         }
     }
-
 }

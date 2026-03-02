@@ -194,6 +194,45 @@ data class Pid(
     val attestationLegalCategory: String? = null,
 
     ) : MdocData {
+    override val docType = "eu.europa.ec.eudi.pid.1"
+
+    override fun toNamespaces(): Map<String, Map<String, Any>> = namespacesOf(
+        "eu.europa.ec.eudi.pid.1" to mapOf(
+            "family_name" to familyName,
+            "given_name" to givenName,
+            "birth_date" to birthDate,
+            // "age_in_years" to age,
+            // "age_birth_year" to age,
+            "age_over_18" to ageOver18,
+            "age_over_21" to ageOver21,
+            "family_name_birth" to familyNameBirth,
+            "given_name_birth" to givenNameBirth,
+            "birth_place" to birthPlace,
+            /* "birth_country" to birthCountry,
+             "birth_state" to birthState,
+             "birth_city" to birthCity,*/
+            "resident_address" to residentAddress,
+            "resident_country" to residentCountry,
+            "resident_state" to residentState,
+            "resident_city" to residentCity,
+            "resident_postal_code" to residentPostalCode,
+            "resident_street" to residentStreet,
+            "resident_house_number" to residentHouseNumber,
+            "sex" to sex,
+            "nationality" to nationality,
+            "issuance_date" to issuanceDate,
+            "expiry_date" to expiryDate,
+            "issuing_authority" to issuingAuthority,
+            "document_number" to documentNumber,
+            "personal_administrative_number" to personalAdministrativeNumber,
+            "issuing_jurisdiction" to issuingJurisdiction,
+            "issuing_country" to issuingCountry,
+            "portrait" to portrait,
+            "email_address" to emailAddress,
+            "mobile_phone_number" to mobilePhoneNumber,
+        )
+    )
+
     enum class PidSex(val code: UInt) {
         NOT_KNOWN(0u),
         MALE(1u),

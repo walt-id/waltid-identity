@@ -2,14 +2,48 @@
 
 package id.walt.mdoc.credsdata
 
+import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.mdoc.objects.elements.IssuerSignedItem
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonObject
 
 //
 ///**
 // * Abstract interface for different mdoc document types.
 // */
 sealed interface MdocData {
+    val docType: String
 
+    fun toNamespaces(): Map<String, Map<String, Any>>
+    fun toNamespaceIssuerSignedItems(): Map<String, List<IssuerSignedItem>> {
+        var idx = 0u
+
+        val namespaces = toNamespaces()
+
+        return namespaces.mapValues { (_, namespaceEntries) ->
+            namespaceEntries.mapNotNull { (elementIdentifier, elementValue) ->
+                if (elementValue != null)
+                    IssuerSignedItem.create(idx++, elementIdentifier, elementValue)
+                else null
+            }
+        }.filter { it.value.isNotEmpty() }
+    }
+
+    fun toNamespacesJson(): Map<String, JsonObject> =
+        toNamespaces().mapValues { (_, namespaceData) ->
+            JsonObject(namespaceData.mapValues { (_, elementValue) ->
+                elementValue.toJsonElement()
+            })
+        }
+
+    fun namespacesOf(vararg namespaces: Pair<String, Map<String, Any?>>): Map<String, Map<String, Any>> {
+        @Suppress("UNCHECKED_CAST")
+        return namespaces.map { (namespace, values) ->
+            namespace to values.filterValues {
+                it != null
+            }
+        }.toMap() as Map<String, Map<String, Any>>
+    }
 }
 //
 //typealias NameSpace = String

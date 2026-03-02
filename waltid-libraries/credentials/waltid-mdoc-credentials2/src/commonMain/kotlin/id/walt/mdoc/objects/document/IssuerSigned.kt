@@ -80,7 +80,6 @@ data class IssuerSigned private constructor(
 
                     put(item.elementIdentifier, serialized)
                 }
-
             }
         }
     }
@@ -92,7 +91,7 @@ data class IssuerSigned private constructor(
 
     suspend fun getParsedIssuerAuth(): ParsedIssuerAuth {
         val containedX5c = issuerAuth.unprotected.x5chain
-        requireNotNull(containedX5c) { "Missingg x5c X509 certificate chain in Mdocs credential" }
+        requireNotNull(containedX5c) { "Missing x5c X509 certificate chain in Mdocs credential" }
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
 
