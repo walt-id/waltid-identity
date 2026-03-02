@@ -198,13 +198,21 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
 
+                val externalRoles = OidcExternalRoleExtractor.extract(
+                    idTokenPayload = idTokenPayload,
+                    config = config,
+                    issuer = oidcConfig.issuer,
+                    subject = subject,
+                )
+
                 session.setSessionData(
                     this@OIDC, OidcSessionAuthenticatedData(
                         tokenValidationData = TokenValidationData(
                             idpJwksUrl = oidcConfig.jwksUri,
                             idpIss = oidcConfig.issuer,
                         ),
-                        oidcIdentifier = identifier
+                        oidcIdentifier = identifier,
+                        externalRoles = externalRoles,
                     )
                 )
 
