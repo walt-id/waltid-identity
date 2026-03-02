@@ -49,6 +49,23 @@ class MdocIssuanceTest {
         ) as JWKKey
     }
 
+    val holderKeyInit = suspend {
+        KeyManager.resolveSerializedKey(
+            """
+           {
+            "type": "jwk",
+            "jwk": {
+              "kty": "EC",
+              "d": "2STd0J5vD68K5FdxvK4SvgkumTr7shP0abiAmbRdgNk",
+              "crv": "P-256",
+              "kid": "holder",
+              "x": "lcaMxDbsqZsDc-REGbONOCz7ghxVuk38wZ__8BNuF4c",
+              "y": "rWK-j7daO07d1AwyhD2It6a1evaTwmoSs1p70PGu99M"
+            }
+          }""".trimIndent()
+        ) as JWKKey
+    }
+
     val issuerCert =
         listOf("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M")
     val issuerCertCose = issuerCert.map { CoseCertificate(it.decodeFromBase64()) }
@@ -149,7 +166,7 @@ class MdocIssuanceTest {
     @Test
     fun testUniversalIssuance() = runTest {
         val issuerKey = issuerKeyInit()
-        val holderKey = issuerKey.getPublicKey().getCosePublicKey()
+        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
         val issuerPublicKey = issuerKey.getPublicKey()
         val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
 
@@ -226,7 +243,7 @@ class MdocIssuanceTest {
     @Test
     fun testTypesafeIssuance() = runTest {
         val issuerKey = issuerKeyInit()
-        val holderKey = issuerKey.getPublicKey().getCosePublicKey()
+        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
         val issuerPublicKey = issuerKey.getPublicKey()
         val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
 
