@@ -65,6 +65,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                 dataMapping = dataMapping,
                 x5Chain = x5Chain,
                 display = display,
+                sdJwtTypeHeader = configuration.format.value,
             )
 
             CredentialResponseResult.Success(
