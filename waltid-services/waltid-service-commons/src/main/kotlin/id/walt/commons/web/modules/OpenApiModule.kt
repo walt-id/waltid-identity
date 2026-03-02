@@ -111,7 +111,13 @@ object OpenApiModule {
                 }
 
                 exampleEncoder = { type, example ->
-                    if (example is String && type is KTypeDescriptor && type.type.classifier == String::class) {
+                    val isStringType = when (type) {
+                        is KTypeDescriptor -> type.type.classifier == String::class
+                        is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
+                        else -> false
+                    }
+                    
+                    if (example is String && isStringType) {
                         example
                     } else {
                         runCatching {
