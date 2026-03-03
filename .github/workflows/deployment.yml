@@ -53,6 +53,9 @@ jobs:
           - k8s: waltid-identity/waltid-applications/waltid-web-portal/k8s
             name: portal
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-applications/waltid-digital-credentials/k8s
+            name: digital-credentials
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s/opa
             name: opa
             namespace: ${{ inputs.oss }}
