@@ -42,7 +42,7 @@ object MdocIssuer {
         /** Doctype of the credential to use */
         docType: String,
 
-        validFrom: Instant = Clock.System.now(),
+        validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"
@@ -54,6 +54,8 @@ object MdocIssuer {
                 ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, digestAlgorithm)
             })
         }
+        val signedTimestamp = Clock.System.now()
+        val effectiveValidFrom = if (validFrom != null && validFrom > signedTimestamp) validFrom else signedTimestamp
 
         val mso = MobileSecurityObject(
             version = "1.0",
@@ -62,8 +64,8 @@ object MdocIssuer {
             valueDigests = valueDigests,
             deviceKeyInfo = DeviceKeyInfo(deviceKey = holderKey),
             validityInfo = ValidityInfo(
-                signed = Clock.System.now(),
-                validFrom = validFrom,
+                signed = signedTimestamp,
+                validFrom = effectiveValidFrom,
                 validUntil = validUntil
             ),
             status = status
@@ -113,8 +115,7 @@ object MdocIssuer {
 
         /** The credential data to issue */
         data: MdocUniversalIssuanceData,
-
-        validFrom: Instant = Clock.System.now(),
+        validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
@@ -161,7 +162,8 @@ object MdocIssuer {
         /** The credential data to issue */
         typesafeData: MdocData,
 
-        validFrom: Instant = Clock.System.now(),
+        validFrom: Instant? = null,
+        
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"
