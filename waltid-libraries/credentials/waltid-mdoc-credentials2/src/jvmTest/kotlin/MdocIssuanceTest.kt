@@ -32,9 +32,11 @@ import kotlin.time.Clock
 
 class MdocIssuanceTest {
 
-    val issuerKeyInit = suspend {
-        KeyManager.resolveSerializedKey(
-            """
+    companion object {
+
+        val issuerKeyInit = suspend {
+            KeyManager.resolveSerializedKey(
+                """
            {
             "type": "jwk",
             "jwk": {
@@ -46,12 +48,12 @@ class MdocIssuanceTest {
               "y": "6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo"
             }
           }""".trimIndent()
-        ) as JWKKey
-    }
+            ) as JWKKey
+        }
 
-    val holderKeyInit = suspend {
-        KeyManager.resolveSerializedKey(
-            """
+        val holderKeyInit = suspend {
+            KeyManager.resolveSerializedKey(
+                """
            {
             "type": "jwk",
             "jwk": {
@@ -63,104 +65,110 @@ class MdocIssuanceTest {
               "y": "rWK-j7daO07d1AwyhD2It6a1evaTwmoSs1p70PGu99M"
             }
           }""".trimIndent()
-        ) as JWKKey
-    }
+            ) as JWKKey
+        }
 
-    val issuerCert =
-        listOf("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M")
-    val issuerCertCose = issuerCert.map { CoseCertificate(it.decodeFromBase64()) }
+        val issuerCert =
+            listOf("MIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M")
+        val issuerCertCose = issuerCert.map { CoseCertificate(it.decodeFromBase64()) }
 
-    suspend fun verifyIssued(
-        document: Document,
-        docType: String,
-        namespaceToCheck: String,
-        holderKey: CoseKey,
-        issuerPublicCoseVerifier: CoseVerifier,
-        namespaces: Map<String, JsonObject>
-    ) {
-        // --- 3. VERIFICATION PROCESS: Simulate what a verifier would do ---
 
-        // A verifier receives the `document`. First, they parse the MSO.
-        val receivedIssuerAuth = document.issuerSigned.issuerAuth
+        suspend fun verifyIssued(
+            document: Document,
+            docType: String,
+            namespacesToCheck: List<String>,
+            holderKey: CoseKey,
+            issuerPublicCoseVerifier: CoseVerifier,
+            namespaces: Map<String, JsonObject>
+        ) {
+            // --- 3. VERIFICATION PROCESS: Simulate what a verifier would do ---
 
-        // A. Verify the COSE signature
-        val isSignatureValid = receivedIssuerAuth.verify(issuerPublicCoseVerifier)
-        check(isSignatureValid, { "COSE signature verification failed!" })
-        println("COSE signature on MSO is valid.")
+            // A verifier receives the `document`. First, they parse the MSO.
+            val receivedIssuerAuth = document.issuerSigned.issuerAuth
 
-        val decodedMso = receivedIssuerAuth.decodeIsoPayload<MobileSecurityObject>()
+            // A. Verify the COSE signature
+            val isSignatureValid = receivedIssuerAuth.verify(issuerPublicCoseVerifier)
+            check(isSignatureValid, { "COSE signature verification failed!" })
+            println("COSE signature on MSO is valid.")
 
-        // Assert that the MSO content is as expected
-        check("1.0" == decodedMso.version) { "Invalid version" }
-        check(docType == decodedMso.docType) { "Doctype does not match" }
-        check(holderKey == decodedMso.deviceKeyInfo.deviceKey) { "Holder key / device key does not match" }
+            val decodedMso = receivedIssuerAuth.decodeIsoPayload<MobileSecurityObject>()
 
-        // The core of the verification: check if the digests in the MSO match the received data.
-        val receivedDigests = decodedMso.valueDigests[namespaceToCheck]!!.entries
-        val receivedIssuerItems = document.issuerSigned.namespaces!![namespaceToCheck]!!.entries
+            // Assert that the MSO content is as expected
+            check("1.0" == decodedMso.version) { "Invalid version" }
+            check(docType == decodedMso.docType) { "Doctype does not match" }
+            check(holderKey == decodedMso.deviceKeyInfo.deviceKey) { "Holder key / device key does not match" }
 
-        // check(issuerSignedItems.size == receivedDigests.size)
+            namespacesToCheck.forEach { namespaceToCheck ->
+                // The core of the verification: check if the digests in the MSO match the received data.
+                val receivedDigests = decodedMso.valueDigests[namespaceToCheck]!!.entries
+                val receivedIssuerItems = document.issuerSigned.namespaces!![namespaceToCheck]!!.entries
 
-        // For each received item, calculate its digest and verify it matches the one in the MSO
-        for (signedItemWrapper in receivedIssuerItems) {
-            val signedItem = signedItemWrapper.value
-            val expectedDigest = ValueDigest.fromIssuerSignedItem(signedItem, namespaceToCheck, decodedMso.digestAlgorithm)
-            val receivedDigest = receivedDigests.find { it.key == signedItem.digestId }
+                // check(issuerSignedItems.size == receivedDigests.size)
 
-            requireNotNull(receivedDigest, { "Digest with ID ${signedItem.digestId} not found in MSO" })
-            check(
-                expectedDigest.value.toHexString() == receivedDigest.value.toHexString(),
-                { "Digest for '${signedItem.elementIdentifier}' does not match!" }
+                // For each received item, calculate its digest and verify it matches the one in the MSO
+                for (signedItemWrapper in receivedIssuerItems) {
+                    val signedItem = signedItemWrapper.value
+                    val expectedDigest = ValueDigest.fromIssuerSignedItem(signedItem, namespaceToCheck, decodedMso.digestAlgorithm)
+                    val receivedDigest = receivedDigests.find { it.key == signedItem.digestId }
+
+                    requireNotNull(receivedDigest, { "Digest with ID ${signedItem.digestId} not found in MSO" })
+                    check(
+                        expectedDigest.value.toHexString() == receivedDigest.value.toHexString(),
+                        { "Digest for '${signedItem.elementIdentifier}' does not match!" }
+                    )
+                    println("Iterating ${signedItem.digestId} - ${signedItem.elementIdentifier}: Digest matches: ${receivedDigest.value.toHexString()}")
+                }
+
+
+                println("Successfully verified ${receivedIssuerItems.size} issuer-signed item digests against the MSO.")
+                println("(MSO has ${receivedDigests.size} item digests)")
+            }
+
+            println("--- Running Verifier")
+
+            val hexCred = coseCompliantCbor.encodeToHexString(document)
+
+            val verificationResults = VPPolicyRunner.verifySpecificPresentation(
+                presentation = MsoMdocPresentation(CredentialParser.parseOnly(hexCred) as MdocsCredential),
+                policies = VPVerificationPolicyManager.defaultMsoMdocPolicies.filterNot { it.id == "mso_mdoc/device-auth" },
+                verificationContext = null
             )
-            println("Iterating ${signedItem.digestId} - ${signedItem.elementIdentifier}: Digest matches: ${receivedDigest.value.toHexString()}")
+
+            verificationResults.forEach { (id, result) ->
+                println("$id: ${result.success} - $result")
+            }
+
+            verificationResults.forEach { (id, result) -> require(result.success) { "Verification result for '${id}' failed!" } }
+
+            val prettyJson = Json { prettyPrint = true }
+
+            println("Original:")
+            println(prettyJson.encodeToString(namespaces))
+
+            println("Decoded:")
+            val issuerSignedNamespacesJson = document.issuerSigned.namespacesToJson()
+            println(prettyJson.encodeToString(issuerSignedNamespacesJson))
+
+            val clearedNamespaces = namespaces.mapValues { (namespace, namespaceData) ->
+                JsonObject(namespaceData.filterValues { it !is JsonNull })
+            }
+
+            require(JsonObject(clearedNamespaces) == issuerSignedNamespacesJson)
         }
 
-        println("Successfully verified ${receivedDigests.size} item digests against the MSO.")
-
-        println("--- Running Verifier!!!")
-
-        val hexCred = coseCompliantCbor.encodeToHexString(document)
-
-        val verificationResults = VPPolicyRunner.verifySpecificPresentation(
-            presentation = MsoMdocPresentation(CredentialParser.parseOnly(hexCred) as MdocsCredential),
-            policies = VPVerificationPolicyManager.defaultMsoMdocPolicies.filterNot { it.id == "mso_mdoc/device-auth" },
-            verificationContext = null
-        )
-
-        verificationResults.forEach { (id, result) ->
-            println("$id: ${result.success} - $result")
-        }
-
-        verificationResults.forEach { (id, result) -> require(result.success) { "Verification result for '${id}' failed!" } }
-
-        val prettyJson = Json { prettyPrint = true }
-
-        println("Original:")
-        println(prettyJson.encodeToString(namespaces))
-
-        println("Decoded:")
-        val issuerSignedNamespacesJson = document.issuerSigned.namespacesToJson()
-        println(prettyJson.encodeToString(issuerSignedNamespacesJson))
-
-        val clearedNamespaces = namespaces.mapValues { (namespace, namespaceData)->
-            JsonObject(namespaceData.filterValues { it !is JsonNull })
-        }
-
-        require(JsonObject(clearedNamespaces) == issuerSignedNamespacesJson)
-    }
-
-    fun makeDocument(docType: String, issuerSigned: IssuerSigned): Document {
-        val document = Document(
-            docType = docType,
-            issuerSigned = issuerSigned,
-            deviceSigned = DeviceSigned(
-                ByteStringWrapper(DeviceNameSpaces(mapOf())),
-                DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
+        fun makeDocument(docType: String, issuerSigned: IssuerSigned): Document {
+            val document = Document(
+                docType = docType,
+                issuerSigned = issuerSigned,
+                deviceSigned = DeviceSigned(
+                    ByteStringWrapper(DeviceNameSpaces(mapOf())),
+                    DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
+                )
             )
-        )
-        println("Document: $document")
+            println("Document: $document")
 
-        return document
+            return document
+        }
     }
 
     @Test
@@ -196,25 +204,24 @@ class MdocIssuanceTest {
         val data = MdocIssuer.MdocUniversalIssuanceData(
             namespaces = mapOf(
                 ns to buildJsonObject {
-                    mapOf(
-                        "family_name" to "Doe",
-                        "given_name" to "John",
-                        "birth_date" to "1986-03-22",
-                        "issue_date" to "2019-10-20",
-                        "expiry_date" to "2024-10-20",
-                        "issuing_country" to "AT",
-                        "issuing_authority" to "AT DMV",
-                        "document_number" to "123456789",
-                        "explicit_null" to null
-                    ).forEach { (key, value) ->
-                        put(key, JsonPrimitive(value))
-                    }
+                    put("family_name", "Doe")
+                    put("family_name", "Doe")
+                    put("given_name", "John")
+                    put("birth_date", "1986-03-22")
+                    put("issue_date", "2019-10-20")
+                    put("expiry_date", "2024-10-20")
+                    put("issuing_country", "AT")
+                    put("issuing_authority", "AT DMV")
+                    put("document_number", "123456789")
+                    put("height_cm", JsonPrimitive(180u))
+                    put("explicit_null", null)
                 },
+
                 "org.waltid.ns2" to buildJsonObject {
-                    put("a", JsonPrimitive(false))
-                    put("b", JsonPrimitive(1))
+                    put("a", false)
+                    put("b", 1)
                     put("c", JsonPrimitive(2547483647u))
-                    put("d", JsonPrimitive(30000000000L))
+                    put("d", 30000000000L)
                 })
         )
 
@@ -233,7 +240,7 @@ class MdocIssuanceTest {
             document = document,
             docType = docType,
             issuerPublicCoseVerifier = issuerPublicCoseVerifier,
-            namespaceToCheck = ns,
+            namespacesToCheck = listOf(ns),
             holderKey = holderKey,
             namespaces = data.namespaces
         )
@@ -282,7 +289,7 @@ class MdocIssuanceTest {
             document = document,
             docType = data.docType,
             issuerPublicCoseVerifier = issuerPublicCoseVerifier,
-            namespaceToCheck = namespacesForVerification.keys.first(),
+            namespacesToCheck = namespacesForVerification.keys.toList(),
             holderKey = holderKey,
             namespaces = data.toNamespacesJson()
         )

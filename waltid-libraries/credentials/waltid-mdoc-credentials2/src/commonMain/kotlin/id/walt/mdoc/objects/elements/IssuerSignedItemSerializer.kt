@@ -9,6 +9,8 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.cbor.ValueTags
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -73,15 +75,23 @@ open class IssuerSignedItemSerializer(
             element(IssuerSignedItem.PROP_ELEMENT_VALUE, elementValueSerializer.descriptor, value.elementValue.annotations())
         }
 
+        if (MdocsCborSerializer.lookupSerializer(namespace, value.elementIdentifier) != null) {
+            MdocsCborSerializer.encode(namespace, value.elementIdentifier, descriptor, index, this, value.elementValue)
+            return
+        }
+
         when (val it = value.elementValue) {
             is String -> encodeStringElement(descriptor, index, it)
             is Int -> encodeIntElement(descriptor, index, it)
+            is UInt -> encodeSerializableElement(descriptor, index, UInt.serializer(), it)
             is Long -> encodeLongElement(descriptor, index, it)
             is LocalDate -> encodeSerializableElement(descriptor, index, LocalDate.serializer(), it)
             is Instant -> encodeSerializableElement(descriptor, index, InstantStringSerializer, it)
             is Boolean -> encodeBooleanElement(descriptor, index, it)
             is ByteArray -> encodeSerializableElement(descriptor, index, ByteArraySerializer(), it)
-            else -> MdocsCborSerializer.encode(namespace, value.elementIdentifier, descriptor, index, this, it)
+            is List<*> -> encodeSerializableElement(descriptor, index, ListSerializer(GenericAnySerializer), it as List<Any>)
+            is Map<*, *> -> encodeSerializableElement(descriptor, index, MapSerializer(String.serializer(), GenericAnySerializer), it as Map<String, Any>)
+            else -> error("IssuerSignedItemSerializer: Cannot dynamically encode unsupported type ${it::class.simpleName} for ${value.elementIdentifier}")
         }
     }
 
@@ -102,18 +112,24 @@ open class IssuerSignedItemSerializer(
         namespace: String,
         elementValue: T,
         elementIdentifier: String
-    ) = when (elementValue) {
-        is String -> String.serializer()
-        is Int -> Int.serializer()
-        is Long -> Long.serializer()
-        is LocalDate -> LocalDate.serializer()
-        is Instant -> InstantStringSerializer
-        is Boolean -> Boolean.serializer()
-        is ByteArray -> ByteArraySerializer()
-        is Any -> MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
-            ?: error("serializer not found for $elementIdentifier, with value $elementValue")
+    ): KSerializer<out Any?> {
 
-        else -> error("serializer not found for $elementIdentifier, with value $elementValue")
+        MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)?.let { return it }
+
+        return when (elementValue) {
+            is String -> String.serializer()
+            is Int -> Int.serializer()
+            is UInt -> UInt.serializer()
+            is Long -> Long.serializer()
+            is LocalDate -> LocalDate.serializer()
+            is Instant -> InstantStringSerializer
+            is Boolean -> Boolean.serializer()
+            is ByteArray -> ByteArraySerializer()
+            is List<*> -> ListSerializer(GenericAnySerializer) // Handle ARRAY
+            is Map<*, *> -> MapSerializer(String.serializer(), GenericAnySerializer) // Handle MAP
+
+            else -> error("IssuerSignedItemSerializer: Standard serializer not found for $elementIdentifier, with value $elementValue")
+        }
     }
 
 
