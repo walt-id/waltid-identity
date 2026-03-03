@@ -49,7 +49,7 @@ class MdocSchemaTest {
     )
 
     @Test
-    fun testSchema() = runTest {
+    fun testIssuanceWithSchema() = runTest {
         val issuerKey = issuerKeyInit()
         val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
         val issuerPublicKey = issuerKey.getPublicKey()
@@ -100,7 +100,6 @@ class MdocSchemaTest {
         println("Issued: $issuerSigned")
 
         val document = makeDocument(docType, issuerSigned)
-        println("Document: $document")
 
         verifyIssued(
             document = document,

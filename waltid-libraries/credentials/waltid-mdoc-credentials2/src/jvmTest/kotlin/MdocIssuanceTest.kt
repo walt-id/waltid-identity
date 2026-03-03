@@ -98,6 +98,8 @@ class MdocIssuanceTest {
             check(docType == decodedMso.docType) { "Doctype does not match" }
             check(holderKey == decodedMso.deviceKeyInfo.deviceKey) { "Holder key / device key does not match" }
 
+            require(namespacesToCheck.isNotEmpty()) { "Error in code: Did not specify any namespaces to check" }
+
             namespacesToCheck.forEach { namespaceToCheck ->
                 // The core of the verification: check if the digests in the MSO match the received data.
                 val receivedDigests = decodedMso.valueDigests[namespaceToCheck]!!.entries
@@ -121,7 +123,7 @@ class MdocIssuanceTest {
 
 
                 println("Successfully verified ${receivedIssuerItems.size} issuer-signed item digests against the MSO.")
-                println("(MSO has ${receivedDigests.size} item digests)")
+                println("(MSO namespace $namespaceToCheck has ${receivedDigests.size} item digests)")
             }
 
             println("--- Running Verifier")
