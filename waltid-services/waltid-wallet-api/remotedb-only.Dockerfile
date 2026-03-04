@@ -20,7 +20,7 @@ COPY waltid-wallet-api/build.gradle.kts waltid-wallet-api/gradle.properties walt
 
 RUN gradle clean installDist
 
-FROM docker.io/eclipse-temurin:17
+FROM docker.io/eclipse-temurin:25
 
 # Non-root user
 RUN useradd --create-home waltid

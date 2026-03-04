@@ -1,5 +1,5 @@
 # BUILD
-FROM node:20-slim AS buildstage
+FROM node:25-slim AS buildstage
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -12,7 +12,7 @@ RUN pnpm install
 RUN pnpm build
 
 # RUN
-FROM docker.io/node:20-alpine
+FROM docker.io/node:25-alpine
 
 # Create non-root user
 RUN addgroup -g 10001 -S appgroup && \
