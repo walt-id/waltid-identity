@@ -99,13 +99,10 @@ iOS test application for OpenID4VC library. Demonstrates OpenID4VC flows and cre
 
 **Use when:** You need to test OpenID4VC functionality on iOS or understand iOS protocol integration.
 
-### [🟢 waltid-digital-credentials-button](https://github.com/walt-id/waltid-digital-credentials-button)
-Reusable Digital Credentials API web component plus a minimal demo backend. Includes vanilla, React, and Vue demos that hit real verifier endpoints through the in-repo backend middleware.
+### [🟢 waltid-digital-credentials](./waltid-digital-credentials)
+Standalone web test app for validating the Digital Credentials API flow directly against verifier endpoints. Provides a user-friendly interface for testing and debugging DC API verification flows.
 
-**Use when:** You want to test using the Digital Credentials API for verifying credentials.
-
-**Note**: This is a standalone project and not part of the current monorepo as it is still experimental.
-
+**Use when:** You want to test the Digital Credentials API verification flow against walt.id verifier endpoints.
 
 ## Join the community
 
