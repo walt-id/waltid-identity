@@ -80,8 +80,8 @@ object Verifier2AuthorizationRequestHandler {
 
             isDcApi && isSigned -> dcApiWrapper(
                 "openid4vp-v1-signed", mapOf(
-                    "client_id" to verificationSession.authorizationRequest.clientId,
-                    "expected_origins" to verificationSession.authorizationRequest.expectedOrigins,
+                    //"client_id" to verificationSession.authorizationRequest.clientId,
+                    //"expected_origins" to verificationSession.authorizationRequest.expectedOrigins,
                     "request" to verificationSession.signedAuthorizationRequestJwt
                 ).toJsonObject()
             )

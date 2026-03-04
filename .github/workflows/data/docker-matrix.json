@@ -20,6 +20,11 @@
     "image": "vc-repository"
   },
   {
+    "context": "waltid-identity/waltid-applications/waltid-digital-credentials",
+    "folder": "waltid-identity/waltid-applications/waltid-digital-credentials",
+    "image": "digital-credentials"
+  },
+  {
     "context": "waltid-identity-enterprise",
     "folder": "waltid-identity-enterprise/waltid-enterprise-ui",
     "image": "waltid-enterprise-ui"
