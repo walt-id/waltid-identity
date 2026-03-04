@@ -1,0 +1,73 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: digital-credentials
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: digital-credentials
+  template:
+    metadata:
+      labels:
+        app: digital-credentials
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: digital-credentials
+          image: waltid/digital-credentials:__DEFAULT_IMAGE_TAG__
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+          ports:
+            - containerPort: 80
+              name: http
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: digital-credentials
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: digital-credentials
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: digital-credentials-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - digital-credentials.walt.id
+      secretName: digital-credentials-tls-secret
+  rules:
+    - host: digital-credentials.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: digital-credentials
+                port:
+                  name: http
