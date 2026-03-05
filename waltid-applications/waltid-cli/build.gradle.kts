@@ -34,7 +34,7 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
             implementation("com.google.code.gson:gson:2.12.1")
 
@@ -65,10 +65,10 @@ kotlin {
             implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
 
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
 
             // Ktor server
             implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")

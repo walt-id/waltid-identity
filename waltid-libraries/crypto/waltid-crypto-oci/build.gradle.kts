@@ -9,7 +9,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // Coroutines
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
@@ -43,15 +43,15 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // Logging
             implementation("org.slf4j:slf4j-simple:2.0.17")
 
             // Test
             implementation(kotlin("test"))
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter-api:5.12.2")
+            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
         }
     }
 }

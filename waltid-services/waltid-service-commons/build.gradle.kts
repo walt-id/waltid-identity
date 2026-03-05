@@ -39,7 +39,7 @@ dependencies {
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    api(identityLibs.kotlinx.serialization.json)
 
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.6.2")

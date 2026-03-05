@@ -27,7 +27,7 @@ kotlin {
             implementation("io.github.oshai:kotlin-logging:7.0.13")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // -- Multiplatform --
             // Multiplatform / Uuid

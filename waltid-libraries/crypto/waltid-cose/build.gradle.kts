@@ -22,10 +22,10 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // CBOR
-            api("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            api(identityLibs.kotlinx.serialization.cbor)
 
             // Waltid
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -37,7 +37,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation(kotlin("test-common"))
             implementation(kotlin("test-annotations-common"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
@@ -52,8 +52,8 @@ kotlin {
             // Test
             implementation(kotlin("test"))
 
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter-api:5.12.2")
+            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
         }
         jsMain.dependencies {
 

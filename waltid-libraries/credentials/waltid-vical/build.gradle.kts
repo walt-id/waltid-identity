@@ -32,7 +32,7 @@ kotlin {
             implementation(kotlin("test-annotations-common"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
         }
         jvmMain.dependencies {
 
@@ -44,8 +44,8 @@ kotlin {
             // Test
             implementation(kotlin("test"))
 
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter-api:5.12.2")
+            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
         }
         jsMain.dependencies {
 

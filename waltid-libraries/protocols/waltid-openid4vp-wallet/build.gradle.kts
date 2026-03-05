@@ -23,7 +23,7 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             implementation("io.github.optimumcode:json-schema-validator:0.5.2")
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
