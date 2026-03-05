@@ -5,7 +5,7 @@ package id.walt.iso18013.annexc
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Annex C EncryptedResponse = ["dcapi", {enc, cipherText}]
@@ -13,7 +13,7 @@ import kotlinx.serialization.cbor.CborArray
  * @see ISO/IEC TS 18013-7:2024(en), Annex C
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class AnnexCEncryptedResponse(
     val type: String,
     val response: AnnexCEncryptedResponseData,
