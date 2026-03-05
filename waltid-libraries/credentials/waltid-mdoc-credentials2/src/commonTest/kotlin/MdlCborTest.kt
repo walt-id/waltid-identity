@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
@@ -9,11 +9,11 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
 import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.objects.elements.IssuerSignedItem
-import id.walt.mdoc.objects.elements.IssuerSignedItemSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.random.Random
@@ -315,13 +315,13 @@ class MdlCborTest {
         val issuerSignedList = document.issuerSigned.namespaces?.get("org.iso.18013.5.1")
         assertNotNull(issuerSignedList)
         assertEquals(issuerSignedList.findItem(0U).elementIdentifier, "family_name")
-        assertEquals(issuerSignedList.findItem(0U).elementValue, "Doe")
+        assertEquals(issuerSignedList.findItem(0U).elementValue, CborString("Doe"))
         assertEquals(issuerSignedList.findItem(3U).elementIdentifier, "issue_date")
-        assertEquals(issuerSignedList.findItem(3U).elementValue, LocalDate.parse("2019-10-20"))
+        assertEquals(issuerSignedList.findItem(3U).elementValue, CborString(LocalDate.parse("2019-10-20").toString()))
         assertEquals(issuerSignedList.findItem(4U).elementIdentifier, "expiry_date")
-        assertEquals(issuerSignedList.findItem(4U).elementValue, LocalDate.parse("2024-10-20"))
+        assertEquals(issuerSignedList.findItem(4U).elementValue, CborString(LocalDate.parse("2024-10-20").toString()))
         assertEquals(issuerSignedList.findItem(7U).elementIdentifier, "document_number")
-        assertEquals(issuerSignedList.findItem(7U).elementValue, "123456789")
+        assertEquals(issuerSignedList.findItem(7U).elementValue, CborString("123456789"))
         assertEquals(issuerSignedList.findItem(8U).elementIdentifier, "portrait")
 
         assertNotNull(issuerSignedList.findItem(8U).elementValue)
@@ -407,10 +407,7 @@ class MdlCborTest {
         val inputDecoded = input.hexToByteArray()
 
         val deserialized = coseCompliantCbor.decodeFromByteArray(
-            IssuerSignedItemSerializer(
-                "org.iso.18013.5.1",
-                "issue_date"
-            ), inputDecoded
+            IssuerSignedItem.serializer(), inputDecoded
         )
         val serialized = deserialized.serialize("org.iso.18013.5.1")
 
@@ -476,10 +473,7 @@ class MdlCborTest {
 
         val inputDecoded = input.hexToByteArray()
         val deserialized = coseCompliantCbor.decodeFromByteArray(
-            IssuerSignedItemSerializer(
-                "org.iso.18013.5.1",
-                "driving_privileges"
-            ), inputDecoded
+            IssuerSignedItem.serializer(), inputDecoded
         )
         val serialized = deserialized.serialize("org.iso.18013.5.1")
 
@@ -631,4 +625,4 @@ private fun IssuerSignedList.findItem(digestId: UInt) =
 
 
 private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
-    coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
+    coseCompliantCbor.encodeToByteArray(IssuerSignedItem.serializer(), this)

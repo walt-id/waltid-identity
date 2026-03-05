@@ -1,4 +1,5 @@
 @file:Suppress("PackageDirectoryMismatch")
+@file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalSerializationApi::class)
 
 package id.walt.policies2.vp.policies
 
@@ -19,6 +20,7 @@ import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
@@ -45,7 +47,7 @@ class IssuerSignedDataMdocVpPolicyTest {
             digestId = 1u,
             random = ByteArray(16) { 0x01 },
             elementIdentifier = elementId,
-            elementValue = "Inga",
+            elementValue = CborString("Inga"),
         )
 
         val policy = IssuerSignedDataMdocVpPolicy()
@@ -84,7 +86,7 @@ class IssuerSignedDataMdocVpPolicyTest {
             digestId = 1u,
             random = ByteArray(16) { 0x01 },
             elementIdentifier = elementId,
-            elementValue = "Inga",
+            elementValue = CborString("Inga"),
         )
         val correctDigest = ValueDigest.fromIssuerSignedItem(item, namespace, "SHA-256")
         val wrongDigestBytes = correctDigest.value.copyOf().also { it[0] = (it[0].toInt() xor 0x01).toByte() }

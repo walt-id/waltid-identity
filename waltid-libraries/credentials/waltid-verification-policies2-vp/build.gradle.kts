@@ -28,7 +28,7 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             implementation("io.github.optimumcode:json-schema-validator:0.5.2")
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
@@ -50,9 +50,9 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation("org.slf4j:slf4j-simple:2.0.17")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.serialization.cbor)
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
             implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")

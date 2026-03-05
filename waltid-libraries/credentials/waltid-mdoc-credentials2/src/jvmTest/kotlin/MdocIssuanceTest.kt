@@ -20,11 +20,13 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.*
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.*
 import kotlin.test.Test
@@ -73,6 +75,7 @@ class MdocIssuanceTest {
         val issuerCertCose = issuerCert.map { CoseCertificate(it.decodeFromBase64()) }
 
 
+        /** Verification process: Simulate what a verifier would do */
         suspend fun verifyIssued(
             document: Document,
             docType: String,
@@ -81,7 +84,7 @@ class MdocIssuanceTest {
             issuerPublicCoseVerifier: CoseVerifier,
             namespaces: Map<String, JsonObject>
         ) {
-            // --- 3. VERIFICATION PROCESS: Simulate what a verifier would do ---
+            println("Verify issued...")
 
             // A verifier receives the `document`. First, they parse the MSO.
             val receivedIssuerAuth = document.issuerSigned.issuerAuth
@@ -101,6 +104,7 @@ class MdocIssuanceTest {
             require(namespacesToCheck.isNotEmpty()) { "Error in code: Did not specify any namespaces to check" }
 
             namespacesToCheck.forEach { namespaceToCheck ->
+                println("Checking namespace $namespaceToCheck...")
                 // The core of the verification: check if the digests in the MSO match the received data.
                 val receivedDigests = decodedMso.valueDigests[namespaceToCheck]!!.entries
                 val receivedIssuerItems = document.issuerSigned.namespaces!![namespaceToCheck]!!.entries
@@ -118,7 +122,7 @@ class MdocIssuanceTest {
                         expectedDigest.value.toHexString() == receivedDigest.value.toHexString(),
                         { "Digest for '${signedItem.elementIdentifier}' does not match!" }
                     )
-                    println("Iterating ${signedItem.digestId} - ${signedItem.elementIdentifier}: Digest matches: ${receivedDigest.value.toHexString()}")
+                    println("Iterating ${signedItem.digestId} - ${signedItem.elementIdentifier}: Digest matches: ${receivedDigest.value.toHexString()} (${signedItem.elementValue} (${signedItem.elementValue::class.simpleName}))")
                 }
 
 
@@ -183,10 +187,10 @@ class MdocIssuanceTest {
         val docType = "org.waltid.123456.custom"
         val ns = "org.waltid.123456.custom.1"
 
-        val exampleValueMappingFunction: (docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement) -> Any? =
+        val exampleValueMappingFunction: (docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement) -> CborElement? =
             { docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement ->
                 if (elementValueJson is JsonPrimitive) {
-                    if (elementIdentifier.endsWith("date")) {
+                    /*if (elementIdentifier.endsWith("date")) {
                         LocalDate.parse(elementValueJson.content)
                     } else when {
                         elementValueJson.isString -> elementValueJson.content
@@ -197,7 +201,8 @@ class MdocIssuanceTest {
                         elementValueJson.booleanOrNull != null -> elementValueJson.boolean
                         elementValueJson is JsonNull -> null
                         else -> TODO("1 Got: $elementValueJson (${elementValueJson::class.simpleName})")
-                    }
+                    }*/
+                    elementValueJson.jsonToCborElement()
                 } else {
                     TODO("2 Got: $elementValueJson (${elementValueJson::class})")
                 }

@@ -101,7 +101,7 @@ data class ValueDigest(
         }
 
         private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
-            coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
+            coseCompliantCbor.encodeToByteArray(IssuerSignedItem.serializer(), this)
     }
 }
 
