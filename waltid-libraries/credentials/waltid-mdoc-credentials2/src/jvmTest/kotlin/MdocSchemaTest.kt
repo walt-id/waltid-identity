@@ -6,8 +6,10 @@ import MdocIssuanceTest.Companion.issuerKeyInit
 import MdocIssuanceTest.Companion.makeDocument
 import MdocIssuanceTest.Companion.verifyIssued
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.schema.MdocsSchema
 import id.walt.mdoc.schema.MdocsSchema.MdocsDatatype.*
 import id.walt.mdoc.schema.MdocsSchema.MdocsSchemaType
@@ -15,6 +17,8 @@ import id.walt.mdoc.schema.MdocsSchemaMappingFunction
 import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromHexString
+import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.time.Clock
@@ -100,9 +104,14 @@ class MdocSchemaTest {
         println("Issued: $issuerSigned")
 
         val document = makeDocument(docType, issuerSigned)
+        val documentHex = coseCompliantCbor.encodeToHexString(document)
+        println("Document (\"sending\"): $documentHex")
+
+        val decodedDocument = coseCompliantCbor.decodeFromHexString<Document>(documentHex)
+        println("Decoded:  $decodedDocument")
 
         verifyIssued(
-            document = document,
+            document = decodedDocument,
             docType = docType,
             issuerPublicCoseVerifier = issuerPublicCoseVerifier,
             namespacesToCheck = listOf(ns1, ns2),
