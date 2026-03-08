@@ -185,7 +185,7 @@ async function loadDcApiExamples(config: RuntimeConfig): Promise<ExampleEntry[]>
   Object.entries(examplesObj).forEach(([title, raw]) => {
     if (!title.toLowerCase().includes('dc_api')) return;
     if (!raw || typeof raw !== 'object') return;
-    const payload = (raw as { value?: unknown }).value;
+    const payload = normalizeSwaggerExamplePayload((raw as { value?: unknown }).value);
     if (payload === undefined) return;
     examples.push({ title, payload });
   });
@@ -577,6 +577,29 @@ function tryParseJson(input: string): unknown | null {
   } catch {
     return null;
   }
+}
+
+function normalizeSwaggerExamplePayload(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  let current: unknown = value;
+
+  for (let i = 0; i < 3; i += 1) {
+    if (typeof current !== 'string') {
+      return current;
+    }
+
+    const parsed = tryParseJson(current);
+    if (parsed === null) {
+      return current;
+    }
+
+    current = parsed;
+  }
+
+  return current;
 }
 
 function sleep(ms: number): Promise<void> {
