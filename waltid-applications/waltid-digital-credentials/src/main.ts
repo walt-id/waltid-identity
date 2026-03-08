@@ -333,6 +333,12 @@ async function pollInfo(
   const infoUrl = buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
   const sessionBoundVerifierBase = withSessionBoundTarget(config.verifierBase, sessionId);
   const fallbackInfoUrls = [
+    ...(sessionBoundVerifierBase
+      ? [
+          buildUrl(sessionBoundVerifierBase, `/verification-session/info`),
+          buildUrl(sessionBoundVerifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`)
+        ]
+      : []),
     infoUrl,
     buildUrl(config.verifierBase, `/verification-session/info`),
     buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/info`),
@@ -340,13 +346,7 @@ async function pollInfo(
       config.verifierBase,
       `/verification-session/info?verification-session=${encodeURIComponent(sessionId)}`
     ),
-    buildUrl(config.verifierBase, `/verification-session/info/${encodeURIComponent(sessionId)}`),
-    ...(sessionBoundVerifierBase
-      ? [
-          buildUrl(sessionBoundVerifierBase, `/verification-session/info`),
-          buildUrl(sessionBoundVerifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`)
-        ]
-      : [])
+    buildUrl(config.verifierBase, `/verification-session/info/${encodeURIComponent(sessionId)}`)
   ];
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt += 1) {
@@ -449,7 +449,14 @@ async function fetchJsonWithFallback(urls: string[], init: RequestInit, label: s
     try {
       return await fetchJson(url, init, `${label}#${index + 1}`);
     } catch (error) {
-      if (error instanceof HttpError && error.status === 404 && index < urls.length - 1) {
+      if (
+        error instanceof HttpError &&
+        index < urls.length - 1 &&
+        error.status >= 400 &&
+        error.status < 500 &&
+        error.status !== 401 &&
+        error.status !== 403
+      ) {
         continue;
       }
       lastError = error;
