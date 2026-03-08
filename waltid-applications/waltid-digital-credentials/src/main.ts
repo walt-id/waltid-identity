@@ -331,14 +331,22 @@ async function pollInfo(
   logEl: HTMLPreElement
 ): Promise<unknown> {
   const infoUrl = buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
+  const sessionBoundVerifierBase = withSessionBoundTarget(config.verifierBase, sessionId);
   const fallbackInfoUrls = [
     infoUrl,
+    buildUrl(config.verifierBase, `/verification-session/info`),
     buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/info`),
     buildUrl(
       config.verifierBase,
       `/verification-session/info?verification-session=${encodeURIComponent(sessionId)}`
     ),
-    buildUrl(config.verifierBase, `/verification-session/info/${encodeURIComponent(sessionId)}`)
+    buildUrl(config.verifierBase, `/verification-session/info/${encodeURIComponent(sessionId)}`),
+    ...(sessionBoundVerifierBase
+      ? [
+          buildUrl(sessionBoundVerifierBase, `/verification-session/info`),
+          buildUrl(sessionBoundVerifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`)
+        ]
+      : [])
   ];
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt += 1) {
@@ -647,6 +655,20 @@ function buildUrl(baseUrl: string, path: string): string {
   const normalizedBase = baseUrl.replace(/\/+$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;
+}
+
+function withSessionBoundTarget(verifierBase: string, sessionId: string): string | null {
+  const marker = '.verifier2';
+  const serviceMarker = '/verifier2-service-api';
+  const markerIndex = verifierBase.indexOf(marker);
+  const serviceIndex = verifierBase.indexOf(serviceMarker);
+
+  if (markerIndex === -1 || serviceIndex === -1 || markerIndex > serviceIndex) {
+    return null;
+  }
+
+  const insertAt = markerIndex + marker.length;
+  return `${verifierBase.slice(0, insertAt)}.${encodeURIComponent(sessionId)}${verifierBase.slice(insertAt)}`;
 }
 
 function getOpenApiCandidateUrls(verifierBase: string): string[] {
