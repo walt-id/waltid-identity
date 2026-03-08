@@ -5,7 +5,8 @@ const VERIFIER_PRESETS = {
     verifierBase: 'https://verifier2.portal.test.waltid.cloud'
   },
   enterprise: {
-    verifierBase: '/verifier-api/v1/waltid.tenant1.verifier2/verifier2-service-api'
+    verifierBase: '/verifier-api/v1/waltid.tenant1.verifier2/verifier2-service-api',
+    openApiUrl: 'https://waltid.enterprise.test.waltid.cloud/api.json'
   }
 } as const;
 const DEFAULT_VERIFIER_PRESET = 'open-source';
@@ -25,6 +26,7 @@ type CreateResponse = {
 type RuntimeConfig = {
   verifierBase: string;
   bearerToken: string;
+  openApiUrl?: string;
 };
 
 type VerifierPresetKey = keyof typeof VERIFIER_PRESETS;
@@ -71,7 +73,14 @@ async function init(): Promise<void> {
       examples = await loadDcApiExamples(config);
 
       if (!examples.length) {
-        setStatus(statusEl, 'No dc_api examples found in Swagger');
+        select.innerHTML = '';
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No dc_api examples found (paste payload manually)';
+        select.appendChild(option);
+        select.selectedIndex = 0;
+        setStatus(statusEl, 'No dc_api examples found in Swagger — you can paste payload manually');
+        callButton.disabled = false;
         return;
       }
 
@@ -127,7 +136,9 @@ async function init(): Promise<void> {
 }
 
 async function loadDcApiExamples(config: RuntimeConfig): Promise<ExampleEntry[]> {
-  const openApiUrls = getOpenApiCandidateUrls(config.verifierBase);
+  const openApiUrls = config.openApiUrl
+    ? [config.openApiUrl, ...getOpenApiCandidateUrls(config.verifierBase)]
+    : getOpenApiCandidateUrls(config.verifierBase);
   let api: unknown | undefined;
   let lastError: unknown;
 
@@ -583,12 +594,14 @@ function getRuntimeConfig(
   bearerTokenInput: HTMLInputElement
 ): RuntimeConfig {
   const presetKey = getVerifierPresetKey(verifierPresetSelect.value);
-  const verifierBase = VERIFIER_PRESETS[presetKey].verifierBase;
+  const preset = VERIFIER_PRESETS[presetKey];
+  const verifierBase = preset.verifierBase;
   const bearerToken = bearerTokenInput.value.trim().replace(/^Bearer\s+/i, '');
 
   return {
     verifierBase,
-    bearerToken
+    bearerToken,
+    openApiUrl: 'openApiUrl' in preset ? preset.openApiUrl : undefined
   };
 }
 
