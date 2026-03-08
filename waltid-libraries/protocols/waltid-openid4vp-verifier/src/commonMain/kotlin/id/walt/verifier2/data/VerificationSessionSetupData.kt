@@ -291,8 +291,10 @@ data class DcApiFlowSetup(
 
 /**
  * ISO 18013-7 Annex C (DC API) flow using the unified /verification-session endpoints.
+ *
+ * The `core_flow` is auto-generated from `docType` and `requestedElements`. Users can optionally
+ * provide a partial `core_flow` to configure additional settings:
  */
-// TODO: Not optimal with such custom logic
 @Serializable
 @SerialName("dc_api-annex-c")
 data class DcApiAnnexCFlowSetup(
@@ -300,8 +302,11 @@ data class DcApiAnnexCFlowSetup(
     val requestedElements: Map<String, List<String>>,
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
     val origin: String,
-    @SerialName("core_flow") override val core: GeneralFlowConfig = buildAnnexCCore(docType, requestedElements, policies)
+    @SerialName("core_flow") private val coreInput: GeneralFlowConfig? = null
 ) : VerificationSessionSetup {
+
+    override val core: GeneralFlowConfig = buildAnnexCCore(docType, requestedElements, policies, coreInput)
+
     init {
         val parsedOrigin = UrlUtils.checkDcApiOriginUrl(origin)
         require(parsedOrigin.secureContext) { "Provided origin \"$origin\" is not a secure context. Use of HTTPS is required!" }
@@ -309,14 +314,21 @@ data class DcApiAnnexCFlowSetup(
             "Your provided origin \"$origin\" has a trailing slash ('/' at the end), this will be silently dropped by OS handlers when using DC API. Remove the trailing slash to avoid errors."
         }
 
-        val expectedCore = buildAnnexCCore(docType, requestedElements, policies)
-        require(core.dcqlQuery == expectedCore.dcqlQuery) { "core_flow.dcql_query must match docType/requestedElements" }
-        require(core.policies == expectedCore.policies) { "core_flow.policies must match policies" }
+        val expectedCore = buildAnnexCCore(docType, requestedElements, policies, coreInput)
+        core.dcqlQuery?.let {
+            require(it == expectedCore.dcqlQuery) { "core_flow.dcql_query must match docType/requestedElements" }
+        }
+        core.policies?.let {
+            require(it == expectedCore.policies) { "core_flow.policies must match policies" }
+        }
     }
 
     companion object {
         private fun buildAnnexCCore(
-            docType: String, requestedElements: Map<String, List<String>>, policies: DefinedVerificationPolicies
+            docType: String,
+            requestedElements: Map<String, List<String>>,
+            policies: DefinedVerificationPolicies,
+            coreInput: GeneralFlowConfig?
         ): GeneralFlowConfig {
             val claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
                 elements.distinct().sorted().map { elementId ->
@@ -333,7 +345,9 @@ data class DcApiAnnexCFlowSetup(
             )
 
             return GeneralFlowConfig(
-                dcqlQuery = dcqlQuery, policies = policies
+                dcqlQuery = dcqlQuery,
+                policies = policies,
+                notifications = coreInput?.notifications,
             )
         }
 
