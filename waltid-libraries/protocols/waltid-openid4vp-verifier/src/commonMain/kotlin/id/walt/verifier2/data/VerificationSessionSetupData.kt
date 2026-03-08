@@ -313,13 +313,11 @@ data class DcApiAnnexCFlowSetup(
         require(!parsedOrigin.nonComplexTrailingSlash) {
             "Your provided origin \"$origin\" has a trailing slash ('/' at the end), this will be silently dropped by OS handlers when using DC API. Remove the trailing slash to avoid errors."
         }
-
-        val expectedCore = buildAnnexCCore(docType, requestedElements, policies, coreInput)
-        core.dcqlQuery?.let {
-            require(it == expectedCore.dcqlQuery) { "core_flow.dcql_query must match docType/requestedElements" }
+        coreInput.dcqlQuery?.let {
+            require(it == core.dcqlQuery) { "core_flow.dcql_query must match docType/requestedElements" }
         }
-        core.policies?.let {
-            require(it == expectedCore.policies) { "core_flow.policies must match policies" }
+        coreInput.policies?.let {
+            require(it == core.policies) { "core_flow.policies must match policies" }
         }
     }
 
