@@ -46,13 +46,13 @@ kotlin {
 
             // -- Multiplatform --
             // Multiplatform / Uuid
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation("app.softwork:kotlinx-uuid-core:0.1.7")
 
             // Multiplatform / Date & time
             implementation(identityLibs.kotlinx.datetime)
 
             // Multiplatform / Hashes
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
+            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))
             implementation("org.kotlincrypto.hash:sha2")
         }
         commonTest.dependencies {
@@ -65,17 +65,17 @@ kotlin {
         jvmMain.dependencies {
             implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation("com.nimbusds:nimbus-jose-jwt:10.8")
         }
         jvmTest.dependencies {
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation("com.nimbusds:nimbus-jose-jwt:10.8")
             implementation("io.kotest:kotest-runner-junit5:5.9.1")
             implementation("io.kotest:kotest-assertions-core:5.9.1")
             implementation("io.kotest:kotest-assertions-json:5.9.1")
             implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-            implementation("com.google.crypto.tink:tink:1.16.0") // for JOSE using Ed25519
-            implementation("org.bouncycastle:bcprov-lts8on:2.73.8") // for secp256k1 (which was removed with Java 17)
-            implementation("org.bouncycastle:bcpkix-lts8on:2.73.8") // PEM import
+            implementation("com.google.crypto.tink:tink:1.20.0") // for JOSE using Ed25519
+            implementation("org.bouncycastle:bcprov-lts8on:2.73.10") // for secp256k1 (which was removed with Java 17)
+            implementation("org.bouncycastle:bcpkix-lts8on:2.73.10") // PEM import
 
             implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-server-netty-jvm:${Versions.KTOR_VERSION}")
