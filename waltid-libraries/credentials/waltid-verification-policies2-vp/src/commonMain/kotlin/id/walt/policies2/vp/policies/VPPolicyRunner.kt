@@ -24,18 +24,33 @@ object VPPolicyRunner {
             .toMap()
     }
 
+    suspend fun verifySpecificPresentation(
+        presentation: JwtVcJsonPresentation,
+        policies: List<JwtVcJsonVPPolicy>,
+        verificationContext: VerificationSessionContext?
+    ) = executeParallelPolicies(policies) { runPolicy(presentation, verificationContext) }
+
+    suspend fun verifySpecificPresentation(
+        presentation: DcSdJwtPresentation,
+        policies: List<DcSdJwtVPPolicy>,
+        verificationContext: VerificationSessionContext?
+    ) = executeParallelPolicies(policies) { runPolicy(presentation, verificationContext) }
+
+    suspend fun verifySpecificPresentation(
+        presentation: MsoMdocPresentation,
+        policies: List<MdocVPPolicy>,
+        verificationContext: VerificationSessionContext?
+    ) = executeParallelPolicies(policies) { runPolicy(presentation, verificationContext) }
 
     suspend fun verifyPresentation(
         presentation: VerifiablePresentation,
         policies: VPPolicyList,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Map<String, PolicyRunResult> {
         return when (presentation) {
             is JwtVcJsonPresentation -> executeParallelPolicies(policies.jwtVcJson) { runPolicy(presentation, verificationContext) }
             is DcSdJwtPresentation -> executeParallelPolicies(policies.dcSdJwt) { runPolicy(presentation, verificationContext) }
-            is MsoMdocPresentation -> executeParallelPolicies(policies.msoMdoc) {
-                runPolicy(document = presentation.mdoc.document, mso = presentation.mdoc.documentMso, verificationContext)
-            }
+            is MsoMdocPresentation -> executeParallelPolicies(policies.msoMdoc) { runPolicy(presentation, verificationContext) }
 
             is LdpVcPresentation -> throw NotImplementedError("Verifying LDP presentations is not yet implemented!")
         }

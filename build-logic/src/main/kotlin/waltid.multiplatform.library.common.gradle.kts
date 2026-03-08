@@ -22,7 +22,7 @@ kotlin {
 }
 
 powerAssert {
-    includedSourceSets = listOf("commonTest")
+    includedSourceSets = listOf("commonTest", "jvmTest")
     functions = listOf(
         // kotlin.test
         "kotlin.assert", "kotlin.test.assertEquals", "kotlin.test.assertNull", "kotlin.test.assertTrue", "kotlin.test.assertFalse",

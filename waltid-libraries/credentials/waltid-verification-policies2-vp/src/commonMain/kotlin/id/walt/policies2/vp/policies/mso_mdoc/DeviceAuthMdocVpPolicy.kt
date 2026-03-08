@@ -30,8 +30,10 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> = coroutineScope {
+        requireNotNull(verificationContext) { "Verification context needs to be provided for DeviceAuth Mdoc VP Policy" }
+
         log.trace { "--- Verifying device authentication ---" }
         log.trace { "Using verification context: $verificationContext" }
 

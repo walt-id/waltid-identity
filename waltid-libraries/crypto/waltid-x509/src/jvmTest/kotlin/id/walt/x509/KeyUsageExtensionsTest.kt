@@ -52,11 +52,9 @@ class KeyUsageExtensionsTest {
     fun `toBouncyCastleKeyUsage returns zero bits for empty iterable`() {
         val bc = emptySet<X509KeyUsage>().toBouncyCastleKeyUsage()
 
-        assertEquals(
-            expected = emptySet(),
-            actual = bc.toCertificateKeyUsages(),
-        )
-
+        check(bc.toCertificateKeyUsages() == emptySet<X509KeyUsage>()) {
+            "Expected empty set, but got: ${bc.toCertificateKeyUsages()} of $bc "
+        }
     }
 
     @Test

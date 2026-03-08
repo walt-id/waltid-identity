@@ -5,6 +5,7 @@ package id.walt.mdoc.objects.elements
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.cbor.ByteString
+import org.kotlincrypto.random.CryptoRand
 
 /**
  * Represents a single data element attested to by the issuing authority.
@@ -96,5 +97,13 @@ data class IssuerSignedItem(
         internal const val PROP_RANDOM = "random"
         internal const val PROP_ELEMENT_ID = "elementIdentifier"
         internal const val PROP_ELEMENT_VALUE = "elementValue"
+
+        fun create(digestId: UInt, elementIdentifier: String, elementValue: Any): IssuerSignedItem {
+            val randomSalt = CryptoRand.nextBytes(ByteArray(24)) // must be at least 16 bytes
+
+            val issuerSignedItem = IssuerSignedItem(digestId, randomSalt, elementIdentifier, elementValue)
+
+            return issuerSignedItem
+        }
     }
 }
