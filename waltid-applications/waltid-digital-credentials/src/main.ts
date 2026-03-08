@@ -330,10 +330,10 @@ async function pollInfo(
   config: RuntimeConfig,
   logEl: HTMLPreElement
 ): Promise<unknown> {
-  const infoUrl = buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/info`);
+  const infoUrl = buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
   const fallbackInfoUrls = [
     infoUrl,
-    buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`),
+    buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/info`),
     buildUrl(
       config.verifierBase,
       `/verification-session/info?verification-session=${encodeURIComponent(sessionId)}`
