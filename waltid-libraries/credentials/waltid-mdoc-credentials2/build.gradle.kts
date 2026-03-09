@@ -33,7 +33,7 @@ kotlin {
             implementation("net.orandja.obor:obor:2.1.3")
 
             // Crypto
-            implementation("org.kotlincrypto.random:crypto-rand:0.5.2") // SecureRandom
+            implementation("org.kotlincrypto.random:crypto-rand:0.6.0") // SecureRandom
 
             implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.7.1"))
             implementation("org.kotlincrypto.hash:sha2") // SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/t, SHA-512/224, SHA-512/256
@@ -53,6 +53,9 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
         }
     }
 }

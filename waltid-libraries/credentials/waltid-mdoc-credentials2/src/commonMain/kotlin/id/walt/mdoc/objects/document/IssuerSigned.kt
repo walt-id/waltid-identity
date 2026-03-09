@@ -3,7 +3,7 @@ package id.walt.mdoc.objects.document
 import id.walt.cose.CoseSign1
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
@@ -76,11 +76,10 @@ data class IssuerSigned private constructor(
                         ?.runCatching {
                             Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                         }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
-                        ?: item.elementValue.toJsonElement()
+                        ?: item.elementValue.toSerializedJsonElement()
 
                     put(item.elementIdentifier, serialized)
                 }
-
             }
         }
     }
@@ -92,7 +91,7 @@ data class IssuerSigned private constructor(
 
     suspend fun getParsedIssuerAuth(): ParsedIssuerAuth {
         val containedX5c = issuerAuth.unprotected.x5chain
-        requireNotNull(containedX5c) { "Missingg x5c X509 certificate chain in Mdocs credential" }
+        requireNotNull(containedX5c) { "Missing x5c X509 certificate chain in Mdocs credential" }
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
 

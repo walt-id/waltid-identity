@@ -28,7 +28,7 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> = coroutineScope {
         log.trace { "--- Verifying issuer authentication ---" }
         val issuerAuth = document.issuerSigned.issuerAuth

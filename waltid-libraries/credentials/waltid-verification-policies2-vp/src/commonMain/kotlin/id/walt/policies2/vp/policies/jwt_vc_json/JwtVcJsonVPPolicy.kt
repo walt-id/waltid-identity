@@ -10,12 +10,12 @@ sealed class JwtVcJsonVPPolicy() : VPPolicy2() {
 
     abstract suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
-        verificationContext: VerificationSessionContext // JwtVcJsonVPVerificationRequest
+        verificationContext: VerificationSessionContext? // JwtVcJsonVPVerificationRequest
     ): Result<Unit>
 
     suspend fun runPolicy(
         presentation: JwtVcJsonPresentation,
-        verificationContext: VerificationSessionContext // JwtVcJsonVPVerificationRequest
+        verificationContext: VerificationSessionContext? // JwtVcJsonVPVerificationRequest
     ) = runPolicy {
         verifyJwtVcJsonPolicy(
             presentation = presentation,

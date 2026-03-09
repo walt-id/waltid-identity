@@ -65,7 +65,9 @@ kotlin {
             implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
             implementation("io.mockk:mockk:1.14.2")
         }
-        iosMain.dependencies {}
+        if (enableIosBuild) {
+            iosMain.dependencies {}
+        }
     }
 }
 
