@@ -23,8 +23,10 @@ class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> {
+        requireNotNull(verificationContext) { "Verification context needs to be provided for AudienceCheck SD-JWT VP Policy" }
+
         addResult("presentation_audience", presentation.audience)
         addResult("expected_audience", verificationContext.expectedAudience)
         presentationRequire(

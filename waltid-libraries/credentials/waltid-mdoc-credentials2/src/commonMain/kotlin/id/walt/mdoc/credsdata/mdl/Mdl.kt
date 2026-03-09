@@ -40,7 +40,7 @@ data class Mdl(
     @SerialName("document_number") val documentNumber: String,
     @ByteString
     @Serializable(with = ByteArrayBase64UrlSerializer::class)
-    @SerialName("portrait") val portrait: ByteArray,
+    @SerialName("portrait") val portrait: ByteArray? = null,
     @SerialName("driving_privileges") val drivingPrivileges: List<DrivingPrivilege>,
     @SerialName("un_distinguishing_sign") val unDistinguishingSign: String? = null,
     @SerialName("administrative_number") val administrativeNumber: String? = null,
@@ -140,6 +140,60 @@ data class Mdl(
     @Serializable(with = ByteArrayBase64UrlSerializer::class)
     val signatureOrUsualMark: ByteArray? = null
 ) : MdocData {
+    override val docType = "org.iso.18013.5.1.mDL"
+
+    override fun toNamespaces(): Map<String, Map<String, Any>> =
+        namespacesOf(
+            "org.iso.18013.5.1" to mapOf(
+                "family_name" to familyName,
+                "given_name" to givenName,
+                "birth_date" to birthDate, // full-date
+                "issue_date" to issueDate, // tdate or full-date
+                "expiry_date" to expiryDate, // tdate or full-date
+                "issuing_country" to issuingCountry,
+                "issuing_authority" to issuingAuthority,
+                "document_number" to documentNumber,
+                "portrait" to portrait,
+                "driving_privileges" to drivingPrivileges,
+                "un_distinguishing_sign" to unDistinguishingSign,
+                "administrative_number" to administrativeNumber,
+                "sex" to sex, // 0=not known, 1=male, 2=female, 9=not applicable
+                "height" to height,
+                "weight" to weight,
+                "eye_colour" to eyeColour,
+                "hair_colour" to hairColour,
+                "birth_place" to birthPlace,
+                "resident_address" to residentAddress,
+                "portrait_capture_date" to portraitCaptureDate, // tdate
+                "age_in_years" to ageInYears,
+                "age_birth_year" to ageBirthYear,
+                "age_over_12" to ageOver12,
+                "age_over_13" to ageOver13,
+                "age_over_14" to ageOver14,
+                "age_over_16" to ageOver16,
+                "age_over_18" to ageOver18,
+                "age_over_21" to ageOver21,
+                "age_over_25" to ageOver25,
+                "age_over_60" to ageOver60,
+                "age_over_62" to ageOver62,
+                "age_over_65" to ageOver65,
+                "age_over_68" to ageOver68,
+                "issuing_jurisdiction" to issuingJurisdiction,
+                "nationality" to nationality,
+                "resident_city" to residentCity,
+                "resident_state" to residentState,
+                "resident_postal_code" to residentPostalCode,
+                "resident_country" to residentCountry,
+                "biometric_template_face" to biometricTemplateFace,
+                "biometric_template_finger" to biometricTemplateFinger,
+                "biometric_template_signature_sign" to biometricTemplateSignatureSign,
+                "biometric_template_iris" to biometricTemplateIris,
+                "family_name_national_character" to familyNameNationalCharacter,
+                "given_name_national_character" to givenNameNationalCharacter,
+                "signature_usual_mark" to signatureOrUsualMark
+            )
+        )
+
     companion object : MdocCompanion {
         override fun registerSerializationTypes() {
             val localDate = LocalDate.serializer()
