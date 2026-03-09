@@ -10,8 +10,8 @@ const VERIFIER_PRESETS = {
   }
 } as const;
 const DEFAULT_VERIFIER_PRESET = 'open-source';
-const POLL_INTERVAL_MS = 10_000;
-const MAX_POLL_ATTEMPTS = 60;
+const POLL_INTERVAL_MS = 5_000;
+const MAX_POLL_ATTEMPTS = 12;
 const SESSION_STORAGE_KEY = 'dc-api-test.sessionId';
 
 type ExampleEntry = {
@@ -319,7 +319,7 @@ async function runDcApiFlow(
   );
   appendLog(logEl, `Posted wallet response (HTTP ${postResponse.status})`);
 
-  setStatus(statusEl, 'Polling verification-session info every 10 seconds...');
+  setStatus(statusEl, 'Polling verification-session info every 5 seconds...');
   const finalInfo = await pollInfo(sessionId, config, logEl);
   appendPayloadLog(logEl, 'Final result payload', finalInfo);
   console.log('[dc-api-test] final verification result', finalInfo);
@@ -330,28 +330,16 @@ async function pollInfo(
   config: RuntimeConfig,
   logEl: HTMLPreElement
 ): Promise<unknown> {
-  const infoUrl = buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
   const sessionBoundVerifierBase = withSessionBoundTarget(config.verifierBase, sessionId);
-  const fallbackInfoUrls = [
-    ...(sessionBoundVerifierBase
-      ? [
-          buildUrl(sessionBoundVerifierBase, `/verification-session/info`),
-          buildUrl(sessionBoundVerifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`)
-        ]
-      : []),
-    infoUrl,
-    buildUrl(config.verifierBase, `/verification-session/info`),
-    buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/info`),
-    buildUrl(
-      config.verifierBase,
-      `/verification-session/info?verification-session=${encodeURIComponent(sessionId)}`
-    ),
-    buildUrl(config.verifierBase, `/verification-session/info/${encodeURIComponent(sessionId)}`)
-  ];
+  if (!sessionBoundVerifierBase) {
+    throw new Error('Could not construct session-bound verifier URL for info endpoint');
+  }
+
+  const infoUrl = buildUrl(sessionBoundVerifierBase, '/verification-session/info');
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt += 1) {
-    const info = await fetchJsonWithFallback(
-      fallbackInfoUrls,
+    const info = await fetchJson(
+      infoUrl,
       {
         method: 'GET',
         headers: withAuthorization(
@@ -365,17 +353,17 @@ async function pollInfo(
     );
 
     const status = getInfoStatus(info);
-    appendLog(logEl, `Poll #${attempt}: status=${status || 'UNKNOWN'}`);
+    appendLog(logEl, `Poll #${attempt}: status=${status ?? 'MISSING'}`);
 
     if (status === 'SUCCESSFUL') {
       appendLog(logEl, 'Verification status is SUCCESSFUL.');
       return info;
     }
 
-    if (status !== 'IN_USE') {
-      appendLog(logEl, `Verification failed with status ${status || 'UNKNOWN'}.`);
+    if (status === 'FAILED') {
+      appendLog(logEl, 'Verification status is FAILED.');
       appendPayloadLog(logEl, 'Failure payload', info);
-      throw new Error(`Verification failed with status ${status || 'UNKNOWN'}`);
+      throw new Error('Verification failed with status FAILED');
     }
 
     await sleep(POLL_INTERVAL_MS);
