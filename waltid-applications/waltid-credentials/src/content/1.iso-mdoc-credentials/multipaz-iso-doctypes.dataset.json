@@ -1,0 +1,1851 @@
+[
+  {
+    "sourceFile": "AgeVerification.kt",
+    "docType": "eu.europa.ec.av.1",
+    "fields": [
+      {
+        "name": "age_over_01",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_02",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_03",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_04",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_05",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_06",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_07",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_08",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_09",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_10",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_11",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_12",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_13",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_14",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_15",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_16",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_17",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_18",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_19",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_20",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_21",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_22",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_23",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_24",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_25",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_26",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_27",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_28",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_29",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_30",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_31",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_32",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_33",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_34",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_35",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_36",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_37",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_38",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_39",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_40",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_41",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_42",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_43",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_44",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_45",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_46",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_47",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_48",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_49",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_50",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_51",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_52",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_53",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_54",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_55",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_56",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_57",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_58",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_59",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_60",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": false
+      },
+      {
+        "name": "age_over_61",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_62",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_63",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_64",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_65",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": false
+      },
+      {
+        "name": "age_over_66",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_67",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": false
+      },
+      {
+        "name": "age_over_68",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_69",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_70",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_71",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_72",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_73",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_74",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_75",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_76",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_77",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_78",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_79",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_80",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_81",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_82",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_83",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_84",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_85",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_86",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_87",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_88",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_89",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_90",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_91",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_92",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_93",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_94",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_95",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_96",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_97",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_98",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_99",
+        "namespace": "eu.europa.ec.av.1",
+        "sampleValue": null
+      }
+    ]
+  },
+  {
+    "sourceFile": "DigitalPaymentCredential.kt",
+    "docType": "org.multipaz.payment.sca.1",
+    "fields": [
+      {
+        "name": "issuer_name",
+        "namespace": "org.multipaz.payment.sca.1",
+        "sampleValue": "\"Utopia Bank\".toDataItem()"
+      },
+      {
+        "name": "payment_instrument_id",
+        "namespace": "org.multipaz.payment.sca.1",
+        "sampleValue": "\"pi-77AABBCC\".toDataItem()"
+      },
+      {
+        "name": "masked_account_reference",
+        "namespace": "org.multipaz.payment.sca.1",
+        "sampleValue": "\"****1234\".toDataItem()"
+      },
+      {
+        "name": "holder_name",
+        "namespace": "org.multipaz.payment.sca.1",
+        "sampleValue": "\"Erika\" \"Mustermann\""
+      },
+      {
+        "name": "issue_date",
+        "namespace": "org.multipaz.payment.sca.1",
+        "sampleValue": "\"2024-03-15\""
+      },
+      {
+        "name": "expiry_date",
+        "namespace": "org.multipaz.payment.sca.1",
+        "sampleValue": "\"2028-09-01\""
+      }
+    ]
+  },
+  {
+    "sourceFile": "DrivingLicense.kt",
+    "docType": "org.iso.18013.5.1.mDL",
+    "fields": [
+      {
+        "name": "family_name",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Mustermann\""
+      },
+      {
+        "name": "given_name",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Erika\""
+      },
+      {
+        "name": "birth_date",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"1971-09-01\""
+      },
+      {
+        "name": "issue_date",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"2024-03-15\""
+      },
+      {
+        "name": "expiry_date",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"2028-09-01\""
+      },
+      {
+        "name": "issuing_country",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"US\""
+      },
+      {
+        "name": "issuing_authority",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Utopia Department of Motor Vehicles\""
+      },
+      {
+        "name": "document_number",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"987654321\""
+      },
+      {
+        "name": "portrait",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "SampleData.PORTRAIT_BASE64URL.fromBase64Url().toDataItem()"
+      },
+      {
+        "name": "driving_privileges",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "buildCborArray { addCborMap { put(\"vehicle_category_code\", \"A\") put(\"issue_date\", Tagged(Tagged.FULL_DATE_STRING, Tstr(\"2018-08-09\"))) put(\"expiry_date\", Tagged(Tagged.FULL_DATE_STRING, Tstr(\"2028-09-01\"))) } addCborMap { put(\"vehicle_category_code\", \"B\") put(\"issue_date\", Tagged(Tagged.FULL_DATE_STRING, Tstr(\"2017-02-23\"))) put(\"expiry_date\", Tagged(Tagged.FULL_DATE_STRING, Tstr(\"2028-09-01\"))) } }"
+      },
+      {
+        "name": "un_distinguishing_sign",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"UTO\""
+      },
+      {
+        "name": "administrative_number",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"123456789\""
+      },
+      {
+        "name": "sex",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "2"
+      },
+      {
+        "name": "height",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "175"
+      },
+      {
+        "name": "weight",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "68"
+      },
+      {
+        "name": "eye_colour",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"blue\".toDataItem()"
+      },
+      {
+        "name": "hair_colour",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"blond\".toDataItem()"
+      },
+      {
+        "name": "birth_place",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Sample City\""
+      },
+      {
+        "name": "resident_address",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Sample Street 123, 12345 Sample City, Sample State, Utopia\""
+      },
+      {
+        "name": "portrait_capture_date",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"2020-03-14\""
+      },
+      {
+        "name": "age_in_years",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "54"
+      },
+      {
+        "name": "age_birth_year",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "1971"
+      },
+      {
+        "name": "age_over_13",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "true"
+      },
+      {
+        "name": "age_over_16",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "true"
+      },
+      {
+        "name": "age_over_18",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "true"
+      },
+      {
+        "name": "age_over_21",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "true"
+      },
+      {
+        "name": "age_over_25",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "true"
+      },
+      {
+        "name": "age_over_60",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "false"
+      },
+      {
+        "name": "age_over_62",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "false"
+      },
+      {
+        "name": "age_over_65",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "false"
+      },
+      {
+        "name": "age_over_68",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "false"
+      },
+      {
+        "name": "issuing_jurisdiction",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"State of Utopia\""
+      },
+      {
+        "name": "nationality",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"ZZ\""
+      },
+      {
+        "name": "resident_city",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Sample City\""
+      },
+      {
+        "name": "resident_state",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"Sample State\""
+      },
+      {
+        "name": "resident_postal_code",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"12345\""
+      },
+      {
+        "name": "resident_country",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"ZZ\""
+      },
+      {
+        "name": "family_name_national_character",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"\u0411\u0430\u0431\u0456\u0430\u043a\""
+      },
+      {
+        "name": "given_name_national_character",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "\"\u0415\u0440\u0438\u043a\u0430\""
+      },
+      {
+        "name": "signature_usual_mark",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "SampleData.SIGNATURE_OR_USUAL_MARK_BASE64URL.fromBase64Url().toDataItem()"
+      },
+      {
+        "name": "domestic_driving_privileges",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "buildCborArray {}"
+      },
+      {
+        "name": "name_suffix",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"Jr III\".toDataItem()"
+      },
+      {
+        "name": "organ_donor",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "1.toDataItem()"
+      },
+      {
+        "name": "veteran",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "1.toDataItem()"
+      },
+      {
+        "name": "family_name_truncation",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"N\".toDataItem()"
+      },
+      {
+        "name": "given_name_truncation",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"N\".toDataItem()"
+      },
+      {
+        "name": "aka_family_name",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"Musstermensch\".toDataItem()"
+      },
+      {
+        "name": "aka_given_name",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"Erica\".toDataItem()"
+      },
+      {
+        "name": "aka_suffix",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"Ica\".toDataItem()"
+      },
+      {
+        "name": "weight_range",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "3.toDataItem()"
+      },
+      {
+        "name": "race_ethnicity",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"W\".toDataItem()"
+      },
+      {
+        "name": "DHS_compliance",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"F\".toDataItem()"
+      },
+      {
+        "name": "DHS_temporary_lawful_status",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "1.toDataItem()"
+      },
+      {
+        "name": "EDL_credential",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "1.toDataItem()"
+      },
+      {
+        "name": "resident_county",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"037\".toDataItem()"
+      },
+      {
+        "name": "hazmat_endorsement_expiration_date",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"2028-09-01\""
+      },
+      {
+        "name": "sex",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "2"
+      },
+      {
+        "name": "biometric_template_face",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "Simple.NULL"
+      },
+      {
+        "name": "biometric_template_finger",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "Simple.NULL"
+      },
+      {
+        "name": "biometric_template_signature_sign",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "Simple.NULL"
+      },
+      {
+        "name": "biometric_template_iris",
+        "namespace": "org.iso.18013.5.1",
+        "sampleValue": "Simple.NULL"
+      },
+      {
+        "name": "audit_information",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "\"\".toDataItem()"
+      },
+      {
+        "name": "aamva_version",
+        "namespace": "org.iso.18013.5.1.aamva",
+        "sampleValue": "1.toDataItem()"
+      }
+    ]
+  },
+  {
+    "sourceFile": "EUCertificateOfResidence.kt",
+    "docType": "eu.europa.ec.eudi.cor.1",
+    "fields": []
+  },
+  {
+    "sourceFile": "EUPersonalID.kt",
+    "docType": "eu.europa.ec.eudi.pid.1",
+    "fields": [
+      {
+        "name": "birth_place",
+        "namespace": "eu.europa.ec.eudi.pid.1",
+        "sampleValue": "\"Sample City\""
+      }
+    ]
+  },
+  {
+    "sourceFile": "IDPass.kt",
+    "docType": "com.google.wallet.idcard.1",
+    "fields": []
+  },
+  {
+    "sourceFile": "Loyalty.kt",
+    "docType": "org.multipaz.loyalty.1",
+    "fields": [
+      {
+        "name": "family_name",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "\"Mustermann\""
+      },
+      {
+        "name": "given_name",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "\"Erika\""
+      },
+      {
+        "name": "portrait",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "SampleData.PORTRAIT_BASE64URL.fromBase64Url().toDataItem()"
+      },
+      {
+        "name": "membership_number",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "\"24601\""
+      },
+      {
+        "name": "tier",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "\"basic\".toDataItem()"
+      },
+      {
+        "name": "issue_date",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "\"2024-03-15\""
+      },
+      {
+        "name": "expiry_date",
+        "namespace": "org.multipaz.loyalty.1",
+        "sampleValue": "\"2028-09-01\""
+      }
+    ]
+  },
+  {
+    "sourceFile": "PhotoID.kt",
+    "docType": "org.iso.23220.photoid.1",
+    "fields": [
+      {
+        "name": "family_name",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Mustermann\""
+      },
+      {
+        "name": "family_name_viz",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Mustermann\""
+      },
+      {
+        "name": "given_name",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Erika\""
+      },
+      {
+        "name": "given_name_viz",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Erika\""
+      },
+      {
+        "name": "// TODO: this is a more complex type\n            \"birth_date\"",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "buildCborMap { put(\"birth_date\", LocalDate.parse(SampleData.BIRTH_DATE).toDataItemFullDate()) }"
+      },
+      {
+        "name": "portrait",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "SampleData.PORTRAIT_BASE64URL.fromBase64Url().toDataItem()"
+      },
+      {
+        "name": "issue_date",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"2024-03-15\""
+      },
+      {
+        "name": "expiry_date",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"2028-09-01\""
+      },
+      {
+        "name": "issuing_authority_unicode",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Utopia Central Registry\""
+      },
+      {
+        "name": "issuing_country",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"US\""
+      },
+      {
+        "name": "age_in_years",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "54"
+      },
+      {
+        "name": "age_over_01",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_02",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_03",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_04",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_05",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_06",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_07",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_08",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_09",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_10",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_11",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_12",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_13",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_14",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_15",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_16",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_17",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_18",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_19",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_20",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_21",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_22",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_23",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_24",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_25",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_26",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_27",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_28",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_29",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_30",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_31",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_32",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_33",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_34",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_35",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_36",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_37",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_38",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_39",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_40",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": true
+      },
+      {
+        "name": "age_over_41",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_42",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_43",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_44",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_45",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_46",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_47",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_48",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_49",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_50",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_51",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_52",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_53",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_54",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_55",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_56",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_57",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_58",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_59",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_60",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": false
+      },
+      {
+        "name": "age_over_61",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_62",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_63",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_64",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_65",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": false
+      },
+      {
+        "name": "age_over_66",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_67",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": false
+      },
+      {
+        "name": "age_over_68",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_69",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_70",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_71",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_72",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_73",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_74",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_75",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_76",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_77",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_78",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_79",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_80",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_81",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_82",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_83",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_84",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_85",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_86",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_87",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_88",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_89",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_90",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_91",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_92",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_93",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_94",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_95",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_96",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_97",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_98",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_over_99",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "age_birth_year",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "1971"
+      },
+      {
+        "name": "portrait_capture_date",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"2020-03-14\""
+      },
+      {
+        "name": "birthplace",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Sample City\""
+      },
+      {
+        "name": "name_at_birth",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "resident_address",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Sample Street 123, 12345 Sample City, Sample State, Utopia\""
+      },
+      {
+        "name": "resident_city",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"Sample City\""
+      },
+      {
+        "name": "resident_postal_code",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"12345\""
+      },
+      {
+        "name": "resident_country",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"ZZ\""
+      },
+      {
+        "name": "resident_city_latin1",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "sex",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "2"
+      },
+      {
+        "name": "nationality",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"ZZ\""
+      },
+      {
+        "name": "document_number",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"987654321\""
+      },
+      {
+        "name": "issuing_subdivision",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": "\"State of Utopia\""
+      },
+      {
+        "name": "family_name_latin1",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "given_name_latin1",
+        "namespace": "org.iso.23220.1",
+        "sampleValue": null
+      },
+      {
+        "name": "person_id",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": "\"24601\""
+      },
+      {
+        "name": "birth_country",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": null
+      },
+      {
+        "name": "birth_state",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": null
+      },
+      {
+        "name": "birth_city",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": null
+      },
+      {
+        "name": "administrative_number",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": "\"123456789\""
+      },
+      {
+        "name": "resident_street",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": "\"Sample Street\""
+      },
+      {
+        "name": "resident_house_number",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": "\"123\""
+      },
+      {
+        "name": "travel_document_type",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": null
+      },
+      {
+        "name": "travel_document_number",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": null
+      },
+      {
+        "name": "travel_document_mrz",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": null
+      },
+      {
+        "name": "resident_state",
+        "namespace": "org.iso.23220.photoid.1",
+        "sampleValue": "\"Sample State\""
+      },
+      {
+        "name": "version",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "sod",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg1",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg2",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg3",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg4",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg5",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg6",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg7",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg8",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg9",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg10",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg11",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg12",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg13",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg14",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg15",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dg16",
+        "namespace": "org.iso.23220.dtc.1",
+        "sampleValue": null
+      }
+    ]
+  },
+  {
+    "sourceFile": "UtopiaBoardingPass.kt",
+    "docType": "org.multipaz.example.boarding-pass.1",
+    "fields": [
+      {
+        "name": "passenger_name",
+        "namespace": "org.multipaz.example.boarding-pass.1",
+        "sampleValue": "\"Erika Mustermann\".toDataItem()"
+      },
+      {
+        "name": "flight_number",
+        "namespace": "org.multipaz.example.boarding-pass.1",
+        "sampleValue": "\"United 815\".toDataItem()"
+      },
+      {
+        "name": "seat_number",
+        "namespace": "org.multipaz.example.boarding-pass.1",
+        "sampleValue": "\"12A\".toDataItem()"
+      },
+      {
+        "name": "departure_time",
+        "namespace": "org.multipaz.example.boarding-pass.1",
+        "sampleValue": "Clock.System.now().toDataItemDateTimeString()"
+      }
+    ]
+  },
+  {
+    "sourceFile": "VaccinationDocument.kt",
+    "docType": "org.micov.1",
+    "fields": [
+      {
+        "name": "1D47_vaccinated",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "RA01_vaccinated",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "RA01_test",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "safeEntry_Leisure",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "fac",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "fni",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "gni",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "by",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "bm",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "bd",
+        "namespace": "org.micov.attestation.1",
+        "sampleValue": null
+      },
+      {
+        "name": "fn",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "gn",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "dob",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "sex",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "v_RA01_1",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "v_RA01_2",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "pid_PPN",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      },
+      {
+        "name": "pid_DL",
+        "namespace": "org.micov.vtr.1",
+        "sampleValue": null
+      }
+    ]
+  },
+  {
+    "sourceFile": "VehicleRegistration.kt",
+    "docType": "nl.rdw.mekb.1",
+    "fields": [
+      {
+        "name": "registration_info",
+        "namespace": "nl.rdw.mekb.1",
+        "sampleValue": null
+      },
+      {
+        "name": "issue_date",
+        "namespace": "nl.rdw.mekb.1",
+        "sampleValue": null
+      },
+      {
+        "name": "registration_holder",
+        "namespace": "nl.rdw.mekb.1",
+        "sampleValue": null
+      },
+      {
+        "name": "basic_vehicle_info",
+        "namespace": "nl.rdw.mekb.1",
+        "sampleValue": null
+      },
+      {
+        "name": "vin",
+        "namespace": "nl.rdw.mekb.1",
+        "sampleValue": null
+      }
+    ]
+  }
+]
