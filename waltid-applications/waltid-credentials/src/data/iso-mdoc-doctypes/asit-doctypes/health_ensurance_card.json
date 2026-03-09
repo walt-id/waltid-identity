@@ -1,0 +1,90 @@
+{
+  "name": "urn:eudi:ehic:1",
+  "docType": "urn:eudi:ehic:1",
+  "fields": [
+    {
+      "name": "social_security_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "personal_administrative_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_country",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_authority.id",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_authority.name",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "authentic_source.id",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "authentic_source.name",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "document_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuance_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "date_of_issuance",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "expiry_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "date_of_expiry",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "starting_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "ending_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    }
+  ]
+}

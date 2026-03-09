@@ -1,0 +1,132 @@
+{
+  "name": "id.walt.bookingorder.1",
+  "docType": "id.walt.bookingorder.1",
+  "fields": [
+    {
+      "name": "givenName",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "orderIdentifier",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "surname",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "titleName",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "destStationWALTLocationCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "flightIdentifierDate",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "operatingCarrierAirlineDesigCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "operatingCarrierFlightNumber",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "originStationWALTLocationCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "bookingStatusCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "scheduledArrivalTime",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "scheduledDepartureTime",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].destStationWALTLocationCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].flightIdentifierDate",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].operatingCarrierAirlineDesigCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].operatingCarrierFlightNumber",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].originStationWALTLocationCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].bookingStatusCode",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].scheduledArrivalTime",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "pax_segments[].scheduledDepartureTime",
+      "namespace": "id.walt.bookingorder.1",
+      "mandatory": false,
+      "sampleValue": null
+    }
+  ]
+}

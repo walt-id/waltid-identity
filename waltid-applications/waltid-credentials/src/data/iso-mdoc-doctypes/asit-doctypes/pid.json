@@ -1,0 +1,168 @@
+{
+  "name": "eu.europa.ec.eudi.pid.1",
+  "docType": "eu.europa.ec.eudi.pid.1",
+  "fields": [
+    {
+      "name": "family_name",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "given_name",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "birth_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "family_name_birth",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "given_name_birth",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "place_of_birth",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_address",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_country",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_state",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_city",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_postal_code",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_street",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_house_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "sex",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "nationality",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuance_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "expiry_date",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_authority",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "document_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_country",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_jurisdiction",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "personal_administrative_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "portrait",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "email_address",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "mobile_phone_number",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "trust_anchor",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "location_status",
+      "namespace": null,
+      "mandatory": null,
+      "sampleValue": null
+    }
+  ]
+}
