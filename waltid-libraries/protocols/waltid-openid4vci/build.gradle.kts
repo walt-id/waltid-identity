@@ -55,8 +55,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(kotlin("test-junit5"))
-            implementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
-            runtimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+            implementation(identityLibs.junit.jupiter.api)
         }
         jsMain.dependencies {
             implementation(npm("jose", "5.10.0"))

@@ -142,8 +142,8 @@ dependencies {
     implementation("io.klogging:slf4j-klogging:0.11.6")
 
     // Test
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.12.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
+    testImplementation(identityLibs.junit.jupiter.api)
+    testImplementation(identityLibs.junit.jupiter.params)
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")

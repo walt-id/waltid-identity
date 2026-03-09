@@ -52,8 +52,8 @@ kotlin {
             // Test
             implementation(kotlin("test"))
 
-            implementation("org.junit.jupiter:junit-jupiter-api:5.12.2")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.params)
         }
         jsMain.dependencies {
 

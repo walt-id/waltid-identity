@@ -68,7 +68,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
 
-            implementation("org.junit.jupiter:junit-jupiter-params:5.12.2")
+            implementation(identityLibs.junit.jupiter.params)
 
             // Ktor server
             implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")

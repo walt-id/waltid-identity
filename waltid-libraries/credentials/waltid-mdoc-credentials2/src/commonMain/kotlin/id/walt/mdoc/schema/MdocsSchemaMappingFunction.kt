@@ -13,7 +13,7 @@ import kotlin.time.Instant
 
 object MdocsSchemaMappingFunction {
 
-    fun JsonElement.decodeByMdocsScheme(schemaType: MdocsSchemaType): Any {
+    fun JsonElement.decodeByScheme(schemaType: MdocsSchemaType): Any {
         return when (schemaType.type) {
             // Basic types:
             STRING -> jsonPrimitive.content
@@ -26,13 +26,13 @@ object MdocsSchemaMappingFunction {
             DATETIME -> Instant.parse(jsonPrimitive.content)
 
             // Primitive types:
-            ARRAY -> jsonArray.map { it.decodeByMdocsScheme(schemaType.generic!!) }
-            MAP -> jsonObject.mapValues { (_, value) -> value.decodeByMdocsScheme(schemaType.generic!!) }
+            ARRAY -> jsonArray.map { it.decodeByScheme(schemaType.generic!!) }
+            MAP -> jsonObject.mapValues { (_, value) -> value.decodeByScheme(schemaType.generic!!) }
         }
     }
 
     // JSON -> CBOR
-    fun JsonElement.jsonToCborElement(schemaType: MdocsSchemaType): CborElement {
+    fun JsonElement.schemafulJsonToCborElement(schemaType: MdocsSchemaType): CborElement {
         if (this is JsonNull) return CborNull()
 
         return when (schemaType.type) {
@@ -44,13 +44,13 @@ object MdocsSchemaMappingFunction {
             BYTES -> CborByteString(jsonArray.map { it.jsonPrimitive.int.toByte() }.toByteArray())
 
             // Applying CBOR tags directly!
-            DATE -> CborString(jsonPrimitive.content, tags = ulongArrayOf(1004u))
-            DATETIME -> CborString(jsonPrimitive.content, tags = ulongArrayOf(0u))
+            DATE -> CborString(jsonPrimitive.content, 1004u)
+            DATETIME -> CborString(jsonPrimitive.content, 0u)
 
-            ARRAY -> CborArray(jsonArray.map { it.jsonToCborElement(schemaType.generic!!) })
+            ARRAY -> CborArray(jsonArray.map { it.schemafulJsonToCborElement(schemaType.generic!!) })
             MAP -> CborMap(
                 jsonObject.map { (k, v) ->
-                    CborString(k) to v.jsonToCborElement(schemaType.generic!!)
+                    CborString(k) to v.schemafulJsonToCborElement(schemaType.generic!!)
                 }.toMap()
             )
         }
@@ -60,7 +60,7 @@ object MdocsSchemaMappingFunction {
         return when (this) {
             is JsonNull -> CborNull()
             is JsonPrimitive -> when {
-                this.isString -> CborString(jsonPrimitive.content)
+                this.isString -> jsonPrimitive.content.toCborElement()
                 this.intOrNull != null || this.longOrNull != null -> CborInteger(jsonPrimitive.long)
                 this.doubleOrNull != null -> CborFloat(jsonPrimitive.double)
                 this.booleanOrNull != null -> CborBoolean(jsonPrimitive.boolean)
@@ -78,7 +78,7 @@ object MdocsSchemaMappingFunction {
     }
 
     // CBOR -> JSON
-    fun CborElement.toJsonElement(schemaType: MdocsSchemaType): JsonElement {
+    fun CborElement.schemafulToJsonElement(schemaType: MdocsSchemaType): JsonElement {
         if (this is CborNull) return JsonNull
 
         return when (schemaType.type) {
@@ -87,24 +87,33 @@ object MdocsSchemaMappingFunction {
             UINT -> JsonPrimitive((this as CborInteger).value.toLong())
             BOOLEAN -> JsonPrimitive((this as CborBoolean).value)
             BYTES -> JsonArray((this as CborByteString).value.map { JsonPrimitive(it) })
-            ARRAY -> JsonArray((this as CborArray).map { it.toJsonElement(schemaType.generic!!) })
+            ARRAY -> JsonArray((this as CborArray).map { it.schemafulToJsonElement(schemaType.generic!!) })
             MAP -> JsonObject((this as CborMap).entries.associate { (k, v) ->
-                (k as CborString).value to v.toJsonElement(schemaType.generic!!)
+                (k as CborString).value to v.schemafulToJsonElement(schemaType.generic!!)
             })
         }
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
     fun Any.toCborElement(): CborElement = when (this) {
-        is String -> CborString(this)
+        is String -> {
+            runCatching {
+                LocalDate.parse(this)
+            }.fold(onSuccess = {
+                CborString(this, 1004UL)
+            }, onFailure = {
+                CborString(this)
+            })
+        }
+
         is Int -> CborInteger(this.toLong())
         is Long -> CborInteger(this)
         is UInt -> CborInteger(this.toULong())
         is ULong -> CborInteger(this)
         is Boolean -> CborBoolean(this)
         is ByteArray -> CborByteString(this)
-        is LocalDate -> CborString(this.toString(), tags = ulongArrayOf(1004u))
-        is Instant -> CborString(this.toString(), tags = ulongArrayOf(0u))
+        is LocalDate -> CborString(this.toString(), 1004u)
+        is Instant -> CborString(this.toString(), 0u)
         is List<*> -> CborArray(this.map { it!!.toCborElement() })
         is Map<*, *> -> CborMap(this.entries.associate { CborString(it.key as String) to it.value!!.toCborElement() })
         is CborElement -> this
@@ -120,7 +129,7 @@ object MdocsSchemaMappingFunction {
             val schemaType = schema.credentialSchemas[docType]?.get(namespace)?.get(elementIdentifier)
                 ?: throw IllegalArgumentException("Element $elementIdentifier not defined in schema")
 
-            value.jsonToCborElement(schemaType)
+            value.schemafulJsonToCborElement(schemaType)
         }
     /*
             val schemaType =

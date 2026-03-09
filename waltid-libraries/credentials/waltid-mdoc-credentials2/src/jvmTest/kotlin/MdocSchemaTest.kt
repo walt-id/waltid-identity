@@ -120,4 +120,70 @@ class MdocSchemaTest {
         )
     }
 
+    @Test
+    fun testCustomIssuanceWithoutSchema() = runTest {
+        val issuerKey = issuerKeyInit()
+        val holderKey = holderKeyInit().getPublicKey().getCosePublicKey()
+        val issuerPublicKey = issuerKey.getPublicKey()
+        val issuerPublicCoseVerifier = issuerPublicKey.toCoseVerifier()
+
+        val credentialData = MdocIssuer.MdocUniversalIssuanceData(
+            namespaces = mapOf(
+                "walt.id.credential.ns1" to buildJsonObject {
+                    put("name", "Max Mustermann") // tstr
+                    put("portrait", JsonArray(byteArrayOf(1, 2, 3).map { JsonPrimitive(it) })) // bstr
+                    put("measurement", 5)
+                    put("count", 123L)
+                    put("height", JsonPrimitive(80u)) // uint
+                    put("flag", true) // bool
+                    put("birth_date", LocalDate(2000, 12, 30).toString()) // full-date
+                    put("issue_date", Clock.System.now().toString()) // tdate
+                },
+                "waltid.credential.nsspecial" to buildJsonObject {
+                    putJsonArray("nationalities") {
+                        add("AT")
+                        add("DE")
+                    }
+                    putJsonObject("organization_location") {
+                        put("address", "Abc St. 1")
+                        put("city", "Stadt")
+                        put("state", "Staat")
+                        put("postal_code", "A1234")
+                    }
+                    putJsonArray("driving_privileges") {
+                        add(buildJsonObject {
+                            put("vehicle_category_code", "B")
+                            put("number_plate", "ABC123")
+                        })
+                    }
+                })
+        )
+
+        val issuerSigned = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            issuerCertificate = issuerCertCose,
+            holderKey = holderKey,
+            docType = docType,
+            data = credentialData
+        )
+
+        println("Issued: $issuerSigned")
+
+        val document = makeDocument(docType, issuerSigned)
+        val documentHex = coseCompliantCbor.encodeToHexString(document)
+        println("Document (\"sending\"): $documentHex")
+
+        val decodedDocument = coseCompliantCbor.decodeFromHexString<Document>(documentHex)
+        println("Decoded:  $decodedDocument")
+
+        verifyIssued(
+            document = decodedDocument,
+            docType = docType,
+            issuerPublicCoseVerifier = issuerPublicCoseVerifier,
+            namespacesToCheck = listOf(ns1, ns2),
+            holderKey = holderKey,
+            namespaces = credentialData.namespaces
+        )
+    }
+
 }

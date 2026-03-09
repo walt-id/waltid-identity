@@ -28,8 +28,9 @@ kotlin {
             implementation(kotlin("reflect"))
 
             //Interoperability test support with A-SIT's implementation
-            implementation("at.asitplus.wallet:vck:5.8.0")
-            implementation("at.asitplus.wallet:mobiledrivinglicence:1.2.0")
+            // Temporarily disabled, see waltid-libraries/credentials/waltid-mdoc-credentials/src/jvmTest/kotlin/interop/ASITTest.kt
+            //implementation("at.asitplus.wallet:vck:5.8.0")
+            //implementation("at.asitplus.wallet:mobiledrivinglicence:1.2.0")
         }
         jsMain.dependencies {
             implementation(npm("cose-js", "0.9.0"))

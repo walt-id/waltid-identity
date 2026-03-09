@@ -83,6 +83,9 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
                     addHashListResult("matching_digest", namespace, issuerSignedItem.elementIdentifier)
                 } else {
                     addHashListResult("unmatched_digests", namespace, issuerSignedItem.elementIdentifier)
+                    throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest, IssuerSignedItem: $issuerSignedItemWrapped")
+
+                    /*
                     val elementValueType = issuerSignedItem.elementValue::class.simpleName
                     if (elementValueType !in listOf("String", "Long", "Boolean", "UInt")) {
                         log.warn { "Hash does not match for non primitive type: $namespace - ${issuerSignedItem.elementIdentifier} has invalid hash for value: ${issuerSignedItem.elementValue} ($elementValueType). Does the Issuer support this non-primitive type?" }
@@ -90,6 +93,7 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
                     } else {
                         throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest, IssuerSignedItem: $issuerSignedItemWrapped")
                     }
+                    */
                 }
 
             }

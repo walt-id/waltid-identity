@@ -31,6 +31,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -115,7 +116,7 @@ class IssuerSignedDataMdocVpPolicyTest {
 
     @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)
     @Test
-    fun shouldNotFailWhenNonPrimitivesMismatches() = runTest {
+    fun shouldFailWhenNonPrimitivesMismatches() = runTest {
         val namespace = "org.iso.18013.5.1"
         val targetElementId = "driving_privileges"
 
@@ -152,14 +153,10 @@ class IssuerSignedDataMdocVpPolicyTest {
         val policy = IssuerSignedDataMdocVpPolicy()
         val result = policy.runPolicy(document, tamperedMso, dummyVerificationContext())
 
-        assertTrue(result.success)
+        assertFalse(result.success)
 
         val unmatchedNonPrimitive = result.results["unmatched_non_primitive"]?.jsonObject
-        assertNotNull(unmatchedNonPrimitive)
-
-        val ids = unmatchedNonPrimitive[namespace]?.jsonArray
-        assertNotNull(ids)
-        assertTrue(JsonPrimitive(targetElementId) in ids)
+        assertNull(unmatchedNonPrimitive)
     }
 
     @OptIn(ExperimentalTime::class)
