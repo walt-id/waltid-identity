@@ -27,6 +27,7 @@ type RuntimeConfig = {
   verifierBase: string;
   bearerToken: string;
   openApiUrl?: string;
+  presetKey: VerifierPresetKey;
 };
 
 type VerifierPresetKey = keyof typeof VERIFIER_PRESETS;
@@ -273,13 +274,10 @@ async function runDcApiFlow(
     sessionId
   });
 
-  const requestUrl = buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/request`);
+  const requestUrls = getRequestUrls(config, sessionId);
   setStatus(statusEl, 'Fetching DC API request...');
   const dcApiRequest = await fetchJsonWithFallback(
-    [
-      requestUrl,
-      buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/request`)
-    ],
+    requestUrls,
     {
       method: 'GET',
       headers: withAuthorization(
@@ -297,13 +295,10 @@ async function runDcApiFlow(
   const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest);
   appendPayloadLog(logEl, 'DC API wallet response', dcApiResponse);
 
-  const responseUrl = buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/response`);
+  const responseUrls = getResponseUrls(config, sessionId);
   setStatus(statusEl, 'Posting wallet response...');
   const postResponse = await fetchAnyWithFallback(
-    [
-      responseUrl,
-      buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/response`)
-    ],
+    responseUrls,
     {
       method: 'POST',
       headers: withAuthorization(
@@ -330,12 +325,7 @@ async function pollInfo(
   config: RuntimeConfig,
   logEl: HTMLPreElement
 ): Promise<unknown> {
-  const sessionBoundVerifierBase = withSessionBoundTarget(config.verifierBase, sessionId);
-  if (!sessionBoundVerifierBase) {
-    throw new Error('Could not construct session-bound verifier URL for info endpoint');
-  }
-
-  const infoUrl = buildUrl(sessionBoundVerifierBase, '/verification-session/info');
+  const infoUrl = getInfoUrl(config, sessionId);
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt += 1) {
     const info = await fetchJson(
@@ -357,12 +347,13 @@ async function pollInfo(
 
     if (status === 'SUCCESSFUL') {
       appendLog(logEl, 'Verification status is SUCCESSFUL.');
+      appendPayloadLog(logEl, 'Verification result payload', info);
       return info;
     }
 
     if (status === 'FAILED') {
       appendLog(logEl, 'Verification status is FAILED.');
-      appendPayloadLog(logEl, 'Failure payload', info);
+      appendPayloadLog(logEl, 'Verification result payload', info);
       throw new Error('Verification failed with status FAILED');
     }
 
@@ -374,7 +365,9 @@ async function pollInfo(
 
 function getInfoStatus(info: unknown): string | null {
   if (!info || typeof info !== 'object') return null;
-  const status = (info as { status?: unknown }).status;
+  const session = (info as { session?: unknown }).session;
+  if (!session || typeof session !== 'object') return null;
+  const status = (session as { status?: unknown }).status;
   if (typeof status !== 'string') return null;
   return status.toUpperCase();
 }
@@ -621,7 +614,8 @@ function getRuntimeConfig(
   return {
     verifierBase,
     bearerToken,
-    openApiUrl: 'openApiUrl' in preset ? preset.openApiUrl : undefined
+    openApiUrl: 'openApiUrl' in preset ? preset.openApiUrl : undefined,
+    presetKey
   };
 }
 
@@ -664,6 +658,34 @@ function withSessionBoundTarget(verifierBase: string, sessionId: string): string
 
   const insertAt = markerIndex + marker.length;
   return `${verifierBase.slice(0, insertAt)}.${encodeURIComponent(sessionId)}${verifierBase.slice(insertAt)}`;
+}
+
+function getRequestUrls(config: RuntimeConfig, sessionId: string): string[] {
+  if (config.presetKey === 'enterprise') {
+    return [buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/request`)];
+  }
+
+  return [buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/request`)];
+}
+
+function getResponseUrls(config: RuntimeConfig, sessionId: string): string[] {
+  if (config.presetKey === 'enterprise') {
+    return [buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/response`)];
+  }
+
+  return [buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/response`)];
+}
+
+function getInfoUrl(config: RuntimeConfig, sessionId: string): string {
+  if (config.presetKey === 'enterprise') {
+    const sessionBoundVerifierBase = withSessionBoundTarget(config.verifierBase, sessionId);
+    if (!sessionBoundVerifierBase) {
+      throw new Error('Could not construct session-bound verifier URL for info endpoint');
+    }
+    return buildUrl(sessionBoundVerifierBase, '/verification-session/info');
+  }
+
+  return buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
 }
 
 function getOpenApiCandidateUrls(verifierBase: string): string[] {
