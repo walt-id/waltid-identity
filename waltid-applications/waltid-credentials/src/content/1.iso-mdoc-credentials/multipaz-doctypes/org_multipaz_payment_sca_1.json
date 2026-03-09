@@ -1,0 +1,41 @@
+{
+  "docType": "org.multipaz.payment.sca.1",
+  "fields": [
+    {
+      "name": "issuer_name",
+      "namespace": "org.multipaz.payment.sca.1",
+      "mandatory": true,
+      "sampleValue": "Utopia Bank"
+    },
+    {
+      "name": "payment_instrument_id",
+      "namespace": "org.multipaz.payment.sca.1",
+      "mandatory": false,
+      "sampleValue": "pi-77AABBCC"
+    },
+    {
+      "name": "masked_account_reference",
+      "namespace": "org.multipaz.payment.sca.1",
+      "mandatory": true,
+      "sampleValue": "****1234"
+    },
+    {
+      "name": "holder_name",
+      "namespace": "org.multipaz.payment.sca.1",
+      "mandatory": true,
+      "sampleValue": "Erika Mustermann"
+    },
+    {
+      "name": "issue_date",
+      "namespace": "org.multipaz.payment.sca.1",
+      "mandatory": true,
+      "sampleValue": "2024-03-15"
+    },
+    {
+      "name": "expiry_date",
+      "namespace": "org.multipaz.payment.sca.1",
+      "mandatory": true,
+      "sampleValue": "2028-09-01"
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "docType": "eu.europa.ec.eudi.pid.1",
+  "fields": [
+    {
+      "name": "birth_place",
+      "namespace": "eu.europa.ec.eudi.pid.1",
+      "mandatory": true,
+      "sampleValue": "Sample City"
+    }
+  ]
+}
