@@ -111,12 +111,22 @@ object OpenApiModule {
                 }
 
                 exampleEncoder = { type, example ->
-                    runCatching {
-                        kotlinxEncoder.invoke(type, example)
-                    }.recoverCatching {
-                        logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\"." }
-                        reflectionEncoder.invoke(type, example)
-                    }.getOrThrow()
+                    val isStringType = when (type) {
+                        is KTypeDescriptor -> type.type.classifier == String::class
+                        is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
+                        else -> false
+                    }
+                    
+                    if (example is String && isStringType) {
+                        example
+                    } else {
+                        runCatching {
+                            kotlinxEncoder.invoke(type, example)
+                        }.recoverCatching {
+                            logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\"." }
+                            reflectionEncoder.invoke(type, example)
+                        }.getOrThrow()
+                    }
                 }
             }
 
