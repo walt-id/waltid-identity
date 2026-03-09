@@ -365,6 +365,10 @@ async function pollInfo(
 
 function getInfoStatus(info: unknown): string | null {
   if (!info || typeof info !== 'object') return null;
+  const statusOss = (info as { status?: unknown }).status;
+  if (statusOss) {
+       return statusOss.toUpperCase();
+  }
   const session = (info as { session?: unknown }).session;
   if (!session || typeof session !== 'object') return null;
   const status = (session as { status?: unknown }).status;
