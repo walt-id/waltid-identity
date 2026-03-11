@@ -687,6 +687,7 @@ object OpenID4VCI {
         dataMapping: JsonObject? = null,
         x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
+        sdJwtTypeHeader: String? = null,
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
@@ -774,7 +775,7 @@ object OpenID4VCI {
 
         val headers = mapOf(
             JWTClaims.Header.keyID to getKidHeader(issuerKey, issuerDid),
-            JWTClaims.Header.type to SD_JWT_VC_TYPE_HEADER
+            JWTClaims.Header.type to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
         ).plus(x5Chain?.let {
             mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf())
