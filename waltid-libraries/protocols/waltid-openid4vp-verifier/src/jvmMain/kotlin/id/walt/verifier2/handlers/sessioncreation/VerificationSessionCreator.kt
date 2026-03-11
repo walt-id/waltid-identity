@@ -71,10 +71,10 @@ object VerificationSessionCreator {
         val isSignedRequest = setup.core.signedRequest
         val isEncryptedResponse = setup.core.encryptedResponse || isAnnexC
         val isCrossDevice = setup is CrossDeviceFlowSetup
-        val isDcApi = setup is DcApiFlowSetup || isAnnexC
-        val isDcApiHaip = isDcApi && (setup is DcApiFlowSetup && setup.haip)
+        val isDcApi = setup is DcApiAnnexDFlowSetup || isAnnexC
+        val isDcApiHaip = isDcApi && (setup is DcApiAnnexDFlowSetup && setup.haip)
         val origins =
-            if (setup is DcApiFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
+            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
 
         var ephemeralKey: JWKKey? = null
 
@@ -133,7 +133,7 @@ object VerificationSessionCreator {
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
                     "mso_mdoc" to JsonObject(
-                         mapOf(
+                        mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
                             "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
                         )
@@ -285,9 +285,9 @@ object VerificationSessionCreator {
                 AnnexCRequestResponse(
                     protocol = AnnexC.PROTOCOL,
                     data = AnnexCRequestResponse.Data(
-                        deviceRequest = DeviceRequest(setup.docType, setup.requestedElements).encodeToBase64Url(),
+                        deviceRequest = DeviceRequest(setup.requestedElements).encodeToBase64Url(),
                         encryptionInfo = DCAPIEncryptionInfo(
-                            nonce.toByteArray(),
+                            nonce = nonce.toByteArray(),
                             recipientPublicKey = ephemeralKey?.getCosePublicKey() ?: error("Missing ephermal key for Annex C verification")
                         ).encodeToBase64Url()
                     )

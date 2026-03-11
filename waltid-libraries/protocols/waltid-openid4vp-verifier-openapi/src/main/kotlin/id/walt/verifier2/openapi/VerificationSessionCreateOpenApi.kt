@@ -2,7 +2,7 @@ package id.walt.verifier2.openapi
 
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
-import id.walt.verifier2.data.DcApiFlowSetup
+import id.walt.verifier2.data.DcApiAnnexDFlowSetup
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.openapi.Verifier2OpenApiExamples.nestedPresentationRequestWithMultipleClaims
@@ -102,17 +102,18 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-http][iso mdl & photo-id]") { value = CrossDeviceFlowSetup.EXAMPLE_MDL_OR_PHOTOID }
                 example("[openid4vp-http][iso photo-id] vical") { value = Verifier2OpenApiExamples.openid4vpHttpIsoPhotoIdVical }
 
-                example("[openid4vp-dc_api][iso mdl] unsigned & unencrypted") { value = DcApiFlowSetup.EXAMPLE_UNSIGNED_UNENCRYPTED_MDL }
-                example("[openid4vp-dc_api][iso mdl] unsigned & encrypted") { value = DcApiFlowSetup.EXAMPLE_UNSIGNED_ENCRYPTED_MDL }
-                example("[openid4vp-dc_api][iso mdl] signed & unencrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_MDL }
-                example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
-                example("[openid4vp-dc_api][iso photo-id] signed & encrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PHOTOID }
-                example("[openid4vp-dc_api][iso pid] signed & encrypted") { value = DcApiFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PID }
+                example("[openid4vp-dc_api][iso mdl] unsigned & unencrypted") { value = DcApiAnnexDFlowSetup.EX_UNSIGNED_UNENCRYPTED_MDL }
+                example("[openid4vp-dc_api][iso mdl] unsigned & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_UNSIGNED_ENCRYPTED_MDL }
+                example("[openid4vp-dc_api][iso mdl] signed & unencrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_MDL }
+                example("[openid4vp-dc_api][iso mdl] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_MDL }
+                example("[openid4vp-dc_api][iso photo-id] signed & encrypted") { value = DcApiAnnexDFlowSetup.EX_SIGNED_ENCRYPTED_PHOTOID }
+                example("[openid4vp-dc_api][iso pid] signed & encrypted") { value = DcApiAnnexDFlowSetup.EXAMPLE_SIGNED_ENCRYPTED_PID }
 
                 // Annex-C examples
                 example("[iso-18013-7-dc_api][iso mdl]") { value = DcApiAnnexCFlowSetup.EXTENDED_MDL_EXAMPLE }
                 example("[iso-18013-7-dc_api][iso pid]") { value = DcApiAnnexCFlowSetup.EXTENDED_PID_EXAMPLE }
                 example("[iso-18013-7-dc_api][iso photo-id]") { value = DcApiAnnexCFlowSetup.EXTENDED_PHOTOID_EXAMPLE }
+                example("[iso-18013-7-dc_api][iso mdl + photo-id]") { value = DcApiAnnexCFlowSetup.MULTI_CREDENTIAL_EXAMPLE }
             }
         }
         response {

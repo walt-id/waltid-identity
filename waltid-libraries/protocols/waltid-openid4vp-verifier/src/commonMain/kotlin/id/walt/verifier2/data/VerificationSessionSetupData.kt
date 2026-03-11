@@ -131,12 +131,13 @@ data class SameDeviceFlowSetup(
 ) : UrlBearingDeviceFlowSetup
 
 /**
+ * Annex D
  * Digital Credentials API (Browser/OS native)
  * Can be Standard or HAIP (High Assurance).
  */
 @Serializable
 @SerialName("dc_api")
-data class DcApiFlowSetup(
+data class DcApiAnnexDFlowSetup(
     override val core: GeneralFlowConfig,
 
     // Properties unique to this flow:
@@ -156,7 +157,7 @@ data class DcApiFlowSetup(
     }
 
     companion object {
-        val EXAMPLE_UNSIGNED_UNENCRYPTED_MDL = DcApiFlowSetup(
+        val EX_UNSIGNED_UNENCRYPTED_MDL = DcApiAnnexDFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = DcqlQuery(
                     credentials = listOf(
@@ -181,13 +182,13 @@ data class DcApiFlowSetup(
             expectedOrigins = listOf("https://digital-credentials.walt.id"),
             haip = false
         )
-        val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.copy(
-            core = EXAMPLE_UNSIGNED_UNENCRYPTED_MDL.core.copy(
+        val EXAMPLE_UNSIGNED_ENCRYPTED_MDL = EX_UNSIGNED_UNENCRYPTED_MDL.copy(
+            core = EX_UNSIGNED_UNENCRYPTED_MDL.core.copy(
                 encryptedResponse = true
             )
         )
 
-        val EXAMPLE_SIGNED_MDL = DcApiFlowSetup(
+        val EXAMPLE_SIGNED_MDL = DcApiAnnexDFlowSetup(
             core = GeneralFlowConfig(
                 dcqlQuery = DcqlQuery(
                     credentials = listOf(
@@ -232,7 +233,7 @@ data class DcApiFlowSetup(
             )
         )
 
-        val EXAMPLE_SIGNED_ENCRYPTED_PHOTOID = EXAMPLE_SIGNED_ENCRYPTED_MDL.copy(
+        val EX_SIGNED_ENCRYPTED_PHOTOID = EXAMPLE_SIGNED_ENCRYPTED_MDL.copy(
             core = EXAMPLE_SIGNED_ENCRYPTED_MDL.core.copy(
                 dcqlQuery = DcqlQuery(
                     credentials = listOf(
@@ -289,6 +290,9 @@ data class DcApiFlowSetup(
     }
 }
 
+typealias AnnexCDocTypeToRequestedElements = Map<String, AnnexCNamespaceRequestedElements>
+typealias AnnexCNamespaceRequestedElements = Map<String, List<String>>
+
 /**
  * ISO 18013-7 Annex C (DC API) flow using the unified /verification-session endpoints.
  */
@@ -296,14 +300,14 @@ data class DcApiFlowSetup(
 @Serializable
 @SerialName("dc_api-annex-c")
 data class DcApiAnnexCFlowSetup(
-    val docType: String,
-    val requestedElements: Map<String, List<String>>,
+    val requestedElements: AnnexCDocTypeToRequestedElements,
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
     val origin: String,
     @SerialName("core_flow") private val coreInput: GeneralFlowConfig? = null
 ) : VerificationSessionSetup {
 
-    override val core: GeneralFlowConfig = buildAnnexCCore(docType, requestedElements, policies, coreInput)
+
+    override val core: GeneralFlowConfig = buildAnnexCCore(requestedElements, policies, coreInput)
 
     init {
         val parsedOrigin = UrlUtils.checkDcApiOriginUrl(origin)
@@ -322,21 +326,26 @@ data class DcApiAnnexCFlowSetup(
 
     companion object {
         private fun buildAnnexCCore(
-            docType: String, requestedElements: Map<String, List<String>>, policies: DefinedVerificationPolicies, coreInput: GeneralFlowConfig?
+            namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
+            policies: DefinedVerificationPolicies,
+            coreInput: GeneralFlowConfig?
         ): GeneralFlowConfig {
-            val claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
-                elements.distinct().sorted().map { elementId ->
-                    ClaimsQuery(path = listOf(namespace, elementId))
-                }
+            val credentials = namespaceRequestedElements.entries
+
+            val dcqlIndividualQueries: List<CredentialQuery> = credentials.map { (docType, requestedElements) ->
+                CredentialQuery(
+                    id = docType,
+                    format = CredentialFormat.MSO_MDOC,
+                    meta = MsoMdocMeta(doctypeValue = docType),
+                    claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
+                        elements.distinct().sorted().map { elementId ->
+                            ClaimsQuery(path = listOf(namespace, elementId))
+                        }
+                    }
+                )
             }
 
-            val dcqlQuery = DcqlQuery(
-                credentials = listOf(
-                    CredentialQuery(
-                        id = "annex_c", format = CredentialFormat.MSO_MDOC, meta = MsoMdocMeta(doctypeValue = docType), claims = claims
-                    )
-                )
-            )
+            val dcqlQuery = DcqlQuery(credentials = dcqlIndividualQueries)
 
             return GeneralFlowConfig(
                 dcqlQuery = dcqlQuery, policies = policies, notifications = coreInput?.notifications
@@ -344,98 +353,106 @@ data class DcApiAnnexCFlowSetup(
         }
 
         val EXTENDED_MDL_EXAMPLE = DcApiAnnexCFlowSetup(
-            docType = "org.iso.18013.5.1.mDL",
             requestedElements = mapOf(
-                "org.iso.18013.5.1" to listOf(
-                    "family_name",
-                    "given_name",
-                    "birth_date",
-                    "issue_date",
-                    "expiry_date",
-                    "issuing_country",
-                    "issuing_authority",
-                    "driving_privileges",
+                "org.iso.18013.5.1.mDL" to mapOf(
+                    "org.iso.18013.5.1" to listOf(
+                        "family_name",
+                        "given_name",
+                        "birth_date",
+                        "issue_date",
+                        "expiry_date",
+                        "issuing_country",
+                        "issuing_authority",
+                        "driving_privileges",
 
-                    "age_birth_year",
-                    "age_over_18",
-                    "age_over_21",
-                    "age_over_65",
+                        "age_birth_year",
+                        "age_over_18",
+                        "age_over_21",
+                        "age_over_65",
 
-                    "issuing_jurisdiction",
-                    "nationality"
+                        "issuing_jurisdiction",
+                        "nationality"
+                    )
                 )
             ),
             origin = "https://digital-credentials.walt.id"
         )
 
         val EXTENDED_PHOTOID_EXAMPLE = DcApiAnnexCFlowSetup(
-            docType = "org.iso.23220.photoid.1",
             requestedElements = mapOf(
-                "org.iso.23220.1" to listOf(
-                    "family_name",
-                    "family_name_viz",
-                    "given_name",
-                    "given_name_viz",
-                    "issue_date",
-                    "expiry_date",
-                    "issuing_authority_unicode",
-                    "issuing_country",
-                    "age_over_18",
-                    "age_over_21",
-                    "age_over_65",
-                    "age_birth_year",
-                    "portrait_capture_date",
-                    "birthplace",
-                    "name_at_birth",
-                    "resident_address",
-                    "resident_city",
-                    "resident_postal_code",
-                    "resident_country",
-                    "resident_city_latin1",
-                    "nationality",
-                    "document_number",
-                    "issuing_subdivision",
-                    "family_name_latin1",
-                    "given_name_latin1"
-                ),
-                "org.iso.23220.photoid.1" to listOf(
-                    "person_id",
-                    "birth_country",
-                    "birth_state",
-                    "birth_city",
-                    "administrative_number",
-                    "resident_street",
-                    "resident_house_number",
-                    "travel_document_type",
-                    "travel_document_number",
-                    "travel_document_mrz",
-                    "resident_state"
+                "org.iso.23220.photoid.1" to mapOf(
+                    "org.iso.23220.1" to listOf(
+                        "family_name",
+                        "family_name_viz",
+                        "given_name",
+                        "given_name_viz",
+                        "issue_date",
+                        "expiry_date",
+                        "issuing_authority_unicode",
+                        "issuing_country",
+                        "age_over_18",
+                        "age_over_21",
+                        "age_over_65",
+                        "age_birth_year",
+                        "portrait_capture_date",
+                        "birthplace",
+                        "name_at_birth",
+                        "resident_address",
+                        "resident_city",
+                        "resident_postal_code",
+                        "resident_country",
+                        "resident_city_latin1",
+                        "nationality",
+                        "document_number",
+                        "issuing_subdivision",
+                        "family_name_latin1",
+                        "given_name_latin1"
+                    ),
+                    "org.iso.23220.photoid.1" to listOf(
+                        "person_id",
+                        "birth_country",
+                        "birth_state",
+                        "birth_city",
+                        "administrative_number",
+                        "resident_street",
+                        "resident_house_number",
+                        "travel_document_type",
+                        "travel_document_number",
+                        "travel_document_mrz",
+                        "resident_state"
+                    )
                 )
             ),
             origin = "https://digital-credentials.walt.id",
         )
 
         val EXTENDED_PID_EXAMPLE = DcApiAnnexCFlowSetup(
-            docType = "eu.europa.ec.eudi.pid.1",
             requestedElements = mapOf(
-                "eu.europa.ec.eudi.pid.1" to listOf(
-                    "family_name",
-                    "given_name",
-                    "birth_date",
-                    "age_birth_year",
-                    "age_over_18",
-                    "age_over_21",
-                    "age_over_65",
-                    "family_name_birth",
-                    "given_name_birth",
-                    "birth_place",
-                    "birth_country",
-                    "issuance_date",
-                    "expiry_date",
-                    "issuing_authority",
-                    "issuing_country"
+                "eu.europa.ec.eudi.pid.1" to mapOf(
+                    "eu.europa.ec.eudi.pid.1" to listOf(
+                        "family_name",
+                        "given_name",
+                        "birth_date",
+                        "age_birth_year",
+                        "age_over_18",
+                        "age_over_21",
+                        "age_over_65",
+                        "family_name_birth",
+                        "given_name_birth",
+                        "birth_place",
+                        "birth_country",
+                        "issuance_date",
+                        "expiry_date",
+                        "issuing_authority",
+                        "issuing_country"
+                    )
                 )
             ),
+            origin = "https://digital-credentials.walt.id",
+        )
+
+        val MULTI_CREDENTIAL_EXAMPLE = DcApiAnnexCFlowSetup(
+            requestedElements = EXTENDED_MDL_EXAMPLE.requestedElements + EXTENDED_PHOTOID_EXAMPLE.requestedElements,
             origin = "https://digital-credentials.walt.id",
         )
     }

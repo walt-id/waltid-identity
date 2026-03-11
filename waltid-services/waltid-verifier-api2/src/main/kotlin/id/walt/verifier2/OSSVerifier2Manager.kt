@@ -22,7 +22,7 @@ object OSSVerifier2Manager {
             urlPrefix = if (setup is UrlBearingDeviceFlowSetup) setup.urlConfig.urlPrefix ?: config.urlPrefix else null,
             urlHost = when (setup) {
                 is UrlBearingDeviceFlowSetup -> setup.urlConfig.urlHost ?: config.urlHost
-                is DcApiFlowSetup -> setup.expectedOrigins.firstOrNull() ?: throw IllegalArgumentException("Missing expected origins (at '$.expectedOrigins')")
+                is DcApiAnnexDFlowSetup -> setup.expectedOrigins.firstOrNull() ?: throw IllegalArgumentException("Missing expected origins (at '$.expectedOrigins')")
                 is DcApiAnnexCFlowSetup -> setup.origin
             },
             key = setup.core.key?.key ?: config.key?.let { KeyManager.resolveSerializedKey(it) },
