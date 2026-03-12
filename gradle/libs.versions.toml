@@ -11,6 +11,7 @@ vanniktech-publish = "0.35.0"
 npm-publish = "3.5.3"
 jib = "3.5.2"
 android-gradle = "8.12.3"
+gradle-shadow = "9.3.2"
 
 # Plugins / Dependencies
 ktor = "3.3.3"
@@ -61,6 +62,7 @@ jib-gradle-plugin = { module = "com.google.cloud.tools:jib-gradle-plugin", versi
 vanniktech-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "vanniktech-publish" }
 petuska-npm-publish-plugin = { module = "dev.petuska.npm.publish:dev.petuska.npm.publish.gradle.plugin", version.ref = "npm-publish" }
 loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:love.forte.plugin.suspend-transform.gradle.plugin", version.ref = "suspendtransform" }
+gradle-shadow = { module = "com.gradleup.shadow:com.gradleup.shadow.gradle.plugin", version.ref = "gradle-shadow" }
 powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref = "kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
