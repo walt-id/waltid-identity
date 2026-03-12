@@ -4,13 +4,13 @@ package id.walt.mdoc.objects.handover
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /** * Helper class to structure the data before hashing.
  * This corresponds to the `dcapiInfo` structure in the spec.
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class AnnexCDcapiHandoverInfo(
     /** The raw Base64url string sent in the JS request 'encryptionInfo' field */
     val base64EncryptionInfo: String,

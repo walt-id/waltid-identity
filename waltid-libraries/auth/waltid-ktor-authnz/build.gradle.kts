@@ -72,12 +72,12 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json")
 
     // Ktor server external
-    implementation("io.github.smiley4:ktor-openapi:5.5.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.5.0")
-    implementation("io.github.smiley4:ktor-redoc:5.5.0")
+    implementation("io.github.smiley4:ktor-openapi:5.6.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
+    implementation("io.github.smiley4:ktor-redoc:5.6.0")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(identityLibs.kotlinx.serialization.json)
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 

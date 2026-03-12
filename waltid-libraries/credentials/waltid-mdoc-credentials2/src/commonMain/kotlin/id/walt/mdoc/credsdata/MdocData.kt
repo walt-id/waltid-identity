@@ -4,6 +4,7 @@ package id.walt.mdoc.credsdata
 
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.elements.IssuerSignedItem
+import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
 
@@ -23,7 +24,7 @@ sealed interface MdocData {
         return namespaces.mapValues { (_, namespaceEntries) ->
             namespaceEntries.mapNotNull { (elementIdentifier, elementValue) ->
                 if (elementValue != null)
-                    IssuerSignedItem.create(idx++, elementIdentifier, elementValue)
+                    IssuerSignedItem.create(idx++, elementIdentifier, elementValue.toCborElement())
                 else null
             }
         }.filter { it.value.isNotEmpty() }
