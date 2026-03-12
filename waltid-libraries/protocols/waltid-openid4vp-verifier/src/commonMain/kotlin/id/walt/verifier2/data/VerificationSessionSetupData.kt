@@ -300,14 +300,21 @@ typealias AnnexCNamespaceRequestedElements = Map<String, List<String>>
 @Serializable
 @SerialName("dc_api-annex-c")
 data class DcApiAnnexCFlowSetup(
+    @SerialName("core_flow") private val coreInput: GeneralFlowConfig? = null,
     val requestedElements: AnnexCDocTypeToRequestedElements,
-    val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
     val origin: String,
-    @SerialName("core_flow") private val coreInput: GeneralFlowConfig? = null
 ) : VerificationSessionSetup {
 
+    val generatedCore = buildAnnexCCore(requestedElements)
 
-    override val core: GeneralFlowConfig = buildAnnexCCore(requestedElements, policies, coreInput)
+    init {
+        require(coreInput?.dcqlQuery == null || coreInput.dcqlQuery == generatedCore.dcqlQuery) { "Cannot use DCQL query for Annex C!" }
+    }
+
+    override val core: GeneralFlowConfig =
+        coreInput?.copy(
+            dcqlQuery = generatedCore.dcqlQuery
+        ) ?: generatedCore
 
     init {
         val parsedOrigin = UrlUtils.checkDcApiOriginUrl(origin)
@@ -327,8 +334,6 @@ data class DcApiAnnexCFlowSetup(
     companion object {
         private fun buildAnnexCCore(
             namespaceRequestedElements: AnnexCDocTypeToRequestedElements,
-            policies: DefinedVerificationPolicies,
-            coreInput: GeneralFlowConfig?
         ): GeneralFlowConfig {
             val credentials = namespaceRequestedElements.entries
 
@@ -348,7 +353,7 @@ data class DcApiAnnexCFlowSetup(
             val dcqlQuery = DcqlQuery(credentials = dcqlIndividualQueries)
 
             return GeneralFlowConfig(
-                dcqlQuery = dcqlQuery, policies = policies, notifications = coreInput?.notifications
+                dcqlQuery = dcqlQuery
             )
         }
 
