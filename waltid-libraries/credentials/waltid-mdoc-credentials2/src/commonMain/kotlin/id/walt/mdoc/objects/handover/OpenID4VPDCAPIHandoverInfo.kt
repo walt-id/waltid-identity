@@ -5,10 +5,10 @@ package id.walt.mdoc.objects.handover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class OpenID4VPDCAPIHandoverInfo(
     /** verifier's origin - without 'origin:' prefix (e.g., https://verifier.example.com) */
     val origin: String?,

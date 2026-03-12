@@ -23,14 +23,13 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
             implementation(identityLibs.kotlinx.serialization.cbor)
-            implementation("net.orandja.obor:obor:2.1.3")
 
             // Crypto
             implementation("org.kotlincrypto.random:crypto-rand:0.6.0") // SecureRandom

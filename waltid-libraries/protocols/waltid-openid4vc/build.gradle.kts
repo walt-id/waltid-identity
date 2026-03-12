@@ -69,10 +69,10 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation("com.nimbusds:nimbus-jose-jwt:10.6")
-            implementation("io.kotest:kotest-runner-junit5:5.9.1")
-            implementation("io.kotest:kotest-assertions-core:5.9.1")
-            implementation("io.kotest:kotest-assertions-json:5.9.1")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation("io.kotest:kotest-runner-junit5:6.1.5")
+            implementation("io.kotest:kotest-assertions-core:6.1.5")
+            implementation("io.kotest:kotest-assertions-json:6.1.5")
+            implementation(identityLibs.junit.jupiter.params)
             implementation("com.google.crypto.tink:tink:1.16.0") // for JOSE using Ed25519
             implementation("org.bouncycastle:bcprov-lts8on:2.73.8") // for secp256k1 (which was removed with Java 17)
             implementation("org.bouncycastle:bcpkix-lts8on:2.73.8") // PEM import

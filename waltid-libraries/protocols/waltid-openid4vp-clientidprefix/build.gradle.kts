@@ -23,7 +23,7 @@ kotlin {
             implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // Crypto
             implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.8.0"))

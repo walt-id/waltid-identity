@@ -21,7 +21,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("io.github.optimumcode:json-schema-validator:0.4.0")
 
             // Ktor client
@@ -54,7 +54,7 @@ kotlin {
             // Ktor client
             implementation(identityLibs.ktor.client.okhttp)
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }
     }

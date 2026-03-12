@@ -4,7 +4,7 @@ package id.walt.mdoc.objects.dcapi
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Represents the `dcapiInfo` structure used in the `SessionTranscript` for a DCAPI flow.
@@ -20,7 +20,7 @@ import kotlinx.serialization.cbor.CborArray
  * @property serializedOrigin The ASCII-serialized origin of the mdoc reader's request.
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class DCAPIInfo(
     /** Base64EncryptionInfo contains the cbor encoded EncryptionInfo as
      * a base64-url-without-padding string.
