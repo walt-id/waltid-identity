@@ -94,7 +94,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("id.walt.openid4vp.verifier.MainKt")
+    mainClass.set("id.walt.verifier2.MainKt")
 }
 
 ktor {
