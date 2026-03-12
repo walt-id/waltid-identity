@@ -27,7 +27,7 @@ RUN gradle buildFatJar --no-daemon
 
 # Stage 3: Create the Runtime Image
 FROM amazoncorretto:22 AS runtime
-WORKDIR /app
+WORKDIR /waltid-verifier-api2
 
 # Create an unprivileged user and group
 RUN yum install -y shadow-utils \
@@ -35,8 +35,8 @@ RUN yum install -y shadow-utils \
  && useradd -r -g app -u 10001 app \
  && yum clean all
 
-COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-verifier-api2/build/libs/*.jar /app/verifier-api2.jar
+COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-verifier-api2/build/libs/*.jar /waltid-verifier-api2/verifier-api2.jar
 
 USER app
 EXPOSE 7003
-ENTRYPOINT ["java","-jar","/app/verifier-api2.jar"]
+ENTRYPOINT ["java","-jar","/waltid-verifier-api2/verifier-api2.jar"]
