@@ -24,7 +24,7 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
             implementation("io.ktor:ktor-http:${Versions.KTOR_VERSION}")
 
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation("io.github.oshai:kotlin-logging:8.0.01")
 
             // JSON
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
