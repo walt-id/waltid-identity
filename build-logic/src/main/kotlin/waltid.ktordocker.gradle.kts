@@ -43,3 +43,11 @@ configure<JibExtension> {
         }
     }
 }
+
+// Required for hoplite to run correctly with buildFatJar task
+tasks.withType<ShadowJar> {
+    mergeServiceFiles()
+
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
+
