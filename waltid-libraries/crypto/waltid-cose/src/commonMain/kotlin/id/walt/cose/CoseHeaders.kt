@@ -4,7 +4,13 @@ import kotlinx.serialization.*
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.cbor.ByteString
+import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborByteString
+import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.cbor.CborInteger
 import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.cbor.CborString
+import kotlinx.serialization.cbor.long
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -96,11 +102,7 @@ sealed class CoseContentType {
     data class AsString(val value: String) : CoseContentType()
 }
 
-/**
- * **This custom serializer is required, due to:**
- *
- * Custom serializer for the CoseContentType sealed class to handle the tstr/uint union type.
- */
+@OptIn(ExperimentalSerializationApi::class)
 object CoseContentTypeSerializer : KSerializer<CoseContentType> {
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("CoseContentType", PrimitiveKind.STRING)
@@ -112,29 +114,16 @@ object CoseContentTypeSerializer : KSerializer<CoseContentType> {
         }
     }
 
-    /**
-     * This custom deserialization is required, as the content type could be either a RFC6838 Section 4.2 string
-     * in the form of "<type-name>/<subtype-name>", or it can be a Integer from the "CoAP Content-Formats" IANA registry table.
-     * And there is no possible differentiator in the headers, so during deserialization we don't actually know if
-     * we handle a string content-type, or an int content-type. Thus, we can only try with `decodeString()` and `decodeInt()`.
-     *
-     * NOTE: It is required to give priority to `decodeString()`, and use `decodeInt()` as an fallback. The reason
-     * is that calling `decodeInt()` on a string content type (like "text/plain") will work, e.g. it reads 10. But then,
-     * the rest of the data stream will be corrupted. The reverse is not possible however, as strings are prefixed with 0B,
-     * so calling `decodeString()` on an int content type will throw an error. This is the only way I found to decode them
-     * to the correct data type.
-     */
     override fun deserialize(decoder: Decoder): CoseContentType {
-        // Probe the type by attempting to decode as a String first, falling back to Int.
-        return try {
-            CoseContentType.AsString(decoder.decodeString())
-        } catch (e: SerializationException) {
-            require(e.message?.startsWith("Expected start of string, but found") == true) { "Error deserializing CoseContentType: ${e.stackTraceToString()}" }
-            CoseContentType.AsInt(decoder.decodeInt())
+        val element = decoder.decodeSerializableValue(CborElement.serializer())
+
+        return when (element) {
+            is CborString -> CoseContentType.AsString(element.value)
+            is CborInteger -> CoseContentType.AsInt(element.long.toInt())
+            else -> throw IllegalArgumentException("Expected string or int for content type, got ${element::class.simpleName}")
         }
     }
 }
-
 
 @OptIn(ExperimentalSerializationApi::class)
 data class CoseCertificate(
@@ -155,43 +144,30 @@ data class CoseCertificate(
     }
 }
 
-/**
- * **This custom serializer is required, due to:**
- *
- * Per RFC 9360 the `x5chain` header (label 33) must always be an array of certificates,
- * and if there's one certificate it is an array of 1 element.
- *
- * However, some real life examples are not standard-compliant, and encode a
- * single certificate chain as a raw bytestring (instead of: array of bytestrings).
- * This
- */
+@OptIn(ExperimentalSerializationApi::class)
 object CoseCertificateSerializer : KSerializer<List<CoseCertificate>> {
-    private val listSerializer = ListSerializer(ByteArraySerializer())
-    private val singleSerializer = ByteArraySerializer()
     override val descriptor: SerialDescriptor =
         ListSerializer(ByteArraySerializer()).descriptor
 
     override fun serialize(encoder: Encoder, value: List<CoseCertificate>) {
-        // Handle non-compliant single certificate chain for round-trip test compatibility
         if (value.size == 1) {
-            encoder.encodeSerializableValue(singleSerializer, value.first().rawBytes)
+            encoder.encodeSerializableValue(CborElement.serializer(), CborByteString(value.first().rawBytes))
         } else {
-            encoder.encodeSerializableValue(listSerializer, value.map { it.rawBytes })
+            val cborArray = CborArray(value.map { CborByteString(it.rawBytes) })
+            encoder.encodeSerializableValue(CborElement.serializer(), cborArray)
         }
     }
 
-    @OptIn(ExperimentalSerializationApi::class)
-    /**
-     * Try to decode certificate chain as array
-     * of bytearray (correct, standard compliant version).
-     * Alternatively, fallback to decoding a single bytearray (incorrect, non-standard-compliant).
-     */
-    override fun deserialize(decoder: Decoder): List<CoseCertificate> = try {
-        decoder.decodeNullableSerializableValue(ListSerializer(ByteArraySerializer()))
-    } catch (e: SerializationException) {
-        require(e.message?.startsWith("Expected start of array, but found") == true) { "Error deserializing CoseContentType: ${e.stackTraceToString()}" }
-        decoder.decodeNullableSerializableValue(ByteArraySerializer())?.let { listOf(it) }
-    }?.map { CoseCertificate(it) }
-        ?: emptyList()
+    override fun deserialize(decoder: Decoder): List<CoseCertificate> {
+        val element = decoder.decodeSerializableValue(CborElement.serializer())
 
+        return when (element) {
+            is CborArray -> element.map {
+                require(it is CborByteString) { "x5chain array elements must be byte strings" }
+                CoseCertificate(it.value)
+            }
+            is CborByteString -> listOf(CoseCertificate(element.value))
+            else -> throw IllegalArgumentException("Expected array or bytestring for x5chain, got ${element::class.simpleName}")
+        }
+    }
 }

@@ -25,15 +25,13 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.objects.MdocsCborSerializer
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -122,11 +120,13 @@ object CredentialParser {
                     x.forEach { item: IssuerSignedItem ->
                         log.trace { "$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})" }
 
-                        val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
+                        val serialized = item.elementValue.toSerializedJsonElement()
+
+                        /*val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
                             ?.runCatching {
                                 Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                             }?.getOrElse { log.warn { "Error encoding with custom serializer: ${it.stackTraceToString()}" }; null }
-                            ?: item.elementValue.toJsonElement()
+                            ?: item.elementValue.toJsonElement()*/
 
                         log.trace { "as JsonElement: $serialized" }
                         put(item.elementIdentifier, serialized)

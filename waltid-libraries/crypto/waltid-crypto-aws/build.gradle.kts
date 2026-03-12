@@ -13,7 +13,7 @@ dependencies {
     api(project(":waltid-libraries:crypto:waltid-crypto"))
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(identityLibs.kotlinx.serialization.json)
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")

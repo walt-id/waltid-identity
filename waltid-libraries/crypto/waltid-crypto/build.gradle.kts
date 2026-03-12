@@ -23,6 +23,7 @@ kotlin {
         commonMain.dependencies {
             // Kotlinx.serialization
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Kotlinx
             implementation(identityLibs.kotlinx.datetime)

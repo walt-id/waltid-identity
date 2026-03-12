@@ -5,7 +5,7 @@ package id.walt.mdoc.objects.handover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Represents the `OpenID4VPHandoverInfo` structure. This is an intermediate data structure
@@ -24,7 +24,7 @@ import kotlinx.serialization.cbor.CborArray
  * identifying the endpoint for the response.
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class OpenID4VPHandoverInfo(
     val clientId: String,
 

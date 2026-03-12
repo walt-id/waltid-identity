@@ -26,7 +26,7 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation")
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation(identityLibs.kotlinx.serialization.json)
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
     implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 

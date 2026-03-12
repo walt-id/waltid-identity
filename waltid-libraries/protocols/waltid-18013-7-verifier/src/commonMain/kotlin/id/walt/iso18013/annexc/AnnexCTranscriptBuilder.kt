@@ -7,14 +7,14 @@ import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.dcapi.DCAPIHandover
 import id.walt.mdoc.objects.sha256
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.encodeToByteArray
 
 /**
  * Annex C dcapiInfo = [ Base64EncryptionInfoString, SerializedOriginString ]
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class AnnexCDcApiInfo(
     val encryptionInfoB64: String,
     val serializedOrigin: String,
