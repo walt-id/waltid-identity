@@ -1,11 +1,11 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.request.AccessTokenRequest
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -27,66 +27,63 @@ class ProviderAuthorizationOnlyFlowTest {
         )
 
         // 1) Parse the authorize request received from the wallet.
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to "code",
-                "client_id" to "demo-client",
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
-                "scope" to "openid name credential",
+                "response_type" to listOf("code"),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                "scope" to listOf("openid name credential"),
             ),
         )
-        assertTrue(authorizeRequestResult.isSuccess())
-        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request.also {
-            it.setIssuerId(issuerId)
-        }
+        assertTrue(AuthorizationRequestResult.isSuccess())
+        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request
+            .withIssuer(issuerId)
 
         // Client constructs its session object after authenticating/authorizing the user.
         val session = DefaultSession(subject = "demo-subject")
 
         // 2) After authenticating the user, mint the authorize response using the caller-provided session.
-        val authorizeResponse = provider.createAuthorizeResponse(authorizeRequest, session)
+        val authorizeResponse = provider.createAuthorizationResponse(authorizeRequest, session)
         assertTrue(authorizeResponse.isSuccess())
-        val response = (authorizeResponse as AuthorizeResponseResult.Success).response
-        val code = response.parameters.getValue("code")
+        val response = (authorizeResponse as AuthorizationResponseResult.Success).response
+        val code = response.code
         // (Optional) Convert the authorize response into an HTTP response via writeAuthorizeResponse/writeAuthorizeError.
 
         // 3) Parse the token request from the wallet, supplying a fresh session container.
-        val accessResult = provider.createAccessRequest(
+        val accessResult = provider.createAccessTokenRequest(
             mapOf(
-                "grant_type" to GrantType.AuthorizationCode.value,
-                "client_id" to "demo-client",
-                "code" to code,
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("demo-client"),
+                "code" to listOf(code),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
         )
         assertTrue(accessResult.isSuccess())
-        val accessRequest = (accessResult as AccessRequestResult.Success).request.also {
-            it.setIssuerId(issuerId)
-        }
+        val accessRequest = (accessResult as AccessTokenRequestResult.Success).request.withIssuer(issuerId)
         // 4) Produce the token response based on the authorization code session.
-        val accessResponse = provider.createAccessResponse(accessRequest)
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
-        val tokenResponse = (accessResponse as AccessResponseResult.Success).response
+        val tokenResponse = (accessResponse as AccessTokenResponseResult.Success).response
         assertTrue(tokenResponse.accessToken.isNotBlank())
 
-        val preAccessRequestResult = provider.createAccessRequest(
+        val preAccessTokenRequestResult = provider.createAccessTokenRequest(
             mapOf(
-                "grant_type" to GrantType.PreAuthorizedCode.value,
-                "pre-authorized_code" to "pre-code",
+                "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                "pre-authorized_code" to listOf("pre-code"),
             ),
         )
 
-        when (preAccessRequestResult) {
-            is AccessRequestResult.Success -> {
-                val requestWithIssuer = preAccessRequestResult.request.also { it.setIssuerId(issuerId) }
-                val preAccessResponse = provider.createAccessResponse(requestWithIssuer)
-                val failure = preAccessResponse as? AccessResponseResult.Failure
+        when (preAccessTokenRequestResult) {
+            is AccessTokenRequestResult.Success -> {
+                val requestWithIssuer = preAccessTokenRequestResult.request.withIssuer(issuerId)
+                val preAccessResponse = provider.createAccessTokenResponse(requestWithIssuer)
+                val failure = preAccessResponse as? AccessTokenResponseResult.Failure
                     ?: error("Expected pre-authorized flow to be rejected at token endpoint")
                 assertEquals("unsupported_grant_type", failure.error.error)
             }
 
-            is AccessRequestResult.Failure -> {
-                assertEquals("unsupported_grant_type", preAccessRequestResult.error.error)
+            is AccessTokenRequestResult.Failure -> {
+                assertEquals("unsupported_grant_type", preAccessTokenRequestResult.error.error)
             }
         }
     }
@@ -101,41 +98,41 @@ class ProviderAuthorizationOnlyFlowTest {
             includePreAuthorizedCodeDefaultHandlers = false,
         )
 
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to "code",
-                "client_id" to "demo-client",
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
+                "response_type" to listOf("code"),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
         )
 
-        assertTrue(authorizeRequestResult.isSuccess())
-        val authorizeRequest = (authorizeRequestResult as AuthorizeRequestResult.Success).request
+        assertTrue(AuthorizationRequestResult.isSuccess())
+        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request
 
-        val authorizeResponse = provider.createAuthorizeResponse(
+        val authorizeResponse = provider.createAuthorizationResponse(
             authorizeRequest,
             DefaultSession(subject = "")
         )
 
-        assertTrue(authorizeResponse is AuthorizeResponseResult.Failure)
+        assertTrue(authorizeResponse is AuthorizationResponseResult.Failure)
 
-        val authorizeResponse2 = provider.createAuthorizeResponse(
+        val authorizeResponse2 = provider.createAuthorizationResponse(
             authorizeRequest,
             DefaultSession()
         )
 
-        assertTrue(authorizeResponse2 is AuthorizeResponseResult.Failure)
+        assertTrue(authorizeResponse2 is AuthorizationResponseResult.Failure)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `access request rejects unsupported grant_type`() = runTest {
         val provider = buildOAuth2Provider(createTestConfig())
-        val accessRequestResult = provider.createAccessRequest(
-            mapOf("grant_type" to "client_credentials"),
+        val AccessTokenRequestResult = provider.createAccessTokenRequest(
+            mapOf("grant_type" to listOf("client_credentials")),
         )
-        assertTrue(accessRequestResult is AccessRequestResult.Failure)
-        assertEquals("unsupported_grant_type", accessRequestResult.error.error)
+        assertTrue(AccessTokenRequestResult is AccessTokenRequestResult.Failure)
+        assertEquals("unsupported_grant_type", AccessTokenRequestResult.error.error)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -146,9 +143,20 @@ class ProviderAuthorizationOnlyFlowTest {
             includeAuthorizationCodeDefaultHandlers = false,
             includePreAuthorizedCodeDefaultHandlers = false,
         )
-        val request = AccessTokenRequest().apply { appendGrantType(GrantType.AuthorizationCode.value) }
-        val response = provider.createAccessResponse(request)
-        assertTrue(response is AccessResponseResult.Failure)
+
+        val request = DefaultAccessTokenRequest(
+            client = DefaultClient(
+                id = "test-client",
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.AuthorizationCode.value),
+                responseTypes = setOf("code"),
+            ),
+            grantTypes = mutableSetOf(GrantType.AuthorizationCode.value),
+            requestForm = mutableMapOf(),
+        )
+
+        val response = provider.createAccessTokenResponse(request)
+        assertTrue(response is AccessTokenResponseResult.Failure)
         assertEquals("unsupported_grant_type", response.error.error)
     }
 
@@ -160,19 +168,19 @@ class ProviderAuthorizationOnlyFlowTest {
             includeAuthorizationCodeDefaultHandlers = false,
             includePreAuthorizedCodeDefaultHandlers = false,
         )
-        val authorizeRequestResult = provider.createAuthorizeRequest(
+        val AuthorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to "code",
-                "client_id" to "demo-client",
-                "redirect_uri" to "https://openid4vci.walt.id/callback",
+                "response_type" to listOf("code"),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
         )
-        assertTrue(authorizeRequestResult is AuthorizeRequestResult.Success)
-        val authorizeResponse = provider.createAuthorizeResponse(
-            authorizeRequestResult.request,
+        assertTrue(AuthorizationRequestResult is AuthorizationRequestResult.Success)
+        val authorizeResponse = provider.createAuthorizationResponse(
+            AuthorizationRequestResult.request,
             DefaultSession(subject = "sub"),
         )
-        assertTrue(authorizeResponse is AuthorizeResponseResult.Failure)
+        assertTrue(authorizeResponse is AuthorizationResponseResult.Failure)
         assertEquals("unsupported_response_type", authorizeResponse.error.error)
     }
 }
