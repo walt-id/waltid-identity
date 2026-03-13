@@ -96,6 +96,7 @@ jobs:
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 
       - name: Continuous deployment - ${{ matrix.services.name }}
+        if: ${{ hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != '' }}
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}
