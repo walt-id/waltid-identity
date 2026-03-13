@@ -2,10 +2,10 @@ import './style.css';
 
 const VERIFIER_PRESETS = {
   'open-source': {
-    verifierBase: '/open-source-verifier'
+    verifierBase: 'https://verifier2.portal.test.waltid.cloud'
   },
   enterprise: {
-    verifierBase: '/verifier-api/v1/waltid.tenant.verifier2/verifier2-service-api'
+    verifierBase: '/verifier-api/v1/waltid.tenant1.verifier2/verifier2-service-api'
   }
 } as const;
 const DEFAULT_VERIFIER_PRESET = 'open-source';
