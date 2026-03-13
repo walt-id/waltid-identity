@@ -1,0 +1,114 @@
+{
+  "name": "id.walt.travelid.1",
+  "docType": "id.walt.travelid.1",
+  "fields": [
+    {
+      "name": "id",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "passenger_name",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "passenger_name_record",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "flight_number",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "scheduled_departure_time",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "departure_airport",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "arrival_airport",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "assurance_level",
+      "namespace": "id.walt.wallet.boardingpass.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "sex",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "portrait",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "enrolment_portrait_image",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "given_name",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issue_date",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "expiry_date",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "family_name",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "document_number",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "issuing_authority",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    },
+    {
+      "name": "nationality",
+      "namespace": "org.iso.23220.1.1",
+      "mandatory": null,
+      "sampleValue": null
+    }
+  ]
+}

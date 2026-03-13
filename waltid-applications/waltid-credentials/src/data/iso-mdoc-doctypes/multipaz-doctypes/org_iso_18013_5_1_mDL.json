@@ -1,0 +1,384 @@
+{
+  "name": "org.iso.18013.5.1.mDL",
+  "docType": "org.iso.18013.5.1.mDL",
+  "fields": [
+    {
+      "name": "family_name",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "Mustermann"
+    },
+    {
+      "name": "given_name",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "Erika"
+    },
+    {
+      "name": "birth_date",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "1971-09-01"
+    },
+    {
+      "name": "issue_date",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "2024-03-15"
+    },
+    {
+      "name": "expiry_date",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "2028-09-01"
+    },
+    {
+      "name": "issuing_country",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "US"
+    },
+    {
+      "name": "issuing_authority",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "Utopia Department of Motor Vehicles"
+    },
+    {
+      "name": "document_number",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "987654321"
+    },
+    {
+      "name": "portrait",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": null
+    },
+    {
+      "name": "driving_privileges",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": null
+    },
+    {
+      "name": "un_distinguishing_sign",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": true,
+      "sampleValue": "UTO"
+    },
+    {
+      "name": "administrative_number",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "123456789"
+    },
+    {
+      "name": "sex",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": 2
+    },
+    {
+      "name": "height",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": 175
+    },
+    {
+      "name": "weight",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": 68
+    },
+    {
+      "name": "eye_colour",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "blue"
+    },
+    {
+      "name": "hair_colour",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "blond"
+    },
+    {
+      "name": "birth_place",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "Sample City"
+    },
+    {
+      "name": "resident_address",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "Sample Street 123, 12345 Sample City, Sample State, Utopia"
+    },
+    {
+      "name": "portrait_capture_date",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "2020-03-14"
+    },
+    {
+      "name": "age_in_years",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": 54
+    },
+    {
+      "name": "age_birth_year",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": 1971
+    },
+    {
+      "name": "age_over_13",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": true
+    },
+    {
+      "name": "age_over_16",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": true
+    },
+    {
+      "name": "age_over_18",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": true
+    },
+    {
+      "name": "age_over_21",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": true
+    },
+    {
+      "name": "age_over_25",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": true
+    },
+    {
+      "name": "age_over_60",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": false
+    },
+    {
+      "name": "age_over_62",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": false
+    },
+    {
+      "name": "age_over_65",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": false
+    },
+    {
+      "name": "age_over_68",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": false
+    },
+    {
+      "name": "issuing_jurisdiction",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "State of Utopia"
+    },
+    {
+      "name": "nationality",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "ZZ"
+    },
+    {
+      "name": "resident_city",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "Sample City"
+    },
+    {
+      "name": "resident_state",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "Sample State"
+    },
+    {
+      "name": "resident_postal_code",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "12345"
+    },
+    {
+      "name": "resident_country",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "ZZ"
+    },
+    {
+      "name": "family_name_national_character",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "ÐÐ°Ð±ÑÐ°Ðº"
+    },
+    {
+      "name": "given_name_national_character",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": "ÐÑÐ¸ÐºÐ°"
+    },
+    {
+      "name": "signature_usual_mark",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "domestic_driving_privileges",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": true,
+      "sampleValue": null
+    },
+    {
+      "name": "name_suffix",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "Jr III"
+    },
+    {
+      "name": "organ_donor",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "veteran",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "family_name_truncation",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": true,
+      "sampleValue": "N"
+    },
+    {
+      "name": "given_name_truncation",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": true,
+      "sampleValue": "N"
+    },
+    {
+      "name": "aka_family_name",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "Musstermensch"
+    },
+    {
+      "name": "aka_given_name",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "Erica"
+    },
+    {
+      "name": "aka_suffix",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "Ica"
+    },
+    {
+      "name": "weight_range",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "race_ethnicity",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "W"
+    },
+    {
+      "name": "DHS_compliance",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "F"
+    },
+    {
+      "name": "DHS_temporary_lawful_status",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "EDL_credential",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "resident_county",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": "037"
+    },
+    {
+      "name": "hazmat_endorsement_expiration_date",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": true,
+      "sampleValue": "2028-09-01"
+    },
+    {
+      "name": "sex",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": true,
+      "sampleValue": 2
+    },
+    {
+      "name": "biometric_template_face",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "biometric_template_finger",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "biometric_template_signature_sign",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "biometric_template_iris",
+      "namespace": "org.iso.18013.5.1",
+      "mandatory": false,
+      "sampleValue": null
+    },
+    {
+      "name": "audit_information",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": false,
+      "sampleValue": ""
+    },
+    {
+      "name": "aamva_version",
+      "namespace": "org.iso.18013.5.1.aamva",
+      "mandatory": true,
+      "sampleValue": null
+    }
+  ]
+}
