@@ -75,9 +75,9 @@ data class CredentialSupported(
     @SerialName("id") val id: String? = null, // for draft 11
     @SerialName("cryptographic_suites_supported") val cryptographicSuitesSupported: Set<String>? = null,  // for draft 11
     val types: List<String>? = null, // for draft 11
-@SerialName("credential_signing_alg_values_supported")
-@Serializable(with = FlexibleAlgSetSerializer::class)
-val credentialSigningAlgValuesSupported: Set<CredSignAlgValues>? = null,
+    @SerialName("credential_signing_alg_values_supported")
+    @Serializable(with = FlexibleAlgSetSerializer::class)
+    val credentialSigningAlgValuesSupported: Set<CredSignAlgValues>? = null,
     @SerialName("proof_types_supported") val proofTypesSupported: Map<ProofType, ProofTypeMetadata>? = null,
     @Serializable(DisplayPropertiesListSerializer::class) val display: List<DisplayProperties>? = null,
     @SerialName("@context") val context: List<JsonElement>? = null,
@@ -221,6 +221,7 @@ object FlexibleAlgSetSerializer : KSerializer<Set<CredSignAlgValues>> {
             jsonArray.all { it is JsonPrimitive && it.intOrNull != null } -> {
                 jsonArray.map { CredSignAlgValues.Numeric(it.jsonPrimitive.int) }.toSet()
             }
+
             else -> {
                 throw SerializationException(
                     "credential_signing_alg_values_supported must be all strings or all integers, " +
