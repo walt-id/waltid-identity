@@ -10,8 +10,11 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.iso18013.annexc.AnnexC
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.iso18013.annexc.protocol.AnnexCRequestResponse
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
+import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.VPPolicyList
@@ -294,7 +297,26 @@ object VerificationSessionCreator {
                 )
                 val encryptionInfoB64 = encryptionInfoObj.encodeToBase64Url()
 
-                var deviceRequest = DeviceRequest(setup.requestedElements)
+                // Build deviceRequestInfo if configured
+                val deviceRequestInfoWrapped = setup.deviceRequestInfo?.let { config ->
+                    ByteStringWrapper(
+                        DeviceRequestInfo(
+                            useCases = config.useCases.map { useCase ->
+                                UseCase(
+                                    mandatory = useCase.mandatory,
+                                    purposeHints = useCase.purposeHints,
+                                    documentSets = useCase.documentSets
+                                )
+                            }
+                        )
+                    )
+                }
+
+                var deviceRequest = DeviceRequest(
+                    docTypeRequestedElements = setup.requestedElements,
+                    intentToRetain = false,
+                    deviceRequestInfo = deviceRequestInfoWrapped
+                )
 
                 // ===== READER AUTHENTICATION =====
                 if (isSignedRequest && key != null && !x5c.isNullOrEmpty() && setup.readerAuthMode != ReaderAuthMode.NONE) {

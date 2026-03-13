@@ -315,6 +315,32 @@ enum class ReaderAuthMode {
 }
 
 /**
+ * Configuration for a single use case in DeviceRequestInfo.
+ * Maps to the UseCase CDDL structure in ISO 18013-7.
+ *
+ * @property mandatory Whether this use case is mandatory for the request.
+ * @property purposeHints Optional hints about the purpose of the request (Type -> description).
+ * @property documentSets List of document sets, where each set is a list of DocRequest indices (0-indexed).
+ */
+@Serializable
+data class UseCaseConfig(
+    val mandatory: Boolean,
+    @SerialName("purpose_hints") val purposeHints: Map<Int, String>? = null,
+    @SerialName("document_sets") val documentSets: List<List<UInt>>
+)
+
+/**
+ * Configuration for DeviceRequestInfo in Annex C requests.
+ * This structure provides additional metadata about the verification request.
+ *
+ * @property useCases List of use cases describing how the requested documents will be used.
+ */
+@Serializable
+data class DeviceRequestInfoConfig(
+    @SerialName("use_cases") val useCases: List<UseCaseConfig>
+)
+
+/**
  * ISO 18013-7 Annex C (DC API) flow using the unified /verification-session endpoints.
  */
 // TODO: Not optimal with such custom logic
@@ -325,6 +351,7 @@ data class DcApiAnnexCFlowSetup(
     val requestedElements: AnnexCDocTypeToRequestedElements,
     val origin: String,
     @SerialName("reader_auth_mode") val readerAuthMode: ReaderAuthMode = ReaderAuthMode.READER_AUTH_ALL,
+    @SerialName("device_request_info") val deviceRequestInfo: DeviceRequestInfoConfig? = null,
 ) : VerificationSessionSetup {
 
     val generatedCore = buildAnnexCCore(requestedElements)
@@ -511,9 +538,18 @@ data class DcApiAnnexCFlowSetup(
         /**
          * Example with per-document reader authentication (readerAuth) for Apple Wallet compatibility.
          * Uses READER_AUTH mode instead of READER_AUTH_ALL.
+         * Includes deviceRequestInfo with a single mandatory use case referencing the first document.
          */
         val SIGNED_MDL_APPLE_WALLET_EXAMPLE = SIGNED_MDL_EXAMPLE.copy(
-            readerAuthMode = ReaderAuthMode.READER_AUTH
+            readerAuthMode = ReaderAuthMode.READER_AUTH,
+            deviceRequestInfo = DeviceRequestInfoConfig(
+                useCases = listOf(
+                    UseCaseConfig(
+                        mandatory = true,
+                        documentSets = listOf(listOf(0u))
+                    )
+                )
+            )
         )
     }
 }

@@ -36,7 +36,7 @@ data class DeviceRequest(
     val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
 ) {
     companion object {
-        const val VERSION = "1.0"
+        const val VERSION = "1.1"
 
         fun decodeFromBase64Url(base64Url: String): DeviceRequest {
             return coseCompliantCbor.decodeFromByteArray<DeviceRequest>(base64Url.decodeFromBase64Url())
@@ -80,6 +80,35 @@ data class DeviceRequest(
                     )
                 )
             }
+    )
+
+    /** Request multiple credentials with deviceRequestInfo
+     * @param docTypeRequestedElements Doctype -> Namespace -> Element Identifier
+     * @param intentToRetain Whether to retain the data
+     * @param deviceRequestInfo Optional device request info for Apple Wallet compatibility
+     */
+    constructor(
+        docTypeRequestedElements: Map<String, Map<String, List<String>>>,
+        intentToRetain: Boolean = false,
+        deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>?
+    ) : this(
+        version = VERSION,
+        docRequests =
+            docTypeRequestedElements.map { (docType, requestedElements) ->
+                DocRequest(
+                    itemsRequest = ByteStringWrapper(
+                        value = ItemsRequest(
+                            docType = docType,
+                            namespaces = requestedElements
+                                .filterValues { it.isNotEmpty() }
+                                .mapValues { (_, elems) ->
+                                    ItemsRequestList(elems.distinct().map { ItemRequest(it, intentToRetain) })
+                                }
+                        )
+                    )
+                )
+            },
+        deviceRequestInfo = deviceRequestInfo
     )
 
     /** Request individual credential */
