@@ -8,7 +8,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import kotlinx.serialization.*
-import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.cbor.ValueTags
 
 /**
  * Represents the top-level request from a mdoc reader to a mdoc.
@@ -21,6 +21,7 @@ import kotlinx.serialization.cbor.CborLabel
  * @property readerAuthAll Optional structure for mdoc reader authentication for all documents in the request.
  * @property deviceRequestInfo Optional additional information about the overall request.
  */
+@OptIn(ExperimentalUnsignedTypes::class)
 @Serializable
 data class DeviceRequest(
     @SerialName("version")
@@ -32,7 +33,7 @@ data class DeviceRequest(
     val readerAuthAll: List<CoseSign1>? = null,
 
     @SerialName("deviceRequestInfo")
-    @CborLabel(24)
+    @ValueTags(24U)
     val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
 ) {
     companion object {
