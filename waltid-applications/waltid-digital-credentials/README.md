@@ -43,6 +43,9 @@ This application enables developers to:
 
 **Tested Wallets**:
 - [CM Wallet](https://credentialsmanagement.eu/)
+- [Multipaz Wallet](https://multipaz.io/)
+- [Apple Wallet](https://developer.apple.com/documentation/identitydocumentservices/requesting-a-mobile-document-on-the-web)
+- [Google Wallet](https://developers.google.com/wallet/identity/provisioning/overview)
 
 ## Key Concepts
 

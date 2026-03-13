@@ -114,7 +114,8 @@ object VerificationSessionCreateOpenApi {
                 example("[iso-18013-7-dc_api][iso pid]") { value = DcApiAnnexCFlowSetup.EXTENDED_PID_EXAMPLE }
                 example("[iso-18013-7-dc_api][iso photo-id]") { value = DcApiAnnexCFlowSetup.EXTENDED_PHOTOID_EXAMPLE }
                 example("[iso-18013-7-dc_api][iso mdl + photo-id]") { value = DcApiAnnexCFlowSetup.MULTI_CREDENTIAL_EXAMPLE }
-                example("[iso-18013-7-dc_api][iso mdl] signed") { value = DcApiAnnexCFlowSetup.SIGNED_MDL_EXAMPLE }
+                example("[iso-18013-7-dc_api][iso mdl] signed (readerAuthAll)") { value = DcApiAnnexCFlowSetup.SIGNED_MDL_EXAMPLE }
+                example("[iso-18013-7-dc_api][iso mdl] signed (readerAuth)") { value = DcApiAnnexCFlowSetup.SIGNED_MDL_APPLE_WALLET_EXAMPLE }
             }
         }
         response {

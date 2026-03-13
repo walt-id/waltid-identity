@@ -108,3 +108,28 @@ button:disabled {
   border: 1px solid #1e293b;
   padding: 12px;
 }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.checkbox-row label {
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.checkbox-row code {
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}

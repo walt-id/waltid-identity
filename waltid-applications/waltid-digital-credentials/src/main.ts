@@ -2,10 +2,10 @@ import './style.css';
 
 const VERIFIER_PRESETS = {
   'open-source': {
-    verifierBase: 'https://verifier2.portal.test.waltid.cloud'
+    verifierBase: '/open-source-verifier'
   },
   enterprise: {
-    verifierBase: '/verifier-api/v1/waltid.tenant1.verifier2/verifier2-service-api'
+    verifierBase: '/verifier-api/v1/waltid.tenant.verifier2/verifier2-service-api'
   }
 } as const;
 const DEFAULT_VERIFIER_PRESET = 'open-source';
@@ -42,6 +42,7 @@ async function init(): Promise<void> {
   const reloadButton = document.getElementById('reload-examples') as HTMLButtonElement | null;
   const verifierPresetSelect = document.getElementById('verifier-preset') as HTMLSelectElement | null;
   const bearerTokenInput = document.getElementById('bearer-token') as HTMLInputElement | null;
+  const mediationCheckbox = document.getElementById('mediation-required') as HTMLInputElement | null;
   const statusEl = document.getElementById('status') as HTMLSpanElement | null;
   const logEl = document.getElementById('log-field') as HTMLPreElement | null;
 
@@ -52,6 +53,7 @@ async function init(): Promise<void> {
     !reloadButton ||
     !verifierPresetSelect ||
     !bearerTokenInput ||
+    !mediationCheckbox ||
     !statusEl ||
     !logEl
   ) {
@@ -111,7 +113,8 @@ async function init(): Promise<void> {
     appendLog(logEl, 'Starting DC API flow...');
     try {
       const config = getRuntimeConfig(verifierPresetSelect, bearerTokenInput);
-      await runDcApiFlow(payloadInput.value, statusEl, logEl, config);
+      const mediationRequired = mediationCheckbox.checked;
+      await runDcApiFlow(payloadInput.value, statusEl, logEl, config, mediationRequired);
       setStatus(statusEl, 'Completed successfully.');
     } catch (error) {
       console.error('[dc-api-test] flow failed', error);
@@ -226,7 +229,8 @@ async function runDcApiFlow(
   payloadJson: string,
   statusEl: HTMLSpanElement,
   logEl: HTMLPreElement,
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  mediationRequired: boolean
 ): Promise<void> {
   setStatus(statusEl, 'Parsing payload...');
   const createPayload = parseJson(payloadJson, 'payload-input');
@@ -285,8 +289,12 @@ async function runDcApiFlow(
   );
   appendPayloadLog(logEl, 'DC API request payload', dcApiRequest);
 
+  if (mediationRequired) {
+    appendLog(logEl, 'Mediation: required (Apple Wallet mode)');
+  }
+
   setStatus(statusEl, 'Calling navigator.credentials.get...');
-  const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest);
+  const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest, mediationRequired, logEl);
   appendPayloadLog(logEl, 'DC API wallet response', dcApiResponse);
 
   const responseUrl = buildUrl(
@@ -378,7 +386,7 @@ function getInfoStatus(info: unknown): string | null {
   return status.toUpperCase();
 }
 
-async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unknown> {
+async function invokeDigitalCredentialsApi(requestPayload: unknown, mediationRequired: boolean = false, logEl?: HTMLPreElement): Promise<unknown> {
   const nav = navigator as Navigator & {
     credentials?: {
       get?: (options: unknown) => Promise<unknown>;
@@ -389,18 +397,34 @@ async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unk
     throw new Error('Digital Credentials API is unavailable in this browser (navigator.credentials.get missing).');
   }
 
-  const dcRequestPayload =
+  let dcRequestPayload: Record<string, unknown>;
+
+  if (
     requestPayload != null &&
     typeof requestPayload === 'object' &&
     Object.prototype.hasOwnProperty.call(requestPayload, 'digital')
-      ? requestPayload
-      : {
-          digital: {
-            requests: [requestPayload]
-          }
-        };
+  ) {
+    dcRequestPayload = requestPayload as Record<string, unknown>;
+  } else {
+    dcRequestPayload = {
+      digital: {
+        requests: [requestPayload]
+      }
+    };
+  }
+
+  if (mediationRequired) {
+    dcRequestPayload = {
+      ...dcRequestPayload,
+      mediation: 'required'
+    };
+  }
 
   console.log('[dc-api-test] dc api request payload', dcRequestPayload);
+  if (logEl) {
+    appendPayloadLog(logEl, 'navigator.credentials.get() payload', dcRequestPayload);
+  }
+  
   const result = await nav.credentials.get(dcRequestPayload);
   console.log('[dc-api-test] dc api response', result);
 
