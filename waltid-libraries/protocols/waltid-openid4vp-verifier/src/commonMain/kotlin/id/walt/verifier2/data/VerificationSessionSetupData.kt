@@ -294,6 +294,27 @@ typealias AnnexCDocTypeToRequestedElements = Map<String, AnnexCNamespaceRequeste
 typealias AnnexCNamespaceRequestedElements = Map<String, List<String>>
 
 /**
+ * Specifies the reader authentication mode for Annex C requests.
+ *
+ * ISO 18013-7 defines two types of reader authentication:
+ * - READER_AUTH: Per-document authentication where each DocRequest has its own signature
+ * - READER_AUTH_ALL: Request-level authentication that signs all document requests together
+ *
+ * Apple Wallet requires per-document READER_AUTH mode.
+ */
+@Serializable
+enum class ReaderAuthMode {
+    @SerialName("none")
+    NONE,
+
+    @SerialName("reader_auth")
+    READER_AUTH,
+
+    @SerialName("reader_auth_all")
+    READER_AUTH_ALL
+}
+
+/**
  * ISO 18013-7 Annex C (DC API) flow using the unified /verification-session endpoints.
  */
 // TODO: Not optimal with such custom logic
@@ -303,6 +324,7 @@ data class DcApiAnnexCFlowSetup(
     @SerialName("core_flow") private val coreInput: GeneralFlowConfig? = null,
     val requestedElements: AnnexCDocTypeToRequestedElements,
     val origin: String,
+    @SerialName("reader_auth_mode") val readerAuthMode: ReaderAuthMode = ReaderAuthMode.READER_AUTH_ALL,
 ) : VerificationSessionSetup {
 
     val generatedCore = buildAnnexCCore(requestedElements)
@@ -484,6 +506,14 @@ data class DcApiAnnexCFlowSetup(
                     )
                 )
             )
+        )
+
+        /**
+         * Example with per-document reader authentication (readerAuth) for Apple Wallet compatibility.
+         * Uses READER_AUTH mode instead of READER_AUTH_ALL.
+         */
+        val SIGNED_MDL_APPLE_WALLET_EXAMPLE = SIGNED_MDL_EXAMPLE.copy(
+            readerAuthMode = ReaderAuthMode.READER_AUTH
         )
     }
 }
