@@ -27,7 +27,7 @@ RUN gradle buildFatJar --no-daemon
 
 # Stage 3: Create the Runtime Image
 FROM amazoncorretto:22 AS runtime
-WORKDIR /app
+WORKDIR /waltid-wallet-api
 
 # Create an unprivileged user and group
 RUN yum install -y shadow-utils \
@@ -35,8 +35,8 @@ RUN yum install -y shadow-utils \
  && useradd -r -g app -u 10001 app \
  && yum clean all
 
-COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-wallet-api/build/libs/*.jar /app/wallet-api.jar
+COPY --chown=app:app --from=build /home/gradle/src/waltid-services/waltid-wallet-api/build/libs/*.jar /waltid-wallet-api/wallet-api.jar
 
 USER app
 EXPOSE 7001
-ENTRYPOINT ["java","-jar","/app/wallet-api.jar"]
+ENTRYPOINT ["java","-jar","/waltid-wallet-api/wallet-api.jar"]

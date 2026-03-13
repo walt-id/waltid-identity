@@ -60,10 +60,10 @@ var timeoutAt: Instant? = null
 @Serializable
 @SerialName("aws-rest-api")
 class AWSKeyRestAPI(
-    val config: AWSKeyMetadata,
+    var config: AWSKeyMetadata? = null,
     val id: String,
-    private var _publicKey: String? = null,
-    private var _keyType: KeyType? = null
+    var _publicKey: String? = null,
+    private var _keyType: KeyType? = null,
 ) : Key() {
 
 
@@ -76,7 +76,7 @@ class AWSKeyRestAPI(
     override val hasPrivateKey: Boolean
         get() = true
 
-    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
+    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config?.auth?.region} - $id]"
 
     @JvmBlocking
     @JvmAsync
@@ -144,17 +144,17 @@ class AWSKeyRestAPI(
         val headers = buildSigV4Headers(
             HttpMethod.Post,
             payload = body,
-            config = config
+            config = config!!
         )
 
-        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config!!.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Sign" }
 
         val signature = client.post("https://$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                append(HttpHeaders.Host, "kms.${config.auth.region}.amazonaws.com")
+                append(HttpHeaders.Host, "kms.${config!!.auth.region}.amazonaws.com")
                 append("X-Amz-Target", "TrentService.Sign") // Specific KMS action for CreateKey
                 _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
                     append("X-Amz-Security-Token", it)
@@ -215,10 +215,10 @@ class AWSKeyRestAPI(
         val headers = buildSigV4Headers(
             HttpMethod.Post,
             payload = body,
-            config = config
+            config = config!!
         )
 
-        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config!!.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Verify" }
 
@@ -292,10 +292,10 @@ class AWSKeyRestAPI(
         val headers = buildSigV4Headers(
             HttpMethod.Post,
             payload = body,
-            config = config
+            config = config!!
         )
 
-        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config!!.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.ScheduleKeyDeletion" }
 
@@ -666,14 +666,19 @@ $public
 
             if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
 
-            val publicKey = getPublicKey(metadata, keyId.toString())
+            val publicKey = getPublicKey(metadata, keyId)
 
-            return AWSKeyRestAPI(
+            val createdKey = AWSKeyRestAPI(
                 config = metadata,
-                id = keyId.toString(),
+                id = keyId,
                 _publicKey = publicKey.exportJWK(),
                 _keyType = awsKeyToKeyTypeMapping(keyType)
             )
+
+            createdKey.config?.auth?.accessKeyId = metadata.auth.accessKeyId
+            createdKey.config?.auth?.secretAccessKey = metadata.auth.secretAccessKey
+
+            return createdKey
         }
 
     }
