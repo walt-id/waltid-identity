@@ -6,7 +6,7 @@
     "https://www.w3.org/2018/credentials/v1",
     "https://w3id.org/gaia-x/development#"
   ],
-  "type": ["VerifiableCredential", "gx:LegalPerson"],
+  "type": ["VerifiableCredential", "LegalPerson"],
   "id": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
   "name": "Legal Person",
   "issuer": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
@@ -15,15 +15,15 @@
   "credentialSubject": {
     "id": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
     "type": "gx:LegalPerson",
-    "gx:legalName": "Example Org",
-    "gx:legalRegistrationNumber": {
-      "id": "https://example.org/gaiax-legal-registration-number/68a5bbea9518e7e2ac1cc75bcc8819a7edd5c4711e073ffa4bb260034dc6423c/data.json"
+    "name": "Consumer Organization",
+    "registrationNumber": {
+      "id": "https://gaia-x.eu/legalRegistrationNumber.json"
     },
-    "gx:headquarterAddress": {
-      "gx:countrySubdivisionCode": "FR-75"
+    "headquartersAddress": {
+      "countryCode": "FR"
     },
-    "gx:legalAddress": {
-      "gx:countrySubdivisionCode": "FR-75"
+    "legalAddress": {
+      "countryCode": "FR"
     }
   }
 }

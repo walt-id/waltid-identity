@@ -144,11 +144,6 @@
                 class="text-gray-400 text-center px-2 py-2 font-medium text-xs"
               >
                 <div>
-                  Switch To Dev Version
-                  <hr
-                    class="border-t border-gray-200 mt-1"
-                    aria-hidden="true"
-                  />
                 </div>
               </NuxtLink>
             </div>

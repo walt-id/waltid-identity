@@ -259,7 +259,7 @@
             :style="cardStyle"
             class="absolute bottom-3.5 right-3.5 w-10 lg:w-16 h-10 lg:h-16 overflow-hidden"
         >
-            <img class="overflow-hidden" src="/svg/walt-s.svg" />
+            
         </div>
 
         <!--suppress PointlessBooleanExpressionJS -->

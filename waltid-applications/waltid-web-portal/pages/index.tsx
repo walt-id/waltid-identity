@@ -90,7 +90,7 @@ export default function Home() {
     <div>
       <div className="flex flex-col justify-center items-center mt-10">
         <h1 className="text-4xl font-bold text-primary-900 text-center mt-5">
-          Walt.id Portal
+          DSGA Portal
         </h1>
         <p className="mt-4 text-lg text-primary-900">
           Select Credential(s) to issue or verify

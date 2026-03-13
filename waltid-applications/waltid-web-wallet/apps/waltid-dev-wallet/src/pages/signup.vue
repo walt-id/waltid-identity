@@ -7,13 +7,8 @@
         class="mx-auto w-full max-w-sm lg:w-96 p-3 lg:backdrop-blur-md lg:rounded-3xl lg:shadow lg:bg-neutral-100 lg:bg-opacity-40"
       >
         <div class="">
-          <img
-            alt="walt.id logo"
-            class="h-24 lg:h-16 w-auto mx-auto mt-2"
-            :src="logoImg"
-          />
           <h2 class="mt-4 text-3xl font-bold tracking-tight text-gray-800">
-            Sign up for your SSI wallet
+            Sign up for your Freshblue wallet
           </h2>
         </div>
 
@@ -178,7 +173,7 @@
       :class="[isProgress ? 'animate-spin' : '']"
       class="absolute bottom-3.5 right-3.5 w-10 lg:w-16 h-10 lg:h-16 overflow-hidden"
     >
-      <img class="overflow-hidden" src="/svg/walt-s.svg" />
+      
     </div>
   </div>
 </template>

@@ -66,17 +66,26 @@ export default function Offer() {
   }, [router.isReady, router.query]);
 
   async function copyCurrentURLToClipboard() {
-    navigator.clipboard.writeText(offerURL).then(
-      function () {
-        setCopyText(BUTTON_COPY_TEXT_COPIED);
-        setTimeout(() => {
-          setCopyText(BUTTON_COPY_TEXT_DEFAULT);
-        }, 3000);
-      },
-      function (err) {
-        console.error('Could not copy text: ', err);
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(offerURL);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = offerURL;
+        textArea.style.position = 'fixed';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
       }
-    );
+      setCopyText(BUTTON_COPY_TEXT_COPIED);
+      setTimeout(() => {
+        setCopyText(BUTTON_COPY_TEXT_DEFAULT);
+      }, 3000);
+    } catch (err) {
+      console.error('Could not copy text: ', err);
+    }
   }
 
   function openWebWallet() {

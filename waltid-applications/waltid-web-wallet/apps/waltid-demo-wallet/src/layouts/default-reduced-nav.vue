@@ -100,13 +100,6 @@
                   <div
                     class="absolute left-0 right-0 flex flex-col items-center justify-center bottom-3"
                   >
-                    <NuxtLink
-                      :to="demoWalletUrl"
-                      class="text-white group text-base font-medium"
-                    >
-                      Switch To Demo Version
-                    </NuxtLink>
-                    <hr class="w-2/3 border-blue-200" />
                   </div>
                 </div>
               </nav>
@@ -150,13 +143,6 @@
               </NuxtLink>
             </div>
             <div class="flex flex-col items-center justify-center">
-              <NuxtLink
-                :to="demoWalletUrl"
-                class="text-white group text-base font-medium"
-              >
-                Switch To Demo Version
-              </NuxtLink>
-              <hr class="w-2/3 border-blue-200" />
             </div>
           </div>
         </nav>
@@ -226,11 +212,6 @@
                 <MenuButton
                   class="flex max-w-xs items-center rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 lg:rounded-md lg:p-2 lg:hover:bg-gray-50"
                 >
-                  <img
-                    alt=""
-                    class="h-8 w-8 rounded-full"
-                    src="/svg/walt-s.svg"
-                  />
                   <!-- src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"/> -->
                   <span
                     class="ml-3 hidden text-sm font-medium text-gray-700 lg:block"

@@ -1,12 +1,10 @@
 <template>
     <PageHeader>
         <template v-slot:icon>
-            <img alt="" class="hidden h-16 w-16 rounded-full sm:block" src="/svg/walt-s.svg"/>
             <!-- src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2.6&w=256&h=256&q=80"/> -->
         </template>
 
         <template v-slot:title>
-            <img alt="" class="h-16 w-16 rounded-full sm:hidden" src="/svg/walt-s.svg"/>
             <!-- src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2.6&w=256&h=256&q=80"/> -->
             <h1 class="ml-3 text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:leading-9">
                 Good <span v-if="now.getHours() < 12">morning</span>

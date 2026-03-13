@@ -1,4 +1,4 @@
-# LegalRegistrationNumberLeiCode
+# LegalRegistrationNumber
 
 ```json
 {
@@ -8,7 +8,7 @@
   ],
   "type": [
     "VerifiableCredential",
-    "gx:LeiCode"
+    "LegalRegistrationNumber"
   ],
   "id": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
   "issuer": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
@@ -18,8 +18,8 @@
     "@context": "https://registry.lab.gaia-x.eu/development/api/trusted-shape-registry/v1/shapes/jsonld/trustframework#",
     "type": "gx:legalRegistrationNumber",
     "id": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
-    "gx:leiCode": "391200FJBNU0YW987L26",
-    "gx:leiCode-countryCode": "DE"
+    "leiCode": "9695007586GCAKPYJ703",
+    "countryCode": "FR"
   },
   "evidence": [
     {
