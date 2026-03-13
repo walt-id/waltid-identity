@@ -73,7 +73,7 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Prepare CD - ${{ matrix.services.name }}
-        if: matrix.services.name != 'waltid-enterprise'
+        if: matrix.services.name != 'waltid-enterprise' && matrix.services.name != 'waltid-enterprise-sandbox'
         run: |
           modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
                                 sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g")
