@@ -393,7 +393,13 @@ object IssuanceExamples {
           "issuerKey": $issuerKey,
           "issuerDid": $issuerDid,
           "subjectDid": $issuerDid,
-          "credentialData": ${universityDegreeCredentialData(withProof = false)}
+          "credentialData": ${universityDegreeCredentialData(withProof = false)},
+          "mapping": {
+            "jwt:iat": "<timestamp-seconds>",
+            "jwt:nbf": "<timestamp-seconds>",
+            "jwt:exp": "<timestamp-in-seconds:365d>",
+            "jwt:jti": "<uuid>"
+          }
         }
     """.trimIndent()
 
