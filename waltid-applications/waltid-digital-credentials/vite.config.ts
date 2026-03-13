@@ -7,7 +7,7 @@ const allowedHosts = (process.env.ALLOWED_HOSTS || '')
 
 export default defineConfig({
   server: {
-    allowedHosts: [...allowedHosts, 'digital-credentials.walt.id'],
+    allowedHosts: [...allowedHosts, 'digital-credentials.walt.id', 'digital-credentials.test.waltid.cloud'],
     proxy: {
       '/verifier-api': {
         target: 'https://waltid.enterprise.test.waltid.cloud',
