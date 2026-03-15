@@ -71,7 +71,7 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
             responseType = setOf(responseType!!),
             clientId = when (openId4VPProfile) {
                 OpenId4VPProfile.DEFAULT -> config.redirectUri
-                OpenId4VPProfile.ISO_18013_7_MDOC -> config.redirectUri
+                OpenId4VPProfile.ISO_18013_7_MDOC -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
                 OpenId4VPProfile.EBSIV3 -> config.redirectUri.replace("/openid4vc/verify", "")
                 else -> config.clientIdMap[clientIdScheme] ?: config.defaultClientId
             },
