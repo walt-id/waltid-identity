@@ -172,4 +172,31 @@ class CredentialOfferTest {
         )
         assertEquals(GrantType.PreAuthorizedCode, preAuthOffer.getGrantType())
     }
+
+    @Test
+    fun `credential offer serializes tx_code metadata for pre-authorized grant`() {
+        val offer = CredentialOffer.withPreAuthorizedCodeGrant(
+            credentialIssuer = "https://issuer.example",
+            credentialConfigurationIds = listOf("cred-id-1"),
+            preAuthorizedCode = "pre-auth-123",
+            txCode = TxCode(
+                inputMode = "numeric",
+                length = 6,
+                description = "Enter the code from your device",
+            ),
+        )
+
+        val encoded = json.encodeToJsonElement(CredentialOffer.serializer(), offer).jsonObject
+        val txCode = encoded["grants"]
+            ?.jsonObject
+            ?.get("urn:ietf:params:oauth:grant-type:pre-authorized_code")
+            ?.jsonObject
+            ?.get("tx_code")
+            ?.jsonObject
+
+        assertNotNull(txCode)
+        assertEquals("numeric", txCode["input_mode"]?.jsonPrimitive?.content)
+        assertEquals(6, txCode["length"]?.jsonPrimitive?.content?.toInt())
+        assertEquals("Enter the code from your device", txCode["description"]?.jsonPrimitive?.content)
+    }
 }
