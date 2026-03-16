@@ -7,21 +7,17 @@
                 class="mx-auto w-full max-w-sm lg:w-96 p-3 lg:backdrop-blur-md lg:rounded-3xl lg:shadow lg:bg-neutral-100 lg:bg-opacity-40"
             >
                 <div class="">
-                    <img
-                        :src="logoImg"
-                        alt="walt.id logo"
-                        class="h-24 lg:h-16 w-auto mx-auto mt-2"
-                    />
+                    
                     <!-- TODO: i18n system -->
                     <h2 class="mt-4 text-3xl font-bold tracking-tight text-gray-800">
-                        Sign in to your SSI wallet
+                        Sign in to your Freshblue wallet
                     </h2>
                     <p v-if="!isOidcLogin" class="mt-2 text-sm text-gray-600">
                         Or {{ " " }}
                         <NuxtLink
                             class="font-medium text-blue-600 hover:text-blue-500"
                             to="/signup"
-                        >sign up for your SSI wallet!
+                        >sign up for your Freshblue wallet!
                         </NuxtLink>
                     </p>
                     <p v-if="isOidcLogin" class="flex items-center">
@@ -30,88 +26,7 @@
                 </div>
 
                 <div v-if="!isOidcLogin" class="mt-5">
-                    <div>
-                        <!-- open modal for all 'connect with' chains -->
-                        <div class="flex h-14 gap-5 mx-1">
-                            <div class="w-full inline-flex justify-center">
-                                <button
-                                    class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
-                                    @click="openWeb3()"
-                                >
-                  <span
-                      class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease"
-                  >
-                    <svg
-                        class="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                          d="M14 5l7 7m0 0l-7 7m7-7H3"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                      ></path>
-                    </svg>
-                  </span>
-                                    <span
-                                        class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease"
-                                    >
-                    Connect with web3
-                  </span>
-                                    <span class="relative invisible">Connect with web3</span>
-                                </button>
-                            </div>
-
-                            <div class="w-full inline-flex justify-center">
-                                <button
-                                    class="relative inline-flex items-center justify-center p-4 px-6 py-3 overflow-hidden font-medium text-blue-600 transition duration-300 ease-out border-2 border-blue-600 rounded-full shadow-md group"
-                                    @click="connectOidc()"
-                                >
-                  <span
-                      class="absolute inset-0 flex items-center justify-center w-full h-full text-white duration-300 -translate-x-full bg-blue-600 group-hover:translate-x-0 ease"
-                  >
-                    <svg
-                        class="w-6 h-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                          d="M14 5l7 7m0 0l-7 7m7-7H3"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                      ></path>
-                    </svg>
-                  </span>
-                                    <span
-                                        class="absolute flex items-center justify-center w-full h-full text-blue-600 transition-all duration-300 transform group-hover:translate-x-full ease"
-                                    >
-                    Connect with OIDC
-                  </span>
-                                    <span class="relative invisible">Connect with OIDC</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="relative mt-6">
-                            <div
-                                aria-hidden="true"
-                                class="absolute inset-0 flex items-center"
-                            >
-                                <div class="w-full border-t border-gray-300" />
-                            </div>
-                            <div class="relative flex justify-center text-sm">
-                <span class="bg-white px-2 text-gray-500 rounded-3xl"
-                >Or continue with</span
-                >
-                            </div>
-                        </div>
-                    </div>
+                    
 
                     <div class="mt-6">
                         <form class="space-y-6" @submit.prevent="login">

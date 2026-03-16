@@ -1,22 +1,20 @@
-# LegalRegistrationNumber
+# RegistrationNumber
 
 ```json
 {
   "@context": [
-    "https://www.w3.org/2018/credentials/v1",
-    "https://w3id.org/security/suites/jws-2020/v1"
+    "https://www.w3.org/ns/credentials/v2",
+    "https://w3id.org/gaia-x/development#"
   ],
   "type": [
     "VerifiableCredential",
-    "LegalRegistrationNumber"
+    "gx:RegistrationNumber"
   ],
   "id": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
   "issuer": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
   "issuanceDate": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
   "expirationDate": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
   "credentialSubject": {
-    "@context": "https://registry.lab.gaia-x.eu/development/api/trusted-shape-registry/v1/shapes/jsonld/trustframework#",
-    "type": "gx:legalRegistrationNumber",
     "id": "THIS WILL BE REPLACED WITH DYNAMIC DATA FUNCTION",
     "leiCode": "9695007586GCAKPYJ703",
     "countryCode": "FR"

@@ -3,7 +3,7 @@
 ```json
 {
   "@context": [
-    "https://www.w3.org/2018/credentials/v1",
+    "https://www.w3.org/ns/credentials/v2",
     "https://w3id.org/gaia-x/development#"
   ],
   "type": ["VerifiableCredential", "TrustedDataTransaction"],
