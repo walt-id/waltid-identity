@@ -4,6 +4,7 @@ import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.StubTokenService
+import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
@@ -15,6 +16,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -32,8 +35,6 @@ class PreAuthorizedCodeGrantHandlerTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = "client-pre",
-                userPinRequired = false,
-                userPin = null,
                 scopes = setOf("openid"),
                 audience = emptySet(),
                 session = credentialSession,
@@ -56,24 +57,24 @@ class PreAuthorizedCodeGrantHandlerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `rejects invalid PIN and allows retry`() = runTest {
+    fun `rejects invalid tx_code and allows retry`() = runTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = "client-pin",
-                userPinRequired = true,
-                userPin = "4321",
+                txCode = TxCode(length = 4, description = "Enter your transaction code"),
+                txCodeValue = "4321",
                 session = DefaultSession(subject = "pin-subject"),
             ),
         )
         val code = issued.code
 
-        val firstAttempt = createAccessRequestWithGrant(code = code, userPin = "0000")
+        val firstAttempt = createAccessRequestWithGrant(code = code, txCode = "0000")
 
         val failure = handler.handleTokenEndpointRequest(firstAttempt)
         assertTrue(failure is AccessTokenResponseResult.Failure)
         assertNotNull(repository.get(code))
 
-        val secondAttempt = createAccessRequestWithGrant(code = code, userPin = "4321")
+        val secondAttempt = createAccessRequestWithGrant(code = code, txCode = "4321")
         val success = handler.handleTokenEndpointRequest(secondAttempt)
         assertTrue(success is AccessTokenResponseResult.Success)
         assertNull(repository.get(code))
@@ -85,7 +86,6 @@ class PreAuthorizedCodeGrantHandlerTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
                 clientId = "client-reuse",
-                userPinRequired = false,
                 session = DefaultSession(subject = "reuse-subject"),
             ),
         )
@@ -99,21 +99,97 @@ class PreAuthorizedCodeGrantHandlerTest {
         assertTrue(failure is AccessTokenResponseResult.Failure)
     }
 
-        private fun createAccessRequestWithGrant(code: String? = null, userPin: String? = null): AccessTokenRequest =
-            DefaultAccessTokenRequest(
-                client = DefaultClient(
-                    id = "",
-                    redirectUris = emptyList(),
-                    grantTypes = setOf(GrantType.PreAuthorizedCode.value),
-                    responseTypes = emptySet(),
-                ),
-                grantTypes = setOf(GrantType.PreAuthorizedCode.value),
-                requestForm = buildMap {
-                    if (code != null) put("pre-authorized_code", listOf(code))
-                    if (userPin != null) put("user_pin", listOf(userPin))
-                },
-                session = DefaultSession(subject = "access-subject"),
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `stores tx_code metadata in the pre-authorized code record`() = runTest {
+        val txCode = TxCode(inputMode = "numeric", length = 6, description = "Enter the code")
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = "client-tx-metadata",
+                txCode = txCode,
+                txCodeValue = "123456",
+                session = DefaultSession(subject = "tx-subject"),
+            ),
+        )
+
+        val record = repository.get(issued.code)
+        assertNotNull(record)
+        assertEquals(txCode, record.txCode)
+        assertNotNull(record.txCodeValue)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `generates tx_code value when metadata is configured without explicit value`() = runTest {
+        val txCode = TxCode(inputMode = "numeric", length = 6, description = "Enter the generated code")
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = "client-generated-tx",
+                txCode = txCode,
+                session = DefaultSession(subject = "generated-tx-subject"),
             )
+        )
+
+        assertNotNull(issued.txCodeValue)
+        assertEquals(6, issued.txCodeValue.length)
+        assertTrue(issued.txCodeValue.all(Char::isDigit))
+
+        val record = repository.get(issued.code)
+        assertNotNull(record)
+        assertEquals(txCode, record.txCode)
+        assertNotNull(record.txCodeValue)
+
+        val request = createAccessRequestWithGrant(code = issued.code, txCode = issued.txCodeValue)
+        val result = handler.handleTokenEndpointRequest(request)
+        assertTrue(result is AccessTokenResponseResult.Success)
+        assertNull(repository.get(issued.code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `rejects provided tx_code value that does not match metadata`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            issuer.issue(
+                PreAuthorizedCodeIssueRequest(
+                    clientId = "client-bad-tx",
+                    txCode = TxCode(inputMode = "numeric", length = 6, description = "Enter the code"),
+                    txCodeValue = "abc123",
+                    session = DefaultSession(subject = "bad-tx-subject"),
+                ),
+            )
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `defaults tx_code input_mode to numeric for provided values`() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            issuer.issue(
+                PreAuthorizedCodeIssueRequest(
+                    clientId = "client-default-numeric",
+                    txCode = TxCode(length = 6, description = "Enter the code"),
+                    txCodeValue = "12AB34",
+                    session = DefaultSession(subject = "default-numeric-subject"),
+                ),
+            )
+        }
+    }
+
+    private fun createAccessRequestWithGrant(code: String? = null, txCode: String? = null): AccessTokenRequest =
+        DefaultAccessTokenRequest(
+            client = DefaultClient(
+                id = "",
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.PreAuthorizedCode.value),
+                responseTypes = emptySet(),
+            ),
+            grantTypes = setOf(GrantType.PreAuthorizedCode.value),
+            requestForm = buildMap {
+                if (code != null) put("pre-authorized_code", listOf(code))
+                if (txCode != null) put("tx_code", listOf(txCode))
+            },
+            session = DefaultSession(subject = "access-subject"),
+        )
 
     private class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
         private val records = mutableMapOf<String, PreAuthorizedCodeRecord>()
