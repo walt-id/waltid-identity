@@ -18,8 +18,8 @@ import kotlin.time.Duration.Companion.hours
 @JsExport
 @Serializable
 data class AWSAuth(
-    val accessKeyId: String? = null,
-    val secretAccessKey: String? = null,
+    var accessKeyId: String? = null,
+    var secretAccessKey: String? = null,
     val region: String? = null,
     val roleName: String? = null,
 ) {
@@ -42,18 +42,18 @@ data class AWSAuth(
             .build()
     }
 
-    init {
-        requireAuthenticationMethod()
-    }
-
-    private fun requireAuthenticationMethod() {
-        val usingAccessKey = accessKeyId != null && secretAccessKey != null && region != null
-        val instanceAuth = roleName != null && region != null
-        if (!usingAccessKey && !instanceAuth) {
-            throw IllegalArgumentException("AWSAuth requires either accessKeyId, secretAccessKey, and region or roleName")
-        }
-
-    }
-
+    /* init {
+         requireAuthenticationMethod()
+     }
+ 
+     private fun requireAuthenticationMethod() {
+         val usingAccessKey = accessKeyId != null && secretAccessKey != null && region != null
+         val instanceAuth = roleName != null && region != null
+         if (!usingAccessKey && !instanceAuth) {
+             throw IllegalArgumentException("AWSAuth requires either accessKeyId, secretAccessKey, and region or roleName")
+         }
+ 
+     }
+ */
 
 }
