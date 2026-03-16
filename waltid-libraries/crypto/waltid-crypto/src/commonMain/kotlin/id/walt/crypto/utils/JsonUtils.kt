@@ -1,7 +1,10 @@
 package id.walt.crypto.utils
 
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.InternalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.*
+import kotlinx.serialization.serializerOrNull
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
@@ -13,7 +16,7 @@ object JsonUtils {
 
     internal val prettyJson by lazy { Json { prettyPrint = true } }
 
-    @OptIn(ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)
     fun Any?.toJsonElement(): JsonElement =
         when (this) {
             is JsonElement -> this
@@ -35,8 +38,40 @@ object JsonUtils {
             is Unit -> JsonPrimitive("null")
             else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.simpleName}, was: $this")
         }
-
     fun javaToJsonElement(any: Any?) = any.toJsonElement()
+
+    @OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)
+    fun Any?.toSerializedJsonElement(): JsonElement =
+        when (this) {
+            is JsonElement -> this
+            null -> JsonNull
+            is String -> JsonPrimitive(this)
+            is Boolean -> JsonPrimitive(this)
+            is Number -> JsonPrimitive(this)
+
+            is UByte -> JsonPrimitive(this)
+            is UInt -> JsonPrimitive(this)
+            is ULong -> JsonPrimitive(this)
+            is UShort -> JsonPrimitive(this)
+
+            is Map<*, *> -> JsonObject(map { Pair(it.key.toString(), it.value.toSerializedJsonElement()) }.toMap())
+            is List<*> -> JsonArray(map { it.toSerializedJsonElement() })
+            is Array<*> -> JsonArray(map { it.toSerializedJsonElement() })
+            is Collection<*> -> JsonArray(map { it.toSerializedJsonElement() })
+            is Unit -> JsonPrimitive("null")
+            else -> {
+                val serializer = this::class.serializerOrNull()
+
+                if (serializer != null) {
+                    @Suppress("UNCHECKED_CAST")
+                    Json.encodeToJsonElement(serializer as KSerializer<Any>, this)
+                } else when (this) {
+                    is Enum<*> -> JsonPrimitive(this.toString())
+                    else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.simpleName}, was: $this")
+                }
+            }
+        }
+
 
     @JsName("listToJsonElement")
     fun List<*>.toJsonElement(): JsonElement {

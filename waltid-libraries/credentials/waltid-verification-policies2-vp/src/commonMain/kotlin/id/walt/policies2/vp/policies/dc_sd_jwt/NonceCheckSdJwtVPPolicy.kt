@@ -24,8 +24,10 @@ class NonceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifySdJwtPolicy(
         presentation: DcSdJwtPresentation,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> {
+        requireNotNull(verificationContext) { "Verification context needs to be provided for NonceCheck SD-JWT VP Policy" }
+
         presentationRequire(
             presentation.nonce == verificationContext.expectedNonce,
             DcSdJwtPresentationValidationError.NONCE_MISMATCH

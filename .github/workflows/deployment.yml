@@ -53,6 +53,9 @@ jobs:
           - k8s: waltid-identity/waltid-applications/waltid-web-portal/k8s
             name: portal
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-applications/waltid-digital-credentials/k8s
+            name: digital-credentials
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s/opa
             name: opa
             namespace: ${{ inputs.oss }}
@@ -70,7 +73,7 @@ jobs:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Prepare CD - ${{ matrix.services.name }}
-        if: matrix.services.name != 'waltid-enterprise'
+        if: matrix.services.name != 'waltid-enterprise' && matrix.services.name != 'waltid-enterprise-sandbox'
         run: |
           modified_deployment=$(sed "s/_DEFAULT_DEPLOYMENT_/$GITHUB_SHA/g" ${{ matrix.services.k8s }}/deployment-${{ inputs.deployment }}.yaml | \
                                 sed "s/__DEFAULT_IMAGE_TAG__/$IMAGE_TAG/g")
@@ -93,6 +96,7 @@ jobs:
           sed "s!mongodb://root:password@localhost:27017/!${{ secrets.MONGODB_URL }}!g" > ${{ matrix.services.k8s }}/deployment_mod.yaml
 
       - name: Continuous deployment - ${{ matrix.services.name }}
+        if: ${{ hashFiles(format('{0}/deployment_mod.yaml', matrix.services.k8s)) != '' }}
         uses: actions-hub/kubectl@master
         env:
           KUBE_CONFIG: ${{ secrets[inputs.kubeconfig_secret] }}

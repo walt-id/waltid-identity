@@ -14,6 +14,7 @@ import id.walt.issuer.issuance.openapi.issuerapi.SdJwtDocs.getSdJwtBatchDocs
 import id.walt.issuer.issuance.openapi.issuerapi.SdJwtDocs.getSdJwtDocs
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.CredentialOfferRequest
+import id.walt.w3c.issuance.Issuer.mergingJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.post
@@ -240,16 +241,35 @@ private suspend fun executeCredentialSigning(body: JsonObject) = run {
     val vc =
         requireValue({ W3CVC.fromJson(body["credentialData"]!!.jsonObject.toString()) }) { "Invalid credential format" }
     val subjectDid = body["subjectDid"]!!.jsonPrimitive.content
+    val mapping = body["mapping"]?.jsonObject
 
-    checkValue(
-        {
-            vc.signJws(
-                issuerKey = issuerKey,
-                issuerId = issuerDid,
-                subjectDid = subjectDid
-            )
+    if (mapping != null) {
+        checkValue(
+            {
+                vc.mergingJwtIssue(
+                    issuerKey = issuerKey,
+                    issuerId = issuerDid,
+                    subjectDid = subjectDid,
+                    mappings = mapping,
+                    additionalJwtHeader = emptyMap(),
+                    additionalJwtOptions = emptyMap(),
+                    completeJwtWithDefaultCredentialData = false
+                )
+            }
+        ) {
+            "Failed to sign the credential"
         }
-    ) {
-        "Failed to sign the credential"
+    } else {
+        checkValue(
+            {
+                vc.signJws(
+                    issuerKey = issuerKey,
+                    issuerId = issuerDid,
+                    subjectDid = subjectDid
+                )
+            }
+        ) {
+            "Failed to sign the credential"
+        }
     }
 }

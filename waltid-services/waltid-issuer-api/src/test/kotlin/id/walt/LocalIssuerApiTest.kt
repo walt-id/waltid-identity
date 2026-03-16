@@ -8,12 +8,16 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.issuer.issuance.IssuanceRequest
 import id.walt.issuer.issuance.createCredentialOfferUri
 import id.walt.oid4vc.data.CredentialFormat
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.sdjwt.SDMapBuilder
+import id.walt.w3c.issuance.Issuer.mergingJwtIssue
 import id.walt.w3c.vc.vcs.W3CVC
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.intellij.lang.annotations.Language
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -229,6 +233,46 @@ companion object {
         )
 
         assertEquals(true, sign.isNotEmpty())
+    }
+
+    @Test
+    fun testSignWithJwtMappingClaims() = runTest {
+        val key = KeyManager.resolveSerializedKey(TEST_KEY)
+        val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
+        val subjectDid = TEST_SUBJECT_DID
+        val mapping = Json.decodeFromString<JsonObject>(
+            """{
+              "issuer": {
+                "id": "<issuerDid>"
+              },
+              "credentialSubject": {
+                "id": "<subjectDid>"
+              },
+              "jwt:iat": "<timestamp-seconds>",
+              "jwt:nbf": "<timestamp-seconds>",
+              "jwt:exp": "<timestamp-in-seconds:365d>",
+              "jwt:jti": "<uuid>"
+            }""".trimIndent()
+        )
+
+        val w3cVc = W3CVC(jsonVCObj.toMap())
+
+        val sign = w3cVc.mergingJwtIssue(
+            issuerKey = key,
+            issuerId = TEST_ISSUER_DID,
+            subjectDid = subjectDid,
+            mappings = mapping,
+            additionalJwtHeader = emptyMap(),
+            additionalJwtOptions = emptyMap(),
+            completeJwtWithDefaultCredentialData = false
+        )
+
+        val payload = JwtUtils.parseJWTPayload(sign)
+
+        assertTrue(payload["iat"]?.jsonPrimitive?.longOrNull != null)
+        assertTrue(payload["nbf"]?.jsonPrimitive?.longOrNull != null)
+        assertTrue(payload["exp"]?.jsonPrimitive?.longOrNull != null)
+        assertTrue(payload["jti"]?.jsonPrimitive?.content?.isNotBlank() == true)
     }
 
     @Test
