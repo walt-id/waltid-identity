@@ -237,7 +237,11 @@ object MdocVerifier {
 
                 log.trace { "  ${issuerSignedItem.elementIdentifier} (digestId=${issuerSignedItem.digestId}): ${issuerSignedItem.elementValue} (${issuerSignedItem.elementValue::class.simpleName ?: "?"}) (random hex=${issuerSignedItem.random.toHexString()}) => serialized hex = ${serialized.toHexString()}" }
 
-                val issuerSignedItemValueDigest = ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, mso.digestAlgorithm)
+                val issuerSignedItemValueDigest = ValueDigest.fromIssuerSignedItemBytes(
+                    digestId = issuerSignedItem.digestId,
+                    issuerSignedItemBytesCbor = serialized,
+                    digestAlgorithm = mso.digestAlgorithm
+                )
 
                 val issuerSignedItemHash = issuerSignedItemValueDigest.value
                 log.trace { "  Issuer signed item value digest: DigestID = ${issuerSignedItemValueDigest.key}, hash (hex) = ${issuerSignedItemHash.toHexString()}" }
