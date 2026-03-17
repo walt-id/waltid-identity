@@ -5,9 +5,9 @@ import id.walt.webwallet.service.BitStringValueParser
 import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
-import id.walt.webwallet.utils.JsonUtils
-import id.walt.webwallet.utils.StringUtils.binToInt
-import id.walt.webwallet.utils.StringUtils.hexToInt
+import id.walt.corewallet.utils.JsonUtils
+import id.walt.corewallet.utils.StringUtils.binToInt
+import id.walt.corewallet.utils.StringUtils.hexToInt
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient

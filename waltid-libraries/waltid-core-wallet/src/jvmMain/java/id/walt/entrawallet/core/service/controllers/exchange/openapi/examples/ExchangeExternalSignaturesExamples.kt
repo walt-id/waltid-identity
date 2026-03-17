@@ -1,12 +1,12 @@
-package id.walt.webwallet.web.controllers.exchange.openapi.examples
+package id.walt.corewallet.web.controllers.exchange.openapi.examples
 
 import id.walt.oid4vc.data.dif.DescriptorMapping
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.w3c.utils.VCFormat
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.IETFSdJwtVpProofParameters
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.W3cJwtVpProofParameters
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.IETFSdJwtVpProofParameters
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.W3cJwtVpProofParameters
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 

@@ -8,7 +8,7 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDJwt
 import id.walt.webwallet.manifest.provider.ManifestProvider
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

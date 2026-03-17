@@ -1,4 +1,4 @@
-package id.walt.webwallet.web.controllers.exchange.models.oid4vp
+package id.walt.corewallet.web.controllers.exchange.models.oid4vp
 
 import id.walt.oid4vc.data.dif.PresentationSubmission
 import kotlinx.serialization.Serializable

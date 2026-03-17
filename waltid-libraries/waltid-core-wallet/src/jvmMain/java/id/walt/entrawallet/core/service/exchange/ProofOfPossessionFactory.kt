@@ -1,8 +1,8 @@
-package id.walt.entrawallet.core.service.exchange
+package id.walt.corewallet.service.exchange
 
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.did.dids.DidService
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
+import id.walt.corewallet.service.oidc4vc.TestCredentialWallet
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.oid4vc.data.ProofOfPossession

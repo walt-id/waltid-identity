@@ -1,4 +1,4 @@
-package id.walt.webwallet.utils
+package id.walt.corewallet.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json

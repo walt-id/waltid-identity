@@ -1,6 +1,6 @@
-package id.walt.entrawallet.core.service.oidc4vc
+package id.walt.corewallet.service.oidc4vc
 
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
+import id.walt.corewallet.service.exchange.CredentialDataResult
 import id.walt.oid4vc.data.CredentialFormat
 
 object CredentialFilterUtils {

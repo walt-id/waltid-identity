@@ -7,10 +7,10 @@ import id.walt.oid4vc.data.dif.PresentationSubmission
 import id.walt.w3c.utils.VCFormat
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import id.walt.webwallet.service.exchange.ProofOfPossessionParameters
-import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIResponse
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.*
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.*
 import io.github.smiley4.ktoropenapi.config.ValueExampleDescriptorConfig
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement

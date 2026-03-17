@@ -1,4 +1,4 @@
-package id.walt.entrawallet.core.service.exchange
+package id.walt.corewallet.service.exchange
 
 import id.walt.oid4vc.requests.CredentialRequest
 import id.walt.oid4vc.requests.EntraIssuanceRequest

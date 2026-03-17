@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTime::class)
 
-package id.walt.entrawallet.core.service.oidc4vc
+package id.walt.corewallet.service.oidc4vc
 
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key
@@ -11,8 +11,8 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
-import id.walt.entrawallet.core.utils.SessionAttributes
+import id.walt.corewallet.service.exchange.CredentialDataResult
+import id.walt.corewallet.utils.SessionAttributes
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.dataelement.EncodedCBORElement
@@ -44,7 +44,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.SDJwtVC
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 import id.walt.w3c.utils.VCFormat
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
+import id.walt.corewallet.utils.WalletHttpClients.getHttpClient
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*

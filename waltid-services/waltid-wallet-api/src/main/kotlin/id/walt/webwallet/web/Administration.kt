@@ -1,6 +1,6 @@
 package id.walt.webwallet.web
 
-import id.walt.webwallet.utils.RandomUtils
+import id.walt.corewallet.utils.RandomUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 import io.ktor.server.engine.*

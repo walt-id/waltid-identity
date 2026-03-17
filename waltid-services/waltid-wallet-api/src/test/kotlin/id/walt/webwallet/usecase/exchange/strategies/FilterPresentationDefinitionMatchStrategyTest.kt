@@ -10,7 +10,7 @@ import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.serialization.json.Json

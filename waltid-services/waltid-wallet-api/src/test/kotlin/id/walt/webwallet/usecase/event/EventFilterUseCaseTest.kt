@@ -5,7 +5,7 @@ package id.walt.webwallet.usecase.event
 import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk

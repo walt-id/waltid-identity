@@ -1,7 +1,7 @@
-package id.walt.entrawallet.core.service.exchange
+package id.walt.corewallet.service.exchange
 
 import id.walt.crypto.keys.Key
-import id.walt.entrawallet.core.utils.WalletCredential
+import id.walt.corewallet.utils.WalletCredential
 import kotlinx.serialization.Serializable
 
 

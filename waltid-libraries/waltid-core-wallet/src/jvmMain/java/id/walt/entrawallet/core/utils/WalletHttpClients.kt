@@ -1,4 +1,4 @@
-package id.walt.webwallet.utils
+package id.walt.corewallet.utils
 
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*

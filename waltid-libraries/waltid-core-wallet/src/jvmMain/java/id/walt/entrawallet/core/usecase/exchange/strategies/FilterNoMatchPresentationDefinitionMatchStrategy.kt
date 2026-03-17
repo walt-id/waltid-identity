@@ -1,9 +1,9 @@
-package id.walt.webwallet.usecase.exchange.strategies
+package id.walt.corewallet.usecase.exchange.strategies
 
-import id.walt.entrawallet.core.utils.WalletCredential
+import id.walt.corewallet.utils.WalletCredential
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.usecase.exchange.FilterData
-import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
+import id.walt.corewallet.usecase.exchange.FilterData
+import id.walt.corewallet.usecase.exchange.PresentationDefinitionFilterParser
 
 class FilterNoMatchPresentationDefinitionMatchStrategy(
     private val filterParser: PresentationDefinitionFilterParser,

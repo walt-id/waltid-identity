@@ -1,6 +1,6 @@
 package id.walt.webwallet.utils
 
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive

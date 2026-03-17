@@ -1,7 +1,7 @@
 package id.walt.webwallet.service
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 

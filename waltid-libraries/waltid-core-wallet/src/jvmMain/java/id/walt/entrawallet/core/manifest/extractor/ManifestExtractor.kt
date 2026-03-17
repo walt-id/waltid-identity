@@ -1,4 +1,4 @@
-package id.walt.entrawallet.core.manifest.extractor
+package id.walt.corewallet.manifest.extractor
 
 import id.walt.oid4vc.definitions.CROSS_DEVICE_CREDENTIAL_OFFER_URL
 import id.walt.oid4vc.requests.EntraIssuanceRequest

@@ -1,4 +1,4 @@
-package id.walt.entrawallet.core.service.exchange
+package id.walt.corewallet.service.exchange
 
 import com.nimbusds.jose.jwk.ECKey
 import id.walt.crypto.keys.Key

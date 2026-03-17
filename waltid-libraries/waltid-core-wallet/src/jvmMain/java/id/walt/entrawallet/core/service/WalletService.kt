@@ -1,6 +1,6 @@
-package id.walt.entrawallet.core.service
+package id.walt.corewallet.service
 
-import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
+import id.walt.corewallet.service.exchange.PresentationRequestParameter
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import kotlin.uuid.ExperimentalUuidApi

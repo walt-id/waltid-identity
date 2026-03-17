@@ -1,4 +1,4 @@
-package id.walt.webwallet.utils
+package id.walt.corewallet.utils
 
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.json.*

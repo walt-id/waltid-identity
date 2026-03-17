@@ -1,8 +1,8 @@
-package id.walt.webwallet.usecase.issuer
+package id.walt.corewallet.usecase.issuer
 
 /*
-import id.walt.webwallet.service.issuers.IssuerCredentialsDataTransferObject
-import id.walt.webwallet.service.issuers.IssuerDataTransferObject
+import id.walt.corewallet.service.issuers.IssuerCredentialsDataTransferObject
+import id.walt.corewallet.service.issuers.IssuerDataTransferObject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
