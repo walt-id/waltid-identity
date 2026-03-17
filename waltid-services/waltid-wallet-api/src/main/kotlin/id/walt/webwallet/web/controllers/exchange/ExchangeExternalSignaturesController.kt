@@ -285,8 +285,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val presentationSubmission = req.presentationSubmission
                 val presentedCredentialIdList = req.selectedCredentialIdList
 
-                val vpTokenProofs = (if (req.ietfSdJwtVpProofs != null) {
-                    req.ietfSdJwtVpProofs.map { ietfVpProof ->
+                val ietfSdJwtVpProofsLocal = req.ietfSdJwtVpProofs
+                val vpTokenProofs = (if (ietfSdJwtVpProofsLocal != null) {
+                    ietfSdJwtVpProofsLocal.map { ietfVpProof ->
                         ietfVpProof.sdJwtVc + ietfVpProof.vpTokenProof
                     }
                 } else {
@@ -465,8 +466,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val offer = req.offerURL
                 logger.debug { "Request: $req" }
 
-                val walletDID = req.did?.let {
-                    DidsService.get(walletService.walletId, req.did)
+                val reqDid = req.did
+                val walletDID = reqDid?.let {
+                    DidsService.get(walletService.walletId, it)
                 } ?: walletService.listDids().firstOrNull()
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
                 logger.debug { "Retrieved wallet DID: $walletDID" }

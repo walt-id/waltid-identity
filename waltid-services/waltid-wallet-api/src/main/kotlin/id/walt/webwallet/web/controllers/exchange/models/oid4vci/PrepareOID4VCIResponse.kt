@@ -1,5 +1,6 @@
 package id.walt.webwallet.web.controllers.exchange.models.oid4vci
 
+import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
 import id.walt.webwallet.service.exchange.IssuanceServiceExternalSignatures
 import kotlinx.serialization.Serializable
 
