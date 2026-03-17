@@ -14,7 +14,7 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
 
     // JSON
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 }
 
 mavenPublishing {

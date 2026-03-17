@@ -57,7 +57,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
 
     // Uuid
-    implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+    implementation("app.softwork:kotlinx-uuid-core:0.1.7")
 
     /* -- Misc --*/
 
@@ -68,14 +68,14 @@ dependencies {
     // Logging
     implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
     implementation("org.slf4j:jul-to-slf4j:2.0.17")
-    implementation("io.klogging:klogging-jvm:0.11.6")
-    implementation("io.klogging:slf4j-klogging:0.11.6")
+    implementation("io.klogging:klogging-jvm:0.11.7")
+    implementation("io.klogging:slf4j-klogging:0.11.7")
 
     // Test
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
-    testImplementation("org.bouncycastle:bcprov-lts8on:2.73.9")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.10.0")
+    testImplementation("org.bouncycastle:bcprov-lts8on:2.73.10")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))

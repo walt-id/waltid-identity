@@ -18,7 +18,7 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 
             implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
             // For in-memory cache
