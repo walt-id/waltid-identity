@@ -64,12 +64,25 @@ data class UrlConfig(
 @Serializable
 @JsonClassDiscriminator("flow_type")
 sealed interface VerificationSessionSetup {
-    // Expose the common config for easy, unified access from any flow type.
+    // Expose the common config for easy, unified access from any flow type,
+    // e.g. notifications and policies
     val core: GeneralFlowConfig
 }
 
+/** Flows that use URLs*/
 sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
     val urlConfig: UrlConfig
+}
+
+@Serializable
+data class OpenId4VPConfig(
+    // List of base64url encoded JSON strings
+    val transactionData: List<String>? = null
+)
+
+/** Allow exposing certain OpenID4VP specific options */
+sealed interface OpenID4VP1FlowSetup : VerificationSessionSetup {
+    val openid: OpenId4VPConfig?
 }
 
 /**
@@ -81,10 +94,11 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 data class CrossDeviceFlowSetup(
     @SerialName("core_flow") override val core: GeneralFlowConfig,
     @SerialName("url_config") override val urlConfig: UrlConfig = UrlConfig(),
+    override val openid: OpenId4VPConfig? = null,
 
     // Properties unique to this flow
     val redirects: Verification2Session.VerificationSessionRedirects? = null // Optional final redirect
-) : UrlBearingDeviceFlowSetup {
+) : UrlBearingDeviceFlowSetup, OpenID4VP1FlowSetup {
     companion object {
 
         private val BASE_EXAMPLE = CrossDeviceFlowSetup(
@@ -124,11 +138,13 @@ data class CrossDeviceFlowSetup(
 @Serializable
 @SerialName("same_device")
 data class SameDeviceFlowSetup(
-    override val core: GeneralFlowConfig, override val urlConfig: UrlConfig,
+    override val core: GeneralFlowConfig,
+    override val urlConfig: UrlConfig,
+    override val openid: OpenId4VPConfig? = null,
 
     // Property unique to this flow
     val redirects: Verification2Session.VerificationSessionRedirects // Required for final redirect
-) : UrlBearingDeviceFlowSetup
+) : UrlBearingDeviceFlowSetup, OpenID4VP1FlowSetup
 
 /**
  * Annex D
@@ -139,11 +155,12 @@ data class SameDeviceFlowSetup(
 @SerialName("dc_api")
 data class DcApiAnnexDFlowSetup(
     override val core: GeneralFlowConfig,
+    override val openid: OpenId4VPConfig? = null,
 
     // Properties unique to this flow:
     val expectedOrigins: List<String>,
     val haip: Boolean = false,
-) : VerificationSessionSetup {
+) : VerificationSessionSetup, OpenID4VP1FlowSetup {
     init {
         if (haip) {
             require(core.encryptedResponse) { "To be compliant with profile HAIP, encrypted response must be enabled. Set 'encryptedResponse' to be true (in GeneralFlowConfig)." }

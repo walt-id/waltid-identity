@@ -225,7 +225,7 @@ object VerificationSessionCreator {
              * containing details about the transaction the Verifier is requesting the End-User to authorize.
              * The decoded JSON object structure is represented by [TransactionDataItem].
              */
-            //val transactionData : List < String >? = null, // List of base64url encoded JSON strings
+            transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null, // List of base64url encoded JSON strings
 
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.
