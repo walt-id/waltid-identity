@@ -166,9 +166,9 @@ data class DcApiAnnexDFlowSetup(
                             format = CredentialFormat.MSO_MDOC,
                             meta = MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL"),
                             claims = listOf(
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_21"))
+                                ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
+                                ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name")),
+                                ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "age_over_21"))
                             )
                         )
                     )
@@ -197,9 +197,9 @@ data class DcApiAnnexDFlowSetup(
                             format = CredentialFormat.MSO_MDOC,
                             meta = MsoMdocMeta(doctypeValue = "org.iso.18013.5.1.mDL"),
                             claims = listOf(
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name")),
-                                ClaimsQuery(path = listOf("org.iso.18013.5.1", "age_over_21"))
+                                ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
+                                ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name")),
+                                ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "age_over_21"))
                             )
                         )
                     )
@@ -242,7 +242,7 @@ data class DcApiAnnexDFlowSetup(
                             format = CredentialFormat.MSO_MDOC,
                             meta = MsoMdocMeta(doctypeValue = "org.iso.23220.photoid.1"),
                             claims = listOf(
-                                ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "person_id"))
+                                ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "person_id"))
                             )
                         )
                     )
@@ -277,7 +277,7 @@ data class DcApiAnnexDFlowSetup(
                                 "expiry_date",
                                 "issuing_authority",
                                 "issuing_country"
-                            ).map { ClaimsQuery(path = listOf("eu.europa.ec.eudi.pid.1", it)) }
+                            ).map { ClaimsQuery(pathStrings = listOf("eu.europa.ec.eudi.pid.1", it)) }
                         )
                     )
                 ),
@@ -344,7 +344,7 @@ data class DcApiAnnexCFlowSetup(
                     meta = MsoMdocMeta(doctypeValue = docType),
                     claims = requestedElements.entries.sortedBy { it.key }.flatMap { (namespace, elements) ->
                         elements.distinct().sorted().map { elementId ->
-                            ClaimsQuery(path = listOf(namespace, elementId))
+                            ClaimsQuery(pathStrings = listOf(namespace, elementId))
                         }
                     }
                 )
