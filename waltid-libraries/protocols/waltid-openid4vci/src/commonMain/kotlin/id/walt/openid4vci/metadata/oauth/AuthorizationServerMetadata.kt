@@ -212,6 +212,7 @@ data class AuthorizationServerMetadata(
             clientAttestationSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             clientAttestationPopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             dpopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
+            codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = null,
             pushedAuthorizationRequestEndpointPath: String? = null,
         ): AuthorizationServerMetadata {
@@ -230,6 +231,7 @@ data class AuthorizationServerMetadata(
                 clientAttestationSigningAlgValuesSupported = clientAttestationSigningAlgValuesSupported,
                 clientAttestationPopSigningAlgValuesSupported = clientAttestationPopSigningAlgValuesSupported,
                 dpopSigningAlgValuesSupported = dpopSigningAlgValuesSupported,
+                codeChallengeMethodsSupported = codeChallengeMethodsSupported,
                 requirePushedAuthorizationRequests = requirePushedAuthorizationRequests,
                 pushedAuthorizationRequestEndpoint = parEndpoint,
             )

@@ -37,7 +37,7 @@ class DefaultAccessRequestValidatorTest {
             mapOf(
                 "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
                 "pre-authorized_code" to listOf("pre-auth-code"),
-                "user_pin" to listOf("1234"),
+                "tx_code" to listOf("1234"),
                 "scope" to listOf("openid profile"),
             ),
             session,
@@ -47,7 +47,7 @@ class DefaultAccessRequestValidatorTest {
         val request = (result as AccessTokenRequestResult.Success).request
         assertTrue(request.grantTypes.contains(GrantType.PreAuthorizedCode.value))
         assertEquals("pre-auth-code", request.requestForm["pre-authorized_code"]?.firstOrNull())
-        assertEquals("1234", request.requestForm["user_pin"]?.firstOrNull())
+        assertEquals("1234", request.requestForm["tx_code"]?.firstOrNull())
         assertTrue(request.requestedScopes.contains("openid"))
     }
 

@@ -79,6 +79,7 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES256"), metadata.clientAttestationSigningAlgValuesSupported)
         assertEquals(setOf("ES256"), metadata.clientAttestationPopSigningAlgValuesSupported)
         assertEquals(setOf("ES256"), metadata.dpopSigningAlgValuesSupported)
+        assertEquals(null, metadata.codeChallengeMethodsSupported)
         assertEquals(null, metadata.pushedAuthorizationRequestEndpoint)
         assertEquals(
             setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
@@ -101,6 +102,7 @@ class AuthorizationServerMetadataTest {
             clientAttestationSigningAlgValuesSupported = setOf("ES384"),
             clientAttestationPopSigningAlgValuesSupported = setOf("ES512"),
             dpopSigningAlgValuesSupported = setOf("ES384"),
+            codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/oauth2/par",
             requirePushedAuthorizationRequests = true,
         )
@@ -117,6 +119,7 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES384"), metadata.clientAttestationSigningAlgValuesSupported)
         assertEquals(setOf("ES512"), metadata.clientAttestationPopSigningAlgValuesSupported)
         assertEquals(setOf("ES384"), metadata.dpopSigningAlgValuesSupported)
+        assertEquals(listOf("S256"), metadata.codeChallengeMethodsSupported)
         assertEquals("https://issuer.example/oauth2/par", metadata.pushedAuthorizationRequestEndpoint)
         assertEquals(true, metadata.requirePushedAuthorizationRequests)
     }

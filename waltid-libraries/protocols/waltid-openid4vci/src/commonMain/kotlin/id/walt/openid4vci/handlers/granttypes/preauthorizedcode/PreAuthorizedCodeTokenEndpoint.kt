@@ -6,7 +6,7 @@ import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
-import id.walt.openid4vci.preauthorized.hashPin
+import id.walt.openid4vci.preauthorized.hashTxCode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.tokens.AccessTokenService
@@ -49,21 +49,24 @@ class PreAuthorizedCodeTokenEndpoint(
                 ),
             )
 
-        val providedPin = request.requestForm["user_pin"]?.firstOrNull()
-        if (record.userPinRequired && providedPin.isNullOrBlank()) {
+        val providedTxCode = request.requestForm["tx_code"]?.firstOrNull()
+        if (record.txCode != null && providedTxCode.isNullOrBlank()) {
             return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "invalid_grant",
-                    description = "user_pin is required for this pre-authorized code",
+                    description = "tx_code is required for this pre-authorized code",
                 ),
             )
         }
 
-        if (!record.userPin.isNullOrBlank() && providedPin != null && record.userPin != hashPin(providedPin)) {
+        if (!record.txCodeValue.isNullOrBlank() &&
+            providedTxCode != null &&
+            record.txCodeValue != hashTxCode(providedTxCode)
+        ) {
             return AccessTokenResponseResult.Failure(
                 OAuthError(
                     error = "invalid_grant",
-                    description = "user_pin is invalid",
+                    description = "tx_code is invalid",
                 ),
             )
         }
