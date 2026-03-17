@@ -28,6 +28,12 @@ class WalletApi(
     val categoryApi = CategoryApi(e2e, httpClient)
     val exchangeApi = ExchangeApi(e2e, httpClient)
     val credentialApi = CredentialsApi(e2e, httpClient)
+    val eventLogApi = EventLogApi(e2e, httpClient)
+    val historyApi = HistoryApi(e2e, httpClient)
+    val settingsApi = SettingsApi(e2e, httpClient)
+    val silentExchangeApi = SilentExchangeApi(e2e, httpClient)
+    val trustApi = TrustApi(e2e, httpClient)
+    val reportsApi = ReportsApi(e2e, httpClient)
 
     suspend fun getWallet(): WalletListing =
         authApi.listAccountWallets().wallets.first { it.id == walletId }
@@ -161,5 +167,52 @@ class WalletApi(
 
     suspend fun detachCategoriesFromCredential(credentialId: String, vararg categories: String) =
         credentialApi.detachCategoriesFromCredential(walletId, credentialId, *categories)
+
+    suspend fun rejectCredential(credentialId: String, note: String? = null) =
+        credentialApi.rejectCredential(walletId, credentialId, note)
+
+    //=========================================================================
+    // Event Log API
+    //=========================================================================
+    suspend fun listEventLogs(
+        limit: Int? = null,
+        filters: List<String>? = null,
+        startingAfter: String? = null,
+        sortBy: String? = null,
+        sortOrder: String? = null
+    ) = eventLogApi.listEventLogs(walletId, limit, filters, startingAfter, sortBy, sortOrder)
+
+    suspend fun deleteEventLog(eventId: Int) =
+        eventLogApi.deleteEventLog(walletId, eventId)
+
+    //=========================================================================
+    // History API
+    //=========================================================================
+    suspend fun listHistory() = historyApi.listHistory(walletId)
+
+    //=========================================================================
+    // Settings API
+    //=========================================================================
+    suspend fun getSettings() = settingsApi.getSettings(walletId)
+    suspend fun updateSettings(settings: kotlinx.serialization.json.JsonObject) = settingsApi.updateSettings(walletId, settings)
+
+    //=========================================================================
+    // Silent Exchange API
+    //=========================================================================
+    suspend fun silentClaim(did: String, offerUrl: String) = silentExchangeApi.silentClaim(walletId, did, offerUrl)
+
+    //=========================================================================
+    // Trust API
+    //=========================================================================
+    suspend fun validateIssuerTrust(did: String, credentialType: String, egfUri: String) =
+        trustApi.validateIssuerTrust(walletId, did, credentialType, egfUri)
+
+    suspend fun validateVerifierTrust(did: String, credentialType: String, egfUri: String) =
+        trustApi.validateVerifierTrust(walletId, did, credentialType, egfUri)
+
+    //=========================================================================
+    // Reports API
+    //=========================================================================
+    suspend fun getFrequentCredentials(limit: Int? = null) = reportsApi.getFrequentCredentials(walletId, limit)
 
 }

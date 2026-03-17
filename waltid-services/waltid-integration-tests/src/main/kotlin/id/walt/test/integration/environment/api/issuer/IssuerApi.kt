@@ -62,6 +62,28 @@ class IssuerApi(
         setBody(request)
     }
 
+    suspend fun issueJwtBatchCredentialRaw(requests: List<IssuanceRequest>) =
+        client.post("/openid4vc/jwt/issueBatch") {
+            setBody(requests)
+        }
+
+    suspend fun issueJwtBatchCredential(requests: List<IssuanceRequest>): String =
+        issueJwtBatchCredentialRaw(requests).let {
+            it.expectSuccess()
+            it.body<String>()
+        }
+
+    suspend fun issueSdJwtBatchCredentialRaw(requests: List<IssuanceRequest>) =
+        client.post("/openid4vc/sdjwt/issueBatch") {
+            setBody(requests)
+        }
+
+    suspend fun issueSdJwtBatchCredential(requests: List<IssuanceRequest>): String =
+        issueSdJwtBatchCredentialRaw(requests).let {
+            it.expectSuccess()
+            it.body<String>()
+        }
+
     suspend fun mdoc(request: IssuanceRequest, output: ((String) -> Unit)? = null) = issue(
         name = "/openid4vc/mdoc/issue - issue mdoc credential",
         url = "/openid4vc/mdoc/issue",

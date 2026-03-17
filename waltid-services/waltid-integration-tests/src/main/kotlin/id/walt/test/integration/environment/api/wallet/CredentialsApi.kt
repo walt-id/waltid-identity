@@ -10,6 +10,7 @@ import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -102,6 +103,16 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
 
     suspend fun detachCategoriesFromCredential(wallet: Uuid, credential: String, vararg categories: String) {
         detachCategoriesFromCredentialRaw(wallet, credential, *categories).expectSuccess()
+    }
+
+    suspend fun rejectCredentialRaw(walletId: Uuid, credentialId: String, note: String? = null) =
+        client.post("/wallet-api/wallet/$walletId/credentials/$credentialId/reject") {
+            contentType(ContentType.Application.Json)
+            setBody(mapOf("note" to note))
+        }
+
+    suspend fun rejectCredential(walletId: Uuid, credentialId: String, note: String? = null) {
+        rejectCredentialRaw(walletId, credentialId, note).expectSuccess()
     }
 
     @Deprecated("Old API")
