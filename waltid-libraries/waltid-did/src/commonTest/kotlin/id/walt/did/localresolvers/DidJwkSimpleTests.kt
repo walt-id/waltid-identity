@@ -8,13 +8,11 @@ import id.walt.did.localresolvers.LocalResolverTestUtils.testDids
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class DidJwkSimpleTests {
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun testDids(vararg dids: String, expectedKeyType: KeyType) =
         runTest {
             val results = testDids(DidJwkResolver(), dids = dids, expectedKeyType = expectedKeyType)

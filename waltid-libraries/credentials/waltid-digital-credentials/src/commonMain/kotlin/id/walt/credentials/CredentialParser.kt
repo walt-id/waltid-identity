@@ -25,20 +25,16 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
-import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.mdoc.objects.MdocsCborSerializer
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.KSerializer
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 object CredentialParser {
 
     private val log = KotlinLogging.logger { }
@@ -118,17 +114,25 @@ object CredentialParser {
 
             document.issuerSigned.namespaces?.forEach { (namespace, issuerSignedList) ->
                 putJsonObject(namespace) {
-                    val x = issuerSignedList.entries.map { it.value }
-                    x.forEach { item: IssuerSignedItem ->
+                    val issuerSignedItems = issuerSignedList.entries.map { it.value }
+                    issuerSignedItems.forEach { item: IssuerSignedItem ->
                         log.trace { "$namespace - ${item.elementIdentifier} -> ${item.elementValue} (${item.elementValue::class.simpleName})" }
 
+                        val serialized = runCatching {
+                            item.elementValue.toSerializedJsonElement()
+                        }.getOrElse {
+                            throw IllegalArgumentException("Could not serialize element ${item.digestId} in $namespace: ${item.elementIdentifier} (value ${item.elementValue}), due to: ${it.message}", it)
+                        }
+
+                        /* Previous serialization:
                         val serialized: JsonElement = MdocsCborSerializer.lookupSerializer(namespace, item.elementIdentifier)
                             ?.runCatching {
                                 Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                             }?.getOrElse { log.warn { "Error encoding with custom serializer: ${it.stackTraceToString()}" }; null }
                             ?: item.elementValue.toJsonElement()
+                        */
 
-                        log.trace { "as JsonElement: $serialized" }
+                        log.trace { "-> as JsonElement: $serialized" }
                         put(item.elementIdentifier, serialized)
                     }
 
@@ -212,7 +216,7 @@ object CredentialParser {
         var availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
 
         if (availableDisclosures?.isNotEmpty() == true) {
-            log.trace { "${"=== MAPPING ==="}" }
+            log.trace { "=== MAPPING ===" }
             // Use a Mutable Set to track what we have successfully mapped
             val mappedDisclosures = HashSet<SdJwtSelectiveDisclosure>()
 
@@ -383,7 +387,6 @@ object CredentialParser {
 
     suspend fun parseOnly(rawCredential: String) = detectAndParse(rawCredential).second
 
-    @OptIn(ExperimentalEncodingApi::class)
     suspend fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
         val credential = rawCredential.trim()
 

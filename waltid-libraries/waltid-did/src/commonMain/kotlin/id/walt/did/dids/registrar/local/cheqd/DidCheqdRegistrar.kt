@@ -30,7 +30,6 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -156,7 +155,6 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         }.body<JobActionResponse>()
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {
         val state = (job.didState as? ActionDidState) ?: error("Unexpected did state")
         if (!state.action.equals("signPayload", true)) error("Unexpected state action: ${state.action}")

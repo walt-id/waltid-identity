@@ -30,7 +30,6 @@ import io.ktor.util.reflect.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 
 val clientId = "test-client"
@@ -46,7 +45,6 @@ private val CI_TOKEN_KEY = runBlocking { JWKKey.generate(KeyType.RSA) }
 private fun signToken(target: TokenTarget, payload: JsonObject, header: JsonObject? = null, keyId: String? = null, privKey: Key? = null) =
     runBlocking { CI_TOKEN_KEY.signJws(payload.toString().toByteArray()) }
 
-@OptIn(ExperimentalEncodingApi::class)
 fun parseTokenHeader(token: String): JsonObject {
     return token.substringBefore(".").let {
         Json.decodeFromString(Base64.UrlSafe.decode(it).decodeToString())
@@ -107,13 +105,13 @@ suspend fun main() {
     println(issueReqUrl)
 
     println("// -------- WALLET ----------")
-    val parsedCredOffer = runBlocking { OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl) }
+    val parsedCredOffer = OpenID4VCI.parseAndResolveCredentialOfferRequestUrl(issueReqUrl)
     println("parse and resolve: $issueReqUrl")
 
     check(credOffer.toJSONString() == parsedCredOffer.toJSONString())
 
     println("Resolve metadata from ${parsedCredOffer.credentialIssuer}")
-    val providerMetadata = runBlocking { OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadata.Draft13 }
+    val providerMetadata = OpenID4VCI.resolveCIProviderMetadata(parsedCredOffer) as OpenIDProviderMetadata.Draft13
 
     check(parsedCredOffer.credentialIssuer == providerMetadata.credentialIssuer)
 

@@ -13,7 +13,7 @@ kotlin {
     sourceSets {
 
         commonMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
             implementation(identityLibs.oshai.kotlinlogging)
@@ -48,8 +48,8 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         jvmTest.dependencies {
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }
     }

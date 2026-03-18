@@ -11,7 +11,7 @@ import id.walt.mdoc.objects.dcapi.DCAPIHandover
 import id.walt.mdoc.objects.sha256
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 import org.bouncycastle.crypto.hpke.HPKE
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -21,7 +21,7 @@ import kotlin.test.assertFailsWith
 class AnnexCHpkeDecryptTest {
 
     @Serializable
-    @CborArray
+    @CborObjectAsArray
     private data class DcApiSessionTranscriptCbor(
         val deviceEngagementBytes: ByteArray? = byteArrayOf(0x00),
         val eReaderKeyBytes: ByteArray? = byteArrayOf(0x00),

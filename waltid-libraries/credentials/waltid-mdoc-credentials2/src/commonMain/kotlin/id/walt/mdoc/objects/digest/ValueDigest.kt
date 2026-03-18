@@ -3,7 +3,6 @@ package id.walt.mdoc.objects.digest
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.crypto.MdocCrypto.digest
 import id.walt.mdoc.objects.elements.IssuerSignedItem
-import id.walt.mdoc.objects.elements.IssuerSignedItemSerializer
 import id.walt.mdoc.objects.wrapInCborTag
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
@@ -102,7 +101,7 @@ data class ValueDigest(
         }
 
         private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
-            coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
+            coseCompliantCbor.encodeToByteArray(IssuerSignedItem.serializer(), this)
     }
 }
 

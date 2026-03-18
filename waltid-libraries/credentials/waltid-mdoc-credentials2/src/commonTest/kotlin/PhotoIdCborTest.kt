@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 import id.walt.cose.*
 import id.walt.crypto.keys.KeyType
@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.random.Random
@@ -109,10 +110,10 @@ class PhotoIdCborTest {
 
         // Map PhotoId data to a list of IssuerSignedItem objects
         val issuerSignedItems = listOf(
-            IssuerSignedItem(0u, Random.nextBytes(16), "family_name_unicode", photoId.familyNameUnicode),
-            IssuerSignedItem(1u, Random.nextBytes(16), "given_name_unicode", photoId.givenNameUnicode),
-            IssuerSignedItem(2u, Random.nextBytes(16), "birth_date", photoId.birthDate),
-            IssuerSignedItem(3u, Random.nextBytes(16), "issuing_country", photoId.issuingCountry)
+            IssuerSignedItem(0u, Random.nextBytes(16), "family_name_unicode", CborString(photoId.familyNameUnicode)),
+            IssuerSignedItem(1u, Random.nextBytes(16), "given_name_unicode", CborString(photoId.givenNameUnicode)),
+            IssuerSignedItem(2u, Random.nextBytes(16), "birth_date", CborString(photoId.birthDate.toString())),
+            IssuerSignedItem(3u, Random.nextBytes(16), "issuing_country", CborString(photoId.issuingCountry))
         )
         issuerSignedItems.forEachIndexed { idx, issuerSignedItem ->
             println("Issuer Signed Item $idx: $issuerSignedItem")
@@ -163,7 +164,10 @@ class PhotoIdCborTest {
                 issuerAuth = issuerAuth
             ),
             // Empty device signed part for this test
-            deviceSigned = DeviceSigned(ByteStringWrapper(DeviceNameSpaces(mapOf())), DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0))))
+            deviceSigned = DeviceSigned(
+                ByteStringWrapper(DeviceNameSpaces(mapOf())),
+                DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
+            )
         )
         println("Document: $document")
 

@@ -16,7 +16,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.util.*
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 enum class VerificationStatus {
     WAITING_FOR_SUBMISSION,
@@ -54,7 +53,6 @@ object Verifier {
         return Pair(presentationRequest, state)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     /**
      * @param requestedClaims provide a map in the form of {claimName=JSON-path-to-attribute}
      */

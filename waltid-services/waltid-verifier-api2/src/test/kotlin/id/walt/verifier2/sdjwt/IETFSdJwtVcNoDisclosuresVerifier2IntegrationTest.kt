@@ -61,9 +61,9 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                     vctValues = listOf("https://issuer.demo.walt.id/draft13/identity_credential")
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("given_name")),
-                    ClaimsQuery(path = listOf("family_name")),
-                    ClaimsQuery(path = listOf("address", "street_address")),
+                    ClaimsQuery(pathStrings = listOf("given_name")),
+                    ClaimsQuery(pathStrings = listOf("family_name")),
+                    ClaimsQuery(pathStrings = listOf("address", "street_address")),
                 )
             )
         )

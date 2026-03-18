@@ -25,7 +25,6 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.verifier2.verifierModule
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.RegexPolicy
@@ -58,24 +57,24 @@ class MsoMdocsVerifier2IntegrationTest {
                     doctypeValue = "org.iso.23220.photoid.1"
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                    ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                    ClaimsQuery(path = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
                     ClaimsQuery(
-                        path = listOf("org.iso.18013.5.1", "resident_postal_code"),
+                        pathStrings = listOf("org.iso.18013.5.1", "resident_postal_code"),
                         values = listOf(1180, 1190, 1200, 1210).map { JsonPrimitive(it) }
                     ),
                     ClaimsQuery(
-                        path = listOf("org.iso.18013.5.1", "issuing_country"),
+                        pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
                         values = listOf(JsonPrimitive("AT"))
                     ),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "person_id")),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "resident_street")),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "administrative_number")),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "travel_document_number")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "person_id")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "resident_street")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "administrative_number")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number")),
 
-                    ClaimsQuery(path = listOf("org.iso.23220.dtc.1", "dtc_version")),
-                    ClaimsQuery(path = listOf("org.iso.23220.dtc.1", "dtc_dg1"))
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_version")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_dg1"))
                 )
             )
         )
