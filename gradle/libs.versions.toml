@@ -27,7 +27,7 @@ kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 
 # Logging
-kotlinlogging = "7.0.14"
+kotlinlogging = "8.0.01"
 slf4j-simple = "2.0.17"
 
 # Misc
