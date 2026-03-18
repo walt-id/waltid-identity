@@ -118,12 +118,16 @@ object MdocPresenter {
         //--- SD START
         val selectedIssuerSignedItems = dcqlQueryClaims
             // Group by the string content of the first path element (Namespace)
-            .groupBy { it.path.first().jsonPrimitive.content }
+            .groupBy {
+                (it.path.firstOrNull()
+                    ?: throw IllegalArgumentException("Empty path in ClaimsQuery")
+                        ).jsonPrimitive.content
+            }
             .mapValues { (sdNamespace2, claimQueries) ->
                 claimQueries.map { claimsQuery ->
                     val path = claimsQuery.path
                     // Allow >= 2 because DCQL might query deep inside an mdoc element (e.g., an array index)
-                    require(path.size >= 2) { "Invalid state: Expected DCQL claim path to have at least two elements (namespace + elementIdentifier)" }
+                    require(path.size >= 2) { "Invalid state: Expected DCQL claim path to have at least two elements (namespace + elementIdentifier), but path was: $path" }
 
                     // Extract the actual Strings from the JsonElements
                     val sdNamespace: String = path[0].jsonPrimitive.content
