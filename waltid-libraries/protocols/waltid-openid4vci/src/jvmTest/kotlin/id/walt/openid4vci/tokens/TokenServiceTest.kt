@@ -3,8 +3,10 @@ package id.walt.openid4vci.tokens
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
+import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
+import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import java.lang.ThreadLocal
 import kotlinx.coroutines.async
@@ -20,20 +22,21 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
 import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.createTestConfig
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.requests.credential.CredentialRequestResult
 
 class TokenServiceTest {
 
     @Test
     fun `resolves key from resolver and signs token`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val service = JwtAccessTokenService ({ key })
+        val service = JwtAccessTokenIssuer({ key })
 
         val token = service.createAccessToken(mapOf("sub" to "alice"))
         assertTrue(token.isNotBlank())
@@ -46,45 +49,45 @@ class TokenServiceTest {
     @Test
     fun `authorization code flow embeds granted scopes into JWT scope claim`(): Unit = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val tokenService = JwtAccessTokenService( { key })
-        val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
+        val accessTokenService = JwtAccessTokenIssuer(resolver = { key })
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenService = accessTokenService))
 
         val issuerId = "issuer-scope"
         val scope = "openid email profile"
         val clientId = "client-scope"
         val redirectUri = "https://client.example/callback"
 
-        val authorizeResult = provider.createAuthorizeRequest(
+        val authorizeResult = provider.createAuthorizationRequest(
             mapOf(
-                "response_type" to "code",
-                "client_id" to clientId,
-                "redirect_uri" to redirectUri,
-                "scope" to scope,
+                "response_type" to listOf("code"),
+                "client_id" to listOf(clientId),
+                "redirect_uri" to listOf(redirectUri),
+                "scope" to listOf(scope),
             ),
         )
-        require(authorizeResult is AuthorizeRequestResult.Success)
-        val authorizeRequest = authorizeResult.request.also { it.setIssuerId(issuerId) }
+        require(authorizeResult is AuthorizationRequestResult.Success)
+        val authorizeRequest = authorizeResult.request.withIssuer(issuerId)
 
-        val authorizeResponse = provider.createAuthorizeResponse(
+        val authorizeResponse = provider.createAuthorizationResponse(
             authorizeRequest,
             DefaultSession(subject = "alice"),
         )
-        require(authorizeResponse is AuthorizeResponseResult.Success)
-        val code = authorizeResponse.response.parameters.getValue("code")
+        require(authorizeResponse is AuthorizationResponseResult.Success)
+        val code = authorizeResponse.response.code
 
-        val accessRequestResult = provider.createAccessRequest(
+        val accessTokenRequestResult = provider.createAccessTokenRequest(
             mapOf(
-                "grant_type" to GrantType.AuthorizationCode.value,
-                "client_id" to clientId,
-                "code" to code,
-                "redirect_uri" to redirectUri,
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf(clientId),
+                "code" to listOf(code),
+                "redirect_uri" to listOf(redirectUri),
             ),
         )
-        require(accessRequestResult is AccessRequestResult.Success)
-        val accessRequest = accessRequestResult.request.also { it.setIssuerId(issuerId) }
+        require(accessTokenRequestResult is AccessTokenRequestResult.Success)
+        val accessRequest = accessTokenRequestResult.request.withIssuer(issuerId)
 
-        val accessResponse = provider.createAccessResponse(accessRequest)
-        require(accessResponse is AccessResponseResult.Success)
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
+        require(accessResponse is AccessTokenResponseResult.Success)
         val token = accessResponse.response.accessToken
 
         val payload = decodePayload(token)
@@ -104,7 +107,7 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val service = JwtAccessTokenService ({ currentKey.get() ?: error("No key in context") })
+        val service = JwtAccessTokenIssuer(resolver = { currentKey.get() ?: error("No key in context") })
 
         val tokens = keys.map { key ->
             async(currentKey.asContextElement(value = key)) {
@@ -127,7 +130,7 @@ class TokenServiceTest {
 
         val currentKey = ThreadLocal<Key?>()
         val resolver = JwtSigningKeyResolver { resolveCurrentKey(currentKey) }
-        val service = JwtAccessTokenService(resolver)
+        val service = JwtAccessTokenIssuer(resolver)
 
         suspend fun signFor(key: Key): String = withContext(currentKey.asContextElement(key)) {
             service.createAccessToken(mapOf("sub" to "demo"))
@@ -154,44 +157,45 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val tokenService = JwtAccessTokenService( { resolveCurrentKey(currentKey) })
-        val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
+        val accessTokenService = JwtAccessTokenIssuer(resolver = { resolveCurrentKey(currentKey) })
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenService = accessTokenService))
 
-        suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
-            val authorizeRequestResult = provider.createAuthorizeRequest(
-                mapOf(
-                    "response_type" to "code",
-                    "client_id" to "client-$issuerId",
-                    "redirect_uri" to "https://client.example/callback",
-                    "scope" to "openid",
-                ),
-            )
-            require(authorizeRequestResult is AuthorizeRequestResult.Success)
-            val authorizeRequest = authorizeRequestResult.request.also { it.setIssuerId(issuerId) }
+        suspend fun runFlow(issuerId: String): String =
+            withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
+                val authorizationRequestResult = provider.createAuthorizationRequest(
+                    mapOf(
+                        "response_type" to listOf("code"),
+                        "client_id" to listOf("client-$issuerId"),
+                        "redirect_uri" to listOf("https://client.example/callback"),
+                        "scope" to listOf("openid"),
+                    ),
+                )
+                require(authorizationRequestResult is AuthorizationRequestResult.Success)
+                val authorizeRequest = authorizationRequestResult.request.withIssuer(issuerId)
 
-            val authorizeResponse = provider.createAuthorizeResponse(
-                authorizeRequest,
-                DefaultSession(subject = "sub-$issuerId"),
-            )
-            require(authorizeResponse is AuthorizeResponseResult.Success)
-            val code = authorizeResponse.response.parameters.getValue("code")
+                val authorizeResponse = provider.createAuthorizationResponse(
+                    authorizeRequest,
+                    DefaultSession(subject = "sub-$issuerId"),
+                )
+                require(authorizeResponse is AuthorizationResponseResult.Success)
+                val code = authorizeResponse.response.code
 
-            val accessRequestResult = provider.createAccessRequest(
-                mapOf(
-                    "grant_type" to GrantType.AuthorizationCode.value,
-                    "client_id" to "client-$issuerId",
-                    "code" to code,
-                    "redirect_uri" to "https://client.example/callback",
-                ),
-            )
-            require(accessRequestResult is AccessRequestResult.Success)
-            val accessRequest = accessRequestResult.request.also { it.setIssuerId(issuerId) }
+                val accessTokenRequestResult = provider.createAccessTokenRequest(
+                    mapOf(
+                        "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                        "client_id" to listOf("client-$issuerId"),
+                        "code" to listOf(code),
+                        "redirect_uri" to listOf("https://client.example/callback"),
+                    ),
+                )
+                require(accessTokenRequestResult is AccessTokenRequestResult.Success)
+                val accessRequest = accessTokenRequestResult.request.withIssuer(issuerId)
 
-            val accessResponse = provider.createAccessResponse(accessRequest)
-            require(accessResponse is AccessResponseResult.Success)
+                val accessResponse = provider.createAccessTokenResponse(accessRequest)
+                require(accessResponse is AccessTokenResponseResult.Success)
 
-            accessResponse.response.accessToken
-        }
+                accessResponse.response.accessToken
+            }
 
         val tokensByIssuer = keysByIssuer.keys.associateWith { runFlow(it) }
         tokensByIssuer.forEach { (issuerId, token) ->
@@ -200,6 +204,74 @@ class TokenServiceTest {
             assertEquals(key.keyType.jwsAlg, header["alg"])
             assertEquals(key.getKeyId(), header["kid"])
         }
+    }
+
+    @Test
+    fun `credential request verifies access token when context is provided`() = runBlocking {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val accessTokenService = JwtAccessTokenIssuer(resolver = { key })
+        val accessTokenVerifier = JwtAccessTokenVerifier { _ -> key.getPublicKey() }
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                accessTokenService = accessTokenService,
+                accessTokenVerifier = accessTokenVerifier,
+            )
+        )
+
+        val token = accessTokenService.createAccessToken(
+            defaultAccessTokenClaims(
+                subject = "alice",
+                issuer = "https://issuer.example",
+                audience = "https://audience.example",
+            )
+        )
+
+        val result = provider.createCredentialRequest(
+            parameters = mapOf(
+                "credential_configuration_id" to listOf("test-credential")
+            ),
+            session = null,
+            accessTokenContext = AccessTokenContext(
+                token = token,
+                expectedIssuer = "https://issuer.example",
+            )
+        )
+
+        assertTrue(result is CredentialRequestResult.Success)
+    }
+
+    @Test
+    fun `credential request fails when access token issuer mismatches`() = runBlocking {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val accessTokenService = JwtAccessTokenIssuer(resolver = { key })
+        val accessTokenVerifier = JwtAccessTokenVerifier { _ -> key.getPublicKey() }
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                accessTokenService = accessTokenService,
+                accessTokenVerifier = accessTokenVerifier,
+            )
+        )
+
+        val token = accessTokenService.createAccessToken(
+            defaultAccessTokenClaims(
+                subject = "alice",
+                issuer = "https://issuer.example",
+                audience = "https://audience.example",
+            )
+        )
+
+        val result = provider.createCredentialRequest(
+            parameters = mapOf(
+                "credential_configuration_id" to listOf("test-credential")
+            ),
+            session = null,
+            accessTokenContext = AccessTokenContext(
+                token = token,
+                expectedIssuer = "https://wrong-issuer.example",
+            )
+        )
+
+        assertTrue(result is CredentialRequestResult.Failure)
     }
 
     private fun resolveCurrentKey(currentKey: ThreadLocal<Key?>): Key =
