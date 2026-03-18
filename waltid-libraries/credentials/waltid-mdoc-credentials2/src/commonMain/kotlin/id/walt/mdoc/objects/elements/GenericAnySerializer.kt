@@ -1,5 +1,6 @@
 package id.walt.mdoc.objects.elements
 
+import kotlinx.datetime.LocalDate
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -9,7 +10,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlinx.datetime.LocalDate
 import kotlin.time.Instant
 
 object GenericAnySerializer : KSerializer<Any> {
@@ -28,12 +28,20 @@ object GenericAnySerializer : KSerializer<Any> {
             is Instant -> encoder.encodeSerializableValue(InstantStringSerializer, value)
             is List<*> -> encoder.encodeSerializableValue(
                 ListSerializer(GenericAnySerializer),
-                value as List<Any>
+                value.filterNotNull().also {
+                    require(it.size == value.size) { "List contains null elements" }
+                }
             )
+
             is Map<*, *> -> encoder.encodeSerializableValue(
                 MapSerializer(String.serializer(), GenericAnySerializer),
-                value as Map<String, Any>
+                value.entries.associate { (k, v) ->
+                    require(k is String) { "Map key must be String, got: ${k?.let { it::class.simpleName }}" }
+                    requireNotNull(v) { "Map value cannot be null" }
+                    k to v
+                }
             )
+
             else -> throw IllegalArgumentException("Dynamic serialization unsupported for type: ${value::class.simpleName}")
         }
     }

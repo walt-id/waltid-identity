@@ -26,7 +26,6 @@ import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import java.time.Duration
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.ExperimentalTime
 import kotlin.time.measureTime
 import kotlin.time.toJavaDuration
@@ -102,7 +101,6 @@ actual class OCIKey actual constructor(
         throw NotImplementedError("PEM export is not available for remote keys.")
 
 
-    @OptIn(ExperimentalEncodingApi::class)
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val encodedMessage: String = Base64.encode(SHA256().digest(plaintext))
 

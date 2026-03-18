@@ -212,7 +212,6 @@ class MdocIssuanceTest {
             namespaces = mapOf(
                 ns to buildJsonObject {
                     put("family_name", "Doe")
-                    put("family_name", "Doe")
                     put("given_name", "John")
                     put("birth_date", "1986-03-22")
                     put("issue_date", "2019-10-20")

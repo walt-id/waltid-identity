@@ -8,6 +8,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import kotlinx.serialization.*
+import kotlinx.serialization.cbor.CborLabel
 
 /**
  * Represents the top-level request from a mdoc reader to a mdoc.
@@ -30,8 +31,9 @@ data class DeviceRequest(
     @SerialName("readerAuthAll")
     val readerAuthAll: List<CoseSign1>? = null,
 
-    //@SerialName("deviceRequestInfo")
-    //val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
+    @SerialName("deviceRequestInfo")
+    @CborLabel(24)
+    val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
 ) {
     companion object {
         const val VERSION = "1.0"
@@ -58,6 +60,29 @@ data class DeviceRequest(
 
     fun encodeToBase64Url(): String = coseCompliantCbor.encodeToByteArray(this).encodeToBase64Url()
 
+    /** Request multiple credentials
+     * @param docTypeRequestedElements Doctype -> Namespace -> Element Identifier
+     */
+    constructor(docTypeRequestedElements: Map<String, Map<String, List<String>>>, intentToRetain: Boolean = false) : this(
+        version = VERSION,
+        docRequests =
+            docTypeRequestedElements.map { (docType, requestedElements) ->
+                DocRequest(
+                    itemsRequest = ByteStringWrapper(
+                        value = ItemsRequest(
+                            docType = docType,
+                            namespaces = requestedElements
+                                .filterValues { it.isNotEmpty() }
+                                .mapValues { (_, elems) ->
+                                    ItemsRequestList(elems.distinct().map { ItemRequest(it, intentToRetain) })
+                                }
+                        )
+                    )
+                )
+            }
+    )
+
+    /** Request individual credential */
     constructor(docType: String, requestedElements: Map<String, List<String>>, intentToRetain: Boolean = false) : this(
         version = VERSION,
         docRequests = listOf(

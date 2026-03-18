@@ -84,7 +84,7 @@ object MdocsSchemaMappingFunction {
         return when (schemaType.type) {
             STRING, DATE, DATETIME -> JsonPrimitive((this as CborString).value)
             INT, LONG -> JsonPrimitive((this as CborInteger).long)
-            UINT -> JsonPrimitive((this as CborInteger).value.toLong())
+            UINT -> JsonPrimitive((this as CborInteger).value.toUInt())
             BOOLEAN -> JsonPrimitive((this as CborBoolean).value)
             BYTES -> JsonArray((this as CborByteString).value.map { JsonPrimitive(it) })
             ARRAY -> JsonArray((this as CborArray).map { it.schemafulToJsonElement(schemaType.generic!!) })
@@ -95,7 +95,7 @@ object MdocsSchemaMappingFunction {
     }
 
     @OptIn(ExperimentalUnsignedTypes::class)
-    fun Any.toCborElement(): CborElement = when (this) {
+    fun Any?.toCborElement(): CborElement = when (this) {
         is String -> {
             runCatching {
                 LocalDate.parse(this)
@@ -114,10 +114,11 @@ object MdocsSchemaMappingFunction {
         is ByteArray -> CborByteString(this)
         is LocalDate -> CborString(this.toString(), 1004u)
         is Instant -> CborString(this.toString(), 0u)
-        is List<*> -> CborArray(this.map { it!!.toCborElement() })
-        is Map<*, *> -> CborMap(this.entries.associate { CborString(it.key as String) to it.value!!.toCborElement() })
+        is List<*> -> CborArray(this.map { it.toCborElement() })
+        is Map<*, *> -> CborMap(this.entries.associate { CborString(it.key as String) to it.value.toCborElement() })
         is CborElement -> this
         is JsonElement -> this.jsonToCborElement()
+        null -> CborNull()
 
         else -> this.toSerializedJsonElement().jsonToCborElement()
         // else -> throw IllegalArgumentException("Cannot convert ${this::class.simpleName} to CborElement")

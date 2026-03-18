@@ -8,7 +8,6 @@ import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Device response data structure containing MDocs presented by device
@@ -63,7 +62,6 @@ data class DeviceResponse(
     /**
      * Serialize to CBOR base64 url-encoded string
      */
-    @OptIn(ExperimentalEncodingApi::class)
     fun toCBORBase64URL() = Base64.UrlSafe.encode(toCBOR())
 
     companion object {
@@ -79,7 +77,6 @@ data class DeviceResponse(
         @OptIn(ExperimentalSerializationApi::class)
         fun fromCBORHex(cbor: String) = Cbor.decodeFromHexString<DeviceResponse>(cbor)
 
-        @OptIn(ExperimentalEncodingApi::class)
         fun fromCBORBase64URL(cbor: String) =
             fromCBOR(Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL).decode(cbor))
 

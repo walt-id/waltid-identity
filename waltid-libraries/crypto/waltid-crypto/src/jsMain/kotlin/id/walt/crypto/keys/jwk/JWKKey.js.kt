@@ -21,8 +21,13 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.Uint8Array
+import kotlin.collections.Map
+import kotlin.collections.firstOrNull
+import kotlin.collections.joinToString
+import kotlin.collections.map
+import kotlin.collections.toPair
+import kotlin.collections.toTypedArray
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.json
 
 @OptIn(ExperimentalJsExport::class)
@@ -152,7 +157,6 @@ actual class JWKKey actual constructor(
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun parsePemToBinary(pem: String): ArrayBuffer {
         // 1. Remove header, footer, and line breaks
         val pemBody = pem
