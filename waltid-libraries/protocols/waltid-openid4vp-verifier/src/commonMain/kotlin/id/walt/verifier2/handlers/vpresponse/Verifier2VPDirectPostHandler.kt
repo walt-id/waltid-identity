@@ -65,10 +65,11 @@ object Verifier2VPDirectPostHandler {
 
                 val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(plaintext)
                 requireNotNull(deviceResponse.documents) { "Missing 'documents' in DeviceResponse!" }
-                val virtualVpToken = deviceResponse.documents!!.associate {
-                    it.docType to listOf(coseCompliantCbor.encodeToHexString(it))
-                }
-                //val virtualVpToken = mapOf("annex_c" to listOf(plaintext.encodeToBase64Url()))
+
+                val virtualVpToken = deviceResponse.documents!!
+                    .groupBy { it.docType }
+                    .mapValues { (_, docs) -> docs.map { doc -> coseCompliantCbor.encodeToHexString(doc) } }
+
                 //require("1.0" == deviceResponse.version)
                 //require(0u == deviceResponse.status)
                 //println("Device response: $deviceResponse")
