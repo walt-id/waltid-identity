@@ -6,7 +6,6 @@ import korlibs.crypto.SecureRandom
 import korlibs.crypto.sha256
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
@@ -141,7 +140,6 @@ data class SDPayload internal constructor(
         disclosePayloadRecursively(undisclosedPayload, it)
     }.isEmpty()
 
-    @OptIn(ExperimentalEncodingApi::class)
     @JsExport.Ignore // see SDPayloadBuilder for JS support
     companion object {
 

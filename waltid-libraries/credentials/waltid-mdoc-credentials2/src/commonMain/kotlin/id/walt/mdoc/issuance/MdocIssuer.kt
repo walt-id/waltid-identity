@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.mdoc.issuance
 
 import id.walt.cose.*
@@ -11,8 +13,11 @@ import id.walt.mdoc.objects.mso.DeviceKeyInfo
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.Status
 import id.walt.mdoc.objects.mso.ValidityInfo
+import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
+import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -98,6 +103,12 @@ object MdocIssuer {
         return issuerSigned
     }
 
+    val defaultSchemalessMappingFunction: (
+        docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement
+    ) -> CborElement? = { _, _, _, elementValueJson ->
+        elementValueJson.toCborElement()
+    }
+
     /**
      * Issue mdocs credential that is not defined as type-safe credential
      * (providing raw JSON data)
@@ -126,7 +137,7 @@ object MdocIssuer {
             namespace: String,
             elementIdentifier: String,
             elementValueJson: JsonElement
-        ) -> Any?
+        ) -> CborElement? = defaultSchemalessMappingFunction
     ): IssuerSigned {
         var idx = 0u
         val namespaceIssuerSignedItems = data.namespaces.mapValues { (namespace, namespaceData) ->

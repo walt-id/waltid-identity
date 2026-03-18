@@ -33,7 +33,8 @@ kotlin {
             implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+
+            implementation(identityLibs.kotlinx.serialization.json)
 
             implementation("io.ktor:ktor-client-core:${Versions.KTOR_VERSION}")
             implementation("io.ktor:ktor-client-serialization:${Versions.KTOR_VERSION}")

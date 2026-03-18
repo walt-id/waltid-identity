@@ -74,7 +74,7 @@ dependencies {
     // Test
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+    testImplementation(identityLibs.kotlinx.serialization.cbor)
     testImplementation("org.bouncycastle:bcprov-lts8on:2.73.9")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))

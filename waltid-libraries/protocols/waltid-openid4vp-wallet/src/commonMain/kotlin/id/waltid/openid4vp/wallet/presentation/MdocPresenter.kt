@@ -26,6 +26,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonPrimitive
 
 object MdocPresenter {
 
@@ -116,17 +117,25 @@ object MdocPresenter {
 
         //--- SD START
         val selectedIssuerSignedItems = dcqlQueryClaims
-            .groupBy { it.path.first() }
+            // Group by the string content of the first path element (Namespace)
+            .groupBy {
+                (it.path.firstOrNull()
+                    ?: throw IllegalArgumentException("Empty path in ClaimsQuery")
+                        ).jsonPrimitive.content
+            }
             .mapValues { (sdNamespace2, claimQueries) ->
                 claimQueries.map { claimsQuery ->
                     val path = claimsQuery.path
-                    require(path.size == 2) { "Invalid state: Expected DCQL claim path two have only two elements (namespace + elementIdentifier)?" }
+                    // Allow >= 2 because DCQL might query deep inside an mdoc element (e.g., an array index)
+                    require(path.size >= 2) { "Invalid state: Expected DCQL claim path to have at least two elements (namespace + elementIdentifier), but path was: $path" }
 
-                    val (sdNamespace, sdElementIdentifier) = path
-                    check(sdNamespace == sdNamespace2) { "??? $sdNamespace != $sdNamespace2" }
+                    // Extract the actual Strings from the JsonElements
+                    val sdNamespace: String = path[0].jsonPrimitive.content
+                    val sdElementIdentifier: String = path[1].jsonPrimitive.content
+
+                    check(sdNamespace == sdNamespace2) { "Namespace mismatch: $sdNamespace != $sdNamespace2" }
 
                     val issuerSignedNamespaces: Map<String, IssuerSignedList>? = issuerSigned.namespaces
-                    // todo: in theory, all items could be device-provided data too
                     requireNotNull(issuerSignedNamespaces) { "No issuer-signed namespaces to choose from for DCQL query claims!" }
 
                     val selectedNamespace: IssuerSignedList = issuerSignedNamespaces[sdNamespace]
@@ -136,10 +145,10 @@ object MdocPresenter {
                         selectedNamespace.entries.find { it.value.elementIdentifier == sdElementIdentifier }?.value
                             ?: throw IllegalArgumentException("Could not find item for DCQL query: namespace = $sdNamespace, element = $sdElementIdentifier")
 
-                    log.trace { "Mapped sd claim $claimsQuery to $matchedIssuerSignedItem of namespace $sdNamespace" }
+                    log.trace { "Mapped sd claim $claimsQuery to ${matchedIssuerSignedItem.elementIdentifier} of namespace $sdNamespace" }
 
                     matchedIssuerSignedItem
-                }
+                }.distinctBy { it.elementIdentifier } // 3. Prevent duplicate disclosures if multiple deep paths hit the same element
             }
         log.trace { "Selected disc:" + matchResult.selectedDisclosures }
         log.trace { "DCQL claims:  " + authorizationRequest.dcqlQuery!!.credentials.first().claims!! }
@@ -149,7 +158,6 @@ object MdocPresenter {
                 namespacedItems = selectedIssuerSignedItems,
                 issuerAuth = issuerSigned.issuerAuth
             )
-
         //--- SD END
 
         // 5. Assemble the final DeviceResponse

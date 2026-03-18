@@ -21,7 +21,6 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.verifier2.verifierModule
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
@@ -57,7 +56,7 @@ class Verifier2RemoteSchemaTest {
                     typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("credentialSubject", "achievement", "name")),
+                    ClaimsQuery(pathStrings = listOf("credentialSubject", "achievement", "name")),
                 )
             )
         )

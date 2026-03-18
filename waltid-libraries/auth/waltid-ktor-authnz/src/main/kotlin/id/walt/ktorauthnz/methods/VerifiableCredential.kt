@@ -22,7 +22,6 @@ import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 object VerifiableCredential : AuthenticationMethod("vc") {
 
@@ -104,7 +103,6 @@ object Verifier {
         return VerificationSessionResponse(presentationRequest, state)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     suspend fun getVerificationResult(verifierUrl: String, id: String, requestedClaims: List<String>): VerificationResultStatus {
         val resp = client.get("$verifierUrl/openid4vc/session/$id").body<JsonObject>()
 

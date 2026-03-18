@@ -23,7 +23,6 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -351,7 +350,6 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     open suspend fun executeFullAuthIssuance(
         credentialOffer: CredentialOffer,
         holderDid: String,
