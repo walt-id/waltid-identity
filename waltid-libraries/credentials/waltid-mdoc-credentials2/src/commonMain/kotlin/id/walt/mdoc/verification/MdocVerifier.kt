@@ -36,7 +36,12 @@ object MdocVerifier {
     private val log = KotlinLogging.logger {}
 
     fun buildSessionTranscriptForContext(context: MdocVerificationContext): SessionTranscript = when {
-        context.isAnnexC -> MdocCryptoHelper.reconstructAnnexCSessionTranscript(context, context.data?.get("data")?.jsonObject["encryptionInfo"]?.jsonPrimitive?.content ?: throw IllegalStateException("No encryption info to verify Annex C for, custom data is: ${context.data}"))
+        context.isAnnexC -> MdocCryptoHelper.reconstructAnnexCSessionTranscript(
+            context,
+            context.data?.get("data")?.jsonObject["encryptionInfo"]?.jsonPrimitive?.content
+                ?: throw IllegalStateException("No encryption info to verify Annex C for, custom data is: ${context.data}")
+        )
+
         context.isDcApi -> MdocCryptoHelper.reconstructDcApiOid4vpSessionTranscript(context)
         else -> MdocCryptoHelper.reconstructOid4vpSessionTranscript(context)
     }
@@ -248,7 +253,12 @@ object MdocVerifier {
 
 
 
-                log.trace { "Finding matching digest in MSO Digests for namespace: ${msoDigestsForNamespace.entries.mapIndexed { idx, msoDigest -> "Option $idx: DigestID=${msoDigest.key} Hash=${msoDigest.value.toHexString()}" }.joinToString()}" }
+                log.trace {
+                    "Finding matching digest in MSO Digests for namespace: ${
+                        msoDigestsForNamespace.entries.mapIndexed { idx, msoDigest -> "Option $idx: DigestID=${msoDigest.key} Hash=${msoDigest.value.toHexString()}" }
+                            .joinToString()
+                    }"
+                }
                 val matchingDigest = msoDigestsForNamespace.entries.find { (digestId, digest) -> issuerSignedItem.digestId == digestId }
                     ?: throw IllegalArgumentException("MSO does not contain value digest for this signed item!")
 
@@ -261,11 +271,7 @@ object MdocVerifier {
                     log.trace { "Hashes match for $namespace - ${issuerSignedItem.elementIdentifier}" }
                 } else {
                     val elementValueType = issuerSignedItem.elementValue::class.simpleName
-                    if (elementValueType !in listOf("String", "Long", "Boolean", "UInt")) {
-                        log.warn { "Hash does not match for non primitive type: $namespace - ${issuerSignedItem.elementIdentifier} has invalid hash for value: ${issuerSignedItem.elementValue} ($elementValueType). Does the Issuer support this non-primitive type?" }
-                    } else {
-                        throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest, IssuerSignedItem: $issuerSignedItemWrapped")
-                    }
+                    throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest, element value of type $elementValueType - issuer signed item: digest id: \"${issuerSignedItem.digestId}\", element identifier \"${issuerSignedItem.elementIdentifier}\" (namespace \"$namespace\"), random: \"${issuerSignedItem.random.toHexString()}\"")
                 }
 
             }

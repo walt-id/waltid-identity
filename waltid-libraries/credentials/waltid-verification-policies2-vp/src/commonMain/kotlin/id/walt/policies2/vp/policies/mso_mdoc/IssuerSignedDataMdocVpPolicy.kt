@@ -83,7 +83,7 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
                     addHashListResult("matching_digest", namespace, issuerSignedItem.elementIdentifier)
                 } else {
                     addHashListResult("unmatched_digests", namespace, issuerSignedItem.elementIdentifier)
-                    throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest, IssuerSignedItem: $issuerSignedItemWrapped")
+                    throw IllegalArgumentException("Value digest does not match! Has data been tampered with? Matching digest from MSO: $matchingDigest - issuer signed item: digest id: \"${issuerSignedItem.digestId}\", element identifier \"${issuerSignedItem.elementIdentifier}\" (namespace \"$namespace\"), random: \"${issuerSignedItem.random.toHexString()}\"")
 
                     /*
                     val elementValueType = issuerSignedItem.elementValue::class.simpleName

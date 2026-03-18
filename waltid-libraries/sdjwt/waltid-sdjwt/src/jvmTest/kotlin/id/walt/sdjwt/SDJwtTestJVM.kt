@@ -10,7 +10,6 @@ import korlibs.crypto.SHA256
 import korlibs.encoding.ASCII
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -122,7 +121,6 @@ class SDJwtTestJVM {
         assertFalse(forgedDisclosureVerifyResult.disclosuresVerified)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     fun forgeDislosure(disclosure: SDisclosure): String {
         return Base64.UrlSafe.encode(buildJsonArray {
             add(disclosure.salt)
@@ -157,9 +155,11 @@ class SDJwtTestJVM {
         val aud = "test-audience"
         val nonce = "test-nonce"
         val issuanceTime = Clock.System.now()
-        val signedJwt = SDJwt.sign(SDPayload.Companion.createSDPayload(
-            buildJsonObject { put("test", JsonPrimitive("hello")) },
-            SDMapBuilder().addField("test", true).build()), cryptoProvider)
+        val signedJwt = SDJwt.sign(
+            sdPayload = SDPayload.createSDPayload(
+                buildJsonObject { put("test", JsonPrimitive("hello")) },
+                SDMapBuilder().addField("test", true).build()), jwtCryptoProvider = cryptoProvider
+        )
         val presentedJwtNoKb = signedJwt.present(true)
         assertNull(presentedJwtNoKb.keyBindingJwt)
         val presentedJwtWithKb = signedJwt.present(true, aud, nonce, cryptoProvider)

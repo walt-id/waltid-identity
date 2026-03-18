@@ -296,7 +296,9 @@ object VerificationSessionCreator {
                 var deviceRequest = DeviceRequest(setup.requestedElements)
 
                 // ===== READER AUTHENTICATION =====
-                if (isSignedRequest && key != null && !x5c.isNullOrEmpty()) {
+                if (isSignedRequest) {
+                    requireNotNull(key) { "Signing key is required for signed Annex C requests" }
+                    require(!x5c.isNullOrEmpty()) { "x5c is required for signed Annex C requests" }
                     // Build the DC API Session Transcript
                     val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
                         encryptionInfoB64,

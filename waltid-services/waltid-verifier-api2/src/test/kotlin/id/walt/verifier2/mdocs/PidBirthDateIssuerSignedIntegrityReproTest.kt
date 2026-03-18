@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUnsignedTypes::class)
+
 package id.walt.verifier2.mdocs
 
 import id.walt.mdoc.objects.digest.ValueDigest
@@ -5,13 +7,15 @@ import id.walt.mdoc.parser.MdocParser
 import id.walt.policies2.vp.policies.IssuerSignedDataMdocVpPolicy
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import kotlinx.datetime.LocalDate
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborString
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PidBirthDateIssuerSignedIntegrityReproTest {
 
+    @OptIn(ExperimentalSerializationApi::class)
     @Test
     fun issuerSignedIntegrity_requires_pid_birthDate_fullDate_encoding() = kotlinx.coroutines.test.runTest {
         /**
@@ -52,11 +56,11 @@ class PidBirthDateIssuerSignedIntegrityReproTest {
 
         // PID `birth_date` is a `full-date` (CBOR tag 1004) and should be modeled as a date type.
         // If this is a String, the implementation is very likely losing tagged-CBOR semantics.
-        /*assertTrue( // Impossible assertion
-            wrapped.value.elementValue is LocalDate,
-            "PID birth_date must be handled as LocalDate (CBOR full-date tag 1004), but was ${wrapped.value.elementValue::class.simpleName}. " +
-                "If this is String, tagged-CBOR semantics are likely lost, causing digest mismatch."
-        )*/
+        assertTrue(
+            wrapped.value.elementValue is CborString && wrapped.value.elementValue.tags.contentEquals(ulongArrayOf(1004U)),
+            "PID birth_date must be handled as LocalDate (CBOR full-date tag 1004), but was ${wrapped.value.elementValue::class.simpleName} (tags: ${wrapped.value.elementValue.tags}). " +
+                    "If this is String, tagged-CBOR semantics are likely lost, causing digest mismatch."
+        )
 
         val digestFromMso = mso.valueDigests[namespace]
             ?.entries

@@ -14,7 +14,13 @@ data class DeviceRequestInfo(
 
     // Note: The spec allows extension fields (* tstr => any).
     // Proprietary extensions would be added here
-)
+) {
+    init {
+        require(useCases == null || useCases.isNotEmpty()) {
+            "\"useCases\" must be non-empty when provided."
+        }
+    }
+}
 
 /**
  * Represents the UseCase CDDL structure.

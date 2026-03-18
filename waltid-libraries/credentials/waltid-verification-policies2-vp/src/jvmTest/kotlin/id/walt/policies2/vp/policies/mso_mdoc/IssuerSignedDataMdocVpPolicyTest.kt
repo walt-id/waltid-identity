@@ -3,11 +3,7 @@
 
 package id.walt.policies2.vp.policies
 
-import id.walt.cose.Cose
-import id.walt.cose.CoseHeaders
-import id.walt.cose.CoseKey
-import id.walt.cose.CoseSign1
-import id.walt.cose.coseCompliantCbor
+import id.walt.cose.*
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
@@ -25,14 +21,8 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.ExperimentalTime
@@ -114,7 +104,6 @@ class IssuerSignedDataMdocVpPolicyTest {
         assertEquals("IllegalArgumentException", result.errors.first().error)
     }
 
-    @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)
     @Test
     fun shouldFailWhenNonPrimitivesMismatches() = runTest {
         val namespace = "org.iso.18013.5.1"

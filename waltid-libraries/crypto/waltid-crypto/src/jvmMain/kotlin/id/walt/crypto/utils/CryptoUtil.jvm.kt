@@ -4,9 +4,7 @@ import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 actual fun sha256WithRsa(privateKeyAsPem: String, data: ByteArray): ByteArray {
     /* val key = runBlocking { LocalKey.importPEM(privateKeyAsPem).getOrThrow() }
 
