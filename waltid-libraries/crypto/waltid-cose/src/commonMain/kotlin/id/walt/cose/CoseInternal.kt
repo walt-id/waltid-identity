@@ -7,7 +7,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.Cbor
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.encodeToByteArray
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -38,7 +38,7 @@ val coseCompliantCbor by lazy {
  * Sig_structure = [ context, body_protected, external_aad, payload ]
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 @OptIn(ExperimentalSerializationApi::class)
 internal data class Signature1ToBeSigned(
     val context: String = "Signature1",
@@ -80,7 +80,7 @@ internal fun buildSignatureStructure(
  * MAC_structure = [ context, body_protected, external_aad, payload ]
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 @OptIn(ExperimentalSerializationApi::class)
 internal data class Mac0ToBeMaced(
     val context: String, // = "MAC0"

@@ -294,7 +294,9 @@ object DcqlMatcher {
         if (isCredentialPotentiallySD && credential.disclosures != null) {
             // More robust path matching for SD-JWTs is needed here.
             // This simplistic approach assumes path.last() is the claim name.
-            val targetClaimName = claimQuery.path.lastOrNull()
+            val targetClaimName = claimQuery.path.lastOrNull {
+                it is JsonPrimitive && it.isString
+            }?.jsonPrimitive?.content
             val matchingDisclosure = credential.disclosures?.find { it.name == targetClaimName /* && it.location matches claimQuery.path more precisely */ }
 
             if (matchingDisclosure != null) {
@@ -322,7 +324,7 @@ object DcqlMatcher {
         if (!claimQuery.values.isNullOrEmpty()) {
             val matchesValue = claimQuery.values.any { queryValue -> queryValue == claimJsonElement }
             if (!matchesValue) {
-                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.path} value '$claimJsonElement' (${if (claimJsonElement is JsonPrimitive && claimJsonElement.isString) "string" else "non-string"}) does not match required values ${claimQuery.values} in ${credential.id}" }
+                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.path} value '$claimJsonElement' does not match required values ${claimQuery.values} in ${credential.id} " }
                 return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path}"))
             }
         }
@@ -503,26 +505,47 @@ object DcqlMatcher {
     }
 
     /** Basic JSON path resolver. Needs enhancement for arrays, different formats. */
-    fun resolveClaimPath(data: JsonObject, path: List<String>): JsonElement? {
-        var currentElement: JsonElement? = data["vc"] as? JsonObject ?: data
-        for (segment in path) {
-            when (currentElement) {
-                is JsonObject -> currentElement = currentElement[segment]
-                // Basic array index support (needs proper error handling/type checks)
-                is JsonArray -> {
-                    val index = segment.toIntOrNull()
-                    currentElement = if (index != null && index >= 0 && index < currentElement.size) {
-                        currentElement[index]
-                    } else {
-                        null
-                    }
-                }
+    fun resolveClaimPath(data: JsonObject, path: List<JsonElement>): JsonElement? {
+        var currentElements: List<JsonElement> = listOf(data["vc"] as? JsonObject ?: data)
 
-                else -> return null // Cannot traverse further
+        for (segment in path) {
+            val nextElements = mutableListOf<JsonElement>()
+
+            for (element in currentElements) {
+                when (element) {
+                    is JsonObject -> {
+                        if (segment is JsonPrimitive && segment.isString) {
+                            element[segment.content]?.let { nextElements.add(it) }
+                        }
+                    }
+                    is JsonArray -> {
+                        if (segment is JsonNull) {
+                            // null means select all elements in the array
+                            nextElements.addAll(element)
+                        } else if (segment is JsonPrimitive && segment.intOrNull != null) {
+                            // integer means select specific index
+                            val index = segment.int
+                            if (index in 0 until element.size) {
+                                nextElements.add(element[index])
+                            }
+                        }
+                    }
+
+                    else -> throw NotImplementedError()
+                }
             }
-            if (currentElement == null || currentElement is JsonNull) return null
+
+            if (nextElements.isEmpty()) return null
+            currentElements = nextElements
         }
-        return currentElement
+
+        // If the final result is a single element, return it.
+        // If it resulted from a wildcard (null), return it as a JsonArray.
+        return if (currentElements.size == 1 && path.lastOrNull() !is JsonNull) {
+            currentElements.first()
+        } else {
+            JsonArray(currentElements)
+        }
     }
 
     /** Check if the matched credentials satisfy the credential set requirements. */

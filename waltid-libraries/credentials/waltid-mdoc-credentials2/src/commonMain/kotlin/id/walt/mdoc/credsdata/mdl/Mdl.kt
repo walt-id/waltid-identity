@@ -303,12 +303,15 @@ object InstantLongSerializer : KSerializer<Instant> {
 @Serializable
 data class DrivingPrivilege(
     @SerialName("vehicle_category_code") val vehicleCategoryCode: String,
+
     @ValueTags(1004u)
     @SerialName("issue_date")
     val issueDate: LocalDate? = null, // full-date
+
     @ValueTags(1004u)
     @SerialName("expiry_date")
     val expiryDate: LocalDate? = null,// full-date
+
     val codes: List<DrivingPrivilegeCode>? = null,
 ) {
     @Serializable

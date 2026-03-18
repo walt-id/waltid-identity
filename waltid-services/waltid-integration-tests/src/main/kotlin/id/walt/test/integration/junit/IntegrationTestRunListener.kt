@@ -8,14 +8,14 @@ import org.junit.platform.launcher.TestPlan
 
 class IntegrationTestRunListener : TestExecutionListener, Klogging {
 
-    override fun testPlanExecutionStarted(testPlan: TestPlan?): Unit = runBlocking {
+    override fun testPlanExecutionStarted(testPlan: TestPlan): Unit = runBlocking {
         logger.info { "Test Execution started" }
-        AbstractIntegrationTest.Companion.environment.start()
+        AbstractIntegrationTest.environment.start()
     }
 
-    override fun testPlanExecutionFinished(testPlan: TestPlan?): Unit = runBlocking {
+    override fun testPlanExecutionFinished(testPlan: TestPlan): Unit = runBlocking {
         logger.info { "Test Execution finished" }
-        AbstractIntegrationTest.Companion.environment.shutdown()
+        AbstractIntegrationTest.environment.shutdown()
     }
 
 }

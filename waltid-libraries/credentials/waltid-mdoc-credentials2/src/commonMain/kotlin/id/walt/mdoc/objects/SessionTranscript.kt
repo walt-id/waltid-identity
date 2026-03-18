@@ -7,7 +7,7 @@ import id.walt.mdoc.objects.handover.isooid4vp.IsoOID4VPHandover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.cbor.CborTag.CBOR_ENCODED_DATA
 import kotlinx.serialization.cbor.ValueTags
 
@@ -29,7 +29,7 @@ import kotlinx.serialization.cbor.ValueTags
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@CborArray
+@CborObjectAsArray
 @ConsistentCopyVisibility
 data class SessionTranscript private constructor(
     // WORKAROUND: These nullable Int properties are a hack to correctly serialize null

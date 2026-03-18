@@ -21,7 +21,6 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
 import id.walt.verifier2.verifierModule
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
@@ -56,7 +55,7 @@ class W3CVerifier2IntegrationTest {
                 ),
                 claims = listOf(
                     //         ClaimsQuery(path = listOf("issuer", "name") ),
-                    ClaimsQuery(path = listOf("credentialSubject", "achievement", "name")),
+                    ClaimsQuery(pathStrings = listOf("credentialSubject", "achievement", "name")),
                     //ClaimsQuery(path = listOf("credentialSubject", "achievement", "description", "narrative")),
                 )
             ),
@@ -67,9 +66,9 @@ class W3CVerifier2IntegrationTest {
                     typeValues = listOf(listOf("VerifiableCredential", "UniversityDegreeCredential"))
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("issuer", "id")),
-                    ClaimsQuery(path = listOf("credentialSubject", "id")),
-                    ClaimsQuery(path = listOf("credentialSubject", "degree", "type")),
+                    ClaimsQuery(pathStrings = listOf("issuer", "id")),
+                    ClaimsQuery(pathStrings = listOf("credentialSubject", "id")),
+                    ClaimsQuery(pathStrings = listOf("credentialSubject", "degree", "type")),
                 )
             )
         )

@@ -29,7 +29,6 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
@@ -92,7 +91,7 @@ class AzureKeyRestApi(
             logger.debug { "Skipping Azure key init: credentials not available" }
             return
         }
-        
+
         ensureAccessTokenValid()
 
         if (_publicKey == null) fetchAndUpdatePublicKey()
@@ -191,7 +190,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun signJws(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
@@ -207,7 +205,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
 
         val publicKey = getPublicKey()
@@ -221,7 +218,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val publicKey = getPublicKey()
         val verification = publicKey.verifyJws(signedJws)

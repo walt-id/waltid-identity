@@ -32,7 +32,6 @@ import org.kotlincrypto.hash.sha2.SHA256
 import java.security.cert.X509Certificate
 import javax.net.ssl.X509TrustManager
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -101,7 +100,6 @@ class EBSIIssueToHolderConformanceTest {
     }
 
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun getCTIssueQualificationCredential() = runTest {
 

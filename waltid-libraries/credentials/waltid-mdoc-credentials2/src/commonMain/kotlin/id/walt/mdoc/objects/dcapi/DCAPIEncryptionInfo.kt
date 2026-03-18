@@ -7,7 +7,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.TransformingSerializerTemplate
 import kotlinx.serialization.*
 import kotlinx.serialization.builtins.serializer
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Contains the encryption parameters for a DCAPI request.
@@ -22,7 +22,7 @@ import kotlinx.serialization.cbor.CborArray
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
 @SerialName("EncryptionInfo")
-@CborArray
+@CborObjectAsArray
 data class DCAPIEncryptionInfo(
     /** Should be set to "dcapi" */
     val type: String,

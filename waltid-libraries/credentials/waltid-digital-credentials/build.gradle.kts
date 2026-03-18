@@ -54,9 +54,8 @@ kotlin {
         jvmTest.dependencies {
             implementation("org.slf4j:slf4j-simple:2.0.17")
 
-            implementation("org.junit.jupiter:junit-jupiter-api")
-            implementation("org.junit.jupiter:junit-jupiter-params")
-            runtimeOnly("org.junit.jupiter:junit-jupiter-engine")
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.params)
         }
     }
 }

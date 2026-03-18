@@ -4,7 +4,9 @@ package id.walt.mdoc.objects.elements
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
+import kotlinx.serialization.cbor.CborElement
 import org.kotlincrypto.random.CryptoRand
 
 /**
@@ -23,6 +25,7 @@ import org.kotlincrypto.random.CryptoRand
  * @property elementIdentifier The identifier for the data element (e.g., "family_name").
  * @property elementValue The actual value of the data element. Its type can be any valid CBOR type, represented here as `Any`.
  */
+@Serializable
 data class IssuerSignedItem(
     @SerialName(PROP_DIGEST_ID)
     val digestId: UInt,
@@ -35,7 +38,7 @@ data class IssuerSignedItem(
     val elementIdentifier: String,
 
     @SerialName(PROP_ELEMENT_VALUE)
-    val elementValue: Any
+    val elementValue: CborElement
 ) {
 
     /**
@@ -98,7 +101,7 @@ data class IssuerSignedItem(
         internal const val PROP_ELEMENT_ID = "elementIdentifier"
         internal const val PROP_ELEMENT_VALUE = "elementValue"
 
-        fun create(digestId: UInt, elementIdentifier: String, elementValue: Any): IssuerSignedItem {
+        fun create(digestId: UInt, elementIdentifier: String, elementValue: CborElement): IssuerSignedItem {
             val randomSalt = CryptoRand.nextBytes(ByteArray(24)) // must be at least 16 bytes
 
             val issuerSignedItem = IssuerSignedItem(digestId, randomSalt, elementIdentifier, elementValue)

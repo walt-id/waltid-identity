@@ -50,7 +50,6 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 import org.cose.java.AlgorithmID
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -684,7 +683,6 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     fun forgeSDisclosureString(disclosures: String): String {
         return disclosures.split("~").filter { it.isNotEmpty() }.map { SDisclosure.parse(it) }
             .joinToString("~") { disclosure ->

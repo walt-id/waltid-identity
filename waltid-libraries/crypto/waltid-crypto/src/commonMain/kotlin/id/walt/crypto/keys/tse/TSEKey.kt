@@ -28,7 +28,6 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
@@ -93,7 +92,6 @@ class TSEKey(
     private fun throwTSEError(msg: String): Nothing =
         throw RuntimeException("Invalid TSE server ($server) response: $msg")
 
-    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun retrievePublicKey(): ByteArray {
         logger.debug { "Retrieving public key: ${this.id}" }
 
@@ -156,7 +154,6 @@ class TSEKey(
     @JsExport.Ignore
     override suspend fun exportPEM(): String = throw IllegalArgumentException("The private key should not be exposed.")
 
-    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -172,7 +169,6 @@ class TSEKey(
         return Base64.decode(signatureBase64)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -188,7 +184,7 @@ class TSEKey(
 
         val signable = "$header.$payload"
 
-        val signatureBase64 = Base64.encode(signRaw(signable.encodeToByteArray()) as ByteArray)
+        val signatureBase64 = Base64.encode(signRaw(signable.encodeToByteArray()))
         val signatureBase64Url = signatureBase64.base64toBase64Url()
 
         return "$signable.$signatureBase64Url"
@@ -251,7 +247,6 @@ class TSEKey(
                 ?: throw KeyNotFoundException(message = "No keys/1/public_key in data response")
         ).value
 
-    @OptIn(ExperimentalEncodingApi::class)
     @JvmBlocking
     @JvmAsync
     @JsPromise

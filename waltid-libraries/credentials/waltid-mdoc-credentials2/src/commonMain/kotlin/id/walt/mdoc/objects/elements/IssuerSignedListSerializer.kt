@@ -8,15 +8,10 @@ import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.cbor.ValueTags
-import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.SerialKind
 import kotlinx.serialization.descriptors.StructureKind
 import kotlinx.serialization.encoding.*
-import net.orandja.obor.codec.Cbor
-import net.orandja.obor.data.CborMap
-import net.orandja.obor.data.CborObject
-import net.orandja.obor.data.CborText
 
 /**
  * Custom serializer for the `IssuerSignedList` class.
@@ -74,7 +69,7 @@ open class IssuerSignedListSerializer(private val namespace: String) : KSerializ
      * Private helper to serialize an IssuerSignedItem to its CBOR byte representation using its dedicated serializer.
      */
     private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
-        coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
+        coseCompliantCbor.encodeToByteArray(IssuerSignedItem.serializer(), this)
 
     override fun deserialize(decoder: Decoder): IssuerSignedList {
         val entries = mutableListOf<ByteStringWrapper<IssuerSignedItem>>()
@@ -85,24 +80,9 @@ open class IssuerSignedListSerializer(private val namespace: String) : KSerializ
                     break
                 }
 
-                // 1. Decode the raw bytestring of one item from the list.
                 val readBytes = decoder.decodeSerializableValue(ByteArraySerializer())
-
-                // 2. Perform a partial, generic decoding to inspect the bytes and find the elementIdentifier.
-                // This is necessary to select the correct type-specific serializer for the full decoding.
-                val cborMap = Cbor.decodeFromByteArray<CborObject>(readBytes) as CborMap
-
-                val elementIdItem = cborMap.first { (it.key as CborText).value == IssuerSignedItem.PROP_ELEMENT_ID }
-                val elementId = (elementIdItem.value as CborText).value
-                entries += ByteStringWrapper(
-                    // 3. Perform the final, type-safe decoding using the specific serializer for that element.
-                    coseCompliantCbor.decodeFromByteArray(
-                        IssuerSignedItemSerializer(
-                            namespace,
-                            elementId
-                        ), cborMap.cbor), // // Use the raw bytes of the map for final decoding
-                    cborMap.cbor
-                )
+                val item = coseCompliantCbor.decodeFromByteArray(IssuerSignedItem.serializer(), readBytes)
+                entries += ByteStringWrapper(item, readBytes)
             }
         }
         return IssuerSignedList(entries)

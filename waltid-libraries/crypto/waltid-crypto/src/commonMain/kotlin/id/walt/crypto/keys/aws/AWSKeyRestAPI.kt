@@ -31,7 +31,6 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Clock
@@ -539,7 +538,6 @@ ${sha256Hex(canonicalRequest)}
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        @OptIn(ExperimentalEncodingApi::class)
         suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
             val method = HttpMethod.Post
             val body = """

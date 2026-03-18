@@ -39,15 +39,15 @@ dependencies {
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    api(identityLibs.kotlinx.serialization.json)
 
     // Health checks
     api("com.sksamuel.cohort:cohort-ktor:2.6.2")
 
     // OpenAPI
-    api("io.github.smiley4:ktor-openapi:5.5.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.5.0")
-    implementation("io.github.smiley4:ktor-redoc:5.5.0")
+    api("io.github.smiley4:ktor-openapi:5.6.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
+    implementation("io.github.smiley4:ktor-redoc:5.6.0")
 
     implementation("io.github.smiley4:schema-kenerator-core:2.6.0")
     implementation("io.github.smiley4:schema-kenerator-swagger:2.6.0")
