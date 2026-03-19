@@ -1,0 +1,30 @@
+{
+  "name": "org.multipaz.example.boarding-pass.1",
+  "docType": "org.multipaz.example.boarding-pass.1",
+  "fields": [
+    {
+      "name": "passenger_name",
+      "namespace": "org.multipaz.example.boarding-pass.1",
+      "mandatory": true,
+      "sampleValue": "Erika Mustermann"
+    },
+    {
+      "name": "flight_number",
+      "namespace": "org.multipaz.example.boarding-pass.1",
+      "mandatory": true,
+      "sampleValue": "United 815"
+    },
+    {
+      "name": "seat_number",
+      "namespace": "org.multipaz.example.boarding-pass.1",
+      "mandatory": true,
+      "sampleValue": "12A"
+    },
+    {
+      "name": "departure_time",
+      "namespace": "org.multipaz.example.boarding-pass.1",
+      "mandatory": true,
+      "sampleValue": null
+    }
+  ]
+}
