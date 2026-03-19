@@ -41,60 +41,6 @@ data class IssuerSignedItem(
     val elementValue: CborElement
 ) {
 
-    /**
-     * Note: A custom `equals` implementation is required because the `elementValue` property is of type `Any`
-     * and may contain arrays. The default `equals` for a `data class` would use reference equality
-     * for arrays, leading to incorrect comparisons. This implementation correctly uses content-based
-     * equality for all array types.
-     */
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is IssuerSignedItem) return false
-
-        if (digestId != other.digestId) return false
-        if (!random.contentEquals(other.random)) return false
-        if (elementIdentifier != other.elementIdentifier) return false
-
-        val otherValue = other.elementValue
-        return when (elementValue) {
-            is ByteArray -> otherValue is ByteArray && elementValue.contentEquals(otherValue)
-            is IntArray -> otherValue is IntArray && elementValue.contentEquals(otherValue)
-            is BooleanArray -> otherValue is BooleanArray && elementValue.contentEquals(otherValue)
-            is CharArray -> otherValue is CharArray && elementValue.contentEquals(otherValue)
-            is ShortArray -> otherValue is ShortArray && elementValue.contentEquals(otherValue)
-            is LongArray -> otherValue is LongArray && elementValue.contentEquals(otherValue)
-            is FloatArray -> otherValue is FloatArray && elementValue.contentEquals(otherValue)
-            is DoubleArray -> otherValue is DoubleArray && elementValue.contentEquals(otherValue)
-            is Array<*> -> otherValue is Array<*> && elementValue.contentDeepEquals(otherValue)
-            else -> elementValue == otherValue
-        }
-    }
-
-    /**
-     * Note: A custom `hashCode` implementation is required to match the custom `equals` logic.
-     * The default `hashCode` would be incorrect for arrays. This implementation correctly uses
-     * content-based hashing for all array types to ensure a consistent contract with `equals`.
-     */
-    override fun hashCode(): Int {
-        var result = digestId.hashCode()
-        result = 31 * result + random.contentHashCode()
-        result = 31 * result + elementIdentifier.hashCode()
-        val valueHash = when (elementValue) {
-            is ByteArray -> elementValue.contentHashCode()
-            is IntArray -> elementValue.contentHashCode()
-            is BooleanArray -> elementValue.contentHashCode()
-            is CharArray -> elementValue.contentHashCode()
-            is ShortArray -> elementValue.contentHashCode()
-            is LongArray -> elementValue.contentHashCode()
-            is FloatArray -> elementValue.contentHashCode()
-            is DoubleArray -> elementValue.contentHashCode()
-            is Array<*> -> elementValue.contentDeepHashCode()
-            else -> elementValue.hashCode()
-        }
-        result = 31 * result + valueHash
-        return result
-    }
-
     companion object {
         internal const val PROP_DIGEST_ID = "digestID"
         internal const val PROP_RANDOM = "random"
@@ -108,5 +54,25 @@ data class IssuerSignedItem(
 
             return issuerSignedItem
         }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is IssuerSignedItem) return false
+
+        if (digestId != other.digestId) return false
+        if (!random.contentEquals(other.random)) return false
+        if (elementIdentifier != other.elementIdentifier) return false
+        if (elementValue != other.elementValue) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = digestId.hashCode()
+        result = 31 * result + random.contentHashCode()
+        result = 31 * result + elementIdentifier.hashCode()
+        result = 31 * result + elementValue.hashCode()
+        return result
     }
 }

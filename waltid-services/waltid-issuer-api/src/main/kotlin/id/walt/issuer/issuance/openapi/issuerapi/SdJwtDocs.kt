@@ -44,7 +44,7 @@ object SdJwtDocs {
         }
     }
 
-    fun getSdJwtBatchDocs(): RouteConfig.() -> Unit =  {
+    fun getSdJwtBatchDocs(): RouteConfig.() -> Unit = {
         summary = "Signs a list of credentials with SD and starts an OIDC credential exchange flow."
         description =
             "This endpoint issues a list of W3C Verifiable Credentials, and returns an issuance URL "

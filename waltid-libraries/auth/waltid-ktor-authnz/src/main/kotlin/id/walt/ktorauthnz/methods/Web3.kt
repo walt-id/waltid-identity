@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.ktorauthnz.methods
 
 import id.walt.commons.web.InvalidChallengeException
@@ -28,7 +26,6 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.security.SecureRandom
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 
 @OptIn(ExperimentalStdlibApi::class)
@@ -89,7 +86,8 @@ object Web3 : AuthenticationMethod("web3") {
 
         val recoveredAddress = "0x" + Keys.getAddress(recoveredKey)
 
-        authCheck(recoveredAddress.equals(expectedAddress, ignoreCase = true) ,
+        authCheck(
+            recoveredAddress.equals(expectedAddress, ignoreCase = true),
             Web3AuthException("Recovered address ($recoveredAddress) does not match provided address (${expectedAddress})")
         )
 
@@ -102,7 +100,7 @@ object Web3 : AuthenticationMethod("web3") {
         val challenge = siweReq.challenge
         log.trace { "Challenge was: $challenge. Verifying challenge authenticity..." }
 
-        authCheck(jwtHandler.validateToken(challenge) , InvalidChallengeException())
+        authCheck(jwtHandler.validateToken(challenge), InvalidChallengeException())
         log.trace { "Challenge is authentic. Verifying challenge timestamp..." }
 
         val decodedJwt = challenge.decodeJws()

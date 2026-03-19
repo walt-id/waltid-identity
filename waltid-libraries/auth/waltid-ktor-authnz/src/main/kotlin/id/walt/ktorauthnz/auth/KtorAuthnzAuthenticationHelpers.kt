@@ -19,9 +19,12 @@ fun ApplicationCall.getAuthToken(): String {
 annotation class ExternallyProvidedJWTCannotResolveToAuthenticatedSession()
 
 @ExternallyProvidedJWTCannotResolveToAuthenticatedSession
-suspend fun RoutingContext.getAuthenticatedSession(): AuthSession = KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
+suspend fun RoutingContext.getAuthenticatedSession(): AuthSession =
+    KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
+
 @ExternallyProvidedJWTCannotResolveToAuthenticatedSession
-suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession = KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
+suspend fun PipelineContext<Unit, ApplicationCall>.getAuthenticatedSession(): AuthSession =
+    KtorAuthnzManager.tokenHandler.resolveTokenToSession(call.getAuthToken())
 
 suspend fun ApplicationCall.getAuthenticatedAccount(): String = KtorAuthnzManager.tokenHandler.getTokenAccountId(getAuthToken())
 

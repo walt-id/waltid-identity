@@ -52,7 +52,7 @@ data class FlowPermissionSet(
             )
         }
 
-//      For Javascript
+        //      For Javascript
         fun fromPermissionStringFlow(id: String, permissionStrings: String): FlowPermissionSet {
             return FlowPermissionSet(
                 id = id,

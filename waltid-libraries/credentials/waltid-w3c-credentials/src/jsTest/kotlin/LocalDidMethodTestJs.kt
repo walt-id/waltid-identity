@@ -28,6 +28,7 @@ class JWKKeyAndDidManagementTest {
 
     @Test
     fun testDidJwkEcKeys() = runTest { testDidMethodsAndKeys(didJwk, ecKeys) }
+
     @Test
     fun testDidWebEcKeys() = runTest { testDidMethodsAndKeys(didWeb, ecKeys) }
 

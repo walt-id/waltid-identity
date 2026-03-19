@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.mdoc.conversion
 
 import id.walt.mdoc.dataelement.ByteStringElement
@@ -9,7 +7,6 @@ import id.walt.mdoc.dataelement.json.JsonStringToCborMappingConfig
 import id.walt.mdoc.dataelement.json.StringToCborTypeConversion
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.*
-import kotlin.time.ExperimentalTime
 
 class JsonStringConversionTest {
 

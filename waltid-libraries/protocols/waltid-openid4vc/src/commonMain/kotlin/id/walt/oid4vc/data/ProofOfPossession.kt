@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.oid4vc.data
 
@@ -13,7 +13,6 @@ import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
 @ConsistentCopyVisibility
@@ -66,7 +65,7 @@ data class ProofOfPossession private constructor(
         private val audience: String? = null,
     ) : ProofBuilder() {
 
-        // TODO: fix the initial issue of the jwk formatting      
+        // TODO: fix the initial issue of the jwk formatting
         fun normalizeKeyOps(jwk: JsonObject): JsonObject {
             val normalized = jwk.toMutableMap()
 
@@ -94,6 +93,7 @@ data class ProofOfPossession private constructor(
             x5c?.let { put(JWTClaims.Header.x5c, it) }
             trustChain?.let { put("trust_chain", it) }
         }
+
         @OptIn(ExperimentalUuidApi::class)
         val payload = buildJsonObject {
             clientId?.let {

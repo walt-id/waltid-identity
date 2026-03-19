@@ -261,6 +261,7 @@ fun Application.testApp(jwt: Boolean) {
                 signingKey = runBlocking { JWKKey.generate(KeyType.Ed25519) }
                 verificationKey = signingKey
             }
+
             else -> KtorAuthNzTokenHandler()
         }
         KtorAuthnzManager.accountStore = ExampleAccountStore

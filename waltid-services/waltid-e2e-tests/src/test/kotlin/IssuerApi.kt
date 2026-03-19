@@ -47,7 +47,7 @@ class IssuerApi(private val e2e: E2ETest, private val client: HttpClient, privat
     private suspend fun issue(name: String, url: String, request: IssuanceRequest, output: ((String) -> Unit)? = null) =
         e2e.test(name) {
             client.post(url) {
-                if(!cbUrl.isNullOrEmpty()) {
+                if (!cbUrl.isNullOrEmpty()) {
                     header("statusCallbackUri", cbUrl)
                 }
                 setBody(request)

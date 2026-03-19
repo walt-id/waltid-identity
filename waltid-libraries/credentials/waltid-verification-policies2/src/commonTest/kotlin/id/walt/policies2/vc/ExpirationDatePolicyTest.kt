@@ -13,6 +13,7 @@ class ExpirationDatePolicyTest : BasePolicyTest() {
 
     @Test
     fun testOk() = baseTestOk()
+
     @Test
     fun testFail() = baseTestNok()
 

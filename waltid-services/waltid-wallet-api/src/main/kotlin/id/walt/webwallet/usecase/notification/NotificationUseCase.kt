@@ -1,10 +1,9 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.notification
 
 import id.walt.webwallet.db.models.Notification
 import id.walt.webwallet.service.notifications.NotificationService
-import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 

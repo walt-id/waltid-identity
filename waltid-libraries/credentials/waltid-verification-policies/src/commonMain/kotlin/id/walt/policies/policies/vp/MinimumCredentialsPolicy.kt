@@ -42,10 +42,10 @@ class MinimumCredentialsPolicy : CredentialWrapperValidatorPolicy(
             )
         else {
             Result.failure(
-              id.walt.policies.MinimumCredentialsException(
-                total = presentedCount,
-                missing = n - presentedCount
-              )
+                id.walt.policies.MinimumCredentialsException(
+                    total = presentedCount,
+                    missing = n - presentedCount
+                )
             )
         }
     }

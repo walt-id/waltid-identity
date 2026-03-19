@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
@@ -43,7 +41,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {

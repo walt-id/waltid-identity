@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca
 
 import id.walt.crypto.keys.Key
@@ -23,7 +21,7 @@ import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
 import kotlin.test.*
-import kotlin.time.ExperimentalTime
+
 
 /*
 The "main" purpose of this test is to check that the data that was input in the

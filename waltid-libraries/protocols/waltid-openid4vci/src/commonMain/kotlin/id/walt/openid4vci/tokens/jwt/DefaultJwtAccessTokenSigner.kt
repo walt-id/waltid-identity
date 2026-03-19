@@ -2,14 +2,8 @@
 
 package id.walt.openid4vci.tokens.jwt
 
-import io.ktor.utils.io.core.toByteArray
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonArray
+import io.ktor.utils.io.core.*
+import kotlinx.serialization.json.*
 
 /**
  * Default JWT signer that follows callback-based key resolution.

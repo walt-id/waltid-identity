@@ -31,6 +31,7 @@ class AWSKeyTest {
                 "aud" to JsonPrimitive("TOKEN"),
             )
         )
+
         // 4352 chars > 4096 bytes of maximum payload size for RSA keys in AWS KMS
         val payload = buildString { repeat(256) { append("Hello, World!!!!!") } }
 
@@ -117,7 +118,7 @@ class AWSKeyTest {
         }
     }
 
-    private suspend fun  awsTestDeleteKey() {
+    private suspend fun awsTestDeleteKey() {
         keys.forEach { key ->
             println("Deleting key: ${key.getKeyId()}")
             key.deleteKey()

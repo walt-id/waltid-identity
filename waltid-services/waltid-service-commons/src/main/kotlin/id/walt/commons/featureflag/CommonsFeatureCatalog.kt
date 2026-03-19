@@ -28,5 +28,12 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
 
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =
-        listOf(persistenceFeature, featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature, authenticationServiceFeature)
+        listOf(
+            persistenceFeature,
+            featureFlagInformationEndpointFeature,
+            healthChecksFeature,
+            debugEndpointsFeature,
+            openApiFeature,
+            authenticationServiceFeature
+        )
 }

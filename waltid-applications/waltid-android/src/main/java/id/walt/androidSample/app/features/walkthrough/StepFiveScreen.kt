@@ -43,7 +43,7 @@ fun StepFiveScreen(
     ) {
 
 
-        when(verificationResult) {
+        when (verificationResult) {
             VerificationResult.Success -> {
                 Text(
                     text = stringResource(id = R.string.success),
@@ -56,6 +56,7 @@ fun StepFiveScreen(
                         .weight(1f),
                 )
             }
+
             VerificationResult.Failed -> {
                 Text(
                     text = stringResource(id = R.string.description_verification_failed),
@@ -68,7 +69,8 @@ fun StepFiveScreen(
                         .weight(1f),
                 )
             }
-            null ->  Spacer(modifier = Modifier.weight(1f))
+
+            null -> Spacer(modifier = Modifier.weight(1f))
         }
 
         WaltSecondaryButton(

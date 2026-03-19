@@ -39,8 +39,8 @@ fun defaultAccessTokenClaims(
 }
 
 /**
-* Common JWT claim names for access tokens.
-*/
+ * Common JWT claim names for access tokens.
+ */
 object JwtPayloadClaims {
     const val SUBJECT = "sub"
     const val ISSUER = "iss"

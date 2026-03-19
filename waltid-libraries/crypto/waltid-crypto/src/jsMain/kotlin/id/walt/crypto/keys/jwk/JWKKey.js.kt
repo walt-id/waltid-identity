@@ -486,9 +486,9 @@ actual class JWKKey actual constructor(
 
         // 1. Decrypt using jose.compactDecrypt
         // _internalKey (private) unwraps the content encryption key
-       /* val result = PromiseUtils.await(
-            jose.compactDecrypt(jweString, _internalKey)
-        )*/
+        /* val result = PromiseUtils.await(
+             jose.compactDecrypt(jweString, _internalKey)
+         )*/
 
         // 2. result.plaintext is a Uint8Array. Convert to Kotlin ByteArray (Int8Array).
         // We create a new Int8Array view/copy from the Uint8Array to satisfy Kotlin's type system.

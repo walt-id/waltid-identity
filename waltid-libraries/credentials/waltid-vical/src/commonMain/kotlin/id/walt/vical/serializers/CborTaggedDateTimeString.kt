@@ -8,7 +8,6 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.jvm.JvmInline
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -29,7 +28,7 @@ private value class CborTaggedDateTimeString(@CborLabel(0) val rfc3339String: St
  * This serializer works by delegating to a compiler-generated serializer for the
  * CborTaggedDateTimeString surrogate, which handles the tagging automatically.
  */
-@OptIn(ExperimentalTime::class)
+
 object VicalInstantSerializer : KSerializer<Instant> {
     private val surrogateSerializer = CborTaggedDateTimeString.serializer()
 

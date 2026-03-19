@@ -97,7 +97,8 @@ data class IssuerSigned private constructor(
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
 
-        val signerKeyCertificate = containedX5c.firstOrNull() ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
+        val signerKeyCertificate = containedX5c.firstOrNull()
+            ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
         val signerKey = JWKKey.importFromDerCertificate(signerKeyCertificate.rawBytes)
             .getOrThrow()
 

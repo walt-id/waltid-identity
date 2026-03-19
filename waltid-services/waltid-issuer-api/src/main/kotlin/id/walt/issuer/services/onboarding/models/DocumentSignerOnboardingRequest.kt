@@ -1,10 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.issuer.services.onboarding.models
 
 import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.Serializable
-import kotlin.time.ExperimentalTime
+
 
 @Serializable
 data class DocumentSignerOnboardingRequest(

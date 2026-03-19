@@ -19,7 +19,7 @@ object WebhookNotifier {
     suspend fun notify(update: KtorSessionUpdate, config: VerificationSessionWebhookNotification) {
         webhookClient.post(config.url) {
             contentType(ContentType.Application.Json)
-           setBody(update)
+            setBody(update)
 
             if (config.basicAuthUser != null && config.basicAuthPass != null) {
                 basicAuth(config.basicAuthUser!!, config.basicAuthPass!!)

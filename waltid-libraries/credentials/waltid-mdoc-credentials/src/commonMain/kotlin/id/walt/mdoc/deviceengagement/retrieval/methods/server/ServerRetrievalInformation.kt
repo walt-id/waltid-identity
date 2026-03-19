@@ -64,7 +64,8 @@ data class ServerRetrievalInformation(
                 "Server retrieval token field of ServerRetrievalInformation must be a text string, instead was found to be of type ${element.value[2].type}"
             }
             return ServerRetrievalInformation(
-                version = (element.value[0] as NumberElement).value.toLong().toUInt(), //not really correct, but life gives you lemons, you make lemonade
+                version = (element.value[0] as NumberElement).value.toLong()
+                    .toUInt(), //not really correct, but life gives you lemons, you make lemonade
                 issuerURL = (element.value[1] as StringElement).value,
                 serverRetrievalToken = (element.value[2] as StringElement).value,
             )

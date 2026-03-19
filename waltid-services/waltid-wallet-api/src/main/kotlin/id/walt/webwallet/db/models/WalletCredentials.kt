@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.db.models
 
@@ -17,7 +17,6 @@ import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi
@@ -75,6 +74,7 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
 
                     CredentialFormat.mso_mdoc ->
                         MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
+
                     else -> throw IllegalArgumentException("Unknown credential format: " + format.value)
                 }.toMutableMap().also {
                     it.putIfAbsent("id", JsonPrimitive(id))

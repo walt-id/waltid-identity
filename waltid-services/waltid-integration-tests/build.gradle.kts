@@ -5,15 +5,13 @@ plugins {
 group = "id.walt"
 
 dependencies {
-    val ktorVersion = "3.3.3"
-
     // Testing
     implementation(kotlin("test"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
-    implementation("io.ktor:ktor-server-test-host:$ktorVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-client-logging:$ktorVersion")
+    implementation(identityLibs.ktor.server.test.host)
+    implementation(identityLibs.ktor.client.cio)
+    implementation(identityLibs.ktor.client.content.negotiation)
+    implementation(identityLibs.ktor.client.logging)
 
 
     // Command line formatting
@@ -25,10 +23,9 @@ dependencies {
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
 
-    implementation("app.softwork:kotlinx-uuid-core:0.1.4")
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation(identityLibs.nimbus.jose.jwt)
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+    implementation(identityLibs.bouncycastle.pkix)
 
     implementation(identityLibs.junit.jupiter.params)
     implementation(identityLibs.junit.platform.launcher)
@@ -36,8 +33,8 @@ dependencies {
 
 
     // Multiplatform / Hashes
-    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-    implementation("org.kotlincrypto.hash:sha2")
+
+    implementation(identityLibs.kotlincrypto.hash.sha2)
 
 }
 

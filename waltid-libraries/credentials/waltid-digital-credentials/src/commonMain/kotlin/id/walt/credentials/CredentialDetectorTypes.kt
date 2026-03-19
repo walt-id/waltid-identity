@@ -56,9 +56,11 @@ object CredentialDetectorTypes {
         val credentialSubType: CredentialSubDataType,
         val signaturePrimary: SignaturePrimaryType,
 
-        *//** Does this credential contain a list of disclosures? *//*
+        */
+    /** Does this credential contain a list of disclosures? *//*
         val containsDisclosures: Boolean = false,
-        *//** Have disclosures been shared with this credential? *//*
+        */
+    /** Have disclosures been shared with this credential? *//*
         val providesDisclosures: Boolean = false
     )*/
 

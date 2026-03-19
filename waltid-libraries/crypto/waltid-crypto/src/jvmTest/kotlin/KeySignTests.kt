@@ -29,7 +29,7 @@ class KeySignTests {
         val key = KeyManager.resolveSerializedKey(loadSerializedLocal(keyFile))
         // when
         val signature = key.signJws(payload.toString().encodeToByteArray(), mapOf("h1" to buildJsonObject {
-           put("h1.1", "bla".toJsonElement())
+            put("h1.1", "bla".toJsonElement())
         }))
         val verificationResult = key.getPublicKey().verifyJws(signature)
         val header = Json.parseToJsonElement(JWSObject.parse(signature).header.toString())

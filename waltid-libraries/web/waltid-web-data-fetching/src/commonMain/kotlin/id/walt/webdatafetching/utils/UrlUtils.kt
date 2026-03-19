@@ -1,7 +1,6 @@
 package id.walt.webdatafetching.utils
 
-import io.ktor.http.URLParserException
-import io.ktor.http.Url
+import io.ktor.http.*
 
 object UrlUtils {
 

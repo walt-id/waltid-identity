@@ -1,6 +1,5 @@
 import {defineStore} from "pinia";
 import {markRaw} from "vue";
-
 import {extend} from "@vue/shared";
 
 const component = extend({});

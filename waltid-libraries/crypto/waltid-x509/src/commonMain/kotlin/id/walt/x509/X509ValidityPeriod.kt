@@ -1,8 +1,5 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509
 
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

@@ -1,6 +1,5 @@
 package id.walt.openid4vp.conformance.testplans.httpdata
 
-
 import kotlinx.serialization.Serializable
 
 @Serializable

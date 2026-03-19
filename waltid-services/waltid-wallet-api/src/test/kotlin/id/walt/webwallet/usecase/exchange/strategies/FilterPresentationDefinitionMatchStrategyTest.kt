@@ -20,10 +20,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalTime::class)
+
 class FilterPresentationDefinitionMatchStrategyTest {
 
     private val filterParserMock = mockk<PresentationDefinitionFilterParser>()

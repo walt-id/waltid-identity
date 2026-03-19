@@ -11,13 +11,13 @@ import id.walt.mdoc.verification.MdocVerifier
 import id.walt.verifier2.verification.Verifier2PresentationValidator.PresentationValidationResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlin.time.ExperimentalTime
+
 
 object MdocPresentationValidator {
 
     private val log = KotlinLogging.logger("MdocPresentationValidator")
 
-    @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
+    @OptIn(ExperimentalSerializationApi::class)
     suspend fun validateMsoMdocPresentation(
         mdocBase64UrlString: String,
         // These three (expectedNonce, expectedAudience, responseUri) are required to reconstruct the SessionTranscript

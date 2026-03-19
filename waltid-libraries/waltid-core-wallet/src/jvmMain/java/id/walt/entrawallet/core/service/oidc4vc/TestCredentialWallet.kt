@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.entrawallet.core.service.oidc4vc
 
 import com.nimbusds.jose.jwk.ECKey
@@ -56,7 +54,6 @@ import org.cose.java.AlgorithmID
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val WALLET_PORT = 8001

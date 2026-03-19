@@ -28,9 +28,13 @@ object FeatureManager {
 
     private val log = logger("FeatureManager")
 
-    suspend fun enableFeatureAndIfNotSucceededRun(feature: AbstractFeature, ifNotSucceeded: (AbstractFeature, Throwable) -> Unit = { _, _ -> }) {
-        enableFeature (feature).ifResultNotSucceeded(feature) { ex -> ifNotSucceeded.invoke(feature, ex) }
+    suspend fun enableFeatureAndIfNotSucceededRun(
+        feature: AbstractFeature,
+        ifNotSucceeded: (AbstractFeature, Throwable) -> Unit = { _, _ -> }
+    ) {
+        enableFeature(feature).ifResultNotSucceeded(feature) { ex -> ifNotSucceeded.invoke(feature, ex) }
     }
+
     suspend fun enableFeature(feature: AbstractFeature): Result<Boolean> {
         feature.dependsOn // todo: handle this
 

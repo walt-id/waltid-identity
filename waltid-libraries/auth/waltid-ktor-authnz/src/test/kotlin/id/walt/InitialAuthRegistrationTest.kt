@@ -70,12 +70,14 @@ class InitialAuthRegistrationTest {
         val loginId = "user@email.com"
         val loginPassword = "pass1234"
 
-        println("""
+        println(
+            """
         -- Login --
         Login method: $loginMethod
         Login id: $loginId
         Login password: $loginPassword
-        """.trimIndent())
+        """.trimIndent()
+        )
 
         // Resolve account identifier
 

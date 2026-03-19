@@ -31,8 +31,7 @@ kotlin {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
 
             // Hashing
-            implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.7.1"))
-            implementation("org.kotlincrypto.macs:hmac-sha2")
+            implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
 
             implementation(identityLibs.kotlinx.coroutines.core)
         }

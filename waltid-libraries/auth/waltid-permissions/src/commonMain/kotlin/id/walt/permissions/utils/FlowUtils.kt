@@ -16,43 +16,43 @@ object FlowUtils {
 
         return flowA to flowB
     }*/
-/*
-    inline fun <T> Flow<T>.partition(crossinline predicate: suspend (T) -> Boolean): Pair<Flow<T>, Flow<T>> {
-        // Create channels for positive and negative flows
-        val positiveChannel = Channel<T>(Channel.UNLIMITED)
-        val negativeChannel = Channel<T>(Channel.UNLIMITED)
+    /*
+        inline fun <T> Flow<T>.partition(crossinline predicate: suspend (T) -> Boolean): Pair<Flow<T>, Flow<T>> {
+            // Create channels for positive and negative flows
+            val positiveChannel = Channel<T>(Channel.UNLIMITED)
+            val negativeChannel = Channel<T>(Channel.UNLIMITED)
 
-        // CoroutineScope to manage coroutine lifecycle
-        val scope = CoroutineScope(Dispatchers.Default)
+            // CoroutineScope to manage coroutine lifecycle
+            val scope = CoroutineScope(Dispatchers.Default)
 
-        val thisFlow = this
+            val thisFlow = this
 
-        // Launch a coroutine to process the original flow
-        scope.launch {
-            thisFlow.collect { value ->
-                if (predicate(value)) {
-                    positiveChannel.send(value)
-                } else {
-                    negativeChannel.send(value)
+            // Launch a coroutine to process the original flow
+            scope.launch {
+                thisFlow.collect { value ->
+                    if (predicate(value)) {
+                        positiveChannel.send(value)
+                    } else {
+                        negativeChannel.send(value)
+                    }
                 }
+                // Close channels when done
+                positiveChannel.close()
+                negativeChannel.close()
             }
-            // Close channels when done
-            positiveChannel.close()
-            negativeChannel.close()
-        }
 
-        // Convert channels to flows
-        val positiveFlow = positiveChannel.consumeAsFlow()
-        val negativeFlow = negativeChannel.consumeAsFlow()
+            // Convert channels to flows
+            val positiveFlow = positiveChannel.consumeAsFlow()
+            val negativeFlow = negativeChannel.consumeAsFlow()
 
-        return positiveFlow to negativeFlow
-    }*/
+            return positiveFlow to negativeFlow
+        }*/
 
 
     /**
      * Extension function to lazily split a string and emit the parts as a Flow<String>
      */
-   fun String.splitIntoFlow(delimiter: String): Flow<String> = flow {
+    fun String.splitIntoFlow(delimiter: String): Flow<String> = flow {
         var startIndex = 0
         var currentIndex: Int
 

@@ -33,10 +33,10 @@ abstract class DidResolverTestBase {
     }.getOrElse { ex ->
         // Check if this is a timeout exception (directly thrown or wrapped in assertion failure)
         val isTimeoutException = ex is SocketTimeoutException ||
-                                  ex is HttpRequestTimeoutException ||
-                                  ex.cause is SocketTimeoutException ||
-                                  ex.cause is HttpRequestTimeoutException
-        
+                ex is HttpRequestTimeoutException ||
+                ex.cause is SocketTimeoutException ||
+                ex.cause is HttpRequestTimeoutException
+
         if (isTimeoutException) {
             println("A resolver URL is timing out: ${ex.cause?.message ?: ex.message}")
             println("Skipping test due to external API unavailability")

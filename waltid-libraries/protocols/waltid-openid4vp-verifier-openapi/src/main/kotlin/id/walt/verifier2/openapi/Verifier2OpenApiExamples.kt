@@ -8,33 +8,18 @@ import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.*
+import id.walt.policies2.vc.policies.status.Values
+import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
+import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
+import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
+import id.walt.policies2.vp.policies.*
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.UrlConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.AllowedIssuerPolicy
-import id.walt.policies2.vc.policies.RegexPolicy
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.policies2.vc.policies.ExpirationDatePolicy
-import id.walt.policies2.vc.policies.NotBeforePolicy
-import id.walt.policies2.vc.policies.RevocationPolicy
-import id.walt.policies2.vc.policies.StatusPolicy
-import id.walt.policies2.vc.policies.VicalPolicy
-import id.walt.policies2.vc.policies.WebhookPolicy
-import id.walt.policies2.vc.policies.status.Values
-import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
-import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
-import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
-import id.walt.policies2.vp.policies.AudienceCheckJwtVcJsonVPPolicy
-import id.walt.policies2.vp.policies.AudienceCheckSdJwtVPPolicy
-import id.walt.policies2.vp.policies.KbJwtSignatureSdJwtVPPolicy
-import id.walt.policies2.vp.policies.NonceCheckJwtVcJsonVPPolicy
-import id.walt.policies2.vp.policies.NonceCheckSdJwtVPPolicy
-import id.walt.policies2.vp.policies.SdHashCheckSdJwtVPPolicy
-import id.walt.policies2.vp.policies.SignatureJwtVcJsonVPPolicy
-import id.walt.policies2.vp.policies.VPPolicyList
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -320,10 +305,12 @@ object Verifier2OpenApiExamples {
             policies = DefinedVerificationPolicies(
                 vp_policies = VPPolicyList(
                     jwtVcJson = listOf(),
-                    dcSdJwt = listOf(AudienceCheckSdJwtVPPolicy(),
+                    dcSdJwt = listOf(
+                        AudienceCheckSdJwtVPPolicy(),
                         KbJwtSignatureSdJwtVPPolicy(),
                         NonceCheckSdJwtVPPolicy(),
-                        SdHashCheckSdJwtVPPolicy()),
+                        SdHashCheckSdJwtVPPolicy()
+                    ),
                     msoMdoc = listOf()
                 )
             )
