@@ -27,15 +27,14 @@ class JwtSignaturePolicy : JwtVerificationPolicy(
     @JsExport.Ignore
     override suspend fun verify(credential: String, args: Any?, context: Map<String, Any>): Result<Any> {
         return JwsSignatureScheme().let {
-            if(SDJwt.isSDJwt(credential, sdOnly = true)) {
+            if (SDJwt.isSDJwt(credential, sdOnly = true)) {
                 val keyInfo = it.getIssuerKeyInfo(credential)
                 it.verifySDJwt(
                     credential, JWTCryptoProviderManager.getDefaultJWTCryptoProvider(
                         mapOf(keyInfo.keyId to keyInfo.key)
                     )
                 )
-            }
-            else
+            } else
                 it.verify(credential)
         }
     }

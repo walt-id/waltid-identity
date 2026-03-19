@@ -344,7 +344,7 @@ class MainTest {
     @Test
     @Ignore("Failing with NoSuchSubcommand :-/ I'll check it later.")
     fun `should print usage instructions when 'vc verify' command is called with no argument`() {
-        val output = tapSystemOut { main(arrayOf("vc verify"))}
+        val output = tapSystemOut { main(arrayOf("vc verify")) }
         assertContains(output, "Usage: waltid vc verify")
     }
 

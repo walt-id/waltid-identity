@@ -46,7 +46,10 @@ object VPPolicyListSerializer : KSerializer<VPPolicyList> {
         val elem = jsonInput.decodeJsonElement()
 
         val allPolicies = when (elem) {
-            is JsonObject -> elem.values.flatMap { it as? JsonArray ?: throw SerializationException("Expected a JsonArray, but was: $elem") }
+            is JsonObject -> elem.values.flatMap {
+                it as? JsonArray ?: throw SerializationException("Expected a JsonArray, but was: $elem")
+            }
+
             is JsonArray -> elem.map { it }
             else -> throw SerializationException("Invalid JSON structure of VPPolicyList, was: $elem")
         }

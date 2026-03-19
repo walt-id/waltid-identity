@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.crypto.keys.azure
 
 import id.walt.crypto.keys.*
@@ -34,7 +32,6 @@ import kotlin.js.JsExport
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }

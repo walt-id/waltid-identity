@@ -20,7 +20,8 @@ object IACADocs {
             example(
                 name = "Required data fields only & local secp256r1 JWK signing key"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                       "certificateData": {
                         "country": "US",
@@ -30,13 +31,15 @@ object IACADocs {
                         }
                       }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Custom validity period & local secp256r1 JWK signing key"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "DE",
@@ -48,13 +51,15 @@ object IACADocs {
                             "notAfter": "2041-01-01T00:00:00Z"
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "All data fields & local secp256r1 JWK signing key"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "GR",
@@ -70,13 +75,15 @@ object IACADocs {
                             "crlDistributionPointUri": "https://crl.gov.gr/iaca.crl"
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 TSE signing key with AppRole (Auth)"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -96,13 +103,15 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 TSE signing key with Username & Password (Auth)"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -123,13 +132,15 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 OCI signing key"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -146,13 +157,15 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 OCI REST API signing key"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -174,13 +187,15 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 AWS REST API signing key with AccessKey (Auth)"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -200,13 +215,15 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 AWS REST API signing key with Role (Auth)"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -225,13 +242,15 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
 
             example(
                 name = "Required data fields & secp256r1 Azure REST API signing key"
             ) {
-                value = Json.decodeFromString<IACAOnboardingRequest>("""
+                value = Json.decodeFromString<IACAOnboardingRequest>(
+                    """
                     {
                         "certificateData": {
                             "country": "US",
@@ -252,7 +271,8 @@ object IACADocs {
                             }
                         }
                     }
-                """.trimIndent())
+                """.trimIndent()
+                )
             }
         }
     }
@@ -266,7 +286,8 @@ object IACADocs {
                 example(
                     name = "Required data fields & local secp256r1 JWK signing key"
                 ) {
-                    value = Json.decodeFromString<IACAOnboardingResponse>("""
+                    value = Json.decodeFromString<IACAOnboardingResponse>(
+                        """
                         {
                           "iacaKey": {
                             "type": "jwk",
@@ -290,7 +311,8 @@ object IACADocs {
                             }
                           }
                         }
-                    """.trimIndent())
+                    """.trimIndent()
+                    )
                 }
             }
         }

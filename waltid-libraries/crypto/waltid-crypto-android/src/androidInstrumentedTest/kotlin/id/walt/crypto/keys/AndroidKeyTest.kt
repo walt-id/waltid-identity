@@ -94,7 +94,7 @@ class AndroidKeyTest {
         val key = AndroidKey.generate(KeyType.secp256r1, AndroidKeyParameters(randomKid))
         assertNotNull(key, "Should return key just created.")
         val loaded = AndroidKey.load(KeyType.secp256r1, randomKid)
-        assertNotNull(loaded,"Should return loaded key.")
+        assertNotNull(loaded, "Should return loaded key.")
         assertEquals(key.getKeyId(), loaded.getKeyId(), "kid's are not equal")
     }
 }

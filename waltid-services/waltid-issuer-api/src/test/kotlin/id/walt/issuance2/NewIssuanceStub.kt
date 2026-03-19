@@ -92,8 +92,6 @@ suspend fun main() {
     // init credential offer for full authorization code flow
 
 
-
-
     val credOffer = CredentialOffer.Draft13.Builder(url)
         .addOfferedCredentialByReference("VerifiableId")
         .addAuthorizationCodeGrant("test-state")
@@ -120,7 +118,7 @@ suspend fun main() {
     println("offeredCredentials: $offeredCredentials")
 
     //check(offeredCredentials.size == 1)
-    offeredCredentials.any { it.format ==  CredentialFormat.jwt_vc_json}
+    offeredCredentials.any { it.format == CredentialFormat.jwt_vc_json }
     offeredCredentials.any { it.credentialDefinition?.type?.last() == "VerifiableId" }
 
     val offeredCredential = offeredCredentials.first()

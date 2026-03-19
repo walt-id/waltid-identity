@@ -9,6 +9,7 @@ import kotlin.js.JsExport
 @JsExport
 sealed interface CredentialDataModel {
     fun encodeToJsonObject(): JsonObject
+
     @JsExport.Ignore
     companion object {
         internal val w3cJson = Json {

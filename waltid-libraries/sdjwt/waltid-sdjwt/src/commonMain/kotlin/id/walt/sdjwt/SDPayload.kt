@@ -1,13 +1,15 @@
 package id.walt.sdjwt
 
 import dev.whyoleg.cryptography.random.CryptographyRandom
+import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.sdjwt.utils.SdjwtStringUtils.decodeFromBase64Url
-import korlibs.crypto.SecureRandom
-import korlibs.crypto.sha256
 import kotlinx.serialization.json.*
+import org.kotlincrypto.hash.sha2.SHA256
+import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.random.Random
 
 /**
  * Payload object of the SD-JWT, representing the undisclosed payload from the JWT body and the selective disclosures, appended to the JWT token
@@ -142,11 +144,33 @@ data class SDPayload internal constructor(
 
     @JsExport.Ignore // see SDPayloadBuilder for JS support
     companion object {
+        val sha256 = SHA256()
 
         private fun digest(value: String): String {
-            val messageDigest = value.encodeToByteArray().sha256()
-            return messageDigest.base64Url
+            val messageDigest = sha256.digest(value.encodeToByteArray())
+            return messageDigest.encodeToBase64Url()
         }
+
+        class CryptoRandAsKotlinRandom(private val cryptoRand: CryptoRand) : Random() {
+            override fun nextBits(bitCount: Int): Int {
+                if (bitCount == 0) return 0
+
+                // Fetch 4 bytes from custom interface
+                val buf = ByteArray(4)
+                cryptoRand.nextBytes(buf)
+
+                // Assemble the 4 bytes into a single 32-bit integer
+                val result = ((buf[0].toInt() and 0xFF) shl 24) or
+                        ((buf[1].toInt() and 0xFF) shl 16) or
+                        ((buf[2].toInt() and 0xFF) shl 8) or
+                        (buf[3].toInt() and 0xFF)
+
+                // shift right to return only the requested number of bits
+                return result ushr (32 - bitCount)
+            }
+        }
+
+        private val secureRandom = CryptoRandAsKotlinRandom(CryptoRand.Default)
 
         private val base64Url = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
@@ -240,8 +264,7 @@ data class SDPayload internal constructor(
                     digests.forEach { add(it) }
                     if (sdMap.decoyMode != DecoyMode.NONE && sdMap.decoys > 0) {
                         val numDecoys = when (sdMap.decoyMode) {
-                            // NOTE: SecureRandom.nextInt always returns 0! Use nextDouble instead
-                            DecoyMode.RANDOM -> SecureRandom.nextDouble(1.0, sdMap.decoys + 1.0).toInt()
+                            DecoyMode.RANDOM -> secureRandom.nextInt(1, sdMap.decoys + 1)
                             DecoyMode.FIXED -> sdMap.decoys
                         }
                         repeat(numDecoys) {

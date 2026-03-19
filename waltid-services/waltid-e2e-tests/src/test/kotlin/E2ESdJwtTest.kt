@@ -62,7 +62,7 @@ class E2ESdJwtTest(
                 "should have a presentation submission after submission"
             )
 
-            assertTrue(it.verificationResult == true, "overall verification should be valid")
+            assertEquals(it.verificationResult, true, "overall verification should be valid")
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
                 assertTrue(it.size > 1, "no policies have run")
@@ -208,7 +208,7 @@ class E2ESdJwtTest(
                 "should have a presentation submission after submission"
             )
 
-            assertTrue(it.verificationResult == true, "overall verification should be valid")
+            assertEquals(it.verificationResult, true, "overall verification should be valid")
             it.policyResults.let {
                 require(it != null) { "policyResults should be available after running policies" }
                 assertTrue(it.size > 1, "no policies have run")
@@ -259,7 +259,7 @@ class E2ESdJwtTest(
         }
 
         sessionApi.get(verificationId) {
-            assertTrue(it.presentationDefinition == PresentationDefinition.fromJSONString(presentationDefinition))
+            assertEquals(it.presentationDefinition, PresentationDefinition.fromJSONString(presentationDefinition))
         }
 
         exchangeApi.matchCredentialsForPresentationDefinition(

@@ -1,8 +1,8 @@
 package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.verifier2.data.Verification2Session
 import id.walt.policies2.vc.CredentialPolicyResult
+import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

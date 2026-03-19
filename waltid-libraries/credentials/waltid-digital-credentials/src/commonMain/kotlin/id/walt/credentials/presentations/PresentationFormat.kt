@@ -11,6 +11,7 @@ import kotlinx.serialization.SerialName
 @Suppress("EnumEntryName")
 enum class PresentationFormat {
     jwt_vc_json,
+
     @SerialName("dc+sd-jwt")
     dc_sd_jwt,
     ldp_vc,

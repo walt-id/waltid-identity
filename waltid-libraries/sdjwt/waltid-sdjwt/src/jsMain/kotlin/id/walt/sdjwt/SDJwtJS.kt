@@ -66,7 +66,7 @@ class SDJwtJS(
         println("Formatting SD_JWT: ${disclosuresJS.joinToString(",")}")
         return listOf(jwt)
             .plus(disclosuresJS)
-            .plus((if(withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
+            .plus((if (withKBJwt) keyBindingJwt else null)?.let { listOf(it) }
                 ?: (if (formatForPresentation) listOf("") else listOf()))
             .joinToString(SEPARATOR_STR)
     }

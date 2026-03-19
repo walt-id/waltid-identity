@@ -7,11 +7,11 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import org.kotlincrypto.hash.sha2.SHA256
+import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-import korlibs.crypto.SecureRandom
-import org.kotlincrypto.hash.sha2.SHA256
 
 /**
  * Service API for issuing OpenID4VCI pre-authorized codes.
@@ -122,4 +122,7 @@ class DefaultPreAuthorizedCodeIssuer(
 internal fun hashPin(pin: String): String =
     Base64.UrlSafe.encode(SHA256().digest(pin.encodeToByteArray()))
 
-internal fun secureRandomBytes(size: Int): ByteArray = ByteArray(size).also { SecureRandom.nextBytes(it) }
+internal fun secureRandomBytes(size: Int): ByteArray {
+    val bytes = ByteArray(size)
+    return CryptoRand.nextBytes(bytes)
+}

@@ -8,11 +8,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionParameters
-import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
-import id.walt.mdoc.objects.deviceretrieval.DocRequest
-import id.walt.mdoc.objects.deviceretrieval.ItemRequest
-import id.walt.mdoc.objects.deviceretrieval.ItemsRequest
-import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
+import id.walt.mdoc.objects.deviceretrieval.*
 
 data class AnnexCRequest(
     val deviceRequestB64: String,

@@ -5,9 +5,6 @@ plugins {
 
 group = "id.walt.did"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableIosBuild = getSetting("enableIosBuild")
@@ -38,9 +35,6 @@ kotlin {
             // Date
             implementation(identityLibs.kotlinx.datetime)
 
-            // Uuid
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
-
             // Crypto
             api(project(":waltid-libraries:crypto:waltid-crypto"))
 
@@ -56,7 +50,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.okhttp)
 
             // Json canonicalization
             implementation("io.github.erdtman:java-json-canonicalization:1.1")
@@ -71,13 +65,13 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(kotlin("test"))
             implementation(identityLibs.junit.jupiter.params)
-            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-network-tls-certificates:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.server.test.host)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.netty)
+            implementation(identityLibs.ktor.network.tls.certificates)
         }
         jsMain.dependencies {
-            implementation("io.ktor:ktor-client-js:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.js)
 
             implementation(npm("canonicalize", "2.0.0"))
             implementation(npm("uuid", "9.0.1"))

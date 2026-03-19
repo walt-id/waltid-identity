@@ -5,7 +5,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ValueTags
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -31,7 +30,7 @@ import kotlin.time.Instant
  * recommends that issuing authorities reduce their precision (e.g., by setting hour/minute/second values
  * consistently across all provisioned mdocs).
  */
-@OptIn(ExperimentalUnsignedTypes::class, ExperimentalTime::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalUnsignedTypes::class, ExperimentalSerializationApi::class)
 @Serializable
 data class ValidityInfo(
     @SerialName("signed")

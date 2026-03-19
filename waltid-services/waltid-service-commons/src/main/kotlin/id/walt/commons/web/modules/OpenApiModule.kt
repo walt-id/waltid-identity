@@ -1,4 +1,4 @@
-@file:OptIn(SealedSerializationApi::class, ExperimentalSerializationApi::class, ExperimentalTime::class)
+@file:OptIn(SealedSerializationApi::class, ExperimentalSerializationApi::class)
 
 package id.walt.commons.web.modules
 
@@ -30,7 +30,6 @@ import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.nanoseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 
@@ -116,7 +115,7 @@ object OpenApiModule {
                         is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
                         else -> false
                     }
-                    
+
                     if (example is String && isStringType) {
                         example
                     } else {

@@ -126,7 +126,6 @@ sealed class CredentialOffer : JsonDataObject() {
 }
 
 
-
 internal object CredentialOfferSerializer : KSerializer<CredentialOffer> {
 
     override val descriptor: SerialDescriptor = buildClassSerialDescriptor("id.walt.oid4vc.data.CredentialOffer") {

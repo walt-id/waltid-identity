@@ -1085,7 +1085,7 @@ class MDocTestSuite(
         e2e.test(
             name = "$TEST_SUITE : e2e mDL: Issuance and Presentation of mDL with all fields and multiple age attestations",
 
-        ) {
+            ) {
 
             val mDLIssuanceRequest = MdocDocs.mDLAllFieldsMultipleAgeAttestations
 

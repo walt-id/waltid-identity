@@ -7,7 +7,7 @@ class TestClass {
     @Test
     fun testFun() {
         runBlocking {
-            P256Key.create("kid","appId").let {
+            P256Key.create("kid", "appId").let {
                 print(it.exportJWK())
             }
         }

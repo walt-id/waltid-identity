@@ -10,7 +10,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -19,13 +19,12 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
 
-            implementation("io.github.optimumcode:json-schema-validator:0.5.2")
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR

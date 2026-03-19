@@ -542,7 +542,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
 
     private object PresentationRequests {
 
-        val universityDegreeW3CVcTypeCorrectJsonPath = """
+        val universityDegreeW3CVcTypeCorrectJsonPath = $$"""
         {
           "vp_policies": [
             "signature",
@@ -564,7 +564,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                   "fields": [
                     {
                       "path": [
-                        "${'$'}.vc.type"
+                        "$.vc.type"
                       ],
                       "filter": {
                         "type": "string",
@@ -579,7 +579,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
         }
     """.trimIndent()
 
-        val universityDegreeW3CVcTypeInvalidJsonPath = """
+        val universityDegreeW3CVcTypeInvalidJsonPath = $$"""
         {
           "vp_policies": [
             "signature",
@@ -601,7 +601,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                   "fields": [
                     {
                       "path": [
-                        "${'$'}.type"
+                        "$.type"
                       ],
                       "filter": {
                         "type": "string",
@@ -652,7 +652,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
         }
     """.trimIndent()
 
-        val universityDegreeCredentialSubjectDegreeTypeCorrectJsonPath = """
+        val universityDegreeCredentialSubjectDegreeTypeCorrectJsonPath = $$"""
         {
           "vp_policies": [
             "signature",
@@ -674,7 +674,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                   "fields": [
                     {
                       "path": [
-                        "${'$'}.vc.type"
+                        "$.vc.type"
                       ],
                       "filter": {
                         "type": "string",
@@ -683,7 +683,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                     },                  
                     {
                       "path": [
-                        "${'$'}.vc.credentialSubject.degree.type"
+                        "$.vc.credentialSubject.degree.type"
                       ],
                       "filter": {
                         "type": "string",
@@ -699,7 +699,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
     """.trimIndent()
 
         fun getUniversityDegreeWithSubjectDegreeTypeValue(subjectDegreeType: String = "BachelorDegree") =
-            """
+            $$"""
         {
           "vp_policies": [
             "signature",
@@ -721,7 +721,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                   "fields": [
                     {
                       "path": [
-                        "${'$'}.vc.type"
+                        "$.vc.type"
                       ],
                       "filter": {
                         "type": "string",
@@ -730,11 +730,11 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                     },                  
                     {
                       "path": [
-                        "${'$'}.vc.credentialSubject.degree.type"
+                        "$.vc.credentialSubject.degree.type"
                       ],
                       "filter": {
                         "type": "string",
-                        "pattern": "$subjectDegreeType"
+                        "pattern": "$$subjectDegreeType"
                       }
                     }
                   ]
@@ -747,7 +747,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
 
         fun getIdentityCredentialWithTwoInputDescriptors(
             isOver65: Boolean = true,
-        ) = """
+        ) = $$"""
             {
               "request_credentials": [
                 {
@@ -761,7 +761,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                       "fields": [
                         {
                           "path": [
-                            "${'$'}.vct"
+                            "$.vct"
                           ],
                           "filter": {
                             "type": "string",
@@ -783,10 +783,10 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                       "fields": [
                         {
                           "path": [
-                            "${'$'}.is_over_65"
+                            "$.is_over_65"
                           ],
                           "filter": {
-                            "const": $isOver65
+                            "const": $$isOver65
                           }
                         }
                       ]
@@ -802,7 +802,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
 
         fun getUniversityDegreePda1ToSeparateInputDescriptors(
             sex: String = "01",
-        ) = """
+        ) = $$"""
             {
               "vp_policies": [
                 "signature",
@@ -824,7 +824,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                       "fields": [
                         {
                           "path": [
-                            "${'$'}.vc.credentialSubject.degree.type"
+                            "$.vc.credentialSubject.degree.type"
                           ],
                           "filter": {
                             "type": "string",
@@ -843,7 +843,7 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                       "fields": [
                         {
                           "path": [
-                            "${'$'}.vc.type"
+                            "$.vc.type"
                           ],
                           "filter": {
                             "type": "string",
@@ -852,11 +852,11 @@ class PresentationDefinitionPolicyTests(private val e2e: E2ETest) {
                         },
                         {
                           "path": [
-                            "${'$'}.vc.credentialSubject.section1.sex"
+                            "$.vc.credentialSubject.section1.sex"
                           ],
                           "filter": {
                             "type": "string",
-                            "pattern": "$sex"
+                            "pattern": "$$sex"
                           }
                         }
                       ]

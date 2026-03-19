@@ -35,7 +35,7 @@ class SimpleJWTCryptoProvider(
 
 class SimpleMultiKeyJWTCryptoProvider(
     val providerMap: Map<String, JWTCryptoProvider>
-): JWTCryptoProvider {
+) : JWTCryptoProvider {
     override fun sign(payload: JsonObject, keyID: String?, typ: String, headers: Map<String, Any>): String {
         return (providerMap[keyID] ?: throw Exception("No key ID defined")).sign(payload, keyID, typ, headers)
     }

@@ -22,7 +22,7 @@ object JWT : AuthenticationMethod("jwt") {
         val parsedJws = JWSObject.parse(jwt)
         val jwtVerifier = MACVerifier(config.verifyKey)
 
-        authCheck(parsedJws.verify(jwtVerifier) , JWTVerificationException())
+        authCheck(parsedJws.verify(jwtVerifier), JWTVerificationException())
 
         val id = parsedJws.payload.toJSONObject()[config.identifyClaim] as String
 

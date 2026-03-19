@@ -88,6 +88,7 @@ object JWKKeyJsonFieldSerializer : KSerializer<String?> {
     override fun deserialize(decoder: Decoder): String =
         Json.encodeToString(decoder.decodeSerializableValue(JsonElement.serializer()))
 
-    override fun serialize(encoder: Encoder, value: String?) = encoder.encodeSerializableValue(JsonElement.serializer(),
+    override fun serialize(encoder: Encoder, value: String?) = encoder.encodeSerializableValue(
+        JsonElement.serializer(),
         value?.let { Json.decodeFromString<JsonElement>(it) } ?: JsonNull)
 }

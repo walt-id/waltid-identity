@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc
 
 import id.walt.crypto.keys.KeyType
@@ -41,7 +39,7 @@ import kotlinx.serialization.json.*
 import org.junit.jupiter.api.BeforeAll
 import kotlin.test.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 class OpenId4VciTest {
     val CREDENTIAL_OFFER_BASE_URL = "openid-credential-offer://test"
@@ -49,20 +47,20 @@ class OpenId4VciTest {
     val DEPLOYED_ISSUER_BASE_URL = "https://issuer.portal.test.waltid.cloud"
     val ISSUER_BASE_URL = "https://test"
     val ISSUER_METADATA = (OpenID4VCI.createDefaultProviderMetadata(
-        baseUrl =  ISSUER_BASE_URL,
-                credentialSupported = mapOf(
-                    "VerifiableId" to CredentialSupported(
-                        format = CredentialFormat.jwt_vc_json,
-                        cryptographicBindingMethodsSupported = setOf("did"),
-                        credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
-                        credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
-                        customParameters = mapOf("foo" to JsonPrimitive("bar"))
-                    ),
-                    "VerifiableDiploma" to CredentialSupported(
-                        format = CredentialFormat.jwt_vc_json,
-                        cryptographicBindingMethodsSupported = setOf("did"),
-                        credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
-                        credentialDefinition = CredentialDefinition(
+        baseUrl = ISSUER_BASE_URL,
+        credentialSupported = mapOf(
+            "VerifiableId" to CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId")),
+                customParameters = mapOf("foo" to JsonPrimitive("bar"))
+            ),
+            "VerifiableDiploma" to CredentialSupported(
+                format = CredentialFormat.jwt_vc_json,
+                cryptographicBindingMethodsSupported = setOf("did"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256K")),
+                credentialDefinition = CredentialDefinition(
                     type = listOf(
                         "VerifiableCredential",
                         "VerifiableAttestation",
@@ -846,7 +844,7 @@ class OpenId4VciTest {
             preAuthorizedCode = credentialOffer.grants[GrantType.pre_authorized_code.value]!!.preAuthorizedCode!!,
             clientId = null,  // The Wallet API should check for token_endpoint_auth_method in Issuer Metadata to see what client authentication types are supported.
         )
-            println("Sending token request... $tokenRequest")
+        println("Sending token request... $tokenRequest")
 
         val tokenResponse = OpenID4VCI.sendTokenRequest(
             providerMetadata = resolvedCIProviderMetadata,

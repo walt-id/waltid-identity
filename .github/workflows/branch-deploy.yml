@@ -41,7 +41,7 @@ jobs:
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/helm-deployment.yml@b1f35bec2ae5c518dad422cfd680f7adf730c095
     secrets: inherit
-    needs: [ version, docker, api-docker]
+    needs: [ version, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       namespace: ${{ needs.version.outputs.release_version }}

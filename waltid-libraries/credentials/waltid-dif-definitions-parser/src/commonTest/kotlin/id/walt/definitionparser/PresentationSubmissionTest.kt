@@ -56,7 +56,6 @@ class PresentationSubmissionTest {
     """.trimIndent()
 
 
-
     @Test
     fun testPresentationSubmissionParsing() {
         println("presentationSubmission")

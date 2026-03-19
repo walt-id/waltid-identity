@@ -1,12 +1,9 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.idp.oidc
 
 import id.walt.idp.oidc.json.InstantAsEpochSecondsSerializer
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

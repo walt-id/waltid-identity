@@ -1,14 +1,12 @@
 package id.walt.openid4vp.conformance.testplans.httpdata
 
-
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTime::class)
+
 @Serializable
 data class TestRunInfo(
     @SerialName("_id")

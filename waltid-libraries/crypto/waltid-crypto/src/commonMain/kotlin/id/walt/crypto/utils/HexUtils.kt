@@ -36,6 +36,7 @@ object HexUtils {
                     // Digits are always okay, continue loop
                     continue
                 }
+
                 in 'a'..'f' -> { // Lowercase letter
                     if (requiresUppercase == null) {
                         // First letter encountered, set state to require lowercase
@@ -46,6 +47,7 @@ object HexUtils {
                     }
                     // If requiresUppercase is false, it's consistent, continue
                 }
+
                 in 'A'..'F' -> { // Uppercase letter
                     if (requiresUppercase == null) {
                         // First letter encountered, set state to require uppercase
@@ -56,6 +58,7 @@ object HexUtils {
                     }
                     // If requiresUppercase is true, it's consistent, continue
                 }
+
                 else -> {
                     // Character is not a digit or a valid hex letter (a-f, A-F)
                     return false

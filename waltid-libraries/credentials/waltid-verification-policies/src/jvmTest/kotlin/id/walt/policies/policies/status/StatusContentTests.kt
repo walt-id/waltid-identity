@@ -32,7 +32,10 @@ class StatusContentTest {
         assertTrue(decoded is W3CStatusContent)
         assertEquals("BitstringStatusList", decoded.type)
         assertEquals("revocation", decoded.purpose)
-        assertEquals("H4sIAAAAAAAAAGNgYGBgZGBkYGLg5mBg4GRgYuBjYGHgYeBh4GNgZeDl4GbgY-Bk4OXgZOBiEGDgYhBg4GIQYOBmEGDgZhBh4GYQYeBiEGPgYhBn4GIQYOBmEGDgZhBg4GYQ", decoded.list)
+        assertEquals(
+            "H4sIAAAAAAAAAGNgYGBgZGBkYGLg5mBg4GRgYuBjYGHgYeBh4GNgZeDl4GbgY-Bk4OXgZOBiEGDgYhBg4GIQYOBmEGDgZhBh4GYQYeBiEGPgYhBn4GIQYOBmEGDgZhBg4GYQ",
+            decoded.list
+        )
     }
 
     @Test

@@ -149,11 +149,11 @@ class SSIKit2WalletService(
                 Result.failure(
                     PresentationError(
                         message =
-                        httpResponseBody?.let {
-                            if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()?.get("message")?.jsonPrimitive?.content
-                                ?: "Presentation failed"
-                            else it
-                        } ?: "Presentation failed",
+                            httpResponseBody?.let {
+                                if (it.couldBeJsonObject()) it.parseAsJsonObject().getOrNull()?.get("message")?.jsonPrimitive?.content
+                                    ?: "Presentation failed"
+                                else it
+                            } ?: "Presentation failed",
                         redirectUri = ""
                     )
                 )

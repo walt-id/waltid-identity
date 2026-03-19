@@ -10,7 +10,7 @@ import kotlin.test.Test
 data class TestUser(val name: String, val roles: List<FlowPermissionSet>) {
     suspend operator fun invoke(block: PermissionChecker.() -> Unit) {
         val c = PermissionChecker()
-    roles.forEach { c.applyPermissions(it) }
+        roles.forEach { c.applyPermissions(it) }
 
         block.invoke(c)
     }
@@ -20,9 +20,9 @@ internal suspend infix fun String.userWith(roles: List<FlowPermissionSet>) = Tes
     .also {
         println("\n== user: $this ==")
         roles.forEachIndexed { roleIndex, flowPermissionSet ->
-            println("Role ${roleIndex+1}: ${flowPermissionSet.id}")
+            println("Role ${roleIndex + 1}: ${flowPermissionSet.id}")
             flowPermissionSet.permissions.collectIndexed { permissionIndex, permission ->
-                println("- ${roleIndex+1}.${permissionIndex+1}.: $permission")
+                println("- ${roleIndex + 1}.${permissionIndex + 1}.: $permission")
             }
         }
     }
@@ -31,6 +31,7 @@ infix fun Boolean.expect(other: Boolean) {
     println("Check: $this == $other")
     check(this == other)
 }
+
 private fun List<Permission.MinimalPermission>.printable() = if (isNotEmpty()) joinToString() else "None"
 infix fun PermissionChecker.PermissionInsights.expect(result: Boolean) {
     println("$target - $operation: ${this.result} == $result ${if (this.result == result) "✅" else ""} | allows: ${allowedBy.printable()} / denies: ${deniedBy.printable()}")

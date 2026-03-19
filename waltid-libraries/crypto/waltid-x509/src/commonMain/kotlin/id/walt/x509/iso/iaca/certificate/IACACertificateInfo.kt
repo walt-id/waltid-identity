@@ -1,10 +1,7 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.x509.X509CertificateHandle
 import okio.ByteString
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

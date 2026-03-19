@@ -1,16 +1,12 @@
 package id.walt.cose
 
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
-import kotlinx.serialization.cbor.CborByteString
-import kotlinx.serialization.cbor.CborElement
-import kotlinx.serialization.cbor.CborInteger
-import kotlinx.serialization.cbor.CborLabel
-import kotlinx.serialization.cbor.CborString
-import kotlinx.serialization.cbor.long
+import kotlinx.serialization.cbor.*
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -166,6 +162,7 @@ object CoseCertificateSerializer : KSerializer<List<CoseCertificate>> {
                 require(it is CborByteString) { "x5chain array elements must be byte strings" }
                 CoseCertificate(it.value)
             }
+
             is CborByteString -> listOf(CoseCertificate(element.value))
             else -> throw IllegalArgumentException("Expected array or bytestring for x5chain, got ${element::class.simpleName}")
         }

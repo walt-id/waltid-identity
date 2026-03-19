@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 object SdJwtVcPresenter {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     suspend fun presentSdJwtVc(
         digitalCredential: DigitalCredential,

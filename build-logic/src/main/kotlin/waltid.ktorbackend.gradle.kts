@@ -4,10 +4,13 @@ plugins {
     application
 }
 
+val catalogs = extensions.getByType<VersionCatalogsExtension>()
+val identityLibs = catalogs.named("identityLibs")
+val ktorVersion = identityLibs.findVersion("ktor").get().requiredVersion
+val kotlinLoggingVersion = identityLibs.findVersion("kotlinlogging").get().requiredVersion
+
 // Common Ktor Dependencies (if all services use these)
 dependencies {
-    val ktorVersion = "3.3.3" // Or load from catalog: identityLibs.findVersion("ktor").get()
-
     // Core server dependencies
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-cio-jvm:$ktorVersion")
@@ -15,7 +18,7 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation-jvm:$ktorVersion")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
+    implementation("io.github.oshai:kotlin-logging-jvm:$kotlinLoggingVersion")
 }
 
 // Windows Start Script Fix

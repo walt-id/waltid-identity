@@ -174,7 +174,7 @@ object MdocIssuer {
         typesafeData: MdocData,
 
         validFrom: Instant? = null,
-        
+
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
         digestAlgorithm: String = "SHA-256"

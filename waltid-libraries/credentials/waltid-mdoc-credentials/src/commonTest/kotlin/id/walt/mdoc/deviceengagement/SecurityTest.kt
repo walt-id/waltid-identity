@@ -11,7 +11,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class SecurityTest {
-    
+
     @Test
     fun testHappyPathSerialize() {
 

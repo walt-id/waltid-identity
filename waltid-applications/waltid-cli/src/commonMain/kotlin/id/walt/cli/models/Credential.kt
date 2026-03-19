@@ -23,10 +23,12 @@ data class Credential(
                     return Credential(
                         id = credentialId,
                         type = type,
-                        parsedDocument = jwsParts.payload["vc"]?.jsonObject ?: throw IllegalArgumentException("JWT does not have \"vc\" payload field"),
+                        parsedDocument = jwsParts.payload["vc"]?.jsonObject
+                            ?: throw IllegalArgumentException("JWT does not have \"vc\" payload field"),
                         serializedCredential = jwsStr,
                     )
                 }
+
                 null -> throw IllegalArgumentException("JWT does not have \"typ\" header field")
                 else -> throw IllegalArgumentException("Invalid credential \"typ\": $type")
             }

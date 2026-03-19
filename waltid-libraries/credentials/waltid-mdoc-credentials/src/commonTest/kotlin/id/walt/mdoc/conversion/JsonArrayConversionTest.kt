@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.mdoc.conversion
 
 import id.walt.mdoc.dataelement.ByteStringElement
@@ -15,7 +13,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
 
 class JsonArrayConversionTest {
 

@@ -29,7 +29,7 @@ object TOTP : AuthenticationMethod("totp") {
 
         val service = DefaultTOTPService()
         authCheck(
-            service.verify(userProvidedOtpCode, secret).isSuccess() , OTPAuthException()
+            service.verify(userProvidedOtpCode, secret).isSuccess(), OTPAuthException()
         )
     }
 
