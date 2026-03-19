@@ -1,10 +1,10 @@
-package id.walt.entrawallet.core.service.exchange
+package id.walt.corewallet.service.exchange
 
 import cbor.Cbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.JwsUtils.decodeJwsOrSdjwt
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
+import id.walt.corewallet.service.oidc4vc.TestCredentialWallet
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
@@ -14,7 +14,7 @@ import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.requests.TokenRequest
 import id.walt.oid4vc.responses.TokenResponse
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
-import id.walt.webwallet.utils.WalletHttpClients
+import id.walt.corewallet.utils.WalletHttpClients
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*

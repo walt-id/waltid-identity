@@ -43,7 +43,7 @@ import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedCre
 import id.walt.webwallet.service.SessionAttributes.HACK_outsideMappedSelectedDisclosuresPerSession
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
+import id.walt.corewallet.utils.WalletHttpClients.getHttpClient
 import io.klogging.Klogging
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*

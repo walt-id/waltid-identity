@@ -1,5 +1,6 @@
 package id.walt.webwallet.utils
 
+import id.walt.corewallet.utils.PKIXUtils
 import kotlinx.coroutines.test.runTest
 import java.security.KeyPairGenerator
 import kotlin.test.Test

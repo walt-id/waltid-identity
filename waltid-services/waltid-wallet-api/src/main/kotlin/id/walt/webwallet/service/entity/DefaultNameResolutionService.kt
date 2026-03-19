@@ -1,7 +1,7 @@
 package id.walt.webwallet.service.entity
 
 import id.walt.webwallet.config.TrustConfig
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*

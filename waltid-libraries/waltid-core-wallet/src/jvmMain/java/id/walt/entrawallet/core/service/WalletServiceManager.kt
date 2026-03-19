@@ -1,15 +1,15 @@
-package id.walt.entrawallet.core.service
+package id.walt.corewallet.service
 
-import id.walt.entrawallet.core.service.exchange.IssuanceServiceExternalSignatures
-import id.walt.webwallet.usecase.claim.ExternalSignatureClaimStrategy
-import id.walt.webwallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
-import id.walt.webwallet.usecase.exchange.NoMatchPresentationDefinitionCredentialsUseCase
-import id.walt.webwallet.usecase.exchange.PresentationDefinitionFilterParser
-import id.walt.webwallet.usecase.exchange.strategies.DescriptorNoMatchPresentationDefinitionMatchStrategy
-import id.walt.webwallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
-import id.walt.webwallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
-import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
+import id.walt.corewallet.service.exchange.IssuanceServiceExternalSignatures
+import id.walt.corewallet.usecase.claim.ExternalSignatureClaimStrategy
+import id.walt.corewallet.usecase.exchange.MatchPresentationDefinitionCredentialsUseCase
+import id.walt.corewallet.usecase.exchange.NoMatchPresentationDefinitionCredentialsUseCase
+import id.walt.corewallet.usecase.exchange.PresentationDefinitionFilterParser
+import id.walt.corewallet.usecase.exchange.strategies.DescriptorNoMatchPresentationDefinitionMatchStrategy
+import id.walt.corewallet.usecase.exchange.strategies.DescriptorPresentationDefinitionMatchStrategy
+import id.walt.corewallet.usecase.exchange.strategies.FilterNoMatchPresentationDefinitionMatchStrategy
+import id.walt.corewallet.usecase.exchange.strategies.FilterPresentationDefinitionMatchStrategy
+import id.walt.corewallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.ExperimentalUuidApi

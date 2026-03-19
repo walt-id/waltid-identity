@@ -1,9 +1,9 @@
-package id.walt.webwallet.usecase.exchange.strategies
+package id.walt.corewallet.usecase.exchange.strategies
 
-import id.walt.entrawallet.core.utils.WalletCredential
+import id.walt.corewallet.utils.WalletCredential
 import id.walt.oid4vc.data.dif.InputDescriptor
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 

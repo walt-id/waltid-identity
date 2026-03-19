@@ -1,18 +1,18 @@
 package id.walt.entrawallet.core
 
 import id.walt.crypto.keys.Key
-import id.walt.entrawallet.core.service.SSIKit2WalletService
-import id.walt.entrawallet.core.service.WalletServiceManager
-import id.walt.entrawallet.core.service.WalletServiceManager.getWalletService
-import id.walt.entrawallet.core.service.WalletServiceManager.httpClient
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
-import id.walt.entrawallet.core.service.exchange.IssuanceService
-import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
-import id.walt.entrawallet.core.service.exchange.UsePresentationResponse
-import id.walt.entrawallet.core.utils.WalletCredential
+import id.walt.corewallet.service.SSIKit2WalletService
+import id.walt.corewallet.service.WalletServiceManager
+import id.walt.corewallet.service.WalletServiceManager.getWalletService
+import id.walt.corewallet.service.WalletServiceManager.httpClient
+import id.walt.corewallet.service.exchange.CredentialDataResult
+import id.walt.corewallet.service.exchange.IssuanceService
+import id.walt.corewallet.service.exchange.PresentationRequestParameter
+import id.walt.corewallet.service.exchange.UsePresentationResponse
+import id.walt.corewallet.utils.WalletCredential
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.dif.PresentationDefinition
-import id.walt.webwallet.usecase.exchange.FilterData
+import id.walt.corewallet.usecase.exchange.FilterData
 import io.ktor.http.*
 import io.ktor.util.*
 

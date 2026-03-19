@@ -1,4 +1,4 @@
-package id.walt.webwallet.usecase.exchange
+package id.walt.corewallet.usecase.exchange
 
 import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.Serializable

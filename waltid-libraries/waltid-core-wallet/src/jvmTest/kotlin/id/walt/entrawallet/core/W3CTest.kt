@@ -1,6 +1,6 @@
 package id.walt.entrawallet.core
 
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
+import id.walt.corewallet.service.exchange.CredentialDataResult
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*

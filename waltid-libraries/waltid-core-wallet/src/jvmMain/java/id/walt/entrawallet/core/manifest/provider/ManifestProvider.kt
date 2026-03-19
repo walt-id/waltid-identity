@@ -1,4 +1,4 @@
-package id.walt.entrawallet.core.manifest.provider
+package id.walt.corewallet.manifest.provider
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject

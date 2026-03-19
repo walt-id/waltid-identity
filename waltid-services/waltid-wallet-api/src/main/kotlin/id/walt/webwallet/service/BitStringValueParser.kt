@@ -1,7 +1,7 @@
 package id.walt.webwallet.service
 
-import id.walt.webwallet.utils.Base64Utils
-import id.walt.webwallet.utils.BitstringUtils
+import id.walt.corewallet.utils.Base64Utils
+import id.walt.corewallet.utils.BitstringUtils
 import java.util.zip.GZIPInputStream
 
 class BitStringValueParser {

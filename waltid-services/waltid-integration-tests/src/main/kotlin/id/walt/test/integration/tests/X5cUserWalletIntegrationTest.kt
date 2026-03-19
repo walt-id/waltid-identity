@@ -8,7 +8,7 @@ import id.walt.test.integration.expectFailure
 import id.walt.test.integration.expectLooksLikeJwt
 import id.walt.test.integration.expectSuccess
 import id.walt.test.integration.randomString
-import id.walt.webwallet.utils.PKIXUtils
+import id.walt.corewallet.utils.PKIXUtils
 import id.walt.webwallet.web.model.X5CAccountRequest
 import io.ktor.client.call.*
 import io.ktor.client.request.*

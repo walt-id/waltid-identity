@@ -1,4 +1,4 @@
-package id.walt.webwallet.utils
+package id.walt.corewallet.utils
 
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -13,7 +13,7 @@ object WalletHttpClients {
                 json()
             }
             install(Logging) {
-                logger = Logger.SIMPLE
+                logger = Logger.DEFAULT
                 level = LogLevel.ALL
             }
             followRedirects = false

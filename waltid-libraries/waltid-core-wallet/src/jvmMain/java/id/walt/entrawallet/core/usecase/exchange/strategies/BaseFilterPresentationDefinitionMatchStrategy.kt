@@ -1,8 +1,8 @@
-package id.walt.webwallet.usecase.exchange.strategies
+package id.walt.corewallet.usecase.exchange.strategies
 
-import id.walt.entrawallet.core.utils.WalletCredential
-import id.walt.webwallet.usecase.exchange.TypeFilter
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.WalletCredential
+import id.walt.corewallet.usecase.exchange.TypeFilter
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray

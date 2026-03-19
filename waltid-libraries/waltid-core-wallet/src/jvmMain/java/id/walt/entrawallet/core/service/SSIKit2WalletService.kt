@@ -1,4 +1,4 @@
-package id.walt.entrawallet.core.service
+package id.walt.corewallet.service
 
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
@@ -9,11 +9,11 @@ import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.LocalRegistrar
 import id.walt.did.dids.resolver.LocalResolver
-import id.walt.entrawallet.core.service.exchange.IssuanceService
-import id.walt.entrawallet.core.service.exchange.PresentationRequestParameter
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
-import id.walt.entrawallet.core.service.oidc4vc.VPresentationSession
-import id.walt.entrawallet.core.utils.SessionAttributes
+import id.walt.corewallet.service.exchange.IssuanceService
+import id.walt.corewallet.service.exchange.PresentationRequestParameter
+import id.walt.corewallet.service.oidc4vc.TestCredentialWallet
+import id.walt.corewallet.service.oidc4vc.VPresentationSession
+import id.walt.corewallet.utils.SessionAttributes
 import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.ResponseMode
 import id.walt.oid4vc.errors.AuthorizationError
@@ -23,8 +23,8 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
-import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
-import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
+import id.walt.corewallet.utils.StringUtils.couldBeJsonObject
+import id.walt.corewallet.utils.StringUtils.parseAsJsonObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.forms.*

@@ -1,7 +1,7 @@
 package id.walt.webwallet.service
 
 import TestUtils
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.params.ParameterizedTest

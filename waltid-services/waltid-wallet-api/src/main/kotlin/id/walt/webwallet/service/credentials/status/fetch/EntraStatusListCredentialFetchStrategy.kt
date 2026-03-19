@@ -4,9 +4,9 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.service.JwsDecoder
 import id.walt.webwallet.service.dids.DidResolverService
 import id.walt.webwallet.service.endpoint.ServiceEndpointProvider
-import id.walt.webwallet.utils.Base64Utils
-import id.walt.webwallet.utils.HttpUtils
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.Base64Utils
+import id.walt.corewallet.utils.HttpUtils
+import id.walt.corewallet.utils.JsonUtils
 import kotlinx.serialization.json.*
 
 class EntraStatusListCredentialFetchStrategy(

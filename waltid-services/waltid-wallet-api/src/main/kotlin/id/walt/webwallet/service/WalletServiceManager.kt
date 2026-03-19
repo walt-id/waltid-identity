@@ -56,7 +56,7 @@ import id.walt.webwallet.usecase.notification.NotificationDataFormatter
 import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationFilterUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
-import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
+import id.walt.corewallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList

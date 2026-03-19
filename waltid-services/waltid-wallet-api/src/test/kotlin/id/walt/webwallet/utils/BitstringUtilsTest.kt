@@ -1,6 +1,7 @@
 package id.walt.webwallet.utils
 
-import id.walt.webwallet.utils.StringUtils.hexToByteArray
+import id.walt.corewallet.utils.BitstringUtils
+import id.walt.corewallet.utils.StringUtils.hexToByteArray
 import kotlin.test.*
 
 class BitstringUtilsTest {

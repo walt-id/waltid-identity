@@ -2,12 +2,12 @@ package id.walt.entrawallet.core
 
 /*
 import id.walt.wallet.core.service.SSIKit2WalletService
-import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIResponse
-import id.walt.webwallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.SubmitOID4VPRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIResponse
+import id.walt.corewallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.SubmitOID4VPRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
 

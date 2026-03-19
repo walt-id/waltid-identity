@@ -6,7 +6,7 @@ import id.walt.webwallet.service.credentials.CredentialValidator
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchFactory
 import id.walt.webwallet.service.credentials.status.fetch.StatusListCredentialFetchStrategy
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
-import id.walt.webwallet.utils.JsonUtils
+import id.walt.corewallet.utils.JsonUtils
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk

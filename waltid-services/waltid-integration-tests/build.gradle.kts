@@ -24,6 +24,7 @@ dependencies {
     implementation(project(":waltid-services:waltid-issuer-api"))
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
+    implementation(project(":waltid-libraries:waltid-core-wallet"))
 
     implementation("app.softwork:kotlinx-uuid-core:0.1.4")
     implementation("com.nimbusds:nimbus-jose-jwt:10.6")

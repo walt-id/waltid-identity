@@ -1,4 +1,4 @@
-package id.walt.entrawallet.core.utils
+package id.walt.corewallet.utils
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind

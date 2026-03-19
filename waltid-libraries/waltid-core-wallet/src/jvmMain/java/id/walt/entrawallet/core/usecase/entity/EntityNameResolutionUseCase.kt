@@ -1,9 +1,9 @@
-package id.walt.webwallet.usecase.entity
+package id.walt.corewallet.usecase.entity
 
 /*
-import id.walt.webwallet.db.models.EntityNameResolutionData
-import id.walt.webwallet.service.cache.EntityNameResolutionCacheService
-import id.walt.webwallet.service.entity.EntityNameResolutionService
+import id.walt.corewallet.db.models.EntityNameResolutionData
+import id.walt.corewallet.service.cache.EntityNameResolutionCacheService
+import id.walt.corewallet.service.entity.EntityNameResolutionService
 import kotlin.time.Clock.System.now
 import kotlin.time.Instant
 

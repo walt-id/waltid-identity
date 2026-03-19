@@ -57,8 +57,8 @@ import id.walt.webwallet.service.report.ReportService
 import id.walt.webwallet.service.settings.SettingsService
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
-import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
+import id.walt.corewallet.utils.StringUtils.couldBeJsonObject
+import id.walt.corewallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import io.klogging.Klogging

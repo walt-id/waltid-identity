@@ -10,7 +10,7 @@ import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OfferedCredential
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
-import id.walt.webwallet.utils.WalletHttpClients
+import id.walt.corewallet.utils.WalletHttpClients
 import io.klogging.Klogger
 import io.ktor.client.call.*
 import io.ktor.client.request.*

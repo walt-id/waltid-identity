@@ -1,6 +1,6 @@
-package id.walt.webwallet.web.controllers.exchange.models.oid4vci
+package id.walt.corewallet.web.controllers.exchange.models.oid4vci
 
-import id.walt.entrawallet.core.service.exchange.IssuanceServiceExternalSignatures
+import id.walt.corewallet.service.exchange.IssuanceServiceExternalSignatures
 import kotlinx.serialization.Serializable
 
 @Serializable

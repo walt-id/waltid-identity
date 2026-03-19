@@ -1,7 +1,7 @@
-package id.walt.entrawallet.core.utils
+package id.walt.corewallet.utils
 
 import id.walt.crypto.keys.Key
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
+import id.walt.corewallet.service.exchange.CredentialDataResult
 
 object SessionAttributes {
 

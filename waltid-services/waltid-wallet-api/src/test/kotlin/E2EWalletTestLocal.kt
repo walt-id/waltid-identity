@@ -4,7 +4,7 @@ import id.walt.webwallet.config.DatasourceConfiguration
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
-import id.walt.webwallet.utils.WalletHttpClients
+import id.walt.corewallet.utils.WalletHttpClients
 import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
 import io.ktor.client.plugins.*

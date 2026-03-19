@@ -1,9 +1,9 @@
-package id.walt.entrawallet.core.service.exchange
+package id.walt.corewallet.service.exchange
 
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidService
-import id.walt.entrawallet.core.manifest.extractor.EntraManifestExtractor
-import id.walt.entrawallet.core.service.oidc4vc.TestCredentialWallet
+import id.walt.corewallet.manifest.extractor.EntraManifestExtractor
+import id.walt.corewallet.service.oidc4vc.TestCredentialWallet
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.CredentialOffer

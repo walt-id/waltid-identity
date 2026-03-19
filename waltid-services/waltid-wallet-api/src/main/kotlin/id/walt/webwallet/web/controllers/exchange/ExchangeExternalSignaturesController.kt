@@ -27,14 +27,14 @@ import id.walt.webwallet.service.dids.DidsService
 import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.keys.KeysService
-import id.walt.webwallet.utils.WalletHttpClients
+import id.walt.corewallet.utils.WalletHttpClients
 import id.walt.webwallet.web.controllers.auth.getWalletService
-import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIRequest
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.PrepareOID4VCIResponse
 import id.walt.webwallet.web.controllers.exchange.models.oid4vci.SubmitOID4VCIRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
-import id.walt.webwallet.web.controllers.exchange.models.oid4vp.SubmitOID4VPRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPRequest
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.PrepareOID4VPResponse
+import id.walt.corewallet.web.controllers.exchange.models.oid4vp.SubmitOID4VPRequest
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeOpenApiCommons
 import id.walt.webwallet.web.controllers.exchange.openapi.examples.ExchangeExternalSignaturesExamples
 import id.walt.webwallet.web.controllers.walletRoute
@@ -285,8 +285,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val presentationSubmission = req.presentationSubmission
                 val presentedCredentialIdList = req.selectedCredentialIdList
 
-                val vpTokenProofs = (if (req.ietfSdJwtVpProofs != null) {
-                    req.ietfSdJwtVpProofs.map { ietfVpProof ->
+                val ietfSdJwtVpProofsLocal = req.ietfSdJwtVpProofs
+                val vpTokenProofs = (if (ietfSdJwtVpProofsLocal != null) {
+                    ietfSdJwtVpProofsLocal.map { ietfVpProof ->
                         ietfVpProof.sdJwtVc + ietfVpProof.vpTokenProof
                     }
                 } else {
@@ -465,8 +466,9 @@ fun Application.exchangeExternalSignatures() = walletRoute {
                 val offer = req.offerURL
                 logger.debug { "Request: $req" }
 
-                val walletDID = req.did?.let {
-                    DidsService.get(walletService.walletId, req.did)
+                val reqDid = req.did
+                val walletDID = reqDid?.let {
+                    DidsService.get(walletService.walletId, it)
                 } ?: walletService.listDids().firstOrNull()
                 ?: throw IllegalArgumentException("No DID to use supplied and no DID was found in wallet.")
                 logger.debug { "Retrieved wallet DID: $walletDID" }

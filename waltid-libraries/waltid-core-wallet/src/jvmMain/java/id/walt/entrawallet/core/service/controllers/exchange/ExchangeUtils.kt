@@ -1,4 +1,4 @@
-package id.walt.webwallet.web.controllers.exchange
+package id.walt.corewallet.web.controllers.exchange
 
 object ExchangeUtils {
 

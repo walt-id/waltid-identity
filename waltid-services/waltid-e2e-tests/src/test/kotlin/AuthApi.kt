@@ -5,7 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.webwallet.db.models.Account
 import id.walt.webwallet.db.models.AccountWalletListing
-import id.walt.webwallet.utils.PKIXUtils
+import id.walt.corewallet.utils.PKIXUtils
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.KeycloakLogoutRequest
 import id.walt.webwallet.web.model.X5CAccountRequest

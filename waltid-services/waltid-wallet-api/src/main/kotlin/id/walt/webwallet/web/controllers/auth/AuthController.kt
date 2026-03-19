@@ -15,7 +15,7 @@ import id.walt.commons.web.UnauthorizedException
 import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.entrawallet.core.utils.UuidSerializer
+import id.walt.corewallet.utils.UuidSerializer
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.FeatureCatalog

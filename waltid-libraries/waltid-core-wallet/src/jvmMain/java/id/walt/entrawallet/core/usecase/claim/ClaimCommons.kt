@@ -1,9 +1,9 @@
 @file:OptIn(ExperimentalTime::class)
 
-package id.walt.webwallet.usecase.claim
+package id.walt.corewallet.usecase.claim
 
-import id.walt.entrawallet.core.service.exchange.CredentialDataResult
-import id.walt.entrawallet.core.utils.WalletCredential
+import id.walt.corewallet.service.exchange.CredentialDataResult
+import id.walt.corewallet.utils.WalletCredential
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi

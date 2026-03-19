@@ -10,7 +10,7 @@ import id.walt.webwallet.config.TrustedCAConfig
 import id.walt.webwallet.db.models.Accounts
 import id.walt.webwallet.db.models.X5CLogins
 import id.walt.webwallet.service.account.*
-import id.walt.webwallet.utils.PKIXUtils
+import id.walt.corewallet.utils.PKIXUtils
 import id.walt.webwallet.web.model.X5CAccountRequest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
