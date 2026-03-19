@@ -115,7 +115,7 @@ dependencies {
     implementation("org.xerial:sqlite-jdbc:3.49.0.0")
     implementation("org.postgresql:postgresql:42.7.5")
     implementation("com.mysql:mysql-connector-j:9.2.0")
-    implementation("com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11")
+    implementation("com.microsoft.sqlserver:mssql-jdbc:13.4.0.jre11")
 
     // Web push
     // implementation("dev.blanke.webpush:webpush:6.1.1") // alternative
