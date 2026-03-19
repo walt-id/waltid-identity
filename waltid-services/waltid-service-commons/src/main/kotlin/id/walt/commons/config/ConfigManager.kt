@@ -8,7 +8,7 @@ import kotlin.reflect.jvm.jvmName
 
 typealias WaltConfig = Any
 
-class ConfigurationException(override val cause: ConfigException): IllegalArgumentException() {
+class ConfigurationException(override val cause: ConfigException) : IllegalArgumentException() {
     fun errorMessage() = cause.localizedMessage.replace(" com.typesafe.config.ConfigException\$Parse: Reader:", "")
 }
 
@@ -21,13 +21,13 @@ object ConfigManager {
     val preloadedConfigurations = HashMap<Pair<String, KClass<out WaltConfig>>, WaltConfig>()
 
     val configLoaders = HashMap<String, ConfigLoader>()
-    
+
     /**
      * Custom decoders that can be registered by services before config loading.
      * These are added to all config loaders.
      */
     private val customDecoders = mutableListOf<com.sksamuel.hoplite.decoder.Decoder<*>>()
-    
+
     /**
      * Register a custom Hoplite decoder that will be used for all config loading.
      * Should be called before configs are loaded (e.g., in service initialization).

@@ -53,7 +53,7 @@ enum class DeviceRetrievalMethodType(val value: UInt) {
     }
 }
 
-internal object DeviceRetrievalMethodTypeSerializer: KSerializer<DeviceRetrievalMethodType> {
+internal object DeviceRetrievalMethodTypeSerializer : KSerializer<DeviceRetrievalMethodType> {
 
     override val descriptor = buildClassSerialDescriptor("DeviceRetrievalMethodType")
 

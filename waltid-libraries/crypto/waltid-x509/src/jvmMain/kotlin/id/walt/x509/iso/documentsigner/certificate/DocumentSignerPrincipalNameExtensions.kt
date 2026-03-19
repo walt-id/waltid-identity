@@ -1,11 +1,6 @@
 package id.walt.x509.iso.documentsigner.certificate
 
-import id.walt.x509.buildX500Name
-import id.walt.x509.getCommonName
-import id.walt.x509.getCountryCode
-import id.walt.x509.getLocalityName
-import id.walt.x509.getOrganizationName
-import id.walt.x509.getStateOrProvinceName
+import id.walt.x509.*
 import org.bouncycastle.asn1.x500.X500Name
 
 internal fun DocumentSignerPrincipalName.Companion.parseFromJcaX500Name(

@@ -36,19 +36,19 @@ class DidWebRegistrar : LocalRegistrarMethod("web") {
     @JsPromise
     @JsExport.Ignore
     override suspend fun registerByKey(key: Key, options: DidCreateOptions): DidResult {
-            val domain = getUrlEncodedDomainOrThrow(options)
-            val path = getPath(options)
-            val did = getDid(domain, path)
-            return DidResult(
-                did,
-                DidDocument(
-                    DidWebDocument(
-                        did = did,
-                        keyId = key.getKeyId(),
-                        didKey = key.getPublicKey().exportJWKObject()
-                    ).toMap()
-                ),
-            )
+        val domain = getUrlEncodedDomainOrThrow(options)
+        val path = getPath(options)
+        val did = getDid(domain, path)
+        return DidResult(
+            did,
+            DidDocument(
+                DidWebDocument(
+                    did = did,
+                    keyId = key.getKeyId(),
+                    didKey = key.getPublicKey().exportJWKObject()
+                ).toMap()
+            ),
+        )
     }
 
     private suspend fun registerByDidDocConfig(

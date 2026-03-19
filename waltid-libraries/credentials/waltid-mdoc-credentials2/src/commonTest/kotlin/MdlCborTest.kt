@@ -15,7 +15,6 @@ import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborArray
-import kotlinx.serialization.cbor.CborMap
 import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
@@ -24,10 +23,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTime::class)
 class MdlCborTest {
 
     @Test
@@ -318,7 +315,7 @@ class MdlCborTest {
         val issuerSignedList = document.issuerSigned.namespaces?.get("org.iso.18013.5.1")
         assertNotNull(issuerSignedList)
         assertEquals(issuerSignedList.findItem(0U).elementIdentifier, "family_name")
-        assertEquals(CborString("Doe"), issuerSignedList.findItem(0U).elementValue, )
+        assertEquals(CborString("Doe"), issuerSignedList.findItem(0U).elementValue)
         assertEquals(issuerSignedList.findItem(3U).elementIdentifier, "issue_date")
         assertEquals(CborString(LocalDate.parse("2019-10-20").toString(), 1004UL), issuerSignedList.findItem(3U).elementValue)
         assertEquals(issuerSignedList.findItem(4U).elementIdentifier, "expiry_date")
@@ -356,12 +353,24 @@ class MdlCborTest {
         assertEquals(mso.validityInfo.validUntil, Instant.parse("2021-10-01T13:30:02Z"))
         val valueDigestList = mso.valueDigests["org.iso.18013.5.1"]
         assertNotNull(valueDigestList)
-        assertEquals(valueDigestList.findItem(0U).toHexString().uppercase(), "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF")
-        assertEquals(valueDigestList.findItem(1U).toHexString().uppercase(), "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571")
+        assertEquals(
+            valueDigestList.findItem(0U).toHexString().uppercase(),
+            "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF"
+        )
+        assertEquals(
+            valueDigestList.findItem(1U).toHexString().uppercase(),
+            "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571"
+        )
         val valueDigestListUs = mso.valueDigests["${"org.iso.18013.5.1"}.US"]
         assertNotNull(valueDigestListUs)
-        assertEquals(valueDigestListUs.findItem(0U).toHexString().uppercase(), "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C")
-        assertEquals(valueDigestListUs.findItem(1U).toHexString().uppercase(), "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34")
+        assertEquals(
+            valueDigestListUs.findItem(0U).toHexString().uppercase(),
+            "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C"
+        )
+        assertEquals(
+            valueDigestListUs.findItem(1U).toHexString().uppercase(),
+            "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34"
+        )
 
         assertNotNull(document.deviceSigned?.deviceAuth?.deviceMac)
 
@@ -605,12 +614,24 @@ class MdlCborTest {
         assertEquals(mso.validityInfo.validUntil, Instant.parse("2021-10-01T13:30:02Z"))
         val valueDigestList = mso.valueDigests["org.iso.18013.5.1"]
         assertNotNull(valueDigestList)
-        assertEquals(valueDigestList.findItem(0U).toHexString().uppercase(), "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF")
-        assertEquals(valueDigestList.findItem(1U).toHexString().uppercase(), "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571")
+        assertEquals(
+            valueDigestList.findItem(0U).toHexString().uppercase(),
+            "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF"
+        )
+        assertEquals(
+            valueDigestList.findItem(1U).toHexString().uppercase(),
+            "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571"
+        )
         val valueDigestListUs = mso.valueDigests["${"org.iso.18013.5.1"}.US"]
         assertNotNull(valueDigestListUs)
-        assertEquals(valueDigestListUs.findItem(0U).toHexString().uppercase(), "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C")
-        assertEquals(valueDigestListUs.findItem(1U).toHexString().uppercase(), "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34")
+        assertEquals(
+            valueDigestListUs.findItem(0U).toHexString().uppercase(),
+            "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C"
+        )
+        assertEquals(
+            valueDigestListUs.findItem(1U).toHexString().uppercase(),
+            "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34"
+        )
 
         assertEquals(coseSigned.serialize().toHexString().uppercase(), input)
     }

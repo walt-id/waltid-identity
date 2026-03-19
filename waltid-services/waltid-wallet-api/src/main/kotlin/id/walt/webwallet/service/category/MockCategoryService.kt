@@ -1,7 +1,6 @@
 package id.walt.webwallet.service.category
 
 import id.walt.webwallet.db.models.WalletCategoryData
-
 import kotlin.random.Random
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

@@ -21,10 +21,10 @@ class RedisPersistence<V>(
         else
             pool["$discriminator:$id"] = encoding.invoke(value)
     }
-    
+
     override fun set(id: String, value: V, ttl: Duration?) {
         val effectiveTtl = ttl ?: defaultExpiration
-        
+
         if (effectiveTtl != null)
             pool.setex("$discriminator:$id", effectiveTtl.inWholeSeconds, encoding.invoke(value))
         else

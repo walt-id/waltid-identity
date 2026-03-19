@@ -59,7 +59,8 @@ class IssuerSignedDataMdocVpPolicy : MdocVPPolicy() {
                 // not by re-serializing the IssuerSignedItem object.
                 // Re-serialization can differ between issuers (e.g., different CBOR map key ordering),
                 // and would incorrectly fail digest verification for valid credentials.
-                val issuerSignedItemValueDigest = ValueDigest.fromIssuerSignedItemBytes(issuerSignedItem.digestId, serialized, mso.digestAlgorithm)
+                val issuerSignedItemValueDigest =
+                    ValueDigest.fromIssuerSignedItemBytes(issuerSignedItem.digestId, serialized, mso.digestAlgorithm)
 
                 val issuerSignedItemHash = issuerSignedItemValueDigest.value
                 log.trace { "  Issuer signed item value digest: DigestID = ${issuerSignedItemValueDigest.key}, hash (hex) = ${issuerSignedItemHash.toHexString()}" }

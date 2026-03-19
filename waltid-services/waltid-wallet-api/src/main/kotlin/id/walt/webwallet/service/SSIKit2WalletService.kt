@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.service
 
 import com.nimbusds.jose.JOSEObjectType
@@ -77,10 +75,9 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.net.URI
-import java.util.*
+import java.util.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -479,20 +476,24 @@ class SSIKit2WalletService(
                     "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
                     "x" to (j["x"]?.jsonPrimitive?.content ?: "")
                 )
+
                 "EC" -> mapOf(
                     "kty" to kty,
                     "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
                     "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
                     "y" to (j["y"]?.jsonPrimitive?.content ?: "")
                 )
+
                 "RSA" -> mapOf(
                     "kty" to kty,
                     "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
                     "e" to (j["e"]?.jsonPrimitive?.content ?: "")
                 )
+
                 else -> j.mapValues { it.value.jsonPrimitive.contentOrNull ?: it.value.toString() }
             }
         }
+
         val match = jwkComparable(providedPublicJwk) == jwkComparable(didDocPubJwk)
         if (!match) {
             throw BadRequestException("Provided private key does not match DID's key")
@@ -781,12 +782,14 @@ class SSIKit2WalletService(
                     val kid = headers.getValue("kid").jsonPrimitive.content
                     if (kid != alias) throw IllegalArgumentException("JWT headers.kid must match alias: $alias")
                 }
+
                 headers.containsKey("jwk") -> {
                     val jwk = headers.getValue("jwk").jsonObject
                     val kid = jwk["kid"]?.jsonPrimitive?.content
                     if (kid != null && kid != alias)
                         throw IllegalArgumentException("JWT headers.jwk.kid must match alias: $alias")
                 }
+
                 else -> {
                     headers = JsonObject(headers + ("kid" to JsonPrimitive(alias)))
                 }

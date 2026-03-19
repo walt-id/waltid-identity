@@ -22,17 +22,16 @@ kotlin {
         commonMain.dependencies {
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)

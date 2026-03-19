@@ -33,15 +33,17 @@ sealed class P256 {
             fun importInKeychain(
                 kid: String,
                 externalRepresentation: ByteArray,
-                inSecureEnclave: Boolean): PrivateKey =
+                inSecureEnclave: Boolean
+            ): PrivateKey =
                 KeychainOperations.P256.createPrivateKeyFrom(externalRepresentation) { privateKey ->
                     ExistingP256KeychainPrivateKey(kid, inSecureEnclave, privateKey)
                 }
 
             fun publicKeyJwkFrom(externalRepresentation: ByteArray): JsonObject {
-                val jwk = KeychainOperations.usePublicKeyFrom(externalRepresentation) { publicKey ->//.publicKeyFrom(externalRepresentation) { publicKey ->
-                    ECKeyUtils.exportJwkWithPublicKey(publicKey, null)!!
-                }.let { Json.parseToJsonElement(it).jsonObject }
+                val jwk =
+                    KeychainOperations.usePublicKeyFrom(externalRepresentation) { publicKey ->//.publicKeyFrom(externalRepresentation) { publicKey ->
+                        ECKeyUtils.exportJwkWithPublicKey(publicKey, null)!!
+                    }.let { Json.parseToJsonElement(it).jsonObject }
                 return jwk
             }
 
@@ -206,7 +208,6 @@ internal class P256KeychainPublicKey(private val kid: String, private val inSecu
 }
 
 
-
 internal class P256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean) : P256.PrivateKey(kid, inSecureEnclave) {
     override fun <T> loadPrivateSecKey(kid: String, block: (privateSecKey: SecKeyRef?) -> T) {
         KeychainOperations.P256.withPrivateKey(kid, inSecureEnclave) { key ->
@@ -215,7 +216,8 @@ internal class P256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean) : P
     }
 }
 
-internal class ExistingP256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean, private val secKeyRef: SecKeyRef?) : P256.PrivateKey(kid, inSecureEnclave) {
+internal class ExistingP256KeychainPrivateKey(kid: String, inSecureEnclave: Boolean, private val secKeyRef: SecKeyRef?) :
+    P256.PrivateKey(kid, inSecureEnclave) {
     override fun <T> loadPrivateSecKey(kid: String, block: (privateSecKey: SecKeyRef?) -> T) {
         block(secKeyRef)
     }

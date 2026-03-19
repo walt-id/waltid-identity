@@ -10,4 +10,4 @@ inline fun <T> Iterable<T>.forEachNumbered(action: (index: Int, total: Int, T) -
 inline fun <T, R> Iterable<T>.mapNumbered(transform: (index: Int, total: Int, T) -> R): List<R> =
     count().let { count ->
         mapIndexed { idx, item -> transform(idx + 1, count, item) }
-}
+    }

@@ -244,13 +244,14 @@ object DcqlMatcher {
                 log.trace { "Checking all listed claims for credential ${credential.id}" }
                 overallMatchLogic(claimsQueries)
             }
+
             else -> { // Case 2: At least one claim_set must be satisfied
                 log.trace { "Checking claim sets for credential ${credential.id}" }
                 claimSets.any { setOptionIds -> // Try to satisfy one option
                     log.trace { "Checking claim set option: $setOptionIds" }
                     val claimsForThisSet = setOptionIds.mapNotNull { claimsQueriesMapById[it] }
                     if (claimsForThisSet.size != setOptionIds.size) { // A claimId in set was not in main claims list
-                        log.warn{"Not all claim IDs in claim_set $setOptionIds found in main claims list for ${credential.id}"}
+                        log.warn { "Not all claim IDs in claim_set $setOptionIds found in main claims list for ${credential.id}" }
                         false
                     } else {
                         overallMatchLogic(claimsForThisSet) // This will populate collectedSelectedClaims if true
@@ -297,7 +298,8 @@ object DcqlMatcher {
             val targetClaimName = claimQuery.path.lastOrNull {
                 it is JsonPrimitive && it.isString
             }?.jsonPrimitive?.content
-            val matchingDisclosure = credential.disclosures?.find { it.name == targetClaimName /* && it.location matches claimQuery.path more precisely */ }
+            val matchingDisclosure =
+                credential.disclosures?.find { it.name == targetClaimName /* && it.location matches claimQuery.path more precisely */ }
 
             if (matchingDisclosure != null) {
                 if (!claimQuery.values.isNullOrEmpty()) {
@@ -313,7 +315,7 @@ object DcqlMatcher {
             } else {
                 // If path not found as a disclosure, it might be an always-visible claim in the SD-JWT core.
                 // Fall through to generic path resolution for such cases.
-                log.trace { "Claim path ${claimQuery.path} not found among SD disclosures for ${credential.id}. Checking core JWT."}
+                log.trace { "Claim path ${claimQuery.path} not found among SD disclosures for ${credential.id}. Checking core JWT." }
             }
         }
 
@@ -518,6 +520,7 @@ object DcqlMatcher {
                             element[segment.content]?.let { nextElements.add(it) }
                         }
                     }
+
                     is JsonArray -> {
                         if (segment is JsonNull) {
                             // null means select all elements in the array

@@ -10,7 +10,7 @@ val http = HttpClient {
     val log = KotlinLogging.logger("id.walt.oid4vc.http")
 
     engine {
-        log.info {"Initializing oid4vc HTTP client with engine config: ${this::class.simpleName}" }
+        log.info { "Initializing oid4vc HTTP client with engine config: ${this::class.simpleName}" }
     }
 
     // For CI/CD OkHttp client should be used. CIO client seems to have some issues with timeouts when connecting to

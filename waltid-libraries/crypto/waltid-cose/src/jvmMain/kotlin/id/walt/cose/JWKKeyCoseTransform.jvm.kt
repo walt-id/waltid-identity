@@ -15,6 +15,7 @@ actual object JWKKeyCoseTransform {
                     y = ecKey.y.decode()
                 )
             }
+
             KeyType.Ed25519 -> {
                 val octKey = _internalJwk.toOctetKeyPair()
                 CoseKey(
@@ -23,6 +24,7 @@ actual object JWKKeyCoseTransform {
                     x = octKey.x.decode()
                 )
             }
+
             else -> throw IllegalArgumentException("Key type $keyType not supported for COSE conversion")
         }
     }

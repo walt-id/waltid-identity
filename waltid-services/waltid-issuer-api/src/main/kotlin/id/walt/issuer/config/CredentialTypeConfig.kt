@@ -195,7 +195,7 @@ data class CredentialTypeConfig(
             )
         ),
 
-    ),
+        ),
 ) : WaltConfig() {
     fun parse(): Map<String, CredentialSupported> {
         return supportedCredentialTypes.flatMap { entry ->

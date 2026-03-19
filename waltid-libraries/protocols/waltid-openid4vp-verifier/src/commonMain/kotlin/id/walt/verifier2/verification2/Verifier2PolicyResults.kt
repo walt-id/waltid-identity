@@ -19,7 +19,7 @@ data class Verifier2PolicyResults(
 
     val overallSuccess: Boolean =
         vpPolicies.all { it.value.all { it.value.success } } &&
-        vcPolicies.all { it.success } &&
+                vcPolicies.all { it.success } &&
                 specificVcPolicies.values.all { policies -> policies.all { it.success } }
 
 }

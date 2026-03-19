@@ -14,7 +14,6 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -22,7 +21,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.bouncycastle.asn1.x500.X500Name
 import java.security.KeyPairGenerator
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
+import java.util.Date
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
@@ -33,7 +34,7 @@ class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun userInfo(expectedStatus: HttpStatusCode, output: ((Account) -> Unit)? = null) =
         e2e.test("/wallet-api/auth/user-info - wallet-api user-info") {
             client.get("/wallet-api/auth/user-info").apply {
-                assertTrue(status == expectedStatus, "Expected status: $expectedStatus, but had $status")
+                assertEquals(status, expectedStatus, "Expected status: $expectedStatus, but had $status")
                 output?.invoke(body<Account>())
             }
         }
@@ -65,7 +66,7 @@ class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
         e2e.test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()
-                assertTrue(expectedAccountId == listing.account, "Wallet listing is for wrong account!")
+                assertEquals(expectedAccountId, listing.account, "Wallet listing is for wrong account!")
                 assertTrue(listing.wallets.isNotEmpty(), "No wallets available!")
                 output?.invoke(listing)
             }
@@ -197,19 +198,18 @@ class AuthApi(private val e2e: E2ETest, private val client: HttpClient) {
         )
         private val subjectJWKPrivateKey = PKIXUtils.javaPrivateKeyToJWKKey(subjectKeyPair.private)
 
-        private fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate): AccountRequest = runBlocking {
+        private suspend fun createX5CAccountRequest(key: JWKKey, cert: X509Certificate): AccountRequest =
             X5CAccountRequest(
-                null,
-                key.signJws(
+                name = null,
+                token = key.signJws(
                     Json.encodeToJsonElement(
                         emptyMap<String, String>()
                     ).toString().toByteArray(),
                     headers = mapOf(
                         "x5c" to listOf(Base64.getEncoder().encodeToString(cert.encoded)).toJsonElement(),
-                    ),
+                    )
                 )
             )
-        }
 
         private suspend fun checkX5CLoginCreatesWallet() = e2e.test(
             name = "/wallet-api/auth/x5c/login - validate wallet api x5c login with trustworthy subject certificate also creates wallet"

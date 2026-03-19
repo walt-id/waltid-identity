@@ -1,18 +1,17 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.sdjwt
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.MACVerifier
 import com.nimbusds.jwt.JWTClaimsSet
-import korlibs.crypto.SHA256
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import korlibs.encoding.ASCII
 import kotlinx.serialization.json.*
+import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
 import kotlin.test.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 class SDJwtTestJVM {
     // Generate shared secret for HMAC crypto algorithm
@@ -103,7 +102,8 @@ class SDJwtTestJVM {
         val isValid = parsedUndisclosedJwt.verify(cryptoProvider).verified
         println("Undisclosed SD-JWT verified: $isValid")
 
-        val disclosedJwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~"
+        val disclosedJwt =
+            "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~"
         val parsedDisclosedJwtVerifyResult = SDJwt.verifyAndParse(
             disclosedJwt,
             cryptoProvider
@@ -112,7 +112,8 @@ class SDJwtTestJVM {
         println("Disclosed JWT payload:")
         println(parsedDisclosedJwtVerifyResult.sdJwt.fullPayload.toString())
 
-        val forgedDisclosure = parsedDisclosedJwtVerifyResult.sdJwt.jwt + "~" + forgeDislosure(parsedDisclosedJwtVerifyResult.sdJwt.disclosureObjects.first())
+        val forgedDisclosure =
+            parsedDisclosedJwtVerifyResult.sdJwt.jwt + "~" + forgeDislosure(parsedDisclosedJwtVerifyResult.sdJwt.disclosureObjects.first())
         val forgedDisclosureVerifyResult = SDJwt.verifyAndParse(
             forgedDisclosure, cryptoProvider
         )
@@ -133,7 +134,8 @@ class SDJwtTestJVM {
     fun testJwtWithCustomHeaders() {
         // Create SimpleJWTCryptoProvider with MACSigner and MACVerifier
         val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
-        val signedJwt = cryptoProvider.sign(buildJsonObject { put("test", JsonPrimitive("hello")) },
+        val signedJwt = cryptoProvider.sign(
+            buildJsonObject { put("test", JsonPrimitive("hello")) },
             headers = mapOf(
                 "h1" to "v1",
                 "h2" to 2,
@@ -158,7 +160,8 @@ class SDJwtTestJVM {
         val signedJwt = SDJwt.sign(
             sdPayload = SDPayload.createSDPayload(
                 buildJsonObject { put("test", JsonPrimitive("hello")) },
-                SDMapBuilder().addField("test", true).build()), jwtCryptoProvider = cryptoProvider
+                SDMapBuilder().addField("test", true).build()
+            ), jwtCryptoProvider = cryptoProvider
         )
         val presentedJwtNoKb = signedJwt.present(true)
         assertNull(presentedJwtNoKb.keyBindingJwt)
@@ -168,7 +171,10 @@ class SDJwtTestJVM {
         assertTrue(presentedJwtWithKb.keyBindingJwt.issuedAt >= issuanceTime.epochSeconds)
         assertEquals(aud, presentedJwtWithKb.keyBindingJwt.audience)
         assertEquals(nonce, presentedJwtWithKb.keyBindingJwt.nonce)
-        assertEquals(SHA256.digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url, presentedJwtWithKb.keyBindingJwt.sdHash)
+        assertEquals(
+            SHA256().digest(ASCII.encode(presentedJwtNoKb.toString())).encodeToBase64Url(),
+            presentedJwtWithKb.keyBindingJwt.sdHash
+        )
 
     }
 }

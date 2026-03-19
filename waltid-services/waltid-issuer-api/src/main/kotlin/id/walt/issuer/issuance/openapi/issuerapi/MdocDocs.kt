@@ -154,7 +154,10 @@ object MdocDocs {
                     put("resident_city", "Vienna".toJsonElement())
                     put("resident_state", "Vienna".toJsonElement())
                     put("resident_postal_code", "07008".toJsonElement())
-                    put("biometric_template_face", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())
+                    put(
+                        "biometric_template_face",
+                        listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement()
+                    )
                     put("family_name_national_character", "Doe".toJsonElement())
                     put("given_name_national_character", "John".toJsonElement())
                     put("signature_usual_mark", listOf(141, 182, 121, 111, 238, 50, 120, 94, 54, 111, 113, 13, 241, 12, 12).toJsonElement())

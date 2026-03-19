@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
@@ -7,7 +5,7 @@ import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
 import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
-import kotlin.time.ExperimentalTime
+
 
 /**
  * Builder for ISO Document Signer X.509 certificates.

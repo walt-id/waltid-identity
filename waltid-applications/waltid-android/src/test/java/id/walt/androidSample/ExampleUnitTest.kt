@@ -1,7 +1,6 @@
 package id.walt.androidSample
 
 import org.junit.Test
-
 import org.junit.Assert.*
 
 /**

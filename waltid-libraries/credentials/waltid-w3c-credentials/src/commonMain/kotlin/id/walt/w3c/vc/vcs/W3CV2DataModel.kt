@@ -1,6 +1,5 @@
 package id.walt.w3c.vc.vcs
 
-
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject

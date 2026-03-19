@@ -15,7 +15,7 @@ import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Date
 import kotlin.test.*
 
 class X509V3ExtensionsTest {

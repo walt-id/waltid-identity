@@ -1,11 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.db.models
 
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.dao.id.IntIdTable
 import org.jetbrains.exposed.v1.javatime.timestamp
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
 

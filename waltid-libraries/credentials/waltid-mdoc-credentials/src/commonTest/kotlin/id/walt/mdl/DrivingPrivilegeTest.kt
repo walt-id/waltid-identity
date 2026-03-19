@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdl
 
@@ -14,7 +14,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 class DrivingPrivilegeTest {
 

@@ -165,6 +165,7 @@ object Verifier {
                 specificCredentialPolicies = specificCredentialPolicies,
                 presentationContext = presentationContext
             )
+
             else -> verifyW3CPresentation(
                 format = format,
                 vpToken = vpToken,

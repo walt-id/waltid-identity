@@ -1,9 +1,9 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeAuthorizeHandler
 import id.walt.openid4vci.granttypehandlers.AuthorizationCodeTokenHandler
 import id.walt.openid4vci.granttypehandlers.PreAuthorizedCodeTokenHandler
-import id.walt.openid4vci.GrantType
 
 /**
  * Entry point for consumers to obtain the OAuth provider.

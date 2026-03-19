@@ -121,7 +121,10 @@ object CredentialParser {
                         val serialized = runCatching {
                             item.elementValue.toSerializedJsonElement()
                         }.getOrElse {
-                            throw IllegalArgumentException("Could not serialize element ${item.digestId} in $namespace: ${item.elementIdentifier} (value ${item.elementValue}), due to: ${it.message}", it)
+                            throw IllegalArgumentException(
+                                "Could not serialize element ${item.digestId} in $namespace: ${item.elementIdentifier} (value ${item.elementValue}), due to: ${it.message}",
+                                it
+                            )
                         }
 
                         /* Previous serialization:
@@ -247,6 +250,7 @@ object CredentialParser {
                             if (key != "_sd") scanForHashes(value, "$currentPath.$key")
                         }
                     }
+
                     is JsonArray -> {
                         element.forEachIndexed { index, item ->
                             // Check for Array Disclosure format: { "...": "hash" }
@@ -261,6 +265,7 @@ object CredentialParser {
                             }
                         }
                     }
+
                     else -> {} // Primitives contain no hashes
                 }
             }

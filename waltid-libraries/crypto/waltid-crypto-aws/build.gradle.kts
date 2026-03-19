@@ -16,17 +16,17 @@ dependencies {
     implementation(identityLibs.kotlinx.serialization.json)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(identityLibs.kotlinx.coroutines.core)
 
     // AWS
-    implementation("aws.sdk.kotlin:kms-jvm:1.5.103")
+    implementation("aws.sdk.kotlin:kms-jvm:1.6.39")
 
     // JOSE
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation(identityLibs.nimbus.jose.jwt)
 
     // Hashing with SHA-2
-    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-    implementation("org.kotlincrypto.hash:sha2")
+
+    implementation(identityLibs.kotlincrypto.hash.sha2)
 }
 
 tasks.withType<Test> {

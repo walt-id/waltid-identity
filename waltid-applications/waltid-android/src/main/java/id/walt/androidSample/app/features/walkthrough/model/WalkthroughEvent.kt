@@ -9,10 +9,11 @@ sealed interface WalkthroughEvent {
         data object GoBack : NavigateEvent
         data object RestartWalkthrough : NavigateEvent
     }
+
     sealed interface Biometrics : WalkthroughEvent {
         data object BiometricsUnavailable : Biometrics
         data object BiometricAuthenticationFailure : Biometrics
         data class BiometricError(val msg: String) : Biometrics
-        data object SecureLockScreenNotEnabled: Biometrics
+        data object SecureLockScreenNotEnabled : Biometrics
     }
 }

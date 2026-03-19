@@ -3,37 +3,28 @@ package id.walt.openid4vci.tokens
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.core.*
+import id.walt.openid4vci.createTestConfig
 import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import java.lang.ThreadLocal
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.asContextElement
+import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import kotlin.test.assertNotNull
-import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
-import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.createTestConfig
+import kotlin.test.assertTrue
 
 class TokenServiceTest {
 
     @Test
     fun `resolves key from resolver and signs token`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val service = JwtAccessTokenService ({ key })
+        val service = JwtAccessTokenService({ key })
 
         val token = service.createAccessToken(mapOf("sub" to "alice"))
         assertTrue(token.isNotBlank())
@@ -46,7 +37,7 @@ class TokenServiceTest {
     @Test
     fun `authorization code flow embeds granted scopes into JWT scope claim`(): Unit = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val tokenService = JwtAccessTokenService( { key })
+        val tokenService = JwtAccessTokenService({ key })
         val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         val issuerId = "issuer-scope"
@@ -104,7 +95,7 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val service = JwtAccessTokenService ({ currentKey.get() ?: error("No key in context") })
+        val service = JwtAccessTokenService({ currentKey.get() ?: error("No key in context") })
 
         val tokens = keys.map { key ->
             async(currentKey.asContextElement(value = key)) {
@@ -154,7 +145,7 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val tokenService = JwtAccessTokenService( { resolveCurrentKey(currentKey) })
+        val tokenService = JwtAccessTokenService({ resolveCurrentKey(currentKey) })
         val provider = buildOAuth2Provider(createTestConfig(tokenService = tokenService))
 
         suspend fun runFlow(issuerId: String): String = withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {

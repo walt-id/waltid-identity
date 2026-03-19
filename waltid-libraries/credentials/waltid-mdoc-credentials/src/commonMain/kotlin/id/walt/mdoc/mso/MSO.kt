@@ -79,7 +79,7 @@ class MSO(
          * Create item digest, for the given item
          */
         fun digestItem(encodedItem: EncodedCBORElement, digestAlgorithm: DigestAlgorithm): ByteArray {
-            return digestAlgorithm.getHasher().digest(encodedItem.toCBOR()).bytes
+            return digestAlgorithm.getHasher().digest(encodedItem.toCBOR())
         }
 
         /**

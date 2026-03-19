@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.policies
 
 import id.walt.policies.policies.NotBeforeDatePolicy
@@ -16,7 +14,6 @@ import java.util.stream.Stream
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class NotBeforeDatePolicyTest : DatePolicyTestBase() {
@@ -34,25 +31,25 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
                     named(it.getValue(), it),
                     named("past", Clock.System.now().minus(1.days)),
                     named("vc", "vc"),
-                  Companion::assertSuccessResult
+                    Companion::assertSuccessResult
                 ),
                 arguments(
                     named(it.getValue(), it),
                     named("future", Clock.System.now().plus(1.days)),
                     named("vc", "vc"),
-                  Companion::assertFailureResult
+                    Companion::assertFailureResult
                 ),
                 arguments(
                     named(it.getValue(), it),
                     named("past", Clock.System.now().minus(1.days)),
                     named("root", null),
-                  Companion::assertSuccessResult
+                    Companion::assertSuccessResult
                 ),
                 arguments(
                     named(it.getValue(), it),
                     named("future", Clock.System.now().plus(1.days)),
                     named("root", null),
-                  Companion::assertFailureResult
+                    Companion::assertFailureResult
                 ),
             )
         }.let { Stream.of(*it.toTypedArray()) }
@@ -62,11 +59,11 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
             listOf(
                 arguments(
                     named(it.getValue(), it), named("past", Clock.System.now().minus(1.days)),
-                  Companion::assertSuccessResult
+                    Companion::assertSuccessResult
                 ),
                 arguments(
                     named(it.getValue(), it), named("future", Clock.System.now().plus(1.days)),
-                  Companion::assertFailureResult
+                    Companion::assertFailureResult
                 ),
             )
         }.let { Stream.of(*it.toTypedArray()) }
@@ -81,7 +78,7 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
                         named(jwtClaim.getValue(), jwtClaim),
                         named("future", Clock.System.now().plus(1.days)),
                         named("vc", "vc"),
-                      Companion::assertSuccessResult
+                        Companion::assertSuccessResult
                     ),
                     arguments(
                         named(vcClaim.getValue(), vcClaim),
@@ -89,7 +86,7 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
                         named(jwtClaim.getValue(), jwtClaim),
                         named("past", Clock.System.now().minus(1.days)),
                         named("vc", "vc"),
-                      Companion::assertFailureResult
+                        Companion::assertFailureResult
                     ),
                     arguments(
                         named(vcClaim.getValue(), vcClaim),
@@ -97,7 +94,7 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
                         named(jwtClaim.getValue(), jwtClaim),
                         named("future", Clock.System.now().plus(1.days)),
                         named("root", null),
-                      Companion::assertSuccessResult
+                        Companion::assertSuccessResult
                     ),
                     arguments(
                         named(vcClaim.getValue(), vcClaim),
@@ -105,7 +102,7 @@ class NotBeforeDatePolicyTest : DatePolicyTestBase() {
                         named(jwtClaim.getValue(), jwtClaim),
                         named("past", Clock.System.now().minus(1.days)),
                         named("root", null),
-                      Companion::assertFailureResult
+                        Companion::assertFailureResult
                     ),
                 )
             }

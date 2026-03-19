@@ -26,7 +26,6 @@ import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import java.time.Duration
 import kotlin.io.encoding.Base64
-import kotlin.time.ExperimentalTime
 import kotlin.time.measureTime
 import kotlin.time.toJavaDuration
 import kotlin.time.toKotlinDuration
@@ -234,7 +233,7 @@ actual class OCIKey actual constructor(
             else -> throw IllegalArgumentException("Not supported: $type")
         }
 
-        @OptIn(ExperimentalTime::class)
+
         actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
             return retry {
                 val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
@@ -295,8 +294,6 @@ actual class OCIKey actual constructor(
 
 }
 
-
-@ExperimentalTime
 private suspend fun <T> retry(
     maxDuration: Duration = Duration.ofSeconds(2),
     retryInterval: Duration = Duration.ofMillis(100),

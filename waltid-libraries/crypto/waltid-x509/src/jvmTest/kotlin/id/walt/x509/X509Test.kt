@@ -3,7 +3,7 @@ package id.walt.x509
 import okio.ByteString.Companion.toByteString
 import java.security.KeyStore
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -6,9 +6,9 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class IssuanceEventFilter(
-  val credentialConfigurationId: Set<String>? = null,
-  val format: Set<CredentialFormat>? = null,
-  val sessionId: String? = null,
-  val proofType: Set<ProofType>? = null,
-  val holder: Set<String>? = null,
+    val credentialConfigurationId: Set<String>? = null,
+    val format: Set<CredentialFormat>? = null,
+    val sessionId: String? = null,
+    val proofType: Set<ProofType>? = null,
+    val holder: Set<String>? = null,
 )

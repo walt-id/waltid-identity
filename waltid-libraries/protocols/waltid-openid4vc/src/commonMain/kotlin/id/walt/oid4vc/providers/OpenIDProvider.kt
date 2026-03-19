@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
@@ -28,7 +26,7 @@ import kotlinx.serialization.json.put
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
+
 
 abstract class OpenIDProvider<S : AuthorizationSession>(
     val baseUrl: String,

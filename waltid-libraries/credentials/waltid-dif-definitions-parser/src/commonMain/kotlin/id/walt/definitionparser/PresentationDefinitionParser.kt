@@ -46,6 +46,7 @@ class JsonObjectEnquirer {
                     field.filter["type"]?.jsonPrimitive?.contentOrNull?.lowercase() == "string" && resolvedPath is JsonArray -> resolvedPath.any {
                         schema.validate(it, OutputCollector.flag()).valid
                     }
+
                     else -> schema.validate(resolvedPath, OutputCollector.flag()).valid
                 }
             } else true

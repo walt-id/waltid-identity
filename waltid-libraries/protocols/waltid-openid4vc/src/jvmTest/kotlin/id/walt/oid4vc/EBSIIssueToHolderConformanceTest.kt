@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc
 
 import id.walt.crypto.keys.jwk.JWKKey
@@ -37,7 +35,6 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val ISSUER_MOCK_PORT = 7018

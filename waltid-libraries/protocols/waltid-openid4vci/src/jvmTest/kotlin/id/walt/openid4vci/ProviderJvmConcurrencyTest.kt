@@ -1,18 +1,7 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.OAuth2ProviderConfig
-import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.buildOAuth2Provider
-import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
+import id.walt.openid4vci.core.*
+import kotlinx.coroutines.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

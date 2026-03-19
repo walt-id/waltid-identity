@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc
 
 import id.walt.crypto.keys.Key
@@ -31,7 +29,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 object OpenID4VC {
     private val log = KotlinLogging.logger { }

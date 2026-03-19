@@ -43,6 +43,7 @@ object JsonUtils {
                     }
                     JsonObject(jsonEntries)
                 }
+
                 is CborUndefined -> JsonNull
             }
 

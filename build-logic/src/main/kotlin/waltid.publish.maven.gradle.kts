@@ -14,6 +14,7 @@ publishing {
             credentials {
                 val envUsername = providers.environmentVariable("MAVEN_USERNAME").getOrNull()
                 val envPassword = providers.environmentVariable("MAVEN_PASSWORD").getOrNull()
+
                 // Helper to read local file fallback
                 fun readSecret(name: String): String =
                     File(rootDir, "secret_maven_$name.txt").let { if (it.isFile) it.readLines().first() else "" }

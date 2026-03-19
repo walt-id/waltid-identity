@@ -19,7 +19,8 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.datetime)
-            implementation("com.soywiz:korlibs-crypto:6.0.0")
+            implementation(identityLibs.kotlincrypto.hash.sha2)
+            implementation(identityLibs.kotlincrypto.random)
             implementation("com.soywiz:korlibs-encoding:6.0.0")
             implementation(identityLibs.oshai.kotlinlogging)
         }
@@ -27,7 +28,7 @@ kotlin {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation(identityLibs.nimbus.jose.jwt)
             api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         jvmTest.dependencies {

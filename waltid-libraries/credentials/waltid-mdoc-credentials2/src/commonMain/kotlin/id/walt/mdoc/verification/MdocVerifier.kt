@@ -24,13 +24,13 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.time.ExperimentalTime
+
 
 /**
  * Verifies an MSO Mdoc presentation according to ISO/IEC 18013-5 and OID4VP profiles.
  * The verification process is broken down into auditable steps, returning a detailed result.
  */
-@OptIn(ExperimentalTime::class)
+
 object MdocVerifier {
 
     private val log = KotlinLogging.logger {}

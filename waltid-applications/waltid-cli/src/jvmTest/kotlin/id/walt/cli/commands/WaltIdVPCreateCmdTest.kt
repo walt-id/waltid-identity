@@ -127,7 +127,11 @@ class WaltIdVPCreateCmdTest {
             assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
             val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
             val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
-            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+            assertEquals(
+                expectedPresSub.descriptorMap,
+                outputPresSub.descriptorMap,
+                "Presentation submissions descriptor maps do not match"
+            )
         }
 
     @Test
@@ -162,7 +166,11 @@ class WaltIdVPCreateCmdTest {
             assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
             val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
             val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
-            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+            assertEquals(
+                expectedPresSub.descriptorMap,
+                outputPresSub.descriptorMap,
+                "Presentation submissions descriptor maps do not match"
+            )
         }
 
     @Test
@@ -197,8 +205,13 @@ class WaltIdVPCreateCmdTest {
             assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
             val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
             val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
-            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+            assertEquals(
+                expectedPresSub.descriptorMap,
+                outputPresSub.descriptorMap,
+                "Presentation submissions descriptor maps do not match"
+            )
         }
+
     @Test
     fun `should successfully create vp based on openbadge_verifiable_educational_id_presdef and submission should match openbadge_verifiable_educational_id_pressub`() =
         runTest {
@@ -233,6 +246,10 @@ class WaltIdVPCreateCmdTest {
             assertContains(result.stdout, "Presentation Submission saved at file .*${outputPresSubPath}".toRegex(RegexOption.MULTILINE))
             val expectedPresSub = Json.decodeFromString<PresentationSubmission>(File(expectedPresSubPath).readText())
             val outputPresSub = Json.decodeFromString<PresentationSubmission>(File(outputPresSubPath).readText())
-            assertEquals(expectedPresSub.descriptorMap, outputPresSub.descriptorMap, "Presentation submissions descriptor maps do not match")
+            assertEquals(
+                expectedPresSub.descriptorMap,
+                outputPresSub.descriptorMap,
+                "Presentation submissions descriptor maps do not match"
+            )
         }
 }

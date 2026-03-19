@@ -30,7 +30,7 @@ data class SdJwtVcTypeMetadataDraft04(
     @SerialName("schema_uri#integrity")
     val schemaUriIntegrity: String? = null,
     override val customParameters: Map<String, JsonElement>? = mapOf(),
-): JsonDataObject() {
+) : JsonDataObject() {
 
     init {
 

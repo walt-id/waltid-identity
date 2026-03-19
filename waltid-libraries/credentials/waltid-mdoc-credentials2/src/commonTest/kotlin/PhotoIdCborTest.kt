@@ -27,7 +27,6 @@ import kotlin.random.Random
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 
 class PhotoIdCborTest {
 
@@ -72,7 +71,6 @@ class PhotoIdCborTest {
         assertContains(serializedHex, "f5") // CBOR encoding for `true`
     }
 
-    @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
     @Test
     fun `Photo ID signing and verification structure test`() = runTest {
         val issuerKey = JWKKey.generate(KeyType.secp256r1)

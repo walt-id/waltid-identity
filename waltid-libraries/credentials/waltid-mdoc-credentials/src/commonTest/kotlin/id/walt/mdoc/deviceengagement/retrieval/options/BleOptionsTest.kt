@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class BleOptionsTest {
-    
+
     @Test
     fun testHappyPathSerialize() {
         val payloads = listOf(

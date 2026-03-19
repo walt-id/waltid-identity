@@ -1,10 +1,10 @@
 package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.verifier2.data.PresentationValidationResult
-import id.walt.verifier2.verification.Verifier2PresentationValidator
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier2.data.PresentationValidationResult
+import id.walt.verifier2.verification.Verifier2PresentationValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 object Verifier2SessionPresentationValidation {

@@ -57,7 +57,11 @@ class ImportTestsJs {
         println("Importing private JWK...")
         val privateKeyResult = JWKKey.importJWK(privateKeyJsonString)
 
-        assertTrue("Error importing private JWK: ${privateKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
+        assertTrue(
+            "Error importing private JWK: ${
+                privateKeyResult.exceptionOrNull()?.stackTraceToString()
+            }"
+        ) { privateKeyResult.isSuccess }
 
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()
@@ -109,7 +113,11 @@ class ImportTestsJs {
         val privateKeyResult = JWKKey.importPEM(privateKeyPem)
         println("  Checking import success...${privateKeyResult.exceptionOrNull() ?: ""}")
 
-        assertTrue("Error importing private PEM: ${privateKeyResult.exceptionOrNull()?.stackTraceToString()}") { privateKeyResult.isSuccess }
+        assertTrue(
+            "Error importing private PEM: ${
+                privateKeyResult.exceptionOrNull()?.stackTraceToString()
+            }"
+        ) { privateKeyResult.isSuccess }
 
         println("  Getting private key...")
         val privateKey = privateKeyResult.getOrThrow()

@@ -532,10 +532,13 @@ object Cose {
         // HMAC:
         /** HMAC w/ SHA-256 truncated to 64 bits */
         const val HMAC_256_64 = 4
+
         /** HMAC w/ SHA-256 */
         const val HMAC_256 = 5
+
         /** HMAC w/ SHA-384 */
         const val HMAC_384 = 6
+
         /** HMAC w/ SHA-512 */
         const val HMAC_512 = 7
     }

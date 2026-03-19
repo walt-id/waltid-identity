@@ -1,6 +1,6 @@
 package id.walt.commons.config.statics
 
-import java.util.*
+import java.util.Properties
 
 object BuildConfig {
 

@@ -18,21 +18,21 @@ dependencies {
     implementation(identityLibs.kotlinx.serialization.json)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+    implementation(identityLibs.kotlinx.coroutines.core)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.2")
 
     // Azure Identity (for Managed Identity authentication)
     implementation("com.azure:azure-identity:1.19.0-beta.2")
 
     // Azure Key Vault Keys (for cryptographic operations)
-    implementation("com.azure:azure-security-keyvault-keys:4.9.1")
+    implementation("com.azure:azure-security-keyvault-keys:4.10.5")
 
     // JOSE
-    implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    implementation(identityLibs.nimbus.jose.jwt)
 
     // Hashing with SHA-2
-    implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-    implementation("org.kotlincrypto.hash:sha2")
+
+    implementation(identityLibs.kotlincrypto.hash.sha2)
 }
 
 tasks.withType<Test> {

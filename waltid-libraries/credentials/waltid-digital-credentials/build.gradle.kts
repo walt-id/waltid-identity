@@ -25,7 +25,7 @@ kotlin {
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -39,8 +39,8 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
 
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-            implementation("org.kotlincrypto.hash:sha2")
+            
+            implementation(identityLibs.kotlincrypto.hash.sha2)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
