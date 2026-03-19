@@ -1,6 +1,6 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.3.10"
+kotlin = "2.3.20"
 suspend-transform = "2.3.10-0.13.2"
 
 # Used for build-plugins
@@ -8,11 +8,11 @@ java-service = "21"
 java-library = "17"
 
 # Plugins
-vanniktech-publish = "0.35.0"
+vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.2"
 android-gradle = "8.12.3"
-gradle-shadow = "9.3.2"
+gradle-shadow = "9.4.0"
 
 # Plugins / Dependencies
 ktor = "3.3.3"
