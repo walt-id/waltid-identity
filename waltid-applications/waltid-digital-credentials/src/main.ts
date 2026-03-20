@@ -5,12 +5,13 @@ const VERIFIER_PRESETS = {
     verifierBase: 'https://verifier2.portal.test.waltid.cloud'
   },
   enterprise: {
-    verifierBase: '/verifier-api/v1/waltid.tenant1.verifier2/verifier2-service-api'
+    verifierBase: 'https://waltid.enterprise.test.waltid.cloud/v1/waltid.tenant1.verifier2/verifier2-service-api',
+    openApiUrl: 'https://waltid.enterprise.test.waltid.cloud/api.json'
   }
 } as const;
 const DEFAULT_VERIFIER_PRESET = 'open-source';
-const POLL_INTERVAL_MS = 10_000;
-const MAX_POLL_ATTEMPTS = 60;
+const POLL_INTERVAL_MS = 5_000;
+const MAX_POLL_ATTEMPTS = 12;
 const SESSION_STORAGE_KEY = 'dc-api-test.sessionId';
 
 type ExampleEntry = {
@@ -25,6 +26,8 @@ type CreateResponse = {
 type RuntimeConfig = {
   verifierBase: string;
   bearerToken: string;
+  openApiUrl?: string;
+  presetKey: VerifierPresetKey;
 };
 
 type VerifierPresetKey = keyof typeof VERIFIER_PRESETS;
@@ -71,7 +74,14 @@ async function init(): Promise<void> {
       examples = await loadDcApiExamples(config);
 
       if (!examples.length) {
-        setStatus(statusEl, 'No dc_api examples found in Swagger');
+        select.innerHTML = '';
+        const option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No dc_api examples found (paste payload manually)';
+        select.appendChild(option);
+        select.selectedIndex = 0;
+        setStatus(statusEl, 'No dc_api examples found in Swagger — you can paste payload manually');
+        callButton.disabled = false;
         return;
       }
 
@@ -127,7 +137,9 @@ async function init(): Promise<void> {
 }
 
 async function loadDcApiExamples(config: RuntimeConfig): Promise<ExampleEntry[]> {
-  const openApiUrls = getOpenApiCandidateUrls(config.verifierBase);
+  const openApiUrls = config.openApiUrl
+    ? [config.openApiUrl, ...getOpenApiCandidateUrls(config.verifierBase)]
+    : getOpenApiCandidateUrls(config.verifierBase);
   let api: unknown | undefined;
   let lastError: unknown;
 
@@ -174,7 +186,7 @@ async function loadDcApiExamples(config: RuntimeConfig): Promise<ExampleEntry[]>
   Object.entries(examplesObj).forEach(([title, raw]) => {
     if (!title.toLowerCase().includes('dc_api')) return;
     if (!raw || typeof raw !== 'object') return;
-    const payload = (raw as { value?: unknown }).value;
+    const payload = normalizeSwaggerExamplePayload((raw as { value?: unknown }).value);
     if (payload === undefined) return;
     examples.push({ title, payload });
   });
@@ -262,16 +274,10 @@ async function runDcApiFlow(
     sessionId
   });
 
-  const requestUrl = buildUrl(
-    config.verifierBase,
-    `/verification-session/${encodeURIComponent(sessionId)}/request`
-  );
+  const requestUrls = getRequestUrls(config, sessionId);
   setStatus(statusEl, 'Fetching DC API request...');
   const dcApiRequest = await fetchJsonWithFallback(
-    [
-      requestUrl,
-      buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/request`)
-    ],
+    requestUrls,
     {
       method: 'GET',
       headers: withAuthorization(
@@ -289,16 +295,10 @@ async function runDcApiFlow(
   const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest);
   appendPayloadLog(logEl, 'DC API wallet response', dcApiResponse);
 
-  const responseUrl = buildUrl(
-    config.verifierBase,
-    `/verification-session/${encodeURIComponent(sessionId)}/response`
-  );
+  const responseUrls = getResponseUrls(config, sessionId);
   setStatus(statusEl, 'Posting wallet response...');
   const postResponse = await fetchAnyWithFallback(
-    [
-      responseUrl,
-      buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/response`)
-    ],
+    responseUrls,
     {
       method: 'POST',
       headers: withAuthorization(
@@ -314,7 +314,7 @@ async function runDcApiFlow(
   );
   appendLog(logEl, `Posted wallet response (HTTP ${postResponse.status})`);
 
-  setStatus(statusEl, 'Polling verification-session info every 10 seconds...');
+  setStatus(statusEl, 'Polling verification-session info every 5 seconds...');
   const finalInfo = await pollInfo(sessionId, config, logEl);
   appendPayloadLog(logEl, 'Final result payload', finalInfo);
   console.log('[dc-api-test] final verification result', finalInfo);
@@ -325,20 +325,11 @@ async function pollInfo(
   config: RuntimeConfig,
   logEl: HTMLPreElement
 ): Promise<unknown> {
-  const infoUrl = buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
-  const fallbackInfoUrls = [
-    infoUrl,
-    buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/info`),
-    buildUrl(
-      config.verifierBase,
-      `/verification-session/info?verification-session=${encodeURIComponent(sessionId)}`
-    ),
-    buildUrl(config.verifierBase, `/verification-session/info/${encodeURIComponent(sessionId)}`)
-  ];
+  const infoUrl = getInfoUrl(config, sessionId);
 
   for (let attempt = 1; attempt <= MAX_POLL_ATTEMPTS; attempt += 1) {
-    const info = await fetchJsonWithFallback(
-      fallbackInfoUrls,
+    const info = await fetchJson(
+      infoUrl,
       {
         method: 'GET',
         headers: withAuthorization(
@@ -352,17 +343,18 @@ async function pollInfo(
     );
 
     const status = getInfoStatus(info);
-    appendLog(logEl, `Poll #${attempt}: status=${status || 'UNKNOWN'}`);
+    appendLog(logEl, `Poll #${attempt}: status=${status ?? 'MISSING'}`);
 
     if (status === 'SUCCESSFUL') {
       appendLog(logEl, 'Verification status is SUCCESSFUL.');
+      appendPayloadLog(logEl, 'Verification result payload', info);
       return info;
     }
 
-    if (status !== 'IN_USE') {
-      appendLog(logEl, `Verification failed with status ${status || 'UNKNOWN'}.`);
-      appendPayloadLog(logEl, 'Failure payload', info);
-      throw new Error(`Verification failed with status ${status || 'UNKNOWN'}`);
+    if (status === 'FAILED') {
+      appendLog(logEl, 'Verification status is FAILED.');
+      appendPayloadLog(logEl, 'Verification result payload', info);
+      throw new Error('Verification failed with status FAILED');
     }
 
     await sleep(POLL_INTERVAL_MS);
@@ -373,7 +365,13 @@ async function pollInfo(
 
 function getInfoStatus(info: unknown): string | null {
   if (!info || typeof info !== 'object') return null;
-  const status = (info as { status?: unknown }).status;
+  const statusOss = (info as { status?: unknown }).status;
+  if (statusOss) {
+       return statusOss.toUpperCase();
+  }
+  const session = (info as { session?: unknown }).session;
+  if (!session || typeof session !== 'object') return null;
+  const status = (session as { status?: unknown }).status;
   if (typeof status !== 'string') return null;
   return status.toUpperCase();
 }
@@ -436,7 +434,14 @@ async function fetchJsonWithFallback(urls: string[], init: RequestInit, label: s
     try {
       return await fetchJson(url, init, `${label}#${index + 1}`);
     } catch (error) {
-      if (error instanceof HttpError && error.status === 404 && index < urls.length - 1) {
+      if (
+        error instanceof HttpError &&
+        index < urls.length - 1 &&
+        error.status >= 400 &&
+        error.status < 500 &&
+        error.status !== 401 &&
+        error.status !== 403
+      ) {
         continue;
       }
       lastError = error;
@@ -568,6 +573,29 @@ function tryParseJson(input: string): unknown | null {
   }
 }
 
+function normalizeSwaggerExamplePayload(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  let current: unknown = value;
+
+  for (let i = 0; i < 3; i += 1) {
+    if (typeof current !== 'string') {
+      return current;
+    }
+
+    const parsed = tryParseJson(current);
+    if (parsed === null) {
+      return current;
+    }
+
+    current = parsed;
+  }
+
+  return current;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -583,12 +611,15 @@ function getRuntimeConfig(
   bearerTokenInput: HTMLInputElement
 ): RuntimeConfig {
   const presetKey = getVerifierPresetKey(verifierPresetSelect.value);
-  const verifierBase = VERIFIER_PRESETS[presetKey].verifierBase;
+  const preset = VERIFIER_PRESETS[presetKey];
+  const verifierBase = preset.verifierBase;
   const bearerToken = bearerTokenInput.value.trim().replace(/^Bearer\s+/i, '');
 
   return {
     verifierBase,
-    bearerToken
+    bearerToken,
+    openApiUrl: 'openApiUrl' in preset ? preset.openApiUrl : undefined,
+    presetKey
   };
 }
 
@@ -617,6 +648,48 @@ function buildUrl(baseUrl: string, path: string): string {
   const normalizedBase = baseUrl.replace(/\/+$/, '');
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;
+}
+
+function withSessionBoundTarget(verifierBase: string, sessionId: string): string | null {
+  const marker = '.verifier2';
+  const serviceMarker = '/verifier2-service-api';
+  const markerIndex = verifierBase.indexOf(marker);
+  const serviceIndex = verifierBase.indexOf(serviceMarker);
+
+  if (markerIndex === -1 || serviceIndex === -1 || markerIndex > serviceIndex) {
+    return null;
+  }
+
+  const insertAt = markerIndex + marker.length;
+  return `${verifierBase.slice(0, insertAt)}.${encodeURIComponent(sessionId)}${verifierBase.slice(insertAt)}`;
+}
+
+function getRequestUrls(config: RuntimeConfig, sessionId: string): string[] {
+  if (config.presetKey === 'enterprise') {
+    return [buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/request`)];
+  }
+
+  return [buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/request`)];
+}
+
+function getResponseUrls(config: RuntimeConfig, sessionId: string): string[] {
+  if (config.presetKey === 'enterprise') {
+    return [buildUrl(config.verifierBase, `/${encodeURIComponent(sessionId)}/response`)];
+  }
+
+  return [buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/response`)];
+}
+
+function getInfoUrl(config: RuntimeConfig, sessionId: string): string {
+  if (config.presetKey === 'enterprise') {
+    const sessionBoundVerifierBase = withSessionBoundTarget(config.verifierBase, sessionId);
+    if (!sessionBoundVerifierBase) {
+      throw new Error('Could not construct session-bound verifier URL for info endpoint');
+    }
+    return buildUrl(sessionBoundVerifierBase, '/verification-session/info');
+  }
+
+  return buildUrl(config.verifierBase, `/verification-session/${encodeURIComponent(sessionId)}/info`);
 }
 
 function getOpenApiCandidateUrls(verifierBase: string): string[] {
