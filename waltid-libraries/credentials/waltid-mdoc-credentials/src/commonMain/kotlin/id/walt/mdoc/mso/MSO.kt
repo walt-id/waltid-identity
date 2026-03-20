@@ -70,7 +70,7 @@ class MSO(
         val algorithm = DigestAlgorithm.entries.first { it.value == digestAlgorithm.value }
         return items.all {
             val digestId = it.decode<IssuerSignedItem>().digestID.value.toInt()
-            return msoDigests.containsKey(digestId) && msoDigests[digestId]!!.contentEquals(digestItem(it, algorithm))
+            msoDigests.containsKey(digestId) && msoDigests[digestId]!!.contentEquals(digestItem(it, algorithm))
         }
     }
 
@@ -79,7 +79,7 @@ class MSO(
          * Create item digest, for the given item
          */
         fun digestItem(encodedItem: EncodedCBORElement, digestAlgorithm: DigestAlgorithm): ByteArray {
-            return digestAlgorithm.getHasher().digest(encodedItem.toCBOR()).bytes
+            return digestAlgorithm.getHasher().digest(encodedItem.toCBOR())
         }
 
         /**

@@ -74,7 +74,11 @@ data class CodeInfo(
                 "CodeInfo CBOR map of DrivingPrivilege must contain string key code"
             }
             require(element.value[MapKey("code")]!!.type == DEType.textString) {
-                "Value of code key of CodeInfo CBOR map expected to be of type ${DEType.textString}, but instead was found to be of type ${element.value[MapKey("code")]!!.type}"
+                "Value of code key of CodeInfo CBOR map expected to be of type ${DEType.textString}, but instead was found to be of type ${
+                    element.value[MapKey(
+                        "code"
+                    )]!!.type
+                }"
             }
             return CodeInfo(
                 code = (element.value[MapKey("code")]!! as StringElement).value,
@@ -96,12 +100,12 @@ data class CodeInfo(
     }
 }
 
-internal object CodeInfoSerializer: KSerializer<CodeInfo> {
+internal object CodeInfoSerializer : KSerializer<CodeInfo> {
 
     override val descriptor = buildClassSerialDescriptor("CodeInfo")
 
     override fun serialize(encoder: Encoder, value: CodeInfo) {
-        when(encoder) {
+        when (encoder) {
             is JsonEncoder -> {
                 encoder.encodeSerializableValue(JsonObject.serializer(), value.toJSON())
             }
@@ -113,7 +117,7 @@ internal object CodeInfoSerializer: KSerializer<CodeInfo> {
     }
 
     override fun deserialize(decoder: Decoder): CodeInfo {
-        return when(decoder) {
+        return when (decoder) {
             is JsonDecoder -> {
                 CodeInfo.fromJSON(decoder.decodeJsonElement().jsonObject)
             }

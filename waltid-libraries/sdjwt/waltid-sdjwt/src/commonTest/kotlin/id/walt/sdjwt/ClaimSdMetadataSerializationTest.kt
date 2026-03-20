@@ -66,9 +66,9 @@ class ClaimSdMetadataSerializationTest {
     @Test
     fun `enum as map key serializes to its SerialName`() {
         val map = mapOf(
-            ClaimSdMetadata.Always  to 1,
+            ClaimSdMetadata.Always to 1,
             ClaimSdMetadata.Allowed to 2,
-            ClaimSdMetadata.Never   to 3
+            ClaimSdMetadata.Never to 3
         )
         val s = Json.encodeToString(map)
         // Order may vary; verify by decoding back

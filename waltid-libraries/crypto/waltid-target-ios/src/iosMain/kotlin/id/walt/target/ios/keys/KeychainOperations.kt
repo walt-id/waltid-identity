@@ -43,7 +43,6 @@ import platform.Security.kSecPrivateKeyAttrs
 internal object KeychainOperations {
 
 
-
     private fun deleteFromKeychain(kid: String, keyType: CFStringRef?) {
         cfRetain(kid.toNSData()) { kidCF ->
             operation(
@@ -186,9 +185,11 @@ internal object KeychainOperations {
                         CFDictionaryAddValue(this, kSecAttrIsPermanent, kCFBooleanTrue)
                     }
 
-                    val privateKey = checkErrorResult { error ->  SecKeyCreateRandomKey(
-                        generateKeyParams, error
-                    )}
+                    val privateKey = checkErrorResult { error ->
+                        SecKeyCreateRandomKey(
+                            generateKeyParams, error
+                        )
+                    }
 
                     CFBridgingRelease(privateKey)
 

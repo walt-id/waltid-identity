@@ -137,7 +137,7 @@ fun Application.verifierApi() {
                         val code = Uuid.random().toString()
                         call.respondRedirect("openid://?code=$code&state=$state")
                     } else {
-                        if(it.isNotBlank()) {
+                        if (it.isNotBlank()) {
                             call.respond(
                                 status = HttpStatusCode.OK,
                                 message = mapOf("redirect_uri" to it),

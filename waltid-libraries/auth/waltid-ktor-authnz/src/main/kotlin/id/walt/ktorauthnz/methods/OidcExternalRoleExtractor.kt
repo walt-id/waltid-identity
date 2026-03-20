@@ -2,11 +2,7 @@ package id.walt.ktorauthnz.methods
 
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcExternalRoles
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 object OidcExternalRoleExtractor {
 
@@ -62,6 +58,7 @@ object OidcExternalRoleExtractor {
         is JsonArray -> this.mapNotNull {
             runCatching { it.jsonPrimitive.content }.getOrNull()
         }.toSet()
+
         else -> emptySet()
     }
 }

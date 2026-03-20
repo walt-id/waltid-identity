@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.issuer.issuance
 
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
@@ -43,7 +41,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
+
 
 object OidcApi : CIProvider(), Klogging {
 

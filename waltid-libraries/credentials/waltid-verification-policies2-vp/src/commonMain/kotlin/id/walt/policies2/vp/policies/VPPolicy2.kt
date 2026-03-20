@@ -73,7 +73,10 @@ sealed class VPPolicy2() {
         return PolicyRunResult(
             policyExecuted = this,
             success = runResult.isSuccess && policyContext.errors.isEmpty(),
-            results = policyContext.results.mapValues { v -> runCatching { v.value.toJsonElement() }.recoverCatching { ex -> JsonPrimitive(v.value.toString()) }.getOrElse { JsonPrimitive("?") } },
+            results = policyContext.results.mapValues { v ->
+                runCatching { v.value.toJsonElement() }.recoverCatching { ex -> JsonPrimitive(v.value.toString()) }
+                    .getOrElse { JsonPrimitive("?") }
+            },
             errors = policyContext.errors.map { PolicyRunError(it) },
             executionTime = timedRunResult.duration
         )

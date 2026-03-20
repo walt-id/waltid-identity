@@ -21,18 +21,17 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -54,7 +53,7 @@ kotlin {
             // Ktor client
             implementation(identityLibs.ktor.client.okhttp)
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }
     }

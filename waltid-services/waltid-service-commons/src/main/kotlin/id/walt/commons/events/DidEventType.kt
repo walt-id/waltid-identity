@@ -1,8 +1,8 @@
 package id.walt.commons.events
 
 enum class DidEventType {
-  Create,
-  Update,
-  Delete,
-  Resolve
+    Create,
+    Update,
+    Delete,
+    Resolve
 }

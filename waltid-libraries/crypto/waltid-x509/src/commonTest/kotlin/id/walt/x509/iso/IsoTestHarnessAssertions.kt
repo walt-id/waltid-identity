@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso
 
 import id.walt.x509.X509KeyUsage
@@ -9,7 +7,7 @@ import okio.ByteString
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
+
 
 fun assertIACABuilderDataEqualsCertificateData(
     profileData: IACACertificateProfileData,

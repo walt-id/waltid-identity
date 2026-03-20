@@ -4,7 +4,6 @@ import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
-import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

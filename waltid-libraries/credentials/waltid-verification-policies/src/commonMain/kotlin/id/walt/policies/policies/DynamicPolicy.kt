@@ -22,6 +22,7 @@ import kotlin.js.JsExport
 
 
 private val logger = KotlinLogging.logger {}
+
 @Serializable
 data class DynamicPolicyConfig(
     val opaServer: String = "http://localhost:8181",

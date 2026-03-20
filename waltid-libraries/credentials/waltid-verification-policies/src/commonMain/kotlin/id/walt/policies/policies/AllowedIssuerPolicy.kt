@@ -42,10 +42,10 @@ class AllowedIssuerPolicy : CredentialWrapperValidatorPolicy() {
         return when (issuer) {
             in allowedIssuers -> Result.success(issuer)
             else -> Result.failure(
-              id.walt.policies.NotAllowedIssuerException(
-                issuer = issuer,
-                allowedIssuers = allowedIssuers
-              )
+                id.walt.policies.NotAllowedIssuerException(
+                    issuer = issuer,
+                    allowedIssuers = allowedIssuers
+                )
             )
         }
     }

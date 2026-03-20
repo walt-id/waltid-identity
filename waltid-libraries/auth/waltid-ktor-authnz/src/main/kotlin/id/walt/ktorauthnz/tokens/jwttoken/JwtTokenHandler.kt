@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.ktorauthnz.tokens.jwttoken
 
 import id.walt.commons.web.ExpiredTokenException
@@ -10,7 +8,6 @@ import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.tokens.TokenHandler
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class JwtTokenHandler : TokenHandler {
@@ -35,7 +32,8 @@ class JwtTokenHandler : TokenHandler {
         jwtPayload["exp"]?.jsonPrimitive?.long?.let { exp ->
             val expirationDate = Instant.fromEpochSeconds(exp)
             val now = Clock.System.now()
-            authCheck(now < expirationDate ,
+            authCheck(
+                now < expirationDate,
                 ExpiredTokenException("JWT Login Token expired since: ${now - expirationDate}")
             )
         }

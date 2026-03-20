@@ -81,10 +81,10 @@ class AuthorizationCodeFlow(private val e2e: E2ETest, private val client: HttpCl
         client.get("$authorizeEndpoint?${authorizationRequest.toHttpQueryString()}") {}
             .expectRedirect().apply {
                 val idTokenRequest = AuthorizationRequest.fromHttpQueryString(headers["location"]!!)
-                kotlin.test.assertTrue(idTokenRequest.responseType.size == 1, "response type should be id_token")
-                kotlin.test.assertTrue(idTokenRequest.responseType.first() == ResponseType.IdToken, "response type should be id_token")
+                kotlin.test.assertEquals(idTokenRequest.responseType.size, 1, "response type should be id_token")
+                kotlin.test.assertEquals(idTokenRequest.responseType.first(), ResponseType.IdToken, "response type should be id_token")
 
-                kotlin.test.assertTrue(idTokenRequest.responseMode == ResponseMode.direct_post, "response mode should be direct post")
+                kotlin.test.assertEquals(idTokenRequest.responseMode, ResponseMode.direct_post, "response mode should be direct post")
             }
 
         //

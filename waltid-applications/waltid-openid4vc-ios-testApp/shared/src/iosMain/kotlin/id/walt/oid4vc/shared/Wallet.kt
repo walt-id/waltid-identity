@@ -56,7 +56,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.js.ExperimentalJsExport
-
 import kotlin.time.Duration
 
 //const val WALLET_BASE_URL = "https://waltid-issuer.internal.dev.udisp8.di-uisp-accenture.com"
@@ -169,12 +168,14 @@ internal class TestCredentialWallet(
                             })
                         } ?: buildJsonObject { }
                         runBlocking {
-                            signJws(plaintext = payload.toString().toByteArray(),
+                            signJws(
+                                plaintext = payload.toString().toByteArray(),
                                 headers = headerWithAlg.jsonObject.mapValues { it.value })
                         }
                     }
                 }
             }
+
             else -> TODO("signToken $target not implemented yet")
         }
     }

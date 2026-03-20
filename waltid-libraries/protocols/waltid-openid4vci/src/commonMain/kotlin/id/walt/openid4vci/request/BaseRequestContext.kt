@@ -2,16 +2,10 @@
 
 package id.walt.openid4vci.request
 
-import id.walt.openid4vci.Arguments
-import id.walt.openid4vci.Client
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.Parameters
-import id.walt.openid4vci.Session
-import id.walt.openid4vci.append
-import id.walt.openid4vci.newArguments
+import id.walt.openid4vci.*
+import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 import kotlin.time.Instant
-import korlibs.crypto.SecureRandom
 
 /**
  * Will be updated
@@ -97,6 +91,8 @@ open class BaseRequestContext(
         issuerId = id
     }
 
-    private fun generateId(): String =
-        Base64.UrlSafe.encode(ByteArray(16).also { SecureRandom.nextBytes(it) })
+    private fun generateId(): String {
+        val bytes = ByteArray(16)
+        return Base64.UrlSafe.encode(CryptoRand.nextBytes(bytes))
+    }
 }

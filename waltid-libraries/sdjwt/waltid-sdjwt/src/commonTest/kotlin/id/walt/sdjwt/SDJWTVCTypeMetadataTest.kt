@@ -1,6 +1,5 @@
 package id.walt.sdjwt
 
-
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft13
 import kotlinx.serialization.json.Json

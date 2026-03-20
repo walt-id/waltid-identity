@@ -94,19 +94,19 @@ class ServiceEndpointTest {
     fun testServiceEndpointMixedSerialization() {
         val mixSvcEndpointList = listOf(
             ServiceEndpointObject(
-                    buildJsonObject {
-                        put("some-url-property1", "url-value1".toJsonElement())
-                        put("some-additional-property1", "some-value1".toJsonElement())
-                    },
-                ),
+                buildJsonObject {
+                    put("some-url-property1", "url-value1".toJsonElement())
+                    put("some-additional-property1", "some-value1".toJsonElement())
+                },
+            ),
             ServiceEndpointURL("something"),
             ServiceEndpointURL("else"),
             ServiceEndpointObject(
-                    buildJsonObject {
-                        put("some-url-property2", "url-value2".toJsonElement())
-                        put("some-additional-property2", "some-value2".toJsonElement())
-                    },
-                )
+                buildJsonObject {
+                    put("some-url-property2", "url-value2".toJsonElement())
+                    put("some-additional-property2", "some-value2".toJsonElement())
+                },
+            )
 
         )
         val mixSvcJsonEncodedString =

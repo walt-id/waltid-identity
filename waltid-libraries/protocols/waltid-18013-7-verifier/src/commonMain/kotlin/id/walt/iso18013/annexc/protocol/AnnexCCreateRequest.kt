@@ -1,7 +1,7 @@
 package id.walt.iso18013.annexc.protocol
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class AnnexCRequestResponse(

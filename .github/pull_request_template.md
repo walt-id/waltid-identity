@@ -2,13 +2,10 @@
 
 Provide a clear and concise description of the changes made in this pull request:
 
-
-
 ## Type of Change
 
 - [ ] bug fix - change which fixes an issue
 - [ ] new feature - change which adds functionality
-
 
 ## Checklist
 

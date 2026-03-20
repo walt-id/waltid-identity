@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
@@ -22,17 +20,17 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.verifierModule
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
+import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -41,13 +39,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.assertNotNull
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
@@ -61,9 +58,9 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
                     vctValues = listOf("https://issuer.demo.walt.id/draft13/identity_credential")
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("given_name")),
-                    ClaimsQuery(path = listOf("family_name")),
-                    ClaimsQuery(path = listOf("address", "street_address")),
+                    ClaimsQuery(pathStrings = listOf("given_name")),
+                    ClaimsQuery(pathStrings = listOf("family_name")),
+                    ClaimsQuery(pathStrings = listOf("address", "street_address")),
                 )
             )
         )

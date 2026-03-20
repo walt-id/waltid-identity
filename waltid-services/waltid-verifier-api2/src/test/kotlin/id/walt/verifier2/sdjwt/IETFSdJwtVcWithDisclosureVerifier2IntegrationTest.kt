@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.verifier2.sdjwt
 
 import id.walt.commons.config.ConfigManager
@@ -43,7 +41,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
@@ -57,12 +54,12 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     vctValues = listOf("https://issuer.demo.walt.id/draft13/identity_credential")
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("given_name")),
-                    ClaimsQuery(path = listOf("family_name")),
-                    ClaimsQuery(path = listOf("address", "street_address")),
+                    ClaimsQuery(pathStrings = listOf("given_name")),
+                    ClaimsQuery(pathStrings = listOf("family_name")),
+                    ClaimsQuery(pathStrings = listOf("address", "street_address")),
 
                     // Selective disclosure:
-                    ClaimsQuery(path = listOf("birthdate")),
+                    ClaimsQuery(pathStrings = listOf("birthdate")),
                 )
             )
         )

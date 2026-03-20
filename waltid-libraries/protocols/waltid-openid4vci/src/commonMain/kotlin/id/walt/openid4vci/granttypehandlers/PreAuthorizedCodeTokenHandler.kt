@@ -1,16 +1,11 @@
 package id.walt.openid4vci.granttypehandlers
 
-import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.TokenEndpointHandler
-import id.walt.openid4vci.TokenEndpointResult
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.argumentsOf
-import id.walt.openid4vci.newArguments
+import id.walt.openid4vci.*
+import id.walt.openid4vci.preauthorized.hashPin
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
 import id.walt.openid4vci.tokens.AccessTokenService
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
-import id.walt.openid4vci.preauthorized.hashPin
 import kotlin.time.Clock
 import kotlin.time.Instant
 
@@ -19,10 +14,10 @@ import kotlin.time.Instant
  *
  * Consumes a stored pre-authorized code session. The business logic will be modified, is just the skeleton that is working.
  */
-    class PreAuthorizedCodeTokenHandler(
-        private val codeRepository: PreAuthorizedCodeRepository,
-        private val tokenService: AccessTokenService,
-    ) : TokenEndpointHandler {
+class PreAuthorizedCodeTokenHandler(
+    private val codeRepository: PreAuthorizedCodeRepository,
+    private val tokenService: AccessTokenService,
+) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.getGrantTypes().contains(GrantType.PreAuthorizedCode.value)

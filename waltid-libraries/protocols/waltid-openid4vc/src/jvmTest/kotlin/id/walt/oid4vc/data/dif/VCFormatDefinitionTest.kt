@@ -1,6 +1,5 @@
 package id.walt.oid4vc.data.dif
 
-
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive

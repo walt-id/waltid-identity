@@ -1,5 +1,5 @@
 @file:Suppress("SERIALIZER_TYPE_INCOMPATIBLE", "UNCHECKED_CAST")
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.dataelement
 
@@ -16,7 +16,6 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /** Data Element Type,

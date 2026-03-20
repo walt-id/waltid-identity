@@ -1,10 +1,6 @@
 package id.walt.openid4vci.request
 
-import id.walt.openid4vci.Arguments
-import id.walt.openid4vci.Session
-import id.walt.openid4vci.append
-import id.walt.openid4vci.has
-import id.walt.openid4vci.newArguments
+import id.walt.openid4vci.*
 
 /**
  * Will be updated

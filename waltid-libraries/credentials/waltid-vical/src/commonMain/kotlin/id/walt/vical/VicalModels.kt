@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.vical
 
@@ -10,7 +10,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.json.JsonObject
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

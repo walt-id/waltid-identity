@@ -5,9 +5,6 @@ plugins {
 
 group = "id.walt"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 dependencies {
 
@@ -16,15 +13,15 @@ dependencies {
     }
 
     api(project(":waltid-services:waltid-service-commons"))
-    api("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
+    api(identityLibs.ktor.server.test.host)
 
     // Testing
     implementation(kotlin("test"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-logging:${Versions.KTOR_VERSION}")
+    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.content.negotiation)
+    implementation(identityLibs.ktor.serialization.kotlinx.json)
+    implementation(identityLibs.ktor.client.logging)
 }
 
 // Create a configuration for test artefacts

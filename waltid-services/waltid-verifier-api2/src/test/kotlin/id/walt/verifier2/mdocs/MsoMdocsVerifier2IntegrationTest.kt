@@ -19,34 +19,35 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.RegexPolicy
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
-import id.walt.verifier2.verifierModule
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.RegexPolicy
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
+import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTime::class)
+
 class MsoMdocsVerifier2IntegrationTest {
 
     private val mdocsDcqlQuery = DcqlQuery(
@@ -58,24 +59,24 @@ class MsoMdocsVerifier2IntegrationTest {
                     doctypeValue = "org.iso.23220.photoid.1"
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("org.iso.18013.5.1", "family_name_unicode")),
-                    ClaimsQuery(path = listOf("org.iso.18013.5.1", "given_name_unicode")),
-                    ClaimsQuery(path = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
                     ClaimsQuery(
-                        path = listOf("org.iso.18013.5.1", "resident_postal_code"),
+                        pathStrings = listOf("org.iso.18013.5.1", "resident_postal_code"),
                         values = listOf(1180, 1190, 1200, 1210).map { JsonPrimitive(it) }
                     ),
                     ClaimsQuery(
-                        path = listOf("org.iso.18013.5.1", "issuing_country"),
+                        pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
                         values = listOf(JsonPrimitive("AT"))
                     ),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "person_id")),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "resident_street")),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "administrative_number")),
-                    ClaimsQuery(path = listOf("org.iso.23220.photoid.1", "travel_document_number")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "person_id")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "resident_street")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "administrative_number")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number")),
 
-                    ClaimsQuery(path = listOf("org.iso.23220.dtc.1", "dtc_version")),
-                    ClaimsQuery(path = listOf("org.iso.23220.dtc.1", "dtc_dg1"))
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_version")),
+                    ClaimsQuery(pathStrings = listOf("org.iso.23220.dtc.1", "dtc_dg1"))
                 )
             )
         )

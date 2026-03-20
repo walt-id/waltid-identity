@@ -6,31 +6,27 @@ plugins {
 
 group = "id.walt.protocols"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 kotlin {
 
     sourceSets {
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // HTTP
-            implementation("io.ktor:ktor-server-core:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.server.core)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
-            implementation("io.github.optimumcode:json-schema-validator:0.5.2")
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR

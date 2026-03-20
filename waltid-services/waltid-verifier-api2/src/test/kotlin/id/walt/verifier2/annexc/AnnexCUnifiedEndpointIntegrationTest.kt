@@ -2,32 +2,20 @@
 
 package id.walt.verifier2.annexc
 
-import id.walt.commons.config.ConfigManager
-import id.walt.commons.testing.E2ETest
 import id.walt.cose.Cose
 import id.walt.cose.CoseKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.base64UrlDecode
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.did.dids.DidService
-import id.walt.did.dids.resolver.LocalResolver
-import id.walt.iso18013.annexc.*
+import id.walt.iso18013.annexc.AnnexCEncryptedResponse
+import id.walt.iso18013.annexc.AnnexCEncryptedResponseData
+import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
-import id.walt.verifier2.*
-import id.walt.verifier2.data.DcApiAnnexCFlowSetup
-import id.walt.verifier.openid.models.authorization.ClientMetadata
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.server.application.*
-import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.bouncycastle.crypto.hpke.HPKE
 import java.io.File
 import java.net.ServerSocket
-import kotlin.test.Test
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 class AnnexCUnifiedEndpointIntegrationTest {
 

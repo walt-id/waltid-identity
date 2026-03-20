@@ -26,7 +26,6 @@ import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertDoesNotThrow
-import org.junit.jupiter.api.assertNull
 import kotlin.test.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -172,7 +171,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
     private lateinit var universityDegreeWithDisclosuresWalletCredentialId: String
     private lateinit var universityDegreeDisclosures: List<String>
     private val universityDegreeWithDisclosuresPresentationRequest = Json.decodeFromString<JsonObject>(
-        """
+        $$"""
         {
             "vp_policies": [
                 "signature",
@@ -197,7 +196,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                             "fields": [
                                 {
                                     "path": [
-                                        "${'$'}.vc.issuanceDate"
+                                        "$.vc.issuanceDate"
                                     ],
                                     "filter": {
                                         "type": "string",
@@ -206,7 +205,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                                 },
                                 {
                                     "path": [
-                                        "${'$'}.vc.credentialSubject.degree.name"
+                                        "$.vc.credentialSubject.degree.name"
                                     ],
                                     "filter": {
                                         "type": "string",
@@ -235,7 +234,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
     private lateinit var openBadgeWithDisclosuresWalletCredentialId: String
     private lateinit var openBadgeDisclosures: List<String>
     private val openBadgeWithDisclosuresPresentationRequest = Json.decodeFromString<JsonObject>(
-        """
+        $$"""
         {
             "vp_policies": [
                 "signature",
@@ -260,7 +259,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                             "fields": [
                                 {
                                     "path": [
-                                        "${'$'}.vc.issuanceDate"
+                                        "$.vc.issuanceDate"
                                     ],
                                     "filter": {
                                         "type": "string",
@@ -269,7 +268,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                                 },
                                 {
                                     "path": [
-                                        "${'$'}.vc.expirationDate"
+                                        "$.vc.expirationDate"
                                     ],
                                     "filter": {
                                         "type": "string",
@@ -341,7 +340,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
     private lateinit var sdJwtVcWalletCredentialId: String
     private lateinit var sdJwtVcDisclosures: List<String>
     private val sdJwtVcPresentationRequest = Json.decodeFromString<JsonObject>(
-        """
+        $$"""
         {
             "request_credentials": [
                 {
@@ -356,7 +355,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                             "fields": [
                                 {
                                     "path": [
-                                        "${'$'}.birthdate"
+                                        "$.birthdate"
                                     ],
                                     "filter": {
                                         "type": "string",
@@ -548,7 +547,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -561,7 +560,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                 actual = holder.jsonPrimitive.content,
             )
 
-            assertTrue(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationSimpleView.verifiableCredentials.size, 1)
 
             val simpleViewResponse =
                 client.get("/openid4vc/session/${sessionId}/presented-credentials") {
@@ -600,13 +599,13 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonVerboseViewMode
             }
 
-            assertTrue(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationVerboseView.verifiableCredentials.size, 1)
 
         }
 
@@ -653,7 +652,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -666,7 +665,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                 actual = holder.jsonPrimitive.content,
             )
 
-            assertTrue(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationSimpleView.verifiableCredentials.size, 1)
 
             val simpleViewResponse =
                 client.get("/openid4vc/session/${sessionId}/presented-credentials") {
@@ -705,13 +704,13 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonVerboseViewMode
             }
 
-            assertTrue(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationVerboseView.verifiableCredentials.size, 1)
 
         }
 
@@ -761,7 +760,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.sd_jwt_vc])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val sdJwtVcPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedSdJwtVcSimpleViewMode
@@ -806,7 +805,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.sd_jwt_vc])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val sdJwtVcPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedSdJwtVcVerboseViewMode
@@ -828,7 +827,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
 
             val disclosures = assertNotNull(sdJwtVcPresentationVerboseView.vc.disclosures)
 
-            assertTrue(disclosures.size == 2)
+            assertEquals(disclosures.size, 2)
 
         }
 
@@ -876,7 +875,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.mso_mdoc])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val msoMdocPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedMsoMdocSimpleViewMode
@@ -929,7 +928,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.mso_mdoc])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val msoMdocPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedMsoMdocVerboseViewMode
@@ -947,7 +946,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                 actual = msoMdocPresentationVerboseView.status,
             )
 
-            assertTrue(msoMdocPresentationVerboseView.documents.size == 1)
+            assertEquals(msoMdocPresentationVerboseView.documents.size, 1)
 
             val mDoc = msoMdocPresentationVerboseView.documents[0]
 
@@ -958,7 +957,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
 
             assertNull(mDoc.errors)
 
-            assertTrue(mDoc.issuerSigned.nameSpaces.size == 1)
+            assertEquals(mDoc.issuerSigned.nameSpaces.size, 1)
 
             assertEquals(
                 actual = mDoc.issuerSigned.nameSpaces.keys,
@@ -1013,7 +1012,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -1026,7 +1025,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                 actual = holder.jsonPrimitive.content,
             )
 
-            assertTrue(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationSimpleView.verifiableCredentials.size, 1)
 
             val simpleViewResponse =
                 client.get("/openid4vc/session/${sessionId}/presented-credentials") {
@@ -1065,13 +1064,13 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonVerboseViewMode
             }
 
-            assertTrue(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationVerboseView.verifiableCredentials.size, 1)
 
             val verboseCredential = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
 
@@ -1088,7 +1087,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
 
             val disclosures = assertNotNull(verboseCredential.disclosures)
 
-            assertTrue(disclosures.size == 2)
+            assertEquals(disclosures.size, 2)
 
         }
 
@@ -1138,7 +1137,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -1151,7 +1150,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                 actual = holder.jsonPrimitive.content,
             )
 
-            assertTrue(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationSimpleView.verifiableCredentials.size, 1)
 
             val simpleViewResponse =
                 client.get("/openid4vc/session/${sessionId}/presented-credentials") {
@@ -1190,13 +1189,13 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonVerboseViewMode
             }
 
-            assertTrue(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 1)
+            assertEquals(jwtVcJsonPresentationVerboseView.verifiableCredentials.size, 1)
 
             val verboseCredential = jwtVcJsonPresentationVerboseView.verifiableCredentials.first()
 
@@ -1213,7 +1212,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
 
             val disclosures = assertNotNull(verboseCredential.disclosures)
 
-            assertTrue(disclosures.size == 2)
+            assertEquals(disclosures.size, 2)
 
         }
 
@@ -1268,7 +1267,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             )
 
             val dummyPresentationSubmissionString =
-                """{"id":"X0zlmZ3BuJNS","definition_id":"X0zlmZ3BuJNS","descriptor_map":[{"id":"UniversityDegreeCredential","format":"jwt_vp","path":"${'$'}","path_nested":{"format":"jwt_vc","path":"${'$'}.vp.verifiableCredential[0]"}}]}"""
+                $$"""{"id":"X0zlmZ3BuJNS","definition_id":"X0zlmZ3BuJNS","descriptor_map":[{"id":"UniversityDegreeCredential","format":"jwt_vp","path":"$","path_nested":{"format":"jwt_vc","path":"$.vp.verifiableCredential[0]"}}]}"""
 
             val dummyVpToken = dummyEcKey.signJws(
                 plaintext = Json.encodeToString(buildJsonObject {
@@ -1357,7 +1356,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             var credentials =
                 assertNotNull(simpleViewByDefaultResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationSimpleView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonSimpleViewMode
@@ -1370,7 +1369,7 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
                 actual = holder.jsonPrimitive.content,
             )
 
-            assertTrue(jwtVcJsonPresentationSimpleView.verifiableCredentials.size == 2)
+            assertEquals(jwtVcJsonPresentationSimpleView.verifiableCredentials.size, 2)
 
             val simpleViewResponse =
                 client.get("/openid4vc/session/${sessionId}/presented-credentials") {
@@ -1409,13 +1408,13 @@ class VerifierPresentedCredentialsTests(val e2e: E2ETest) {
             credentials =
                 assertNotNull(verboseViewResponse.credentialsByFormat[VCFormat.jwt_vc_json])
 
-            assertTrue(credentials.size == 1)
+            assertEquals(credentials.size, 1)
 
             val jwtVcJsonPresentationVerboseView = assertDoesNotThrow {
                 credentials.first() as PresentedJwtVcJsonVerboseViewMode
             }
 
-            assertTrue(jwtVcJsonPresentationVerboseView.verifiableCredentials.size == 2)
+            assertEquals(jwtVcJsonPresentationVerboseView.verifiableCredentials.size, 2)
 
         }
 

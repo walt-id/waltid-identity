@@ -5,7 +5,7 @@ package id.walt.mdoc.objects.handover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Represents the `OpenID4VPHandover` structure, which is the `Handover` component of a `SessionTranscript`
@@ -19,7 +19,7 @@ import kotlinx.serialization.cbor.CborArray
  * @property infoHash The SHA-256 hash of the CBOR-encoded [OpenID4VPHandoverInfo] structure.
  */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class OpenID4VPHandover(
     val identifier: String, // "OpenID4VPHandover"
     @ByteString

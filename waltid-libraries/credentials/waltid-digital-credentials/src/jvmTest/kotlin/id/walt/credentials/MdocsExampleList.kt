@@ -20,11 +20,11 @@ object MdocsExampleList {
             CredentialDetectorTypes.SignaturePrimaryType.COSE,
             true, true
         ),
-       /*MdocsExamples.mdocExampleMdocsLib to CredentialDetectionResult(
-            CredentialPrimaryDataType.MDOCS,
-            MdocsSubType.mdocs,
-            CredentialDetectorTypes.SignaturePrimaryType.COSE,
-           true, true
-        )*/
+        /*MdocsExamples.mdocExampleMdocsLib to CredentialDetectionResult(
+             CredentialPrimaryDataType.MDOCS,
+             MdocsSubType.mdocs,
+             CredentialDetectorTypes.SignaturePrimaryType.COSE,
+            true, true
+         )*/
     )
 }

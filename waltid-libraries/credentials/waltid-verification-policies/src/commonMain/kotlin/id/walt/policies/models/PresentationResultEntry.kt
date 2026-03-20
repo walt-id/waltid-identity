@@ -20,6 +20,11 @@ data class PresentationResultEntrySurrogate(val credential: String, val policyRe
                     policyResults = original.policyResults.map {
                         PolicyResultSurrogate(it)
                     })
-            }.getOrElse { ex -> throw IllegalStateException("Could not build PresentationResultEntrySurrogate off PresentationResultEntry: $original", ex) }
+            }.getOrElse { ex ->
+                throw IllegalStateException(
+                    "Could not build PresentationResultEntrySurrogate off PresentationResultEntry: $original",
+                    ex
+                )
+            }
     }
 }

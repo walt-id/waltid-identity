@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.crypto.keys.aws
 
 import id.walt.crypto.exceptions.KeyNotFoundException
@@ -31,12 +29,10 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }
@@ -128,7 +124,7 @@ class AWSKeyRestAPI(
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
         val digestedMessage = sha256(plaintext)
@@ -198,7 +194,8 @@ class AWSKeyRestAPI(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
-        val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
+        val messageToVerify =
+            detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
 
         // Calculate SHA-256 hash to handle payloads larger than 4KB
         val digestedMessage = sha256(messageToVerify)
@@ -310,7 +307,6 @@ class AWSKeyRestAPI(
         logger.debug { "Key $id scheduled for deletion" }
         return response.status == HttpStatusCode.OK
     }
-
 
 
     companion object : AWSKeyCreator {
@@ -539,7 +535,6 @@ ${sha256Hex(canonicalRequest)}
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        @OptIn(ExperimentalEncodingApi::class)
         suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
             val method = HttpMethod.Post
             val body = """

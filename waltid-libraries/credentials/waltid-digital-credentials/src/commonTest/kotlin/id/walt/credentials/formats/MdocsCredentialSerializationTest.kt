@@ -14,9 +14,8 @@ import id.walt.mdoc.objects.mso.ValidityInfo
 import kotlinx.serialization.json.*
 import kotlin.test.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
-@OptIn(ExperimentalTime::class)
+
 class MdocsCredentialSerializationTest {
 
     private val dummyValueDigest = ValueDigest(key = 1u, value = byteArrayOf())

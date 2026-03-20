@@ -6,9 +6,6 @@ plugins {
 
 group = "id.walt.policies"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableIosBuild = getSetting("enableIosBuild")
@@ -29,7 +26,7 @@ kotlin {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             implementation(project(":waltid-libraries:credentials:waltid-dif-definitions-parser"))
@@ -60,10 +57,10 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.junit.jupiter.params)
-            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
-            implementation("io.mockk:mockk:1.14.2")
+            implementation(identityLibs.ktor.server.test.host)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.netty)
+            implementation("io.mockk:mockk:1.14.9")
         }
         if (enableIosBuild) {
             iosMain.dependencies {}

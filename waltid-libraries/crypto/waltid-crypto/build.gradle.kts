@@ -23,6 +23,7 @@ kotlin {
         commonMain.dependencies {
             // Kotlinx.serialization
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Kotlinx
             implementation(identityLibs.kotlinx.datetime)
@@ -40,9 +41,7 @@ kotlin {
             //
 
             // Hashes
-            implementation(project.dependencies.platform(identityLibs.kotlincrypto.hash.bom))
             implementation(identityLibs.kotlincrypto.hash.sha2)
-            implementation(project.dependencies.platform(identityLibs.kotlincrypto.macs.bom))
             implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
         }
         commonTest.dependencies {

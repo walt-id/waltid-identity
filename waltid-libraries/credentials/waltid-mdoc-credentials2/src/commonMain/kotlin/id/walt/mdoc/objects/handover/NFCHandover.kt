@@ -3,7 +3,7 @@ package id.walt.mdoc.objects.handover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Represents the `NFCHandover` structure, which is a component of the `SessionTranscript`
@@ -19,7 +19,7 @@ import kotlinx.serialization.cbor.CborArray
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class NFCHandover(
     /** Handover Select Message (binary) */
     @ByteString
@@ -28,7 +28,7 @@ data class NFCHandover(
     /** Handover Request Message (binary) - null if NFC Static Handover was used */
     @ByteString
     val handoverRequest: ByteArray?
-): BaseHandoverInfo {
+) : BaseHandoverInfo {
     /**
      * Note: `equals` and `hashCode` are manually overridden because the default implementation for a
      * `data class` uses reference equality for `ByteArray` properties. This override ensures

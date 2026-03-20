@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.crypto.keys.oci
 
 import id.walt.crypto.exceptions.KeyNotFoundException
@@ -38,11 +36,9 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 private val log = KotlinLogging.logger { }
 
@@ -389,7 +385,6 @@ class OCIKeyRestApi(
             }
         }
 
-        @OptIn(ExperimentalEncodingApi::class)
         private fun signingRequest(
             method: String, restApi: String, host: String, requestBody: String?, signingKey: String? // = null
         ): String {
@@ -417,7 +412,6 @@ class OCIKeyRestApi(
             return Base64.encode(sha256WithRsa(privateOciApiKey, signingString.encodeToByteArray()))
         }
 
-        @OptIn(ExperimentalEncodingApi::class)
         private fun calculateSHA256(data: String?): String {
             if (data == null) return ""
             val digest = SHA256()

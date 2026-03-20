@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.documentsigner
 
 import id.walt.crypto.keys.Key
@@ -20,7 +18,7 @@ import org.bouncycastle.asn1.*
 import org.bouncycastle.asn1.x509.*
 import kotlin.test.*
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
+
 
 /*
 The "main" purpose of this test is to check that the data that was input in the

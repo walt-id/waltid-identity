@@ -1,9 +1,7 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.documentsigner.certificate
 
 import id.walt.x509.X509ValidityPeriod
-import kotlin.time.ExperimentalTime
+
 
 /**
  * ISO profile input data used to build a Document Signer X.509 certificate.

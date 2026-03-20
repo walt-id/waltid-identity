@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca
 
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
@@ -11,7 +9,6 @@ import okio.ByteString.Companion.toByteString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.time.ExperimentalTime
 
 class IACACertificateInfoTest {
 

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc
 
 import id.walt.crypto.keys.jwk.JWKKey
@@ -32,13 +30,11 @@ import org.kotlincrypto.hash.sha2.SHA256
 import java.security.cert.X509Certificate
 import javax.net.ssl.X509TrustManager
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val ISSUER_MOCK_PORT = 7018
@@ -101,7 +97,6 @@ class EBSIIssueToHolderConformanceTest {
     }
 
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun getCTIssueQualificationCredential() = runTest {
 

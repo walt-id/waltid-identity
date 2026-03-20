@@ -5,7 +5,7 @@ import id.walt.mdoc.objects.SessionTranscript
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.cbor.ValueTags
 
 /**
@@ -26,7 +26,7 @@ import kotlinx.serialization.cbor.ValueTags
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class DeviceAuthentication(
     /** `DeviceAuthentication` */
     val type: String, // Normal text string (not bytestring)

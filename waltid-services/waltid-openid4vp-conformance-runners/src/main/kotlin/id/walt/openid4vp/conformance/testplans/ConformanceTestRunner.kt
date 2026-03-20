@@ -9,10 +9,10 @@ import id.walt.openid4vp.conformance.testplans.plans.MdlX509SanDnsRequestUriSign
 import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPost
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.verifierModule
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.ktor.server.application.*
 import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull

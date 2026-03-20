@@ -3,7 +3,7 @@ package id.walt.mdoc.objects.dcapi
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Represents the `Handover` structure for a `SessionTranscript` when using a
@@ -18,7 +18,7 @@ import kotlinx.serialization.cbor.CborArray
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class DCAPIHandover(
     val type: HandoverType,
     /**

@@ -15,19 +15,18 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
+import id.walt.policies2.vc.VCPolicyList
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.JsonSchemaPolicy
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
-import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
-import id.walt.verifier2.verifierModule
-import id.walt.policies2.vc.VCPolicyList
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.policies2.vc.policies.JsonSchemaPolicy
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
+import id.walt.verifier2.verifierModule
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -42,10 +41,9 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTime::class)
+
 class Verifier2RemoteSchemaTest {
 
     private val w3cDcqlQuery = DcqlQuery(
@@ -57,7 +55,7 @@ class Verifier2RemoteSchemaTest {
                     typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
                 ),
                 claims = listOf(
-                    ClaimsQuery(path = listOf("credentialSubject", "achievement", "name")),
+                    ClaimsQuery(pathStrings = listOf("credentialSubject", "achievement", "name")),
                 )
             )
         )
