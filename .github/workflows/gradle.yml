@@ -99,6 +99,7 @@ jobs:
             exit 1
           fi
           echo "CHROME_BIN=$CHROME_BIN" >> $GITHUB_ENV
+          echo "SELENIUM_BROWSER=chrome" >> $GITHUB_ENV
           echo "Using CHROME_BIN=$CHROME_BIN"
 
       - name: Clean and build with all tests
