@@ -7,6 +7,7 @@ import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers
 import id.walt.webwallet.db.models.authnz.AuthnzAccountIdentifiers.userId
 import id.walt.webwallet.db.models.authnz.AuthnzStoredData
+import id.walt.webwallet.db.models.authnz.AuthnzUsers
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,12 +27,24 @@ class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispat
             newAccountIdentifier: AccountIdentifier
         ): Unit = withContext(dispatcher) {
             transaction {
-                AuthnzAccountIdentifiers.insert {
-                    it[userId] = UUID.fromString(accountId)
-                    it[identifier] = newAccountIdentifier.toDataString()
-                    //it[AuthnzAccountIdentifiers.method] =
+                val userUuid = UUID.fromString(accountId)
+                
+                val userExists = AuthnzUsers
+                    .select(AuthnzUsers.id)
+                    .where { AuthnzUsers.id eq userUuid }
+                    .singleOrNull() != null
+                
+                if (!userExists) {
+                    AuthnzUsers.insert {
+                        it[id] = userUuid
+                    }
                 }
-                Unit // Explicitly return Unit
+                
+                AuthnzAccountIdentifiers.insert {
+                    it[userId] = userUuid
+                    it[identifier] = newAccountIdentifier.toDataString()
+                }
+                Unit
             }
         }
 
