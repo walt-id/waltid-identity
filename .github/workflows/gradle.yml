@@ -66,8 +66,7 @@ jobs:
       - name: Check if Google Chrome is installed
         id: check-browser
         run: |
-          if command -v google-chrome >/dev/null 2>&1 || \
-             command -v google-chrome-stable >/dev/null 2>&1; then
+          if [ -x /usr/bin/google-chrome ] || [ -x /usr/bin/google-chrome-stable ]; then
             echo "installed=true" >> $GITHUB_OUTPUT
             echo "Google Chrome is already installed"
           else
@@ -88,7 +87,13 @@ jobs:
 
       - name: Export CHROME_BIN
         run: |
-          CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable)"
+          if [ -x /usr/bin/google-chrome ]; then
+            CHROME_BIN=/usr/bin/google-chrome
+          elif [ -x /usr/bin/google-chrome-stable ]; then
+            CHROME_BIN=/usr/bin/google-chrome-stable
+          else
+            CHROME_BIN=""
+          fi
           if [ -z "$CHROME_BIN" ]; then
             echo "Could not determine Google Chrome binary path"
             exit 1
