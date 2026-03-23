@@ -34,8 +34,9 @@ object WebhookNotifier {
                     bearerAuth(config.bearerToken!!)
                 }
             }
-            log.debug { "Webhook notification sent successfully to ${config.url}, status: ${response.status}" }
-            if (!response.status.isSuccess()) {
+            if (response.status.isSuccess()) {
+                log.debug { "Webhook notification sent successfully to ${config.url}, status: ${response.status}" }
+            } else {
                 log.warn { "Webhook notification to ${config.url} returned non-success status: ${response.status}" }
             }
         } catch (ex: Exception) {
