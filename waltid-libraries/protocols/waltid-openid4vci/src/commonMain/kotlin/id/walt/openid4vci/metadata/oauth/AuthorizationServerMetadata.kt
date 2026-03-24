@@ -93,6 +93,8 @@ data class AuthorizationServerMetadata(
     val authorizationDetailsTypesSupported: Set<String>? = null,
     @SerialName("pre-authorized_grant_anonymous_access_supported")
     val preAuthorizedGrantAnonymousAccessSupported: Boolean? = null,
+    @SerialName("status_list_aggregation_endpoint")
+    val statusListAggregationEndpoint: String? = null,
     val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
@@ -172,6 +174,7 @@ data class AuthorizationServerMetadata(
 
         // RFC 8414 §2: Validate jwks_uri if present
         jwksUri?.let { validateUrl("jwks_uri", it) }
+        statusListAggregationEndpoint?.let { validateUrl("status_list_aggregation_endpoint", it) }
 
         // RFC 8414 §2: "none" is not a valid JWS alg for token endpoint JWT auth.
         tokenEndpointAuthSigningAlgValuesSupported?.let { algorithms ->
@@ -215,6 +218,7 @@ data class AuthorizationServerMetadata(
             codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = null,
             pushedAuthorizationRequestEndpointPath: String? = null,
+            statusListAggregationEndpointPath: String? = null,
         ): AuthorizationServerMetadata {
             val normalized = baseUrl.trimEnd('/')
             val parEndpoint = pushedAuthorizationRequestEndpointPath?.let { normalized + it }
@@ -234,6 +238,7 @@ data class AuthorizationServerMetadata(
                 codeChallengeMethodsSupported = codeChallengeMethodsSupported,
                 requirePushedAuthorizationRequests = requirePushedAuthorizationRequests,
                 pushedAuthorizationRequestEndpoint = parEndpoint,
+                statusListAggregationEndpoint = statusListAggregationEndpointPath?.let { normalized + it },
             )
         }
 
@@ -323,6 +328,9 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             value.preAuthorizedGrantAnonymousAccessSupported?.let {
                 put("pre-authorized_grant_anonymous_access_supported", JsonPrimitive(it))
             }
+            value.statusListAggregationEndpoint?.let {
+                put("status_list_aggregation_endpoint", JsonPrimitive(it))
+            }
         }
         val merged = value.customParameters?.let { extras ->
             buildJsonObject {
@@ -376,6 +384,7 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
             authorizationDetailsTypesSupported = element.stringSet("authorization_details_types_supported"),
             preAuthorizedGrantAnonymousAccessSupported =
                 element.bool("pre-authorized_grant_anonymous_access_supported"),
+            statusListAggregationEndpoint = element.string("status_list_aggregation_endpoint"),
             customParameters = customParameters,
         )
     }
