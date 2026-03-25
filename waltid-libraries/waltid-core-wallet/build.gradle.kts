@@ -38,7 +38,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
+            implementation(identityLibs.ktor.client.cio)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

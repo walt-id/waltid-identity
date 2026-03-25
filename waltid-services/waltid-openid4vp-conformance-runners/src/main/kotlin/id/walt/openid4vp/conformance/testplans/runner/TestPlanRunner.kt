@@ -6,7 +6,6 @@ import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus
 import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -30,7 +29,7 @@ class TestPlanRunner(
         }
     }
 
-    private val conformanceHttp = HttpClient(OkHttp) {
+    private val conformanceHttp = HttpClient() {
         followRedirects = false
 
         defaultRequest {
