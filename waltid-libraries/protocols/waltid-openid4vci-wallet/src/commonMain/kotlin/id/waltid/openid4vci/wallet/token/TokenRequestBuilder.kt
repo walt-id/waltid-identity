@@ -33,11 +33,7 @@ class TokenRequestBuilder(
         val token_type: String,
         val expires_in: Int? = null,
         val refresh_token: String? = null,
-        val scope: String? = null,
-        // OpenID4VCI specific fields
-        val c_nonce: String? = null,
-        val c_nonce_expires_in: Int? = null,
-        val authorization_details: String? = null,
+        val scope: String? = null
     )
 
     /**
@@ -123,7 +119,9 @@ class TokenRequestBuilder(
         }
 
         return try {
+            println("the Token exc response is ${response.body<TokenResponse>()}")
             response.body<TokenResponse>()
+            
         } catch (e: Exception) {
             val responseBody = response.bodyAsText()
             log.error(e) { "Failed to parse token response. Body: $responseBody" }
