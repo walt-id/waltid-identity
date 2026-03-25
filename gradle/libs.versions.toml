@@ -31,6 +31,7 @@ kotlinx-serialization-cbor-TEMP = "1.10.1-waltid_20260309-SNAPSHOT"
 kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 kotlinx-atomicfu = "0.31.0"
+kotlinx-io = "0.9.0"
 
 # Logging
 kotlinlogging = "8.0.01"
@@ -141,6 +142,8 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinx-coroutines" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "kotlinx-atomicfu" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
+kotlinx-io-bytestring = { module = "org.jetbrains.kotlinx:kotlinx-io-bytestring", version.ref = "kotlinx-io" }
 
 ## Crypto
 bcprov-lts8on = { group = "org.bouncycastle", name = "bcprov-lts8on", version.ref = "bcprov" }

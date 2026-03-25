@@ -22,6 +22,8 @@ kotlin {
 
             // Kotlinx
             implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlinx.io.core)
+            implementation(identityLibs.kotlinx.io.bytestring)
 
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
@@ -40,8 +42,6 @@ kotlin {
             implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
             implementation("com.soywiz:korlibs-io:6.0.2")
-
-            implementation(libs.okio)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

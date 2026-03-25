@@ -10,11 +10,11 @@ import id.walt.vical.Vical
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import okio.ByteString.Companion.toByteString
 
 private val log = KotlinLogging.logger { }
 
@@ -57,7 +57,7 @@ data class VicalPolicy(
 
             // Loading the certificate chain from the provided credential
             val chain = x5cList.x5c.map {
-                CertificateDer(it.base64Der.decodeFromBase64().toByteString())
+                CertificateDer(it.base64Der.decodeFromBase64())
             }.filter { it != signingCert } // Do not put the signing cert in the chain
 
             val anchors: List<CertificateDer>? = loadTrustAnchorsFromVical(this.vical, credential.docType)
@@ -100,7 +100,7 @@ data class VicalPolicy(
         }.getOrNull(0)
             ?: throw IllegalArgumentException("Could not determine document signing credential in x5c list")
 
-        val signingCert = CertificateDer(signingX5CCertificateString.base64Der.decodeFromBase64().toByteString())
+        val signingCert = CertificateDer(signingX5CCertificateString.base64Der.decodeFromBase64())
         return signingCert
     }
 
@@ -124,7 +124,7 @@ data class VicalPolicy(
         } else decodedVical.vicalData.certificateInfos
 
         // Build anchors from VICAL certificateInfos
-        val anchorsFromVical: List<CertificateDer> = certificateInfos.map { info -> CertificateDer(info.certificate.toByteString()) }
+        val anchorsFromVical: List<CertificateDer> = certificateInfos.map { info -> CertificateDer(info.certificate) }
 
         return anchorsFromVical.ifEmpty { null }
     }
