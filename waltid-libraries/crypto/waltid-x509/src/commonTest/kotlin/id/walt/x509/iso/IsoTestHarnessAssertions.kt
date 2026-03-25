@@ -3,7 +3,7 @@ package id.walt.x509.iso
 import id.walt.x509.X509KeyUsage
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
-import okio.ByteString
+import kotlinx.io.bytestring.ByteString
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue

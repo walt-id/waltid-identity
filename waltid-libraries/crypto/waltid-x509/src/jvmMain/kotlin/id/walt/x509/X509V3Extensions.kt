@@ -1,7 +1,6 @@
 package id.walt.x509
 
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.x509.AuthorityKeyIdentifier
 import org.bouncycastle.asn1.x509.Extension
@@ -34,7 +33,7 @@ val X509Certificate.subjectKeyIdentifier: ByteString?
     get() = getExtensionValue(Extension.subjectKeyIdentifier.id)?.let { skiExtRaw ->
         SubjectKeyIdentifier.getInstance(
             ASN1OctetString.getInstance(skiExtRaw).octets
-        ).keyIdentifier?.toByteString()
+        ).keyIdentifier?.let { ByteString(it) }
     }
 
 /**
@@ -44,7 +43,7 @@ val X509Certificate.authorityKeyIdentifier: ByteString?
     get() = getExtensionValue(Extension.authorityKeyIdentifier.id)?.let { skiExtRaw ->
         AuthorityKeyIdentifier.getInstance(
             ASN1OctetString.getInstance(skiExtRaw).octets
-        ).keyIdentifierOctets?.toByteString()
+        ).keyIdentifierOctets?.let { ByteString(it) }
     }
 
 /**
