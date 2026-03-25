@@ -3,7 +3,7 @@
 package id.walt.commons.web.modules
 
 import com.sksamuel.hoplite.simpleName
-import id.walt.commons.config.statics.BuildConfig
+import id.walt.commons.config.statics.RunConfiguration
 import id.walt.commons.config.statics.ServiceConfig
 import io.github.smiley4.ktoropenapi.OpenApi
 import io.github.smiley4.ktoropenapi.config.*
@@ -28,7 +28,6 @@ import io.swagger.v3.oas.models.media.Schema
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
-import kotlin.time.Clock
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
@@ -122,7 +121,7 @@ object OpenApiModule {
                         runCatching {
                             kotlinxEncoder.invoke(type, example)
                         }.recoverCatching {
-                            logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\"." }
+                            logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\". Example in question: $example" }
                             reflectionEncoder.invoke(type, example)
                         }.getOrThrow()
                     }
@@ -131,11 +130,9 @@ object OpenApiModule {
 
             info {
                 title = "${ServiceConfig.config.vendor} ${ServiceConfig.config.name}"
-                version = BuildConfig.version
+                version = ServiceConfig.config.version
                 description = """
-                    Interact with the ${ServiceConfig.config.vendor} ${ServiceConfig.config.name}. Version is reported to be ${BuildConfig.version} and this service instance was started ${
-                    Clock.System.now().roundToSecond()
-                }.
+                    Interact with the ${ServiceConfig.config.vendor} ${ServiceConfig.config.name}. Version is reported to be ${ServiceConfig.config.version} and this service instance was started ${RunConfiguration.serviceStartupTime.roundToSecond()}.
                     Questions about anything here? Visit <a href='${ServiceConfig.config.supportUrl}'>support</a>.
 
                 """.trimIndent().replace("\n", "<br/>")
