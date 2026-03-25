@@ -17,11 +17,11 @@ import io.ktor.server.engine.*
 import java.net.BindException
 
 data class WebService(
-    val module: Application.() -> Unit,
+    val module: suspend Application.() -> Unit,
 ) {
     private val log = logger("WebService")
 
-    val webServiceModule: Application.() -> Unit = {
+    val webServiceModule: suspend Application.() -> Unit = {
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
         { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
         { OpenApiModule.run { enable() } } whenFeature CommonsFeatureCatalog.openApiFeature
