@@ -92,6 +92,10 @@ application {
     mainClass.set("id.walt.verifier2.MainKt")
 }
 
+buildConfig {
+    packageName("id.walt.verifier2")
+}
+
 ktor {
     docker {
         portMappings.set(listOf(DockerPortMapping(7003, 7003, DockerPortMappingProtocol.TCP)))

@@ -73,7 +73,7 @@ class InMemoryCommunityStackEnvironment private constructor(val e2e: E2ETest) : 
     suspend fun start() {
         scope.launch {
             e2e.testBlock(
-                config = ServiceConfiguration("e2e-test"),
+                config = ServiceConfiguration("e2e-test", version = "test"),
                 logConfig = "config-file",
                 features = listOf(
                     id.walt.issuer.FeatureCatalog,

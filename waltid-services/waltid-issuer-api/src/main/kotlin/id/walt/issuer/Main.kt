@@ -21,7 +21,7 @@ import io.ktor.server.application.*
 
 suspend fun main(args: Array<String>) {
     ServiceMain(
-        ServiceConfiguration("issuer"), ServiceInitialization(
+        ServiceConfiguration("issuer", version = BuildConfig.VERSION), ServiceInitialization(
             features = FeatureCatalog,
             featureAmendments = mapOf(
                 CommonsFeatureCatalog.authenticationServiceFeature to issuerAuthenticationPluginAmendment

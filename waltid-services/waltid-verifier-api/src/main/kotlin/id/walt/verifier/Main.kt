@@ -15,7 +15,7 @@ import io.ktor.server.application.*
 
 suspend fun main(args: Array<String>) {
     ServiceMain(
-        ServiceConfiguration("verifier"), ServiceInitialization(
+        ServiceConfiguration("verifier", version = BuildConfig.VERSION), ServiceInitialization(
             features = FeatureCatalog,
             init = {
                 DidService.apply {

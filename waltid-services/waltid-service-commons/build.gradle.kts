@@ -1,6 +1,7 @@
 plugins {
     id("waltid.jvm.library")
     id("waltid.publish.maven")
+    id("com.github.gmazzo.buildconfig") version "5.4.0" // Add this line
 }
 
 group = "id.walt"
