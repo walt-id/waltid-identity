@@ -4,6 +4,8 @@ import com.sksamuel.cohort.Cohort
 import com.sksamuel.cohort.HealthCheckRegistry
 import com.sksamuel.cohort.HealthCheckResult
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.statics.RunConfiguration
+import id.walt.commons.config.statics.ServiceConfig.config
 import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import io.klogging.logger
@@ -14,6 +16,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
 import java.lang.management.ManagementFactory
 import java.lang.management.MemoryUsage
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 
 object ServiceHealthChecksDebugModule {
@@ -32,21 +35,40 @@ object ServiceHealthChecksDebugModule {
 
     object KtorStatusChecker {
 
-        private val log = noCoLogger("Ktor status")
+        private val logger = noCoLogger("EnterpriseStatus")
 
         var ktorStatus: KtorStatus = KtorStatus.Unknown
             set(value) {
-                log.trace { "New ktor server status: ${value.name}" }
                 field = value
             }
 
         fun Application.init() {
-            monitor.subscribe(ApplicationStarting) { ktorStatus = KtorStatus.ApplicationStarting }
-            monitor.subscribe(ApplicationStarted) { ktorStatus = KtorStatus.ApplicationStarted }
-            monitor.subscribe(ServerReady) { ktorStatus = KtorStatus.ServerReady }
-            monitor.subscribe(ApplicationStopPreparing) { ktorStatus = KtorStatus.ApplicationStopPreparing }
-            monitor.subscribe(ApplicationStopping) { ktorStatus = KtorStatus.ApplicationStopping }
-            monitor.subscribe(ApplicationStopped) { ktorStatus = KtorStatus.ApplicationStopped }
+            monitor.subscribe(ApplicationStarting) {
+                ktorStatus = KtorStatus.ApplicationStarting
+                logger.info("${config.vendor} ${config.name} - Starting up...")
+            }
+            monitor.subscribe(ApplicationStarted) {
+                ktorStatus = KtorStatus.ApplicationStarted
+                logger.info("${config.vendor} ${config.name} - Web server started, the app will be ready soon...")
+            }
+            monitor.subscribe(ServerReady) {
+                ktorStatus = KtorStatus.ServerReady
+                val totalStartupTime = Clock.System.now() - RunConfiguration.serviceStartupTime
+                logger.info("${config.vendor} ${config.name} - Web server ready! [total startup time: ${totalStartupTime.inWholeMilliseconds}ms]")
+            }
+
+            monitor.subscribe(ApplicationStopPreparing) {
+                ktorStatus = KtorStatus.ApplicationStopPreparing
+                logger.info("${config.vendor} ${config.name} - Web server - stop preparing...")
+            }
+            monitor.subscribe(ApplicationStopping) {
+                ktorStatus = KtorStatus.ApplicationStopping
+                logger.info("${config.vendor} ${config.name} - Web server - stopping...")
+            }
+            monitor.subscribe(ApplicationStopped) {
+                ktorStatus = KtorStatus.ApplicationStopped
+                logger.info("${config.vendor} ${config.name} - Web server is stopped.")
+            }
         }
     }
 
