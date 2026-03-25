@@ -13,6 +13,7 @@ npm-publish = "3.5.3"
 jib = "3.5.2"
 android-gradle = "8.12.3"
 gradle-shadow = "9.3.2"
+buildconfig = "6.0.9"
 
 # Plugins / Dependencies
 ktor = "3.3.3"
@@ -77,6 +78,7 @@ powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
 mokkery-gradle-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
+buildconfig-plugin = { module="com.github.gmazzo.buildconfig:com.github.gmazzo.buildconfig.gradle.plugin", version.ref="buildconfig" }
 
 # Libraries
 
