@@ -37,64 +37,53 @@ class IssuerMetadataResolver(
      */
     suspend fun resolveCredentialIssuerMetadata(credentialIssuerUrl: String): CredentialIssuerMetadata {
         require(credentialIssuerUrl.isNotBlank()) { "Credential issuer URL cannot be blank" }
-        println(" the credential issuer metadata is :$credentialIssuerUrl")
-        val metadataUrl = if (credentialIssuerUrl.contains(CREDENTIAL_ISSUER_WELL_KNOWN_PATH)) {
-            credentialIssuerUrl
+
+        val urlsToTry = mutableListOf<String>()
+
+        if (credentialIssuerUrl.contains("/v1/") && credentialIssuerUrl.contains("/issuer-service-api2/openid4vci")) {
+            val url = Url(credentialIssuerUrl)
+            val path = url.encodedPath
+            urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$CREDENTIAL_ISSUER_WELL_KNOWN_PATH$path")
+        }
+
+        if (credentialIssuerUrl.contains(CREDENTIAL_ISSUER_WELL_KNOWN_PATH)) {
+            urlsToTry.add(credentialIssuerUrl)
         } else {
-            buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH)
+            urlsToTry.add(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
         }
-        log.debug { "Fetching credential issuer metadata from: $metadataUrl" }
-
-        val response: HttpResponse = try {
-            httpClient.get(metadataUrl)
-        } catch (e: Exception) {
-            log.error(e) { "Failed to fetch credential issuer metadata from: $metadataUrl" }
-            throw Exception("Failed to fetch credential issuer metadata from: $metadataUrl", e)
+        
+        if (!credentialIssuerUrl.contains("/openid4vc/")) {
+            if (credentialIssuerUrl.endsWith("/")) {
+                urlsToTry.add("${credentialIssuerUrl}openid4vc/Draft13$CREDENTIAL_ISSUER_WELL_KNOWN_PATH")
+            } else {
+                urlsToTry.add("$credentialIssuerUrl/openid4vc/Draft13$CREDENTIAL_ISSUER_WELL_KNOWN_PATH")
+            }
         }
 
-        if (!response.status.isSuccess()) {
-            val errorBody = response.bodyAsText()
-            log.error { "Failed to fetch credential issuer metadata. Status: ${response.status}, Body: $errorBody" }
-
-            if (response.status == HttpStatusCode.NotFound) {
-                val fallbackUrl = if (!credentialIssuerUrl.contains("/openid4vc/")) {
-                    if (credentialIssuerUrl.endsWith("/")) {
-                        "${credentialIssuerUrl}openid4vc/Draft13$CREDENTIAL_ISSUER_WELL_KNOWN_PATH"
-                    } else {
-                        "$credentialIssuerUrl/openid4vc/Draft13$CREDENTIAL_ISSUER_WELL_KNOWN_PATH"
-                    }
-                } else null
-
-                val enterpriseFallbackUrl = if (credentialIssuerUrl.contains("/v1/") && credentialIssuerUrl.contains("/issuer-service-api2/openid4vci")) {
-                    val url = Url(credentialIssuerUrl)
-                    val path = url.encodedPath
-                    "${url.protocol.name}://${url.hostWithPort}$CREDENTIAL_ISSUER_WELL_KNOWN_PATH$path"
-                } else null
-
-                for (urlToTry in listOfNotNull(enterpriseFallbackUrl, fallbackUrl)) {
-                    log.debug { "Trying fallback metadata URL: $urlToTry" }
-                    val fallbackResponse = try {
-                        httpClient.get(urlToTry)
-                    } catch (e: Exception) {
-                        null
-                    }
-
-                    if (fallbackResponse?.status?.isSuccess() == true) {
-                        return fallbackResponse.body<CredentialIssuerMetadata>()
-                    }
-                }
+        for (metadataUrl in urlsToTry.distinct()) {
+            log.debug { "Fetching credential issuer metadata from: $metadataUrl" }
+            val response: HttpResponse = try {
+                httpClient.get(metadataUrl)
+            } catch (e: Exception) {
+                log.error(e) { "Failed to fetch credential issuer metadata from: $metadataUrl" }
+                continue
             }
 
-            throw Exception("Failed to fetch credential issuer metadata. Status: ${response.status}")
+            if (response.status.isSuccess()) {
+                return try {
+                    response.body<CredentialIssuerMetadata>()
+                } catch (e: Exception) {
+                    val responseBody = response.bodyAsText()
+                    log.error(e) { "Failed to parse credential issuer metadata from $metadataUrl. Body: $responseBody" }
+                    continue
+                }
+            } else {
+                val errorBody = response.bodyAsText()
+                log.debug { "Failed to fetch credential issuer metadata from $metadataUrl. Status: ${response.status}, Body: $errorBody" }
+            }
         }
 
-        return try {
-            response.body<CredentialIssuerMetadata>()
-        } catch (e: Exception) {
-            val responseBody = response.bodyAsText()
-            log.error(e) { "Failed to parse credential issuer metadata. Body: $responseBody" }
-            throw Exception("Failed to parse credential issuer metadata", e)
-        }
+        throw Exception("Failed to resolve credential issuer metadata for $credentialIssuerUrl from any of: $urlsToTry")
     }
 
     /**
@@ -107,63 +96,52 @@ class IssuerMetadataResolver(
     suspend fun resolveAuthorizationServerMetadata(authorizationServerUrl: String): AuthorizationServerMetadata {
         require(authorizationServerUrl.isNotBlank()) { "Authorization server URL cannot be blank" }
 
-        val metadataUrl = if (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)) {
-            authorizationServerUrl
+        val urlsToTry = mutableListOf<String>()
+
+        if (authorizationServerUrl.contains("/v1/") && authorizationServerUrl.contains("/issuer-service-api2/openid4vci")) {
+            val url = Url(authorizationServerUrl)
+            val path = url.encodedPath
+            urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH$path")
+        }
+
+        if (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)) {
+            urlsToTry.add(authorizationServerUrl)
         } else {
-            buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)
-        }
-        log.debug { "Fetching authorization server metadata from: $metadataUrl" }
-
-        val response: HttpResponse = try {
-            httpClient.get(metadataUrl)
-        } catch (e: Exception) {
-            log.error(e) { "Failed to fetch authorization server metadata from: $metadataUrl" }
-            throw Exception("Failed to fetch authorization server metadata from: $metadataUrl", e)
+            urlsToTry.add(buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))
         }
 
-        if (!response.status.isSuccess()) {
-            val errorBody = response.bodyAsText()
-            log.error { "Failed to fetch authorization server metadata. Status: ${response.status}, Body: $errorBody" }
+        if (!authorizationServerUrl.contains("/openid4vc/")) {
+            if (authorizationServerUrl.endsWith("/")) {
+                urlsToTry.add("${authorizationServerUrl}openid4vc/Draft13$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH")
+            } else {
+                urlsToTry.add("$authorizationServerUrl/openid4vc/Draft13$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH")
+            }
+        }
 
-            if (response.status == HttpStatusCode.NotFound) {
-                val fallbackUrl = if (!authorizationServerUrl.contains("/openid4vc/")) {
-                    if (authorizationServerUrl.endsWith("/")) {
-                        "${authorizationServerUrl}openid4vc/Draft13$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH"
-                    } else {
-                        "$authorizationServerUrl/openid4vc/Draft13$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH"
-                    }
-                } else null
-
-                val enterpriseFallbackUrl = if (authorizationServerUrl.contains("/v1/") && authorizationServerUrl.contains("/issuer-service-api2/openid4vci")) {
-                    val url = Url(authorizationServerUrl)
-                    val path = url.encodedPath
-                    "${url.protocol.name}://${url.hostWithPort}$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH$path"
-                } else null
-
-                for (urlToTry in listOfNotNull(enterpriseFallbackUrl, fallbackUrl)) {
-                    log.debug { "Trying fallback authorization server metadata URL: $urlToTry" }
-                    val fallbackResponse = try {
-                        httpClient.get(urlToTry)
-                    } catch (e: Exception) {
-                        null
-                    }
-
-                    if (fallbackResponse?.status?.isSuccess() == true) {
-                        return fallbackResponse.body<AuthorizationServerMetadata>()
-                    }
-                }
+        for (metadataUrl in urlsToTry.distinct()) {
+            log.debug { "Fetching authorization server metadata from: $metadataUrl" }
+            val response: HttpResponse = try {
+                httpClient.get(metadataUrl)
+            } catch (e: Exception) {
+                log.error(e) { "Failed to fetch authorization server metadata from: $metadataUrl" }
+                continue
             }
 
-            throw Exception("Failed to fetch authorization server metadata. Status: ${response.status}")
+            if (response.status.isSuccess()) {
+                return try {
+                    response.body<AuthorizationServerMetadata>()
+                } catch (e: Exception) {
+                    val responseBody = response.bodyAsText()
+                    log.error(e) { "Failed to parse authorization server metadata from $metadataUrl. Body: $responseBody" }
+                    continue
+                }
+            } else {
+                val errorBody = response.bodyAsText()
+                log.debug { "Failed to fetch authorization server metadata from $metadataUrl. Status: ${response.status}, Body: $errorBody" }
+            }
         }
 
-        return try {
-            response.body<AuthorizationServerMetadata>()
-        } catch (e: Exception) {
-            val responseBody = response.bodyAsText()
-            log.error(e) { "Failed to parse authorization server metadata. Body: $responseBody" }
-            throw Exception("Failed to parse authorization server metadata", e)
-        }
+        throw Exception("Failed to resolve authorization server metadata for $authorizationServerUrl from any of: $urlsToTry")
     }
 
     /**
@@ -177,65 +155,53 @@ class IssuerMetadataResolver(
     suspend fun resolveOpenIDProviderMetadata(providerUrl: String): OpenIDProviderMetadata {
         require(providerUrl.isNotBlank()) { "Provider URL cannot be blank" }
 
-        val metadataUrl = if (providerUrl.contains(OPENID_CONFIGURATION_WELL_KNOWN_PATH)) {
-            providerUrl
+        val urlsToTry = mutableListOf<String>()
+
+        if (providerUrl.contains("/v1/") && providerUrl.contains("/issuer-service-api2/openid4vci")) {
+            val url = Url(providerUrl)
+            val path = url.encodedPath
+            val newPath = path.replace("/issuer-service-api2/openid4vci", "/issuer-service-api2/openid4vc/v1")
+            urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$newPath$OPENID_CONFIGURATION_WELL_KNOWN_PATH")
+        }
+
+        if (providerUrl.contains(OPENID_CONFIGURATION_WELL_KNOWN_PATH)) {
+            urlsToTry.add(providerUrl)
         } else {
-            buildMetadataUrl(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH)
-        }
-        log.debug { "Fetching OpenID provider metadata from: $metadataUrl" }
-
-        val response: HttpResponse = try {
-            httpClient.get(metadataUrl)
-        } catch (e: Exception) {
-            log.error(e) { "Failed to fetch OpenID provider metadata from: $metadataUrl" }
-            throw Exception("Failed to fetch OpenID provider metadata from: $metadataUrl", e)
+            urlsToTry.add(buildMetadataUrl(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH))
         }
 
-        if (!response.status.isSuccess()) {
-            val errorBody = response.bodyAsText()
-            log.error { "Failed to fetch OpenID provider metadata. Status: ${response.status}, Body: $errorBody" }
+        if (!providerUrl.contains("/openid4vc/")) {
+            if (providerUrl.endsWith("/")) {
+                urlsToTry.add("${providerUrl}openid4vc/Draft13$OPENID_CONFIGURATION_WELL_KNOWN_PATH")
+            } else {
+                urlsToTry.add("$providerUrl/openid4vc/Draft13$OPENID_CONFIGURATION_WELL_KNOWN_PATH")
+            }
+        }
 
-            if (response.status == HttpStatusCode.NotFound) {
-                val fallbackUrl = if (!providerUrl.contains("/openid4vc/")) {
-                    if (providerUrl.endsWith("/")) {
-                        "${providerUrl}openid4vc/Draft13$OPENID_CONFIGURATION_WELL_KNOWN_PATH"
-                    } else {
-                        "$providerUrl/openid4vc/Draft13$OPENID_CONFIGURATION_WELL_KNOWN_PATH"
-                    }
-                } else null
-
-                val enterpriseFallbackUrl = if (providerUrl.contains("/v1/") && providerUrl.contains("/issuer-service-api2/openid4vci")) {
-                    // Try the specific enterprise api2 structure: /v1/{target}/issuer-service-api2/openid4vc/v1/.well-known/openid-configuration
-                    val url = Url(providerUrl)
-                    val path = url.encodedPath
-                    val newPath = path.replace("/issuer-service-api2/openid4vci", "/issuer-service-api2/openid4vc/v1")
-                    "${url.protocol.name}://${url.hostWithPort}$newPath$OPENID_CONFIGURATION_WELL_KNOWN_PATH"
-                } else null
-
-                for (urlToTry in listOfNotNull(enterpriseFallbackUrl, fallbackUrl)) {
-                    log.debug { "Trying fallback OpenID provider metadata URL: $urlToTry" }
-                    val fallbackResponse = try {
-                        httpClient.get(urlToTry)
-                    } catch (e: Exception) {
-                        null
-                    }
-
-                    if (fallbackResponse?.status?.isSuccess() == true) {
-                        return fallbackResponse.body<OpenIDProviderMetadata>()
-                    }
-                }
+        for (metadataUrl in urlsToTry.distinct()) {
+            log.debug { "Fetching OpenID provider metadata from: $metadataUrl" }
+            val response: HttpResponse = try {
+                httpClient.get(metadataUrl)
+            } catch (e: Exception) {
+                log.error(e) { "Failed to fetch OpenID provider metadata from: $metadataUrl" }
+                continue
             }
 
-            throw Exception("Failed to fetch OpenID provider metadata. Status: ${response.status}")
+            if (response.status.isSuccess()) {
+                return try {
+                    response.body<OpenIDProviderMetadata>()
+                } catch (e: Exception) {
+                    val responseBody = response.bodyAsText()
+                    log.error(e) { "Failed to parse OpenID provider metadata from $metadataUrl. Body: $responseBody" }
+                    continue
+                }
+            } else {
+                val errorBody = response.bodyAsText()
+                log.debug { "Failed to fetch OpenID provider metadata from $metadataUrl. Status: ${response.status}, Body: $errorBody" }
+            }
         }
 
-        return try {
-            response.body<OpenIDProviderMetadata>()
-        } catch (e: Exception) {
-            val responseBody = response.bodyAsText()
-            log.error(e) { "Failed to parse OpenID provider metadata. Body: $responseBody" }
-            throw Exception("Failed to parse OpenID provider metadata", e)
-        }
+        throw Exception("Failed to resolve OpenID provider metadata for $providerUrl from any of: $urlsToTry")
     }
 
     /**
