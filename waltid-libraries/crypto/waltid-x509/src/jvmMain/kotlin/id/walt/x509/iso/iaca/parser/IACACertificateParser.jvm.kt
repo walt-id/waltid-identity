@@ -8,7 +8,8 @@ import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
 import id.walt.x509.iso.parseFromX509Certificate
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.toHexString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.toKotlinInstant
 
@@ -31,7 +32,7 @@ internal actual suspend fun platformParseIACACertificate(
         cert.subjectKeyIdentifier
     ) {
         "Subject key identifier must exist as part of the IACA X509 certificate, but was found missing"
-    }.hex()
+    }.toHexString()
 
     return IACADecodedCertificate(
         principalName = principalName,
@@ -40,7 +41,7 @@ internal actual suspend fun platformParseIACACertificate(
             notAfter = cert.notAfter.toInstant().toKotlinInstant(),
         ),
         issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
-        serialNumber = cert.serialNumber.toByteArray().toByteString(),
+        serialNumber = ByteString(cert.serialNumber.toByteArray()),
         basicConstraints = cert.x509BasicConstraints,
         keyUsage = certificateKeyUsages,
         skiHex = skiHex,

@@ -1,7 +1,7 @@
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.x509.X509CertificateHandle
-import okio.ByteString
+import kotlinx.io.bytestring.ByteString
 import kotlin.time.Instant
 
 /**
