@@ -144,6 +144,10 @@ dependencies {
     testImplementation(identityLibs.klogging)
 }
 
+buildConfig {
+    packageName("id.walt.webwallet")
+}
+
 ktor {
     docker {
         portMappings.set(

@@ -33,7 +33,7 @@ private val log = KotlinLogging.logger { }
 
 suspend fun main(args: Array<String>) {
     ServiceMain(
-        ServiceConfiguration("wallet"), ServiceInitialization(
+        ServiceConfiguration("wallet", version = BuildConfig.VERSION), ServiceInitialization(
             features = FeatureCatalog,
             featureAmendments = mapOf(
                 CommonsFeatureCatalog.openApiFeature to walletOpenApiPluginAmendment,
