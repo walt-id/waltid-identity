@@ -72,18 +72,19 @@ object ServiceHealthChecksDebugModule {
         }
     }
 
-    val enableDebug = logger.isTraceEnabled()
+    val enableDebug = logger.isDebugEnabled()
+    val enableTrace = logger.isTraceEnabled()
 
     data class ServiceDebugModuleConfiguration(
         val endpointPrefix: String = "debug",
         val operatingSystem: Boolean = enableDebug,
-        val memory: Boolean = enableDebug, // currently broken?
+        val memory: Boolean = enableTrace, // currently broken?
         val memoryPool: Boolean = enableDebug,
         val ram: Boolean = enableDebug,
         val cpu: Boolean = enableDebug,
         val jvm: Boolean = enableDebug,
         val sysprops: Boolean = enableDebug,
-        val heapdump: Boolean = enableDebug,
+        val heapdump: Boolean = enableTrace,
         val threaddump: Boolean = enableDebug,
         val gc: Boolean = enableDebug,
     )
@@ -102,14 +103,14 @@ object ServiceHealthChecksDebugModule {
 
         install(Cohort) {
             if (debugConfig != null) {
-                endpointPrefix = debugConfig.endpointPrefix
+                heapDump = debugConfig.heapdump
                 operatingSystem = debugConfig.operatingSystem
                 memory = debugConfig.memory
                 jvmInfo = debugConfig.jvm
-                sysprops = debugConfig.sysprops
-                heapDump = debugConfig.heapdump
-                threadDump = debugConfig.threaddump
                 gc = debugConfig.gc
+                threadDump = debugConfig.threaddump
+                sysprops = debugConfig.sysprops
+                endpointPrefix = debugConfig.endpointPrefix
             }
 
             KtorStatusChecker.run { init() }
