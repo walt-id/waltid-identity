@@ -26,6 +26,8 @@ object ServiceHealthChecksDebugModule {
     enum class KtorStatus {
         Unknown,
         ApplicationStarting,
+        ApplicationModulesLoading,
+        ApplicationModulesLoaded,
         ApplicationStarted,
         ServerReady,
         ApplicationStopPreparing,
@@ -38,14 +40,19 @@ object ServiceHealthChecksDebugModule {
         private val logger = noCoLogger("EnterpriseStatus")
 
         var ktorStatus: KtorStatus = KtorStatus.Unknown
-            set(value) {
-                field = value
-            }
 
         fun Application.init() {
             monitor.subscribe(ApplicationStarting) {
                 ktorStatus = KtorStatus.ApplicationStarting
                 logger.info("${config.vendor} ${config.name} - Starting up...")
+            }
+            monitor.subscribe(ApplicationModulesLoading) {
+                ktorStatus = KtorStatus.ApplicationModulesLoading
+                logger.info("${config.vendor} ${config.name} - Application modules loading...")
+            }
+            monitor.subscribe(ApplicationModulesLoaded) {
+                ktorStatus = KtorStatus.ApplicationModulesLoaded
+                logger.info("${config.vendor} ${config.name} - Application modules loaded, web server is starting...")
             }
             monitor.subscribe(ApplicationStarted) {
                 ktorStatus = KtorStatus.ApplicationStarted
@@ -112,8 +119,6 @@ object ServiceHealthChecksDebugModule {
                 sysprops = debugConfig.sysprops
                 endpointPrefix = debugConfig.endpointPrefix
             }
-
-            KtorStatusChecker.run { init() }
 
             healthcheck("livez", HealthCheckRegistry {
                 register("http", {
