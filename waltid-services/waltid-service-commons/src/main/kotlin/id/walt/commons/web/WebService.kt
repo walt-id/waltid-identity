@@ -8,6 +8,7 @@ import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.commons.web.modules.FeatureFlagInformationModule
 import id.walt.commons.web.modules.OpenApiModule
 import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
+import id.walt.commons.web.modules.ServiceHealthChecksDebugModule.KtorStatusChecker
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
 import io.klogging.logger
@@ -22,6 +23,8 @@ data class WebService(
     private val log = logger("WebService")
 
     val webServiceModule: suspend Application.() -> Unit = {
+        KtorStatusChecker.run { init() };
+
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
         { OpenApiModule.run { enable() } } whenFeature CommonsFeatureCatalog.openApiFeature
         { AuthenticationServiceModule.run { enable() } } whenFeature CommonsFeatureCatalog.authenticationServiceFeature
