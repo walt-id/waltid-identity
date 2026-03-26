@@ -55,13 +55,8 @@ data class PreAuthorizedCodeIssueResult(
 
 class DefaultPreAuthorizedCodeIssuer(
     private val repository: PreAuthorizedCodeRepository,
-    private val codeLifetimeSeconds: Long = 300,
     private val maxGenerateAttempts: Int = 3,
 ) : PreAuthorizedCodeIssuer {
-
-    init {
-        require(codeLifetimeSeconds > 0) { "codeLifetimeSeconds must be positive" }
-    }
 
     override suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult {
         val subject = request.session.subject?.takeIf { it.isNotBlank() }
@@ -75,7 +70,10 @@ class DefaultPreAuthorizedCodeIssuer(
         val resolvedTxCodeValue = resolveTxCodeValue(request.txCode, request.txCodeValue)
 
         val now = kotlin.time.Clock.System.now()
-        val expiresAt = now + codeLifetimeSeconds.seconds
+        // Respect preconfigured ACCESS_TOKEN expiry from caller session when present (issuer2 path).
+        // Fallback is used only for callers that do not set an explicit session expiry.
+        val expiresAt = request.session.expiresAt[TokenType.ACCESS_TOKEN]
+            ?: (now + DEFAULT_PRE_AUTHORIZED_CODE_LIFETIME_SECONDS.seconds)
         val sessionSnapshot = request.session.copy()
             .withSubject(subject)
             .withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
@@ -188,6 +186,7 @@ internal fun secureRandomBytes(size: Int): ByteArray {
 
 private const val TX_CODE_INPUT_MODE_NUMERIC = "numeric"
 private const val TX_CODE_INPUT_MODE_TEXT = "text"
+private const val DEFAULT_PRE_AUTHORIZED_CODE_LIFETIME_SECONDS = 300L
 private const val DEFAULT_GENERATED_TX_CODE_LENGTH = 6
 private const val NUMERIC_TX_CODE_ALPHABET = "0123456789"
 private const val TEXT_TX_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

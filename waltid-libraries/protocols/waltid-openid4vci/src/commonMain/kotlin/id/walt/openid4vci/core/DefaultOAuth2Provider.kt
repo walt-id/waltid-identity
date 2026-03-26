@@ -25,7 +25,11 @@ import id.walt.crypto.keys.Key
 import id.walt.openid4vci.tokens.AccessTokenContext
 import id.walt.oid4vc.data.DisplayProperties
 import id.walt.sdjwt.SDMap
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 
 
 /**
@@ -157,8 +161,8 @@ class DefaultOAuth2Provider(
         AccessTokenResponseHttp(
             status = 400,
             payload = buildMap {
-                put("error", error.error)
-                error.description?.let { put("error_description", it) }
+                put("error", JsonPrimitive(error.error))
+                error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
         )
 
@@ -169,12 +173,30 @@ class DefaultOAuth2Provider(
         AccessTokenResponseHttp(
             status = 200,
             payload = buildMap {
-                put("token_type", response.tokenType)
-                put("access_token", response.accessToken)
-                response.expiresIn?.let { put("expires_in", it) }
-                putAll(response.extra)
+                put("token_type", JsonPrimitive(response.tokenType))
+                put("access_token", JsonPrimitive(response.accessToken))
+                response.expiresIn?.let { put("expires_in", JsonPrimitive(it)) }
+                response.extra.forEach { (key, value) ->
+                    put(key, value.toJsonElement())
+                }
             },
         )
+
+    private fun Any?.toJsonElement(): JsonElement = when (this) {
+        null -> JsonNull
+        is JsonElement -> this
+        is String -> JsonPrimitive(this)
+        is Boolean -> JsonPrimitive(this)
+        is Int -> JsonPrimitive(this)
+        is Long -> JsonPrimitive(this)
+        is Float -> JsonPrimitive(this)
+        is Double -> JsonPrimitive(this)
+        is Number -> JsonPrimitive(this.toDouble())
+        is Iterable<*> -> buildJsonArray { this@toJsonElement.forEach { add(it.toJsonElement()) } }
+        is Array<*> -> buildJsonArray { this@toJsonElement.forEach { add(it.toJsonElement()) } }
+        is Map<*, *> -> JsonObject(this.entries.associate { (k, v) -> k.toString() to v.toJsonElement() })
+        else -> JsonPrimitive(this.toString())
+    }
 
     override suspend fun createCredentialRequest(
         parameters: Map<String, List<String>>,

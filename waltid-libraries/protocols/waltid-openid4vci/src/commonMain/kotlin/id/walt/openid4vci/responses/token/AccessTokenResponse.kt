@@ -3,6 +3,7 @@ package id.walt.openid4vci.responses.token
 import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.token.AccessTokenRequest
+import kotlinx.serialization.json.JsonElement
 
 data class AccessTokenResponse(
     val tokenType: String = TOKEN_TYPE_BEARER,
@@ -23,6 +24,6 @@ sealed class AccessTokenResponseResult {
 
 data class AccessTokenResponseHttp(
     val status: Int,
-    val payload: Map<String, Any?>,
+    val payload: Map<String, JsonElement>,
     val headers: Map<String, String> = emptyMap(),
 )

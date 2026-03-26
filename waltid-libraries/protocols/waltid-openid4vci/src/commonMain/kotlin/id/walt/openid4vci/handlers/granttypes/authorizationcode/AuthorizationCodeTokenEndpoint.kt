@@ -12,6 +12,7 @@ import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlinx.serialization.SerializationException
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
 
 /**
  * Token endpoint handler for the authorization-code code grant.
@@ -63,8 +64,8 @@ class AuthorizationCodeTokenEndpoint(
             }
             val scopedRequest = updatedRequest.withGrantedScopes(effectiveGrantedScope)
 
-            val expiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
-                ?: (Clock.System.now() + 3600.seconds)
+            val sessionExpiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
+            val expiresAt = sessionExpiresAt ?: (Clock.System.now() + 3600.seconds)
 
             val subject = session.subject?.takeIf { it.isNotBlank() }
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
@@ -82,16 +83,26 @@ class AuthorizationCodeTokenEndpoint(
 
             val accessToken = tokenService.createAccessToken(claims)
 
+            // If no explicit session expiry is configured, return the spec-default lifetime as exact 3600.
+            // If an explicit expiry exists, return the real remaining lifetime from now.
+            val expiresIn = if (sessionExpiresAt == null) 3600L else computeRemainingSeconds(expiresAt)
+
             return AccessTokenResponseResult.Success(
                 request = scopedRequest,
                 AccessTokenResponse(
                     accessToken = accessToken,
                     tokenType = id.walt.openid4vci.core.TOKEN_TYPE_BEARER,
+                    expiresIn = expiresIn,
                     extra = emptyMap(),
                 )
             )
         } catch (e: SerializationException) {
             AccessTokenResponseResult.Failure(OAuthError("invalid_request", e.message))
         }
+    }
+
+    private fun computeRemainingSeconds(expiresAt: Instant): Long {
+        val remaining = expiresAt - Clock.System.now()
+        return if (remaining.isNegative()) 0 else remaining.inWholeSeconds
     }
 }
