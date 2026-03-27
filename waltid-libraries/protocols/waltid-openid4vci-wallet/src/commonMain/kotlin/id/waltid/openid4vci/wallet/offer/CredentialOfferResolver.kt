@@ -37,40 +37,59 @@ class CredentialOfferResolver(
     suspend fun resolveCredentialOfferUri(credentialOfferUri: String): CredentialOffer {
         require(credentialOfferUri.isNotBlank()) { "Credential offer URI cannot be blank" }
 
-        log.debug { "Resolving credential offer URI: $credentialOfferUri" }
+        log.info { "Resolving credential offer from URI" }
+        log.trace { "Credential offer URI: $credentialOfferUri" }
 
         // Validate URI format
         val url = try {
             Url(credentialOfferUri)
         } catch (e: Exception) {
+            log.error(e) { "Invalid credential offer URI format: $credentialOfferUri" }
             throw IllegalArgumentException("Invalid credential offer URI: $credentialOfferUri", e)
         }
 
+        log.trace { "Validated URI format, preparing HTTP request" }
+
         // Fetch the credential offer
         val response: HttpResponse = try {
+            log.debug { "Fetching credential offer from: ${url.host}" }
             httpClient.get(url)
         } catch (e: Exception) {
-            log.error(e) { "Failed to fetch credential offer from URI: $credentialOfferUri" }
+            log.error(e) { "Network error while fetching credential offer from: ${url.host}" }
             throw Exception("Failed to fetch credential offer from URI: $credentialOfferUri", e)
         }
 
         // Check response status
         if (!response.status.isSuccess()) {
             val errorBody = response.bodyAsText()
-            log.error { "Failed to fetch credential offer. Status: ${response.status}, Body: $errorBody" }
+            log.error {
+                "Credential offer fetch failed - Status: ${response.status.value} ${response.status.description}, " +
+                "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
+            }
             throw Exception("Failed to fetch credential offer. Status: ${response.status}")
         }
+
+        log.trace { "Received successful response (${response.status.value}), parsing credential offer" }
 
         // Parse the response
         val credentialOffer = try {
             response.body<CredentialOffer>()
         } catch (e: Exception) {
             val responseBody = response.bodyAsText()
-            log.error(e) { "Failed to parse credential offer response. Body: $responseBody" }
+            log.error(e) {
+                "Failed to parse credential offer response - " +
+                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+            }
             throw Exception("Failed to parse credential offer response", e)
         }
 
-        log.debug { "Successfully resolved credential offer from URI" }
+        log.info {
+            "Successfully resolved credential offer - " +
+            "Issuer: ${credentialOffer.credentialIssuer}, " +
+            "Credentials: ${credentialOffer.credentialConfigurationIds.size}"
+        }
+        log.trace { "Credential configuration IDs: ${credentialOffer.credentialConfigurationIds.joinToString()}" }
+        
         return credentialOffer
     }
 
@@ -86,22 +105,27 @@ class CredentialOfferResolver(
         credentialOffer: CredentialOffer?,
         credentialOfferUri: String?,
     ): CredentialOffer {
+        log.trace { "Resolving credential offer - Inline: ${credentialOffer != null}, URI: ${credentialOfferUri != null}" }
+        
         return when {
             credentialOffer != null && credentialOfferUri == null -> {
-                log.debug { "Using inline credential offer" }
+                log.info { "Using inline credential offer - Issuer: ${credentialOffer.credentialIssuer}" }
+                log.trace { "Inline offer credentials: ${credentialOffer.credentialConfigurationIds.size}" }
                 credentialOffer
             }
 
             credentialOffer == null && credentialOfferUri != null -> {
-                log.debug { "Resolving credential offer from URI" }
+                log.info { "Resolving credential offer from URI reference" }
                 resolveCredentialOfferUri(credentialOfferUri)
             }
 
             credentialOffer != null && credentialOfferUri != null -> {
+                log.error { "Invalid credential offer request: both inline offer and URI provided" }
                 throw IllegalArgumentException("Cannot provide both inline credential offer and URI")
             }
 
             else -> {
+                log.error { "Invalid credential offer request: neither inline offer nor URI provided" }
                 throw IllegalArgumentException("Must provide either inline credential offer or URI")
             }
         }
