@@ -41,6 +41,7 @@ class AuthorizationRequestBuilder(
     /**
      * Result of building an authorization request
      */
+    @Serializable
     data class AuthorizationRequest(
         val url: String,
         val state: String,
@@ -69,8 +70,13 @@ class AuthorizationRequestBuilder(
         require(authorizationEndpoint.isNotBlank()) { "Authorization endpoint cannot be blank" }
         require(credentialConfigurationId.isNotBlank()) { "Credential configuration ID cannot be blank" }
 
+        log.info { "Building authorization request for credential configuration: $credentialConfigurationId" }
+        log.trace { "Authorization endpoint: $authorizationEndpoint" }
+        log.trace { "Issuer state: ${issuerState ?: "none"}, Scope: $scope" }
+
         // Generate state for CSRF protection
         val state = StateManager.generateState()
+        log.trace { "Generated state for CSRF protection" }
 
         // Generate PKCE data if enabled
         var pkceData: PKCEManager.PKCEData? = null
@@ -78,7 +84,9 @@ class AuthorizationRequestBuilder(
             // Determine PKCE method based on metadata
             val method = determinePKCEMethod(metadata)
             pkceData = PKCEManager.generatePKCEData(method)
-            log.debug { "Generated PKCE data with method: ${pkceData.codeChallengeMethod}" }
+            log.debug { "Generated PKCE challenge using method: ${pkceData.codeChallengeMethod.value}" }
+        } else {
+            log.debug { "PKCE disabled for this authorization request" }
         }
 
         // Build authorization_details
@@ -86,6 +94,7 @@ class AuthorizationRequestBuilder(
             credential_configuration_id = credentialConfigurationId
         )
         val authzDetailsJson = json.encodeToString(listOf(authzDetails))
+        log.trace { "Authorization details JSON: ${authzDetailsJson.take(100)}${if (authzDetailsJson.length > 100) "..." else ""}" }
 
         // Build URL with query parameters
         val urlBuilder = URLBuilder(authorizationEndpoint)
@@ -97,7 +106,10 @@ class AuthorizationRequestBuilder(
             append("authorization_details", authzDetailsJson)
 
             // Add issuer_state if present (from authorization code grant offer)
-            issuerState?.let { append("issuer_state", it) }
+            issuerState?.let {
+                append("issuer_state", it)
+                log.trace { "Added issuer_state parameter to authorization request" }
+            }
 
             // Add scope if present
             scope?.let { append("scope", it) }
@@ -110,7 +122,8 @@ class AuthorizationRequestBuilder(
         }
 
         val authorizationUrl = urlBuilder.buildString()
-        log.debug { "Built authorization request URL for credential: $credentialConfigurationId" }
+        log.info { "Successfully built authorization request - Client: ${clientConfig.clientId}, PKCE: $usePKCE" }
+        log.trace { "Authorization URL length: ${authorizationUrl.length} characters" }
 
         return AuthorizationRequest(
             url = authorizationUrl,
