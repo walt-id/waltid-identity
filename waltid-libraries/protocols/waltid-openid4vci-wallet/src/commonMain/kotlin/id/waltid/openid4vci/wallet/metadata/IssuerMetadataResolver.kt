@@ -38,6 +38,9 @@ class IssuerMetadataResolver(
     suspend fun resolveCredentialIssuerMetadata(credentialIssuerUrl: String): CredentialIssuerMetadata {
         require(credentialIssuerUrl.isNotBlank()) { "Credential issuer URL cannot be blank" }
 
+        log.info { "Resolving credential issuer metadata" }
+        log.trace { "Credential issuer URL: $credentialIssuerUrl" }
+
         val urlsToTry = mutableListOf<String>()
 
         if (credentialIssuerUrl.contains("/v1/") && credentialIssuerUrl.contains("/issuer-service-api2/openid4vci")) {
@@ -60,29 +63,52 @@ class IssuerMetadataResolver(
             }
         }
 
-        for (metadataUrl in urlsToTry.distinct()) {
-            log.debug { "Fetching credential issuer metadata from: $metadataUrl" }
+        log.debug { "Attempting to fetch metadata from ${urlsToTry.size} well-known endpoints" }
+        log.trace { "Metadata URLs to try: ${urlsToTry.joinToString()}" }
+
+        for ((index, metadataUrl) in urlsToTry.distinct().withIndex()) {
+            log.debug { "Attempt ${index + 1}/${urlsToTry.distinct().size}: Fetching from $metadataUrl" }
+            
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
-                log.error(e) { "Failed to fetch credential issuer metadata from: $metadataUrl" }
+                log.warn(e) { "Network error fetching credential issuer metadata from: $metadataUrl" }
                 continue
             }
 
             if (response.status.isSuccess()) {
+                log.trace { "Received successful response (${response.status.value}), parsing metadata" }
                 return try {
-                    response.body<CredentialIssuerMetadata>()
+                    val metadata = response.body<CredentialIssuerMetadata>()
+                    log.info {
+                        "Successfully resolved credential issuer metadata - " +
+                        "Issuer: ${metadata.credentialIssuer}, " +
+                        "Configurations: ${metadata.credentialConfigurationsSupported.size}"
+                    }
+                    log.trace { "Supported credential configurations: ${metadata.credentialConfigurationsSupported.keys.joinToString()}" }
+                    metadata
                 } catch (e: Exception) {
                     val responseBody = response.bodyAsText()
-                    log.error(e) { "Failed to parse credential issuer metadata from $metadataUrl. Body: $responseBody" }
+                    log.error(e) {
+                        "Failed to parse credential issuer metadata from $metadataUrl - " +
+                        "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+                    }
                     continue
                 }
             } else {
                 val errorBody = response.bodyAsText()
-                log.debug { "Failed to fetch credential issuer metadata from $metadataUrl. Status: ${response.status}, Body: $errorBody" }
+                log.debug {
+                    "Failed to fetch credential issuer metadata from $metadataUrl - " +
+                    "Status: ${response.status.value} ${response.status.description}"
+                }
+                log.trace { "Error body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}" }
             }
         }
 
+        log.error {
+            "Failed to resolve credential issuer metadata for issuer: $credentialIssuerUrl - " +
+            "Tried ${urlsToTry.distinct().size} endpoints"
+        }
         throw Exception("Failed to resolve credential issuer metadata for $credentialIssuerUrl from any of: $urlsToTry")
     }
 
@@ -216,31 +242,37 @@ class IssuerMetadataResolver(
     suspend fun resolveAuthorizationServerMetadataWithFallback(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ): AuthorizationServerMetadata {
+        log.info { "Resolving authorization server metadata with fallback logic" }
+        
         // Try authorization_servers if present
         val authorizationServers = credentialIssuerMetadata.authorizationServers
         if (!authorizationServers.isNullOrEmpty()) {
             val authServerUrl = authorizationServers.first()
-            log.debug { "Using authorization server from metadata: $authServerUrl" }
+            log.info { "Attempting to use authorization server from issuer metadata: ${authServerUrl}" }
             return try {
                 resolveAuthorizationServerMetadata(authServerUrl)
             } catch (e: Exception) {
-                log.warn(e) { "Failed to resolve authorization server metadata from: $authServerUrl. Trying fallback..." }
+                log.warn(e) { "Failed to resolve authorization server from issuer metadata, trying fallback strategies" }
                 // Continue to fallback
             } as AuthorizationServerMetadata
         }
 
         // Fallback: use credential issuer URL as authorization server
         val credentialIssuerUrl = credentialIssuerMetadata.credentialIssuer
-        log.debug { "Trying credential issuer URL as authorization server: $credentialIssuerUrl" }
+        log.info { "Fallback strategy 1: Using credential issuer URL as authorization server" }
+        log.trace { "Credential issuer URL: $credentialIssuerUrl" }
 
         return try {
             resolveAuthorizationServerMetadata(credentialIssuerUrl)
         } catch (e: Exception) {
-            log.warn(e) { "Failed to resolve authorization server metadata. Trying OpenID configuration..." }
+            log.warn(e) { "Failed to resolve as authorization server, trying OpenID configuration as final fallback" }
 
             // Final fallback: try OpenID configuration
             try {
+                log.info { "Fallback strategy 2: Attempting to resolve OpenID Provider metadata" }
                 val oidcMetadata = resolveOpenIDProviderMetadata(credentialIssuerUrl)
+                log.trace { "Converting OpenID Provider metadata to Authorization Server metadata" }
+                
                 // Convert OpenIDProviderMetadata to AuthorizationServerMetadata
                 // (they share most fields through inheritance)
                 AuthorizationServerMetadata(
@@ -264,7 +296,9 @@ class IssuerMetadataResolver(
                     dpopSigningAlgValuesSupported = null
                 )
             } catch (oidcError: Exception) {
-                log.error(oidcError) { "All metadata resolution attempts failed" }
+                log.error(oidcError) {
+                    "All authorization server metadata resolution strategies failed for issuer: $credentialIssuerUrl"
+                }
                 throw Exception("Failed to resolve authorization server metadata from any source", oidcError)
             }
         }
