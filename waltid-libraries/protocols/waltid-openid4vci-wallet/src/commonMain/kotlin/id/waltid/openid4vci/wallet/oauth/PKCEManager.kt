@@ -26,6 +26,7 @@ object PKCEManager {
     /**
      * PKCE data containing code verifier and code challenge
      */
+    @kotlinx.serialization.Serializable
     data class PKCEData(
         val codeVerifier: String,
         val codeChallenge: String,
