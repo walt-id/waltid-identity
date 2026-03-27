@@ -53,14 +53,19 @@ class TokenRequestBuilder(
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
 
-        log.debug { "Exchanging authorization code for access token" }
+        log.info { "Exchanging authorization code for access token" }
+        log.trace { "Token endpoint: $tokenEndpoint" }
+        log.trace { "Code verifier present: ${codeVerifier != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
             append("code", code)
             append("redirect_uri", clientConfig.primaryRedirectUri)
             append("client_id", clientConfig.clientId)
-            codeVerifier?.let { append("code_verifier", it) }
+            codeVerifier?.let {
+                append("code_verifier", it)
+                log.trace { "Including PKCE code verifier in token request" }
+            }
         }
 
         return executeTokenRequest(tokenEndpoint, parameters)
@@ -83,13 +88,18 @@ class TokenRequestBuilder(
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
 
-        log.debug { "Exchanging pre-authorized code for access token" }
+        log.info { "Exchanging pre-authorized code for access token" }
+        log.trace { "Token endpoint: $tokenEndpoint" }
+        log.trace { "Transaction code (PIN) present: ${txCode != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
             append("pre-authorized_code", preAuthorizedCode)
             append("client_id", clientConfig.clientId)
-            txCode?.let { append("tx_code", it) }
+            txCode?.let {
+                append("tx_code", it)
+                log.trace { "Including transaction code in token request" }
+            }
         }
 
         return executeTokenRequest(tokenEndpoint, parameters)
@@ -102,29 +112,46 @@ class TokenRequestBuilder(
         tokenEndpoint: String,
         parameters: Parameters,
     ): TokenResponse {
+        log.debug { "Sending token request to authorization server" }
+        log.trace { "Request parameters count: ${parameters.names().size}" }
+        
         val response: HttpResponse = try {
             httpClient.post(tokenEndpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(parameters.formUrlEncode())
             }
         } catch (e: Exception) {
-            log.error(e) { "Failed to send token request to: $tokenEndpoint" }
+            log.error(e) { "Network error sending token request to: $tokenEndpoint" }
             throw Exception("Failed to send token request", e)
         }
 
         if (!response.status.isSuccess()) {
             val errorBody = response.bodyAsText()
-            log.error { "Token request failed. Status: ${response.status}, Body: $errorBody" }
+            log.error {
+                "Token request failed - Status: ${response.status.value} ${response.status.description}, " +
+                "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
+            }
             throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
         }
 
+        log.trace { "Received successful token response (${response.status.value}), parsing" }
+        
         return try {
-            println("the Token exc response is ${response.body<TokenResponse>()}")
-            response.body<TokenResponse>()
-            
+            val tokenResponse = response.body<TokenResponse>()
+            log.info {
+                "Successfully obtained access token - " +
+                "Type: ${tokenResponse.token_type}, " +
+                "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
+                "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
+            }
+            log.trace { "Token scope: ${tokenResponse.scope ?: "not specified"}" }
+            tokenResponse
         } catch (e: Exception) {
             val responseBody = response.bodyAsText()
-            log.error(e) { "Failed to parse token response. Body: $responseBody" }
+            log.error(e) {
+                "Failed to parse token response - " +
+                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+            }
             throw Exception("Failed to parse token response", e)
         }
     }
