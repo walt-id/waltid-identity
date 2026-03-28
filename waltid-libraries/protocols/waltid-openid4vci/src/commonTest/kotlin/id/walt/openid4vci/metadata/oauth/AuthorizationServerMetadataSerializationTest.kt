@@ -52,6 +52,31 @@ class AuthorizationServerMetadataSerializationTest {
     }
 
     @Test
+    fun `serializes and deserializes status list aggregation endpoint`() {
+        val metadata = AuthorizationServerMetadata(
+            issuer = "https://issuer.example",
+            authorizationEndpoint = "https://issuer.example/authorize",
+            tokenEndpoint = "https://issuer.example/token",
+            responseTypesSupported = setOf(ResponseType.CODE.value),
+            statusListAggregationEndpoint = "https://issuer.example/status-list-aggregation",
+        )
+
+        val encoded = json.encodeToString(metadata)
+        val jsonObject = json.parseToJsonElement(encoded).jsonObject
+
+        assertEquals(
+            "https://issuer.example/status-list-aggregation",
+            jsonObject["status_list_aggregation_endpoint"]?.jsonPrimitive?.content
+        )
+
+        val decoded = json.decodeFromString<AuthorizationServerMetadata>(encoded)
+        assertEquals(
+            "https://issuer.example/status-list-aggregation",
+            decoded.statusListAggregationEndpoint
+        )
+    }
+
+    @Test
     fun `deserializes when optional fields are omitted`() {
         val payload = """
             {

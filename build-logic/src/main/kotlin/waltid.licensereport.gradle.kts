@@ -177,7 +177,8 @@ val aggregateDependencyNotices = tasks.register("aggregateDependencyNotices") {
                     appendLine("* No third-party dependencies detected.")
                 } else {
                     uniqueDeps(deps).forEach { dep ->
-                        val linkTitle = if (dep.url.isNotBlank()) "[${dep.name} ${dep.version}](${dep.url})" else "${dep.name} ${dep.version}".trim()
+                        val linkTitle =
+                            if (dep.url.isNotBlank()) "[${dep.name} ${dep.version}](${dep.url})" else "${dep.name} ${dep.version}".trim()
                         appendLine("* $linkTitle. ${dep.license}.")
                         val noticeKey = "${dep.name.replace(":", ".")}-${dep.version}"
                         notices[noticeKey].orEmpty().forEach { noticeLine ->

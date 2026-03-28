@@ -10,9 +10,11 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
+            implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlincrypto.hash.sha2)
+            implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
+            implementation(identityLibs.kotlincrypto.random)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -21,8 +23,8 @@ kotlin {
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
         }
         jvmTest.dependencies {
-            implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
-            implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+            implementation(identityLibs.bouncycastle.prov)
+            implementation(identityLibs.bouncycastle.pkix)
             implementation("io.mockk:mockk:1.13.16")
 
             implementation(kotlin("reflect"))

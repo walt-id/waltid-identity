@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.service.dids
 
 import id.walt.commons.web.ConflictException
@@ -13,7 +11,6 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

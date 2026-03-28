@@ -179,7 +179,7 @@ class ProviderCombinedFlowTest {
             assertEquals(expectedScopes, updatedRequest.grantedScopes.toSet(), "granted scopes must match request for $clientId")
 
             assertEquals(TOKEN_TYPE_BEARER, tokenResponse.tokenType)
-            assertNull(tokenResponse.expiresIn)
+            assertTrue((tokenResponse.expiresIn ?: -1) >= 0)
             assertTrue(tokenResponse.extra.isEmpty())
             return tokenResponse to accessRequest
         }

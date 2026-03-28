@@ -29,7 +29,7 @@ class DataBuilderTest {
             addContext("https://www.w3.org/ns/credentials/examples/v2") // [W3CV2 VC context, custom context]
             addType("MyCustomCredential") // [VerifiableCredential, MyCustomCredential]
 
-                                          // credentialId = "123"
+            // credentialId = "123"
             randomCredentialSubjectUUID() // automatically generate
             issuerDid = "did:key:abc"     // possibly later overridden by data mapping during issuance
             subjectDid = "did:key:xyz"    // possibly later overridden by data mapping during issuance

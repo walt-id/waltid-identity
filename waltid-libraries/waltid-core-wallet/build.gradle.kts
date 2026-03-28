@@ -5,20 +5,17 @@ plugins {
 
 group = "id.walt.wallet"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 kotlin {
     sourceSets {
 
         commonMain.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation(identityLibs.kotlinx.datetime)
 
             implementation(identityLibs.oshai.kotlinlogging)
 
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:waltid-did"))
@@ -32,16 +29,16 @@ kotlin {
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Bouncy Castle
-            implementation("org.bouncycastle:bcprov-lts8on:2.73.8")
-            implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+            implementation(identityLibs.bouncycastle.prov)
+            implementation(identityLibs.bouncycastle.pkix)
 
             // Problematic libraries:
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation(identityLibs.nimbus.jose.jwt)
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.okhttp)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

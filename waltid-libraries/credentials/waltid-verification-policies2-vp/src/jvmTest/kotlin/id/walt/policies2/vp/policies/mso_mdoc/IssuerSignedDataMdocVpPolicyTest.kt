@@ -25,7 +25,7 @@ import kotlin.io.encoding.Base64
 import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
+
 
 class IssuerSignedDataMdocVpPolicyTest {
 
@@ -148,7 +148,7 @@ class IssuerSignedDataMdocVpPolicyTest {
         assertNull(unmatchedNonPrimitive)
     }
 
-    @OptIn(ExperimentalTime::class)
+
     private fun dummyMsoWithDigests(
         docType: String,
         digestAlgorithm: String,

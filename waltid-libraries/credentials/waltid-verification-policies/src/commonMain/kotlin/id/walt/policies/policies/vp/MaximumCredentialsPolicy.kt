@@ -42,10 +42,10 @@ class MaximumCredentialsPolicy : CredentialWrapperValidatorPolicy(
             )
         else {
             Result.failure(
-              id.walt.policies.MaximumCredentialsException(
-                total = presentedCount,
-                exceeded = presentedCount - n
-              )
+                id.walt.policies.MaximumCredentialsException(
+                    total = presentedCount,
+                    exceeded = presentedCount - n
+                )
             )
         }
     }

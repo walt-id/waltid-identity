@@ -1,6 +1,5 @@
 package id.walt.did.dids.document
 
-
 import id.walt.did.dids.DidUtils
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi

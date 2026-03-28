@@ -21,7 +21,8 @@ object IssuanceExamples {
         }
 
     val ISSUER_JWK_KEY = runBlocking {
-        JWKKey.importJWK("""
+        JWKKey.importJWK(
+            """
             {
                 "kty": "EC",
                 "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
@@ -29,10 +30,12 @@ object IssuanceExamples {
                 "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
                 "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
             }
-        """.trimIndent()).getOrThrow()
+        """.trimIndent()
+        ).getOrThrow()
     }
 
-    val ISSUER_DID = "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
+    val ISSUER_DID =
+        "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
 
     val ISSUER_CERT = "-----BEGIN CERTIFICATE-----\n" +
             "MIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB\n" +
@@ -1268,7 +1271,8 @@ object IssuanceExamples {
 
     val sdJwtVCExampleWithSDSub = typedValueExampleDescriptorDsl<IssuanceRequest>(sdJwtVCDataWithSDSub)
 
-    val ebsiCTExampleAuthInTimeDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    val ebsiCTExampleAuthInTimeDraft11 = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
         {
           "credentialConfigurationId": "InTimeIssuance_jwt_vc",
           "standardVersion": "DRAFT11",
@@ -1320,7 +1324,8 @@ object IssuanceExamples {
     """.trimIndent()
     )
 
-    val ebsiCTExampleAuthDeferredDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    val ebsiCTExampleAuthDeferredDraft11 = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
         {
           "credentialConfigurationId": "DeferredIssuance_jwt_vc",
           "standardVersion": "DRAFT11",
@@ -1373,7 +1378,8 @@ object IssuanceExamples {
     """.trimIndent()
     )
 
-    val ebsiCTExamplePreAuthDraft11 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    val ebsiCTExamplePreAuthDraft11 = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
         {
           "credentialConfigurationId": "PreAuthIssuance_jwt_vc",
           "standardVersion": "DRAFT11",
@@ -1424,7 +1430,8 @@ object IssuanceExamples {
     """.trimIndent()
     )
 
-    val ebsiCTExampleAuthInTimeDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    val ebsiCTExampleAuthInTimeDraft13 = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
         {
           "credentialConfigurationId": "InTimeIssuance_jwt_vc",
           "standardVersion": "DRAFT13",
@@ -1475,7 +1482,8 @@ object IssuanceExamples {
     """.trimIndent()
     )
 
-    val ebsiCTExampleAuthDeferredDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    val ebsiCTExampleAuthDeferredDraft13 = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
         {
           "credentialConfigurationId": "DeferredIssuance_jwt_vc",
           "standardVersion": "DRAFT13",
@@ -1527,7 +1535,8 @@ object IssuanceExamples {
     """.trimIndent()
     )
 
-    val ebsiCTExamplePreAuthDraft13 =  typedValueExampleDescriptorDsl<IssuanceRequest>("""
+    val ebsiCTExamplePreAuthDraft13 = typedValueExampleDescriptorDsl<IssuanceRequest>(
+        """
         {
           "credentialConfigurationId": "PreAuthIssuance_jwt_vc",
           "standardVersion": "DRAFT13",

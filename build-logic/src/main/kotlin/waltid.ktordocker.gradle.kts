@@ -1,6 +1,6 @@
-import io.ktor.plugin.features.DockerImageRegistry.Companion.dockerHub
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import com.google.cloud.tools.jib.gradle.JibExtension
+import io.ktor.plugin.features.DockerImageRegistry.Companion.dockerHub
 
 plugins {
     id("io.ktor.plugin")

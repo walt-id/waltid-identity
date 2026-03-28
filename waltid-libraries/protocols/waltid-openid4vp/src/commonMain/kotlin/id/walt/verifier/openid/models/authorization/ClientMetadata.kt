@@ -1,10 +1,14 @@
 package id.walt.verifier.openid.models.authorization
 
-import kotlinx.serialization.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.buildClassSerialDescriptor
 import kotlinx.serialization.descriptors.element
-import kotlinx.serialization.encoding.*
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.*
 
 /**
@@ -123,7 +127,9 @@ data class ClientMetadata(
             return runCatching {
                 jsonParser.decodeFromJsonElement<ClientMetadata>(jsonString)
             }
-        }fun fromJson(jsonString: String): Result<ClientMetadata> {
+        }
+
+        fun fromJson(jsonString: String): Result<ClientMetadata> {
             return runCatching {
                 jsonParser.decodeFromString<ClientMetadata>(jsonString)
             }
@@ -198,18 +204,23 @@ object ClientMetadataSerializer : KSerializer<ClientMetadata> {
                         "client_name" -> {
                             (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { clientNameI18n[languageTag] = it }
                         }
+
                         "logo_uri" -> {
                             (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { logoUriI18n[languageTag] = it }
                         }
+
                         "tos_uri" -> {
                             (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { tosUriI18n[languageTag] = it }
                         }
+
                         "policy_uri" -> {
                             (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { policyUriI18n[languageTag] = it }
                         }
+
                         "client_uri" -> {
                             (value as? JsonPrimitive)?.takeIf { it.isString }?.content?.let { clientUriI18n[languageTag] = it }
                         }
+
                         else -> {
                             // Unknown i18n field - store in additionalFields
                             additionalFields[key] = value

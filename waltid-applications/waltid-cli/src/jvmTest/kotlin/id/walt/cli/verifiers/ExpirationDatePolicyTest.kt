@@ -120,7 +120,11 @@ class ExpirationDatePolicyTest {
         assertTrue(policyAvailable, "policy not available i.e. policy not even applied.")
         assertTrue(result.isSuccess)
         assertNull(result.exceptionOrNull())
-        assertEquals((result.getOrThrow() as JsonObject)["policy_available"]!!, JsonPrimitive(true), "policy not available i.e. policy not even applied.")
+        assertEquals(
+            (result.getOrThrow() as JsonObject)["policy_available"]!!,
+            JsonPrimitive(true),
+            "policy not available i.e. policy not even applied."
+        )
     }
 
     private fun assertFail(result: Result<Any?>) {

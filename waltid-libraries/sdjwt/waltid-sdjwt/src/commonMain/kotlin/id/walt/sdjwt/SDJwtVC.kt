@@ -1,10 +1,7 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.sdjwt
 
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
 class SDJwtVC(sdJwt: SDJwt) :
     SDJwt(

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.onboarding.service
 
 import id.walt.crypto.keys.KeyManager
@@ -24,7 +22,6 @@ import kotlin.test.assertFails
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class IsoMdlOnboardingTests {

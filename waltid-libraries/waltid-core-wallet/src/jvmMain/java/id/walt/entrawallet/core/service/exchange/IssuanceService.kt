@@ -108,10 +108,10 @@ object IssuanceService : IssuanceServiceBase() {
             logger.info { "Offered credential format: ${offeredCredential.format.name}" }
             logger.info {
                 "Offered credential cryptographic binding methods: ${
-                            offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
-                                ", "
-                            ) ?: ""
-                        }"
+                    offeredCredential.cryptographicBindingMethodsSupported?.joinToString(
+                        ", "
+                    ) ?: ""
+                }"
             }
             CredentialRequest.forOfferedCredential(
                 offeredCredential = offeredCredential,

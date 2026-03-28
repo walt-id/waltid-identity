@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
@@ -26,7 +24,6 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

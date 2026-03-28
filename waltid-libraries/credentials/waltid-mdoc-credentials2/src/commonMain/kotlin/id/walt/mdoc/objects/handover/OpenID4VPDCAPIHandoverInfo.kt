@@ -19,7 +19,7 @@ data class OpenID4VPDCAPIHandoverInfo(
     /** SHA-256 thumbprint of the ephemeral public encryption key of client_metadata */
     @ByteString
     val jwkThumbprint: ByteArray?
-): BaseHandoverInfo {
+) : BaseHandoverInfo {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is OpenID4VPDCAPIHandoverInfo) return false

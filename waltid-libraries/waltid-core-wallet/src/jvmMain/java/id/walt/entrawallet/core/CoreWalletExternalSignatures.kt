@@ -17,12 +17,12 @@ object CoreWalletExternalSignatures {
 
     */
 /**
-     * Preparation (first) step for an OID4VP flow with externally provided signatures.
-     * @param req Credential (W3C Verifiable Credential / W3C SD-JWT Verifiable Credential / IETF SD-JWT Verifiable Credential)
-     *
-     * @return Collection of parameters that are necessary to invoke the submit endpoint.
-     * The client is expected to, in between, sign the vp token based on the vpTokenParams object that is contained within.
-     *//*
+ * Preparation (first) step for an OID4VP flow with externally provided signatures.
+ * @param req Credential (W3C Verifiable Credential / W3C SD-JWT Verifiable Credential / IETF SD-JWT Verifiable Credential)
+ *
+ * @return Collection of parameters that are necessary to invoke the submit endpoint.
+ * The client is expected to, in between, sign the vp token based on the vpTokenParams object that is contained within.
+ *//*
 
     fun externalSignaturePresentationPrepare(req: PrepareOID4VPRequest): PrepareOID4VPResponse {
         val walletService = getWalletService()
@@ -140,12 +140,12 @@ object CoreWalletExternalSignatures {
 
     */
 /**
-     * Submission (second) step of an OID4VP flow with externally provided signatures.
-     * The client is expected to provide the signed vp token in the respective input request field.
-     *
-     * @param req W3C Verifiable Credential / W3C SD-JWT Verifiable Credential / IETF SD-JWT Verifiable Credential
-     * @return Presentation result
-     *//*
+ * Submission (second) step of an OID4VP flow with externally provided signatures.
+ * The client is expected to provide the signed vp token in the respective input request field.
+ *
+ * @param req W3C Verifiable Credential / W3C SD-JWT Verifiable Credential / IETF SD-JWT Verifiable Credential
+ * @return Presentation result
+ *//*
 
     fun externalSignaturePresentationSubmit(req: SubmitOID4VPRequest): JsonObject {
         val walletService = getWalletService()
@@ -295,14 +295,14 @@ object CoreWalletExternalSignatures {
 
     */
 /**
-     * Preparation (first) step for an OID4VCI flow with externally provided signatures.
-     *
-     * @param req W3C Verifiable Credential / IETF SD-JWT Verifiable Credential / mDoc Verifiable Credential
-     *
-     * @return Collection of parameters that are necessary to invoke the respective submit endpoint.
-     * For each offered credential, the client is expected to compute a signature based on the provided
-     * proof of possession parameters.
-     *//*
+ * Preparation (first) step for an OID4VCI flow with externally provided signatures.
+ *
+ * @param req W3C Verifiable Credential / IETF SD-JWT Verifiable Credential / mDoc Verifiable Credential
+ *
+ * @return Collection of parameters that are necessary to invoke the respective submit endpoint.
+ * For each offered credential, the client is expected to compute a signature based on the provided
+ * proof of possession parameters.
+ *//*
 
     fun externalSignaturesOfferPrepare(req: PrepareOID4VCIRequest): PrepareOID4VCIResponse {
         val walletService = getWalletService()
@@ -351,10 +351,10 @@ object CoreWalletExternalSignatures {
 
     */
 /**
-     * Submission (second) step for an OID4VCI flow with externally provided signatures.
-     *
-     * @return List of credentials
-     *//*
+ * Submission (second) step for an OID4VCI flow with externally provided signatures.
+ *
+ * @return List of credentials
+ *//*
 
     fun externalSignaturesOfferSubmit(req: SubmitOID4VCIRequest):  {
         val walletService = getWalletService()

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.mdoc.doc
 
 import cbor.Cbor
@@ -17,7 +15,7 @@ import kotlinx.serialization.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 /**
  * MDoc data structure containing doc type, issuer signed items, device signed items and errors, if any.

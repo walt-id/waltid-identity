@@ -24,7 +24,10 @@ import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.*
+import kotlinx.datetime.DatePeriod
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.plus
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
 import kotlinx.serialization.encodeToHexString

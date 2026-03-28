@@ -91,7 +91,8 @@ class PrefixTests {
         DidService.minimalInit()
 
         // Setup realistic DID
-        val signedJws = "eyJraWQiOiJQQnYzVHh2NnRhWE5zMTBZNUcyOW1kUmFiMzBMVWljN21ubFNSOUxqaVVNIiwiYWxnIjoiRVMyNTYifQ.eyJyZXNwb25zZV90eXBlIjoidnBfdG9rZW4iLCJub25jZSI6Inh5eiJ9.MLhDuXg5uOvgWkRJoTwnWZY7Ump9-TeGLyMWDlxGNCOVBgS6mPyKKd2H8jrcDGvW3BASKo4jJi4MhHgrvCcUsA"
+        val signedJws =
+            "eyJraWQiOiJQQnYzVHh2NnRhWE5zMTBZNUcyOW1kUmFiMzBMVWljN21ubFNSOUxqaVVNIiwiYWxnIjoiRVMyNTYifQ.eyJyZXNwb25zZV90eXBlIjoidnBfdG9rZW4iLCJub25jZSI6Inh5eiJ9.MLhDuXg5uOvgWkRJoTwnWZY7Ump9-TeGLyMWDlxGNCOVBgS6mPyKKd2H8jrcDGvW3BASKo4jJi4MhHgrvCcUsA"
 
         // Create context and authenticate
         val context = RequestContext(

@@ -1,10 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.mdoc.dataelement.json
 
 import id.walt.mdoc.dataelement.*
 import kotlinx.serialization.json.*
-import kotlin.time.ExperimentalTime
+
 
 fun JsonElement.toDataElement(): AnyDataElement = when (this) {
     is JsonObject -> this.mapValues { it.value.toDataElement() }.toDataElement()
@@ -16,7 +14,7 @@ fun JsonElement.toDataElement(): AnyDataElement = when (this) {
 
             this.booleanOrNull != null -> BooleanElement(this.boolean)
 
-            (this.intOrNull ?: this.longOrNull ?: this.floatOrNull ?: this.doubleOrNull) != null  -> {
+            (this.intOrNull ?: this.longOrNull ?: this.floatOrNull ?: this.doubleOrNull) != null -> {
                 NumberElement((this.intOrNull ?: this.longOrNull ?: this.floatOrNull ?: this.double))
             }
 
@@ -45,7 +43,7 @@ fun DataElement.toJsonElement(): JsonElement = when (this) {
 fun DataElement.toUIJson(): JsonElement = when (this) {
     is MapElement -> buildJsonObject {
         this@toUIJson.value.forEach { (key, value) ->
-            when(key.type) {
+            when (key.type) {
                 MapKeyType.int -> put(key.int.toString(), value.toUIJson())
                 MapKeyType.string -> put(key.str, value.toUIJson())
             }

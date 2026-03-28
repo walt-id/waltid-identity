@@ -1,5 +1,4 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
@@ -21,7 +20,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.cbor)
             implementation(identityLibs.kotlinx.coroutines.core)
 
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation(identityLibs.kotlinx.datetime)
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))

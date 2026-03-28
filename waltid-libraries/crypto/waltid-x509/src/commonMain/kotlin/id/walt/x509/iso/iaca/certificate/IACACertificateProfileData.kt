@@ -1,10 +1,8 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.IssuerAlternativeName
-import kotlin.time.ExperimentalTime
+
 
 /**
  * ISO profile input data used to build an IACA X.509 certificate.

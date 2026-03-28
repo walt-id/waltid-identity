@@ -10,7 +10,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -19,8 +19,7 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
@@ -34,11 +33,8 @@ kotlin {
             // Crypto
             implementation("org.kotlincrypto.random:crypto-rand:0.6.0") // SecureRandom
 
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.7.1"))
-            implementation("org.kotlincrypto.hash:sha2") // SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/t, SHA-512/224, SHA-512/256
-
-            implementation(project.dependencies.platform("org.kotlincrypto.macs:bom:0.7.1"))
-            implementation("org.kotlincrypto.macs:hmac-sha2")
+            implementation(identityLibs.kotlincrypto.hash.sha2) // SHA-224, SHA-256, SHA-384, SHA-512, SHA-512/t, SHA-512/224, SHA-512/256
+            implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
 
             /*
              * walt.id:

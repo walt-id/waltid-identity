@@ -19,9 +19,11 @@ class DidUtil {
             }
         }
 
-        fun createDid(method: DidMethod,
-                      key: JWKKey,
-                      options: DidCreateOptions? = null): DidResult {
+        fun createDid(
+            method: DidMethod,
+            key: JWKKey,
+            options: DidCreateOptions? = null
+        ): DidResult {
             return runBlocking {
                 if (options != null)
                     DidService.registerByKey(method.name.lowercase(), key, options)
@@ -30,7 +32,7 @@ class DidUtil {
             }
         }
 
-        fun resolveDid(did:String): JsonObject? {
+        fun resolveDid(did: String): JsonObject? {
             return runBlocking {
                 DidService.resolve(did).getOrNull()
             }

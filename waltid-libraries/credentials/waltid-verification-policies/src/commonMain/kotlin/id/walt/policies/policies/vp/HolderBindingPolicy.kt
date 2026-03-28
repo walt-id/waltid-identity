@@ -45,10 +45,10 @@ class HolderBindingPolicy : CredentialWrapperValidatorPolicy(
         return when {
             credentialSubjects.all { it == presenterDid } -> Result.success(presenterDid)
             else -> Result.failure(
-              id.walt.policies.HolderBindingException(
-                presenterDid = presenterDid,
-                credentialDids = credentialSubjects
-              )
+                id.walt.policies.HolderBindingException(
+                    presenterDid = presenterDid,
+                    credentialDids = credentialSubjects
+                )
             )
         }
     }

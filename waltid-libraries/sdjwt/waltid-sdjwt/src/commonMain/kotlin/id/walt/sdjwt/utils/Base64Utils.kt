@@ -1,11 +1,10 @@
 package id.walt.sdjwt.utils
 
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-@OptIn(ExperimentalJsExport::class, ExperimentalEncodingApi::class)
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 object Base64Utils {
 

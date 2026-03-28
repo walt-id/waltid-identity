@@ -81,6 +81,7 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES256"), metadata.dpopSigningAlgValuesSupported)
         assertEquals(null, metadata.codeChallengeMethodsSupported)
         assertEquals(null, metadata.pushedAuthorizationRequestEndpoint)
+        assertEquals(null, metadata.statusListAggregationEndpoint)
         assertEquals(
             setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
             metadata.grantTypesSupported,
@@ -105,6 +106,7 @@ class AuthorizationServerMetadataTest {
             codeChallengeMethodsSupported = listOf("S256"),
             pushedAuthorizationRequestEndpointPath = "/oauth2/par",
             requirePushedAuthorizationRequests = true,
+            statusListAggregationEndpointPath = "/oauth2/status-list-aggregation",
         )
 
         assertEquals("https://issuer.example", metadata.issuer)
@@ -121,6 +123,10 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES384"), metadata.dpopSigningAlgValuesSupported)
         assertEquals(listOf("S256"), metadata.codeChallengeMethodsSupported)
         assertEquals("https://issuer.example/oauth2/par", metadata.pushedAuthorizationRequestEndpoint)
+        assertEquals(
+            "https://issuer.example/oauth2/status-list-aggregation",
+            metadata.statusListAggregationEndpoint
+        )
         assertEquals(true, metadata.requirePushedAuthorizationRequests)
     }
 
@@ -192,6 +198,7 @@ class AuthorizationServerMetadataTest {
             codeChallengeMethodsSupported = listOf("S256", "plain"),
             authorizationDetailsTypesSupported = setOf("openid_credential"),
             preAuthorizedGrantAnonymousAccessSupported = true,
+            statusListAggregationEndpoint = "https://issuer.example/status-list-aggregation",
         )
 
         assertEquals("https://issuer.example", metadata.issuer)
@@ -223,5 +230,9 @@ class AuthorizationServerMetadataTest {
         assertEquals(listOf("S256", "plain"), metadata.codeChallengeMethodsSupported)
         assertEquals(setOf("openid_credential"), metadata.authorizationDetailsTypesSupported)
         assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
+        assertEquals(
+            "https://issuer.example/status-list-aggregation",
+            metadata.statusListAggregationEndpoint
+        )
     }
 }

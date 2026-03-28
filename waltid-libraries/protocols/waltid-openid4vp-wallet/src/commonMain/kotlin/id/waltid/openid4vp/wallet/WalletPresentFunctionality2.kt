@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.waltid.openid4vp.wallet
 
@@ -14,11 +14,7 @@ import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
-import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
-import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.*
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -45,7 +41,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 object WalletPresentFunctionality2 {
 
@@ -231,7 +227,12 @@ object WalletPresentFunctionality2 {
                                 if (result.error is ClientIdError.PreRegisteredClientNotFound && legacyFallbackCallback != null) {
                                     val fallbackResult = runCatching { legacyFallbackCallback(presentationRequestUrl) }
                                     if (fallbackResult.isSuccess && fallbackResult.getOrThrow().isSuccess)
-                                        return Result.success(WalletPresentResult(transmissionSuccess = true, verifierResponse = fallbackResult.getOrThrow().getOrThrow()))
+                                        return Result.success(
+                                            WalletPresentResult(
+                                                transmissionSuccess = true,
+                                                verifierResponse = fallbackResult.getOrThrow().getOrThrow()
+                                            )
+                                        )
                                 }
 
                                 throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")

@@ -65,7 +65,7 @@ class RadiusAuthException :
 class OTPAuthException :
     AuthException("Invalid one-time password (OTP).", HttpStatusCode.Unauthorized)
 
-class Web3AuthException(override val message : String) :
+class Web3AuthException(override val message: String) :
     AuthException(message, HttpStatusCode.Unauthorized)
 
 class InvalidChallengeException :

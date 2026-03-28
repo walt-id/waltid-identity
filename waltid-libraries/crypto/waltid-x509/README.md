@@ -144,7 +144,7 @@ The `id.walt.x509.iso` package provides the following:
 Generating an IACA X.509 certificate with all the mandatory fields is achieved as follows: 
 
 ```kotlin
-@OptIn(ExperimentalTime::class)
+
 suspend fun buildIaca(signingKey: Key) = IACACertificateBuilder().build(
     profileData = IACACertificateProfileData(
         principalName = IACAPrincipalName(
@@ -170,7 +170,7 @@ suspend fun buildIaca(signingKey: Key) = IACACertificateBuilder().build(
 Generating Document Signer X.509 certificate with all the mandatory fields is achieved as follows:
 
 ```kotlin
-@OptIn(ExperimentalTime::class)
+
 suspend fun buildDocumentSigner(
     dsPublicKey: Key,
     iacaProfileData: IACACertificateProfileData,

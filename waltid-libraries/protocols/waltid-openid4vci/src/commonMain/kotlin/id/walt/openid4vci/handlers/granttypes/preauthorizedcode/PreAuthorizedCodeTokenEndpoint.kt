@@ -100,8 +100,8 @@ class PreAuthorizedCodeTokenEndpoint(
         }
         val clientRequest = updatedRequest.withClient(clientToUse)
 
-        val expiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
-            ?: (Clock.System.now() + 3600.seconds)
+        val sessionExpiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
+        val expiresAt = sessionExpiresAt ?: (Clock.System.now() + 3600.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
             ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
@@ -130,11 +130,16 @@ class PreAuthorizedCodeTokenEndpoint(
             }
         }
 
+        // If no explicit session expiry is configured, return the spec-default lifetime as exact 3600.
+        // If an explicit expiry exists, return the real remaining lifetime from now.
+        val expiresIn = if (sessionExpiresAt == null) 3600L else computeRemainingSeconds(expiresAt)
+
         return AccessTokenResponseResult.Success(
             request = clientRequest,
             AccessTokenResponse(
                 accessToken = accessToken,
                 tokenType = id.walt.openid4vci.core.TOKEN_TYPE_BEARER,
+                expiresIn = expiresIn,
                 extra = extra,
             ),
         )

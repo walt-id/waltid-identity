@@ -15,7 +15,7 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class)
 class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
-    private val didRegexPattern = "^^did:%s:\\S+\$"
+    private val didRegexPattern = $$"^^did:%s:\\S+$"
     suspend fun list(
         wallet: Uuid,
         expectedDefault: DefaultDidOption,
@@ -66,7 +66,7 @@ class DidsApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
-    suspend fun importDid(wallet: Uuid , didImportRequest : DidImportRequest) =
+    suspend fun importDid(wallet: Uuid, didImportRequest: DidImportRequest) =
         e2e.test("/wallet-api/wallet/{wallet}/dids/import - import did") {
             client.post("/wallet-api/wallet/$wallet/dids/import") {
                 setBody(didImportRequest)

@@ -6,16 +6,13 @@ plugins {
 
 group = "id.walt.credentials"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 kotlin {
 
     sourceSets {
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -24,13 +21,12 @@ kotlin {
             implementation(identityLibs.oshai.kotlinlogging)
 
             // Kotlinx
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
 
-            implementation("io.github.optimumcode:json-schema-validator:0.5.2")
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             /*
@@ -53,10 +49,10 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.serialization.cbor)
             implementation(identityLibs.junit.jupiter.params)
-            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
-            implementation("io.mockk:mockk:1.14.2")
+            implementation(identityLibs.ktor.server.test.host)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.netty)
+            implementation("io.mockk:mockk:1.14.9")
         }
     }
 }

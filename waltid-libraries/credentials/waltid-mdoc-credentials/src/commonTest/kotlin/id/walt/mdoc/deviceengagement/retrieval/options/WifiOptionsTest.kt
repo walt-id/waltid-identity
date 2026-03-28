@@ -85,9 +85,9 @@ class WifiOptionsTest {
     fun testInvalidPayloads() {
         val payloads = listOf<DataElement>(
             MapElement(
-              buildMap {
-                  put(MapKey(0), "asdf".toDataElement())
-              }
+                buildMap {
+                    put(MapKey(0), "asdf".toDataElement())
+                }
             ),
             MapElement(
                 buildMap {

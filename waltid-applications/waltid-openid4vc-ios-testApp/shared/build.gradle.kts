@@ -8,10 +8,6 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
 
-    object Versions {
-        const val KTOR_VERSION = "3.3.3"
-    }
-
     cocoapods {
         summary = "Some description for the Shared Module"
         homepage = "Link to the Shared Module homepage"
@@ -36,12 +32,12 @@ kotlin {
 
             implementation(identityLibs.kotlinx.serialization.json)
 
-            implementation("io.ktor:ktor-client-core:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-serialization:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-serialization-kotlinx-json:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-json:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-logging:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.ktor.client.serialization)
+            implementation(identityLibs.ktor.client.content.negotiation)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
+            implementation(identityLibs.ktor.client.json)
+            implementation(identityLibs.ktor.client.logging)
         }
         commonTest.dependencies {
 

@@ -1,10 +1,10 @@
 package id.walt.openid4vci.requests
 
-import korlibs.crypto.SecureRandom
+import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 
 internal fun generateRequestId(): String {
     val bytes = ByteArray(16)
-    SecureRandom.nextBytes(bytes)
+    CryptoRand.nextBytes(bytes)
     return Base64.UrlSafe.encode(bytes)
 }

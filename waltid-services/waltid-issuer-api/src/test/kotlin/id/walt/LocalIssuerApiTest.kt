@@ -16,17 +16,17 @@ import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import org.intellij.lang.annotations.Language
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class IssuerApiTest {
-companion object {
-    @Language("JSON")
-    val TEST_KEY = """{
+    companion object {
+        @Language("JSON")
+        val TEST_KEY = """{
   "type": "jwk",
   "jwk": {
     "kty": "OKP",
@@ -37,10 +37,10 @@ companion object {
   }
 }"""
 
-    val TEST_ISSUER_DID = "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
+        val TEST_ISSUER_DID = "did:key:z6MkjoRhq1jSNJdLiruSXrFFxagqrztZaXHqHGUTKJbcNywp"
 
-    @Language("JSON")
-    val TEST_W3VC = """{
+        @Language("JSON")
+        val TEST_W3VC = """{
   "@context": [
     "https://www.w3.org/2018/credentials/v1",
     "https://purl.imsglobal.org/spec/ob/v3p0/context.json"
@@ -86,8 +86,8 @@ companion object {
   }
 }"""
 
-    @Language("JSON")
-    val TEST_W3VC2 = """{
+        @Language("JSON")
+        val TEST_W3VC2 = """{
   "@context": [
     "https://www.w3.org/2018/credentials/v1"
   ],
@@ -120,11 +120,11 @@ companion object {
   "issuanceDate": "2021-08-31T00:00:00Z"
 }"""
 
-    val TEST_SUBJECT_DID =
-        "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiMW1lTUJuX3EtVklTQzd5Yk42UnExX0FISkxwSHZKVG83N3V6Nk44UkdDQSIsIngiOiJQdEV1YlB1MWlrRzR5emZsYUF2dnNmTWIwOXR3NzlIcTFsVnJRX1c0ZnVjIn0"
+        val TEST_SUBJECT_DID =
+            "did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJFZDI1NTE5Iiwia2lkIjoiMW1lTUJuX3EtVklTQzd5Yk42UnExX0FISkxwSHZKVG83N3V6Nk44UkdDQSIsIngiOiJQdEV1YlB1MWlrRzR5emZsYUF2dnNmTWIwOXR3NzlIcTFsVnJRX1c0ZnVjIn0"
 
-    @Language("JSON")
-    val TEST_MAPPING = """{
+        @Language("JSON")
+        val TEST_MAPPING = """{
   "id": "\u003cuuid\u003e",
   "issuer": {
     "id": "\u003cissuerDid\u003e"
@@ -137,8 +137,8 @@ companion object {
 }"""
 
 
-    @Language("JSON")
-    val TEST_MAPPING_WITH_DISPLAY = """{
+        @Language("JSON")
+        val TEST_MAPPING_WITH_DISPLAY = """{
   "id": "\u003cuuid\u003e",
   "display": "\u003cdisplay\u003e",
   "issuer": {
@@ -151,11 +151,12 @@ companion object {
   "expirationDate": "\u003ctimestamp-in:365d\u003e"
 }"""
 
-    val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
-    val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
-    val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
-    val jsonMappingObjWithDisplay = Json.decodeFromString<JsonObject>(TEST_MAPPING_WITH_DISPLAY)
-}
+        val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
+        val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
+        val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
+        val jsonMappingObjWithDisplay = Json.decodeFromString<JsonObject>(TEST_MAPPING_WITH_DISPLAY)
+    }
+
     @Test
     fun testJwt() = runTest {
         val issueRequest =
@@ -313,20 +314,20 @@ companion object {
 
         val json = Json.encodeToString(
             IssuanceEvent(
-            "originator",
-            organization = "organization",
-            target = "target",
-            timestamp = 0,
-            status = Status("status"),
-            action = Action("action"),
-            sessionId = "sessionId",
-            credentialConfigurationId = "credentialConfigurationId",
-            format = "format",
-            proofType = null,
-            holderId = null,
-            callId = null,
-            error = null
-        )
+                "originator",
+                organization = "organization",
+                target = "target",
+                timestamp = 0,
+                status = Status("status"),
+                action = Action("action"),
+                sessionId = "sessionId",
+                credentialConfigurationId = "credentialConfigurationId",
+                format = "format",
+                proofType = null,
+                holderId = null,
+                callId = null,
+                error = null
+            )
         )
         println(json)
     }

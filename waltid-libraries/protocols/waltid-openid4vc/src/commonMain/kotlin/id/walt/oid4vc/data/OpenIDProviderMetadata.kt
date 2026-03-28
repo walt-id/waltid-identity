@@ -356,7 +356,10 @@ sealed class OpenIDProviderMetadata : JsonDataObject() {
         @SerialName("userinfo_endpoint") override val userinfoEndpoint: String? = null,
         @SerialName("jwks_uri") override val jwksUri: String? = null,
         @SerialName("registration_endpoint") override val registrationEndpoint: String? = null,
-        @EncodeDefault @SerialName("scopes_supported") override val scopesSupported: Set<String> = setOf("openid", "org.iso.23220.photoid.1"),
+        @EncodeDefault @SerialName("scopes_supported") override val scopesSupported: Set<String> = setOf(
+            "openid",
+            "org.iso.23220.photoid.1"
+        ),
         @SerialName("response_types_supported") override val responseTypesSupported: Set<String>? = null,
         @EncodeDefault @SerialName("response_modes_supported") override val responseModesSupported: Set<ResponseMode> = setOf(
             ResponseMode.query,

@@ -35,7 +35,6 @@ fun Application.configureStatusPages() {
         }
 
 
-
     }
 }
 

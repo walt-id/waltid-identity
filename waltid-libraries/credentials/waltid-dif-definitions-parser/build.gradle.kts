@@ -16,12 +16,12 @@ kotlin {
             // JSON
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("io.github.optimumcode:json-schema-validator:0.4.0")
+            implementation(identityLibs.optimumcode.jsonschemavalidator)
 
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
