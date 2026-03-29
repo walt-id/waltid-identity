@@ -33,7 +33,9 @@ class TokenRequestBuilder(
         val token_type: String,
         val expires_in: Int? = null,
         val refresh_token: String? = null,
-        val scope: String? = null
+        val scope: String? = null,
+        val c_nonce: String? = null,
+        val c_nonce_expires_in: Int? = null,
     )
 
     /**
