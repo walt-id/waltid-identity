@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.mdoc.dataelement
 
 import kotlinx.datetime.LocalDate
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**

@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 enum class RequestUriHttpMethod(val method: String) {
     @SerialName("get")
     GET("get"),
+
     @SerialName("post")
     POST("post"),
 }

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.idp.poc
 
 import com.nimbusds.jose.JWSAlgorithm
@@ -40,7 +38,6 @@ import kotlinx.serialization.json.*
 import java.io.File
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -152,8 +149,8 @@ fun Application.test() {
         get("/jwks") {
             call.respond(
                 mapOf(
-                "keys" to listOf(key).map { it.toPublicJWK().toJSONObject() }
-            ))
+                    "keys" to listOf(key).map { it.toPublicJWK().toJSONObject() }
+                ))
         }
 
 

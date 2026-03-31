@@ -50,7 +50,6 @@ class IssuerApi(
         }
 
 
-
     private suspend fun issueCredentialRaw(
         url: String,
         request: IssuanceRequest,

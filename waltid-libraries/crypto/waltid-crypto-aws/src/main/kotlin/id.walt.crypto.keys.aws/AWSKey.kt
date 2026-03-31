@@ -69,7 +69,7 @@ class AWSKey(
     }
 
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
         val digestedMessage = AWSKey.sha256(plaintext)
@@ -111,10 +111,11 @@ class AWSKey(
     }
 
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
             throw SigningException("failed to verofy - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
-        val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
+        val messageToVerify =
+            detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
         val digestedMessage = AWSKey.sha256(messageToVerify)
 
         val verifyRequest = VerifyRequest {
@@ -215,11 +216,11 @@ class AWSKey(
 
             val publicKey = getAwsPublicKey(config, keyId)
             val keyType = response.keyMetadata?.keySpec?.value
-            // remove tags from config 
+            // remove tags from config
             val editedConfig = config.copy(tags = null)
-            
-            
-            
+
+
+
             return AWSKey(
                 config = editedConfig,
                 id = keyId,

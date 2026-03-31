@@ -3,9 +3,7 @@ package id.walt.credentials.utils
 import id.walt.crypto.utils.Base64Utils.base64Url
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 object JwtUtils {
 
     fun String.isJwt() = startsWith("ey") && count { it == '.' } == 2

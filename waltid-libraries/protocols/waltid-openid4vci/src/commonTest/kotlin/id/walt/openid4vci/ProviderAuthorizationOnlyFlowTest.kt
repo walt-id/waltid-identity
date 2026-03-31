@@ -1,10 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AccessResponseResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.AuthorizeResponseResult
-import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.core.*
 import id.walt.openid4vci.request.AccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -14,7 +10,7 @@ import kotlin.test.assertTrue
 
 class ProviderAuthorizationOnlyFlowTest {
 
-    @OptIn( ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `provider supporting only authorization code flow succeeds and rejects pre-authorized grant`() = runTest {
         val config = createTestConfig()

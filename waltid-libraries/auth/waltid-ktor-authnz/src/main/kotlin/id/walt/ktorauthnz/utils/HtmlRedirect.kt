@@ -11,10 +11,12 @@ object HtmlRedirect {
         head {
             title("Authentication success")
             script(type = ScriptType.textJavaScript) {
-                unsafe { raw(
-                    // language=javascript
-                    "window.location.href = \"$redirectUrl\";"
-                ) }
+                unsafe {
+                    raw(
+                        // language=javascript
+                        "window.location.href = \"$redirectUrl\";"
+                    )
+                }
             }
             meta {
                 httpEquiv = "refresh"

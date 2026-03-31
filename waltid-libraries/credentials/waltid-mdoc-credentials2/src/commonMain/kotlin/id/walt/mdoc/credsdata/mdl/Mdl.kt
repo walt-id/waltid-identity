@@ -21,7 +21,6 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -252,7 +251,7 @@ data class MobileDrivingLicenceJwsNamespace(
     val mdl: Mdl,
 )
 
-@OptIn(ExperimentalTime::class)
+
 @Serializable
 data class MobileDrivingLicenceJws(
     @SerialName("doctype")
@@ -267,7 +266,7 @@ data class MobileDrivingLicenceJws(
     val expiration: Instant?,
 )
 
-@OptIn(ExperimentalTime::class)
+
 class NullableInstantLongSerializer : KSerializer<Instant?> {
 
     override val descriptor: SerialDescriptor =
@@ -282,7 +281,7 @@ class NullableInstantLongSerializer : KSerializer<Instant?> {
 
 }
 
-@OptIn(ExperimentalTime::class)
+
 object InstantLongSerializer : KSerializer<Instant> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("InstantLongSerializer", PrimitiveKind.LONG)
@@ -303,12 +302,15 @@ object InstantLongSerializer : KSerializer<Instant> {
 @Serializable
 data class DrivingPrivilege(
     @SerialName("vehicle_category_code") val vehicleCategoryCode: String,
+
     @ValueTags(1004u)
     @SerialName("issue_date")
     val issueDate: LocalDate? = null, // full-date
+
     @ValueTags(1004u)
     @SerialName("expiry_date")
     val expiryDate: LocalDate? = null,// full-date
+
     val codes: List<DrivingPrivilegeCode>? = null,
 ) {
     @Serializable

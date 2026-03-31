@@ -5,6 +5,7 @@ package id.walt.crypto2.hash
 internal interface DigestProvider {
     fun create(algorithm: HashAlgorithm): Digest
 }
+
 internal expect fun getPlatformDefaultDigestProvider(): DigestProvider
 
 /**

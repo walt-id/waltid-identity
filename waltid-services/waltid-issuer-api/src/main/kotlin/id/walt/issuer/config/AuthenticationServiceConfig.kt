@@ -8,4 +8,4 @@ data class AuthenticationServiceConfig(
     val accessTokenUrl: String = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token",
     val clientId: String = "issuer_api",
     val clientSecret: String = "<your-client-secret>",
-)  : WaltConfig()
+) : WaltConfig()

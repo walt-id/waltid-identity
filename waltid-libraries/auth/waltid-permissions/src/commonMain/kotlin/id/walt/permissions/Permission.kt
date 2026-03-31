@@ -6,7 +6,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Permission(val target: PermissionedResourceTarget, val action: String, val operation: PermissionOperation = PermissionOperation.ADD) {
+data class Permission(
+    val target: PermissionedResourceTarget,
+    val action: String,
+    val operation: PermissionOperation = PermissionOperation.ADD
+) {
 
     @Serializable
     data class MinimalPermission(val target: String, val action: String) {

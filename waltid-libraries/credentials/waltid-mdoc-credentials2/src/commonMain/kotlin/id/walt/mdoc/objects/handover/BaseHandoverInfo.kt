@@ -4,8 +4,8 @@ package id.walt.mdoc.objects.handover
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 @Serializable
-@CborArray
+@CborObjectAsArray
 sealed interface BaseHandoverInfo

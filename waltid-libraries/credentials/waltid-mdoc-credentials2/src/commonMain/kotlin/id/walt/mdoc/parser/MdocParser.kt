@@ -12,7 +12,7 @@ import kotlinx.serialization.decodeFromByteArray
 
 object MdocParser {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     @OptIn(ExperimentalSerializationApi::class)
     fun parseToDocument(signed: String): Document {

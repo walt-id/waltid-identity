@@ -12,7 +12,8 @@ import kotlin.time.Duration.Companion.minutes
 class ConformanceTests {
 
     companion object {
-        val verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
+        val verifier2UrlPrefix: String =
+            "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
         val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud"
         val conformancePort: Int = 8443 // 443
 
@@ -23,6 +24,7 @@ class ConformanceTests {
                 println("Error getting server version: $it")
             }
         }
+
         @JvmStatic
         val isConformanceAvailable = conformanceServerVersionResult.isSuccess
     }

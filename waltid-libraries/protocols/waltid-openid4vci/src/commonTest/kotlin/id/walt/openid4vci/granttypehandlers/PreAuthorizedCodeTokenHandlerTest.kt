@@ -1,11 +1,6 @@
 package id.walt.openid4vci.granttypehandlers
 
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.StubTokenService
-import id.walt.openid4vci.TokenEndpointResult
-import id.walt.openid4vci.argumentsOf
+import id.walt.openid4vci.*
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
@@ -13,12 +8,8 @@ import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.request.AccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlin.test.*
 import kotlin.time.Duration.Companion.seconds
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class PreAuthorizedCodeTokenHandlerTest {
 
@@ -112,8 +103,8 @@ class PreAuthorizedCodeTokenHandlerTest {
         assertTrue(failure is TokenEndpointResult.Failure)
     }
 
-        private fun createAccessRequestWithGrant(): AccessTokenRequest =
-            AccessTokenRequest(session = DefaultSession(subject = "access-subject")).apply {
+    private fun createAccessRequestWithGrant(): AccessTokenRequest =
+        AccessTokenRequest(session = DefaultSession(subject = "access-subject")).apply {
             setClient(
                 DefaultClient(
                     id = "",

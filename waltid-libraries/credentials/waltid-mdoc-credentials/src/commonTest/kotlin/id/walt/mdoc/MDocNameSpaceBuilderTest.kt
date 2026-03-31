@@ -101,7 +101,7 @@ class MDocNameSpaceBuilderTest {
         assertIs<StringElement>(mDLNameSpace.claimsMap.value[MapKey("issuing_country")])
         assertIs<StringElement>(mDLNameSpace.claimsMap.value[MapKey("issuing_authority")])
         assertIs<StringElement>(mDLNameSpace.claimsMap.value[MapKey("document_number")])
-        
+
         assertIs<TDateElement>(mDLNameSpace.claimsMap.value[MapKey("birth_date")])
         assertIs<FullDateElement>(mDLNameSpace.claimsMap.value[MapKey("issue_date")])
         assertIs<FullDateElement>(mDLNameSpace.claimsMap.value[MapKey("expiry_date")])

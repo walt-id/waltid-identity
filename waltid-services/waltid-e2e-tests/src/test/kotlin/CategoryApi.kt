@@ -6,7 +6,7 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
 import java.net.URLEncoder
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -15,7 +15,7 @@ class CategoryApi(private val e2e: E2ETest, private val client: HttpClient) {
         e2e.test("/wallet-api/wallet/{wallet}/categories - list categories") {
             client.get("/wallet-api/wallet/$wallet/categories").expectSuccess().apply {
                 val result = body<List<JsonObject>>()
-                assertTrue(result.size == expectedSize)
+                assertEquals(result.size, expectedSize)
                 output?.invoke(result)
             }
         }

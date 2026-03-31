@@ -1,5 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import com.android.build.api.dsl.androidLibrary
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("waltid.multiplatform.library")

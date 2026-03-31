@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.policies2.vc.policies
 
 import com.nfeld.jsonpathkt.JsonPath
@@ -16,7 +14,6 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @Serializable

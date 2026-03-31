@@ -76,6 +76,7 @@ fun StepOneScreen(
                                 ctx.startActivity(it)
                             }
                         }
+
                         SnackbarResult.Dismissed -> {}
                     }
                 }

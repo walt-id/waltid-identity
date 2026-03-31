@@ -17,7 +17,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import platform.Foundation.NSError
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 sealed class Ed25519 {
     sealed class PrivateKey : Signing, KeyRepresentation {
@@ -245,8 +244,6 @@ internal class Ed25519PublicKeyJwk(private val jwk: String) : Ed25519.PublicKey(
     }
 
     private val _jwk by lazy { json.decodeFromJsonElement<Jwk>(jwk()) }
-
-    @OptIn(ExperimentalEncodingApi::class)
 
     private val externalRepresentation: ByteArray by lazy {
         base64Url.decode(_jwk.x)

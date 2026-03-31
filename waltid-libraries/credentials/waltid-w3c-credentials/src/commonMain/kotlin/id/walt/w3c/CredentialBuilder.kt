@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.w3c
 
 import id.walt.crypto.utils.UuidUtils.randomUUID
@@ -17,7 +15,6 @@ import kotlin.js.JsExport
 import kotlin.js.JsName
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 

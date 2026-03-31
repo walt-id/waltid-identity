@@ -1,11 +1,6 @@
 package id.walt.openid4vci
 
-import id.walt.openid4vci.core.AccessRequestResult
-import id.walt.openid4vci.core.AuthorizeRequestResult
-import id.walt.openid4vci.core.buildOAuth2Provider
-import id.walt.openid4vci.core.OAuth2Provider
-import id.walt.openid4vci.core.OAuthError
-import id.walt.openid4vci.core.OAuth2ProviderConfig
+import id.walt.openid4vci.core.*
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
@@ -14,11 +9,7 @@ import id.walt.openid4vci.validation.AccessRequestValidator
 import id.walt.openid4vci.validation.AuthorizeRequestValidator
 import id.walt.openid4vci.validation.DefaultAccessRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizeRequestValidator
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import kotlin.test.*
 
 class BuildProviderConfigurationTest {
 
@@ -118,6 +109,7 @@ class BuildProviderConfigurationTest {
     private class CustomGrantHandler : TokenEndpointHandler {
         override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
             request.getGrantTypes().contains("custom_grant")
+
         override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): TokenEndpointResult =
             TokenEndpointResult.Success(accessToken = "custom")
     }

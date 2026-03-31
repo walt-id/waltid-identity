@@ -14,10 +14,10 @@ import kotlin.time.Clock
  *
  * Returns a lightweight [TokenEndpointResult] instead of mutating a responder in place.
  */
-    class AuthorizationCodeTokenHandler(
-        private val codeRepository: AuthorizationCodeRepository,
-        private val tokenService: AccessTokenService,
-    ) : TokenEndpointHandler {
+class AuthorizationCodeTokenHandler(
+    private val codeRepository: AuthorizationCodeRepository,
+    private val tokenService: AccessTokenService,
+) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.getGrantTypes().contains(GrantType.AuthorizationCode.value)

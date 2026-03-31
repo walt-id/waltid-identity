@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.vical
 
 import id.walt.cose.Cose
@@ -11,7 +9,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
-import kotlin.time.ExperimentalTime
+
 
 class MultiplatformVicalUsageExamples {
 

@@ -1,13 +1,5 @@
 package id.walt.openid4vp.conformance
 
-import id.walt.openid4vp.conformance.testplans.ConformanceTestRunner
-import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.condition.EnabledIf
-import kotlin.test.Test
-import kotlin.time.Duration.Companion.minutes
-
 /*class WalletPresentConformanceTests {
 
     companion object {

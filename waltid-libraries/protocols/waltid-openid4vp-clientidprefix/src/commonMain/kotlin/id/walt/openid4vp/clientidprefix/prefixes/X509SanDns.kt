@@ -7,7 +7,6 @@ import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray

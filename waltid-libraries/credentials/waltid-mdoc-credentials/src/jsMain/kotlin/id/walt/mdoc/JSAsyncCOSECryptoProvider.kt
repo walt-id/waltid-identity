@@ -6,6 +6,6 @@ import kotlin.js.Promise
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-interface JSAsyncCOSECryptoProvider: AsyncCOSECryptoProvider {
-  fun sign1Async(payload: dynamic, keyID: String?): Promise<COSESign1>
+interface JSAsyncCOSECryptoProvider : AsyncCOSECryptoProvider {
+    fun sign1Async(payload: dynamic, keyID: String?): Promise<COSESign1>
 }

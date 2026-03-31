@@ -1,14 +1,12 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.crypto.keys.Key
 import id.walt.x509.*
-import id.walt.x509.iso.blockingBridge
 import id.walt.x509.iso.IssuerAlternativeName
+import id.walt.x509.iso.blockingBridge
 import okio.ByteString
 import okio.ByteString.Companion.decodeHex
-import kotlin.time.ExperimentalTime
+
 
 /**
  * Decoded view (not validated) of an IACA X.509 certificate.

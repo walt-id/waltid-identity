@@ -5,9 +5,6 @@ plugins {
 
 group = "id.walt"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 dependencies {
     api(project(":waltid-libraries:waltid-library-commons"))
@@ -17,21 +14,21 @@ dependencies {
     api(project(":waltid-libraries:waltid-did"))
 
     // Ktor
-    api("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
-    api("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
+    api(identityLibs.ktor.server.core)
+    api(identityLibs.ktor.server.cio)
+    api(identityLibs.ktor.server.status.pages)
+    api(identityLibs.ktor.server.content.negotiation)
+    api(identityLibs.ktor.serialization.kotlinx.json)
+    implementation(identityLibs.ktor.server.auth)
+    implementation(identityLibs.ktor.client.okhttp)
 
     // Logging
-    api("io.klogging:klogging-jvm:0.11.6") // JVM + ~JS
-    implementation("io.klogging:slf4j-klogging:0.11.6")
-    implementation("org.slf4j:jul-to-slf4j:2.0.17")
+    api(identityLibs.klogging) // JVM + ~JS
+    implementation(identityLibs.slf4j.klogging)
+    implementation(identityLibs.slf4j.julbridge)
 
     // CLI
-    api("com.github.ajalt.clikt:clikt:5.0.3")  // JVM
+    api(identityLibs.clikt.core)
 
     // Config
     api("com.sksamuel.hoplite:hoplite-core:2.9.0")
@@ -39,15 +36,15 @@ dependencies {
     api("com.sksamuel.hoplite:hoplite-hikaricp:2.9.0")
 
     // Kotlinx.serialization
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    api(identityLibs.kotlinx.serialization.json)
 
     // Health checks
-    api("com.sksamuel.cohort:cohort-ktor:2.6.2")
+    api(identityLibs.sksamuel.cohort)
 
     // OpenAPI
-    api("io.github.smiley4:ktor-openapi:5.5.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.5.0")
-    implementation("io.github.smiley4:ktor-redoc:5.5.0")
+    api("io.github.smiley4:ktor-openapi:5.6.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
+    implementation("io.github.smiley4:ktor-redoc:5.6.0")
 
     implementation("io.github.smiley4:schema-kenerator-core:2.6.0")
     implementation("io.github.smiley4:schema-kenerator-swagger:2.6.0")
@@ -56,7 +53,6 @@ dependencies {
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-    api("app.softwork:kotlinx-uuid-core:0.1.6")
     api("redis.clients:jedis:5.2.0")
 
     // Testing

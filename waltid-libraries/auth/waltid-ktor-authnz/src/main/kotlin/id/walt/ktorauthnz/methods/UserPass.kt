@@ -31,7 +31,7 @@ object UserPass : UserPassBasedAuthMethod("userpass") {
         val passwordHash = PasswordHash.fromString(storedData.passwordHash ?: error("Missing password hash"))
         val check = PasswordHashing.check(credential.password, passwordHash)
 
-        authCheck(check.valid , InvalidCredentialsException())
+        authCheck(check.valid, InvalidCredentialsException())
         if (check.updated) {
             val newData = storedData.copy(passwordHash = check.updatedHash!!.toString())
             KtorAuthnzManager.accountStore.updateAccountIdentifierStoredData(identifier, id, newData)

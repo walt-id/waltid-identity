@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.ktorauthnz.sessions
 
 import id.walt.ktorauthnz.KtorAuthnzManager
@@ -17,7 +15,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlin.reflect.jvm.jvmName
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 enum class AuthSessionStatus(val value: String) {

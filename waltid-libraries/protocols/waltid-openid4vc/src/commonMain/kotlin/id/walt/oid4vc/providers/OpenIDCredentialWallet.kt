@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
@@ -23,11 +21,9 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -351,7 +347,6 @@ abstract class OpenIDCredentialWallet<S : SIOPSession>(
         )
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     open suspend fun executeFullAuthIssuance(
         credentialOffer: CredentialOffer,
         holderDid: String,

@@ -2,12 +2,13 @@
 
 package id.walt.verifier2.handlers.vpresponse
 
+import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.iso18013.annexc.AnnexCResponseVerifier
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
+import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
-import id.walt.sdjwt.utils.Base64Utils.encodeToBase64Url
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
@@ -21,6 +22,8 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToHexString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -60,8 +63,13 @@ object Verifier2VPDirectPostHandler {
                         ?: error("Missing ephemeral decryption key for Annex C")
                 )
 
-                val virtualVpToken = mapOf("annex_c" to listOf(plaintext.encodeToBase64Url()))
-                //val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(plaintext)
+                val deviceResponse = coseCompliantCbor.decodeFromByteArray<DeviceResponse>(plaintext)
+                requireNotNull(deviceResponse.documents) { "Missing 'documents' in DeviceResponse!" }
+
+                val virtualVpToken = deviceResponse.documents!!
+                    .groupBy { it.docType }
+                    .mapValues { (_, docs) -> docs.map { doc -> coseCompliantCbor.encodeToHexString(doc) } }
+
                 //require("1.0" == deviceResponse.version)
                 //require(0u == deviceResponse.status)
                 //println("Device response: $deviceResponse")

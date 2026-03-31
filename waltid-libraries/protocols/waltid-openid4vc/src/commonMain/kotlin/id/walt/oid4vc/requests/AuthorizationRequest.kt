@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc.requests
 
 import id.walt.oid4vc.OpenID4VC
@@ -16,7 +14,7 @@ import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
+
 
 interface IAuthorizationRequest {
     val responseType: Set<ResponseType>

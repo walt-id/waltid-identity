@@ -15,10 +15,10 @@ import java.security.cert.X509Certificate
  * @param trustedRootCAs enforce trusted root CA, if not publicly known, for certificate path validation
  */
 data class COSECryptoProviderKeyInfo(
-  val keyID: String,
-  val algorithmID: AlgorithmID,
-  val publicKey: PublicKey,
-  val privateKey: PrivateKey? = null,
-  val x5Chain: List<X509Certificate> = listOf(),
-  val trustedRootCAs: List<X509Certificate> = listOf()
+    val keyID: String,
+    val algorithmID: AlgorithmID,
+    val publicKey: PublicKey,
+    val privateKey: PrivateKey? = null,
+    val x5Chain: List<X509Certificate> = listOf(),
+    val trustedRootCAs: List<X509Certificate> = listOf()
 )

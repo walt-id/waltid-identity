@@ -5,7 +5,6 @@ package id.walt.mdoc.objects.elements
 import id.walt.cose.coseCompliantCbor
 import id.walt.mdoc.encoding.ByteStringWrapper
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToByteArray
 
 /**
  * Represents the list of issuer-signed items for a single namespace.
@@ -60,6 +59,6 @@ data class IssuerSignedList(
             })
 
         private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
-            coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
+            coseCompliantCbor.encodeToByteArray(IssuerSignedItem.serializer(), this)
     }
 }

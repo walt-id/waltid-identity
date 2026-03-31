@@ -8,11 +8,11 @@ import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.core.AuthorizeResponse
 import id.walt.openid4vci.core.AuthorizeResponseResult
 import id.walt.openid4vci.core.OAuthError
-import korlibs.crypto.SecureRandom
-import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
+import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.request.AuthorizationRequest
+import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.seconds
@@ -106,7 +106,7 @@ class AuthorizationCodeAuthorizeHandler(
     }
 
     private fun generateCode(): String {
-        val bytes = ByteArray(33).also { SecureRandom.nextBytes(it) } //prevent padding
-        return Base64.UrlSafe.encode(bytes)
+        val bytes = ByteArray(33) //prevent padding
+        return Base64.UrlSafe.encode(CryptoRand.nextBytes(bytes))
     }
 }

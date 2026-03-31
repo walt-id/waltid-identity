@@ -2,10 +2,6 @@
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
-
 plugins {
     id("waltid.multiplatform.library.jvm")
 }
@@ -34,18 +30,17 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-            implementation("com.google.code.gson:gson:2.12.1")
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.datetime)
 
             // CLI
-            implementation("com.github.ajalt.clikt:clikt:5.0.3")
-            implementation("com.github.ajalt.clikt:clikt-markdown:5.0.3")
+            implementation(identityLibs.clikt.core)
+            implementation(identityLibs.clikt.markdown)
             implementation("com.github.ajalt.mordant:mordant:3.0.2")
             implementation("com.github.ajalt.mordant:mordant-markdown:3.0.2")
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -59,42 +54,43 @@ kotlin {
             implementation("org.slf4j:slf4j-simple:2.0.17")
 
             // JOSE
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation(identityLibs.nimbus.jose.jwt)
 
             // BouncyCastle for PEM import
-            implementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+            implementation(identityLibs.bouncycastle.pkix)
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
 
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation(identityLibs.junit.jupiter.params)
 
             // Ktor server
-            implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-netty-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
+
+            implementation(identityLibs.ktor.server.core)
+            implementation(identityLibs.ktor.server.netty)
+            implementation(identityLibs.ktor.server.auth)
+            implementation(identityLibs.ktor.server.sessions)
+            implementation(identityLibs.ktor.server.authjwt)
+            implementation(identityLibs.ktor.server.auto.head.response)
+            implementation(identityLibs.ktor.server.double.receive)
+            implementation(identityLibs.ktor.server.host.common)
+            implementation(identityLibs.ktor.server.status.pages)
+            implementation(identityLibs.ktor.server.compression)
+            implementation(identityLibs.ktor.server.cors)
+            implementation(identityLibs.ktor.server.forwarded.header)
+            implementation(identityLibs.ktor.server.call.logging)
+            implementation(identityLibs.ktor.server.call.id)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.cio)
 
             // Ktor client
-            implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.ktor.client.serialization)
+            implementation(identityLibs.ktor.client.content.negotiation)
+            implementation(identityLibs.ktor.client.json)
+            implementation(identityLibs.ktor.client.okhttp)
+            implementation(identityLibs.ktor.client.logging)
 
         }
 

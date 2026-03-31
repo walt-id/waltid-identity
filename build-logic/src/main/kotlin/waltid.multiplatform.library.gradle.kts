@@ -16,7 +16,7 @@ kotlin {
     jvm()
 
     js(IR) {
-        useEsModules()
+        useCommonJs()
         generateTypeScriptDefinitions()
 
         binaries.library() // Produce library instead of standalone application

@@ -10,7 +10,8 @@ object AuthMethodManager {
     fun registerAuthenticationMethods(vararg authenticationMethods: AuthenticationMethod) =
         authenticationMethods.forEach { registerAuthenticationMethod(it) }
 
-    fun getAuthenticationMethodById(id: String): AuthenticationMethod = registeredAuthMethods[id] ?: throw IllegalArgumentException("Unknown authentication method: $id")
+    fun getAuthenticationMethodById(id: String): AuthenticationMethod =
+        registeredAuthMethods[id] ?: throw IllegalArgumentException("Unknown authentication method: $id")
 
     init {
         registerAuthenticationMethods(

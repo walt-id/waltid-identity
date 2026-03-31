@@ -33,8 +33,10 @@ object WellKnownKeyResolver : BaseKeyResolver {
                     log.debug { "Fetching JWKS from: $jwksUri" }
                     httpClient.get(jwksUri).body<JsonObject>()
                 }
+
                 "jwks" in metadata -> metadata["jwks"]?.jsonObject
                     ?: throw IllegalArgumentException("Metadata 'jwks' is not a valid JSON object.")
+
                 else -> throw IllegalArgumentException("Issuer metadata must contain 'jwks' or 'jwks_uri'.")
             }
 

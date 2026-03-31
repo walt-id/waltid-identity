@@ -14,7 +14,8 @@ data class ResponseError(
         suspend fun of(response: HttpResponse): ResponseError {
             return ResponseError(
                 response.status,
-                response.body<JsonObject>())
+                response.body<JsonObject>()
+            )
         }
     }
 

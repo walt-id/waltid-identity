@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.service.credentials
 
 import id.walt.webwallet.db.models.WalletCategory
@@ -13,7 +11,6 @@ import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

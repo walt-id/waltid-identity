@@ -15,6 +15,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
 import kotlin.io.encoding.Base64
@@ -78,7 +79,8 @@ data class IssuerSigned private constructor(
                         }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
                         ?: item.elementValue.toSerializedJsonElement()
 
-                    put(item.elementIdentifier, serialized)
+                    if (serialized != JsonNull)
+                        put(item.elementIdentifier, serialized)
                 }
             }
         }
@@ -95,7 +97,8 @@ data class IssuerSigned private constructor(
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
 
-        val signerKeyCertificate = containedX5c.firstOrNull() ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
+        val signerKeyCertificate = containedX5c.firstOrNull()
+            ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
         val signerKey = JWKKey.importFromDerCertificate(signerKeyCertificate.rawBytes)
             .getOrThrow()
 

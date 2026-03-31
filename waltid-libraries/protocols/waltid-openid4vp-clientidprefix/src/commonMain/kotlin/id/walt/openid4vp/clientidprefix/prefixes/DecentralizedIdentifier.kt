@@ -5,7 +5,6 @@ import id.walt.did.dids.DidService
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonPrimitive
 

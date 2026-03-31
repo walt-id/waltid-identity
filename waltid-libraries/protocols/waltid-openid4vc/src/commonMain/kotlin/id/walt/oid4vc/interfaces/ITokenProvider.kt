@@ -18,7 +18,13 @@ interface ITokenProvider {
      * Signs and returns the given [payload] with the optionally specified additional [header]s as _CWT token_,
      * using the appropriate key and algorithm for the given token [target], and/or the optionally given [keyId] or [privKey].
      */
-    fun signCWTToken(target: TokenTarget, payload: MapElement, header: MapElement? = null, keyId: String? = null, privKey: Key? = null): String
+    fun signCWTToken(
+        target: TokenTarget,
+        payload: MapElement,
+        header: MapElement? = null,
+        keyId: String? = null,
+        privKey: Key? = null
+    ): String
 
     /**
      * Verifies the signature of the given _JWT_ [token], ensuring the appropriate key and algorithm for the given token [target] was used.

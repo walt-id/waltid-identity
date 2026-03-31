@@ -14,7 +14,7 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.math.BigInteger
 import java.security.*
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Date
 import javax.security.auth.x500.X500Principal
 
 private const val oneYearInMillis = 365L * 24 * 3600 * 1000

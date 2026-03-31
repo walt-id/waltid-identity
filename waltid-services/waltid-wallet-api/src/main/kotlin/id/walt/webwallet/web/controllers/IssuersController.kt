@@ -96,9 +96,10 @@ fun Application.issuers() = walletRoute {
                     HttpStatusCode.BadRequest to { description = "Authorization failed" }
                 }
             }) {
-                WalletServiceManager.issuerUseCase.authorize(call.getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
-                    call.respond(HttpStatusCode.Accepted)
-                }.onFailure {
+                WalletServiceManager.issuerUseCase.authorize(call.getWalletService().walletId, call.parameters.getOrFail("issuer"))
+                    .onSuccess {
+                        call.respond(HttpStatusCode.Accepted)
+                    }.onFailure {
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }
@@ -125,9 +126,10 @@ fun Application.issuers() = walletRoute {
                     }
                 }
             }) {
-                WalletServiceManager.issuerUseCase.credentials(call.getWalletService().walletId, call.parameters.getOrFail("issuer")).onSuccess {
-                    call.respond(it)
-                }.onFailure {
+                WalletServiceManager.issuerUseCase.credentials(call.getWalletService().walletId, call.parameters.getOrFail("issuer"))
+                    .onSuccess {
+                        call.respond(it)
+                    }.onFailure {
                     call.respond(HttpStatusCode.BadRequest, it.localizedMessage)
                 }
             }

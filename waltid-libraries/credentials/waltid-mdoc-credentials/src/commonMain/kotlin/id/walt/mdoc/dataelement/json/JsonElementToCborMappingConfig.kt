@@ -68,7 +68,7 @@ data class JsonArrayToCborMappingConfig(
     override fun executeMapping(
         json: JsonElement,
     ): DataElement {
-        require(json is JsonArray){
+        require(json is JsonArray) {
             "Expected to execute conversion from json array, but " +
                     "input $json is not a json array"
         }

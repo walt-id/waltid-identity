@@ -3,7 +3,7 @@ package id.walt.mdoc.objects.handover.isooid4vp
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 /**
  * Represents the `OID4VPHandover` structure, which is the `Handover` component of a `SessionTranscript`
@@ -26,7 +26,7 @@ import kotlinx.serialization.cbor.CborArray
  */
 @OptIn(ExperimentalSerializationApi::class)
 @Serializable
-@CborArray
+@CborObjectAsArray
 @Deprecated("Legacy 18013-7 handling")
 data class IsoOID4VPHandover(
     @ByteString

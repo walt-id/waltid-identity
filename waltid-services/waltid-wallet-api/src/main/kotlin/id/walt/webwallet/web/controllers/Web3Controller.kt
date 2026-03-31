@@ -62,7 +62,8 @@ fun Application.web3accounts() = walletRoute {
             request {
                 body<String> {
                     required = true
-                    description = "Wallet id" }
+                    description = "Wallet id"
+                }
             }
             response {
                 HttpStatusCode.OK to { description = "Wallet unlinked" }

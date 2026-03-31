@@ -3,6 +3,7 @@ package id.walt.crypto.utils
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.cbor.*
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializerOrNull
 import kotlin.js.ExperimentalJsExport
@@ -21,6 +22,31 @@ object JsonUtils {
         when (this) {
             is JsonElement -> this
             null -> JsonNull
+
+            is CborElement -> when (this) {
+                is CborNull -> JsonNull
+                is CborBoolean -> JsonPrimitive(this.value)
+                is CborInteger -> JsonPrimitive(this.long)
+                is CborFloat -> JsonPrimitive(this.value)
+                is CborString -> JsonPrimitive(this.value)
+                is CborByteString -> JsonArray(this.value.map { JsonPrimitive(it) })
+                is CborArray -> JsonArray(this.map { it.toJsonElement() })
+                is CborMap -> {
+                    // We must unwrap the CborElement key into a standard Kotlin String
+                    val jsonEntries = this.entries.associate { (cborKey, cborValue) ->
+                        val keyString = when (cborKey) {
+                            is CborString -> cborKey.value         // Extract "address" from CborString
+                            is CborInteger -> cborKey.long.toString() // e.g., if a map uses int keys
+                            else -> cborKey.toString()             // Fallback
+                        }
+                        keyString to cborValue.toJsonElement()
+                    }
+                    JsonObject(jsonEntries)
+                }
+
+                is CborUndefined -> JsonNull
+            }
+
             is String -> JsonPrimitive(this)
             is Boolean -> JsonPrimitive(this)
             is Number -> JsonPrimitive(this)
@@ -36,14 +62,17 @@ object JsonUtils {
             is Collection<*> -> JsonArray(map { it.toJsonElement() })
             is Enum<*> -> JsonPrimitive(this.toString())
             is Unit -> JsonPrimitive("null")
+
             else -> throw IllegalArgumentException("Cannot convert to JsonElement - Unknown type: ${this::class.simpleName}, was: $this")
         }
+
     fun javaToJsonElement(any: Any?) = any.toJsonElement()
 
     @OptIn(ExperimentalSerializationApi::class, InternalSerializationApi::class)
     fun Any?.toSerializedJsonElement(): JsonElement =
         when (this) {
             is JsonElement -> this
+            is CborElement -> this.toJsonElement()
             null -> JsonNull
             is String -> JsonPrimitive(this)
             is Boolean -> JsonPrimitive(this)

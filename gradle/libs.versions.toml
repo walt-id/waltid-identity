@@ -1,8 +1,9 @@
 [versions]
 # Build/compilation versions
 kotlin = "2.3.10"
-suspendtransform = "2.3.10-0.13.2"
+suspend-transform = "2.3.10-0.13.2"
 
+# Used for build-plugins
 java-service = "21"
 java-library = "17"
 
@@ -18,34 +19,45 @@ ktor = "3.3.3"
 
 # ...
 
+# Ktor external plugins
+cohort = "2.8.3"
+smiley-openapi = "5.6.0"
 
 # Kotlinx
-kotlinx-serialization = "1.9.0"
+kotlinx-serialization = "1.10.1-waltid_20260309-SNAPSHOT"
+kotlinx-serialization-cbor-TEMP = "1.10.1-waltid_20260309-SNAPSHOT"
+
 kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
+kotlinx-atomicfu = "0.31.0"
 
 # Logging
-kotlinlogging = "7.0.14"
+kotlinlogging = "8.0.01"
+klogging = "0.11.7"
 slf4j-simple = "2.0.17"
 
 # Misc
 cache4k = "0.14.0"
 
 # Crypto
-bouncycastle = "2.73.8"
-nimbus-jose = "10.7"
+bouncycastle = "2.73.10"
+nimbus-jose = "10.8"
 jose-npm = "5.10.0"
 bcprov = "2.73.10"
 bcpkix = "2.73.10"
 kotlincrypto = "0.8.0"
-tink = "1.16.0"
+kotlincrypto-rand = "0.6.0"
+tink = "1.20.0"
 
 # Testing
-junit-jupiter = "5.11.4"
-mokkery = "3.1.1"
+junit-jupiter = "6.0.3"
+mokkery = "3.3.0"
 
 # HTTP
-okio = "3.16.2"
+okio = "3.17.0"
+
+# Misc
+clikt = "5.1.0"
 
 [libraries]
 
@@ -59,7 +71,7 @@ owasp-dependencycheck = { module = "org.owasp.dependencycheck:org.owasp.dependen
 jib-gradle-plugin = { module = "com.google.cloud.tools:jib-gradle-plugin", version.ref = "jib" }
 vanniktech-publish-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "vanniktech-publish" }
 petuska-npm-publish-plugin = { module = "dev.petuska.npm.publish:dev.petuska.npm.publish.gradle.plugin", version.ref = "npm-publish" }
-loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:love.forte.plugin.suspend-transform.gradle.plugin", version.ref = "suspendtransform" }
+loveforte-suspendtransform = { module = "love.forte.plugin.suspend-transform:love.forte.plugin.suspend-transform.gradle.plugin", version.ref = "suspend-transform" }
 gradle-shadow = { module = "com.gradleup.shadow:com.gradleup.shadow.gradle.plugin", version.ref = "gradle-shadow" }
 powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains.kotlin.plugin.power-assert.gradle.plugin", version.ref = "kotlin" }
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
@@ -79,28 +91,61 @@ ktor-client-encoding = { module = "io.ktor:ktor-client-encoding", version.ref = 
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-json = { module = "io.ktor:ktor-client-json", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-apache = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-java = { module = "io.ktor:ktor-client-java", version.ref = "ktor" }
 ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
 
 ## Ktor Server
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+ktor-server-auth = { module = "io.ktor:ktor-server-auth", version.ref = "ktor" }
+ktor-server-sessions = { module = "io.ktor:ktor-server-sessions", version.ref = "ktor" }
+ktor-server-authjwt = { module = "io.ktor:ktor-server-auth-jwt", version.ref = "ktor" }
+ktor-server-auto-head-response = { module = "io.ktor:ktor-server-auto-head-response", version.ref = "ktor" }
+ktor-server-double-receive = { module = "io.ktor:ktor-server-double-receive", version.ref = "ktor" }
+ktor-server-host-common = { module = "io.ktor:ktor-server-host-common", version.ref = "ktor" }
+ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages", version.ref = "ktor" }
+ktor-server-compression = { module = "io.ktor:ktor-server-compression", version.ref = "ktor" }
+ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+ktor-server-forwarded-header = { module = "io.ktor:ktor-server-forwarded-header", version.ref = "ktor" }
+ktor-server-default-headers = { module = "io.ktor:ktor-server-default-headers", version.ref = "ktor" }
+ktor-server-call-logging = { module = "io.ktor:ktor-server-call-logging", version.ref = "ktor" }
+ktor-server-call-id = { module = "io.ktor:ktor-server-call-id", version.ref = "ktor" }
+ktor-server-sse = { module = "io.ktor:ktor-server-sse", version.ref = "ktor" }
+ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder", version.ref = "ktor" }
+ktor-server-method-override = { module = "io.ktor:ktor-server-method-override", version.ref = "ktor" }
+ktor-server-rate-limit = { module = "io.ktor:ktor-server-rate-limit", version.ref = "ktor" }
 ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+ktor-network-tls-certificates = { module = "io.ktor:ktor-network-tls-certificates", version.ref = "ktor" }
+ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
+
+## Ktor external plugins
+sksamuel-cohort = { module = "com.sksamuel.cohort:cohort-ktor", version.ref = "cohort" }
+
+smiley-ktor-openapi = { module = "io.github.smiley4:ktor-openapi", version.ref = "smiley-openapi" }
+smiley-ktor-swaggerui = { module = "io.github.smiley4:ktor-swagger-ui", version.ref = "smiley-openapi" }
+smiley-ktor-redoc = { module = "io.github.smiley4:ktor-redoc", version.ref = "smiley-openapi" }
 
 ## Kotlinx
-kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinx-serialization" }
-kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+kotlinx-serialization-cbor = { module = "org.jetbrains.kotlinx:kotlinx-serialization-cbor", version.ref = "kotlinx-serialization-cbor-TEMP" }
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinx-coroutines" }
+kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "kotlinx-atomicfu" }
 
 ## Crypto
 bcprov-lts8on = { group = "org.bouncycastle", name = "bcprov-lts8on", version.ref = "bcprov" }
 bcpkix-lts8on = { group = "org.bouncycastle", name = "bcpkix-lts8on", version.ref = "bcpkix" }
-kotlincrypto-hash-bom = { module = "org.kotlincrypto.hash:bom", version.ref = "kotlincrypto" }
 kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
-kotlincrypto-macs-bom = { module = "org.kotlincrypto.macs:bom", version.ref = "kotlincrypto" }
 kotlincrypto-macs-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
+kotlincrypto-random = { module = "org.kotlincrypto.random:crypto-rand", version.ref = "kotlincrypto-rand" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-lts8on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "bouncycastle" }
@@ -111,14 +156,26 @@ kotlin-test = { group = "org.jetbrains.kotlin", name = "kotlin-test", version.re
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit-jupiter" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
+junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit-jupiter" }
+junit-platform-console = { group = "org.junit.platform", name = "junit-platform-console", version.ref = "junit-jupiter" }
 
 ## HTTP
-okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
+okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" } # should be replaced with kotlinx-io
 
 ## Logging
 oshai-kotlinlogging = { module = "io.github.oshai:kotlin-logging", version.ref = "kotlinlogging" }
 slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j-simple" }
+slf4j-julbridge = { module = "org.slf4j:jul-to-slf4j", version.ref = "slf4j-simple" }
+klogging = { module = "io.klogging:klogging", version.ref = "klogging" }
+slf4j-klogging = { module = "io.klogging:slf4j-klogging", version.ref = "klogging" }
 
+## clikt
+clikt-core = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
+clikt-markdown = { module = "com.github.ajalt.clikt:clikt-markdown", version.ref = "clikt" }
+
+## JSON handling
+optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.4" }
+jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "3.0.2" }
 
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }

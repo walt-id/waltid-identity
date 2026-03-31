@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca
 
 import id.walt.crypto.keys.KeyGenerationRequest
@@ -14,7 +12,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertTrue
-import kotlin.time.ExperimentalTime
+
 
 class IACACertificateBuilderMPTest {
 

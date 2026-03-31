@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.db.models
 
@@ -7,7 +7,6 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -21,6 +20,7 @@ enum class AccountWalletPermissions(val power: Int) {
 
 object AccountWalletMappings : Table("account_wallet_mapping") {
     val tenant = varchar("tenant", 128).default("")
+
     @OptIn(ExperimentalUuidApi::class)
     val accountId = kotlinxUuid("id")
     val wallet = reference("wallet", Wallets)

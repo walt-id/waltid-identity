@@ -100,19 +100,23 @@ class CoseSign1TestVectors {
                     val coseSelf = CoseSign1.fromTagged(signedHex)
                     val coseOther = CoseSign1.fromTagged(expectedHex)
 
-                    println("""
+                    println(
+                        """
                         Self: $coseSelf
                         Other: $coseOther
-                    """.trimIndent())
+                    """.trimIndent()
+                    )
 
                     val verifier = jwkKey.toCoseVerifier(alg)
                     val verifySelf = coseSelf.verify(verifier, externalAad)
                     val verifyOther = coseOther.verify(verifier, externalAad)
 
-                    println("""
+                    println(
+                        """
                         |Verify self:  $verifySelf
                         |Verify other: $verifyOther
-                    """.trimMargin())
+                    """.trimMargin()
+                    )
 
                     return when {
                         !verifyOther -> Result.failure(IllegalStateException("Could not verify other: $coseOther"))

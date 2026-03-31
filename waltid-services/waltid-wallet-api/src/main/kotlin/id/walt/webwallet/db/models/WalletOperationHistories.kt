@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JsonUtils.toJsonObject
@@ -15,7 +13,6 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.dao.id.UUIDTable
 import org.jetbrains.exposed.v1.javatime.timestamp
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi

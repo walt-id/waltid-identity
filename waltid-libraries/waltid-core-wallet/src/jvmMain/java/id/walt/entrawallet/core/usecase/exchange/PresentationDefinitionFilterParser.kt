@@ -4,7 +4,6 @@ import id.walt.oid4vc.data.dif.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class PresentationDefinitionFilterParser {
     private val prefixRegex = "^(\\$\\.(vc\\.)?)".toRegex()

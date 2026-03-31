@@ -1,6 +1,6 @@
 package id.walt.verifier2.handlers.sessioncreation
 
-import id.walt.cose.Cose
+import id.walt.cose.*
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
@@ -8,6 +8,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.iso18013.annexc.AnnexC
+import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.iso18013.annexc.protocol.AnnexCRequestResponse
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
@@ -20,6 +21,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.*
+import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import kotlinx.datetime.DateTimeUnit
@@ -27,12 +29,12 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
+import kotlin.io.encoding.Base64
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class, ExperimentalTime::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
@@ -71,10 +73,10 @@ object VerificationSessionCreator {
         val isSignedRequest = setup.core.signedRequest
         val isEncryptedResponse = setup.core.encryptedResponse || isAnnexC
         val isCrossDevice = setup is CrossDeviceFlowSetup
-        val isDcApi = setup is DcApiFlowSetup || isAnnexC
-        val isDcApiHaip = isDcApi && (setup is DcApiFlowSetup && setup.haip)
+        val isDcApi = setup is DcApiAnnexDFlowSetup || isAnnexC
+        val isDcApiHaip = isDcApi && (setup is DcApiAnnexDFlowSetup && setup.haip)
         val origins =
-            if (setup is DcApiFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
+            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
 
         var ephemeralKey: JWKKey? = null
 
@@ -133,7 +135,7 @@ object VerificationSessionCreator {
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
                     "mso_mdoc" to JsonObject(
-                         mapOf(
+                        mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
                             "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
                         )
@@ -222,7 +224,7 @@ object VerificationSessionCreator {
              * containing details about the transaction the Verifier is requesting the End-User to authorize.
              * The decoded JSON object structure is represented by [TransactionDataItem].
              */
-            //val transactionData : List < String >? = null, // List of base64url encoded JSON strings
+            transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null, // List of base64url encoded JSON strings
 
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.
@@ -282,16 +284,82 @@ object VerificationSessionCreator {
 
         val customData = when {
             isAnnexC -> {
+
+                val encryptionInfoObj = DCAPIEncryptionInfo(
+                    nonce = nonce.toByteArray(),
+                    recipientPublicKey = ephemeralKey?.getCosePublicKey()
+                        ?: error("Missing ephemeral key for Annex C verification")
+                )
+                val encryptionInfoB64 = encryptionInfoObj.encodeToBase64Url()
+
+                var deviceRequest = DeviceRequest(setup.requestedElements)
+
+                // ===== READER AUTHENTICATION =====
+                if (isSignedRequest) {
+                    requireNotNull(key) { "Signing key is required for signed Annex C requests" }
+                    require(!x5c.isNullOrEmpty()) { "x5c is required for signed Annex C requests" }
+                    // Build the DC API Session Transcript
+                    val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
+                        encryptionInfoB64,
+                        setup.origin
+                    )
+
+                    // Extract ItemsRequestBytes from the request
+                    val itemsRequestBytesAll = deviceRequest.docRequests.map { it.itemsRequest.serialized }
+
+                    // Build ReaderAuthenticationAll
+                    val readerAuthAll = ReaderAuthenticationAll(
+                        sessionTranscript = sessionTranscript,
+                        itemsRequestBytesAll = itemsRequestBytesAll,
+                        docRequestsInfoBytes = deviceRequest.deviceRequestInfo?.serialized
+                    )
+
+                    // Encode as ByteArray (becomes the detached payload)
+                    val detachedPayload = coseCompliantCbor.encodeToByteArray(
+                        ReaderAuthenticationAll.serializer(),
+                        readerAuthAll
+                    )
+
+                    val x5cByteArrays = x5c.map { Base64.decode(it) }
+
+                    // Setup the CoseSigner
+                    val coseSigner = key.toCoseSigner()
+
+                    // Create the Detached Signature
+                    val coseSign1 = CoseSign1.createAndSignDetached(
+                        protectedHeaders = CoseHeaders(
+                            algorithm = key.keyType.toCoseAlgorithm()
+                        ),
+                        unprotectedHeaders = CoseHeaders(
+                            x5chain = x5cByteArrays.map { CoseCertificate(it) } // COSE Header 33
+                        ),
+                        detachedPayload = detachedPayload,
+                        signer = coseSigner
+                    )
+
+                    // Attach to the request
+                    deviceRequest = deviceRequest.copy(readerAuthAll = listOf(coseSign1))
+                }
+                // ===== END READER AUTHENTICATION =====
+
                 AnnexCRequestResponse(
                     protocol = AnnexC.PROTOCOL,
                     data = AnnexCRequestResponse.Data(
-                        deviceRequest = DeviceRequest(setup.docType, setup.requestedElements).encodeToBase64Url(),
+                        deviceRequest = deviceRequest.encodeToBase64Url(),
+                        encryptionInfo = encryptionInfoB64
+                    )
+                )
+
+                /*AnnexCRequestResponse(
+                    protocol = AnnexC.PROTOCOL,
+                    data = AnnexCRequestResponse.Data(
+                        deviceRequest = DeviceRequest(setup.requestedElements).encodeToBase64Url(),
                         encryptionInfo = DCAPIEncryptionInfo(
-                            nonce.toByteArray(),
+                            nonce = nonce.toByteArray(),
                             recipientPublicKey = ephemeralKey?.getCosePublicKey() ?: error("Missing ephermal key for Annex C verification")
                         ).encodeToBase64Url()
                     )
-                )
+                )*/
             }
 
             else -> null

@@ -228,7 +228,7 @@ class InputDescriptorMatchingTest(
         )
     })
 
-    fun getPresentationRequestByType(type: String, degreeType: String = ".*") = """
+    fun getPresentationRequestByType(type: String, degreeType: String = ".*") = $$"""
     {
       "vp_policies": [
         "signature",
@@ -250,20 +250,20 @@ class InputDescriptorMatchingTest(
               "fields": [
                 {
                   "path": [
-                    "${'$'}.vc.type"
+                    "$.vc.type"
                   ],
                   "filter": {
                     "type": "string",
-                    "pattern": "$type"
+                    "pattern": "$$type"
                   }
                 },
                 {
                   "path": [
-                    "${'$'}.vc.credentialSubject.degree.type"
+                    "$.vc.credentialSubject.degree.type"
                   ],
                   "filter": {
                     "type": "string",
-                    "pattern": "$degreeType"
+                    "pattern": "$$degreeType"
                   }
                 }
               ],
@@ -275,7 +275,7 @@ class InputDescriptorMatchingTest(
     }
   """.trimIndent()
 
-    fun getPresentationRequestByDegreeType(degreeType: String) = """
+    fun getPresentationRequestByDegreeType(degreeType: String) = $$"""
     {
       "vp_policies": [
         "signature",
@@ -297,11 +297,11 @@ class InputDescriptorMatchingTest(
               "fields": [
                 {
                   "path": [
-                    "${'$'}.vc.credentialSubject.degree.type"
+                    "$.vc.credentialSubject.degree.type"
                   ],
                   "filter": {
                     "type": "string",
-                    "pattern": "$degreeType"
+                    "pattern": "$$degreeType"
                   }
                 }
               ],

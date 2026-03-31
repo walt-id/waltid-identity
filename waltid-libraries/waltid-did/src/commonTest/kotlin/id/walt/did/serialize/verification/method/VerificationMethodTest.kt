@@ -12,7 +12,8 @@ import kotlin.test.assertEquals
 
 class VerificationMethodTest {
 
-    private val keyString = """{"alg":"EdDSA","crv":"Ed25519","kid":"151df6ec01714883b812f26f2d63e584","kty":"OKP","use":"sig","x":"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM"}"""
+    private val keyString =
+        """{"alg":"EdDSA","crv":"Ed25519","kid":"151df6ec01714883b812f26f2d63e584","kty":"OKP","use":"sig","x":"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM"}"""
 
     @Test
     fun testSerialization() = runTest {
@@ -23,7 +24,8 @@ class VerificationMethodTest {
             controller = "some-controller",
             material = Pair(VerificationMaterialType.PublicKeyJwk, key.exportJWKObject()),
         )
-        val methodJsonString = "{\"id\":\"some-id\",\"type\":\"JsonWebKey2020\",\"controller\":\"some-controller\",\"publicKeyJwk\":{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"151df6ec01714883b812f26f2d63e584\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}}"
+        val methodJsonString =
+            "{\"id\":\"some-id\",\"type\":\"JsonWebKey2020\",\"controller\":\"some-controller\",\"publicKeyJwk\":{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"151df6ec01714883b812f26f2d63e584\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}}"
         val canonicalMethodJsonString = JsonCanonicalization
             .getCanonicalString("{\"id\":\"some-id\",\"type\":\"JsonWebKey2020\",\"controller\":\"some-controller\",\"publicKeyJwk\":{\"alg\":\"EdDSA\",\"crv\":\"Ed25519\",\"kid\":\"151df6ec01714883b812f26f2d63e584\",\"kty\":\"OKP\",\"use\":\"sig\",\"x\":\"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM\"}}")
         //encode
