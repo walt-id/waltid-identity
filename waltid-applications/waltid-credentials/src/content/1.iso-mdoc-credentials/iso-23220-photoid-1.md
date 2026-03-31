@@ -1,26 +1,19 @@
-# org.iso.23220.photoid.1
-
-## Source
-
-- Dataset source: https://github.com/openwallet-foundation/multipaz
+# ISO Photo ID
 
 ## Document Type
 
-- `docType`: `org.iso.23220.photoid.1`
-- `fields`: `154`
+`org.iso.23220.photoid.1`
 
-## Example JSON (from sample values)
+## Credential Data
 
 ```json
 {
-  "docType": "org.iso.23220.photoid.1",
-  "credentialSubject": {
     "org.iso.23220.1": {
       "family_name": "Mustermann",
       "family_name_viz": "Mustermann",
       "given_name": "Erika",
       "given_name_viz": "Erika",
-      "// TODO: this is a more complex type\n            \"birth_date\"": null,
+      "birth_date": "1974-03-15",
       "portrait": null,
       "issue_date": "2024-03-15",
       "expiry_date": "2028-09-01",

@@ -63,7 +63,7 @@ def main() -> None:
                 f"- `docType`: `{doc_type}`",
                 f"- `fields`: `{len(fields)}`",
                 "",
-                "## Example JSON (from sample values)",
+                "## Credential Data",
                 "",
                 "```json",
                 json.dumps({"docType": doc_type, "credentialSubject": grouped}, indent=2, ensure_ascii=False),

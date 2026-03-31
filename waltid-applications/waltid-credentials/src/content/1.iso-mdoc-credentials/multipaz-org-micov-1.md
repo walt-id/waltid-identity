@@ -6,112 +6,56 @@
 
 ## Document Type
 
-- `docType`: `org.micov.1`
-- `fields`: `18`
+`org.micov.1`
 
-## Example JSON (from sample values)
+## Credential Data
 
 ```json
 {
-  "docType": "org.micov.1",
-  "credentialSubject": {
-    "org.micov.attestation.1": {
-      "1D47_vaccinated": null,
-      "RA01_vaccinated": null,
-      "RA01_test": null,
-      "safeEntry_Leisure": null,
-      "fac": null,
-      "fni": null,
-      "gni": null,
-      "by": null,
-      "bm": null,
-      "bd": null
+  "org.micov.attestation.1": {
+    "1D47_vaccinated": true,
+    "RA01_vaccinated": true,
+    "RA01_test": false,
+    "safeEntry_Leisure": true,
+    "fac": "Musterfrau",
+    "fni": "Anna Maria",
+    "gni": "Anna Maria",
+    "by": 1988,
+    "bm": 8,
+    "bd": 25
+  },
+  "org.micov.vtr.1": {
+    "fn": "Musterfrau",
+    "gn": "Anna Maria",
+    "dob": "1988-08-25",
+    "sex": 2,
+    "v_RA01_1": {
+      "tg": "840539006",
+      "vp": "1119349007",
+      "mp": "EU/1/20/1528",
+      "ma": "ORG-100030215",
+      "dn": 2,
+      "sd": 2,
+      "dt": "2022-01-14",
+      "co": "AT",
+      "is": "Bundesministerium für Soziales, Gesundheit, Pflege und Konsumentenschutz",
+      "ci": "URN:UVCI:01:AT:VACC:2022-00018427"
     },
-    "org.micov.vtr.1": {
-      "fn": null,
-      "gn": null,
-      "dob": null,
-      "sex": null,
-      "v_RA01_1": null,
-      "v_RA01_2": null,
-      "pid_PPN": null,
-      "pid_DL": null
-    }
+    "v_RA01_2": {
+      "tg": "840539006",
+      "vp": "1119349007",
+      "mp": "EU/1/20/1528",
+      "ma": "ORG-100030215",
+      "dn": 3,
+      "sd": 3,
+      "dt": "2022-10-21",
+      "co": "AT",
+      "is": "Bundesministerium für Soziales, Gesundheit, Pflege und Konsumentenschutz",
+      "ci": "URN:UVCI:01:AT:VACC:2022-00028427"
+    },
+    "pid_PPN": "P<AUTMUSTERFRAU<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<",
+    "pid_DL": "DL-AT-2025-00018427"
   }
 }
+
 ```
-
-## Fields
-
-- **1D47_vaccinated**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **RA01_vaccinated**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **RA01_test**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **safeEntry_Leisure**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **fac**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **fni**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **gni**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **by**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **bm**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **bd**
-  - namespace: `org.micov.attestation.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **fn**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `True`
-  - sampleValue: `null`
-- **gn**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `True`
-  - sampleValue: `null`
-- **dob**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `True`
-  - sampleValue: `null`
-- **sex**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **v_RA01_1**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **v_RA01_2**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **pid_PPN**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `False`
-  - sampleValue: `null`
-- **pid_DL**
-  - namespace: `org.micov.vtr.1`
-  - mandatory: `False`
-  - sampleValue: `null`
