@@ -1,5 +1,6 @@
 package id.walt.ktornotifications.core
 
+import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -9,7 +10,7 @@ data class KtorSessionNotifications(
 ) {
     @Serializable
     data class VerificationSessionWebhookNotification(
-        val url: String,
+        val url: Url,
 
         @SerialName("basic_auth_username")
         val basicAuthUser: String? = null,
