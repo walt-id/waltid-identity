@@ -37,7 +37,7 @@ sealed class VPPolicy2() {
         constructor(ex: Throwable) : this(
             error = ex::class.simpleName ?: ex::class.portableSimpleName,
             message = ex.message,
-            cause = ex.cause?.let { PolicyRunError(ex.cause!!) }
+            cause = ex.cause?.let { PolicyRunError(it) }
         )
     }
 
