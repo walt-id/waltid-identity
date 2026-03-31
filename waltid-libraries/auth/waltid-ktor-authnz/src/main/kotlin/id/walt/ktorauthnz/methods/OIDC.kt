@@ -1,5 +1,6 @@
 package id.walt.ktorauthnz.methods
 
+import com.sun.tools.javac.code.TypeAnnotationPosition.field
 import id.walt.crypto.keys.jwk.JwkKeyProvider
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.AuthContext
@@ -248,7 +249,10 @@ object OIDC : AuthenticationMethod("oidc") {
             }
 
             // --- Provider-Initiated Logout Routes ---
-
+            // NOTE: These endpoints are for OIDC provider-initiated logout interoperability.
+            // - logout/backchannel is called by the IdP with a logout_token.
+            // - logout/frontchannel is called by the IdP/browser flow with iss + sid.
+            // They should not be used as the primary user-triggered logout endpoints in client apps.
             post("logout/backchannel") {
                 log.trace { "OIDC: Backchannel-logout" }
                 val logoutTokenStr = call.receiveParameters()["logout_token"]
