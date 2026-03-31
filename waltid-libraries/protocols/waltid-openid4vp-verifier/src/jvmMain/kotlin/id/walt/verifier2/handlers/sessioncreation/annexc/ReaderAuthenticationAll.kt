@@ -10,9 +10,13 @@ import kotlinx.serialization.cbor.CborObjectAsArray
 @Serializable
 @CborObjectAsArray
 data class ReaderAuthenticationAll(
-    val context: String = "ReaderAuthenticationAll",
+    val context: String,
     val sessionTranscript: SessionTranscript,
     val itemsRequestBytesAll: List<ByteArray>,
     val docRequestsInfoBytes: ByteArray? = null
-)
+) {
+    companion object {
+        val CONTEXT = "ReaderAuthenticationAll"
+    }
+}
 

@@ -41,4 +41,8 @@ data class UseCase(
     // Thus, [+ DocumentSet] becomes a List of Lists of UInts.
     @SerialName("documentSets")
     val documentSets: List<List<UInt>>
-)
+) {
+    override fun toString(): String {
+        return "[DeviceRequestInfo UseCase] mandatory=$mandatory, documentSets=$documentSets, puroseHints=$purposeHints, documentSets=$documentSets"
+    }
+}
