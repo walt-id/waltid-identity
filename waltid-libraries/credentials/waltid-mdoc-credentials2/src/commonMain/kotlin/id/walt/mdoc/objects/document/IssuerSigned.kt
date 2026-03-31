@@ -9,6 +9,7 @@ import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.elements.NamespacedIssuerSignedListSerializer
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -54,8 +55,12 @@ data class IssuerSigned private constructor(
      * @return The parsed [MobileSecurityObject].
      * @throws Exception if the payload cannot be decoded.
      */
-    fun decodeMobileSecurityObject() =
+    fun decodeMobileSecurityObject() = runCatching {
         issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+    }.getOrElse { ex ->
+        log.trace(ex) { "Unable to parse MSO with decodeMobileSecurityObject(), MSO is: ${issuerAuth.payload?.toHexString()}" }
+        throw IllegalArgumentException("Unable to parse MSO (mobile security object) of IssuerSigned: ${ex.message}", ex)
+    }
 
     /**
      * A utility function to convert the structured, CBOR-oriented `namespaces` map into a
@@ -107,6 +112,8 @@ data class IssuerSigned private constructor(
 
 
     companion object {
+        val log = KotlinLogging.logger {  }
+
         /**
          * The primary factory method for creating an [IssuerSigned] instance.
          * Using a factory method with a private constructor ensures that the object is always
