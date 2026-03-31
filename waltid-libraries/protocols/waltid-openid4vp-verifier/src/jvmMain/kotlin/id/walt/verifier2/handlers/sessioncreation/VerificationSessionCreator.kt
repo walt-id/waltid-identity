@@ -10,8 +10,11 @@ import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.iso18013.annexc.AnnexC
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.iso18013.annexc.protocol.AnnexCRequestResponse
+import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.dcapi.DCAPIEncryptionInfo
 import id.walt.mdoc.objects.deviceretrieval.DeviceRequest
+import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
+import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.VPPolicyList
@@ -28,6 +31,7 @@ import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.plus
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
@@ -292,10 +296,9 @@ object VerificationSessionCreator {
                 )
                 val encryptionInfoB64 = encryptionInfoObj.encodeToBase64Url()
 
-                var deviceRequest = DeviceRequest(setup.requestedElements)
 
                 // ===== READER AUTHENTICATION =====
-                if (isSignedRequest) {
+                val deviceRequest = if (isSignedRequest) {
                     requireNotNull(key) { "Signing key is required for signed Annex C requests" }
                     require(!x5c.isNullOrEmpty()) { "x5c is required for signed Annex C requests" }
                     // Build the DC API Session Transcript
@@ -304,21 +307,33 @@ object VerificationSessionCreator {
                         setup.origin
                     )
 
+                    val deviceRequest = DeviceRequest(setup.requestedElements).copy(
+                        version = DeviceRequest.VERSION_WITH_SIGNING,
+                        deviceRequestInfo = ByteStringWrapper(
+                            DeviceRequestInfo(
+                                useCases = listOf(
+                                    UseCase(
+                                        mandatory = true,
+                                        documentSets = listOf(setup.requestedElements.keys.withIndex().map { it.index.toUInt() })
+                                    )
+                                )
+                            )
+                        )
+                    )
+
                     // Extract ItemsRequestBytes from the request
                     val itemsRequestBytesAll = deviceRequest.docRequests.map { it.itemsRequest.serialized }
 
                     // Build ReaderAuthenticationAll
                     val readerAuthAll = ReaderAuthenticationAll(
+                        context = ReaderAuthenticationAll.CONTEXT,
                         sessionTranscript = sessionTranscript,
                         itemsRequestBytesAll = itemsRequestBytesAll,
                         docRequestsInfoBytes = deviceRequest.deviceRequestInfo?.serialized
                     )
 
                     // Encode as ByteArray (becomes the detached payload)
-                    val detachedPayload = coseCompliantCbor.encodeToByteArray(
-                        ReaderAuthenticationAll.serializer(),
-                        readerAuthAll
-                    )
+                    val detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthAll)
 
                     val x5cByteArrays = x5c.map { Base64.decode(it) }
 
@@ -338,7 +353,11 @@ object VerificationSessionCreator {
                     )
 
                     // Attach to the request
-                    deviceRequest = deviceRequest.copy(readerAuthAll = listOf(coseSign1))
+                    deviceRequest.copy(
+                        readerAuthAll = listOf(coseSign1)
+                    )
+                } else {
+                    DeviceRequest(setup.requestedElements)
                 }
                 // ===== END READER AUTHENTICATION =====
 
@@ -349,17 +368,6 @@ object VerificationSessionCreator {
                         encryptionInfo = encryptionInfoB64
                     )
                 )
-
-                /*AnnexCRequestResponse(
-                    protocol = AnnexC.PROTOCOL,
-                    data = AnnexCRequestResponse.Data(
-                        deviceRequest = DeviceRequest(setup.requestedElements).encodeToBase64Url(),
-                        encryptionInfo = DCAPIEncryptionInfo(
-                            nonce = nonce.toByteArray(),
-                            recipientPublicKey = ephemeralKey?.getCosePublicKey() ?: error("Missing ephermal key for Annex C verification")
-                        ).encodeToBase64Url()
-                    )
-                )*/
             }
 
             else -> null
