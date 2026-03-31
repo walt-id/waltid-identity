@@ -214,6 +214,8 @@ object OIDC : AuthenticationMethod("oidc") {
                         ),
                         oidcIdentifier = identifier,
                         externalRoles = externalRoles,
+                        idTokenClaims = idTokenPayload,
+                        userInfoClaims = userInfo,
                     )
                 )
 
