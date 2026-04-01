@@ -1,5 +1,9 @@
 # EU PID Credential (ISO mdoc)
 
+## Source
+
+- Dataset source: https://github.com/eu-digital-identity-wallet/eudi-doc-attestation-rulebooks-catalog/blob/main/rulebooks/pid/pid-rulebook.md
+
 ## Document Type
 
 `eu.europa.ec.eudi.pid.1`
@@ -12,37 +16,39 @@
       "family_name": "Musterfrau",
       "given_name": "Anna Maria",
       "birth_date": "1971-09-01",
-      "age_in_years": 54,
-      "age_birth_year": 1971,
-      "age_over_18": true,
-      "age_over_21": true,
-      "family_name_birth": "Leitner",
-      "given_name_birth": "Anna",
-      "place_of_birth": "Graz",
-      "resident_address": "Mariahilfer Straße 120/8, 1070 Wien, Austria",
-      "resident_country": "AT",
-      "resident_state": "Wien",
-      "resident_city": "Wien",
-      "resident_postal_code": "1070",
-      "resident_street": "Mariahilfer Straße",
-      "resident_house_number": "120/8",
-      "sex": 2,
+      "birth_place": {
+        "country" : "Austria",
+        "region" : "Vienna",
+        "locality" : "Vienna"
+      },
       "nationality": [
         "AT",
         "CH"
       ],
-      "issuance_date": "2025-01-15T09:30:00Z",
+      "resident_address": "Mariahilfer Straße 120/8, 1070 Wien, Austria",
+      "resident_country": "AT",
+      "resident_state": "Vienna",
+      "resident_city": "Vienna",
+      "resident_postal_code": "1070",
+      "resident_street": "Mariahilfer Straße",
+      "resident_house_number": "120/8",
+      "personal_administrative_number": "9876543210",
+      "portrait": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
+      "family_name_birth": "Leitner",
+      "given_name_birth": "Anna",
+      "sex": 2,
+      "email_address": "anna.musterfrau@example.at",
+      "mobile_phone_number": "+4366412345678",
       "expiry_date": "2030-01-15T09:30:00Z",
       "issuing_authority": "Bundesministerium für Inneres",
       "document_number": "PID-AT-2025-00018427",
       "issuing_country": "AT",
+      "document_number": "A01234567",
       "issuing_jurisdiction": "AT-9",
-      "personal_administrative_number": "9876543210",
-      "portrait": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII=",
-      "email_address": "anna.musterfrau@example.at",
-      "mobile_phone_number": "+4366412345678",
+      "location_status": "https://example.com/statuslists/pid/",
+      "issuance_date": "2025-01-15T09:30:00Z",
       "trust_anchor": "https://wallet.example.at/trust/anchors/root-ca-2025.pem",
-      "location_status": "resident"
+      "attestation_legal_category": "PID"
     }
 }
 ```

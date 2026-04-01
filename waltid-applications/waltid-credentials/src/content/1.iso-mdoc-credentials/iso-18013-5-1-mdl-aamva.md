@@ -1,12 +1,13 @@
-# com.google.wallet.idcard.1
+# ISO 18013-5  mDL + AAMVA
 
 ## Source
 
-- Dataset source: https://github.com/openwallet-foundation/multipaz
+- Dataset source: https://developers.google.com/wallet/identity/verify/supported-credential-attributes#id-pass-fields
 
 ## Document Type
 
-`com.google.wallet.idcard.1`
+`org.iso.18013.5.1.mDL`
+
 
 ## Credential Data
 
@@ -50,8 +51,8 @@
     "resident_state": "Sample State",
     "resident_postal_code": "12345",
     "resident_country": "ZZ",
-    "family_name_national_character": "ÐÐ°Ð±ÑÐ°Ðº",
-    "given_name_national_character": "ÐÑÐ¸ÐºÐ°",
+    "family_name_national_character": null,
+    "given_name_national_character": null,
     "signature_usual_mark": null,
     "biometric_template_face": null,
     "biometric_template_finger": null,
