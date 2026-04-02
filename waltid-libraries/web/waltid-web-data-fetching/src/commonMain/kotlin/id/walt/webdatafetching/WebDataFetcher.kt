@@ -3,9 +3,11 @@ package id.walt.webdatafetching
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.json
 
 class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null) {
 
@@ -19,6 +21,10 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
     val httpClient = dataFetcherConfiguration.http.engineCreator().getHttpClient {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)
+
+        install(ContentNegotiation) {
+            json()
+        }
     }
 
     val cache = dataFetcherConfiguration.cache?.buildCache<Any>()
