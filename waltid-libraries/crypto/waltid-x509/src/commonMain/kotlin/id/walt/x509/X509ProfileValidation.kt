@@ -443,10 +443,10 @@ private fun validateKnownBuildData(
                     if (issuerAlternativeNames.isNotEmpty()) {
                         validateIssuerAlternativeNames(profileId, issuerAlternativeNames, issues)
                     }
+                    if (crlDistributionPointUri.isNullOrBlank()) {
+                        issues += "Profile '${profileId.value}' requires a non-blank CRL distribution point URI"
+                    }
                 }
-            }
-            if (crlDistributionPointUri.isNullOrBlank()) {
-                issues += "Profile '${profileId.value}' requires a non-blank CRL distribution point URI"
             }
         }
 
