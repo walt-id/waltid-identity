@@ -1,7 +1,7 @@
 package id.walt.webdatafetching.engines
 
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 
-expect object Apache5Engine: WebDataFetcherHttpEngine {
-    override fun getHttpClient(): HttpClient
+expect object Apache5Engine : WebDataFetcherHttpEngine {
+    override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient
 }
