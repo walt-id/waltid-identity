@@ -1,6 +1,6 @@
 package id.walt.webdatafetching.config
 
-enum class HttpEngines {
+enum class HttpEngine {
     /** Official Coroutine-IO engine */
     CIO,
 
