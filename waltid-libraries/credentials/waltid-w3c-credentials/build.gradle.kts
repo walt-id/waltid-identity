@@ -40,6 +40,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
+            api(project(":waltid-libraries:web:waltid-web-data-fetching"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
