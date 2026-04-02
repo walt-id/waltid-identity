@@ -30,6 +30,22 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - **Pluggable trust model**: validate against:
     - your **organization trust store** (recommended), or
     - an explicit **pinned root** included in the `x5c` chain (private PKI / pinning).
+- **Generic X.509 profile foundation (KMP)**:
+  - generic `X509CertificateProfile` abstraction
+  - reusable `X509ProfileId`
+  - `profileId` as the primary semantic identifier
+  - generic subject / SAN / EKU / validity policy models for future profile-driven issuance
+- **Profile-driven issuance foundation (JVM)**:
+  - initial support for a profile-driven issuer/resolver model
+  - current practical profile set includes:
+    - `iso.iaca`
+    - `iso.document-signer`
+    - `generic-ca`
+    - `generic-end-entity`
+  - additional known profile definitions show the generic model can also represent:
+    - `etsi.qwac`
+    - `etsi.qsealc`
+    - `etsi.psd2.transport`
 - **[ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (JVM)**:
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
@@ -37,6 +53,113 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 - **Clear exceptions**: failures raise `X509ValidationException` with context.
 
 ---
+
+## New generic profile / issuance foundation
+
+The library now contains a **generic certificate profile layer** plus a **profile-driven JVM issuer foundation**.
+
+### Core types
+- `X509ProfileId`
+- `X509CertificateProfile`
+- `X509Subject`
+- `X509SubjectAttribute`
+- `X509SubjectAlternativeName`
+- `X509ExtendedKeyUsage`
+- `X509ValidityPolicy`
+
+### Current profile IDs
+Built-in known profiles now include:
+- `iso.iaca`
+- `iso.document-signer`
+- `generic-ca`
+- `generic-end-entity`
+- `etsi.qwac`
+- `etsi.qsealc`
+- `etsi.psd2.transport`
+
+### What is really implemented today
+- generic profile modeling = **implemented**
+- profile-driven JVM issuance = **implemented for**:
+  - `iso.iaca`
+  - `iso.document-signer`
+  - `generic-ca`
+  - `generic-end-entity`
+- QWAC / QSealC / PSD2-style profiles = **modeled as generic profiles, not full issuance flows yet**
+- CSR-driven issuance = **not implemented yet**
+
+### Important ISO note
+For `iso.iaca` and `iso.document-signer`, the generic JVM issuer currently routes through the existing ISO-specific implementation path. That is deliberate.
+
+The ISO-specific builder/parser/validator classes remain authoritative for now, and deprecation is blocked until parity is proven by tests. See `docs/iso-parity-gate.md`.
+
+### Why the model is intentionally simple
+`X509CertificateProfile` uses **`profileId` as the primary semantic identifier**.
+There is no additional coarse category layer anymore. This keeps the model smaller and avoids encoding the same meaning twice.
+
+### Example: define a generic profile
+
+```kotlin
+val qwacProfile = X509CertificateProfile(
+    profileId = X509ProfileId("etsi.qwac"),
+    keyUsages = setOf(X509KeyUsage.DigitalSignature, X509KeyUsage.KeyEncipherment),
+    extendedKeyUsages = setOf(X509ExtendedKeyUsage.ServerAuth),
+    basicConstraints = X509BasicConstraints(isCA = false, pathLengthConstraint = 0),
+    validityPolicy = X509ValidityPolicy(maximumValidity = 398.days),
+    description = "Example QWAC-style transport certificate profile",
+)
+```
+
+### Example: issue using the generic JVM issuer
+
+```kotlin
+val issuer = DefaultX509ProfileDrivenIssuer()
+
+val issued = issuer.issue(
+    X509SelfSignedCertificateIssuanceSpec(
+        profileId = X509KnownProfileIds.GenericCa,
+        certificateData = X509CertificateBuildData(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("AT"),
+                X509SubjectAttributes.commonName("Example Generic CA"),
+            ),
+            validityPeriod = X509ValidityPeriod(
+                notBefore = Instant.parse("2026-01-01T00:00:00Z"),
+                notAfter = Instant.parse("2030-01-01T00:00:00Z"),
+            ),
+        ),
+        signingKey = caKey,
+    )
+)
+```
+
+### Example: issuer-signed end-entity certificate
+
+```kotlin
+val issued = issuer.issue(
+    X509IssuerSignedCertificateIssuanceSpec(
+        profileId = X509KnownProfileIds.GenericEndEntity,
+        certificateData = X509CertificateBuildData(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("AT"),
+                X509SubjectAttributes.commonName("service.example.org"),
+            ),
+            validityPeriod = X509ValidityPeriod(
+                notBefore = Instant.parse("2026-01-02T00:00:00Z"),
+                notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+            ),
+            subjectAlternativeNames = setOf(
+                X509SubjectAlternativeName.DnsName("service.example.org"),
+            ),
+        ),
+        publicKey = eePublicKey,
+        issuer = X509CertificateSignerSpec(
+            profileId = X509KnownProfileIds.GenericCa,
+            certificateData = caIssued.certificateData.toBuildData(),
+            signingKey = caKey,
+        ),
+    )
+)
+```
 
 ## Targets
 
@@ -138,6 +261,10 @@ The `id.walt.x509.iso` package provides the following:
 - Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validated** by the parsers; use the validator classes for validation.
 - Validator classes for IACA (via `IACAValidator`) and Document Signer (via `DocumentSignerValidator`) decoded certificate instances (`IACADecodedCertificate` and `DocumentSignerDecodedCertificate` respectively) with a simple and flexible validation configuration tuning (refer to `IACAValidationConfig` and `DocumentSignerValidationConfig` for the respective configuration options).
 - VICAL-aligned IACA certificate info extraction (via `IACADecodedCertificate.toIacaCertificateInfo()`), returning structured certificate info data required for VICALs, including issuer/subject DER and issuing authority string (JVM).
+
+### Authoritative ISO implementation note
+
+The generic/profile-driven issuer can issue `iso.iaca` and `iso.document-signer`, but those profile IDs are still backed by the existing ISO-specific implementation path. That is deliberate: the specific ISO builders/parsers/validators remain the source of truth until semantic parity is proven convincingly enough for deprecation. The parity gate currently requires coverage for decoded subject/issuer data, validity, key usage, EKU, basic constraints, issuer/subject alternative names where applicable, CRL distribution points where applicable, and validator or roundtrip acceptance behavior.
 
 ### IACA X.509 Certificate Generation
 
