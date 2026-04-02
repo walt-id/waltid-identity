@@ -19,9 +19,9 @@ class WebDataFetcher(id: String) {
 
     val cache = dataFetcherConfiguration.cache?.buildCache<Any>()
 
-    suspend inline fun <reified T: Any> fetch(url: String): T = fetch<T>(UrlUtils.parseUrl(url))
+    suspend inline fun <reified T : Any> fetch(url: String): T = fetch<T>(UrlUtils.parseUrl(url))
 
-    suspend inline fun <reified T: Any> fetch(url: Url): T {
+    suspend inline fun <reified T : Any> fetch(url: Url): T {
         val cacheId = url.toString()
 
         dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
