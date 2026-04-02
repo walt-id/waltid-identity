@@ -4,6 +4,7 @@ import id.walt.x509.iso.DS_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.DocumentSignerEkuOID
 import id.walt.x509.iso.IACA_CERT_MAX_VALIDITY_SECONDS
 import id.walt.x509.iso.isValidIsoCountryCode
+import kotlin.time.Duration
 
 data class X509ProfileValidationResult(
     val isValid: Boolean,
@@ -43,7 +44,7 @@ fun X509CertificateProfile.validateDefinition(): X509ProfileValidationResult {
     }
 
     validityPolicy?.let { validityPolicy ->
-        if (validityPolicy.maximumValidity.isZero()) {
+        if (validityPolicy.maximumValidity == Duration.ZERO) {
             issues += "Profile '${profileId.value}' validity policy maximumValidity must be greater than zero"
         }
     }
@@ -72,6 +73,7 @@ fun X509CertificateBuildData.checkCompatibility(
         subjectAlternativeNames = subjectAlternativeNames,
         issuerAlternativeNames = issuerAlternativeNames,
         crlDistributionPointUri = crlDistributionPointUri,
+        mode = X509BuildDataValidationMode.Request,
         issues = issues,
     )
 
@@ -97,11 +99,12 @@ fun X509IssuedCertificateData.checkCompatibility(
         subjectAlternativeNames = subjectAlternativeNames,
         issuerAlternativeNames = issuerAlternativeNames,
         crlDistributionPointUri = crlDistributionPointUri,
+        mode = X509BuildDataValidationMode.IssuedCertificate,
         issues = issues,
     )
 
     profile.basicConstraints?.let { expectedBasicConstraints ->
-        if (basicConstraints != expectedBasicConstraints) {
+        if (!isCompatibleIssuedBasicConstraints(basicConstraints, expectedBasicConstraints)) {
             issues += "Issued certificate basic constraints $basicConstraints do not match profile basic constraints $expectedBasicConstraints"
         }
     }
@@ -193,7 +196,7 @@ internal fun validateKnownCsrCompatibility(
         subjectAlternativeNames = csrData.subjectAlternativeNames,
         issuerAlternativeNames = emptySet(),
         crlDistributionPointUri = null,
-        certificateOnlyChecks = false,
+        mode = X509BuildDataValidationMode.Request,
         issues = issues,
     )
 
@@ -348,13 +351,18 @@ private fun validateValidityPeriod(
     }
 }
 
+private enum class X509BuildDataValidationMode {
+    Request,
+    IssuedCertificate,
+}
+
 private fun validateKnownBuildData(
     profileId: X509ProfileId,
     subject: X509Subject,
     subjectAlternativeNames: Set<X509SubjectAlternativeName>,
     issuerAlternativeNames: Set<X509SubjectAlternativeName>,
     crlDistributionPointUri: String?,
-    certificateOnlyChecks: Boolean = true,
+    mode: X509BuildDataValidationMode,
     issues: MutableList<String>,
 ) {
     when (profileId) {
@@ -384,11 +392,15 @@ private fun validateKnownBuildData(
             if (subjectAlternativeNames.isNotEmpty()) {
                 issues += "Profile '${profileId.value}' does not support subject alternative names"
             }
-            if (certificateOnlyChecks) {
-                validateIssuerAlternativeNames(profileId, issuerAlternativeNames, issues)
-                if (crlDistributionPointUri != null && crlDistributionPointUri.isBlank()) {
-                    issues += "Profile '${profileId.value}' CRL distribution point URI must not be blank"
-                }
+            when (mode) {
+                X509BuildDataValidationMode.Request,
+                X509BuildDataValidationMode.IssuedCertificate,
+                    -> {
+                        validateIssuerAlternativeNames(profileId, issuerAlternativeNames, issues)
+                        if (crlDistributionPointUri != null && crlDistributionPointUri.isBlank()) {
+                            issues += "Profile '${profileId.value}' CRL distribution point URI must not be blank"
+                        }
+                    }
             }
         }
 
@@ -420,13 +432,21 @@ private fun validateKnownBuildData(
             if (subjectAlternativeNames.isNotEmpty()) {
                 issues += "Profile '${profileId.value}' does not support subject alternative names"
             }
-            if (certificateOnlyChecks) {
-                if (issuerAlternativeNames.isNotEmpty()) {
-                    issues += "Profile '${profileId.value}' does not accept issuer alternative names in certificate build data"
+            when (mode) {
+                X509BuildDataValidationMode.Request -> {
+                    if (issuerAlternativeNames.isNotEmpty()) {
+                        issues += "Profile '${profileId.value}' does not accept issuer alternative names in certificate build data"
+                    }
                 }
-                if (crlDistributionPointUri.isNullOrBlank()) {
-                    issues += "Profile '${profileId.value}' requires a non-blank CRL distribution point URI"
+
+                X509BuildDataValidationMode.IssuedCertificate -> {
+                    if (issuerAlternativeNames.isNotEmpty()) {
+                        validateIssuerAlternativeNames(profileId, issuerAlternativeNames, issues)
+                    }
                 }
+            }
+            if (crlDistributionPointUri.isNullOrBlank()) {
+                issues += "Profile '${profileId.value}' requires a non-blank CRL distribution point URI"
             }
         }
 
@@ -482,6 +502,20 @@ private fun validateIsoCountryIfPresent(
             issues += "Profile '${profileId.value}' requires a valid uppercase ISO 3166-1 alpha-2 country code"
         }
     }
+}
+
+private fun isCompatibleIssuedBasicConstraints(
+    actual: X509BasicConstraints?,
+    expected: X509BasicConstraints,
+): Boolean {
+    if (actual == null) return false
+    if (actual == expected) return true
+
+    if (!expected.isCA && !actual.isCA) {
+        return true
+    }
+
+    return false
 }
 
 private fun validateIssuerAlternativeNames(
