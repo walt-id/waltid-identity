@@ -1,10 +1,10 @@
 package id.walt.webdatafetching.engines
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
 
-object CIOEngine: WebDataFetcherHttpEngine {
-    override fun getHttpClient() = HttpClient(CIO)
+object CIOEngine : WebDataFetcherHttpEngine {
+    override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(CIO, block)
 
 
 }
