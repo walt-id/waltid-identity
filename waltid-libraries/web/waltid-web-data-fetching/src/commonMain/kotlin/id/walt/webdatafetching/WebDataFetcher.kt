@@ -2,7 +2,6 @@ package id.walt.webdatafetching
 
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -13,7 +12,7 @@ class WebDataFetcher(id: String) {
     private val log = KotlinLogging.logger("WebDataFetcher[$id]")
     val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id)
 
-    val httpClient = HttpClient() {
+    val httpClient = dataFetcherConfiguration.http.engineCreator().getHttpClient {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)
     }
 
