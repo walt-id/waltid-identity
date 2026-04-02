@@ -4,8 +4,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
 
 class X509CertificateProfileTest {
 
@@ -150,5 +152,51 @@ class X509CertificateProfileTest {
         assertEquals("AT", subject.getFirstAttributeValue(X509SubjectAttributeOids.CountryName))
         assertEquals("Example CA", subject.getFirstAttributeValue(X509SubjectAttributeOids.CommonName))
         assertEquals("walt.id", subject.getFirstAttributeValue(X509SubjectAttributeOids.OrganizationName))
+    }
+
+    @Test
+    fun `known profile definitions validate successfully`() {
+        X509KnownCertificateProfiles.all.forEach { profile ->
+            val validation = profile.validateDefinition()
+            assertTrue(validation.isValid, "${profile.profileId.value}: ${validation.issues.joinToString()}")
+        }
+    }
+
+    @Test
+    fun `qwac build data requires dns or ip san`() {
+        val validation = X509CertificateBuildData(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("DE"),
+                X509SubjectAttributes.commonName("bank.example"),
+            ),
+            validityPeriod = X509ValidityPeriod(
+                notBefore = Instant.parse("2026-01-01T00:00:00Z"),
+                notAfter = Instant.parse("2026-06-01T00:00:00Z"),
+            ),
+        ).checkCompatibility(X509KnownCertificateProfiles.Qwac)
+
+        assertTrue(!validation.isValid)
+        assertTrue(validation.issues.any { it.contains("DNS or IP") })
+    }
+
+    @Test
+    fun `iso iaca build data requires issuer alternative name and forbids subject sans`() {
+        val validation = X509CertificateBuildData(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("US"),
+                X509SubjectAttributes.commonName("Example IACA"),
+            ),
+            validityPeriod = X509ValidityPeriod(
+                notBefore = Instant.parse("2026-01-01T00:00:00Z"),
+                notAfter = Instant.parse("2027-01-01T00:00:00Z"),
+            ),
+            subjectAlternativeNames = setOf(
+                X509SubjectAlternativeName.DnsName("iaca.example.org"),
+            ),
+        ).checkCompatibility(X509KnownCertificateProfiles.IsoIaca)
+
+        assertTrue(!validation.isValid)
+        assertTrue(validation.issues.any { it.contains("subject alternative names") })
+        assertTrue(validation.issues.any { it.contains("issuer alternative name") })
     }
 }

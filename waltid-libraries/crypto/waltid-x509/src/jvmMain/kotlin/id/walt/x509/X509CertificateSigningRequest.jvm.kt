@@ -191,6 +191,7 @@ private fun Extension.toX509RequestedExtension(): X509RequestedExtension = when 
                 X509ExtendedKeyUsage.CodeSigning,
                 X509ExtendedKeyUsage.EmailProtection,
                 X509ExtendedKeyUsage.TimeStamping,
+                X509ExtendedKeyUsage(id.walt.x509.iso.DocumentSignerEkuOID, "mdlDS"),
             ).find { it.oid == usageOid.id } ?: X509ExtendedKeyUsage(usageOid.id)
         }.toSet(),
         critical = isCritical,

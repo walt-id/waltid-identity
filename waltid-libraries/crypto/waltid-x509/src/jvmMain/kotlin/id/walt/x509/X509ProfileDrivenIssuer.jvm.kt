@@ -43,7 +43,7 @@ import kotlin.time.Instant
 
 class X509ProfileDrivenIssuer(
     private val profileResolver: X509CertificateProfileResolver = X509KnownCertificateProfiles.registry,
-) : X509ProfileDrivenIssuer {
+) : X509ProfileDrivenIssuerApi {
 
     private val iacaCertificateBuilder = IACACertificateBuilder()
     private val documentSignerCertificateBuilder = DocumentSignerCertificateBuilder()
@@ -54,13 +54,23 @@ class X509ProfileDrivenIssuer(
         val profile = profileResolver.resolve(spec.profileId)
             ?: throw IllegalArgumentException("Unsupported X509 profile id: ${spec.profileId.value}")
 
-        return when (spec.profileId) {
+        spec.checkCompatibility(profileResolver).requireValid(
+            message = "X509 issuance spec is incompatible with profile '${profile.profileId.value}'",
+        )
+
+        val issued = when (spec.profileId) {
             X509KnownProfileIds.IsoIaca -> issueIsoIaca(profile, spec)
             X509KnownProfileIds.IsoDocumentSigner -> issueIsoDocumentSigner(profile, spec)
             X509KnownProfileIds.GenericCa -> issueGenericCa(profile, spec)
             X509KnownProfileIds.GenericEndEntity -> issueGenericEndEntity(profile, spec)
             else -> throw IllegalArgumentException("Unsupported X509 profile id: ${spec.profileId.value}")
         }
+
+        issued.certificateData.checkCompatibility(issued.profile).requireValid(
+            message = "Issued certificate is incompatible with profile '${issued.profile.profileId.value}'",
+        )
+
+        return issued
     }
 
     private suspend fun issueIsoIaca(

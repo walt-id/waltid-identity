@@ -41,19 +41,69 @@ class X509CertificateSigningRequestCommonTest {
     }
 
     @Test
-    fun `CSR profile compatibility should allow subset requests`() {
+    fun `CSR profile compatibility should allow omitted profile managed extensions`() {
         val csrData = X509CertificateSigningRequestBuilder(
             subject = x509SubjectOf(
                 X509SubjectAttributes.country("AT"),
                 X509SubjectAttributes.commonName("service.example.org"),
             ),
-        ).addKeyUsage(X509KeyUsage.DigitalSignature)
-            .addExtendedKeyUsage(X509ExtendedKeyUsage.ServerAuth)
+        ).addSubjectAlternativeName(X509SubjectAlternativeName.DnsName("service.example.org"))
             .build()
 
         val compatibility = csrData.checkCompatibility(X509KnownCertificateProfiles.Qwac)
 
         assertTrue(compatibility.isCompatible)
         assertTrue(compatibility.issues.isEmpty())
+    }
+
+    @Test
+    fun `CSR profile compatibility should reject incomplete qwac eku requests`() {
+        val csrData = X509CertificateSigningRequestBuilder(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("DE"),
+                X509SubjectAttributes.commonName("bank.example"),
+            ),
+        ).addSubjectAlternativeName(
+            X509SubjectAlternativeName.DnsName("bank.example")
+        ).addExtendedKeyUsage(
+            X509ExtendedKeyUsage.ServerAuth
+        ).build()
+
+        val compatibility = csrData.checkCompatibility(X509KnownCertificateProfiles.Qwac)
+
+        assertFalse(compatibility.isCompatible)
+        assertTrue(compatibility.issues.any { it.contains("missing profile-required usages") })
+    }
+
+    @Test
+    fun `CSR profile compatibility should reject iso document signer sans`() {
+        val csrData = X509CertificateSigningRequestBuilder(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("AT"),
+                X509SubjectAttributes.commonName("Example Document Signer"),
+            ),
+        ).applyProfile(X509KnownProfileIds.IsoDocumentSigner)
+            .addSubjectAlternativeName(X509SubjectAlternativeName.DnsName("ds.example.org"))
+            .build()
+
+        val compatibility = csrData.checkCompatibility(X509KnownCertificateProfiles.IsoDocumentSigner)
+
+        assertFalse(compatibility.isCompatible)
+        assertTrue(compatibility.issues.any { it.contains("subject alternative names") })
+    }
+
+    @Test
+    fun `CSR builder can apply profile defaults`() {
+        val csrData = X509CertificateSigningRequestBuilder(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("AT"),
+                X509SubjectAttributes.commonName("Example Document Signer"),
+            ),
+        ).applyProfile(X509KnownProfileIds.IsoDocumentSigner)
+            .build()
+
+        assertEquals(X509KnownCertificateProfiles.IsoDocumentSigner.keyUsages, csrData.keyUsages)
+        assertEquals(X509KnownCertificateProfiles.IsoDocumentSigner.extendedKeyUsages, csrData.extendedKeyUsages)
+        assertEquals(X509KnownCertificateProfiles.IsoDocumentSigner.basicConstraints, csrData.basicConstraints)
     }
 }

@@ -97,6 +97,38 @@ class X509CertificateSigningRequestTest {
     }
 
     @Test
+    fun `generates a Document Signer CSR compatible with the ISO profile`() = runTest {
+        val key = JWKKey.generate(KeyType.secp256r1)
+
+        val csrData = X509CertificateSigningRequestBuilder(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("AT"),
+                X509SubjectAttributes.commonName("Example Document Signer"),
+                X509SubjectAttributes.locality("Vienna"),
+            ),
+        ).addKeyUsage(X509KeyUsage.DigitalSignature)
+            .addExtendedKeyUsage(X509KnownCertificateProfiles.IsoDocumentSigner.extendedKeyUsages.single())
+            .build()
+
+        val csr = generator.generate(
+            X509CertificateSigningRequestSpec(
+                csrData = csrData,
+                signingKey = key,
+            )
+        )
+        val parsed = parser.parse(csr)
+        val compatibility = parsed.checkCompatibility(X509KnownCertificateProfiles.IsoDocumentSigner)
+
+        validateCertificateSigningRequestSignature(csr)
+
+        assertEquals(csrData.subject, parsed.subject)
+        assertEquals(setOf(X509KeyUsage.DigitalSignature), parsed.keyUsages)
+        assertEquals(X509KnownCertificateProfiles.IsoDocumentSigner.extendedKeyUsages, parsed.extendedKeyUsages)
+        assertEquals(null, parsed.basicConstraints)
+        assertTrue(compatibility.isCompatible, compatibility.issues.joinToString())
+    }
+
+    @Test
     fun `rejects tampered CSR signatures`() = runTest {
         val key = JWKKey.generate(KeyType.secp256r1)
         val csr = generator.generate(

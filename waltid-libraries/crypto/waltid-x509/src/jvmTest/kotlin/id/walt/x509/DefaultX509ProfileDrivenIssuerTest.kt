@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.fail
 import kotlin.time.Instant
 
 class X509ProfileDrivenIssuerTest {
@@ -44,6 +45,7 @@ class X509ProfileDrivenIssuerTest {
         assertEquals(issued.certificateData.subject, issued.certificateData.issuer)
         assertEquals(setOf(X509KeyUsage.KeyCertSign, X509KeyUsage.CRLSign), jcaCertificate.x509KeyUsages)
         assertTrue(jcaCertificate.x509BasicConstraints.isCA)
+        assertTrue(issued.certificateData.checkCompatibility(issued.profile).isValid)
     }
 
     @Test
@@ -103,6 +105,7 @@ class X509ProfileDrivenIssuerTest {
         val jcaCertificate = eeIssued.certificateDer.toJcaX509Certificate()
         assertEquals(setOf(X509KeyUsage.DigitalSignature), jcaCertificate.x509KeyUsages)
         assertTrue(!jcaCertificate.x509BasicConstraints.isCA)
+        assertTrue(eeIssued.certificateData.checkCompatibility(eeIssued.profile).isValid)
     }
 
     @Test
@@ -181,6 +184,110 @@ class X509ProfileDrivenIssuerTest {
         assertEquals(X509KnownProfileIds.IsoDocumentSigner, issued.profile.profileId)
         assertTrue(issued.certificateData.extendedKeyUsages.any { it.oid == id.walt.x509.iso.DocumentSignerEkuOID })
         assertEquals("https://iaca.example.org/crl", issued.certificateData.crlDistributionPointUri)
+        assertTrue(issued.certificateData.checkCompatibility(issued.profile).isValid)
+    }
+
+    @Test
+    fun `rejects generic end entity validity outside issuer validity`() = runTest {
+        val caKey = JWKKey.generate(KeyType.secp256r1)
+        val eeKey = JWKKey.generate(KeyType.secp256r1)
+
+        val caIssued = issuer.issue(
+            X509SelfSignedCertificateIssuanceSpec(
+                profileId = X509KnownProfileIds.GenericCa,
+                certificateData = X509CertificateBuildData(
+                    subject = x509SubjectOf(
+                        X509SubjectAttributes.country("AT"),
+                        X509SubjectAttributes.commonName("Example Generic CA"),
+                    ),
+                    validityPeriod = X509ValidityPeriod(
+                        notBefore = Instant.parse("2026-01-01T00:00:00Z"),
+                        notAfter = Instant.parse("2027-01-01T00:00:00Z"),
+                    ),
+                ),
+                signingKey = caKey,
+            )
+        )
+
+        val error = try {
+            issuer.issue(
+                X509IssuerSignedCertificateIssuanceSpec(
+                    profileId = X509KnownProfileIds.GenericEndEntity,
+                    certificateData = X509CertificateBuildData(
+                        subject = x509SubjectOf(
+                            X509SubjectAttributes.country("AT"),
+                            X509SubjectAttributes.commonName("service.example.org"),
+                        ),
+                        validityPeriod = X509ValidityPeriod(
+                            notBefore = Instant.parse("2026-01-02T00:00:00Z"),
+                            notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+                        ),
+                    ),
+                    publicKey = eeKey.getPublicKey(),
+                    issuer = X509CertificateSignerSpec(
+                        profileId = X509KnownProfileIds.GenericCa,
+                        certificateData = caIssued.certificateData.toBuildData(),
+                        signingKey = caKey,
+                    ),
+                )
+            )
+            fail("Expected issuance compatibility validation to fail")
+        } catch (exception: IllegalArgumentException) {
+            exception
+        }
+
+        assertTrue(error.message!!.contains("must not be after issuer notAfter"))
+    }
+
+    @Test
+    fun `rejects iso document signer build data with issuer alternative names`() = runTest {
+        val iacaKey = JWKKey.generate(KeyType.secp256r1)
+        val dsKey = JWKKey.generate(KeyType.secp256r1)
+
+        val error = try {
+            issuer.issue(
+                X509IssuerSignedCertificateIssuanceSpec(
+                    profileId = X509KnownProfileIds.IsoDocumentSigner,
+                    certificateData = X509CertificateBuildData(
+                        subject = x509SubjectOf(
+                            X509SubjectAttributes.country("US"),
+                            X509SubjectAttributes.commonName("Example DS"),
+                        ),
+                        validityPeriod = X509ValidityPeriod(
+                            notBefore = Instant.parse("2026-01-02T00:00:00Z"),
+                            notAfter = Instant.parse("2026-12-31T00:00:00Z"),
+                        ),
+                        issuerAlternativeNames = setOf(
+                            X509SubjectAlternativeName.Uri("https://should-not-be-here.example.org"),
+                        ),
+                        crlDistributionPointUri = "https://iaca.example.org/crl",
+                    ),
+                    publicKey = dsKey.getPublicKey(),
+                    issuer = X509CertificateSignerSpec(
+                        profileId = X509KnownProfileIds.IsoIaca,
+                        certificateData = X509CertificateBuildData(
+                            subject = x509SubjectOf(
+                                X509SubjectAttributes.country("US"),
+                                X509SubjectAttributes.commonName("Example IACA"),
+                            ),
+                            validityPeriod = X509ValidityPeriod(
+                                notBefore = Instant.parse("2025-01-01T00:00:00Z"),
+                                notAfter = Instant.parse("2030-01-01T00:00:00Z"),
+                            ),
+                            issuerAlternativeNames = setOf(
+                                X509SubjectAlternativeName.Uri("https://iaca.example.org"),
+                            ),
+                        ),
+                        signingKey = iacaKey,
+                    ),
+                )
+            )
+            fail("Expected issuance compatibility validation to fail")
+        } catch (exception: IllegalArgumentException) {
+            exception
+        }
+
+        assertTrue(error.message!!.contains("does not accept issuer alternative names"))
     }
 
     private fun X509IssuedCertificateData.toBuildData() = X509CertificateBuildData(

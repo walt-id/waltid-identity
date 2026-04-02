@@ -246,6 +246,21 @@ class X509CertificateSigningRequestBuilder(
         basicConstraints = constraints
     }
 
+    fun applyProfile(profile: X509CertificateProfile) = apply {
+        addSubjectAlternativeNames(profile.subjectAlternativeNames)
+        addKeyUsages(profile.keyUsages)
+        addExtendedKeyUsages(profile.extendedKeyUsages)
+        basicConstraints(profile.basicConstraints)
+    }
+
+    fun applyProfile(
+        profileId: X509ProfileId,
+        profileResolver: X509CertificateProfileResolver = X509KnownCertificateProfiles.registry,
+    ) = applyProfile(
+        profileResolver.resolve(profileId)
+            ?: throw IllegalArgumentException("Unsupported X509 profile id: ${profileId.value}"),
+    )
+
     fun addRequestedExtension(extension: X509RequestedExtension) = apply {
         when (extension.oid) {
             X509V3ExtensionOID.SubjectAlternativeName.oid -> {
@@ -333,6 +348,8 @@ fun X509CertificateSigningRequestData.checkCompatibility(
 ): X509CsrProfileCompatibility {
     val issues = mutableListOf<String>()
 
+    issues += profile.validateDefinition().issues
+
     profile.subject?.attributes?.forEach { profileAttribute ->
         val csrValues = subject.getAttributeValues(profileAttribute.oid)
         if (csrValues.isEmpty()) {
@@ -370,6 +387,12 @@ fun X509CertificateSigningRequestData.checkCompatibility(
             }
         }
     }
+
+    validateKnownCsrCompatibility(
+        profile = profile,
+        csrData = this,
+        issues = issues,
+    )
 
     return X509CsrProfileCompatibility(
         isCompatible = issues.isEmpty(),

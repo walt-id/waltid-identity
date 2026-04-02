@@ -72,6 +72,6 @@ class StaticX509CertificateProfileRegistry(
     fun supportedProfiles(): Set<X509CertificateProfile> = profilesById.values.toSet()
 }
 
-interface X509ProfileDrivenIssuer {
+interface X509ProfileDrivenIssuerApi {
     suspend fun issue(spec: X509CertificateIssuanceSpec): X509IssuedCertificateBundle
 }
