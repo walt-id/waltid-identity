@@ -4,5 +4,5 @@ import io.ktor.client.*
 import io.ktor.client.engine.darwin.*
 
 actual object NativeEngine : WebDataFetcherHttpEngine {
-    actual override fun getHttpClient() = HttpClient(Darwin)
+    actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(Darwin, block)
 }

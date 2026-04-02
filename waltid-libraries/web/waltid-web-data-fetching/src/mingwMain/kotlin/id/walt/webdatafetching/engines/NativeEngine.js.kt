@@ -4,5 +4,5 @@ import io.ktor.client.*
 import io.ktor.client.engine.winhttp.*
 
 actual object NativeEngine : WebDataFetcherHttpEngine {
-    actual override fun getHttpClient() = HttpClient(WinHttp)
+    actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(WinHttp, block)
 }

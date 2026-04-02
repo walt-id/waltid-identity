@@ -4,5 +4,5 @@ import io.ktor.client.*
 import io.ktor.client.engine.curl.*
 
 actual object NativeEngine : WebDataFetcherHttpEngine {
-    actual override fun getHttpClient() = HttpClient(Curl)
+    actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(Curl, block)
 }

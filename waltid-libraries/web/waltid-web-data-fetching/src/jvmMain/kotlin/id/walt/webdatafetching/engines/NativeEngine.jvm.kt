@@ -4,5 +4,5 @@ import io.ktor.client.*
 import io.ktor.client.engine.java.*
 
 actual object NativeEngine : WebDataFetcherHttpEngine {
-    actual override fun getHttpClient() = HttpClient(Java)
+    actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient = HttpClient(Java, block)
 }
