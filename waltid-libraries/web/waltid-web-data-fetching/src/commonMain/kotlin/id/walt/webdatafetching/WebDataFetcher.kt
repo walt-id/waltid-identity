@@ -7,10 +7,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
-class WebDataFetcher(id: String) {
+class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null) {
 
     private val log = KotlinLogging.logger("WebDataFetcher[$id]")
-    val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id)
+    val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration)
 
     val httpClient = dataFetcherConfiguration.http.engineCreator().getHttpClient {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)

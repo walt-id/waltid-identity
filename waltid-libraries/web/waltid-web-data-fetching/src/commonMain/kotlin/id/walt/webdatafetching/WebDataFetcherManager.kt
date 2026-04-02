@@ -3,10 +3,11 @@ package id.walt.webdatafetching
 object WebDataFetcherManager {
 
     private val fetcherConfigurations = HashMap<String, WebDataFetchingConfiguration>()
-    private val defaultConfiguration: WebDataFetchingConfiguration = WebDataFetchingConfiguration.Default
 
-    fun getConfigurationForId(id: String): WebDataFetchingConfiguration {
-        return fetcherConfigurations[id] ?: defaultConfiguration
+    fun getConfigurationForId(id: String, defaultConfiguration: WebDataFetchingConfiguration?): WebDataFetchingConfiguration {
+        return fetcherConfigurations[id]
+            ?: defaultConfiguration
+            ?: WebDataFetchingConfiguration.Default
     }
 
     fun applyConfigurations(configs: Map<String, WebDataFetchingConfiguration>) {
