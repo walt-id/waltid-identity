@@ -16,6 +16,7 @@ import id.walt.webwallet.service.report.ReportRequestParameter
 import id.walt.webwallet.service.settings.WalletSetting
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import id.walt.webwallet.web.parameter.StoreCredentialRequest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,6 +32,7 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
     abstract suspend fun deleteCredential(id: String, permanent: Boolean): Boolean
     abstract suspend fun restoreCredential(id: String): WalletCredential
     abstract suspend fun getCredential(credentialId: String): WalletCredential
+    abstract suspend fun storeCredential(request: StoreCredentialRequest): WalletCredential
     abstract suspend fun acceptCredential(parameter: CredentialRequestParameter): Boolean
     abstract suspend fun rejectCredential(parameter: CredentialRequestParameter): Boolean
     abstract suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean

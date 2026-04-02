@@ -162,4 +162,7 @@ class WalletApi(
     suspend fun detachCategoriesFromCredential(credentialId: String, vararg categories: String) =
         credentialApi.detachCategoriesFromCredential(walletId, credentialId, *categories)
 
+    suspend fun storeCredential(request: id.walt.webwallet.web.parameter.StoreCredentialRequest) =
+        credentialApi.storeCredentialRaw(walletId, request)
+
 }

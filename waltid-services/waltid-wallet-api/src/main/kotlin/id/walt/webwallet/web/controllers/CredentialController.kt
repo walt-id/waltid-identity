@@ -10,6 +10,7 @@ import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.webwallet.web.parameter.NoteRequestParameter
+import id.walt.webwallet.web.parameter.StoreCredentialRequest
 import io.github.smiley4.ktoropenapi.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -74,8 +75,29 @@ fun Application.credentials() = walletRoute {
 
         put({
             summary = "Store credential"
+            description = "Store a credential directly into the wallet without using a credential offer. Supports JWT and JSON-LD formats."
+            request {
+                body<StoreCredentialRequest> {
+                    description = "Credential to store"
+                    required = true
+                }
+            }
+            response {
+                HttpStatusCode.Created to {
+                    description = "WalletCredential stored successfully"
+                    body<WalletCredential>()
+                }
+                HttpStatusCode.BadRequest to { description = "Invalid credential format or data" }
+            }
         }) {
-            TODO()
+            val request = call.receive<StoreCredentialRequest>()
+            runCatching {
+                call.getWalletService().storeCredential(request)
+            }.onSuccess { credential ->
+                call.respond(HttpStatusCode.Created, credential)
+            }.onFailure { error ->
+                call.respond(HttpStatusCode.BadRequest, error.message ?: "Failed to store credential")
+            }
         }
 
         route("{credentialId}", {

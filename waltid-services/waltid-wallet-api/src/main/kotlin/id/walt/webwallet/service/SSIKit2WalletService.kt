@@ -59,6 +59,8 @@ import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import id.walt.webwallet.web.parameter.StoreCredentialRequest
+import id.walt.crypto.utils.JwsUtils.decodeJws
 import io.klogging.Klogging
 import io.ktor.client.*
 import io.ktor.client.request.forms.*
@@ -159,6 +161,79 @@ class SSIKit2WalletService(
     override suspend fun getCredential(credentialId: String): WalletCredential =
         credentialService.get(walletId, credentialId)
             ?: throw NotFoundException("WalletCredential not found for credentialId: $credentialId")
+
+    override suspend fun storeCredential(request: StoreCredentialRequest): WalletCredential {
+        val credentialId = extractCredentialId(request.document, request.format)
+        
+        val existingCredential = credentialService.get(walletId, credentialId)
+        if (existingCredential != null && existingCredential.deletedOn == null) {
+            throw ConflictException("Credential with id $credentialId already exists in wallet")
+        }
+        
+        val walletCredential = WalletCredential(
+            wallet = walletId,
+            id = credentialId,
+            document = request.document,
+            disclosures = request.disclosures,
+            addedOn = Clock.System.now(),
+            manifest = null,
+            deletedOn = null,
+            pending = false,
+            format = request.format
+        )
+        
+        credentialService.add(walletId, walletCredential)
+        
+        eventUseCase.log(
+            action = EventType.Credential.Receive,
+            originator = "direct-import",
+            tenant = tenant,
+            accountId = accountId,
+            walletId = walletId,
+            data = eventUseCase.credentialEventData(
+                credential = walletCredential,
+                subject = eventUseCase.subjectData(walletCredential),
+                organization = eventUseCase.issuerData(walletCredential),
+                type = extractCredentialType(walletCredential.parsedDocument)
+            ),
+            credentialId = walletCredential.id
+        )
+        
+        return walletCredential
+    }
+
+    private fun extractCredentialId(document: String, format: id.walt.oid4vc.data.CredentialFormat): String {
+        return when (format) {
+            id.walt.oid4vc.data.CredentialFormat.jwt_vc_json,
+            id.walt.oid4vc.data.CredentialFormat.jwt_vc,
+            id.walt.oid4vc.data.CredentialFormat.jwt_vc_json_ld,
+            id.walt.oid4vc.data.CredentialFormat.sd_jwt_vc,
+            id.walt.oid4vc.data.CredentialFormat.sd_jwt_dc -> {
+                val payload = document.decodeJws().payload
+                payload["jti"]?.jsonPrimitive?.contentOrNull
+                    ?: payload["vc"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
+                    ?: "urn:uuid:${Uuid.random()}"
+            }
+            id.walt.oid4vc.data.CredentialFormat.ldp_vc -> {
+                val jsonDoc = Json.parseToJsonElement(document).jsonObject
+                jsonDoc["id"]?.jsonPrimitive?.contentOrNull ?: "urn:uuid:${Uuid.random()}"
+            }
+            id.walt.oid4vc.data.CredentialFormat.mso_mdoc -> {
+                "urn:uuid:${Uuid.random()}"
+            }
+            else -> "urn:uuid:${Uuid.random()}"
+        }
+    }
+
+    private fun extractCredentialType(parsedDocument: JsonObject?): String? {
+        return parsedDocument?.get("type")?.let { typeElement ->
+            when {
+                typeElement is JsonArray -> typeElement.jsonArray.lastOrNull()?.jsonPrimitive?.contentOrNull
+                typeElement is JsonPrimitive -> typeElement.content
+                else -> null
+            }
+        }
+    }
 
     override suspend fun attachCategory(credentialId: String, categories: List<String>): Boolean =
         credentialService.categoryService.add(

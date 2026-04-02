@@ -10,6 +10,7 @@ import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.serialization.json.*
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -140,7 +141,21 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
 
     suspend fun store(wallet: Uuid, credential: String) =
         e2e.test("/wallet-api/wallet/{wallet}/credentials - store credential") {
-            TODO("Not implemented")
+            client.put("/wallet-api/wallet/$wallet/credentials") {
+                contentType(ContentType.Application.Json)
+                setBody(credential)
+            }.expectSuccess()
+        }
+
+    suspend fun storeCredentialRaw(wallet: Uuid, request: id.walt.webwallet.web.parameter.StoreCredentialRequest) =
+        client.put("/wallet-api/wallet/$wallet/credentials") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }
+
+    suspend fun storeCredentialRequest(wallet: Uuid, request: id.walt.webwallet.web.parameter.StoreCredentialRequest) =
+        e2e.test("/wallet-api/wallet/{wallet}/credentials - store credential from request") {
+            storeCredentialRaw(wallet, request)
         }
 
     private fun CredentialFilterObject.toMap() = Json.encodeToJsonElement(this).jsonObject.toMap()
