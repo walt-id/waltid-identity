@@ -80,7 +80,7 @@ class X509ProfileDrivenIssuerTest {
                     ),
                     validityPeriod = X509ValidityPeriod(
                         notBefore = Instant.parse("2026-01-02T00:00:00Z"),
-                        notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+                        notAfter = Instant.parse("2027-03-30T00:00:00Z"),
                     ),
                     subjectAlternativeNames = setOf(
                         X509SubjectAlternativeName.DnsName("service.example.org"),
@@ -168,7 +168,7 @@ class X509ProfileDrivenIssuerTest {
                     ),
                     validityPeriod = X509ValidityPeriod(
                         notBefore = Instant.parse("2026-01-02T00:00:00Z"),
-                        notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+                        notAfter = Instant.parse("2027-03-30T00:00:00Z"),
                     ),
                     crlDistributionPointUri = "https://iaca.example.org/crl",
                 ),
@@ -220,7 +220,7 @@ class X509ProfileDrivenIssuerTest {
                         ),
                         validityPeriod = X509ValidityPeriod(
                             notBefore = Instant.parse("2026-01-02T00:00:00Z"),
-                            notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+                            notAfter = Instant.parse("2027-03-30T00:00:00Z"),
                         ),
                     ),
                     publicKey = eeKey.getPublicKey(),

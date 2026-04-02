@@ -8,11 +8,11 @@ import kotlin.time.Duration.Companion.seconds
 object X509KnownProfileIds {
     val IsoIaca = X509ProfileId("iso.iaca")
     val IsoDocumentSigner = X509ProfileId("iso.document-signer")
-    val GenericCa = X509ProfileId("generic-ca")
-    val GenericEndEntity = X509ProfileId("generic-end-entity")
     val Qwac = X509ProfileId("etsi.qwac")
     val Qsealc = X509ProfileId("etsi.qsealc")
     val Psd2Transport = X509ProfileId("etsi.psd2.transport")
+    val GenericCa = X509ProfileId("generic-ca")
+    val GenericEndEntity = X509ProfileId("generic-end-entity")
 }
 
 object X509KnownCertificateProfiles {
