@@ -24,9 +24,6 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.optimumcode.jsonschemavalidator)
 
-            // Ktor client
-            implementation(identityLibs.bundles.waltid.ktor.client)
-
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
@@ -52,6 +49,7 @@ kotlin {
         }
         jvmTest.dependencies {
             // Ktor client
+            implementation(identityLibs.bundles.waltid.ktor.client)
             implementation(identityLibs.ktor.client.cio)
 
             implementation(identityLibs.kotlinx.serialization.json)
