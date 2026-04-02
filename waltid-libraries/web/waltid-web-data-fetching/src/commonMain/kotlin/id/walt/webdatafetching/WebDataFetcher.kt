@@ -3,11 +3,11 @@ package id.walt.webdatafetching
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.json
+import io.ktor.serialization.kotlinx.json.*
 
 class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null) {
 
@@ -27,11 +27,11 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         }
     }
 
-    val cache = dataFetcherConfiguration.cache?.buildCache<Any>()
+    val cache = dataFetcherConfiguration.cache?.buildCache<WebDataFetchingResult<*>>()
 
-    suspend inline fun <reified Res : Any> fetch(urlString: String): Res = fetch<Res>(UrlUtils.parseUrl(urlString))
+    suspend inline fun <reified Res : Any> fetch(urlString: String): WebDataFetchingResult<Res> = fetch<Res>(UrlUtils.parseUrl(urlString))
 
-    suspend inline fun <reified Res : Any> fetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): Res {
+    suspend inline fun <reified Res : Any> fetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): WebDataFetchingResult<Res> {
         val cacheId = url.toString()
 
         dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
@@ -39,7 +39,8 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         val cachedValue = cache?.get(cacheId)
 
         if (cachedValue != null) {
-            return cachedValue as Res
+            @Suppress("UNCHECKED_CAST")
+            return cachedValue as WebDataFetchingResult<Res>
         }
 
         val requestConfig = dataFetcherConfiguration.request
@@ -53,6 +54,13 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
         val httpResponse = httpResponseResult.getOrElse { ex ->
             throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
+        }
+
+        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+            if (!httpResponse.status.isSuccess()) {
+                // TODO: More detailed error message
+                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+            }
         }
 
         val parsedResponse: Res = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
@@ -71,21 +79,28 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
             }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
         }
 
-        cache?.put(cacheId, parsedResponse)
+        val result = WebDataFetchingResult(
+            body = parsedResponse,
+            success = httpResponse.status.isSuccess(),
+            status = httpResponse.status.value
+        )
 
-        return parsedResponse
+        cache?.put(cacheId, result.copy(cached = true))
+
+        return result
     }
 
-    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req): Res {
-        return fetch<Res>(url) {
-            if (dataFetcherConfiguration.request?.method == null) {
-                method = HttpMethod.Post
-            }
-            setBody(req)
+    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req) = fetch<Res>(url) {
+        if (dataFetcherConfiguration.request?.method == null) {
+            method = HttpMethod.Post
         }
+
+        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        setBody(req)
     }
 
-    suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req): Res =
-        send(UrlUtils.parseUrl(urlString), req)
+
+    suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req) =
+        send<Req, Res>(UrlUtils.parseUrl(urlString), req)
 
 }

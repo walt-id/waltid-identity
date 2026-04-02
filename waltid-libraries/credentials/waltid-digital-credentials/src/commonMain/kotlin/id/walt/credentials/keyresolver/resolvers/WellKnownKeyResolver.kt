@@ -24,7 +24,7 @@ object WellKnownKeyResolver : BaseKeyResolver {
             }.buildString()
 
             log.debug { "Fetching metadata from: $wellKnownUrl" }
-            val metadata = web.fetch<JsonObject>(wellKnownUrl)
+            val metadata = web.fetch<JsonObject>(wellKnownUrl).body
 
             // Find the JWKS (either inline or via URI)
             val jwks = when {
@@ -32,7 +32,7 @@ object WellKnownKeyResolver : BaseKeyResolver {
                     val jwksUri = metadata["jwks_uri"]?.jsonPrimitive?.contentOrNull
                         ?: throw IllegalArgumentException("Metadata 'jwks_uri' is not a valid string.")
                     log.debug { "Fetching JWKS from: $jwksUri" }
-                    web.fetch<JsonObject>(jwksUri)
+                    web.fetch<JsonObject>(jwksUri).body
                 }
 
                 "jwks" in metadata -> metadata["jwks"]?.jsonObject

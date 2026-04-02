@@ -31,7 +31,7 @@ data class JsonSchemaPolicy(
 
     suspend fun getCurrentSchema(): JsonObject {
         return when {
-            schemaUrl != null -> schemaFetcher!!.fetch<JsonObject>(schemaUrl)
+            schemaUrl != null -> schemaFetcher!!.fetch<JsonObject>(schemaUrl).body
             schema != null -> schema
             else -> throw IllegalStateException("No schema defined")
         }

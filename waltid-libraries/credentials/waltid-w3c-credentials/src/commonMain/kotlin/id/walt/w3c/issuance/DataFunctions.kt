@@ -85,8 +85,8 @@ val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.Functi
     "timestamp-before-seconds" to { JsonPrimitive((Clock.System.now() - Duration.parse(it.args!!)).epochSeconds) },
 
     "uuid" to { JsonPrimitive("urn:uuid:${randomUUID()}") },
-    "webhook" to { JsonPrimitive(webDataFetcher.fetch<String>(it.args!!)) },
-    "webhook-json" to { webDataFetcher.fetch<JsonElement>(it.args!!) },
+    "webhook" to { JsonPrimitive(webDataFetcher.fetch<String>(it.args!!).body) },
+    "webhook-json" to { webDataFetcher.fetch<JsonElement>(it.args!!).body },
 
     "last" to {
         it.history?.get(it.args!!)

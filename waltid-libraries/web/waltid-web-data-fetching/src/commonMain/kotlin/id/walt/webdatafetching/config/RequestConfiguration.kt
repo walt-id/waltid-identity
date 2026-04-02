@@ -23,7 +23,8 @@ data class RequestConfiguration(
         if (method?.ktorHttpMethod != null) {
             builder.method = method.ktorHttpMethod
         }
-        builder.expectSuccess = expectSuccess
+        //builder.expectSuccess = expectSuccess // Checked internally
+        builder.expectSuccess = false
 
         /*headers?.let { // if below API only appends single
             headers { it.forEach { (key, value) -> append(key, value) } }
