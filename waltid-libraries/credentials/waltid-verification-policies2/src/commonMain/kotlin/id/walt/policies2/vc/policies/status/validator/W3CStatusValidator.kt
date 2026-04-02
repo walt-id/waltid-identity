@@ -9,15 +9,18 @@ import id.walt.policies2.vc.policies.status.model.W3CEntry
 import id.walt.policies2.vc.policies.status.model.W3CStatusContent
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.reader.StatusValueReader
+import id.walt.policies2.vc.policies.status.signature.StatusListSignatureVerifier
 
 class W3CStatusValidator(
     fetcher: CredentialFetcher,
     reader: StatusValueReader<W3CStatusContent>,
     private val bitValueReaderFactory: BitValueReaderFactory,
     private val expansionAlgorithmFactory: StatusListExpansionAlgorithmFactory<W3CStatusContent>,
+    signatureVerifier: StatusListSignatureVerifier? = null,
 ) : StatusValidatorBase<W3CStatusContent, W3CEntry, W3CStatusPolicyAttribute>(
     fetcher,
-    reader
+    reader,
+    signatureVerifier = signatureVerifier,
 ) {
 
     override suspend fun getBitValue(
