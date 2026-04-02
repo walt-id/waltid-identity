@@ -1,9 +1,9 @@
 package id.walt.webdatafetching.engines
 
-import io.ktor.client.HttpClient
+import io.ktor.client.*
 
 interface WebDataFetcherHttpEngine {
 
-    fun getHttpClient(): HttpClient
+    fun getHttpClient(block: HttpClientConfig<*>.() -> Unit = {}): HttpClient
 
 }
