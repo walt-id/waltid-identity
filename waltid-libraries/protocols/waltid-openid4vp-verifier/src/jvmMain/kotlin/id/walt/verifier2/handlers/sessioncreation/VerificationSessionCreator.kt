@@ -24,6 +24,7 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.*
+import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
@@ -297,69 +298,88 @@ object VerificationSessionCreator {
                 val encryptionInfoB64 = encryptionInfoObj.encodeToBase64Url()
 
 
-                // ===== READER AUTHENTICATION =====
                 val deviceRequest = if (isSignedRequest) {
+                    // --- Reader authentication
+
                     requireNotNull(key) { "Signing key is required for signed Annex C requests" }
                     require(!x5c.isNullOrEmpty()) { "x5c is required for signed Annex C requests" }
+
                     // Build the DC API Session Transcript
                     val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
-                        encryptionInfoB64,
-                        setup.origin
+                        encryptionInfoB64 = encryptionInfoB64,
+                        origin = setup.origin
                     )
 
-                    val deviceRequest = DeviceRequest(setup.requestedElements).copy(
-                        version = DeviceRequest.VERSION_WITH_SIGNING,
-                        deviceRequestInfo = ByteStringWrapper(
-                            DeviceRequestInfo(
-                                useCases = listOf(
-                                    UseCase(
-                                        mandatory = true,
-                                        documentSets = listOf(setup.requestedElements.keys.withIndex().map { it.index.toUInt() })
-                                    )
+                    // Prepare the base request without signatures
+                    val initialDeviceRequest = DeviceRequest(setup.requestedElements)
+
+                    // Create the DeviceRequestInfo (Use Cases)
+                    // By grouping all indices into a single documentSet, we make ALL requested documents mandatory.
+                    val deviceRequestInfo = ByteStringWrapper(
+                        DeviceRequestInfo(
+                            useCases = listOf(
+                                UseCase(
+                                    mandatory = true,
+                                    documentSets = listOf(initialDeviceRequest.docRequests.indices.map { it.toUInt() })
                                 )
                             )
                         )
                     )
 
-                    // Extract ItemsRequestBytes from the request
-                    val itemsRequestBytesAll = deviceRequest.docRequests.map { it.itemsRequest.serialized }
+                    // cryptography setup for both signature types
+                    val coseSigner = key.toCoseSigner()
+                    val x5cByteArrays = x5c.map { Base64.decode(it) }
+                    val protectedHeaders = CoseHeaders(algorithm = key.keyType.toCoseAlgorithm())
+                    val unprotectedHeaders = CoseHeaders(x5chain = x5cByteArrays.map { CoseCertificate(it) })
 
-                    // Build ReaderAuthenticationAll
-                    val readerAuthAll = ReaderAuthenticationAll(
+                    // Generate readerAuth for EACH document requested (Per-Document Signature)
+                    val signedDocRequests = initialDeviceRequest.docRequests.map { docReq ->
+                        val itemsRequestBytes = docReq.itemsRequest.serialized
+
+                        val readerAuthPayload = ReaderAuthentication(
+                            context = ReaderAuthentication.CONTEXT,
+                            sessionTranscript = sessionTranscript,
+                            itemsRequestBytes = itemsRequestBytes
+                        )
+
+                        val readerAuthSignature = CoseSign1.createAndSignDetached(
+                            protectedHeaders = protectedHeaders,
+                            unprotectedHeaders = unprotectedHeaders,
+                            detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthPayload),
+                            signer = coseSigner
+                        )
+
+                        // Attach the signature to this specific document request
+                        docReq.copy(readerAuth = readerAuthSignature)
+                    }
+
+                    // Generate readerAuthAll for the entire set (Global Signature)
+                    val itemsRequestBytesAll = initialDeviceRequest.docRequests.map { it.itemsRequest.serialized }
+
+                    val readerAuthAllPayload = ReaderAuthenticationAll(
                         context = ReaderAuthenticationAll.CONTEXT,
                         sessionTranscript = sessionTranscript,
                         itemsRequestBytesAll = itemsRequestBytesAll,
-                        docRequestsInfoBytes = deviceRequest.deviceRequestInfo?.serialized
+                        docRequestsInfoBytes = deviceRequestInfo.serialized
                     )
 
-                    // Encode as ByteArray (becomes the detached payload)
-                    val detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthAll)
-
-                    val x5cByteArrays = x5c.map { Base64.decode(it) }
-
-                    // Setup the CoseSigner
-                    val coseSigner = key.toCoseSigner()
-
-                    // Create the Detached Signature
-                    val coseSign1 = CoseSign1.createAndSignDetached(
-                        protectedHeaders = CoseHeaders(
-                            algorithm = key.keyType.toCoseAlgorithm()
-                        ),
-                        unprotectedHeaders = CoseHeaders(
-                            x5chain = x5cByteArrays.map { CoseCertificate(it) } // COSE Header 33
-                        ),
-                        detachedPayload = detachedPayload,
+                    val readerAuthAllSignature = CoseSign1.createAndSignDetached(
+                        protectedHeaders = protectedHeaders,
+                        unprotectedHeaders = unprotectedHeaders,
+                        detachedPayload = coseCompliantCbor.encodeToByteArray(readerAuthAllPayload),
                         signer = coseSigner
                     )
 
-                    // Attach to the request
-                    deviceRequest.copy(
-                        readerAuthAll = listOf(coseSign1)
+                    // Assemble final request
+                    DeviceRequest(
+                        version = DeviceRequest.VERSION_WITH_SIGNING,
+                        docRequests = signedDocRequests,
+                        deviceRequestInfo = deviceRequestInfo,
+                        readerAuthAll = listOf(readerAuthAllSignature)
                     )
                 } else {
-                    DeviceRequest(setup.requestedElements)
+                    DeviceRequest(setup.requestedElements).copy(version = DeviceRequest.VERSION)
                 }
-                // ===== END READER AUTHENTICATION =====
 
                 AnnexCRequestResponse(
                     protocol = AnnexC.PROTOCOL,
