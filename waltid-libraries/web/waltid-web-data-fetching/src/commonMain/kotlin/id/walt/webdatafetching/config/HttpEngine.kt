@@ -1,5 +1,7 @@
 package id.walt.webdatafetching.config
 
+import id.walt.webdatafetching.engines.EngineMapping
+
 enum class HttpEngine {
     /** Official Coroutine-IO engine */
     CIO,
@@ -18,4 +20,7 @@ enum class HttpEngine {
 
     // Supports ONLY HTTP2, requires Java 11
     // Jetty
+    ;
+
+    fun engineCreator() = EngineMapping.getEngineInstance(this)
 }
