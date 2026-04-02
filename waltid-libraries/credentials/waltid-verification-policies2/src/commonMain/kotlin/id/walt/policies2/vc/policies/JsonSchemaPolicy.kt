@@ -27,7 +27,7 @@ data class JsonSchemaPolicy(
     }
 
     @Transient
-    private val schemaFetcher = schemaUrl?.let { WebDataFetcher<JsonObject>("schema-policy") }
+    private val schemaFetcher = schemaUrl?.let { WebDataFetcher("schema-policy") }
 
     suspend fun getCurrentSchema(): JsonObject {
         return when {
