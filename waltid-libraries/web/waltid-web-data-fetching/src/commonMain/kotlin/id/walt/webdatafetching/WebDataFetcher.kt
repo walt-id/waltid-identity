@@ -95,7 +95,9 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
             method = HttpMethod.Post
         }
 
-        header(HttpHeaders.ContentType, ContentType.Application.Json)
+        if (req !is String) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json)
+        }
         setBody(req)
     }
 
