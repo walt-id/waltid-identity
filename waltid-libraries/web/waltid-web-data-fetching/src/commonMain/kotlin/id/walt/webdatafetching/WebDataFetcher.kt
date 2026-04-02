@@ -8,21 +8,20 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
-class WebDataFetcher<T : Any>(id: String) {
+class WebDataFetcher(id: String) {
 
     private val log = KotlinLogging.logger("WebDataFetcher[$id]")
-
     val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id)
 
     val httpClient = HttpClient() {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)
     }
 
-    val cache = dataFetcherConfiguration.cache?.buildCache<T>()
+    val cache = dataFetcherConfiguration.cache?.buildCache<Any>()
 
-    suspend inline fun <reified Res : T> fetch(url: String): T = fetch<Res>(UrlUtils.parseUrl(url))
+    suspend inline fun <reified T: Any> fetch(url: String): T = fetch<T>(UrlUtils.parseUrl(url))
 
-    suspend inline fun <reified Res : T> fetch(url: Url): T {
+    suspend inline fun <reified T: Any> fetch(url: Url): T {
         val cacheId = url.toString()
 
         dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
@@ -30,7 +29,7 @@ class WebDataFetcher<T : Any>(id: String) {
         val cachedValue = cache?.get(cacheId)
 
         if (cachedValue != null) {
-            return cachedValue
+            return cachedValue as T
         }
 
         val requestConfig = dataFetcherConfiguration.request
@@ -48,7 +47,7 @@ class WebDataFetcher<T : Any>(id: String) {
         val parsedResponse: T = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
             val body = httpResponse.bodyAsText()
             runCatching {
-                dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
+                dataFetcherConfiguration.decoding.json.decodeFromString<T>(body)
             }.getOrElse { ex ->
                 throw DataFetchingException(
                     "Server answered request with non-/invalid JSON: $body (to request to $url)",
@@ -57,7 +56,7 @@ class WebDataFetcher<T : Any>(id: String) {
             }
         } else {
             runCatching {
-                httpResponse.body<Res>()
+                httpResponse.body<T>()
             }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
         }
 

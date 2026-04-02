@@ -20,7 +20,7 @@ class BasicTest {
 
     @Test
     fun basicTest() = runTest {
-        val dataFetcher = WebDataFetcher<JsonObject>("test-basic")
+        val dataFetcher = WebDataFetcher("test-basic")
 
         val result = dataFetcher.fetch<JsonObject>(EXAMPLE_URL)
         println(result)
@@ -34,7 +34,7 @@ class BasicTest {
             WebDataFetchingConfiguration(url = UrlConfiguration(urls = AllowList(blacklist = listOf(EXAMPLE_URL))))
         )
 
-        val dataFetcher = WebDataFetcher<JsonObject>("test-url-filter")
+        val dataFetcher = WebDataFetcher("test-url-filter")
         assertFailsWith<IllegalArgumentException> {
             dataFetcher.fetch<JsonObject>(EXAMPLE_URL)
         }
@@ -47,7 +47,7 @@ class BasicTest {
             WebDataFetchingConfiguration(timeouts = TimeoutConfiguration(1.milliseconds, 1.milliseconds, 1.milliseconds))
         )
 
-        val dataFetcher = WebDataFetcher<JsonObject>("test-timeout")
+        val dataFetcher = WebDataFetcher("test-timeout")
         val url =
             "https://raw.githubusercontent.com/walt-id/waltid-identity/d550f21916b3c3551f23711ecf2c567d01d3cd48/waltid-services/waltid-integration-tests/src/main/resources/issuance/key.json"
         assertFailsWith<DataFetchingException> {
