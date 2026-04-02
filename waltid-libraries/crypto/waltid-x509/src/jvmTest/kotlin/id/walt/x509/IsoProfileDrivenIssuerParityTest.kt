@@ -27,7 +27,7 @@ import kotlin.time.Instant
 
 class IsoProfileDrivenIssuerParityTest {
 
-    private val issuer = DefaultX509ProfileDrivenIssuer()
+    private val issuer = X509ProfileDrivenIssuer()
     private val iacaBuilder = IACACertificateBuilder()
     private val iacaParser = IACACertificateParser()
     private val iacaValidator = IACAValidator()

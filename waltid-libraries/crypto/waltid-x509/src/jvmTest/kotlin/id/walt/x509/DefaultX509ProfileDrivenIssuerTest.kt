@@ -8,9 +8,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 
-class DefaultX509ProfileDrivenIssuerTest {
+class X509ProfileDrivenIssuerTest {
 
-    private val issuer = DefaultX509ProfileDrivenIssuer()
+    private val issuer = X509ProfileDrivenIssuer()
 
     @Test
     fun `issues generic ca certificate`() = runTest {

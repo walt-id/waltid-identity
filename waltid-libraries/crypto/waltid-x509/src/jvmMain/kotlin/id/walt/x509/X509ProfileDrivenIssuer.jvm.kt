@@ -41,7 +41,7 @@ import java.security.cert.X509Certificate
 import java.util.Date
 import kotlin.time.Instant
 
-class DefaultX509ProfileDrivenIssuer(
+class X509ProfileDrivenIssuer(
     private val profileResolver: X509CertificateProfileResolver = X509KnownCertificateProfiles.registry,
 ) : X509ProfileDrivenIssuer {
 
