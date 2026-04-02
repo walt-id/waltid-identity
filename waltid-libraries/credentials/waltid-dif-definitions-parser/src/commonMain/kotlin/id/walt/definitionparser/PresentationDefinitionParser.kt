@@ -36,8 +36,12 @@ class JsonObjectEnquirer {
         log.trace { "Result of resolving ${field.path}: $resolvedPath" }
 
         return if (resolvedPath == null) {
-            log.trace { "Unresolved field, failing constraint (Path ${field.path} not found in document $document)." }
-            false
+            if (field.optional == true) {
+                log.trace { "Optional field not resolved, passing constraint (Path ${field.path} not found in document)." }
+            } else {
+                log.trace { "Required field not resolved, failing constraint (Path ${field.path} not found in document $document)." }
+            }
+            field.optional == true
         } else {
             log.trace { "Processing field filter: ${field.filter}" }
             if (field.filter != null) {
