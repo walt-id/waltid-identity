@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RequestConfiguration(
-    val method: HttpMethod = HttpMethod.Get,
+    val method: HttpMethod? = null,
 
     val headers: Map<String, String>? = null,
     val cookies: Map<String, String>? = null,
@@ -20,7 +20,9 @@ data class RequestConfiguration(
 ) {
 
     fun applyConfiguration(builder: HttpRequestBuilder) {
-        builder.method = method.ktorHttpMethod
+        if (method?.ktorHttpMethod != null) {
+            builder.method = method.ktorHttpMethod
+        }
         builder.expectSuccess = expectSuccess
 
         /*headers?.let { // if below API only appends single

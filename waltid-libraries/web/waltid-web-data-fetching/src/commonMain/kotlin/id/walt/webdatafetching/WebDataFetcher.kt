@@ -18,9 +18,9 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
     val cache = dataFetcherConfiguration.cache?.buildCache<Any>()
 
-    suspend inline fun <reified T : Any> fetch(url: String): T = fetch<T>(UrlUtils.parseUrl(url))
+    suspend inline fun <reified Res : Any> fetch(urlString: String): Res = fetch<Res>(UrlUtils.parseUrl(urlString))
 
-    suspend inline fun <reified T : Any> fetch(url: Url): T {
+    suspend inline fun <reified Res : Any> fetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): Res {
         val cacheId = url.toString()
 
         dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
@@ -28,7 +28,7 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         val cachedValue = cache?.get(cacheId)
 
         if (cachedValue != null) {
-            return cachedValue as T
+            return cachedValue as Res
         }
 
         val requestConfig = dataFetcherConfiguration.request
@@ -36,6 +36,7 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         val httpResponseResult = runCatching {
             httpClient.request(url) {
                 requestConfig?.applyConfiguration(this)
+                customRequest(this)
             }
         }
 
@@ -43,10 +44,10 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
             throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
         }
 
-        val parsedResponse: T = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
+        val parsedResponse: Res = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
             val body = httpResponse.bodyAsText()
             runCatching {
-                dataFetcherConfiguration.decoding.json.decodeFromString<T>(body)
+                dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
             }.getOrElse { ex ->
                 throw DataFetchingException(
                     "Server answered request with non-/invalid JSON: $body (to request to $url)",
@@ -55,7 +56,7 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
             }
         } else {
             runCatching {
-                httpResponse.body<T>()
+                httpResponse.body<Res>()
             }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
         }
 
@@ -63,5 +64,17 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
         return parsedResponse
     }
+
+    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req): Res {
+        return fetch<Res>(url) {
+            if (dataFetcherConfiguration.request?.method == null) {
+                method = HttpMethod.Post
+            }
+            setBody(req)
+        }
+    }
+
+    suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req): Res =
+        send(UrlUtils.parseUrl(urlString), req)
 
 }
