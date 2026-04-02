@@ -1,5 +1,6 @@
 package id.walt.webdatafetching
 
 enum class WebDataFetcherId {
-    DATA_FUNCTIONS
+    DATA_FUNCTIONS,
+    WELL_KNOWN_KEY_RESOLVER
 }

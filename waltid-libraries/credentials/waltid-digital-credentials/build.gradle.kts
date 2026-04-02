@@ -23,7 +23,8 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Ktor client
-            implementation(identityLibs.bundles.waltid.ktor.client)
+            implementation(identityLibs.ktor.client.core)
+
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
@@ -39,7 +40,7 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
 
-            
+
             implementation(identityLibs.kotlincrypto.hash.sha2)
         }
         commonTest.dependencies {
