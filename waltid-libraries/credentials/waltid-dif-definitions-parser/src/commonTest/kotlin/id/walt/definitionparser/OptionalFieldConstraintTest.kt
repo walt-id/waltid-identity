@@ -6,8 +6,6 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,7 +13,7 @@ import kotlin.test.assertTrue
 
 /**
  * Tests that the PresentationDefinitionParser correctly handles the `optional` property
- * on Field objects per DIF Presentation Exchange v2.0.0, Section 6:
+ * on Field objects per DIF Presentation Exchange v2.0.0 (Input Evaluation):
  *
  * - optional: true  + path missing  → constraint passes
  * - optional: false + path missing  → constraint fails
