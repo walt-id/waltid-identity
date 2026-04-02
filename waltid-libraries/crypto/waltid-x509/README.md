@@ -46,6 +46,11 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
     - `etsi.qwac`
     - `etsi.qsealc`
     - `etsi.psd2.transport`
+- **Certificate Signing Request support (core-lib, JVM)**:
+  - common CSR models, builder, PEM/DER helpers, and compatibility checks
+  - JVM CSR generation, parsing, and signature validation
+  - requested `subjectAltName`, `keyUsage`, `extendedKeyUsage`, and `basicConstraints` reuse the generic X.509 models
+  - custom CSR attributes and custom requested extensions are supported as raw DER payloads
 - **[ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (JVM)**:
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
@@ -84,8 +89,13 @@ Built-in known profiles now include:
   - `iso.document-signer`
   - `generic-ca`
   - `generic-end-entity`
+- first-class CSR support = **implemented in core-lib for**:
+  - common CSR models and builder
+  - JVM CSR generation / parsing / signature validation
+  - PEM / DER CSR helpers
+  - lightweight CSR/profile compatibility checks
 - QWAC / QSealC / PSD2-style profiles = **modeled as generic profiles, not full issuance flows yet**
-- CSR-driven issuance = **not implemented yet**
+- Enterprise CSR-based issuance integration = **not implemented yet**
 
 ### Important ISO note
 For `iso.iaca` and `iso.document-signer`, the generic JVM issuer currently routes through the existing ISO-specific implementation path. That is deliberate.
@@ -161,9 +171,48 @@ val issued = issuer.issue(
 )
 ```
 
+### Example: build and validate a CSR
+
+```kotlin
+val key = JWKKey.generate(KeyType.secp256r1)
+
+val csrData = X509CertificateSigningRequestBuilder(
+    subject = x509SubjectOf(
+        X509SubjectAttributes.country("AT"),
+        X509SubjectAttributes.commonName("service.example.org"),
+    ),
+).addSubjectAlternativeName(
+    X509SubjectAlternativeName.DnsName("service.example.org")
+).addKeyUsage(
+    X509KeyUsage.DigitalSignature
+).addExtendedKeyUsage(
+    X509ExtendedKeyUsage.ServerAuth
+).build()
+
+val csrDer = X509CertificateSigningRequestGenerator().generate(
+    X509CertificateSigningRequestSpec(
+        csrData = csrData,
+        signingKey = key,
+    )
+)
+
+val decoded = X509CertificateSigningRequestParser().parse(csrDer)
+validateCertificateSigningRequestSignature(csrDer)
+
+val compatibility = decoded.checkCompatibility(X509KnownCertificateProfiles.Qwac)
+```
+
+### CSR scope today
+
+- The core library supports PKCS#10 CSR modeling, JVM generation, JVM parsing, PEM/DER conversion, and signature validation.
+- Requested `subjectAltName`, `keyUsage`, `extendedKeyUsage`, and `basicConstraints` are modeled explicitly.
+- Additional requested extensions and CSR attributes are supported as raw DER payloads.
+- The compatibility helper is intentionally lightweight: it flags requests that exceed or conflict with an `X509CertificateProfile`, but it is not a full issuance policy engine.
+- Enterprise integration and CSR-driven issuance flows are intentionally out of scope for now.
+
 ## Targets
 
-- **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
+- **JVM / Android**: Full chain validation, generic CSR generation/parsing/validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
 - **iOS**: Chain validation stub; ISO tooling not implemented yet.
 - **JS**: Chain validation stub; ISO tooling not implemented yet.
 

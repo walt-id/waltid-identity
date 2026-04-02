@@ -26,6 +26,8 @@ data class CertificateDer(
         ): CertificateDer {
             val base64Payload = extractPemBase64Payload(
                 pemEncodedCertificate = pemEncodedCertificate,
+                pemHeader = PEM_HEADER,
+                pemFooter = PEM_FOOTER,
             )
             return CertificateDer(
                 bytes = Base64.Pem.decode(
@@ -33,38 +35,40 @@ data class CertificateDer(
                 ).toByteString(),
             )
         }
-
-        private fun extractPemBase64Payload(
-            pemEncodedCertificate: String,
-        ): String {
-            val trimmedPem = pemEncodedCertificate.trim()
-            require(
-                trimmedPem.startsWith(PEM_HEADER)
-            ) {
-                "PEM header not found."
-            }
-            require(
-                trimmedPem.endsWith(PEM_FOOTER)
-            ) {
-                "PEM footer not found."
-            }
-
-            val base64Payload = trimmedPem
-                .removePrefix(PEM_HEADER)
-                .removeSuffix(PEM_FOOTER)
-                .filterNot(
-                    predicate = { it.isWhitespace() },
-                )
-
-            require(
-                base64Payload.isNotBlank()
-            ) {
-                "PEM payload is empty."
-            }
-
-            return base64Payload
-        }
     }
+}
+
+internal fun extractPemBase64Payload(
+    pemEncodedCertificate: String,
+    pemHeader: String,
+    pemFooter: String,
+): String {
+    val trimmedPem = pemEncodedCertificate.trim()
+    require(
+        trimmedPem.startsWith(pemHeader)
+    ) {
+        "PEM header not found."
+    }
+    require(
+        trimmedPem.endsWith(pemFooter)
+    ) {
+        "PEM footer not found."
+    }
+
+    val base64Payload = trimmedPem
+        .removePrefix(pemHeader)
+        .removeSuffix(pemFooter)
+        .filterNot(
+            predicate = { it.isWhitespace() },
+        )
+
+    require(
+        base64Payload.isNotBlank()
+    ) {
+        "PEM payload is empty."
+    }
+
+    return base64Payload
 }
 
 /**
