@@ -9,6 +9,11 @@ import io.ktor.http.*
 
 class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null) {
 
+    constructor(id: WebDataFetcherId, defaultConfiguration: WebDataFetchingConfiguration? = null) : this(
+        id = id.name,
+        defaultConfiguration = defaultConfiguration
+    )
+
     private val log = KotlinLogging.logger("WebDataFetcher[$id]")
     val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration)
 
