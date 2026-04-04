@@ -66,6 +66,7 @@ class AuthorizationRequestBuilder(
         scope: String? = null,
         usePKCE: Boolean = true,
         metadata: AuthorizationServerMetadata? = null,
+        redirectUri: String? = null,
     ): AuthorizationRequest {
         require(authorizationEndpoint.isNotBlank()) { "Authorization endpoint cannot be blank" }
         require(credentialConfigurationId.isNotBlank()) { "Credential configuration ID cannot be blank" }
@@ -101,7 +102,7 @@ class AuthorizationRequestBuilder(
         urlBuilder.parameters.apply {
             append("response_type", ResponseType.CODE.value)
             append("client_id", clientConfig.clientId)
-            append("redirect_uri", clientConfig.primaryRedirectUri)
+            append("redirect_uri", redirectUri ?: clientConfig.primaryRedirectUri)
             append("state", state)
             append("authorization_details", authzDetailsJson)
 
