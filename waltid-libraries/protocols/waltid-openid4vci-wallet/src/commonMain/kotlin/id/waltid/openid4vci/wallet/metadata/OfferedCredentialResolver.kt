@@ -4,6 +4,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.Serializable
 
 private val log = KotlinLogging.logger {}
 
@@ -16,6 +17,7 @@ object OfferedCredentialResolver {
     /**
      * Represents a resolved credential offer with its configuration
      */
+    @Serializable
     data class ResolvedCredentialOffer(
         val credentialConfigurationId: String,
         val configuration: CredentialConfiguration,
