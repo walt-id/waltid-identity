@@ -43,7 +43,7 @@ class IssuerMetadataResolver(
 
         val urlsToTry = mutableListOf<String>()
 
-        if (credentialIssuerUrl.contains("/v1/") && credentialIssuerUrl.contains("/issuer-service-api2/openid4vci")) {
+        if (credentialIssuerUrl.contains("/v2/") && credentialIssuerUrl.contains("/issuer-service-api/openid4vci")) {
             val url = Url(credentialIssuerUrl)
             val path = url.encodedPath
             urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$CREDENTIAL_ISSUER_WELL_KNOWN_PATH$path")
@@ -55,7 +55,7 @@ class IssuerMetadataResolver(
             urlsToTry.add(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
         }
         
-        if (!credentialIssuerUrl.contains("/openid4vc/")) {
+        if (!credentialIssuerUrl.contains("/openid4vci/")) {
             if (credentialIssuerUrl.endsWith("/")) {
                 urlsToTry.add("${credentialIssuerUrl}openid4vc/Draft13$CREDENTIAL_ISSUER_WELL_KNOWN_PATH")
             } else {
@@ -124,7 +124,7 @@ class IssuerMetadataResolver(
 
         val urlsToTry = mutableListOf<String>()
 
-        if (authorizationServerUrl.contains("/v1/") && authorizationServerUrl.contains("/issuer-service-api2/openid4vci")) {
+        if (authorizationServerUrl.contains("/v2/") && authorizationServerUrl.contains("/issuer-service-api/openid4vci")) {
             val url = Url(authorizationServerUrl)
             val path = url.encodedPath
             urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH$path")
@@ -145,7 +145,7 @@ class IssuerMetadataResolver(
         }
 
         for (metadataUrl in urlsToTry.distinct()) {
-            log.debug { "Fetching authorization server metadata from: $metadataUrl" }
+            log.info { "Fetching authorization server metadata from: $metadataUrl" }
             val response: HttpResponse = try {
                 httpClient.get(metadataUrl)
             } catch (e: Exception) {
@@ -183,7 +183,7 @@ class IssuerMetadataResolver(
 
         val urlsToTry = mutableListOf<String>()
 
-        if (providerUrl.contains("/v1/") && providerUrl.contains("/issuer-service-api2/openid4vci")) {
+        if (providerUrl.contains("/v2/") && providerUrl.contains("/issuer-service-api/openid4vci")) {
             val url = Url(providerUrl)
             val path = url.encodedPath
             val newPath = path.replace("/issuer-service-api2/openid4vci", "/issuer-service-api2/openid4vc/v1")
@@ -246,9 +246,11 @@ class IssuerMetadataResolver(
         
         // Try authorization_servers if present
         val authorizationServers = credentialIssuerMetadata.authorizationServers
+        println("the authorizationServers are: $authorizationServers")
         if (!authorizationServers.isNullOrEmpty()) {
             val authServerUrl = authorizationServers.first()
             log.info { "Attempting to use authorization server from issuer metadata: ${authServerUrl}" }
+            println("Attempting to use authorization server from issuer metadata: ${authServerUrl} - this is a test message, please ignore it.")
             return try {
                 resolveAuthorizationServerMetadata(authServerUrl)
             } catch (e: Exception) {
