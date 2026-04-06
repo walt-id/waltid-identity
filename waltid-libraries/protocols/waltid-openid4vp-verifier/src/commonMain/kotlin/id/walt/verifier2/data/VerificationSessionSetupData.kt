@@ -92,8 +92,8 @@ sealed interface OpenID4VP1FlowSetup : VerificationSessionSetup {
 @Serializable
 @SerialName("cross_device")
 data class CrossDeviceFlowSetup(
-    @SerialName("core_flow") override val core: GeneralFlowConfig,
-    @SerialName("url_config") override val urlConfig: UrlConfig = UrlConfig(),
+    override val core: GeneralFlowConfig,
+    override val urlConfig: UrlConfig = UrlConfig(),
     override val openid: OpenId4VPConfig? = null,
 
     // Properties unique to this flow
