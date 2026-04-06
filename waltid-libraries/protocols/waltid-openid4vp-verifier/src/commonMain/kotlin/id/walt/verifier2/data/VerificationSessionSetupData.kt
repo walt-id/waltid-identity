@@ -317,7 +317,7 @@ typealias AnnexCNamespaceRequestedElements = Map<String, List<String>>
 @Serializable
 @SerialName("dc_api-annex-c")
 data class DcApiAnnexCFlowSetup(
-    @SerialName("core_flow") private val coreInput: GeneralFlowConfig? = null,
+    private val coreInput: GeneralFlowConfig? = null,
     val requestedElements: AnnexCDocTypeToRequestedElements,
     val origin: String,
 ) : VerificationSessionSetup {
@@ -341,10 +341,10 @@ data class DcApiAnnexCFlowSetup(
         }
 
         coreInput?.dcqlQuery?.let {
-            require(it == core.dcqlQuery) { "core_flow.dcql_query must match docType/requestedElements" }
+            require(it == core.dcqlQuery) { "core.dcql_query must match docType/requestedElements" }
         }
         coreInput?.policies?.let {
-            require(it == core.policies) { "core_flow.policies must match policies" }
+            require(it == core.policies) { "core.policies must match policies" }
         }
     }
 
