@@ -3,6 +3,7 @@ import './style.css';
 const VERIFIER_PRESETS = {
   'open-source': {
     verifierBase: 'https://verifier2.portal.test.waltid.cloud'
+    // verifierBase: '/'
   },
   enterprise: {
     verifierBase: '/verifier-api/v1/waltid.tenant1.verifier2/verifier2-service-api'
