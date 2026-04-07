@@ -5,6 +5,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.submitForm
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -143,5 +144,24 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
      */
     suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req) =
         send<Req, Res>(UrlUtils.parseUrl(urlString), req)
+
+    suspend fun sendForm(url: String, parameters: Parameters, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
+        dataFetcherConfiguration.url?.requireUrlAllowed(url)
+        val requestConfig = dataFetcherConfiguration.request
+
+        val httpResponse = httpClient.submitForm(url, parameters, false) {
+            requestConfig?.applyConfiguration(this)
+            customRequest(this)
+        }
+
+        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+            if (!httpResponse.status.isSuccess()) {
+                // TODO: More detailed error message
+                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+            }
+        }
+
+        return httpResponse
+    }
 
 }
