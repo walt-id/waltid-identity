@@ -29,8 +29,14 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
     val cache = dataFetcherConfiguration.cache?.buildCache<WebDataFetchingResult<*>>()
 
+    /**
+     * Fetch data from a remote URL
+     */
     suspend inline fun <reified Res : Any> fetch(urlString: String): WebDataFetchingResult<Res> = fetch<Res>(UrlUtils.parseUrl(urlString))
 
+    /**
+     * Fetch data from a remote URL
+     */
     suspend inline fun <reified Res : Any> fetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): WebDataFetchingResult<Res> {
         val cacheId = url.toString()
 
@@ -101,7 +107,9 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         setBody(req)
     }
 
-
+    /**
+     * Send data to a remote URL
+     */
     suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req) =
         send<Req, Res>(UrlUtils.parseUrl(urlString), req)
 
