@@ -96,6 +96,37 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         return result
     }
 
+    /**
+     * Raw fetching: Does not use certain WebDataFetcher features
+     * Does not use:
+     * - Caching
+     * - Response deserialization
+     */
+    suspend inline fun rawFetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
+        dataFetcherConfiguration.url?.requireUrlAllowed(url.toString())
+        val requestConfig = dataFetcherConfiguration.request
+
+        val httpResponse = httpClient.request(url) {
+            requestConfig?.applyConfiguration(this)
+            customRequest(this)
+        }
+
+        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+            if (!httpResponse.status.isSuccess()) {
+                // TODO: More detailed error message
+                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+            }
+        }
+
+        return httpResponse
+    }
+    suspend inline fun rawFetch(urlString: String): HttpResponse {
+        return rawFetch(UrlUtils.parseUrl(urlString))
+    }
+
+    /**
+     * Send data to a remote URL
+     */
     suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req) = fetch<Res>(url) {
         if (dataFetcherConfiguration.request?.method == null) {
             method = HttpMethod.Post
