@@ -33,6 +33,8 @@ kotlin {
              * walt.id:
              */
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
+            implementation(project(":waltid-libraries:crypto:waltid-cose"))
+            implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:credentials:waltid-vical"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
