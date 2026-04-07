@@ -2,6 +2,10 @@ package id.walt.trust.service.routes
 
 import id.walt.trust.model.*
 import id.walt.trust.service.config.TrustRegistryConfig
+import id.walt.trust.service.openapi.TrustRegistryDocs
+import io.github.smiley4.ktoropenapi.get
+import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -14,9 +18,9 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 fun Application.trustRegistryRoutes() {
-    install(ContentNegotiation) {
-        json()
-    }
+//    install(ContentNegotiation) {
+//        json()
+//    }
     routing {
         route("/trust-registry") {
             resolveRoutes()
@@ -60,7 +64,7 @@ data class LoadSourceRequest(
 
 private fun Route.resolveRoutes() {
     route("/resolve") {
-        post("/certificate") {
+        post("/certificate", TrustRegistryDocs.resolveCertificateDocs()) {
             val req = call.receive<ResolveCertificateRequest>()
             val instant = req.instant?.let { Instant.parse(it) } ?: Clock.System.now()
             val service = TrustRegistryConfig.service
@@ -87,14 +91,14 @@ private fun Route.resolveRoutes() {
             call.respond(decision)
         }
 
-        post("/public-key") {
+        post("/public-key", TrustRegistryDocs.resolvePublicKeyDocs()) {
             val instant = Clock.System.now()
             val service = TrustRegistryConfig.service
             val decision = service.resolveByPublicKey("{}", instant)
             call.respond(decision)
         }
 
-        post("/provider-id") {
+        post("/provider-id", TrustRegistryDocs.resolveProviderIdDocs()) {
             val req = call.receive<ResolveProviderRequest>()
             val instant = req.instant?.let { Instant.parse(it) } ?: Clock.System.now()
             val service = TrustRegistryConfig.service
@@ -116,12 +120,12 @@ private fun Route.resolveRoutes() {
 
 private fun Route.sourceRoutes() {
     route("/sources") {
-        get {
+        get(TrustRegistryDocs.listSourcesDocs()) {
             val sources = TrustRegistryConfig.service.listSources()
             call.respond(sources)
         }
 
-        post("/load") {
+        post("/load", TrustRegistryDocs.loadSourceDocs()) {
             val req = call.receive<LoadSourceRequest>()
             val result = TrustRegistryConfig.service.loadSourceFromContent(
                 sourceId = req.sourceId,
@@ -135,7 +139,7 @@ private fun Route.sourceRoutes() {
             }
         }
 
-        post("/{sourceId}/refresh") {
+        post("/{sourceId}/refresh", TrustRegistryDocs.refreshSourceDocs()) {
             val sourceId = call.parameters["sourceId"]!!
             val result = TrustRegistryConfig.service.refreshSource(sourceId)
             if (result.success) {
@@ -152,7 +156,7 @@ private fun Route.sourceRoutes() {
 // ---------------------------------------------------------------------------
 
 private fun Route.entityRoutes() {
-    get("/entities") {
+    get("/entities", TrustRegistryDocs.listEntitiesDocs()) {
         val sourceFamily = call.request.queryParameters["sourceFamily"]?.let {
             runCatching { SourceFamily.valueOf(it) }.getOrNull()
         }
@@ -179,7 +183,7 @@ private fun Route.entityRoutes() {
 // ---------------------------------------------------------------------------
 
 private fun Route.healthRoutes() {
-    get("/health") {
+    get("/health", TrustRegistryDocs.healthDocs()) {
         val health = TrustRegistryConfig.service.getSourceHealth()
         call.respond(health)
     }
