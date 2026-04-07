@@ -7,7 +7,7 @@ import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.store.TrustStore
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import java.security.MessageDigest
 import java.util.*
 

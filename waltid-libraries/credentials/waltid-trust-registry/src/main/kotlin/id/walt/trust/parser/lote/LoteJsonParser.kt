@@ -1,7 +1,7 @@
 package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 

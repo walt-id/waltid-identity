@@ -4,7 +4,7 @@ import id.walt.trust.model.*
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
 import kotlinx.coroutines.test.runTest
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import kotlin.test.*
 
 /**

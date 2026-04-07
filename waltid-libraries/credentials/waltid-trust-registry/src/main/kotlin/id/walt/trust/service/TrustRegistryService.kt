@@ -1,7 +1,7 @@
 package id.walt.trust.service
 
 import id.walt.trust.model.*
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Main service interface for trust registry operations.

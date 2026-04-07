@@ -1,7 +1,7 @@
 package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import javax.xml.parsers.DocumentBuilderFactory
