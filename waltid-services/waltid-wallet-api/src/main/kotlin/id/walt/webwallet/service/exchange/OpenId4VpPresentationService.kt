@@ -74,11 +74,7 @@ class OpenId4VpPresentationService(
 
     fun buildWalletPresentationRequest(request: String, resolvedRequest: AuthorizationRequest): Url {
         val requestUrl = Url(request)
-        return if (requestUrl.parameters.contains("request_uri")) {
-            requestUrl
-        } else {
-            resolvedRequest.toWalletPresentUrl(baseUrlBuilder(requestUrl))
-        }
+        return resolvedRequest.toWalletPresentUrl(baseUrlBuilder(requestUrl))
     }
 
     suspend fun matchCredentialsForPresentationRequest(
@@ -246,5 +242,15 @@ class OpenId4VpPresentationService(
             urlBuilder.parameters.append(key, json.encodeToString(JsonElement.serializer(), value))
         }
         return urlBuilder.build()
+    }
+
+    companion object {
+        fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
+            val parameters = Url(request).parameters
+            parameters.contains("request") ||
+                parameters.contains("request_uri") ||
+                parameters.contains("dcql_query") ||
+                parameters.contains("transaction_data")
+        }.getOrDefault(false)
     }
 }
