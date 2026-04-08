@@ -103,12 +103,12 @@ class EventLogUseCase(
         }
 
     fun verifierData(request: AuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
-        did = request.clientId.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable,
+        did = normalizeVerifierDid(request.clientId),
         policies = emptyList(),//TODO: from input-descriptors?
     )
 
     fun verifierData(request: OpenId4VpAuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
-        did = request.clientId?.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable,
+        did = normalizeVerifierDid(request.clientId),
         policies = emptyList(),
     )
 
@@ -135,6 +135,9 @@ class EventLogUseCase(
                 else -> it
             }
         }?.jsonPrimitive?.content
+
+    private fun normalizeVerifierDid(clientId: String?): String =
+        clientId?.trim()?.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable
 
     data class EventFilterParameter(
         val accountId: Uuid,

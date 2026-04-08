@@ -247,10 +247,16 @@ class OpenId4VpPresentationService(
     companion object {
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters
-            parameters.contains("request") ||
-                parameters.contains("request_uri") ||
-                parameters.contains("dcql_query") ||
-                parameters.contains("transaction_data")
+            parameters.contains("dcql_query") ||
+                parameters.contains("transaction_data") ||
+                parameters["request"]
+                    ?.takeIf { it.isJwt() }
+                    ?.decodeJws()
+                    ?.payload
+                    ?.let { payload ->
+                        "dcql_query" in payload || "transaction_data" in payload
+                    }
+                    ?: false
         }.getOrDefault(false)
     }
 }
