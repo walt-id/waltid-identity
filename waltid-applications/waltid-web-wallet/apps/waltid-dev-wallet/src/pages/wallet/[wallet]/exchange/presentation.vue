@@ -71,8 +71,8 @@
               class="text-red-600 animate-pulse flex items-center gap-1 py-1"
             >
               <Icon name="heroicons:exclamation-circle" class="h-6 w-6" />
-              You don't have any credentials matching this presentation
-              definition in your wallet.
+              You don't have any credentials matching this presentation request
+              in your wallet.
             </span>
           </div>
 
@@ -169,11 +169,11 @@
       <Disclosure>
         <DisclosureButton class="py-2">
           <ButtonsWaltButton class="bg-gray-400 text-white"
-            >View presentation definition JSON
+            >View presentation request JSON
           </ButtonsWaltButton>
         </DisclosureButton>
         <DisclosurePanel class="text-gray-500 overflow-x-scroll pb-2">
-          <pre>{{ presentationDefinition }}</pre>
+          <pre>{{ requestPayload }}</pre>
         </DisclosurePanel>
       </Disclosure>
     </CenterMain>
@@ -197,7 +197,7 @@ const query = useRoute().query;
 const {
   currentWallet,
   verifierHost,
-  presentationDefinition,
+  requestPayload,
   matchedCredentials,
   selectedCredentialIds,
   selection,
