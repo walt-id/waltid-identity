@@ -215,8 +215,9 @@ object TransactionDataUtils {
         ) {
             "transaction_data_hashes must be present when transaction_data is requested"
         }
+        val actualTransactionDataHashes = requireNotNull(transactionDataHashes)
         requireValidation(
-            transactionDataHashes.size == expectedItems.size,
+            actualTransactionDataHashes.size == expectedItems.size,
             TransactionDataValidationErrorReason.HASHES_MISMATCH,
         ) {
             "transaction_data_hashes must contain one entry per transaction_data item"
@@ -224,7 +225,7 @@ object TransactionDataUtils {
 
         val expectedHashes = calculateTransactionDataHashes(expectedItems, expectedAlgorithm)
         requireValidation(
-            transactionDataHashes == expectedHashes,
+            actualTransactionDataHashes == expectedHashes,
             TransactionDataValidationErrorReason.HASHES_MISMATCH,
         ) {
             "transaction_data_hashes do not match the requested transaction_data"
