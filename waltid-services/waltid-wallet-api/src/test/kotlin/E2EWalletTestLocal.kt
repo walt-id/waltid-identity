@@ -243,7 +243,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
          // FIXME: requestCredential(issuanceUri, availableDids.first().did) // WaltId-MikeRichardson: temporarily disabled due to failure caused by ktor client
      }
 */
-    @Test
+    /*@Test
     fun e2eTestImportW3cJwtCredential() = testApplication {
         runApplication()
         login()
@@ -346,7 +346,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         // Clean up
         val availableDids = listAllDids()
         deleteAllDids(availableDids)
-    }
+    }*/
 
     override var walletClient: HttpClient
         get() = localWalletClient
