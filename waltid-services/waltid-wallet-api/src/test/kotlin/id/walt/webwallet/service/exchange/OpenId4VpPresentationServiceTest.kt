@@ -227,6 +227,40 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `isOpenId4VpRequestCandidate only treats explicit v1 requests as strict v1 candidates`() {
+        val v1RequestObject = signedLikeJwt(
+            """
+            {
+              "client_id":"verifier2",
+              "response_type":"vp_token",
+              "response_mode":"direct_post",
+              "response_uri":"https://verifier.example/response",
+              "nonce":"nonce-123",
+              "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
+            }
+            """.trimIndent(),
+        )
+        val draftRequestObject = signedLikeJwt(
+            """
+            {
+              "client_id":"https://verifier.example/callback",
+              "client_id_scheme":"redirect_uri",
+              "response_type":"vp_token",
+              "response_mode":"direct_post",
+              "response_uri":"https://verifier.example/response",
+              "nonce":"nonce-123",
+              "presentation_definition":{"id":"presentation-definition"}
+            }
+            """.trimIndent(),
+        )
+
+        assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$v1RequestObject"))
+        assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?dcql_query=%7B%7D"))
+        assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$draftRequestObject"))
+        assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request_uri=https://verifier.example/request"))
+    }
+
+    @Test
     fun `matchCredentials returns wallet credentials satisfying a dcql query`() {
         val http = HttpClient()
         try {
