@@ -9,6 +9,7 @@ import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
+import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
@@ -33,14 +34,22 @@ class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
 ) {
     private val logger = KotlinLogging.logger { }
+    private val supportedTransactionDataTypes = TransactionDataUtils.SUPPORTED_TRANSACTION_DATA_TYPES
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
         isLenient = true
     }
 
-    suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> =
-        runCatching { AuthorizationRequestResolver.resolve(request, http) }
+    suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
+        AuthorizationRequestResolver.resolve(request, http).also { resolvedRequest ->
+            TransactionDataUtils.validateRequestTransactionData(
+                transactionData = resolvedRequest.authorizationRequest.transactionData,
+                supportedTypes = supportedTransactionDataTypes,
+                credentialQueriesById = resolvedRequest.authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+            )
+        }
+    }
 
     fun buildWalletPresentationRequest(
         request: String,

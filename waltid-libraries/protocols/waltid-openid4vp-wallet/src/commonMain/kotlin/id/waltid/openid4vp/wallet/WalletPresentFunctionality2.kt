@@ -13,6 +13,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
@@ -152,6 +153,7 @@ object WalletPresentFunctionality2 {
 
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
+        supportedTransactionDataTypes: Set<String> = emptySet(),
 
         // TODO: selected credentials
 
@@ -186,6 +188,11 @@ object WalletPresentFunctionality2 {
         }.getOrThrow()
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
+        TransactionDataUtils.validateRequestTransactionData(
+            transactionData = authorizationRequest.transactionData,
+            supportedTypes = supportedTransactionDataTypes,
+            credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+        )
 
         require(authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN) {
             TODO("Currently only ResponseMode 'vp_token' is supported")

@@ -6,6 +6,7 @@ import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCred
 import id.walt.crypto.keys.Key
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
+import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.w3c.PresentationBuilder
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.createKeyBindingJwt
@@ -45,7 +46,11 @@ object W3CPresenter {
                 nonce = authorizationRequest.nonce!!,
                 audience = authorizationRequest.clientId,
                 selectedDisclosures = disclosuresToPresent, // Pass the actual disclosures for sd_hash
-                holderKey = holderKey
+                holderKey = holderKey,
+                transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+                    transactionData = authorizationRequest.transactionData,
+                    credentialId = matchResult.originalQuery.id,
+                ),
             )
             // Use the disclose method, appending the KB-JWT
             val sdPresentationString =
