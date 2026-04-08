@@ -74,6 +74,32 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `resolvePresentationRequest keeps raw scalar query parameters as strings`() {
+        val http = HttpClient()
+        try {
+            val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+            val request = AuthorizationRequest(
+                clientId = "verifier2",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseUri = "https://verifier.example/response",
+                nonce = "12345",
+                state = "true",
+                dcqlQuery = query,
+            ).toHttpUrl().toString()
+
+            val resolvedRequest = runBlocking {
+                service.resolvePresentationRequest(request)
+            }
+            val resolvedUrl = Url(resolvedRequest)
+
+            assertEquals("12345", resolvedUrl.parameters["nonce"])
+            assertEquals("true", resolvedUrl.parameters["state"])
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
     fun `buildWalletPresentationRequest keeps values JSON encoded for wallet library parsing`() {
         val http = HttpClient()
         try {
