@@ -168,8 +168,8 @@
 
       <Disclosure>
         <DisclosureButton class="py-2">
-          <ButtonsWaltButton class="bg-gray-400 text-white"
-            >View presentation request JSON
+          <ButtonsWaltButton class="bg-gray-400 text-white">
+            View presentation request JSON
           </ButtonsWaltButton>
         </DisclosureButton>
         <DisclosurePanel class="text-gray-500 overflow-x-scroll pb-2">
