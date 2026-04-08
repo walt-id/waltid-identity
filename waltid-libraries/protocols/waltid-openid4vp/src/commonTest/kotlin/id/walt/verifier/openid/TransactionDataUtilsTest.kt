@@ -169,6 +169,27 @@ class TransactionDataUtilsTest {
     }
 
     @Test
+    fun `validateRequestTransactionData rejects missing holder binding requirement`() {
+        val encoded = buildJsonObject {
+            put("type", supportedTransactionDataType)
+            put("credential_ids", buildJsonArray {
+                add(JsonPrimitive("payment_credential"))
+            })
+            put("amount", "42.00")
+            put("payee", "ACME Corp")
+            put("currency", "EUR")
+        }.toString().encodeToByteArray().encodeToBase64Url()
+
+        assertFailsWith<IllegalArgumentException> {
+            TransactionDataUtils.validateRequestTransactionData(
+                transactionData = listOf(encoded),
+                supportedTypes = setOf(supportedTransactionDataType),
+                credentialQueriesById = sdJwtCredentialQueries(),
+            )
+        }
+    }
+
+    @Test
     fun `validateResponseTransactionData verifies sha-256 hashes over encoded values`() {
         val encoded = transactionData(
             type = supportedTransactionDataType,

@@ -154,7 +154,9 @@ data class DcSdJwtPresentation(
             val transactionDataHashes = when (val transactionDataHashesElement = kbJwtPayload["transaction_data_hashes"]) {
                 null -> null
                 is JsonArray -> transactionDataHashesElement.map { element ->
-                    (element as? JsonPrimitive)?.contentOrNull
+                    (element as? JsonPrimitive)
+                        ?.takeIf { it.isString }
+                        ?.content
                         ?: return Result.failure(
                             IllegalArgumentException("transaction_data_hashes must be an array of strings"),
                         )
@@ -166,7 +168,19 @@ data class DcSdJwtPresentation(
                     )
                 }
             }
-            val transactionDataHashesAlg = kbJwtPayload["transaction_data_hashes_alg"]?.jsonPrimitive?.contentOrNull
+            val transactionDataHashesAlg = when (val transactionDataHashesAlgElement = kbJwtPayload["transaction_data_hashes_alg"]) {
+                null -> null
+                is JsonPrimitive -> transactionDataHashesAlgElement
+                    .takeIf { it.isString }
+                    ?.content
+                    ?: return Result.failure(
+                        IllegalArgumentException("transaction_data_hashes_alg must be a string"),
+                    )
+
+                else -> return Result.failure(
+                    IllegalArgumentException("transaction_data_hashes_alg must be a string"),
+                )
+            }
 
             val presentedDisclosureString =
                 if (presentedDisclosures.isNotEmpty())

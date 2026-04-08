@@ -106,10 +106,22 @@ export default function TransactionVerification() {
     return () => window.clearInterval(interval);
   }, [sessionId, verifier2BaseUrl]);
 
+  useEffect(() => {
+    setSessionId(null);
+    setRequestUrl("");
+    setWalletUrl("");
+    setSessionInfo(null);
+    setError(null);
+  }, [amount, currency, payee, presentationFormat, reference]);
+
   async function createTransactionVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setSessionId(null);
+    setRequestUrl("");
+    setWalletUrl("");
+    setSessionInfo(null);
 
     try {
       const encodedTransactionData = encodeBase64Url(JSON.stringify(transactionPreview));

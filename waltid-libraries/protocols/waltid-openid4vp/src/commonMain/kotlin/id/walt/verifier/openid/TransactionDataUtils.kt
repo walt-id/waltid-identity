@@ -84,7 +84,7 @@ object TransactionDataUtils {
                 require(item.type in supportedTypes) { "Unsupported transaction_data type: ${item.type}" }
             }
             require(item.credentialIds.isNotEmpty()) { "transaction_data.credential_ids must not be empty" }
-            require(item.requireCryptographicHolderBinding != false) {
+            require(item.requireCryptographicHolderBinding == true) {
                 "transaction_data type ${item.type} requires cryptographic holder binding"
             }
 
