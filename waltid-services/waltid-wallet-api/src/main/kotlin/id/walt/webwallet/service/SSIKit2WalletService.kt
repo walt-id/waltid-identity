@@ -32,6 +32,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
@@ -983,8 +984,12 @@ class SSIKit2WalletService(
     private suspend fun useOpenId4VpPresentationRequest(
         parameter: PresentationRequestParameter,
         resolvedRequest: OpenId4VpAuthorizationRequest,
-    ): Result<String?> =
-        WalletPresentFunctionality2.walletPresentHandling(
+    ): Result<String?> {
+        if (resolvedRequest.responseMode == OpenID4VPResponseMode.FORM_POST) {
+            return Result.failure(IllegalArgumentException("OpenID4VP response_mode=form_post is not supported by wallet-api"))
+        }
+
+        return WalletPresentFunctionality2.walletPresentHandling(
             holderKey = getKeyByDid(parameter.did),
             holderDid = parameter.did,
             presentationRequestUrl = openId4VpPresentationService.buildWalletPresentationRequest(parameter.request, resolvedRequest),
@@ -1030,4 +1035,5 @@ class SSIKit2WalletService(
 
             redirect
         }
+    }
 }
