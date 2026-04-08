@@ -75,14 +75,14 @@ const importing = ref(false);
 const importSuccess = ref("");
 const importError = ref("");
 
-const dids = ref(null);
+const dids = ref([]);
 const selectedDid = ref("");
 
 onMounted(async () => {
   try {
     const result = await $fetch(`/wallet-api/wallet/${currentWallet.value}/dids`);
     dids.value = result ?? [];
-    const defaultDid = (dids.value || []).find((d) => d.default) || (dids.value || [])[0];
+    const defaultDid = dids.value.find((d) => d.default) || dids.value[0];
     selectedDid.value = defaultDid?.did || "";
   } catch (e) {
     console.error("Failed to load DIDs", e);
