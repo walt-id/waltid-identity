@@ -16,7 +16,10 @@ import id.walt.dcql.models.ClaimsQuery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -45,6 +48,8 @@ data class DcSdJwtPresentation(
     val audience: String?,
     val nonce: String?,
     val sdHash: String?,
+    val transactionDataHashes: List<String>? = null,
+    val transactionDataHashesAlg: String? = null,
     val presentationStringHashable: String, // If only the single hash variant is allowed
     //val hashablePresentationStringVariants: List<String> // If multiple hash variants would be allowed
 ) : VerifiablePresentation(format = PresentationFormat.dc_sd_jwt) {
@@ -52,7 +57,7 @@ data class DcSdJwtPresentation(
     suspend fun presentationVerification(
         expectedAudience: String?,
         expectedNonce: String,
-        originalClaimsQuery: List<ClaimsQuery>?
+        originalClaimsQuery: List<ClaimsQuery>?,
     ) {
         // Validate Key Binding JWT
 
@@ -146,6 +151,22 @@ data class DcSdJwtPresentation(
             val aud = kbJwtPayload["aud"]?.jsonPrimitive?.contentOrNull
             val nonce = kbJwtPayload["nonce"]?.jsonPrimitive?.contentOrNull
             val sdHash = kbJwtPayload["sd_hash"]?.jsonPrimitive?.contentOrNull
+            val transactionDataHashes = when (val transactionDataHashesElement = kbJwtPayload["transaction_data_hashes"]) {
+                null -> null
+                is JsonArray -> transactionDataHashesElement.map { element ->
+                    (element as? JsonPrimitive)?.contentOrNull
+                        ?: return Result.failure(
+                            IllegalArgumentException("transaction_data_hashes must be an array of strings"),
+                        )
+                }
+
+                else -> {
+                    return Result.failure(
+                        IllegalArgumentException("transaction_data_hashes must be an array"),
+                    )
+                }
+            }
+            val transactionDataHashesAlg = kbJwtPayload["transaction_data_hashes_alg"]?.jsonPrimitive?.contentOrNull
 
             val presentedDisclosureString =
                 if (presentedDisclosures.isNotEmpty())
@@ -189,6 +210,8 @@ data class DcSdJwtPresentation(
                     audience = aud,
                     nonce = nonce,
                     sdHash = sdHash,
+                    transactionDataHashes = transactionDataHashes,
+                    transactionDataHashesAlg = transactionDataHashesAlg,
                     //hashablePresentationStringVariants = hashablePresentationStringVariants
                     presentationStringHashable = hashableString
                 )

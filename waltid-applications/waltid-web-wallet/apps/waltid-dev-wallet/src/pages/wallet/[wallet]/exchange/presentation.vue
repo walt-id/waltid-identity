@@ -64,6 +64,37 @@
         <div>Selected: {{ selectedCredentialIds.length }}</div>
 
         <div
+          v-if="transactionDataItems.length"
+          class="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4"
+        >
+          <div class="text-base font-semibold text-gray-900">
+            Transaction details
+          </div>
+          <div class="mt-1 text-sm text-gray-600">
+            This request includes transaction data that will be bound into the OpenID4VP response.
+          </div>
+          <div
+            v-for="(transactionDataItem, itemIndex) in transactionDataItems"
+            :key="`${transactionDataItem.type}-${itemIndex}`"
+            class="mt-4 rounded-lg bg-white p-3"
+          >
+            <div class="font-medium text-gray-900">{{ transactionDataItem.type }}</div>
+            <div
+              v-for="([field, value], fieldIndex) in transactionDataEntries(transactionDataItem)"
+              :key="`${itemIndex}-${fieldIndex}`"
+              class="mt-2 md:flex text-sm text-gray-600"
+            >
+              <div class="min-w-[19vw] font-semibold">
+                {{ formatTransactionDataField(field) }}
+              </div>
+              <div class="grow-0 break-all">
+                {{ formatTransactionDataValue(value) }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
           class="mt-2 divide-y divide-gray-200 border-b border-t border-gray-200"
         >
           <div v-if="matchedCredentials.length == 0">
@@ -186,7 +217,7 @@ import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import PageHeader from "@waltid-web-wallet/components/PageHeader.vue";
 import {Disclosure, DisclosureButton, DisclosurePanel} from "@headlessui/vue";
 import {parseDisclosures} from "@waltid-web-wallet/composables/disclosures.ts";
-import {usePresentation} from "@waltid-web-wallet/composables/presentation.ts";
+import {usePresentation, transactionDataEntries, formatTransactionDataField, formatTransactionDataValue} from "@waltid-web-wallet/composables/presentation.ts";
 import ActionButton from "@waltid-web-wallet/components/buttons/ActionButton.vue";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
@@ -198,6 +229,7 @@ const {
   currentWallet,
   verifierHost,
   requestPayload,
+  transactionDataItems,
   matchedCredentials,
   selectedCredentialIds,
   selection,
@@ -207,6 +239,8 @@ const {
   failed,
   failMessage,
 } = await usePresentation(query);
+
+
 
 if (query.accept) {
   // TODO make accept a JWT or something wallet-backend secured
