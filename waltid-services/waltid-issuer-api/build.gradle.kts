@@ -38,7 +38,7 @@ dependencies {
     implementation(identityLibs.ktor.client.serialization)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.client.json)
-    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.cio)
     implementation(identityLibs.ktor.client.logging)
 
 
@@ -98,6 +98,10 @@ dependencies {
 
 application {
     mainClass.set("id.walt.issuer.MainKt")
+}
+
+buildConfig {
+    packageName("id.walt.issuer")
 }
 
 ktor {

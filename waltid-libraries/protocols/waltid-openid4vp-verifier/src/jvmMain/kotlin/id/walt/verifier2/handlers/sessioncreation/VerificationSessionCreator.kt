@@ -39,11 +39,11 @@ object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
 
-    private suspend fun getKid(clientId: String, key: Key): String {
+    private suspend fun getKid(clientId: String?, key: Key): String {
         val prefix = "decentralized_identifier:"
         val keyId = key.getKeyId()
 
-        return clientId.takeIf { it.startsWith(prefix) }
+        return clientId.takeIf { it?.startsWith(prefix) == true }
             ?.let { "${it.substringAfter(prefix)}#$keyId" }
             ?: keyId
     }
@@ -51,7 +51,7 @@ object VerificationSessionCreator {
     suspend fun createVerificationSession(
         setup: VerificationSessionSetup,
 
-        clientId: String,
+        clientId: String?,
         clientMetadata: ClientMetadata? = null,
 
         /** Is used to build request URL and response URL */

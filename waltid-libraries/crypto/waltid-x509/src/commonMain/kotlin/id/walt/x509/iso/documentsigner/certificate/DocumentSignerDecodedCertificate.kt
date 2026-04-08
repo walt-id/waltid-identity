@@ -4,7 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
-import okio.ByteString
+import kotlinx.io.bytestring.ByteString
 
 
 /**

@@ -35,7 +35,7 @@ dependencies {
     implementation(identityLibs.ktor.client.serialization)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.client.json)
-    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.cio)
     implementation(identityLibs.ktor.client.logging)
 
 
@@ -58,7 +58,7 @@ dependencies {
     implementation(identityLibs.klogging)
     implementation(identityLibs.slf4j.klogging)
 
-    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.cio)
 
     // Crypto
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
@@ -82,6 +82,10 @@ dependencies {
 
 application {
     mainClass.set("id.walt.verifier.MainKt")
+}
+
+buildConfig {
+    packageName("id.walt.verifier")
 }
 
 ktor {

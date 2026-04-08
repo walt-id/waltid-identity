@@ -2,7 +2,7 @@ package id.walt.x509.iso.iaca.certificate
 
 import id.walt.x509.X509CertificateHandle
 import id.walt.x509.toJcaX509Certificate
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 
 internal actual suspend fun platformExtractIACACertificateInfoExtras(
@@ -12,7 +12,7 @@ internal actual suspend fun platformExtractIACACertificateInfoExtras(
     val issuerX500Name = JcaX500NameUtil.getIssuer(certificate)
     return IACACertificateInfoExtras(
         issuingAuthority = issuerX500Name.toString(),
-        issuer = issuerX500Name.encoded.toByteString(),
-        subject = JcaX500NameUtil.getSubject(certificate).encoded.toByteString(),
+        issuer = ByteString(issuerX500Name.encoded),
+        subject = ByteString(JcaX500NameUtil.getSubject(certificate).encoded),
     )
 }

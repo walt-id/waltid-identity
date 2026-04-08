@@ -42,7 +42,7 @@ dependencies {
     implementation(identityLibs.ktor.client.serialization)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.client.json)
-    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.cio)
     implementation(identityLibs.ktor.client.logging)
 
     /* -- Kotlin -- */
@@ -142,6 +142,10 @@ dependencies {
     testImplementation(identityLibs.ktor.server.test.host)
     testImplementation("io.mockk:mockk:1.13.16")
     testImplementation(identityLibs.klogging)
+}
+
+buildConfig {
+    packageName("id.walt.webwallet")
 }
 
 ktor {

@@ -51,7 +51,7 @@ kotlin {
         }
         jvmTest.dependencies {
             // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
+            implementation(identityLibs.ktor.client.cio)
 
             implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.slf4j:slf4j-simple:2.0.17")
