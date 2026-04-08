@@ -3,6 +3,7 @@ package id.walt.policies2.vc.policies
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.JsonSchemaVerificationException
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
 import io.github.optimumcode.json.schema.JsonSchema
@@ -31,7 +32,7 @@ data class JsonSchemaPolicy(
     @Transient
     private val schemaFetcher = schemaUrl?.let {
         WebDataFetcher(
-            "schema-policy",
+            WebDataFetcherId.SCHEMA_POLICY,
             defaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.Native)
         )
     }
