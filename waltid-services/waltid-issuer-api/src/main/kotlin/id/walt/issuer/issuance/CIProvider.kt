@@ -20,8 +20,11 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
+import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.OpenID4VC
@@ -61,6 +64,8 @@ import org.cose.java.OneKey
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+
+private const val MDOC_TRANSACTION_DATA_NAMESPACE = "org.waltid.openid4vp.transaction_data"
 
 
 /**
@@ -484,7 +489,8 @@ open class CIProvider(
                         holderKey.publicKey,
                         null
                     ).AsCBOR().EncodeToBytes()
-                )
+                ),
+                keyAuthorizations = buildTransactionDataKeyAuthorizations(credentialRequest.docType),
             ),
             cryptoProvider = cryptoProvider,
             keyID = keyID
@@ -502,6 +508,22 @@ open class CIProvider(
             credential = JsonPrimitive(mdoc.issuerSigned.toMapElement().toCBOR().encodeToBase64Url()),
             customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
         )
+    }
+
+    private fun buildTransactionDataKeyAuthorizations(docType: String?): MapElement? {
+        val supportedTransactionDataDocTypes = setOf(
+            MDocTypes.ISO_MDL,
+            "org.iso.23220.photoid.1",
+            "eu.europa.ec.eudi.pid.1",
+        )
+
+        if (docType !in supportedTransactionDataDocTypes) {
+            return null
+        }
+
+        return mapOf(
+            "nameSpaces" to listOf(MDOC_TRANSACTION_DATA_NAMESPACE.toDataElement()).toDataElement(),
+        ).toDataElement() as MapElement
     }
 
     fun generateBatchCredentialResponse(

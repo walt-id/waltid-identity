@@ -19,6 +19,7 @@ import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
+import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -189,6 +190,17 @@ object VerificationSessionCreator {
             nonce = null, // not required in the initial request yet
             responseType = null
         )
+        val transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null
+        val credentialQueriesById = transactionData?.let {
+            requireNotNull(setup.core.dcqlQuery) { "transaction_data requires a dcql_query" }
+                .credentials
+                .associateBy { credentialQuery -> credentialQuery.id }
+        }
+        TransactionDataUtils.validateRequestTransactionData(
+            transactionData = transactionData,
+            supportedTypes = TransactionDataUtils.SUPPORTED_TRANSACTION_DATA_TYPES,
+            credentialQueriesById = credentialQueriesById,
+        )
 
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) OpenID4VPResponseType.VP_TOKEN else null,
@@ -233,7 +245,7 @@ object VerificationSessionCreator {
              * containing details about the transaction the Verifier is requesting the End-User to authorize.
              * The decoded JSON object structure is represented by [TransactionDataItem].
              */
-            transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null, // List of base64url encoded JSON strings
+            transactionData = transactionData, // List of base64url encoded JSON strings
 
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.

@@ -1,12 +1,12 @@
 package id.walt.verifier2.verification2
 
-import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.*
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
+import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
@@ -14,12 +14,7 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
-import id.walt.verifier2.verification.Verifier2PresentationValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -42,6 +37,7 @@ object PresentationVerificationEngine {
         presentation: VerifiablePresentation,
         presentationString: String,
         session: Verification2Session,
+        expectedTransactionData: List<String>?,
     ): Map<String, VPPolicy2.PolicyRunResult> {
         requireNotNull(session.policies.vp_policies) { "TODO: vpPolicies cannot be null right now" }
 
@@ -58,6 +54,7 @@ object PresentationVerificationEngine {
             expectedNonce = session.authorizationRequest.nonce!!,
             expectedAudience = expectedAudience,
             expectedOrigins = session.authorizationRequest.expectedOrigins,
+            expectedTransactionData = expectedTransactionData,
             responseUri = authorizationRequest.responseUri,
             responseMode = responseMode!!,
             isSigned = session.signedAuthorizationRequestJwt != null,
@@ -81,7 +78,16 @@ object PresentationVerificationEngine {
     ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> {
         val verifiedPresentations = parsedPresentations.map { (entry, presentation) ->
             val (presentationString, query) = entry
-            val policyResults = verifySinglePresentation(presentation, presentationString, session)
+            val expectedTransactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+                transactionData = session.authorizationRequest.transactionData,
+                credentialId = query.id,
+            ).takeIf(List<String>::isNotEmpty)
+            val policyResults = verifySinglePresentation(
+                presentation = presentation,
+                presentationString = presentationString,
+                session = session,
+                expectedTransactionData = expectedTransactionData,
+            )
 
             query.id to policyResults
         }.toMap()
@@ -141,131 +147,6 @@ object PresentationVerificationEngine {
 
 
     }
-
-    /**
-     * Uses old Verifier2PresentationValidator interface
-     */
-    suspend fun verifySinglePresentationOldPresentationValidator(
-        presentationString: String,
-        originalCredentialQuery: CredentialQuery,
-        session: Verification2Session,
-        queryId: String
-    ): Result<Verifier2PresentationValidator.PresentationValidationResult> {
-        val authorizationRequest = session.authorizationRequest
-        val responseMode = session.authorizationRequest.responseMode
-        val isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
-        val expectedOrigin = session.authorizationRequest.expectedOrigins?.first()
-        val expectedAudience = if (isDcApi) "origin:$expectedOrigin" else authorizationRequest.clientId
-        val isEncrypted = authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
-        val jwkThumbprint = session.jwkThumbprint
-
-        val validationOutcome = Verifier2PresentationValidator.validatePresentation(
-            presentationString = presentationString,
-            expectedFormat = originalCredentialQuery.format,
-            expectedAudience = expectedAudience,
-            expectedNonce = authorizationRequest.nonce!!,
-            responseUri = authorizationRequest.responseUri,
-            originalClaimsQuery = originalCredentialQuery.claims,
-            isDcApi = isDcApi,
-            isEncrypted = isEncrypted,
-            verifierOrigin = expectedOrigin, // Raw origin needed for mdoc,
-            jwkThumbprint = jwkThumbprint
-        )
-
-        if (validationOutcome.isSuccess) {
-            val validatedCredential = validationOutcome.getOrThrow().credentials
-            log.info { "Successfully validated presentation for queryId '$queryId', credential ID (if available): $validatedCredential" }
-        } else {
-            log.warn { "Validation failed for a presentation under queryId '$queryId': ${validationOutcome.exceptionOrNull()?.message}" }
-            // break // Decide if one failed presentation invalidates the whole vp_token
-        }
-
-        return validationOutcome
-    }
-
-    data class PresentationValidationResponse(
-        val validated: Map<String, List<DigitalCredential>>,
-        val errors: Map<String, List<Throwable>>
-    )
-
-    suspend fun verifyAllPresentationOld(
-        vpTokenContents: ParsedVpToken,
-        session: Verification2Session
-    ): PresentationValidationResponse = coroutineScope {
-        val authorizationRequest = session.authorizationRequest
-
-        // --- Plan and Launch Tasks ---
-        val validationJobs = vpTokenContents.flatMap { (queryId, presentedItemsJsonElements) ->
-            val originalCredentialQuery =
-                authorizationRequest.dcqlQuery?.credentials?.find { credentialQuery -> credentialQuery.id == queryId }
-
-            if (originalCredentialQuery == null) {
-                // This is a protocol error or a mismatch. Decide how to handle...
-                // For strictness, one could maybe consider the whole vp_token invalid.
-                // Or ignore the entry.
-                log.warn { "Received presentation for unknown queryId '$queryId' in vp_token." }
-                return@flatMap emptyList()
-            }
-
-            if (presentedItemsJsonElements.isEmpty()) {
-                // This shouldn't happen if the Wallet adheres to the spec (no key for empty results).
-                // If it does, it might mean an optional query had no matches, but the Wallet still included the key.
-                log.warn { "Empty presentation list received for queryId '$queryId'." }
-                return@flatMap emptyList()
-            }
-
-            if (!originalCredentialQuery.multiple && presentedItemsJsonElements.size > 1) {
-                // Handle as an error or process only the first one.
-                // For now, let's process only the first if multiple=false
-                log.warn { "Multiple presentations received for queryId '$queryId' where multiple=false was expected." }
-            }
-
-            val itemsToProcess = if (!originalCredentialQuery.multiple) {
-                presentedItemsJsonElements.take(1)
-            } else {
-                presentedItemsJsonElements
-            }
-
-            // Map every presentation to an async task
-            itemsToProcess.map { presentationJsonElement ->
-                async(Dispatchers.Default) {
-                    val result = verifySinglePresentationOldPresentationValidator(
-                        presentationString = presentationJsonElement,
-                        originalCredentialQuery = originalCredentialQuery,
-                        queryId = queryId,
-                        session = session
-                    )
-                    // Return context (QueryID) with result
-                    queryId to result
-                }
-            }
-        }
-
-        // --- Parallel Execution ---
-        val results = validationJobs.awaitAll()
-
-        // --- Aggregate Results ---
-        val validated = LinkedHashMap<String, MutableList<DigitalCredential>>()
-        val errors = LinkedHashMap<String, MutableList<Throwable>>()
-
-        results.forEach { (queryId, presentationResult) ->
-            if (presentationResult.isSuccess) {
-                val validatedCredentials = presentationResult.getOrThrow().credentials
-
-                validated.getOrPut(queryId) { mutableListOf() }.addAll(validatedCredentials)
-            } else {
-                val error = presentationResult.exceptionOrNull()!!
-
-                errors.getOrPut(queryId) { mutableListOf() }
-                    .add(error)
-            }
-        }
-
-        return@coroutineScope PresentationValidationResponse(
-            validated = validated, errors = errors
-        )
-    }
-
     /**
     1. VP
     2. DCQL
