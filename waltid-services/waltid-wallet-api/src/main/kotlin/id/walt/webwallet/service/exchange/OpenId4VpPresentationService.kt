@@ -200,8 +200,17 @@ class OpenId4VpPresentationService(
         )
 
     private fun parseParameterValue(value: String): JsonElement =
-        runCatching { json.parseToJsonElement(value) }
-            .getOrElse { JsonPrimitive(value) }
+        value.takeIf(::looksLikeJsonEncodedParameterValue)
+            ?.let { encodedValue ->
+                runCatching { json.parseToJsonElement(encodedValue) }
+                    .getOrElse { JsonPrimitive(value) }
+            }
+            ?: JsonPrimitive(value)
+
+    private fun looksLikeJsonEncodedParameterValue(value: String): Boolean {
+        val trimmedValue = value.trimStart()
+        return trimmedValue.startsWith("{") || trimmedValue.startsWith("[") || trimmedValue.startsWith("\"")
+    }
 
     private fun baseUrlBuilder(requestUrl: Url) = URLBuilder(requestUrl.toString().substringBefore("?"))
 

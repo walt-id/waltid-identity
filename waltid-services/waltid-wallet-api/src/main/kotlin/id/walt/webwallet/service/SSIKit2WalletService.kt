@@ -33,6 +33,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.dcql.RawDcqlCredential
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
@@ -1131,6 +1132,8 @@ class SSIKit2WalletService(
             return Result.failure(IllegalArgumentException("OpenID4VP response_mode=form_post is not supported by wallet-api"))
         }
 
+        val matchedCredentialIds = linkedSetOf<String>()
+
         return WalletPresentFunctionality2.walletPresentHandling(
             holderKey = getKeyByDid(parameter.did),
             holderDid = parameter.did,
@@ -1140,7 +1143,11 @@ class SSIKit2WalletService(
                     query = query,
                     credentials = credentialService.list(walletId, CredentialFilterObject.default),
                     selectedCredentialIds = parameter.selectedCredentials.toSet(),
-                ).ifEmpty {
+                ).also { matchedResults ->
+                    matchedCredentialIds += matchedResults.values
+                        .flatten()
+                        .mapNotNull { (it.credential as? RawDcqlCredential)?.id }
+                }.ifEmpty {
                     throw IllegalArgumentException("No matching credentials found for the presentation request")
                 }
             },
@@ -1151,11 +1158,14 @@ class SSIKit2WalletService(
                 result.getUrl != null -> result.getUrl
                 result.redirectTo != null -> result.redirectTo
                 result.transmissionSuccess == true -> null
+                result.transmissionSuccess == false -> {
+                    throw IllegalStateException("OpenID4VP presentation transmission failed")
+                }
                 result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
                 else -> null
             }
 
-            parameter.selectedCredentials.forEach { selectedCredentialId ->
+            matchedCredentialIds.forEach { selectedCredentialId ->
                 credentialService.get(walletId, selectedCredentialId)?.run {
                     eventUseCase.log(
                         action = EventType.Credential.Present,
