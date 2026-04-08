@@ -70,6 +70,7 @@ import io.ktor.http.*
 import io.ktor.server.plugins.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.core.eq
@@ -965,9 +966,20 @@ class SSIKit2WalletService(
     }
 
     private suspend fun resolveOpenId4VpAuthorizationRequest(request: String) =
-        openId4VpPresentationService.tryResolveAuthorizationRequest(request).getOrNull()
-            ?.takeIf { it.dcqlQuery != null || it.transactionData != null }
+        openId4VpPresentationService.tryResolveAuthorizationRequest(request)
+            .fold(
+                onSuccess = { authorizationRequest ->
+                    authorizationRequest.takeIf { it.dcqlQuery != null || it.transactionData != null }
+                },
+                onFailure = { error ->
+                    if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) {
+                        throw error
+                    }
+                    null
+                },
+            )
 
+    @OptIn(ExperimentalSerializationApi::class)
     private suspend fun useOpenId4VpPresentationRequest(
         parameter: PresentationRequestParameter,
         resolvedRequest: OpenId4VpAuthorizationRequest,
@@ -988,12 +1000,34 @@ class SSIKit2WalletService(
             holderPoliciesToRun = null,
             runPolicies = null,
         ).mapCatching { result ->
-            when {
+            val redirect = when {
                 result.getUrl != null -> result.getUrl
                 result.redirectTo != null -> result.redirectTo
                 result.transmissionSuccess == true -> null
                 result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
                 else -> null
             }
+
+            parameter.selectedCredentials.forEach { selectedCredentialId ->
+                credentialService.get(walletId, selectedCredentialId)?.run {
+                    eventUseCase.log(
+                        action = EventType.Credential.Present,
+                        originator = resolvedRequest.clientMetadata?.clientName ?: EventDataNotAvailable,
+                        tenant = tenant,
+                        accountId = accountId,
+                        walletId = walletId,
+                        data = eventUseCase.credentialEventData(
+                            credential = this,
+                            subject = eventUseCase.subjectData(this),
+                            organization = eventUseCase.verifierData(resolvedRequest),
+                            type = null,
+                        ),
+                        credentialId = this.id,
+                        note = parameter.note,
+                    )
+                }
+            }
+
+            redirect
         }
 }
