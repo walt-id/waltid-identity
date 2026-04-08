@@ -68,7 +68,7 @@ jobs:
 
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@7de75d6e9b60fd6f749e640f30b29eff24a21567
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
