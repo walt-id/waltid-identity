@@ -15,6 +15,7 @@ data class VerificationSessionContext(
     val expectedNonce: String,
     val expectedAudience: String?,
     val expectedOrigins: List<String>?,
+    val expectedTransactionData: List<String>? = null,
 
     val responseUri: String?,
     val responseMode: OpenID4VPResponseMode,

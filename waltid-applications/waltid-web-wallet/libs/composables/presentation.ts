@@ -5,12 +5,87 @@ import {decodeRequest} from "./siop-requests.ts";
 import {navigateTo} from "nuxt/app";
 import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
 
+type PresentationTransactionDataItem = {
+  type: string;
+  credential_ids: string[];
+  transaction_data_hashes_alg?: string[];
+  require_cryptographic_holder_binding?: boolean;
+  [key: string]: unknown;
+};
+
 type MatchedCredential = {
   id: string;
   document: string;
-  parsedDocument?: string;
+  parsedDocument?: Record<string, unknown>;
   disclosures?: string;
+  format?: string;
 };
+
+function parseStringArrayParameter(value: string | null): string[] {
+  if (!value) {
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Invalid transaction_data: expected a JSON array of strings.");
+  }
+
+  if (!Array.isArray(parsed) || !parsed.every((entry): entry is string => typeof entry === "string")) {
+    throw new Error("Invalid transaction_data: expected a JSON array of strings.");
+  }
+
+  return parsed;
+}
+
+function decodeBase64UrlJson<T>(value: string): T {
+  try {
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const decoded = window.atob(`${base64}${padding}`);
+    const utf8 = decodeURIComponent(
+      Array.from(decoded)
+        .map((character) => `%${character.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join(""),
+    );
+    return JSON.parse(utf8) as T;
+  } catch {
+    throw new Error("Invalid transaction_data: malformed base64url or JSON.");
+  }
+}
+
+function isPresentationTransactionDataItem(value: unknown): value is PresentationTransactionDataItem {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as PresentationTransactionDataItem).type === "string" &&
+    Array.isArray((value as PresentationTransactionDataItem).credential_ids) &&
+    (value as PresentationTransactionDataItem).credential_ids.every((credentialId) => typeof credentialId === "string")
+  );
+}
+
+const TRANSACTION_DATA_KNOWN_FIELDS = [
+  "type",
+  "credential_ids",
+  "transaction_data_hashes_alg",
+  "require_cryptographic_holder_binding",
+];
+
+export function transactionDataEntries(transactionDataItem: Record<string, unknown>) {
+  return Object.entries(transactionDataItem).filter(
+    ([field]) => !TRANSACTION_DATA_KNOWN_FIELDS.includes(field),
+  );
+}
+
+export function formatTransactionDataField(field: string) {
+  return field.replace(/_/g, " ");
+}
+
+export function formatTransactionDataValue(value: unknown) {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
 
 export async function usePresentation(query: any) {
   const index = ref(0);
@@ -39,6 +114,22 @@ export async function usePresentation(query: any) {
   const resolvedRequest = await resolvePresentationRequest(originalRequest);
   const presentationParams = extractPresentationParams(resolvedRequest as string);
   const isOpenId4Vp = presentationParams.has("dcql_query");
+  let transactionDataItems: PresentationTransactionDataItem[];
+  try {
+    transactionDataItems = parseStringArrayParameter(
+      presentationParams.get("transaction_data"),
+    ).map((encoded) => {
+      const item = decodeBase64UrlJson<unknown>(encoded);
+      if (!isPresentationTransactionDataItem(item)) {
+        throw new Error("Invalid transaction_data: each item must define type and credential_ids.");
+      }
+      return item;
+    });
+  } catch (error) {
+    failed.value = true;
+    failMessage.value = error instanceof Error ? error.message : "Invalid transaction data in presentation request.";
+    throw error;
+  }
 
   const verifierHost = new URL(
     presentationParams.get("response_uri") ??
@@ -183,6 +274,7 @@ export async function usePresentation(query: any) {
   return {
     currentWallet,
     verifierHost,
+    transactionDataItems,
     requestPayload: presentationRequestPayload,
     matchedCredentials,
     selectedCredentialIds,

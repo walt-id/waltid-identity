@@ -20,8 +20,13 @@ import io.mockk.unmockkObject
 import io.mockk.every
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.InputStreamReader
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.net.InetSocketAddress
 import java.util.Base64
 import kotlin.test.Test
@@ -36,6 +41,7 @@ import id.walt.dcql.models.CredentialFormat as DcqlCredentialFormat
 @OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 class OpenId4VpPresentationServiceTest {
     private val json = Json { encodeDefaults = false }
+    private val supportedTransactionDataType = "org.waltid.transaction-data.payment-authorization"
 
     private val query = DcqlQuery(
         credentials = listOf(
@@ -138,6 +144,48 @@ class OpenId4VpPresentationServiceTest {
             assertEquals("verifier2", walletRequest.parameters["client_id"])
             assertTrue(walletRequest.parameters.contains("request_uri").not())
             assertTrue(walletRequest.parameters["dcql_query"]?.startsWith("{") == true)
+        }
+    }
+
+    fun `normalized request URL rejects unsupported transaction data types`() {
+        HttpClient().use { http ->
+            val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+            val request = authorizationRequest(
+                transactionData = listOf(
+                    transactionDataItem(
+                        type = "unsupported-type",
+                        credentialIds = listOf("degree"),
+                        amount = "42.00",
+                    ),
+                ),
+            )
+
+            assertFailsWith<IllegalArgumentException> {
+                runBlocking { resolveNormalizedRequestUrl(service, request) }
+            }
+        }
+    }
+
+    @Test
+    fun `normalized request URL rejects transaction data for unsupported credential query formats`() {
+        HttpClient().use { http ->
+            val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+            val request = authorizationRequest(
+                transactionData = listOf(
+                    transactionDataItem(
+                        type = supportedTransactionDataType,
+                        credentialIds = listOf("degree"),
+                        requireCryptographicHolderBinding = true,
+                        amount = "42.00",
+                    ),
+                ),
+            )
+
+            val error = assertFailsWith<IllegalArgumentException> {
+                runBlocking { resolveNormalizedRequestUrl(service, request) }
+            }
+
+            assertTrue(error.message?.contains("supported transaction_data profile", ignoreCase = true) == true)
         }
     }
 
@@ -446,6 +494,37 @@ class OpenId4VpPresentationServiceTest {
         val accept: String?,
         val body: String,
     )
+
+    private fun authorizationRequest(
+        transactionData: List<String>? = null,
+    ): String = AuthorizationRequest(
+        clientId = "verifier2",
+        responseMode = OpenID4VPResponseMode.DIRECT_POST,
+        responseUri = "https://verifier.example/response",
+        nonce = "nonce-123",
+        dcqlQuery = query,
+        transactionData = transactionData,
+    ).toHttpUrl().toString()
+
+    private fun transactionDataItem(
+        type: String,
+        credentialIds: List<String>,
+        requireCryptographicHolderBinding: Boolean? = null,
+        amount: String,
+    ): String =
+        encodeBase64Url(
+            buildJsonObject {
+                put("type", type)
+                put("credential_ids", buildJsonArray {
+                    credentialIds.forEach { add(JsonPrimitive(it)) }
+                })
+                requireCryptographicHolderBinding?.let { put("require_cryptographic_holder_binding", it) }
+                put("amount", amount)
+            }.toString(),
+        )
+
+    private fun encodeBase64Url(value: String): String =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray())
 
     private fun withAuthorizationRequestServer(
         responseBody: String? = null,

@@ -67,6 +67,7 @@ import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import id.walt.verifier.openid.transactiondata.SUPPORTED_TRANSACTION_DATA_TYPES
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
@@ -1170,6 +1171,7 @@ class SSIKit2WalletService(
             },
             holderPoliciesToRun = null,
             runPolicies = null,
+            supportedTransactionDataTypes = supportedTransactionDataTypes,
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(
