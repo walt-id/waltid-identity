@@ -67,6 +67,12 @@ dependencies {
 
     // walt.id
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+    implementation(project(":waltid-libraries:credentials:waltid-dcql"))
+    implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
+    implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))

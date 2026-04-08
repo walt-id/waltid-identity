@@ -4,12 +4,20 @@ import {computed, type Ref, ref, watch} from "vue";
 import {decodeRequest} from "./siop-requests.ts";
 import {navigateTo} from "nuxt/app";
 
+type MatchedCredential = {
+  id: string;
+  document: string;
+  parsedDocument?: string;
+  disclosures?: string;
+};
+
 export async function usePresentation(query: any) {
   const index = ref(0);
   const failed = ref(false);
   const failMessage = ref("Unknown error occurred.");
 
   const currentWallet = useCurrentWallet();
+  const originalRequest = decodeRequest(query.request as string);
 
   async function resolvePresentationRequest(request: string) {
     try {
@@ -27,33 +35,24 @@ export async function usePresentation(query: any) {
     }
   }
 
-  const request = await resolvePresentationRequest(
-    decodeRequest(query.request as string),
-  );
-  const presentationUrl = new URL(request as string);
+  const resolvedRequest = await resolvePresentationRequest(originalRequest);
+  const presentationUrl = new URL(resolvedRequest as string);
   const presentationParams = presentationUrl.searchParams;
+  const isOpenId4Vp = presentationParams.has("dcql_query");
 
   const verifierHost = new URL(
     presentationParams.get("response_uri") ??
       presentationParams.get("redirect_uri") ??
       "",
   ).host;
-  const presentationDefinition = presentationParams.get(
+  const presentationRequestPayload = (presentationParams.get(
     "presentation_definition",
-  ) as string;
-  const matchedCredentials = await $fetch<
-    Array<{
-      id: string;
-      document: string;
-      parsedDocument?: string;
-      disclosures?: string;
-    }>
-  >(
-    `/wallet-api/wallet/${currentWallet.value}/exchange/matchCredentialsForPresentationDefinition`,
-    {
-      method: "POST",
-      body: presentationDefinition,
-    },
+  ) ?? presentationParams.get("dcql_query")) as string;
+  const matchedCredentials = await fetchMatchedCredentials(
+    currentWallet.value,
+    originalRequest,
+    presentationRequestPayload,
+    isOpenId4Vp,
   );
 
   const selection = ref<{ [key: string]: boolean }>({});
@@ -122,9 +121,9 @@ export async function usePresentation(query: any) {
   async function acceptPresentation() {
     const req = {
       //did: String, // todo: choose DID of shared credential // for now wallet-api chooses the default wallet did
-      presentationRequest: request,
+      presentationRequest: isOpenId4Vp ? originalRequest : resolvedRequest,
       selectedCredentials: selectedCredentialIds.value,
-      disclosures: encodedDisclosures.value,
+      disclosures: isOpenId4Vp ? null : encodedDisclosures.value,
     };
 
     const response = await fetch(
@@ -174,7 +173,7 @@ export async function usePresentation(query: any) {
   return {
     currentWallet,
     verifierHost,
-    presentationDefinition,
+    requestPayload: presentationRequestPayload,
     matchedCredentials,
     selectedCredentialIds,
     disclosures,
@@ -188,4 +187,24 @@ export async function usePresentation(query: any) {
     failed,
     failMessage,
   };
+}
+
+async function fetchMatchedCredentials(
+  walletId: string,
+  originalRequest: string,
+  presentationRequestPayload: string,
+  isOpenId4Vp: boolean,
+) {
+  const path = isOpenId4Vp
+    ? "matchCredentialsForPresentationRequest"
+    : "matchCredentialsForPresentationDefinition";
+  const body = isOpenId4Vp ? originalRequest : presentationRequestPayload;
+
+  return $fetch<Array<MatchedCredential>>(
+    `/wallet-api/wallet/${walletId}/exchange/${path}`,
+    {
+      method: "POST",
+      body,
+    },
+  );
 }

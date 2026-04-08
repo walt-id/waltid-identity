@@ -11,6 +11,7 @@ import id.walt.webwallet.service.exchange.CredentialOfferCache
 import id.walt.webwallet.web.controllers.auth.getUserUUID
 import id.walt.webwallet.web.controllers.auth.getWalletId
 import id.walt.webwallet.web.controllers.auth.getWalletService
+import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getMatchCredentialsForPresentationRequestDocs
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getMatchCredentialsForPresentationDefinitionDocs
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getResolveCredentialOfferDocs
 import id.walt.webwallet.web.controllers.exchange.openapi.ExchangeDocs.getResolveIssuerOpenIDMetadataDocs
@@ -94,6 +95,12 @@ fun Application.exchange() = walletRoute {
                     presentationDefinition
                 )
             call.respond(matchedCredentials)
+        }
+
+        post("matchCredentialsForPresentationRequest", getMatchCredentialsForPresentationRequestDocs()) {
+            val wallet = call.getWalletService()
+            val request = call.receiveText()
+            call.respond(wallet.matchCredentialsForPresentationRequest(request))
         }
 
         post("unmatchedCredentialsForPresentationDefinition", getUnmatchedCredentialsForPresentationDefinition()) {
