@@ -511,13 +511,7 @@ open class CIProvider(
     }
 
     private fun buildTransactionDataKeyAuthorizations(docType: String?): MapElement? {
-        val supportedTransactionDataDocTypes = setOf(
-            MDocTypes.ISO_MDL,
-            "org.iso.23220.photoid.1",
-            "eu.europa.ec.eudi.pid.1",
-        )
-
-        if (docType !in supportedTransactionDataDocTypes) {
+        if (docType == null) {
             return null
         }
 
