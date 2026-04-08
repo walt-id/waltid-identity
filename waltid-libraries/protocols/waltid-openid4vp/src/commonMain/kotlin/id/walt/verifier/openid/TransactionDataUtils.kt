@@ -180,10 +180,16 @@ object TransactionDataUtils {
     ) {
         val expectedItems = expectedTransactionData.orEmpty()
         if (expectedItems.isEmpty()) {
-            require(transactionDataHashes.isNullOrEmpty()) {
+            requireValidation(
+                transactionDataHashes == null,
+                TransactionDataValidationErrorReason.HASHES_MISMATCH,
+            ) {
                 "transaction_data_hashes must be omitted when transaction_data is not requested"
             }
-            require(transactionDataHashesAlg == null) {
+            requireValidation(
+                transactionDataHashesAlg == null,
+                TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH,
+            ) {
                 "transaction_data_hashes_alg must be omitted when transaction_data is not requested"
             }
             return
