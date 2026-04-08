@@ -98,6 +98,32 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `buildWalletPresentationRequest resolves request_uri inputs to wallet encoded parameters`() {
+        val http = HttpClient()
+        try {
+            val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+            val authorizationRequest = AuthorizationRequest(
+                clientId = "verifier2",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseUri = "https://verifier.example/response",
+                nonce = "nonce-123",
+                dcqlQuery = query,
+            )
+
+            val walletRequest = service.buildWalletPresentationRequest(
+                request = "openid4vp://authorize?request_uri=https://verifier.example/request-object&request_uri_method=post",
+                resolvedRequest = authorizationRequest,
+            )
+
+            assertEquals("\"verifier2\"", walletRequest.parameters["client_id"])
+            assertTrue(walletRequest.parameters.contains("request_uri").not())
+            assertTrue(walletRequest.parameters["dcql_query"]?.startsWith("{") == true)
+        } finally {
+            http.close()
+        }
+    }
+
+    @Test
     fun `resolvePresentationRequest parses request object from request parameter`() {
         val http = HttpClient()
         try {

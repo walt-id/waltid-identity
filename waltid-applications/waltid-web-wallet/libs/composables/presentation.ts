@@ -48,6 +48,13 @@ export async function usePresentation(query: any) {
   const presentationRequestPayload = (presentationParams.get(
     "presentation_definition",
   ) ?? presentationParams.get("dcql_query")) as string;
+  if (!presentationRequestPayload) {
+    failed.value = true;
+    failMessage.value = isOpenId4Vp
+      ? "Presentation request is missing dcql_query."
+      : "Presentation request is missing presentation_definition.";
+    throw new Error(failMessage.value);
+  }
   const matchedCredentials = await fetchMatchedCredentials(
     currentWallet.value,
     originalRequest,

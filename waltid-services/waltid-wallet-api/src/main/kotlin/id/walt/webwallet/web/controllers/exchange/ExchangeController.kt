@@ -100,7 +100,16 @@ fun Application.exchange() = walletRoute {
         post("matchCredentialsForPresentationRequest", getMatchCredentialsForPresentationRequestDocs()) {
             val wallet = call.getWalletService()
             val request = call.receiveText()
-            call.respond(wallet.matchCredentialsForPresentationRequest(request))
+            runCatching {
+                wallet.matchCredentialsForPresentationRequest(request)
+            }.onSuccess {
+                call.respond(HttpStatusCode.OK, it)
+            }.onFailure { error ->
+                call.respond(
+                    status = HttpStatusCode.BadRequest,
+                    message = error.message ?: "Invalid presentation request"
+                )
+            }
         }
 
         post("unmatchedCredentialsForPresentationDefinition", getUnmatchedCredentialsForPresentationDefinition()) {
