@@ -17,10 +17,13 @@ import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.elements.DeviceSignedItem
+import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
+import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -102,7 +105,13 @@ object MdocPresenter {
         val sessionTranscript = buildSessionTranscript(authorizationRequest, responseUri)
 
         // Determine which namespaces and elements to disclose based on the DCQL match
-        val disclosedDeviceNamespaces = DeviceNameSpaces(emptyMap()) // Assuming selective disclosure for device data
+        val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
+            mdocsCredential = mdocsCredential,
+            transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+                transactionData = authorizationRequest.transactionData,
+                credentialId = matchResult.originalQuery.id,
+            ),
+        )
 
         val deviceAuth = buildDeviceAuth(
             sessionTranscript = sessionTranscript,
@@ -177,6 +186,47 @@ object MdocPresenter {
         // 6. CBOR-encode and base64url-encode the response string
         val deviceResponseBytes = coseCompliantCbor.encodeToByteArray(deviceResponse)
         return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
+    }
+
+    private fun buildTransactionDataNamespaces(
+        mdocsCredential: MdocsCredential,
+        transactionData: List<String>,
+    ): DeviceNameSpaces {
+        if (transactionData.isEmpty()) {
+            return DeviceNameSpaces(emptyMap())
+        }
+
+        val embeddedTransactionData = TransactionDataUtils.buildMdocEmbeddedTransactionData(transactionData)
+        requireTransactionDataAuthorization(
+            mdocsCredential = mdocsCredential,
+            embeddedTransactionData = embeddedTransactionData,
+        )
+
+        return DeviceNameSpaces(
+            mapOf(
+                TransactionDataUtils.MDOC_DEVICE_SIGNED_NAMESPACE to DeviceSignedItemList(
+                    embeddedTransactionData.map { (key, value) -> DeviceSignedItem(key, value) }
+                )
+            )
+        )
+    }
+
+    private fun requireTransactionDataAuthorization(
+        mdocsCredential: MdocsCredential,
+        embeddedTransactionData: Map<String, String>,
+    ) {
+        val keyAuthorizations = requireNotNull(mdocsCredential.documentMso.deviceKeyInfo.keyAuthorizations) {
+            "transaction_data requires mdoc keyAuthorizations for docType ${mdocsCredential.docType}"
+        }
+        val namespace = TransactionDataUtils.MDOC_DEVICE_SIGNED_NAMESPACE
+        val isNamespaceAuthorized = keyAuthorizations.namespaces?.contains(namespace) == true
+        val authorizedElements = keyAuthorizations.dataElements?.get(namespace).orEmpty().toSet()
+
+        require(
+            isNamespaceAuthorized || authorizedElements.containsAll(embeddedTransactionData.keys)
+        ) {
+            "transaction_data type is not authorized for mdoc docType ${mdocsCredential.docType}"
+        }
     }
 
 }
