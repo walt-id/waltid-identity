@@ -229,6 +229,22 @@ class TransactionDataUtilsTest {
         )
     }
 
+    @Test
+    fun `validateResponseTransactionData rejects empty hash list when transaction data was not requested`() {
+        val error = assertFailsWith<TransactionDataUtils.TransactionDataValidationException> {
+            TransactionDataUtils.validateResponseTransactionData(
+                expectedTransactionData = null,
+                transactionDataHashes = emptyList(),
+                transactionDataHashesAlg = null,
+            )
+        }
+
+        assertEquals(
+            TransactionDataUtils.TransactionDataValidationErrorReason.HASHES_MISMATCH,
+            error.reason,
+        )
+    }
+
     private fun transactionData(
         type: String,
         amount: String,
