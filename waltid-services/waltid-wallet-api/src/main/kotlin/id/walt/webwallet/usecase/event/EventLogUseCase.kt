@@ -10,6 +10,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest as Open
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.utils.JsonUtils
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -104,12 +105,15 @@ class EventLogUseCase(
 
     fun verifierData(request: AuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
         did = normalizeVerifierDid(request.clientId),
+        name = null,
         policies = emptyList(),//TODO: from input-descriptors?
     )
 
+    @OptIn(ExperimentalSerializationApi::class)
     fun verifierData(request: OpenId4VpAuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
         did = normalizeVerifierDid(request.clientId),
-        policies = emptyList(),
+        name = request.clientMetadata?.clientName,
+        policies = listOfNotNull(request.clientMetadata?.policyUri),
     )
 
     fun didEventData(did: String, document: DidDocument) = didEventData(did, document.toString())
