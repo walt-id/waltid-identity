@@ -43,8 +43,16 @@ class OpenId4VpPresentationService(
     }
 
     fun buildWalletPresentationRequest(request: String, resolvedRequest: AuthorizationRequest): Url {
-        val requestUrl = Url(request)
-        return resolvedRequest.toWalletPresentUrl(baseUrlBuilder(requestUrl))
+        val requestParameters = json
+            .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
+            .jsonObject
+            .filterValues { it != JsonNull }
+
+        return URLBuilder(baseUrlBuilder(Url(request)).build()).apply {
+            requestParameters.forEach { (key, value) ->
+                parameters.append(key, json.encodeToString(JsonElement.serializer(), value))
+            }
+        }.build()
     }
 
     suspend fun matchCredentialsForPresentationRequest(
@@ -125,18 +133,6 @@ class OpenId4VpPresentationService(
             ?.disclosures
             ?.map { DcqlDisclosure(it.name, it.value) }
 
-    private fun AuthorizationRequest.toWalletPresentUrl(baseUrl: URLBuilder): Url {
-        val encodedValues = json.encodeToJsonElement(AuthorizationRequest.serializer(), this).jsonObject
-            .entries
-            .filterNot { it.value == JsonNull }
-
-        val urlBuilder = URLBuilder(baseUrl.build())
-        encodedValues.forEach { (key, value) ->
-            urlBuilder.parameters.append(key, json.encodeToString(JsonElement.serializer(), value))
-        }
-        return urlBuilder.build()
-    }
-
     companion object {
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters
@@ -146,9 +142,7 @@ class OpenId4VpPresentationService(
                     ?.takeIf { it.isJwt() }
                     ?.decodeJws()
                     ?.payload
-                    ?.let { payload ->
-                        "dcql_query" in payload || "transaction_data" in payload
-                    }
+                    ?.let { payload -> "dcql_query" in payload || "transaction_data" in payload }
                     ?: false
         }.getOrDefault(false)
     }
