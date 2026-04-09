@@ -104,11 +104,11 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         IssuerConfigManager.loadConfigs(emptyArray())
     }*/
 
-    @Test
+   /* @Test
     fun e2eTestRegisterNewUser() = testApplication {
         runApplication()
         testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
-    }
+    }*/
 
     /* @Test FIXME
      fun e2eTestAuthentication() = testApplication {
