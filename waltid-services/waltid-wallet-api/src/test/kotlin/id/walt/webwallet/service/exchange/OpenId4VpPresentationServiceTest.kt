@@ -90,7 +90,7 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `buildWalletPresentationRequest keeps values JSON encoded for wallet library parsing`() {
+    fun `buildWalletPresentationRequest keeps scalars plain and structured values JSON encoded`() {
         HttpClient().use { http ->
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
             val authorizationRequest = AuthorizationRequest(
@@ -104,8 +104,8 @@ class OpenId4VpPresentationServiceTest {
 
             val walletRequest = service.buildWalletPresentationRequest(request, authorizationRequest)
 
-            assertEquals("\"vp_token\"", walletRequest.parameters["response_type"])
-            assertEquals("\"verifier2\"", walletRequest.parameters["client_id"])
+            assertEquals("vp_token", walletRequest.parameters["response_type"])
+            assertEquals("verifier2", walletRequest.parameters["client_id"])
             assertTrue(walletRequest.parameters["dcql_query"]?.startsWith("{") == true)
         }
     }
@@ -127,7 +127,7 @@ class OpenId4VpPresentationServiceTest {
                 resolvedRequest = authorizationRequest,
             )
 
-            assertEquals("\"verifier2\"", walletRequest.parameters["client_id"])
+            assertEquals("verifier2", walletRequest.parameters["client_id"])
             assertTrue(walletRequest.parameters.contains("request_uri").not())
             assertTrue(walletRequest.parameters["dcql_query"]?.startsWith("{") == true)
         }
