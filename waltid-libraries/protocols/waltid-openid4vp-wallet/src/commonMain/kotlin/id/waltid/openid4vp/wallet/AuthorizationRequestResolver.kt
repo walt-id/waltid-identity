@@ -143,15 +143,9 @@ object AuthorizationRequestResolver {
     private fun parseParameterValue(value: String): JsonElement =
         // Authorization request query parameters arrive as strings, even when they look like JSON scalars.
         // Only parse values that are explicitly JSON-encoded so fields like nonce/state/client_id stay strings.
-        value.takeIf(::looksLikeJsonEncodedParameterValue)
-            ?.let { encodedValue ->
-                runCatching { json.parseToJsonElement(encodedValue) }
-                    .getOrElse { JsonPrimitive(value) }
-            }
-            ?: JsonPrimitive(value)
+        if (!isJsonEncoded(value)) JsonPrimitive(value)
+        else runCatching { json.parseToJsonElement(value) }.getOrElse { JsonPrimitive(value) }
 
-    private fun looksLikeJsonEncodedParameterValue(value: String): Boolean {
-        val trimmedValue = value.trimStart()
-        return trimmedValue.startsWith("{") || trimmedValue.startsWith("[") || trimmedValue.startsWith("\"")
-    }
+    private fun isJsonEncoded(value: String): Boolean =
+        value.trimStart().run { startsWith("{") || startsWith("[") || startsWith("\"") }
 }
