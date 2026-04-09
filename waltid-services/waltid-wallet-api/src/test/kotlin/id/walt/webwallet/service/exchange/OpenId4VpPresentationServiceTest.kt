@@ -2,6 +2,7 @@ package id.walt.webwallet.service.exchange
 
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
+import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -15,6 +16,9 @@ import io.ktor.client.HttpClient
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
+import io.mockk.every
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -338,38 +342,16 @@ class OpenId4VpPresentationServiceTest {
 
         assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$v1RequestObject"))
         assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?dcql_query=%7B%7D"))
+        assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request_uri=https://verifier.example/request"))
         assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$draftRequestObject"))
-        assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request_uri=https://verifier.example/request"))
+        assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?transaction_data=%5B%22eyJ0eXBlIjoicGF5bWVudCJ9%22%5D"))
     }
 
     @Test
     fun `matchCredentials returns wallet credentials satisfying a dcql query`() {
         HttpClient().use { http ->
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
-            val matchingCredential = WalletCredential(
-                wallet = Uuid.random(),
-                id = "credential-1",
-                document = jwt(
-                    """
-                        {
-                          "iss":"did:example:issuer",
-                          "sub":"did:example:holder",
-                          "vc":{
-                            "@context":["https://www.w3.org/2018/credentials/v1"],
-                            "type":["VerifiableCredential","UniversityDegreeCredential"],
-                            "issuer":{"id":"did:example:issuer"},
-                            "credentialSubject":{
-                              "id":"did:example:holder",
-                              "degree":{"type":"BachelorDegree"}
-                            }
-                          }
-                        }
-                        """.trimIndent(),
-                ),
-                disclosures = null,
-                addedOn = Clock.System.now(),
-                format = CredentialFormat.jwt_vc_json,
-            )
+            val matchingCredential = matchingCredential()
 
             val matchedCredentials = runBlocking {
                 service.matchCredentials(query, listOf(matchingCredential))
@@ -378,6 +360,52 @@ class OpenId4VpPresentationServiceTest {
             assertEquals(listOf("credential-1"), matchedCredentials.map { it.id })
         }
     }
+
+    @Test
+    fun `matchCredentialResults propagates matcher failures`() {
+        HttpClient().use { http ->
+            val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+            mockkObject(DcqlMatcher)
+            try {
+                every { DcqlMatcher.match(any(), any()) } returns Result.failure(IllegalArgumentException("boom"))
+
+                val error = assertFailsWith<IllegalArgumentException> {
+                    runBlocking {
+                        service.matchCredentialResults(query, listOf(matchingCredential()))
+                    }
+                }
+
+                assertEquals("boom", error.message)
+            } finally {
+                unmockkObject(DcqlMatcher)
+            }
+        }
+    }
+
+    private fun matchingCredential() = WalletCredential(
+        wallet = Uuid.random(),
+        id = "credential-1",
+        document = jwt(
+            """
+                {
+                  "iss":"did:example:issuer",
+                  "sub":"did:example:holder",
+                  "vc":{
+                    "@context":["https://www.w3.org/2018/credentials/v1"],
+                    "type":["VerifiableCredential","UniversityDegreeCredential"],
+                    "issuer":{"id":"did:example:issuer"},
+                    "credentialSubject":{
+                      "id":"did:example:holder",
+                      "degree":{"type":"BachelorDegree"}
+                    }
+                  }
+                }
+                """.trimIndent(),
+        ),
+        disclosures = null,
+        addedOn = Clock.System.now(),
+        format = CredentialFormat.jwt_vc_json,
+    )
 
     private fun jwt(payloadJson: String): String {
         val header = """{"alg":"none","typ":"JWT"}"""
