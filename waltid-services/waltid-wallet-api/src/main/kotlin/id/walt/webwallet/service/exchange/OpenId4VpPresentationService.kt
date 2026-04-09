@@ -13,9 +13,9 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
-import id.waltid.openid4vp.wallet.AuthorizationRequestParameterCodec
-import id.waltid.openid4vp.wallet.AuthorizationRequestResolver
-import id.waltid.openid4vp.wallet.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.http.URLBuilder
@@ -39,27 +39,15 @@ class OpenId4VpPresentationService(
         isLenient = true
     }
 
-    suspend fun tryResolveAuthorizationRequestWithSource(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
-        AuthorizationRequestResolver.resolve(request, http)
-    }
-
-    suspend fun tryResolveAuthorizationRequest(request: String): Result<AuthorizationRequest> = runCatching {
-        AuthorizationRequestResolver.resolve(request, http).authorizationRequest
-    }
+    suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> =
+        runCatching { AuthorizationRequestResolver.resolve(request, http) }
 
     fun buildWalletPresentationRequest(
         request: String,
         resolvedRequest: ResolvedAuthorizationRequest,
     ): Url = when (resolvedRequest) {
-        is ResolvedAuthorizationRequest.Plain -> buildWalletPresentationRequest(
-            request = request,
-            resolvedRequest = resolvedRequest.authorizationRequest,
-        )
-
-        is ResolvedAuthorizationRequest.WithRequestObject -> buildWalletPresentationRequest(
-            request = request,
-            requestObject = resolvedRequest.requestObject,
-        )
+        is ResolvedAuthorizationRequest.Plain -> buildWalletPresentationRequest(request, resolvedRequest.authorizationRequest)
+        is ResolvedAuthorizationRequest.WithRequestObject -> buildWalletPresentationRequest(request, resolvedRequest.requestObject)
     }
 
     suspend fun matchCredentialsForPresentationRequest(
@@ -69,6 +57,7 @@ class OpenId4VpPresentationService(
     ): List<WalletCredential> =
         tryResolveAuthorizationRequest(request)
             .getOrThrow()
+            .authorizationRequest
             .dcqlQuery?.let { query ->
                 matchCredentials(
                     query = query,
@@ -86,14 +75,9 @@ class OpenId4VpPresentationService(
             .filter { selectedCredentialIds == null || it.id in selectedCredentialIds }
             .mapNotNull { it.toDcqlCredentialOrNull() }
 
-        if (dcqlCredentials.isEmpty()) {
-            return emptyMap()
-        }
-
-        return DcqlMatcher.match(query, dcqlCredentials)
-            .onFailure { error ->
-                logger.warn(error) { "OpenID4VP credential matching failed" }
-            }
+        return if (dcqlCredentials.isEmpty()) emptyMap()
+        else DcqlMatcher.match(query, dcqlCredentials)
+            .onFailure { error -> logger.warn(error) { "OpenID4VP credential matching failed" } }
             .getOrThrow()
     }
 
@@ -102,13 +86,12 @@ class OpenId4VpPresentationService(
         credentials: List<WalletCredential>,
         selectedCredentialIds: Set<String>? = null,
     ): List<WalletCredential> {
-        val matched = matchCredentialResults(query, credentials, selectedCredentialIds)
-        val matchedCredentialIds = matched.values
+        val matchedIds = matchCredentialResults(query, credentials, selectedCredentialIds)
+            .values
             .flatten()
-            .mapNotNull { (it.credential as? RawDcqlCredential)?.id }
-            .toSet()
+            .mapTo(mutableSetOf()) { it.credential.id }
 
-        return credentials.filter { credential -> credential.id in matchedCredentialIds }
+        return credentials.filter { it.id in matchedIds }
     }
 
     private fun walletPresentationRequestBuilder(request: String): URLBuilder =
