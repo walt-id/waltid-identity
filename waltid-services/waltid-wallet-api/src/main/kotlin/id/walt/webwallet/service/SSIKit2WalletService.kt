@@ -65,8 +65,8 @@ import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
-import id.waltid.openid4vp.wallet.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.klogging.Klogging
 import io.ktor.client.*
 import io.ktor.client.request.forms.*
@@ -1114,15 +1114,11 @@ class SSIKit2WalletService(
     }
 
     private suspend fun resolveOpenId4VpAuthorizationRequest(request: String) =
-        openId4VpPresentationService.tryResolveAuthorizationRequestWithSource(request)
+        openId4VpPresentationService.tryResolveAuthorizationRequest(request)
             .fold(
-                onSuccess = { resolvedAuthorizationRequest ->
-                    resolvedAuthorizationRequest.takeIf { it.authorizationRequest.dcqlQuery != null }
-                },
+                onSuccess = { it.takeIf { resolved -> resolved.authorizationRequest.dcqlQuery != null } },
                 onFailure = { error ->
-                    if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) {
-                        throw error
-                    }
+                    if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) throw error
                     null
                 },
             )
@@ -1151,23 +1147,19 @@ class SSIKit2WalletService(
                     query = query,
                     credentials = walletCredentials,
                     selectedCredentialIds = parameter.selectedCredentials.toSet(),
-                ).also { matchedResults ->
-                    selectedMatches = matchedResults
-                }.ifEmpty {
-                    throw IllegalArgumentException("No matching credentials found for the presentation request")
-                }
+                ).also { selectedMatches = it }
+                    .ifEmpty { throw IllegalArgumentException("No matching credentials found for the presentation request") }
             },
             holderPoliciesToRun = null,
             runPolicies = null,
         ).mapCatching { result ->
-            val redirect = extractRedirect(result)
             logPresentedCredentials(
                 resolvedRequest = resolvedRequest.authorizationRequest,
                 note = parameter.note,
                 walletCredentials = walletCredentials,
                 selectedMatches = selectedMatches,
             )
-            redirect
+            extractRedirect(result)
         }
     }
 
@@ -1175,11 +1167,7 @@ class SSIKit2WalletService(
         when {
             result.getUrl != null -> result.getUrl
             result.redirectTo != null -> result.redirectTo
-            result.transmissionSuccess == true -> null
-            result.transmissionSuccess == false -> {
-                throw IllegalStateException("OpenID4VP presentation transmission failed")
-            }
-
+            result.transmissionSuccess == false -> throw IllegalStateException("OpenID4VP presentation transmission failed")
             result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
             else -> null
         }
@@ -1195,8 +1183,7 @@ class SSIKit2WalletService(
             ?.values
             ?.asSequence()
             ?.flatten()
-            ?.mapNotNull { (it.credential as? RawDcqlCredential)?.id }
-            ?.toSet()
+            ?.mapTo(mutableSetOf()) { it.credential.id }
             .orEmpty()
 
         if (presentedCredentialIds.isEmpty()) return

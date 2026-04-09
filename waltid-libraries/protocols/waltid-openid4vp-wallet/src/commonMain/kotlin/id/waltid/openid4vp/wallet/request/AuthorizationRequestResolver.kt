@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
-
-package id.waltid.openid4vp.wallet
+package id.waltid.openid4vp.wallet.request
 
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -31,19 +29,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-sealed class ResolvedAuthorizationRequest {
-    abstract val authorizationRequest: AuthorizationRequest
-
-    data class Plain(
-        override val authorizationRequest: AuthorizationRequest,
-    ) : ResolvedAuthorizationRequest()
-
-    data class WithRequestObject(
-        override val authorizationRequest: AuthorizationRequest,
-        val requestObject: String,
-    ) : ResolvedAuthorizationRequest()
-}
-
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
 
@@ -62,16 +47,13 @@ object AuthorizationRequestResolver {
     suspend fun resolve(request: String, http: HttpClient): ResolvedAuthorizationRequest =
         resolve(Url(request), http)
 
-    private suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
+    suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
         val requestUri = requestUrl.parameters["request_uri"]
-        if (requestUri != null) {
-            return resolveFromRequestUri(requestUrl, requestUri, http)
-        }
+        val requestUriMethod = requestUrl.parameters["request_uri_method"]
+        if (requestUri != null) return resolveFromRequestUri(requestUri, requestUriMethod, http)
 
         val requestObject = requestUrl.parameters["request"]
-        if (requestObject != null) {
-            return resolveFromRequestObject(requestObject)
-        }
+        if (requestObject != null) return resolveFromRequestObject(requestObject)
 
         return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
     }
@@ -81,21 +63,26 @@ object AuthorizationRequestResolver {
         return json.decodeFromJsonElement(
             AuthorizationRequest.serializer(),
             buildJsonObject {
-                parameters.entries().forEach { (key, values) ->
-                    values.lastOrNull()?.let { put(key, AuthorizationRequestParameterCodec.parse(json, it)) }
-                }
+                parameters.entries()
+                    .mapNotNull { (key, values) -> values.lastOrNull()?.let { key to it } }
+                    .forEach { (key, value) ->
+                        put(
+                            key,
+                            AuthorizationRequestParameterCodec.parse(json, value)
+                        )
+                    }
             },
         )
     }
 
     private suspend fun resolveFromRequestUri(
-        requestUrl: Url,
         requestUri: String,
+        requestUriMethod: String?,
         http: HttpClient,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
-        val requestUriMethod = requestUrl.parameters["request_uri_method"]?.let(::parseRequestUriMethod)
+        val requestUriMethod = requestUriMethod?.let(::parseRequestUriMethod)
 
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
         val response = when (requestUriMethod) {
@@ -134,11 +121,15 @@ object AuthorizationRequestResolver {
         }
 
         return ResolvedAuthorizationRequest.WithRequestObject(
-            authorizationRequest = json.decodeFromJsonElement(AuthorizationRequest.serializer(), authReqJws.payload),
+            authorizationRequest = json.decodeFromJsonElement(
+                deserializer = AuthorizationRequest.serializer(),
+                element = authReqJws.payload,
+            ),
             requestObject = requestObject,
         )
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private suspend fun authenticateSignedRequestObject(requestObject: String, payload: JsonObject) {
         val clientId = requireNotNull(payload["client_id"]?.jsonPrimitive?.contentOrNull) {
             "Missing client_id for signed AuthorizationRequest"
@@ -170,9 +161,7 @@ object AuthorizationRequestResolver {
     private fun parseRequestUriMethod(value: String): RequestUriHttpMethod = when (value) {
         RequestUriHttpMethod.GET.method -> RequestUriHttpMethod.GET
         RequestUriHttpMethod.POST.method -> RequestUriHttpMethod.POST
-        else -> throw IllegalArgumentException(
-            "invalid_request_uri_method: $value is neither 'get' nor 'post'",
-        )
+        else -> throw IllegalArgumentException("invalid_request_uri_method: $value is neither 'get' nor 'post'")
     }
 
 }
