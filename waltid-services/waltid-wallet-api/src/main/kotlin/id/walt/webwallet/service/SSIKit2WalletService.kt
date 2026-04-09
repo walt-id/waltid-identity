@@ -373,8 +373,7 @@ class SSIKit2WalletService(
         if (resolvedV1 != null) {
             return openId4VpPresentationService.buildWalletPresentationRequest(
                 request = request,
-                resolvedRequest = resolvedV1.authorizationRequest,
-                requestObject = resolvedV1.requestObject,
+                resolvedRequest = resolvedV1,
             ).toString()
         }
 
@@ -1005,8 +1004,7 @@ class SSIKit2WalletService(
             holderDid = parameter.did,
             presentationRequestUrl = openId4VpPresentationService.buildWalletPresentationRequest(
                 request = parameter.request,
-                resolvedRequest = resolvedRequest.authorizationRequest,
-                requestObject = resolvedRequest.requestObject,
+                resolvedRequest = resolvedRequest,
             ),
             selectCredentialsForQuery = { query ->
                 openId4VpPresentationService.matchCredentialResults(
