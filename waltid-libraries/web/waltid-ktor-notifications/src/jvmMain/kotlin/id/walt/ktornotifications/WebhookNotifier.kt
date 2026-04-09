@@ -65,6 +65,7 @@ object WebhookNotifier {
                 )
             }
         }.getOrElse { ex ->
+            if (ex is CancellationException) throw ex
             if (ex is ConnectTimeoutException) {
                 throw IllegalArgumentException(
                     "Could not connect to configured webhook URL for session update: ${config.url.hostWithPortIfSpecified}",
