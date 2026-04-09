@@ -49,7 +49,7 @@ class OpenId4VpPresentationServiceTest {
     )
 
     @Test
-    fun `resolvePresentationRequest normalizes direct OpenID4VP requests`() {
+    fun `normalized request URL keeps direct OpenID4VP requests intact`() {
         val http = HttpClient()
         try {
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
@@ -61,7 +61,7 @@ class OpenId4VpPresentationServiceTest {
                 dcqlQuery = query,
             ).toHttpUrl().toString()
 
-            val resolvedRequest = runBlocking { service.normalizedRequestUrl(request) }
+            val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("verifier2", resolvedUrl.parameters["client_id"])
@@ -73,7 +73,7 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `resolvePresentationRequest keeps raw scalar query parameters as strings`() {
+    fun `normalized request URL keeps raw scalar query parameters as strings`() {
         val http = HttpClient()
         try {
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
@@ -86,7 +86,7 @@ class OpenId4VpPresentationServiceTest {
                 dcqlQuery = query,
             ).toHttpUrl().toString()
 
-            val resolvedRequest = runBlocking { service.normalizedRequestUrl(request) }
+            val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("12345", resolvedUrl.parameters["nonce"])
@@ -147,7 +147,7 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `resolvePresentationRequest parses request object from request parameter`() {
+    fun `normalized request URL expands request objects from request parameter`() {
         val http = HttpClient()
         try {
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
@@ -161,7 +161,7 @@ class OpenId4VpPresentationServiceTest {
                 ),
             )
 
-            val resolvedRequest = runBlocking { service.normalizedRequestUrl("openid4vp://authorize?request=$requestObject") }
+            val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("verifier2", resolvedUrl.parameters["client_id"])
@@ -173,13 +173,15 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `resolvePresentationRequest fetches authorization request from request_uri using GET`() {
+    fun `normalized request URL fetches authorization requests from request_uri using GET`() {
         withAuthorizationRequestServer { serverUrl, receivedMethod ->
             val http = HttpClient()
             try {
                 val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
 
-                val resolvedRequest = runBlocking { service.normalizedRequestUrl("openid4vp://authorize?request_uri=$serverUrl/request-object") }
+                val resolvedRequest = runBlocking {
+                    resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
+                }
                 val resolvedUrl = Url(resolvedRequest)
 
                 assertEquals("GET", receivedMethod())
@@ -192,14 +194,15 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `resolvePresentationRequest fetches authorization request from request_uri using POST`() {
+    fun `normalized request URL fetches authorization requests from request_uri using POST`() {
         withAuthorizationRequestServer { serverUrl, receivedMethod ->
             val http = HttpClient()
             try {
                 val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
 
                 val resolvedRequest = runBlocking {
-                    service.normalizedRequestUrl(
+                    resolveNormalizedRequestUrl(
+                        service,
                         "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
                     )
                 }
@@ -215,7 +218,7 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `resolvePresentationRequest rejects signed request objects for redirect_uri client ids`() {
+    fun `normalized request URL rejects signed request objects for redirect_uri client ids`() {
         val http = HttpClient()
         try {
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
@@ -235,7 +238,7 @@ class OpenId4VpPresentationServiceTest {
 
             val error = assertFailsWith<IllegalArgumentException> {
                 runBlocking {
-                    service.normalizedRequestUrl("openid4vp://authorize?request=$signedRequestObject")
+                    resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject")
                 }
             }
 
@@ -243,11 +246,6 @@ class OpenId4VpPresentationServiceTest {
         } finally {
             http.close()
         }
-    }
-
-    private suspend fun OpenId4VpPresentationService.normalizedRequestUrl(request: String): String {
-        val resolvedRequest = tryResolveAuthorizationRequest(request).getOrThrow()
-        return resolvedRequest.toHttpUrl(URLBuilder(Url(request).toString().substringBefore("?"))).toString()
     }
 
     @Test
@@ -345,6 +343,15 @@ class OpenId4VpPresentationServiceTest {
                     .withoutPadding()
                     .encodeToString(part.toByteArray())
             }
+    }
+
+    private suspend fun resolveNormalizedRequestUrl(
+        service: OpenId4VpPresentationService,
+        request: String,
+    ): String {
+        val resolvedRequest = service.tryResolveAuthorizationRequest(request).getOrThrow()
+        val requestBaseUrl = URLBuilder(Url(request).toString().substringBefore("?"))
+        return resolvedRequest.toHttpUrl(requestBaseUrl).toString()
     }
 
     private fun withAuthorizationRequestServer(
