@@ -1,4 +1,4 @@
-package id.waltid.openid4vp.wallet
+package id.waltid.openid4vp.wallet.request
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
