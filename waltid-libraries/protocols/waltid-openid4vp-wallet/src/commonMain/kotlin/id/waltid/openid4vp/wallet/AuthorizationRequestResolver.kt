@@ -13,8 +13,10 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
+import io.ktor.client.request.accept
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.Parameters
@@ -27,6 +29,11 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+
+data class ResolvedAuthorizationRequest(
+    val authorizationRequest: AuthorizationRequest,
+    val requestObject: String? = null,
+)
 
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
@@ -46,12 +53,18 @@ object AuthorizationRequestResolver {
     suspend fun resolve(request: String, http: HttpClient): AuthorizationRequest = resolve(Url(request), http)
 
     suspend fun resolve(requestUrl: Url, http: HttpClient): AuthorizationRequest =
+        resolveDetailed(requestUrl, http).authorizationRequest
+
+    suspend fun resolveDetailed(request: String, http: HttpClient): ResolvedAuthorizationRequest =
+        resolveDetailed(Url(request), http)
+
+    suspend fun resolveDetailed(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest =
         when {
             requestUrl.parameters.contains("request_uri") -> resolveFromRequestUri(requestUrl, http)
 
             requestUrl.parameters.contains("request") -> resolveFromRequestObject(requestUrl)
 
-            else -> parseParameters(requestUrl.parameters)
+            else -> ResolvedAuthorizationRequest(parseParameters(requestUrl.parameters))
         }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest {
@@ -66,7 +79,7 @@ object AuthorizationRequestResolver {
         )
     }
 
-    private suspend fun resolveFromRequestUri(requestUrl: Url, http: HttpClient): AuthorizationRequest {
+    private suspend fun resolveFromRequestUri(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
         val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
@@ -74,7 +87,11 @@ object AuthorizationRequestResolver {
 
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod ?: "get"}" }
         val response = when (requestUriMethod) {
-            "post" -> http.post(requestUri)
+            "post" -> http.post(requestUri) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                setBody("")
+            }
             else -> http.get(requestUri)
         }
 
@@ -86,17 +103,19 @@ object AuthorizationRequestResolver {
 
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(body)
-            contentType.match(ContentType.Application.Json) -> json.decodeFromString<AuthorizationRequest>(body)
+            contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest(
+                authorizationRequest = json.decodeFromString<AuthorizationRequest>(body),
+            )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
     }
 
-    private suspend fun resolveFromRequestObject(requestUrl: Url): AuthorizationRequest {
+    private suspend fun resolveFromRequestObject(requestUrl: Url): ResolvedAuthorizationRequest {
         val requestObject = requireNotNull(requestUrl.parameters["request"]) { "Missing request object" }
         return resolveFromRequestObject(requestObject)
     }
 
-    private suspend fun resolveFromRequestObject(requestObject: String): AuthorizationRequest {
+    private suspend fun resolveFromRequestObject(requestObject: String): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via inline request object" }
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
@@ -107,7 +126,10 @@ object AuthorizationRequestResolver {
             authenticateSignedRequestObject(requestObject, authReqJws.payload)
         }
 
-        return json.decodeFromJsonElement(AuthorizationRequest.serializer(), authReqJws.payload)
+        return ResolvedAuthorizationRequest(
+            authorizationRequest = json.decodeFromJsonElement(AuthorizationRequest.serializer(), authReqJws.payload),
+            requestObject = requestObject,
+        )
     }
 
     private suspend fun authenticateSignedRequestObject(requestObject: String, payload: JsonObject) {

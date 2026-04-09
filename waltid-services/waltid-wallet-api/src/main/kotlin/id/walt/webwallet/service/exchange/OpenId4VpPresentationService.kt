@@ -15,13 +15,13 @@ import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.waltid.openid4vp.wallet.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.ExperimentalUuidApi
@@ -39,22 +39,32 @@ class OpenId4VpPresentationService(
         isLenient = true
     }
 
+    suspend fun tryResolveAuthorizationRequestWithSource(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
+        AuthorizationRequestResolver.resolveDetailed(request, http)
+    }
+
     suspend fun tryResolveAuthorizationRequest(request: String): Result<AuthorizationRequest> = runCatching {
         AuthorizationRequestResolver.resolve(request, http)
     }
 
-    fun buildWalletPresentationRequest(request: String, resolvedRequest: AuthorizationRequest): Url {
-        val requestParameters = json
-            .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
-            .jsonObject
-            .filterValues { it != JsonNull }
+    fun buildWalletPresentationRequest(
+        request: String,
+        resolvedRequest: AuthorizationRequest,
+        requestObject: String? = null,
+    ): Url = URLBuilder(Url(request).toString().substringBefore("?")).apply {
+        if (requestObject != null) {
+            parameters.append("request", requestObject)
+        } else {
+            val requestParameters = json
+                .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
+                .jsonObject
+                .filterValues { it != JsonNull }
 
-        return URLBuilder(Url(request).toString().substringBefore("?")).apply {
             requestParameters.forEach { (key, value) ->
                 parameters.append(key, AuthorizationRequestParameterCodec.encode(json, value))
             }
-        }.build()
-    }
+        }
+    }.build()
 
     suspend fun matchCredentialsForPresentationRequest(
         walletId: Uuid,
