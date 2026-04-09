@@ -25,7 +25,7 @@ kotlin {
         jvmTest.dependencies {
             implementation(identityLibs.bouncycastle.prov)
             implementation(identityLibs.bouncycastle.pkix)
-            implementation("io.mockk:mockk:1.13.16")
+            implementation("io.mockk:mockk:1.14.9")
 
             implementation(kotlin("reflect"))
 

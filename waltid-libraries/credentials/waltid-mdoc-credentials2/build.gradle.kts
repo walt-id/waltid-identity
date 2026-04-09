@@ -27,7 +27,7 @@ kotlin {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.10.0")
             implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Crypto
