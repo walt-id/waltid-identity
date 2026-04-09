@@ -39,6 +39,7 @@ object ServiceHealthChecksDebugModule {
 
         private val logger = noCoLogger("EnterpriseStatus")
 
+        @Volatile
         var ktorStatus: KtorStatus = KtorStatus.Unknown
 
         fun Application.init() {
