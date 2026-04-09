@@ -95,7 +95,7 @@ object AuthorizationRequestResolver {
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
-        val requestUriMethod = parseRequestUriMethod(requestUrl.parameters["request_uri_method"])
+        val requestUriMethod = requestUrl.parameters["request_uri_method"]?.let(::parseRequestUriMethod)
 
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
         val response = when (requestUriMethod) {
@@ -167,8 +167,7 @@ object AuthorizationRequestResolver {
         }
     }
 
-    private fun parseRequestUriMethod(value: String?): RequestUriHttpMethod? = when (value) {
-        null -> null
+    private fun parseRequestUriMethod(value: String): RequestUriHttpMethod = when (value) {
         RequestUriHttpMethod.GET.method -> RequestUriHttpMethod.GET
         RequestUriHttpMethod.POST.method -> RequestUriHttpMethod.POST
         else -> throw IllegalArgumentException(
