@@ -3,6 +3,7 @@ import {useCurrentWallet} from "./accountWallet.ts";
 import {computed, type Ref, ref, watch} from "vue";
 import {decodeRequest} from "./siop-requests.ts";
 import {navigateTo} from "nuxt/app";
+import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
 
 type MatchedCredential = {
   id: string;
@@ -205,14 +206,7 @@ function extractPresentationParams(request: string): URLSearchParams {
     return requestUrl.searchParams;
   }
 
-  const payloadSegment = requestObject.split(".")[1];
-  if (!payloadSegment) {
-    throw new Error("Malformed request object in presentation request.");
-  }
-
-  const payload = JSON.parse(
-    atob(base64UrlToBase64(payloadSegment)),
-  ) as Record<string, unknown>;
+  const payload = parseRequestObjectPayload(requestObject);
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(payload)) {
     if (value == null) continue;
@@ -221,10 +215,18 @@ function extractPresentationParams(request: string): URLSearchParams {
   return params;
 }
 
-function base64UrlToBase64(value: string): string {
-  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
-  const padding = (4 - (base64.length % 4)) % 4;
-  return base64 + "=".repeat(padding);
+function parseRequestObjectPayload(
+  requestObject: string,
+): Record<string, unknown> {
+  try {
+    const payload = parseJwt(requestObject);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error("Request object payload is not a JSON object.");
+    }
+    return payload as Record<string, unknown>;
+  } catch {
+    throw new Error("Malformed request object in presentation request.");
+  }
 }
 
 async function fetchMatchedCredentials(
