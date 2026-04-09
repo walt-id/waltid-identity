@@ -11,6 +11,7 @@ import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -30,6 +31,8 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 object AuthorizationRequestResolver {
+    private val log = KotlinLogging.logger { }
+
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
@@ -46,12 +49,20 @@ object AuthorizationRequestResolver {
 
     suspend fun resolve(requestUrl: Url, http: HttpClient): AuthorizationRequest =
         when {
-            requestUrl.parameters.contains("request_uri") -> resolveFromRequestUri(requestUrl, http)
+            requestUrl.parameters.contains("request_uri") -> {
+                log.trace { "Resolving AuthorizationRequest via request_uri" }
+                resolveFromRequestUri(requestUrl, http)
+            }
+
             requestUrl.parameters.contains("request") -> resolveFromRequestObject(
                 requestUrl.parameters["request"] ?: error("Missing request object"),
-            )
+            ).also {
+                log.trace { "Resolving AuthorizationRequest via inline request object" }
+            }
 
-            else -> parseParameters(requestUrl.parameters)
+            else -> parseParameters(requestUrl.parameters).also {
+                log.trace { "Resolving AuthorizationRequest from direct request parameters" }
+            }
         }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest =
@@ -68,6 +79,8 @@ object AuthorizationRequestResolver {
         val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
         val requestUriMethod = requestUrl.parameters["request_uri_method"]?.lowercase()
 
+        log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod ?: "get"}" }
+
         val response = when (requestUriMethod) {
             "post" -> http.post(requestUri)
             else -> http.get(requestUri)
@@ -80,6 +93,8 @@ object AuthorizationRequestResolver {
         val contentType = response.contentType()
             ?: throw IllegalArgumentException("AuthorizationRequest response does not define a content type")
         val body = response.bodyAsText()
+
+        log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
 
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(body)
@@ -94,6 +109,7 @@ object AuthorizationRequestResolver {
         val authReqJws = requestObject.decodeJws()
         val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
         if (!jwtAlg.equals("none", ignoreCase = true)) {
+            log.trace { "Authenticating signed AuthorizationRequest object" }
             authenticateSignedRequestObject(requestObject, authReqJws.payload)
         }
 
@@ -120,7 +136,11 @@ object AuthorizationRequestResolver {
         )
 
         when (val validationResult = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)) {
-            is ClientValidationResult.Success -> Unit
+            is ClientValidationResult.Success -> {
+                log.trace { "Signed AuthorizationRequest authentication succeeded for client_id prefix ${clientIdPrefix::class.simpleName}" }
+                Unit
+            }
+
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
     }
