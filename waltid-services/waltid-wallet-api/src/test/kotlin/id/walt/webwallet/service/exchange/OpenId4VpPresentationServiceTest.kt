@@ -11,6 +11,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import io.ktor.client.HttpClient
+import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -60,9 +61,7 @@ class OpenId4VpPresentationServiceTest {
                 dcqlQuery = query,
             ).toHttpUrl().toString()
 
-            val resolvedRequest = runBlocking {
-                service.resolvePresentationRequest(request)
-            }
+            val resolvedRequest = runBlocking { service.normalizedRequestUrl(request) }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("verifier2", resolvedUrl.parameters["client_id"])
@@ -87,9 +86,7 @@ class OpenId4VpPresentationServiceTest {
                 dcqlQuery = query,
             ).toHttpUrl().toString()
 
-            val resolvedRequest = runBlocking {
-                service.resolvePresentationRequest(request)
-            }
+            val resolvedRequest = runBlocking { service.normalizedRequestUrl(request) }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("12345", resolvedUrl.parameters["nonce"])
@@ -164,9 +161,7 @@ class OpenId4VpPresentationServiceTest {
                 ),
             )
 
-            val resolvedRequest = runBlocking {
-                service.resolvePresentationRequest("openid4vp://authorize?request=$requestObject")
-            }
+            val resolvedRequest = runBlocking { service.normalizedRequestUrl("openid4vp://authorize?request=$requestObject") }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("verifier2", resolvedUrl.parameters["client_id"])
@@ -184,9 +179,7 @@ class OpenId4VpPresentationServiceTest {
             try {
                 val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
 
-                val resolvedRequest = runBlocking {
-                    service.resolvePresentationRequest("openid4vp://authorize?request_uri=$serverUrl/request-object")
-                }
+                val resolvedRequest = runBlocking { service.normalizedRequestUrl("openid4vp://authorize?request_uri=$serverUrl/request-object") }
                 val resolvedUrl = Url(resolvedRequest)
 
                 assertEquals("GET", receivedMethod())
@@ -206,7 +199,7 @@ class OpenId4VpPresentationServiceTest {
                 val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
 
                 val resolvedRequest = runBlocking {
-                    service.resolvePresentationRequest(
+                    service.normalizedRequestUrl(
                         "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
                     )
                 }
@@ -242,7 +235,7 @@ class OpenId4VpPresentationServiceTest {
 
             val error = assertFailsWith<IllegalArgumentException> {
                 runBlocking {
-                    service.resolvePresentationRequest("openid4vp://authorize?request=$signedRequestObject")
+                    service.normalizedRequestUrl("openid4vp://authorize?request=$signedRequestObject")
                 }
             }
 
@@ -250,6 +243,11 @@ class OpenId4VpPresentationServiceTest {
         } finally {
             http.close()
         }
+    }
+
+    private suspend fun OpenId4VpPresentationService.normalizedRequestUrl(request: String): String {
+        val resolvedRequest = tryResolveAuthorizationRequest(request).getOrThrow()
+        return resolvedRequest.toHttpUrl(URLBuilder(Url(request).toString().substringBefore("?"))).toString()
     }
 
     @Test
