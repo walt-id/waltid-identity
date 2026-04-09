@@ -32,6 +32,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
@@ -65,6 +66,7 @@ import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.klogging.Klogging
 import io.ktor.client.*
@@ -976,10 +978,15 @@ class SSIKit2WalletService(
             .fold(
                 onSuccess = { it.takeIf { resolved -> resolved.authorizationRequest.dcqlQuery != null } },
                 onFailure = { error ->
+                    if (shouldFallBackToLegacyDraftRequest(error)) return@fold null
                     if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) throw error
                     null
                 },
             )
+
+    private fun shouldFallBackToLegacyDraftRequest(error: Throwable): Boolean =
+        error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
+            (error.clientIdError as? ClientIdError.UnsupportedPrefix)?.prefix in setOf("http", "https")
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun useOpenId4VpPresentationRequest(
