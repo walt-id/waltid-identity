@@ -47,6 +47,7 @@ val modules = listOfNotNull(
     * "$libraries:protocols".group(
         "waltid-openid4vc",
         "waltid-openid4vci",
+        "waltid-openid4vci-wallet",
         "waltid-openid4vp",
         "waltid-openid4vp-verifier",
         "waltid-openid4vp-verifier-openapi",
