@@ -42,12 +42,6 @@ class OpenId4VpPresentationService(
         AuthorizationRequestResolver.resolve(request, http)
     }
 
-    suspend fun resolvePresentationRequest(request: String): String {
-        val requestUrl = Url(request)
-        val authorizationRequest = tryResolveAuthorizationRequest(request).getOrThrow()
-        return authorizationRequest.toHttpUrl(baseUrlBuilder(requestUrl)).toString()
-    }
-
     fun buildWalletPresentationRequest(request: String, resolvedRequest: AuthorizationRequest): Url {
         val requestUrl = Url(request)
         return resolvedRequest.toWalletPresentUrl(baseUrlBuilder(requestUrl))
@@ -68,7 +62,7 @@ class OpenId4VpPresentationService(
                 )
             } ?: emptyList()
 
-    suspend fun matchCredentials(
+    internal suspend fun matchCredentials(
         query: DcqlQuery,
         credentials: List<WalletCredential>,
         selectedCredentialIds: Set<String>? = null,
