@@ -47,30 +47,6 @@ class OpenId4VpPresentationService(
         AuthorizationRequestResolver.resolve(request, http).authorizationRequest
     }
 
-    private fun walletPresentationRequestBuilder(request: String): URLBuilder =
-        URLBuilder(Url(request).toString().substringBefore("?"))
-
-    private fun buildWalletPresentationRequest(
-        request: String,
-        resolvedRequest: AuthorizationRequest,
-    ): Url = walletPresentationRequestBuilder(request).apply {
-        val requestParameters = json
-            .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
-            .jsonObject
-            .filterValues { it != JsonNull }
-
-        requestParameters.forEach { (key, value) ->
-            parameters.append(key, AuthorizationRequestParameterCodec.encode(json, value))
-        }
-    }.build()
-
-    private fun buildWalletPresentationRequest(
-        request: String,
-        requestObject: String,
-    ): Url = walletPresentationRequestBuilder(request).apply {
-        parameters.append("request", requestObject)
-    }.build()
-
     fun buildWalletPresentationRequest(
         request: String,
         resolvedRequest: ResolvedAuthorizationRequest,
@@ -101,20 +77,6 @@ class OpenId4VpPresentationService(
                 )
             } ?: emptyList()
 
-    internal suspend fun matchCredentials(
-        query: DcqlQuery,
-        credentials: List<WalletCredential>,
-        selectedCredentialIds: Set<String>? = null,
-    ): List<WalletCredential> {
-        val matched = matchCredentialResults(query, credentials, selectedCredentialIds)
-        val matchedCredentialIds = matched.values
-            .flatten()
-            .mapNotNull { (it.credential as? RawDcqlCredential)?.id }
-            .toSet()
-
-        return credentials.filter { credential -> credential.id in matchedCredentialIds }
-    }
-
     suspend fun matchCredentialResults(
         query: DcqlQuery,
         credentials: List<WalletCredential>,
@@ -134,6 +96,44 @@ class OpenId4VpPresentationService(
             }
             .getOrThrow()
     }
+
+    internal suspend fun matchCredentials(
+        query: DcqlQuery,
+        credentials: List<WalletCredential>,
+        selectedCredentialIds: Set<String>? = null,
+    ): List<WalletCredential> {
+        val matched = matchCredentialResults(query, credentials, selectedCredentialIds)
+        val matchedCredentialIds = matched.values
+            .flatten()
+            .mapNotNull { (it.credential as? RawDcqlCredential)?.id }
+            .toSet()
+
+        return credentials.filter { credential -> credential.id in matchedCredentialIds }
+    }
+
+    private fun walletPresentationRequestBuilder(request: String): URLBuilder =
+        URLBuilder(Url(request).toString().substringBefore("?"))
+
+    private fun buildWalletPresentationRequest(
+        request: String,
+        resolvedRequest: AuthorizationRequest,
+    ): Url = walletPresentationRequestBuilder(request).apply {
+        val requestParameters = json
+            .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
+            .jsonObject
+            .filterValues { it != JsonNull }
+
+        requestParameters.forEach { (key, value) ->
+            parameters.append(key, AuthorizationRequestParameterCodec.encode(json, value))
+        }
+    }.build()
+
+    private fun buildWalletPresentationRequest(
+        request: String,
+        requestObject: String,
+    ): Url = walletPresentationRequestBuilder(request).apply {
+        parameters.append("request", requestObject)
+    }.build()
 
     private suspend fun WalletCredential.toDcqlCredentialOrNull(): RawDcqlCredential? =
         runCatching {
