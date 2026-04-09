@@ -62,14 +62,19 @@ object AuthorizationRequestResolver {
     suspend fun resolve(request: String, http: HttpClient): ResolvedAuthorizationRequest =
         resolve(Url(request), http)
 
-    private suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest =
-        when {
-            requestUrl.parameters.contains("request_uri") -> resolveFromRequestUri(requestUrl, http)
-
-            requestUrl.parameters.contains("request") -> resolveFromRequestObject(requestUrl)
-
-            else -> ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
+    private suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
+        val requestUri = requestUrl.parameters["request_uri"]
+        if (requestUri != null) {
+            return resolveFromRequestUri(requestUrl, requestUri, http)
         }
+
+        val requestObject = requestUrl.parameters["request"]
+        if (requestObject != null) {
+            return resolveFromRequestObject(requestObject)
+        }
+
+        return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
+    }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest from direct request parameters" }
@@ -83,10 +88,13 @@ object AuthorizationRequestResolver {
         )
     }
 
-    private suspend fun resolveFromRequestUri(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
+    private suspend fun resolveFromRequestUri(
+        requestUrl: Url,
+        requestUri: String,
+        http: HttpClient,
+    ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
-        val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
         val requestUriMethod = parseRequestUriMethod(requestUrl.parameters["request_uri_method"])
 
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
@@ -112,11 +120,6 @@ object AuthorizationRequestResolver {
             )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
-    }
-
-    private suspend fun resolveFromRequestObject(requestUrl: Url): ResolvedAuthorizationRequest {
-        val requestObject = requireNotNull(requestUrl.parameters["request"]) { "Missing request object" }
-        return resolveFromRequestObject(requestObject)
     }
 
     private suspend fun resolveFromRequestObject(requestObject: String): ResolvedAuthorizationRequest {
