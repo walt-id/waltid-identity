@@ -40,31 +40,51 @@ class OpenId4VpPresentationService(
     }
 
     suspend fun tryResolveAuthorizationRequestWithSource(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
-        AuthorizationRequestResolver.resolveDetailed(request, http)
-    }
-
-    suspend fun tryResolveAuthorizationRequest(request: String): Result<AuthorizationRequest> = runCatching {
         AuthorizationRequestResolver.resolve(request, http)
     }
 
-    fun buildWalletPresentationRequest(
+    suspend fun tryResolveAuthorizationRequest(request: String): Result<AuthorizationRequest> = runCatching {
+        AuthorizationRequestResolver.resolve(request, http).authorizationRequest
+    }
+
+    private fun walletPresentationRequestBuilder(request: String): URLBuilder =
+        URLBuilder(Url(request).toString().substringBefore("?"))
+
+    private fun buildWalletPresentationRequest(
         request: String,
         resolvedRequest: AuthorizationRequest,
-        requestObject: String? = null,
-    ): Url = URLBuilder(Url(request).toString().substringBefore("?")).apply {
-        if (requestObject != null) {
-            parameters.append("request", requestObject)
-        } else {
-            val requestParameters = json
-                .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
-                .jsonObject
-                .filterValues { it != JsonNull }
+    ): Url = walletPresentationRequestBuilder(request).apply {
+        val requestParameters = json
+            .encodeToJsonElement(AuthorizationRequest.serializer(), resolvedRequest)
+            .jsonObject
+            .filterValues { it != JsonNull }
 
-            requestParameters.forEach { (key, value) ->
-                parameters.append(key, AuthorizationRequestParameterCodec.encode(json, value))
-            }
+        requestParameters.forEach { (key, value) ->
+            parameters.append(key, AuthorizationRequestParameterCodec.encode(json, value))
         }
     }.build()
+
+    private fun buildWalletPresentationRequest(
+        request: String,
+        requestObject: String,
+    ): Url = walletPresentationRequestBuilder(request).apply {
+        parameters.append("request", requestObject)
+    }.build()
+
+    fun buildWalletPresentationRequest(
+        request: String,
+        resolvedRequest: ResolvedAuthorizationRequest,
+    ): Url = when (resolvedRequest) {
+        is ResolvedAuthorizationRequest.Plain -> buildWalletPresentationRequest(
+            request = request,
+            resolvedRequest = resolvedRequest.authorizationRequest,
+        )
+
+        is ResolvedAuthorizationRequest.WithRequestObject -> buildWalletPresentationRequest(
+            request = request,
+            requestObject = resolvedRequest.requestObject,
+        )
+    }
 
     suspend fun matchCredentialsForPresentationRequest(
         walletId: Uuid,
