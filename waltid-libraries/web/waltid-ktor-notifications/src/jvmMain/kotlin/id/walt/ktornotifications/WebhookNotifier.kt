@@ -47,7 +47,7 @@ object WebhookNotifier {
 
     suspend fun notify(update: KtorSessionUpdate, config: VerificationSessionWebhookNotification) {
         runCatching {
-            webhookClient.post(config.url) {
+            val response = webhookClient.post(config.url) {
                 contentType(ContentType.Application.Json)
                 setBody(update)
 
@@ -59,6 +59,11 @@ object WebhookNotifier {
                     bearerAuth(config.bearerToken!!)
                 }
             }
+            if (!response.status.isSuccess()) {
+                throw IllegalArgumentException(
+                    "Configured webhook rejected session update with HTTP ${response.status.value}: ${config.url}",
+                )
+            }
         }.getOrElse { ex ->
             if (ex is ConnectTimeoutException) {
                 throw IllegalArgumentException(
@@ -69,6 +74,7 @@ object WebhookNotifier {
                 throw IllegalArgumentException("Could not notify configured webhook for session update: ${ex.message}", ex)
             }
         }
+    }
     }
 
 }
