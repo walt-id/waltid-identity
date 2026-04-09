@@ -43,9 +43,10 @@ object VerificationSessionCreator {
         val prefix = "decentralized_identifier:"
         val keyId = key.getKeyId()
 
-        return clientId.takeIf { it?.startsWith(prefix) == true }
+        return clientId
+            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
             ?.let { "${it.substringAfter(prefix)}#$keyId" }
-            ?: keyId
+             ?: keyId
     }
 
     suspend fun createVerificationSession(
