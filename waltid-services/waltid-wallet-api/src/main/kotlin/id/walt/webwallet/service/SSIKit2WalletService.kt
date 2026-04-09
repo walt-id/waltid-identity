@@ -32,6 +32,7 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.FeatureCatalog
@@ -990,7 +991,8 @@ class SSIKit2WalletService(
             return Result.failure(IllegalArgumentException("OpenID4VP response_mode=form_post is not supported by wallet-api"))
         }
 
-        val matchedCredentialIds = linkedSetOf<String>()
+        val walletCredentials = credentialService.list(walletId, CredentialFilterObject.default)
+        var selectedMatches: Map<String, List<DcqlMatcher.DcqlMatchResult>>? = null
 
         return WalletPresentFunctionality2.walletPresentHandling(
             holderKey = getKeyByDid(parameter.did),
@@ -999,12 +1001,10 @@ class SSIKit2WalletService(
             selectCredentialsForQuery = { query ->
                 openId4VpPresentationService.matchCredentialResults(
                     query = query,
-                    credentials = credentialService.list(walletId, CredentialFilterObject.default),
+                    credentials = walletCredentials,
                     selectedCredentialIds = parameter.selectedCredentials.toSet(),
                 ).also { matchedResults ->
-                    matchedCredentialIds += matchedResults.values
-                        .flatten()
-                        .mapNotNull { (it.credential as? RawDcqlCredential)?.id }
+                    selectedMatches = matchedResults
                 }.ifEmpty {
                     throw IllegalArgumentException("No matching credentials found for the presentation request")
                 }
@@ -1012,38 +1012,66 @@ class SSIKit2WalletService(
             holderPoliciesToRun = null,
             runPolicies = null,
         ).mapCatching { result ->
-            val redirect = when {
-                result.getUrl != null -> result.getUrl
-                result.redirectTo != null -> result.redirectTo
-                result.transmissionSuccess == true -> null
-                result.transmissionSuccess == false -> {
-                    throw IllegalStateException("OpenID4VP presentation transmission failed")
-                }
-                result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
-                else -> null
-            }
-
-            matchedCredentialIds.forEach { selectedCredentialId ->
-                credentialService.get(walletId, selectedCredentialId)?.run {
-                    eventUseCase.log(
-                        action = EventType.Credential.Present,
-                        originator = resolvedRequest.clientMetadata?.clientName ?: EventDataNotAvailable,
-                        tenant = tenant,
-                        accountId = accountId,
-                        walletId = walletId,
-                        data = eventUseCase.credentialEventData(
-                            credential = this,
-                            subject = eventUseCase.subjectData(this),
-                            organization = eventUseCase.verifierData(resolvedRequest),
-                            type = null,
-                        ),
-                        credentialId = this.id,
-                        note = parameter.note,
-                    )
-                }
-            }
-
+            val redirect = extractRedirect(result)
+            logPresentedCredentials(
+                resolvedRequest = resolvedRequest,
+                note = parameter.note,
+                walletCredentials = walletCredentials,
+                selectedMatches = selectedMatches,
+            )
             redirect
         }
+    }
+
+    private fun extractRedirect(result: WalletPresentFunctionality2.WalletPresentResult): String? =
+        when {
+            result.getUrl != null -> result.getUrl
+            result.redirectTo != null -> result.redirectTo
+            result.transmissionSuccess == true -> null
+            result.transmissionSuccess == false -> {
+                throw IllegalStateException("OpenID4VP presentation transmission failed")
+            }
+
+            result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
+            else -> null
+        }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun logPresentedCredentials(
+        resolvedRequest: OpenId4VpAuthorizationRequest,
+        note: String?,
+        walletCredentials: List<WalletCredential>,
+        selectedMatches: Map<String, List<DcqlMatcher.DcqlMatchResult>>?,
+    ) {
+        val presentedCredentialIds = selectedMatches
+            ?.values
+            ?.asSequence()
+            ?.flatten()
+            ?.mapNotNull { (it.credential as? RawDcqlCredential)?.id }
+            ?.toSet()
+            .orEmpty()
+
+        if (presentedCredentialIds.isEmpty()) return
+
+        walletCredentials
+            .asSequence()
+            .filter { it.id in presentedCredentialIds }
+            .forEach { credential ->
+                eventUseCase.log(
+                    action = EventType.Credential.Present,
+                    originator = resolvedRequest.clientMetadata?.clientName ?: EventDataNotAvailable,
+                    tenant = tenant,
+                    accountId = accountId,
+                    walletId = walletId,
+                    data = eventUseCase.credentialEventData(
+                        credential = credential,
+                        subject = eventUseCase.subjectData(credential),
+                        organization = eventUseCase.verifierData(resolvedRequest),
+                        type = null,
+                    ),
+                    credentialId = credential.id,
+                    note = note,
+                )
+            }
     }
 }
