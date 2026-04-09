@@ -128,11 +128,11 @@ class OpenId4VpPresentationService(
             return emptyMap()
         }
 
-        val matched = DcqlMatcher.match(query, dcqlCredentials).getOrElse { error ->
-            logger.info(error) { "OpenID4VP credential matching returned no matches" }
-            return emptyMap()
-        }
-        return matched
+        return DcqlMatcher.match(query, dcqlCredentials)
+            .onFailure { error ->
+                logger.warn(error) { "OpenID4VP credential matching failed" }
+            }
+            .getOrThrow()
     }
 
     private suspend fun WalletCredential.toDcqlCredentialOrNull(): RawDcqlCredential? =
@@ -166,12 +166,12 @@ class OpenId4VpPresentationService(
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters
             parameters.contains("dcql_query") ||
-                parameters.contains("transaction_data") ||
+                parameters.contains("request_uri") ||
                 parameters["request"]
                     ?.takeIf { it.isJwt() }
                     ?.decodeJws()
                     ?.payload
-                    ?.let { payload -> "dcql_query" in payload || "transaction_data" in payload }
+                    ?.let { payload -> "dcql_query" in payload }
                     ?: false
         }.getOrDefault(false)
     }
