@@ -13,6 +13,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.waltid.openid4vp.wallet.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
@@ -48,9 +49,9 @@ class OpenId4VpPresentationService(
             .jsonObject
             .filterValues { it != JsonNull }
 
-        return URLBuilder(baseUrlBuilder(Url(request)).build()).apply {
+        return URLBuilder(Url(request).toString().substringBefore("?")).apply {
             requestParameters.forEach { (key, value) ->
-                parameters.append(key, json.encodeToString(JsonElement.serializer(), value))
+                parameters.append(key, AuthorizationRequestParameterCodec.encode(json, value))
             }
         }.build()
     }
@@ -79,7 +80,7 @@ class OpenId4VpPresentationService(
         val matchedCredentialIds = matched.values
             .flatten()
             .mapNotNull { (it.credential as? RawDcqlCredential)?.id }
-            .distinct()
+            .toSet()
 
         return credentials.filter { credential -> credential.id in matchedCredentialIds }
     }
@@ -103,8 +104,6 @@ class OpenId4VpPresentationService(
         }
         return matched
     }
-
-    private fun baseUrlBuilder(requestUrl: Url) = URLBuilder(requestUrl.toString().substringBefore("?"))
 
     private suspend fun WalletCredential.toDcqlCredentialOrNull(): RawDcqlCredential? =
         runCatching {
