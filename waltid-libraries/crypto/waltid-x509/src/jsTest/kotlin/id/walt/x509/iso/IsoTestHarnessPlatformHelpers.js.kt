@@ -1,9 +1,11 @@
 package id.walt.x509.iso
 
-actual fun isBigIntegerZero(bigInt: okio.ByteString): Boolean {
+import kotlinx.io.bytestring.ByteString
+
+actual fun isBigIntegerZero(bigInt: ByteString): Boolean {
     TODO("Not yet implemented")
 }
 
-actual fun isBigIntegerPositive(bigInt: okio.ByteString): Boolean {
+actual fun isBigIntegerPositive(bigInt: ByteString): Boolean {
     TODO("Not yet implemented")
 }

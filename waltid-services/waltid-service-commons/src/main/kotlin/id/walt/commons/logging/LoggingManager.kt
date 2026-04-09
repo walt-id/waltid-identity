@@ -23,6 +23,7 @@ object LoggingManager {
             DefaultLoggingSetup, // <- default
             DebugLoggingSetup,
             TraceLoggingSetup,
+            SuperTraceLoggingSetup,
             ErrorLoggingSetup,
             ConfigFileLoggingSetup,
             // ..., extend here <---

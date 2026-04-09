@@ -80,7 +80,7 @@ class E2ETest(
     }
 
     fun testBlock(
-        config: ServiceConfiguration = ServiceConfiguration("e2e-test"),
+        config: ServiceConfiguration = ServiceConfiguration("e2e-test", version = "test"),
         features: List<ServiceFeatureCatalog>,
         featureAmendments: Map<AbstractFeature, suspend () -> Unit> = emptyMap(),
         init: suspend () -> Unit,
