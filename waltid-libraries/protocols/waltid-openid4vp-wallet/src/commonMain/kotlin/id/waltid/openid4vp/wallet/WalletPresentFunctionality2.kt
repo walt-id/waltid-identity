@@ -20,30 +20,22 @@ import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import io.ktor.util.*
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.util.escapeHTML
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 
 
@@ -175,7 +167,7 @@ object WalletPresentFunctionality2 {
 
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = runCatching {
-            AuthorizationRequestResolver.resolve(presentationRequestUrl.toString(), http).authorizationRequest
+            AuthorizationRequestResolver.resolve(presentationRequestUrl, http).authorizationRequest
         }.recoverCatching { error ->
             if (
                 error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
