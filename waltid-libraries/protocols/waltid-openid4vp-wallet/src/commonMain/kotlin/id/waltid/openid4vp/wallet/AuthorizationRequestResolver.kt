@@ -51,9 +51,7 @@ object AuthorizationRequestResolver {
         when {
             requestUrl.parameters.contains("request_uri") -> resolveFromRequestUri(requestUrl, http)
 
-            requestUrl.parameters.contains("request") -> resolveFromRequestObject(
-                requestUrl.parameters["request"] ?: error("Missing request object"),
-            )
+            requestUrl.parameters.contains("request") -> resolveFromRequestObject(requestUrl)
 
             else -> parseParameters(requestUrl.parameters)
         }
@@ -97,6 +95,11 @@ object AuthorizationRequestResolver {
             contentType.match(ContentType.Application.Json) -> json.decodeFromString<AuthorizationRequest>(body)
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
+    }
+
+    private suspend fun resolveFromRequestObject(requestUrl: Url): AuthorizationRequest {
+        val requestObject = requireNotNull(requestUrl.parameters["request"]) { "Missing request object" }
+        return resolveFromRequestObject(requestObject)
     }
 
     private suspend fun resolveFromRequestObject(requestObject: String): AuthorizationRequest {
