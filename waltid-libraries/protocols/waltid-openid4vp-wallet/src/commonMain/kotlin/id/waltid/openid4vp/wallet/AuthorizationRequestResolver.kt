@@ -83,16 +83,19 @@ object AuthorizationRequestResolver {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
         val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
-        val requestUriMethod = requestUrl.parameters["request_uri_method"]?.lowercase()
+        val requestUriMethod = requestUrl.parameters["request_uri_method"]
 
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod ?: "get"}" }
         val response = when (requestUriMethod) {
+            null, "get" -> http.get(requestUri)
             "post" -> http.post(requestUri) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.parse("application/oauth-authz-req+jwt"))
                 setBody("")
             }
-            else -> http.get(requestUri)
+            else -> throw IllegalArgumentException(
+                "invalid_request_uri_method: $requestUriMethod is neither 'get' nor 'post'",
+            )
         }
 
         val body = response.bodyAsText()
