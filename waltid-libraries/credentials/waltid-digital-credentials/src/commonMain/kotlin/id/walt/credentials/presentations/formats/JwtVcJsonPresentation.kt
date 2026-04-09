@@ -56,7 +56,7 @@ data class JwtVcJsonPresentation(
 
         // Verify aud == expectedAudience.
         presentationRequire(
-            audience == expectedAudience,
+            audience == expectedAudience || (audience.isNullOrBlank() && expectedAudience.isNullOrBlank()),
             W3CPresentationValidationError.AUDIENCE_MISMATCH
         ) { "Expected $expectedAudience, got $audience" }
 

@@ -8,4 +8,7 @@ sealed class AbstractFeature(
     open val description: String,
     open val configs: Map<String, KClass<out WaltConfig>>,
     open val dependsOn: List<AbstractFeature>,
-)
+) {
+
+    fun shouldDefaultEnable() = (this is BaseFeature || (this is OptionalFeature && this.default.value))
+}

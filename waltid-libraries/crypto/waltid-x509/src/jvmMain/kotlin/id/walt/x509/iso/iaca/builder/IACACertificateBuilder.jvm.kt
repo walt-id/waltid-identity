@@ -10,7 +10,7 @@ import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
@@ -109,7 +109,7 @@ internal actual suspend fun platformSignIACACertificate(
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
     val certificateDer = CertificateDer(
-        bytes = certificate.encoded.toByteString(),
+        bytes = ByteString(certificate.encoded),
     )
 
     return IACACertificateBundle(
@@ -121,7 +121,7 @@ internal actual suspend fun platformSignIACACertificate(
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
             ),
             issuerAlternativeName = profileData.issuerAlternativeName,
-            serialNumber = serialNo.toByteArray().toByteString(),
+            serialNumber = ByteString(serialNo.toByteArray()),
             basicConstraints = certificate.x509BasicConstraints,
             keyUsage = setOf(
                 X509KeyUsage.KeyCertSign,

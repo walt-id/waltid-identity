@@ -39,11 +39,12 @@ object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
 
-    private suspend fun getKid(clientId: String, key: Key): String {
+    private suspend fun getKid(clientId: String?, key: Key): String {
         val prefix = "decentralized_identifier:"
         val keyId = key.getKeyId()
 
-        return clientId.takeIf { it.startsWith(prefix) }
+        return clientId
+            ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
             ?.let { "${it.substringAfter(prefix)}#$keyId" }
             ?: keyId
     }
@@ -51,7 +52,7 @@ object VerificationSessionCreator {
     suspend fun createVerificationSession(
         setup: VerificationSessionSetup,
 
-        clientId: String,
+        clientId: String?,
         clientMetadata: ClientMetadata? = null,
 
         /** Is used to build request URL and response URL */
@@ -83,6 +84,9 @@ object VerificationSessionCreator {
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
+            if (isSignedRequest && !isAnnexC) {
+                require(!clientId.isNullOrBlank()) { "Signed DC API requests require non-empty client_id" }
+            }
         }
 
         val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {

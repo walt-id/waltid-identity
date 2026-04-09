@@ -100,6 +100,10 @@ application {
     mainClass.set("id.walt.issuer.MainKt")
 }
 
+buildConfig {
+    packageName("id.walt.issuer")
+}
+
 ktor {
     docker {
         portMappings.set(

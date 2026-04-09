@@ -117,7 +117,7 @@ class WaltidServicesE2ETests {
     @OptIn(ExperimentalUuidApi::class)
     @Test
     fun e2e() = e2e.testBlock(
-        config = ServiceConfiguration("e2e-test"),
+        config = ServiceConfiguration("e2e-test", version = "test"),
         features = listOf(
             id.walt.issuer.FeatureCatalog,
             id.walt.verifier.FeatureCatalog,

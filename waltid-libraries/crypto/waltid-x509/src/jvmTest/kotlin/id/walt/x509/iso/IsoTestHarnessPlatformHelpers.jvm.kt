@@ -1,6 +1,6 @@
 package id.walt.x509.iso
 
-import okio.ByteString
+import kotlinx.io.bytestring.ByteString
 import java.math.BigInteger
 
 actual fun isBigIntegerZero(bigInt: ByteString): Boolean {

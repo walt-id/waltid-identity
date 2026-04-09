@@ -27,7 +27,7 @@ data class AuthFlow(
     val continueWith: Set<AuthFlow>? = null,
     val success: Boolean = false,
     @Deprecated("replaced with success")
-    val ok: Boolean? = false,
+    val ok: Boolean? = null,
     /** set how long this auth flow result will be valid for */
     val expiration: String? = null
 ) {
