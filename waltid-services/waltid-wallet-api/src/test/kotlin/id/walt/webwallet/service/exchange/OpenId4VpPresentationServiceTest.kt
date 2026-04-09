@@ -17,6 +17,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import java.io.InputStreamReader
 import java.net.InetSocketAddress
 import java.util.Base64
 import kotlin.test.Test
@@ -134,7 +135,7 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `normalized request URL expands request objects from request parameter`() {
+    fun `normalized request URL preserves signed request objects from request parameter`() {
         HttpClient().use { http ->
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
             val requestObject = unsecuredJwt(
@@ -150,15 +151,14 @@ class OpenId4VpPresentationServiceTest {
             val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
             val resolvedUrl = Url(resolvedRequest)
 
-            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
-            assertTrue(resolvedUrl.parameters["dcql_query"]?.contains("UniversityDegreeCredential") == true)
+            assertEquals(requestObject, resolvedUrl.parameters["request"])
+            assertTrue(!resolvedUrl.parameters.contains("dcql_query"))
         }
     }
 
     @Test
     fun `normalized request URL fetches authorization requests from request_uri using GET`() {
-        withAuthorizationRequestServer { serverUrl, receivedMethod ->
+        withAuthorizationRequestServer { serverUrl, receivedRequest ->
             HttpClient().use { http ->
                 val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
 
@@ -167,7 +167,7 @@ class OpenId4VpPresentationServiceTest {
                 }
                 val resolvedUrl = Url(resolvedRequest)
 
-                assertEquals("GET", receivedMethod())
+                assertEquals("GET", receivedRequest().method)
                 assertEquals("verifier2", resolvedUrl.parameters["client_id"])
                 assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
             }
@@ -175,8 +175,8 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
-    fun `normalized request URL fetches authorization requests from request_uri using POST`() {
-        withAuthorizationRequestServer { serverUrl, receivedMethod ->
+    fun `normalized request URL fetches authorization requests from request_uri using spec compliant POST`() {
+        withAuthorizationRequestServer { serverUrl, receivedRequest ->
             HttpClient().use { http ->
                 val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
 
@@ -188,9 +188,44 @@ class OpenId4VpPresentationServiceTest {
                 }
                 val resolvedUrl = Url(resolvedRequest)
 
-                assertEquals("POST", receivedMethod())
+                val request = receivedRequest()
+                assertEquals("POST", request.method)
+                assertEquals("application/x-www-form-urlencoded", request.contentType)
+                assertEquals("application/oauth-authz-req+jwt", request.accept)
+                assertEquals("", request.body)
                 assertEquals("verifier2", resolvedUrl.parameters["client_id"])
                 assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+            }
+        }
+    }
+
+    @Test
+    fun `normalized request URL preserves signed request objects fetched from request_uri`() {
+        val requestObject = unsecuredJwt(
+            AuthorizationRequest(
+                clientId = "verifier2",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseUri = "https://verifier.example/response",
+                nonce = "nonce-123",
+                dcqlQuery = query,
+            ),
+        )
+
+        withAuthorizationRequestServer(
+            responseBody = requestObject,
+            responseContentType = "application/oauth-authz-req+jwt",
+        ) { serverUrl, _ ->
+            HttpClient().use { http ->
+                val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+
+                val resolvedRequest = runBlocking {
+                    resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
+                }
+                val resolvedUrl = Url(resolvedRequest)
+
+                assertEquals(requestObject, resolvedUrl.parameters["request"])
+                assertTrue(!resolvedUrl.parameters.contains("request_uri"))
+                assertTrue(!resolvedUrl.parameters.contains("dcql_query"))
             }
         }
     }
@@ -321,13 +356,25 @@ class OpenId4VpPresentationServiceTest {
         service: OpenId4VpPresentationService,
         request: String,
     ): String {
-        val resolvedRequest = service.tryResolveAuthorizationRequest(request).getOrThrow()
-        val requestBaseUrl = URLBuilder(Url(request).toString().substringBefore("?"))
-        return resolvedRequest.toHttpUrl(requestBaseUrl).toString()
+        val resolvedRequest = service.tryResolveAuthorizationRequestWithSource(request).getOrThrow()
+        return service.buildWalletPresentationRequest(
+            request = request,
+            resolvedRequest = resolvedRequest.authorizationRequest,
+            requestObject = resolvedRequest.requestObject,
+        ).toString()
     }
 
+    private data class RecordedRequest(
+        val method: String?,
+        val contentType: String?,
+        val accept: String?,
+        val body: String,
+    )
+
     private fun withAuthorizationRequestServer(
-        block: (serverUrl: String, receivedMethod: () -> String?) -> Unit,
+        responseBody: String? = null,
+        responseContentType: String = "application/json",
+        block: (serverUrl: String, receivedRequest: () -> RecordedRequest) -> Unit,
     ) {
         val authorizationRequest = AuthorizationRequest(
             clientId = "verifier2",
@@ -337,18 +384,24 @@ class OpenId4VpPresentationServiceTest {
             dcqlQuery = query,
         )
         var method: String? = null
+        var contentType: String? = null
+        var accept: String? = null
+        var body = ""
         val server = HttpServer.create(InetSocketAddress(0), 0)
         server.createContext("/request-object") { exchange: HttpExchange ->
             method = exchange.requestMethod
-            val body = json.encodeToString(AuthorizationRequest.serializer(), authorizationRequest)
-            exchange.responseHeaders.add("Content-Type", "application/json")
-            exchange.sendResponseHeaders(200, body.toByteArray().size.toLong())
-            exchange.responseBody.use { it.write(body.toByteArray()) }
+            contentType = exchange.requestHeaders.getFirst("Content-Type")
+            accept = exchange.requestHeaders.getFirst("Accept")
+            body = InputStreamReader(exchange.requestBody).readText()
+            val response = responseBody ?: json.encodeToString(AuthorizationRequest.serializer(), authorizationRequest)
+            exchange.responseHeaders.add("Content-Type", responseContentType)
+            exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
+            exchange.responseBody.use { it.write(response.toByteArray()) }
             exchange.close()
         }
         server.start()
         try {
-            block("http://127.0.0.1:${server.address.port}") { method }
+            block("http://127.0.0.1:${server.address.port}") { RecordedRequest(method, contentType, accept, body) }
         } finally {
             server.stop(0)
         }
