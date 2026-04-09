@@ -12,6 +12,8 @@ import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.commons.web.WebException
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonObject
@@ -998,11 +1000,16 @@ class SSIKit2WalletService(
         }
 
         val walletCredentials = credentialService.list(walletId, CredentialFilterObject.default)
+        val presentationBinding = resolveOpenId4VpPresentationBinding(
+            selectedCredentials = walletCredentials,
+            selectedCredentialIds = parameter.selectedCredentials.toSet(),
+            fallbackDid = parameter.did,
+        )
         var selectedMatches: Map<String, List<DcqlMatcher.DcqlMatchResult>>? = null
 
         return WalletPresentFunctionality2.walletPresentHandling(
-            holderKey = getKeyByDid(parameter.did),
-            holderDid = parameter.did,
+            holderKey = presentationBinding.key,
+            holderDid = presentationBinding.did,
             presentationRequestUrl = openId4VpPresentationService.buildWalletPresentationRequest(
                 request = parameter.request,
                 resolvedRequest = resolvedRequest,
@@ -1037,6 +1044,91 @@ class SSIKit2WalletService(
             result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
             else -> null
         }
+
+    private suspend fun resolveOpenId4VpPresentationBinding(
+        selectedCredentials: List<WalletCredential>,
+        selectedCredentialIds: Set<String>,
+        fallbackDid: String,
+    ): PresentationBinding {
+        val fallbackBinding = PresentationBinding(
+            key = getKeyByDid(fallbackDid),
+            did = fallbackDid,
+        )
+
+        val selectedHolderBindings = buildList {
+            for (credential in selectedCredentials) {
+                if (credential.id !in selectedCredentialIds) continue
+                credential.resolveSdJwtHolderBindingOrNull()?.let(::add)
+            }
+        }.distinctBy { binding -> jwkComparable(binding.publicJwk) }
+
+        if (selectedHolderBindings.isEmpty()) {
+            return fallbackBinding
+        }
+
+        require(selectedHolderBindings.size == 1) {
+            "Selected credentials require different holder bindings and cannot be presented together."
+        }
+
+        return resolveWalletBindingForPublicJwk(selectedHolderBindings.single().publicJwk)
+            ?: throw IllegalArgumentException("No wallet key matches the selected credential holder binding.")
+    }
+
+    private suspend fun resolveWalletBindingForPublicJwk(publicJwk: JsonObject): PresentationBinding? {
+        val comparableJwk = jwkComparable(publicJwk)
+
+        for (walletDid in DidsService.list(walletId)) {
+            val key = runCatching { getKey(walletDid.keyId) }.getOrNull() ?: continue
+            val publicKeyJwk = runCatching { key.getPublicKey().exportJWKObject() }.getOrNull() ?: continue
+            if (jwkComparable(publicKeyJwk) == comparableJwk) {
+                return PresentationBinding(
+                    key = key,
+                    did = walletDid.did,
+                )
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun WalletCredential.resolveSdJwtHolderBindingOrNull(): CredentialHolderBinding? {
+        val credential = runCatching { CredentialParser.parseOnly(buildRawCredential()) }.getOrNull() as? SdJwtCredential
+            ?: return null
+        val holderKey = credential.getHolderKey() ?: return null
+        return CredentialHolderBinding(holderKey.getPublicKey().exportJWKObject())
+    }
+
+    private fun WalletCredential.buildRawCredential(): String =
+        document + disclosures
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "~$it" }
+            .orEmpty()
+
+    private fun jwkComparable(j: JsonObject): Map<String, String> {
+        val kty = j["kty"]?.jsonPrimitive?.content ?: return emptyMap()
+        return when (kty) {
+            "OKP" -> mapOf(
+                "kty" to kty,
+                "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                "x" to (j["x"]?.jsonPrimitive?.content ?: "")
+            )
+
+            "EC" -> mapOf(
+                "kty" to kty,
+                "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
+                "y" to (j["y"]?.jsonPrimitive?.content ?: "")
+            )
+
+            "RSA" -> mapOf(
+                "kty" to kty,
+                "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
+                "e" to (j["e"]?.jsonPrimitive?.content ?: "")
+            )
+
+            else -> j.mapValues { it.value.jsonPrimitive.contentOrNull ?: it.value.toString() }
+        }
+    }
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun logPresentedCredentials(
@@ -1075,4 +1167,13 @@ class SSIKit2WalletService(
                 )
             }
     }
+
+    private data class CredentialHolderBinding(
+        val publicJwk: JsonObject,
+    )
+
+    private data class PresentationBinding(
+        val key: Key,
+        val did: String?,
+    )
 }
