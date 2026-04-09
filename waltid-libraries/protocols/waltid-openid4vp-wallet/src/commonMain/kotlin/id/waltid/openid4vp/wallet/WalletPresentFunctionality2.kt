@@ -456,7 +456,8 @@ object WalletPresentFunctionality2 {
         nonce: String,
         audience: String?,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
-        holderKey: Key
+        holderKey: Key,
+        transactionData: List<String>? = null,
     ): String {
         selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
@@ -482,6 +483,16 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
+        val decodedTransactionData = TransactionDataUtils.validateRequestTransactionData(
+            transactionData = transactionData,
+        )
+        val transactionDataHashAlgorithm = TransactionDataUtils.resolveHashAlgorithm(decodedTransactionData)
+        val transactionDataHashes = transactionDataHashAlgorithm?.let {
+            TransactionDataUtils.calculateTransactionDataHashes(
+                transactionData = transactionData.orEmpty(),
+                algorithm = it,
+            )
+        }
 
         val jwsHeaders = buildJsonObject {
             //put("alg", JsonPrimitive(holderKey.algorithm)) // e.g., "ES256"
@@ -496,6 +507,23 @@ object WalletPresentFunctionality2 {
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
             // Add exp if needed
             put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
+            if (!transactionDataHashes.isNullOrEmpty()) {
+                put(
+                    "transaction_data_hashes",
+                    buildJsonArray {
+                        transactionDataHashes.forEach { add(JsonPrimitive(it)) }
+                    },
+                )
+                if (decodedTransactionData.any {
+                        !it.transactionData.transactionDataHashesAlg.isNullOrEmpty()
+                    }
+                ) {
+                    put(
+                        "transaction_data_hashes_alg",
+                        JsonPrimitive(transactionDataHashAlgorithm),
+                    )
+                }
+            }
         }
         return holderKey.signJws(plaintext = kbJwtPayload.toString().encodeToByteArray(), headers = jwsHeaders)
     }
