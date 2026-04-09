@@ -107,7 +107,7 @@ fun Application.exchange() = walletRoute {
             }.onFailure { error ->
                 call.respond(
                     status = HttpStatusCode.BadRequest,
-                    message = error.message ?: "Invalid presentation request"
+                    message = error.message ?: "Failed to process presentation request"
                 )
             }
         }
