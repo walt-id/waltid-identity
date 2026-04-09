@@ -55,10 +55,12 @@ export async function usePresentation(query: any) {
       : "Presentation request is missing presentation_definition.";
     throw new Error(failMessage.value);
   }
-  const requestForWalletApi = isOpenId4Vp ? (resolvedRequest as string) : originalRequest;
+  const requestForCredentialMatching = isOpenId4Vp
+    ? (resolvedRequest as string)
+    : originalRequest;
   const matchedCredentials = await fetchMatchedCredentials(
     currentWallet.value,
-    requestForWalletApi,
+    requestForCredentialMatching,
     presentationRequestPayload,
     isOpenId4Vp,
   );
@@ -129,7 +131,7 @@ export async function usePresentation(query: any) {
   async function acceptPresentation() {
     const req = {
       //did: String, // todo: choose DID of shared credential // for now wallet-api chooses the default wallet did
-      presentationRequest: isOpenId4Vp ? requestForWalletApi : resolvedRequest,
+      presentationRequest: resolvedRequest,
       selectedCredentials: selectedCredentialIds.value,
       disclosures: isOpenId4Vp ? null : encodedDisclosures.value,
     };
