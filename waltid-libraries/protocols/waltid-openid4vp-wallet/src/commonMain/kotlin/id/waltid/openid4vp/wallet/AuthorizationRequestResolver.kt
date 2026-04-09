@@ -49,24 +49,18 @@ object AuthorizationRequestResolver {
 
     suspend fun resolve(requestUrl: Url, http: HttpClient): AuthorizationRequest =
         when {
-            requestUrl.parameters.contains("request_uri") -> {
-                log.trace { "Resolving AuthorizationRequest via request_uri" }
-                resolveFromRequestUri(requestUrl, http)
-            }
+            requestUrl.parameters.contains("request_uri") -> resolveFromRequestUri(requestUrl, http)
 
             requestUrl.parameters.contains("request") -> resolveFromRequestObject(
                 requestUrl.parameters["request"] ?: error("Missing request object"),
-            ).also {
-                log.trace { "Resolving AuthorizationRequest via inline request object" }
-            }
+            )
 
-            else -> parseParameters(requestUrl.parameters).also {
-                log.trace { "Resolving AuthorizationRequest from direct request parameters" }
-            }
+            else -> parseParameters(requestUrl.parameters)
         }
 
-    fun parseParameters(parameters: Parameters): AuthorizationRequest =
-        json.decodeFromJsonElement(
+    fun parseParameters(parameters: Parameters): AuthorizationRequest {
+        log.trace { "Resolving AuthorizationRequest from direct request parameters" }
+        return json.decodeFromJsonElement(
             AuthorizationRequest.serializer(),
             buildJsonObject {
                 parameters.entries().forEach { (key, values) ->
@@ -74,8 +68,10 @@ object AuthorizationRequestResolver {
                 }
             },
         )
+    }
 
     private suspend fun resolveFromRequestUri(requestUrl: Url, http: HttpClient): AuthorizationRequest {
+        log.trace { "Resolving AuthorizationRequest via request_uri" }
         val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
         val requestUriMethod = requestUrl.parameters["request_uri_method"]?.lowercase()
 
@@ -104,6 +100,7 @@ object AuthorizationRequestResolver {
     }
 
     private suspend fun resolveFromRequestObject(requestObject: String): AuthorizationRequest {
+        log.trace { "Resolving AuthorizationRequest via inline request object" }
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
         val authReqJws = requestObject.decodeJws()
@@ -138,7 +135,6 @@ object AuthorizationRequestResolver {
         when (val validationResult = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)) {
             is ClientValidationResult.Success -> {
                 log.trace { "Signed AuthorizationRequest authentication succeeded for client_id prefix ${clientIdPrefix::class.simpleName}" }
-                Unit
             }
 
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
