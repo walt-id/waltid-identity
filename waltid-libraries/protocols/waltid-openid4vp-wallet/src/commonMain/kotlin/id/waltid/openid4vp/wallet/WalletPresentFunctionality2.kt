@@ -179,7 +179,7 @@ object WalletPresentFunctionality2 {
 
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = runCatching {
-            AuthorizationRequestResolver.resolve(presentationRequestUrl, http)
+            AuthorizationRequestResolver.resolve(presentationRequestUrl.toString(), http).authorizationRequest
         }.recoverCatching { error ->
             if (
                 error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
