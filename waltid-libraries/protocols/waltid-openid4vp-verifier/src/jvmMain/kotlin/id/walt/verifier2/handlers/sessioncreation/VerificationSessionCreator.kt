@@ -46,7 +46,7 @@ object VerificationSessionCreator {
         return clientId
             ?.takeIf { it.startsWith(prefix) && it.substringAfter(prefix).isNotBlank() }
             ?.let { "${it.substringAfter(prefix)}#$keyId" }
-             ?: keyId
+            ?: keyId
     }
 
     suspend fun createVerificationSession(
@@ -84,6 +84,9 @@ object VerificationSessionCreator {
         if (isDcApi) {
             require(urlPrefix == null) { "URL prefix is not used for DC API" }
             require(!urlHost.startsWith("openid4vp://authorize")) { "URL Host has to be set to the DC API origin" }
+            if (isSignedRequest && !isAnnexC) {
+                require(!clientId.isNullOrBlank()) { "Signed DC API requests require non-empty client_id" }
+            }
         }
 
         val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {
