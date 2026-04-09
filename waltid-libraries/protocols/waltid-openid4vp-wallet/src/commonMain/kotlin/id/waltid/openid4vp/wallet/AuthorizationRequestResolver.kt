@@ -5,6 +5,7 @@ package id.waltid.openid4vp.wallet
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
@@ -34,6 +35,12 @@ object AuthorizationRequestResolver {
         encodeDefaults = false
         isLenient = true
     }
+
+    class SignedAuthorizationRequestValidationException(
+        val clientIdError: ClientIdError,
+    ) : IllegalArgumentException(
+        "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}",
+    )
 
     suspend fun resolve(request: String, http: HttpClient): AuthorizationRequest = resolve(Url(request), http)
 
@@ -114,9 +121,7 @@ object AuthorizationRequestResolver {
 
         when (val validationResult = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)) {
             is ClientValidationResult.Success -> Unit
-            is ClientValidationResult.Failure -> throw IllegalArgumentException(
-                "Could not verify signed AuthorizationRequest with client id prefix: ${validationResult.error::class.simpleName} - ${validationResult.error.message}",
-            )
+            is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
     }
 

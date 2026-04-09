@@ -12,6 +12,7 @@ import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
@@ -180,7 +181,11 @@ object WalletPresentFunctionality2 {
         val authorizationRequest: AuthorizationRequest = runCatching {
             AuthorizationRequestResolver.resolve(presentationRequestUrl, http)
         }.recoverCatching { error ->
-            if (error is IllegalArgumentException && error.message?.contains("Could not verify signed AuthorizationRequest with client id prefix") == true && legacyFallbackCallback != null) {
+            if (
+                error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
+                error.clientIdError is ClientIdError.PreRegisteredClientNotFound &&
+                legacyFallbackCallback != null
+            ) {
                 val fallbackResult = legacyFallbackCallback(presentationRequestUrl).getOrThrow()
                 return Result.success(
                     WalletPresentResult(
