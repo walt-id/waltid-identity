@@ -200,6 +200,52 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `normalized request URL rejects unsupported request_uri_method values`() {
+        withAuthorizationRequestServer { serverUrl, _ ->
+            HttpClient().use { http ->
+                val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+
+                val error = assertFailsWith<IllegalArgumentException> {
+                    runBlocking {
+                        resolveNormalizedRequestUrl(
+                            service,
+                            "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=patch",
+                        )
+                    }
+                }
+
+                assertEquals(
+                    "invalid_request_uri_method: patch is neither 'get' nor 'post'",
+                    error.message,
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `normalized request URL rejects request_uri_method values with incorrect casing`() {
+        withAuthorizationRequestServer { serverUrl, _ ->
+            HttpClient().use { http ->
+                val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+
+                val error = assertFailsWith<IllegalArgumentException> {
+                    runBlocking {
+                        resolveNormalizedRequestUrl(
+                            service,
+                            "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=POST",
+                        )
+                    }
+                }
+
+                assertEquals(
+                    "invalid_request_uri_method: POST is neither 'get' nor 'post'",
+                    error.message,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `normalized request URL preserves signed request objects fetched from request_uri`() {
         val requestObject = unsecuredJwt(
             AuthorizationRequest(
