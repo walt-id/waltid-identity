@@ -1117,9 +1117,7 @@ class SSIKit2WalletService(
         openId4VpPresentationService.tryResolveAuthorizationRequestWithSource(request)
             .fold(
                 onSuccess = { resolvedAuthorizationRequest ->
-                    resolvedAuthorizationRequest.takeIf {
-                        it.authorizationRequest.dcqlQuery != null || it.authorizationRequest.transactionData != null
-                    }
+                    resolvedAuthorizationRequest.takeIf { it.authorizationRequest.dcqlQuery != null }
                 },
                 onFailure = { error ->
                     if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) {
