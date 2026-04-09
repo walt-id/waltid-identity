@@ -11,9 +11,8 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.db.models.WalletCredential
-import id.waltid.openid4vp.wallet.ResolvedAuthorizationRequest
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.ktor.client.HttpClient
-import io.ktor.http.URLBuilder
 import io.ktor.http.Url
 import io.mockk.mockk
 import io.mockk.mockkObject
@@ -434,7 +433,7 @@ class OpenId4VpPresentationServiceTest {
         service: OpenId4VpPresentationService,
         request: String,
     ): String {
-        val resolvedRequest = service.tryResolveAuthorizationRequestWithSource(request).getOrThrow()
+        val resolvedRequest = service.tryResolveAuthorizationRequest(request).getOrThrow()
         return service.buildWalletPresentationRequest(
             request = request,
             resolvedRequest = resolvedRequest,
