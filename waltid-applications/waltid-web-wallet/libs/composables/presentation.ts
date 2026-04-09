@@ -36,8 +36,7 @@ export async function usePresentation(query: any) {
   }
 
   const resolvedRequest = await resolvePresentationRequest(originalRequest);
-  const presentationUrl = new URL(resolvedRequest as string);
-  const presentationParams = presentationUrl.searchParams;
+  const presentationParams = extractPresentationParams(resolvedRequest as string);
   const isOpenId4Vp = presentationParams.has("dcql_query");
 
   const verifierHost = new URL(
@@ -197,6 +196,35 @@ export async function usePresentation(query: any) {
     failed,
     failMessage,
   };
+}
+
+function extractPresentationParams(request: string): URLSearchParams {
+  const requestUrl = new URL(request);
+  const requestObject = requestUrl.searchParams.get("request");
+  if (!requestObject) {
+    return requestUrl.searchParams;
+  }
+
+  const payloadSegment = requestObject.split(".")[1];
+  if (!payloadSegment) {
+    throw new Error("Malformed request object in presentation request.");
+  }
+
+  const payload = JSON.parse(
+    atob(base64UrlToBase64(payloadSegment)),
+  ) as Record<string, unknown>;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(payload)) {
+    if (value == null) continue;
+    params.set(key, typeof value === "string" ? value : JSON.stringify(value));
+  }
+  return params;
+}
+
+function base64UrlToBase64(value: string): string {
+  const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padding = (4 - (base64.length % 4)) % 4;
+  return base64 + "=".repeat(padding);
 }
 
 async function fetchMatchedCredentials(

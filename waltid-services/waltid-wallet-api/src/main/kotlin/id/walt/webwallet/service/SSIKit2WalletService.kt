@@ -64,6 +64,7 @@ import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
+import id.waltid.openid4vp.wallet.ResolvedAuthorizationRequest
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.klogging.Klogging
 import io.ktor.client.*
@@ -370,8 +371,11 @@ class SSIKit2WalletService(
     override suspend fun resolvePresentationRequest(request: String): String {
         val resolvedV1 = resolveOpenId4VpAuthorizationRequest(request)
         if (resolvedV1 != null) {
-            val requestUrl = Url(request)
-            return resolvedV1.toHttpUrl(URLBuilder(requestUrl.toString().substringBefore("?"))).toString()
+            return openId4VpPresentationService.buildWalletPresentationRequest(
+                request = request,
+                resolvedRequest = resolvedV1.authorizationRequest,
+                requestObject = resolvedV1.requestObject,
+            ).toString()
         }
 
         val credentialWallet = getCredentialWallet(accountId, walletId, "did:test:test")
@@ -969,10 +973,12 @@ class SSIKit2WalletService(
     }
 
     private suspend fun resolveOpenId4VpAuthorizationRequest(request: String) =
-        openId4VpPresentationService.tryResolveAuthorizationRequest(request)
+        openId4VpPresentationService.tryResolveAuthorizationRequestWithSource(request)
             .fold(
-                onSuccess = { authorizationRequest ->
-                    authorizationRequest.takeIf { it.dcqlQuery != null || it.transactionData != null }
+                onSuccess = { resolvedAuthorizationRequest ->
+                    resolvedAuthorizationRequest.takeIf {
+                        it.authorizationRequest.dcqlQuery != null || it.authorizationRequest.transactionData != null
+                    }
                 },
                 onFailure = { error ->
                     if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) {
@@ -985,9 +991,9 @@ class SSIKit2WalletService(
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun useOpenId4VpPresentationRequest(
         parameter: PresentationRequestParameter,
-        resolvedRequest: OpenId4VpAuthorizationRequest,
+        resolvedRequest: ResolvedAuthorizationRequest,
     ): Result<String?> {
-        if (resolvedRequest.responseMode == OpenID4VPResponseMode.FORM_POST) {
+        if (resolvedRequest.authorizationRequest.responseMode == OpenID4VPResponseMode.FORM_POST) {
             return Result.failure(IllegalArgumentException("OpenID4VP response_mode=form_post is not supported by wallet-api"))
         }
 
@@ -997,7 +1003,11 @@ class SSIKit2WalletService(
         return WalletPresentFunctionality2.walletPresentHandling(
             holderKey = getKeyByDid(parameter.did),
             holderDid = parameter.did,
-            presentationRequestUrl = openId4VpPresentationService.buildWalletPresentationRequest(parameter.request, resolvedRequest),
+            presentationRequestUrl = openId4VpPresentationService.buildWalletPresentationRequest(
+                request = parameter.request,
+                resolvedRequest = resolvedRequest.authorizationRequest,
+                requestObject = resolvedRequest.requestObject,
+            ),
             selectCredentialsForQuery = { query ->
                 openId4VpPresentationService.matchCredentialResults(
                     query = query,
@@ -1014,7 +1024,7 @@ class SSIKit2WalletService(
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(
-                resolvedRequest = resolvedRequest,
+                resolvedRequest = resolvedRequest.authorizationRequest,
                 note = parameter.note,
                 walletCredentials = walletCredentials,
                 selectedMatches = selectedMatches,
