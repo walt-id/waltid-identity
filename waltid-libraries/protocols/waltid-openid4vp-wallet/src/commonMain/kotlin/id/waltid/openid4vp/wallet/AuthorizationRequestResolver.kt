@@ -23,9 +23,7 @@ import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -62,7 +60,7 @@ object AuthorizationRequestResolver {
             AuthorizationRequest.serializer(),
             buildJsonObject {
                 parameters.entries().forEach { (key, values) ->
-                    values.lastOrNull()?.let { put(key, parseParameterValue(it)) }
+                    values.lastOrNull()?.let { put(key, AuthorizationRequestParameterCodec.parse(json, it)) }
                 }
             },
         )
@@ -140,12 +138,4 @@ object AuthorizationRequestResolver {
         }
     }
 
-    private fun parseParameterValue(value: String): JsonElement =
-        // Authorization request query parameters arrive as strings, even when they look like JSON scalars.
-        // Only parse values that are explicitly JSON-encoded so fields like nonce/state/client_id stay strings.
-        if (!isJsonEncoded(value)) JsonPrimitive(value)
-        else runCatching { json.parseToJsonElement(value) }.getOrElse { JsonPrimitive(value) }
-
-    private fun isJsonEncoded(value: String): Boolean =
-        value.trimStart().run { startsWith("{") || startsWith("[") || startsWith("\"") }
 }
