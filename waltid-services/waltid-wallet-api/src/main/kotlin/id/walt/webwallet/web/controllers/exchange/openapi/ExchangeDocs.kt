@@ -79,6 +79,10 @@ object ExchangeDocs {
                 description = "Credentials that match the presentation request"
                 body<List<WalletCredential>>()
             }
+            HttpStatusCode.BadRequest to {
+                description = "Presentation request could not be processed"
+                body<String>()
+            }
         }
     }
 
