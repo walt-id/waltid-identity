@@ -10,6 +10,7 @@ import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.db.models.WalletCredential
+import id.waltid.openid4vp.wallet.ResolvedAuthorizationRequest
 import io.ktor.client.HttpClient
 import io.ktor.http.URLBuilder
 import io.ktor.http.Url
@@ -103,7 +104,10 @@ class OpenId4VpPresentationServiceTest {
             )
             val request = authorizationRequest.toHttpUrl().toString()
 
-            val walletRequest = service.buildWalletPresentationRequest(request, authorizationRequest)
+            val walletRequest = service.buildWalletPresentationRequest(
+                request,
+                ResolvedAuthorizationRequest.Plain(authorizationRequest),
+            )
 
             assertEquals("vp_token", walletRequest.parameters["response_type"])
             assertEquals("verifier2", walletRequest.parameters["client_id"])
@@ -125,7 +129,7 @@ class OpenId4VpPresentationServiceTest {
 
             val walletRequest = service.buildWalletPresentationRequest(
                 request = "openid4vp://authorize?request_uri=https://verifier.example/request-object&request_uri_method=post",
-                resolvedRequest = authorizationRequest,
+                resolvedRequest = ResolvedAuthorizationRequest.Plain(authorizationRequest),
             )
 
             assertEquals("verifier2", walletRequest.parameters["client_id"])
@@ -405,8 +409,7 @@ class OpenId4VpPresentationServiceTest {
         val resolvedRequest = service.tryResolveAuthorizationRequestWithSource(request).getOrThrow()
         return service.buildWalletPresentationRequest(
             request = request,
-            resolvedRequest = resolvedRequest.authorizationRequest,
-            requestObject = resolvedRequest.requestObject,
+            resolvedRequest = resolvedRequest,
         ).toString()
     }
 

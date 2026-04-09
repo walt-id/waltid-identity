@@ -31,10 +31,18 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
-data class ResolvedAuthorizationRequest(
-    val authorizationRequest: AuthorizationRequest,
-    val requestObject: String? = null,
-)
+sealed class ResolvedAuthorizationRequest {
+    abstract val authorizationRequest: AuthorizationRequest
+
+    data class Plain(
+        override val authorizationRequest: AuthorizationRequest,
+    ) : ResolvedAuthorizationRequest()
+
+    data class WithRequestObject(
+        override val authorizationRequest: AuthorizationRequest,
+        val requestObject: String,
+    ) : ResolvedAuthorizationRequest()
+}
 
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
@@ -51,21 +59,16 @@ object AuthorizationRequestResolver {
         "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}",
     )
 
-    suspend fun resolve(request: String, http: HttpClient): AuthorizationRequest = resolve(Url(request), http)
+    suspend fun resolve(request: String, http: HttpClient): ResolvedAuthorizationRequest =
+        resolve(Url(request), http)
 
-    suspend fun resolve(requestUrl: Url, http: HttpClient): AuthorizationRequest =
-        resolveDetailed(requestUrl, http).authorizationRequest
-
-    suspend fun resolveDetailed(request: String, http: HttpClient): ResolvedAuthorizationRequest =
-        resolveDetailed(Url(request), http)
-
-    suspend fun resolveDetailed(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest =
+    private suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest =
         when {
             requestUrl.parameters.contains("request_uri") -> resolveFromRequestUri(requestUrl, http)
 
             requestUrl.parameters.contains("request") -> resolveFromRequestObject(requestUrl)
 
-            else -> ResolvedAuthorizationRequest(parseParameters(requestUrl.parameters))
+            else -> ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
         }
 
     fun parseParameters(parameters: Parameters): AuthorizationRequest {
@@ -104,7 +107,7 @@ object AuthorizationRequestResolver {
 
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(body)
-            contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest(
+            contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest.Plain(
                 authorizationRequest = json.decodeFromString<AuthorizationRequest>(body),
             )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
@@ -127,7 +130,7 @@ object AuthorizationRequestResolver {
             authenticateSignedRequestObject(requestObject, authReqJws.payload)
         }
 
-        return ResolvedAuthorizationRequest(
+        return ResolvedAuthorizationRequest.WithRequestObject(
             authorizationRequest = json.decodeFromJsonElement(AuthorizationRequest.serializer(), authReqJws.payload),
             requestObject = requestObject,
         )
