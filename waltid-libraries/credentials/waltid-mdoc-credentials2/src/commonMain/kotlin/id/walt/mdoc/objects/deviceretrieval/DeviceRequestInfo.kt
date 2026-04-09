@@ -43,6 +43,6 @@ data class UseCase(
     val documentSets: List<List<UInt>>
 ) {
     override fun toString(): String {
-        return "[DeviceRequestInfo UseCase] mandatory=$mandatory, documentSets=$documentSets, puroseHints=$purposeHints, documentSets=$documentSets"
+        return "[DeviceRequestInfo UseCase] mandatory=$mandatory, documentSets=$documentSets, purposeHints=$purposeHints"
     }
 }
