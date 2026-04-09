@@ -86,6 +86,7 @@ class TokenRequestBuilder(
         tokenEndpoint: String,
         preAuthorizedCode: String,
         txCode: String? = null,
+        additionalParameters: Map<String, String> = emptyMap(),
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -93,6 +94,7 @@ class TokenRequestBuilder(
         log.info { "Exchanging pre-authorized code for access token" }
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Transaction code (PIN) present: ${txCode != null}" }
+        log.trace { "Additional parameters: ${additionalParameters.keys}" }
 
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
@@ -102,6 +104,7 @@ class TokenRequestBuilder(
                 append("tx_code", it)
                 log.trace { "Including transaction code in token request" }
             }
+            additionalParameters.forEach { (k, v) -> append(k, v) }
         }
 
         return executeTokenRequest(tokenEndpoint, parameters)
