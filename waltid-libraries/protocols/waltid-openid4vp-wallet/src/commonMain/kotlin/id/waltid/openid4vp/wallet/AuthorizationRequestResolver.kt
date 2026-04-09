@@ -11,6 +11,7 @@ import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.HttpClient
 import io.ktor.client.request.accept
@@ -83,19 +84,16 @@ object AuthorizationRequestResolver {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
         val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
-        val requestUriMethod = requestUrl.parameters["request_uri_method"]
+        val requestUriMethod = parseRequestUriMethod(requestUrl.parameters["request_uri_method"])
 
-        log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod ?: "get"}" }
+        log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
         val response = when (requestUriMethod) {
-            null, "get" -> http.get(requestUri)
-            "post" -> http.post(requestUri) {
+            null, RequestUriHttpMethod.GET -> http.get(requestUri)
+            RequestUriHttpMethod.POST -> http.post(requestUri) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.parse("application/oauth-authz-req+jwt"))
                 setBody("")
             }
-            else -> throw IllegalArgumentException(
-                "invalid_request_uri_method: $requestUriMethod is neither 'get' nor 'post'",
-            )
         }
 
         val body = response.bodyAsText()
@@ -161,6 +159,15 @@ object AuthorizationRequestResolver {
 
             is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
         }
+    }
+
+    private fun parseRequestUriMethod(value: String?): RequestUriHttpMethod? = when (value) {
+        null -> null
+        RequestUriHttpMethod.GET.method -> RequestUriHttpMethod.GET
+        RequestUriHttpMethod.POST.method -> RequestUriHttpMethod.POST
+        else -> throw IllegalArgumentException(
+            "invalid_request_uri_method: $value is neither 'get' nor 'post'",
+        )
     }
 
 }
