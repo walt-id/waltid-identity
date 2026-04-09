@@ -1160,13 +1160,14 @@ class SSIKit2WalletService(
             holderPoliciesToRun = null,
             runPolicies = null,
         ).mapCatching { result ->
+            val redirect = extractRedirect(result)
             logPresentedCredentials(
                 resolvedRequest = resolvedRequest.authorizationRequest,
                 note = parameter.note,
                 walletCredentials = walletCredentials,
                 selectedMatches = selectedMatches,
             )
-            extractRedirect(result)
+            redirect
         }
     }
 
