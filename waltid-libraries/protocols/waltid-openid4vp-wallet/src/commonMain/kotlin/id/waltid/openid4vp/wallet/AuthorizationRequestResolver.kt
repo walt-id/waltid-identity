@@ -70,24 +70,20 @@ object AuthorizationRequestResolver {
 
     private suspend fun resolveFromRequestUri(requestUrl: Url, http: HttpClient): AuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
+
         val requestUri = requireNotNull(requestUrl.parameters["request_uri"]) { "Missing request_uri" }
         val requestUriMethod = requestUrl.parameters["request_uri_method"]?.lowercase()
 
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod ?: "get"}" }
-
         val response = when (requestUriMethod) {
             "post" -> http.post(requestUri)
             else -> http.get(requestUri)
         }
 
-        check(response.status.isSuccess()) {
-            "AuthorizationRequest cannot be retrieved (${response.status}) from $requestUri: ${response.bodyAsText()}"
-        }
-
-        val contentType = response.contentType()
-            ?: throw IllegalArgumentException("AuthorizationRequest response does not define a content type")
         val body = response.bodyAsText()
+        response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: $body" } }
 
+        val contentType = requireNotNull(response.contentType()) { "AuthorizationRequest response does not define a content type" }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
 
         return when {
@@ -145,6 +141,8 @@ object AuthorizationRequestResolver {
     }
 
     private fun parseParameterValue(value: String): JsonElement =
+        // Authorization request query parameters arrive as strings, even when they look like JSON scalars.
+        // Only parse values that are explicitly JSON-encoded so fields like nonce/state/client_id stay strings.
         value.takeIf(::looksLikeJsonEncodedParameterValue)
             ?.let { encodedValue ->
                 runCatching { json.parseToJsonElement(encodedValue) }
