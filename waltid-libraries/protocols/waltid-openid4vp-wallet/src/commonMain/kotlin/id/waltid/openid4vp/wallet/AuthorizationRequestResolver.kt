@@ -4,8 +4,8 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
@@ -19,6 +19,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.Parameters
 import io.ktor.http.Url
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -26,7 +27,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 object AuthorizationRequestResolver {
@@ -73,7 +73,7 @@ object AuthorizationRequestResolver {
             else -> http.get(requestUri)
         }
 
-        check(response.status.value in 200..299) {
+        check(response.status.isSuccess()) {
             "AuthorizationRequest cannot be retrieved (${response.status}) from $requestUri: ${response.bodyAsText()}"
         }
 
