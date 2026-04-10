@@ -13,6 +13,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -118,8 +119,13 @@ data class VicalPolicy(
     }
 
     /**
-     * Fetches the raw VICAL CBOR bytes from the given HTTP(S) URL.
-     * Accepts `application/cbor`, `application/octet-stream`, and `*\/\*`.
+     * Fetches the VICAL bytes from the given HTTP(S) URL.
+     *
+     * Supports two response encodings:
+     * - **Binary** (`application/cbor`, `application/octet-stream`): raw CBOR bytes used as-is.
+     * - **Text** (`text/plain` or similar): assumed to be a hex-encoded CBOR string, decoded to bytes.
+     *
+     * Tip: append `?format=cbor` to the URL if the server defaults to hex.
      *
      * @throws IllegalStateException if the server returns a non-2xx status.
      * @throws Exception if the network request fails.
@@ -133,11 +139,38 @@ data class VicalPolicy(
             }
             if (!response.status.isSuccess()) {
                 throw IllegalStateException(
-                    "Failed to fetch VICAL from $url — HTTP ${response.status.value} ${response.status.description}"
+                    "Failed to fetch VICAL from $url \u2014 HTTP ${response.status.value} ${response.status.description}"
                 )
             }
-            return response.body()
+            val contentType = response.contentType()
+            return if (contentType?.match(ContentType.Application.Cbor) == true ||
+                       contentType?.match(ContentType.Application.OctetStream) == true) {
+                log.debug { "VICAL response is binary ($contentType)" }
+                response.body()
+            } else {
+                // Assume hex-encoded text (the default format of the enterprise VICAL endpoint)
+                val text = response.bodyAsText().trim()
+                log.debug { "VICAL response is text ($contentType), decoding ${text.length} hex chars" }
+                text.decodeHexToBytes()
+            }
         }
+    }
+
+    /** Decodes a hex string (even-length, lowercase or uppercase) to a [ByteArray]. */
+    private fun String.decodeHexToBytes(): ByteArray {
+        require(length % 2 == 0) { "Hex string must have even length, got $length" }
+        return ByteArray(length / 2) { i ->
+            val hi = hexCharToInt(this[i * 2])
+            val lo = hexCharToInt(this[i * 2 + 1])
+            ((hi shl 4) or lo).toByte()
+        }
+    }
+
+    private fun hexCharToInt(c: Char): Int = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> c - 'a' + 10
+        in 'A'..'F' -> c - 'A' + 10
+        else -> throw IllegalArgumentException("Invalid hex character: $c")
     }
 
     /**
