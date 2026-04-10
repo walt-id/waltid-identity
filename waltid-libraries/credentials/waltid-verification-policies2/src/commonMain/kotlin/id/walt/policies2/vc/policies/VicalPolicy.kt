@@ -10,6 +10,10 @@ import id.walt.vical.Vical
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -24,7 +28,17 @@ private val log = KotlinLogging.logger { }
  * configuration options for document type validation, system trust anchors, trusted chain roots,
  * and revocation checks.
  *
- * @property vical The trusted VICAL file, encoded as either Base64 or hexadecimal.
+ * The VICAL can be supplied in one of two ways (exactly one must be set):
+ * - [vical]: The trusted VICAL, encoded as Base64 (inline, embedded in the policy config).
+ * - [vicalUrl]: An `http(s)://` URL from which the VICAL will be fetched at verification time.
+ *   The response body is expected to be the raw CBOR VICAL bytes (as returned by the VICAL
+ *   service `/latest` endpoint).
+ *
+ * The URL-based pattern is preferred in production because it decouples the policy configuration
+ * from the VICAL artifact size and allows the trust list to be updated without redeploying config.
+ *
+ * @property vical The trusted VICAL file, encoded as Base64. Leave empty when [vicalUrl] is set.
+ * @property vicalUrl An HTTP(S) URL to fetch the raw VICAL bytes from at verification time.
  * @property enableDocumentTypeValidation Flag to enable or disable validation of the credentials document type
  * against the VICAL data.
  * @property enableTrustedChainRoot Flag to enable or disable the use of a trusted root certificate (self-signed) in the chain.
@@ -34,13 +48,28 @@ private val log = KotlinLogging.logger { }
 @Serializable
 @SerialName("vical")
 data class VicalPolicy(
-    val vical: String,
+    val vical: String = "",
+    val vicalUrl: String? = null,
     val enableDocumentTypeValidation: Boolean = false,
     val enableTrustedChainRoot: Boolean = false,
     val enableSystemTrustAnchors: Boolean = false,
     val enableRevocation: Boolean = false
 ) : CredentialVerificationPolicy2() {
     override val id = "vical"
+
+    init {
+        require(vical.isNotBlank() || vicalUrl != null) {
+            "VicalPolicy: either 'vical' (Base64-encoded) or 'vicalUrl' (http/https URL) must be provided"
+        }
+        require(vical.isBlank() || vicalUrl == null) {
+            "VicalPolicy: 'vical' and 'vicalUrl' are mutually exclusive — set exactly one"
+        }
+        vicalUrl?.let {
+            require(it.startsWith("http://") || it.startsWith("https://")) {
+                "VicalPolicy: 'vicalUrl' must be an http or https URL, got: $it"
+            }
+        }
+    }
 
     override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
         log.debug { "Verifying credential with VICAL policy" }
@@ -60,7 +89,8 @@ data class VicalPolicy(
                 CertificateDer(it.base64Der.decodeFromBase64().toByteString())
             }.filter { it != signingCert } // Do not put the signing cert in the chain
 
-            val anchors: List<CertificateDer>? = loadTrustAnchorsFromVical(this.vical, credential.docType)
+            val vicalBytes: ByteArray = resolveVicalBytes()
+            val anchors: List<CertificateDer>? = loadTrustAnchorsFromVicalBytes(vicalBytes, credential.docType)
 
             validateCertificateChain(signingCert, chain, anchors, enableTrustedChainRoot, enableSystemTrustAnchors, enableRevocation)
 
@@ -71,6 +101,43 @@ data class VicalPolicy(
         return Result.success(
             JsonPrimitive(true)
         )
+    }
+
+    /**
+     * Resolves the raw VICAL CBOR bytes from either the inline Base64 [vical] string
+     * or by fetching [vicalUrl] over HTTP(S).
+     */
+    private suspend fun resolveVicalBytes(): ByteArray {
+        return if (vicalUrl != null) {
+            log.debug { "Fetching VICAL from URL: $vicalUrl" }
+            fetchVicalFromUrl(vicalUrl)
+        } else {
+            log.debug { "Decoding inline Base64 VICAL" }
+            vical.decodeFromBase64()
+        }
+    }
+
+    /**
+     * Fetches the raw VICAL CBOR bytes from the given HTTP(S) URL.
+     * Accepts `application/cbor`, `application/octet-stream`, and `*\/\*`.
+     *
+     * @throws IllegalStateException if the server returns a non-2xx status.
+     * @throws Exception if the network request fails.
+     */
+    private suspend fun fetchVicalFromUrl(url: String): ByteArray {
+        HttpClient().use { client ->
+            val response = client.get(url) {
+                headers {
+                    append(HttpHeaders.Accept, "application/cbor, application/octet-stream, */*")
+                }
+            }
+            if (!response.status.isSuccess()) {
+                throw IllegalStateException(
+                    "Failed to fetch VICAL from $url — HTTP ${response.status.value} ${response.status.description}"
+                )
+            }
+            return response.body()
+        }
     }
 
     /**
@@ -105,27 +172,39 @@ data class VicalPolicy(
     }
 
     /**
-     * Loads a list of trust anchors from the provided VICAL data encoded as a Base64 string.
-     * The method decodes the input, processes certificate information, and returns a list of
-     * DER-encoded certificates to be used as trust anchors. If no anchors are available after
-     * processing, the method returns null.
+     * Loads a list of trust anchors from raw VICAL CBOR bytes.
+     * The method processes certificate information and returns a list of DER-encoded certificates
+     * to be used as trust anchors. If no anchors are available after processing, returns null.
      *
-     * @param vicalBase64 The Base64-encoded string representing the VICAL data.
-     * @param allowedDocType If `documentTypeValidation` is `true`, the document type to be validated against the VICAL data.
-     * @return A list of DER-encoded certificates (`CertificateDer`) parsed from the VICAL data, or null if no anchors are available.
+     * @param vicalBytes The raw CBOR bytes of the signed VICAL.
+     * @param allowedDocType If [enableDocumentTypeValidation] is `true`, the document type to
+     * validate against the VICAL data.
+     * @return A list of DER-encoded certificates (`CertificateDer`), or null if none are available.
      */
-    private fun loadTrustAnchorsFromVical(vicalBase64: String, allowedDocType: String): List<CertificateDer>? {
-        // decode VICAL
-        val decodedVical = Vical.decode(vicalBase64.decodeFromBase64())
+    private fun loadTrustAnchorsFromVicalBytes(vicalBytes: ByteArray, allowedDocType: String): List<CertificateDer>? {
+        val decodedVical = Vical.decode(vicalBytes)
 
         val certificateInfos = if (enableDocumentTypeValidation) {
             log.debug { "Document type validation is enabled" }
             decodedVical.vicalData.certificateInfos.filter { allowedDocType in it.docType }
         } else decodedVical.vicalData.certificateInfos
 
-        // Build anchors from VICAL certificateInfos
         val anchorsFromVical: List<CertificateDer> = certificateInfos.map { info -> CertificateDer(info.certificate.toByteString()) }
 
         return anchorsFromVical.ifEmpty { null }
     }
+
+    // ── Legacy compat: keep the old Base64-string overload for existing callers ────────────────
+
+    /**
+     * Loads trust anchors from a Base64-encoded VICAL string (legacy path, used by
+     * [loadTrustAnchorsFromVical] which is kept for source-level backward compatibility).
+     */
+    @Deprecated(
+        "Use loadTrustAnchorsFromVicalBytes with raw bytes instead",
+        ReplaceWith("loadTrustAnchorsFromVicalBytes(vicalBase64.decodeFromBase64(), allowedDocType)")
+    )
+    private fun loadTrustAnchorsFromVical(vicalBase64: String, allowedDocType: String): List<CertificateDer>? =
+        loadTrustAnchorsFromVicalBytes(vicalBase64.decodeFromBase64(), allowedDocType)
 }
+
