@@ -36,8 +36,10 @@ object TransactionDataUtils {
     @Serializable
     data class DecodedTransactionData(
         val encoded: String,
+        // Keeps the original JSON object intact for debugging/forward-compat checks without re-encoding.
         val rawJson: JsonObject,
         val transactionData: TransactionDataItem,
+        // Carries extension fields (outside the known transaction_data parameters) for UI/business usage.
         val details: JsonObject,
     )
 
@@ -114,10 +116,12 @@ object TransactionDataUtils {
             return null
         }
 
-        decodedItems.forEach { item ->
-            item.transactionData.transactionDataHashesAlg?.let(::requireSupportedHashAlgorithms)
-        }
+        val requestedAlgorithms = decodedItems
+            .flatMap { it.transactionData.transactionDataHashesAlg.orEmpty() }
 
+        if (requestedAlgorithms.isNotEmpty()) {
+            requireSupportedHashAlgorithms(requestedAlgorithms)
+        }
         return DEFAULT_HASH_ALGORITHM
     }
 

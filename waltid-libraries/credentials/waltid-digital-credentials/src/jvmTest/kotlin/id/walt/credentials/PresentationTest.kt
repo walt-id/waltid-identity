@@ -5,8 +5,14 @@ import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.assertNull
+import kotlin.test.assertEquals
 import kotlin.test.Test
 
 class PresentationTest {
@@ -106,6 +112,28 @@ class PresentationTest {
 
         assertNull(decoded.transactionDataHashes)
         assertNull(decoded.transactionDataHashesAlg)
+    }
+
+    @Test
+    fun testDcSdJwtPresentationDeserializesWithTransactionDataFields() = runTest {
+        init()
+        val presentation = DcSdJwtPresentation.parse(sampleDcSdJwtPresentation())
+            .getOrThrow()
+        val persistedPresentation = persistedPresentationJson.encodeToString(
+            DcSdJwtPresentation.serializer(),
+            presentation,
+        )
+        val persistedJson = Json.parseToJsonElement(persistedPresentation).jsonObject
+        val withTransactionDataFields = buildJsonObject {
+            persistedJson.forEach { (key, value) -> put(key, value) }
+            put("transactionDataHashes", JsonArray(listOf(JsonPrimitive("hash-1"), JsonPrimitive("hash-2"))))
+            put("transactionDataHashesAlg", "sha-256")
+        }
+
+        val decoded = Json.decodeFromString<DcSdJwtPresentation>(withTransactionDataFields.toString())
+
+        assertEquals(listOf("hash-1", "hash-2"), decoded.transactionDataHashes)
+        assertEquals("sha-256", decoded.transactionDataHashesAlg)
     }
 
     private fun sampleDcSdJwtPresentation(): String =
