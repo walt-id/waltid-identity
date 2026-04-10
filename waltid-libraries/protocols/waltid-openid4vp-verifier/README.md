@@ -160,6 +160,20 @@ This is where the Wallet POSTs the `vp_token`. This is where validation happens 
 
 When the Wallet POSTs the presentation, the verifier parses the `vp_token`, runs the configured VP policies for each presentation format, checks DCQL fulfillment, and finally applies the configured VC policies. The built-in direct-post flow in this library delegates that work to `Verifier2VPDirectPostHandler` and `PresentationVerificationEngine`.
 
+```kotlin
+post("/api/v2/verification/{sessionId}/response") {
+    val sessionId = call.parameters["sessionId"] ?: error("Missing sessionId")
+    val directPostRequest = call.receiveParameters()
+
+    val result = verifier2VPDirectPostHandler.handleDirectPost(
+        sessionId = sessionId,
+        requestParams = directPostRequest,
+    )
+
+    call.respond(result.httpStatusCode, result.body)
+}
+```
+
 ### Key Components
 
 | Component | Description | Usage |
