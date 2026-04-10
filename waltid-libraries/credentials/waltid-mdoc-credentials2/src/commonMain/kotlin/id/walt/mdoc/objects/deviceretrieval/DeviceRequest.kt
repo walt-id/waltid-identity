@@ -8,7 +8,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import kotlinx.serialization.*
-import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.cbor.ValueTags
 
 /**
  * Represents the top-level request from a mdoc reader to a mdoc.
@@ -32,19 +32,25 @@ data class DeviceRequest(
     val readerAuthAll: List<CoseSign1>? = null,
 
     @SerialName("deviceRequestInfo")
-    @CborLabel(24)
+    @ValueTags(24u)
     val deviceRequestInfo: ByteStringWrapper<DeviceRequestInfo>? = null
 ) {
     companion object {
         const val VERSION = "1.0"
+        const val VERSION_WITH_SIGNING = "1.1"
 
         fun decodeFromBase64Url(base64Url: String): DeviceRequest {
             return coseCompliantCbor.decodeFromByteArray<DeviceRequest>(base64Url.decodeFromBase64Url())
         }
+
+        fun convertMappingToDocRequests(docTypeRequestedElements: Map<String, Map<String, List<String>>>) =
+            docTypeRequestedElements.map { (docType, requestedElements) ->
+                DocRequest.fromValues(docType, requestedElements)
+            }
     }
 
     fun print() {
-        println("[DeviceRequest]")
+        println("[DeviceRequest (version $version)]")
         docRequests.forEach { docRequest ->
             docRequest.itemsRequest.value.let { itemRequests ->
                 println("> ItemRequest for \"${itemRequests.docType}\" - requestInfo=${itemRequests.requestInfo}")
@@ -55,7 +61,10 @@ data class DeviceRequest(
                     }
                 }
             }
+            println("Doc request ReaderAuth: ${docRequest.readerAuth?.toString()}")
         }
+        println("Device request info: ${deviceRequestInfo?.value?.useCases?.joinToString { it.toString() }}")
+        println("Device request ReaderAuthAll: $readerAuthAll")
     }
 
     fun encodeToBase64Url(): String = coseCompliantCbor.encodeToByteArray(this).encodeToBase64Url()
@@ -65,39 +74,14 @@ data class DeviceRequest(
      */
     constructor(docTypeRequestedElements: Map<String, Map<String, List<String>>>, intentToRetain: Boolean = false) : this(
         version = VERSION,
-        docRequests =
-            docTypeRequestedElements.map { (docType, requestedElements) ->
-                DocRequest(
-                    itemsRequest = ByteStringWrapper(
-                        value = ItemsRequest(
-                            docType = docType,
-                            namespaces = requestedElements
-                                .filterValues { it.isNotEmpty() }
-                                .mapValues { (_, elems) ->
-                                    ItemsRequestList(elems.distinct().map { ItemRequest(it, intentToRetain) })
-                                }
-                        )
-                    )
-                )
-            }
+        docRequests = convertMappingToDocRequests(docTypeRequestedElements)
     )
 
     /** Request individual credential */
     constructor(docType: String, requestedElements: Map<String, List<String>>, intentToRetain: Boolean = false) : this(
         version = VERSION,
         docRequests = listOf(
-            DocRequest(
-                itemsRequest = ByteStringWrapper(
-                    value = ItemsRequest(
-                        docType = docType,
-                        namespaces = requestedElements
-                            .filterValues { it.isNotEmpty() }
-                            .mapValues { (_, elems) ->
-                                ItemsRequestList(elems.distinct().map { ItemRequest(it, intentToRetain) })
-                            }
-                    )
-                )
-            )
+            DocRequest.fromValues(docType, requestedElements, intentToRetain)
         )
     )
 
