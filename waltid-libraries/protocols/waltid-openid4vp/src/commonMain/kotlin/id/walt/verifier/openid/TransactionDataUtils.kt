@@ -136,11 +136,11 @@ object TransactionDataUtils {
         return transactionData.map(::calculateSha256Base64Url)
     }
 
-    fun filterTransactionDataForCredentialQueryId(
+    fun filterTransactionDataForCredentialId(
         transactionData: List<String>?,
-        credentialQueryId: String,
+        credentialId: String,
     ): List<String> = decodeTransactionDataList(transactionData)
-        .filter { credentialQueryId in it.transactionData.credentialIds }
+        .filter { credentialId in it.transactionData.credentialIds }
         .map { it.encoded }
 
     fun buildMdocEmbeddedTransactionData(transactionData: List<String>): Map<String, String> = transactionData
