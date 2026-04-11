@@ -5,7 +5,7 @@ import nextConfig from "@/next.config";
 import {sendToWebWallet} from "@/utils/sendToWebWallet";
 import axios from "axios";
 import QRCode from "react-qr-code";
-import {FormEvent, useContext, useEffect, useMemo, useState} from "react";
+import {FormEvent, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {useRouter} from "next/router";
 
 const TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization";
@@ -65,6 +65,17 @@ export default function TransactionVerification() {
   const [walletUrl, setWalletUrl] = useState("");
   const [sessionInfo, setSessionInfo] = useState<VerificationSessionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const latestCreateAttemptRef = useRef(0);
+
+  function invalidateSessionState() {
+    latestCreateAttemptRef.current += 1;
+    setLoading(false);
+    setSessionId(null);
+    setRequestUrl("");
+    setWalletUrl("");
+    setSessionInfo(null);
+    setError(null);
+  }
 
   const transactionPreview = useMemo(
     () => ({
@@ -107,6 +118,8 @@ export default function TransactionVerification() {
   }, [sessionId, verifier2BaseUrl]);
 
   useEffect(() => {
+    latestCreateAttemptRef.current += 1;
+    setLoading(false);
     setSessionId(null);
     setRequestUrl("");
     setWalletUrl("");
@@ -116,6 +129,8 @@ export default function TransactionVerification() {
 
   async function createTransactionVerification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const createAttempt = latestCreateAttemptRef.current + 1;
+    latestCreateAttemptRef.current = createAttempt;
     setLoading(true);
     setError(null);
     setSessionId(null);
@@ -142,16 +157,24 @@ export default function TransactionVerification() {
         bootstrapAuthorizationRequestUrl?: string;
         fullAuthorizationRequestUrl?: string;
       };
+      if (latestCreateAttemptRef.current !== createAttempt) {
+        return;
+      }
       const qrUrl = data.bootstrapAuthorizationRequestUrl ?? data.fullAuthorizationRequestUrl ?? "";
       setSessionId(data.sessionId);
       setRequestUrl(qrUrl);
       setWalletUrl(data.fullAuthorizationRequestUrl ?? qrUrl);
       setSessionInfo(null);
     } catch (requestError) {
+      if (latestCreateAttemptRef.current !== createAttempt) {
+        return;
+      }
       console.error(requestError);
       setError("Could not create the transaction verification session.");
     } finally {
-      setLoading(false);
+      if (latestCreateAttemptRef.current === createAttempt) {
+        setLoading(false);
+      }
     }
   }
 
@@ -265,11 +288,7 @@ export default function TransactionVerification() {
                 <Button
                   color="secondary"
                   onClick={() => {
-                    setSessionId(null);
-                    setRequestUrl("");
-                    setWalletUrl("");
-                    setSessionInfo(null);
-                    setError(null);
+                    invalidateSessionState();
                   }}
                 >
                   Reset
