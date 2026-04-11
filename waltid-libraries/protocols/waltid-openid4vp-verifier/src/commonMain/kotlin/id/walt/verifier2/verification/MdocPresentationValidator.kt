@@ -6,17 +6,13 @@ import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.representations.X5CList
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.mdoc.parser.MdocParser
 import id.walt.mdoc.verification.MdocVerificationContext
 import id.walt.mdoc.verification.MdocVerifier
-import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier2.verification.Verifier2PresentationValidator.PresentationValidationResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 
-@Deprecated(
-    message = "Use PresentationVerificationEngine and VP policies for verifier flows. This validator remains as a compatibility shim.",
-)
+
 object MdocPresentationValidator {
 
     private val log = KotlinLogging.logger("MdocPresentationValidator")
@@ -24,89 +20,71 @@ object MdocPresentationValidator {
     @OptIn(ExperimentalSerializationApi::class)
     suspend fun validateMsoMdocPresentation(
         mdocBase64UrlString: String,
+        // These three (expectedNonce, expectedAudience, responseUri) are required to reconstruct the SessionTranscript
         expectedNonce: String,
-        expectedAudience: String?,
+        expectedAudience: String?, // This is the client_id
         responseUri: String?,
+
         isDcApi: Boolean = false,
         isEncrypted: Boolean = false,
-        jwkThumbprint: String? = null,
-        expectedTransactionData: List<String>? = null,
+        jwkThumbprint: String? = null
     ): Result<PresentationValidationResult> = runCatching {
+        // responseUri is not required for DC API, only for Redirect
         if (!isDcApi) {
             requireNotNull(responseUri) { "Response uri is required for redirect-based mdoc validation" }
         }
 
         val verificationContext = MdocVerificationContext(
             expectedNonce = expectedNonce,
-            expectedAudience = expectedAudience,
+            expectedAudience = expectedAudience, // Origin if DC API
             responseUri = responseUri,
             isDcApi = isDcApi,
             isEncrypted = isEncrypted,
-            jwkThumbprint = jwkThumbprint,
+            jwkThumbprint = jwkThumbprint
         )
         log.trace { "Validating Mdoc presentation, with verification context: $verificationContext" }
 
-        val document = MdocParser.parseToDocument(mdocBase64UrlString)
-        val sessionTranscript = MdocVerifier.buildSessionTranscriptForContext(verificationContext)
-        val verificationResult = MdocVerifier.verify(document, sessionTranscript)
+        val verificationResult = MdocVerifier.verify(mdocBase64UrlString, verificationContext)
+
+        // Test some other (non-compliant) variations of DC API responses:
+        /*if (!verificationResult.valid && isDcApi) {
+            log.warn { "DC API response verification failed. Testing non-DC-API handover structure..." }
+            val document = MdocParser.parseToDocument(mdocBase64UrlString)
+            val mso = document.issuerSigned.decodeMobileSecurityObject()
+            val sessionTranscript = MdocCryptoHelper.reconstructOid4vpSessionTranscript(verificationContext)
+
+            log.warn { "Checking DC API response against non-DC-API handover..." }
+            val fallbackAuthentication = runCatching { MdocVerifier.verifyDeviceAuthentication(document, mso, sessionTranscript) }
+            log.warn { "Fallback authentication result: $fallbackAuthentication" }
+        }*/
 
         require(verificationResult.valid) { "Mdoc verification failed: ${verificationResult.errors}" }
-        validateTransactionData(document, expectedTransactionData)
 
+        val docType = verificationResult.docType
+
+        // TODO: can reuse some functionality from Mdoc parser?
         val signerKey = verificationResult.signerKey?.key ?: throw IllegalArgumentException("Missing signer key")
         val x5CList = X5CList(
             (verificationResult.x5c ?: throw IllegalArgumentException("Missing x5c"))
-                .map(::X5CCertificateString),
-        )
+                .map { X5CCertificateString(it) })
+
+        //val issuerVirtualDid = LocalRegistrar().createByKey(signerKey, DidJwkCreateOptions()).did
 
         val mdocsCredential = MdocsCredential(
             credentialData = verificationResult.credentialData,
             signed = mdocBase64UrlString,
-            docType = verificationResult.docType,
-            issuer = null,
+            docType = docType,
+            issuer = null, //issuerVirtualDid,
             signature = CoseCredentialSignature(
                 signerKey = DirectSerializedKey(signerKey),
-                x5cList = x5CList,
-            ),
+                x5cList = x5CList
+            )
         )
 
         PresentationValidationResult(
             presentation = MsoMdocPresentation(mdocsCredential),
-            credentials = listOf(mdocsCredential),
+            credentials = listOf(mdocsCredential)
         )
     }
 
-    private fun validateTransactionData(
-        document: id.walt.mdoc.objects.document.Document,
-        expectedTransactionData: List<String>?,
-    ) {
-        val embeddedTransactionData = TransactionDataUtils.extractMdocEmbeddedTransactionData(
-            deviceSignedItems = document.deviceSigned
-                ?.namespaces
-                ?.value
-                ?.entries
-                ?.get(TransactionDataUtils.MDOC_DEVICE_SIGNED_NAMESPACE)
-                ?.entries
-                ?.associate { it.key to it.value }
-                .orEmpty(),
-        )
-
-        val expectedItems = expectedTransactionData.orEmpty()
-        if (expectedItems.isEmpty()) {
-            require(embeddedTransactionData.isEmpty()) {
-                "mdoc transaction_data entries must be omitted when transaction_data is not requested"
-            }
-            return
-        }
-
-        val algorithm = TransactionDataUtils.resolveHashAlgorithm(
-            TransactionDataUtils.decodeTransactionDataList(expectedItems),
-        ) ?: TransactionDataUtils.DEFAULT_HASH_ALGORITHM
-        val expectedHashes = TransactionDataUtils.calculateTransactionDataHashes(expectedItems, algorithm)
-        val embeddedHashes = TransactionDataUtils.calculateTransactionDataHashes(embeddedTransactionData, algorithm)
-
-        require(embeddedHashes == expectedHashes) {
-            "mdoc transaction_data does not match the requested transaction_data"
-        }
-    }
 }
