@@ -52,9 +52,9 @@ object SdJwtVcPresenter {
             audience = authorizationRequest.clientId,
             selectedDisclosures = disclosuresToPresent,
             holderKey = holderKey,
-            transactionData = TransactionDataUtils.filterTransactionDataForCredentialQueryId(
+            transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
                 transactionData = authorizationRequest.transactionData,
-                credentialQueryId = matchResult.originalQuery.id,
+                credentialId = matchResult.originalQuery.id,
             ),
         )
 
