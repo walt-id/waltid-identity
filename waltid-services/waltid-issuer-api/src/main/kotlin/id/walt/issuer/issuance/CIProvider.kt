@@ -24,7 +24,6 @@ import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
-import id.walt.mdoc.doc.MDocTypes
 import id.walt.mdoc.mso.DeviceKeyInfo
 import id.walt.mdoc.mso.ValidityInfo
 import id.walt.oid4vc.OpenID4VC
@@ -490,7 +489,7 @@ open class CIProvider(
                         null
                     ).AsCBOR().EncodeToBytes()
                 ),
-                keyAuthorizations = buildTransactionDataKeyAuthorizations(credentialRequest.docType),
+                keyAuthorizations = buildTransactionDataKeyAuthorizations(),
             ),
             cryptoProvider = cryptoProvider,
             keyID = keyID
@@ -510,15 +509,8 @@ open class CIProvider(
         )
     }
 
-    private fun buildTransactionDataKeyAuthorizations(docType: String?): MapElement? {
-        if (docType == null) {
-            return null
-        }
-
-        return mapOf(
-            "nameSpaces" to listOf(MDOC_TRANSACTION_DATA_NAMESPACE.toDataElement()).toDataElement(),
-        ).toDataElement() as MapElement
-    }
+    private fun buildTransactionDataKeyAuthorizations(): MapElement =
+        mapOf("nameSpaces" to listOf(MDOC_TRANSACTION_DATA_NAMESPACE.toDataElement()).toDataElement()).toDataElement()
 
     fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,
