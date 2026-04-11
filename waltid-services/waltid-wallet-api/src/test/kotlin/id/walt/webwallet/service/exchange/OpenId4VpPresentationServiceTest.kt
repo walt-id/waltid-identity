@@ -187,6 +187,7 @@ class OpenId4VpPresentationServiceTest {
         assertFalse(resolvedUrl.parameters.contains("dcql_query"))
     }
 
+    @Test
     fun `normalized request URL rejects unsupported transaction data types`() {
         HttpClient().use { http ->
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
