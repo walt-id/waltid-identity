@@ -47,9 +47,9 @@ object W3CPresenter {
                 audience = authorizationRequest.clientId,
                 selectedDisclosures = disclosuresToPresent, // Pass the actual disclosures for sd_hash
                 holderKey = holderKey,
-                transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+                transactionData = TransactionDataUtils.filterTransactionDataForCredentialQueryId(
                     transactionData = authorizationRequest.transactionData,
-                    credentialId = matchResult.originalQuery.id,
+                    credentialQueryId = matchResult.originalQuery.id,
                 ),
             )
             // Use the disclose method, appending the KB-JWT
