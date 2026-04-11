@@ -2,7 +2,11 @@
 
 package id.waltid.openid4vp.wallet.presentation
 
-import id.walt.cose.*
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseAlgorithm
+import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
@@ -23,10 +27,10 @@ import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
-import id.walt.verifier.openid.TransactionDataUtils
-import id.walt.verifier.openid.TransactionDataUtils.MDOC_DEVICE_SIGNED_NAMESPACE
-import id.walt.verifier.openid.TransactionDataUtils.buildMdocEmbeddedTransactionData
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
+import id.walt.verifier.openid.transactiondata.deviceSignedItemKey
+import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -109,7 +113,7 @@ object MdocPresenter {
         // Determine which namespaces and elements to disclose based on the DCQL match
         val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
             mdocsCredential = mdocsCredential,
-            transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+            transactionData = filterTransactionDataForCredentialId(
                 transactionData = authorizationRequest.transactionData,
                 credentialId = matchResult.originalQuery.id,
             ),
@@ -199,6 +203,11 @@ object MdocPresenter {
         ?.also { requireTransactionDataAuthorization(mdocsCredential, it) }
         ?.let(::buildDeviceNameSpaces)
         ?: DeviceNameSpaces(emptyMap())
+
+    private fun buildMdocEmbeddedTransactionData(transactionData: List<String>): Map<String, String> =
+        transactionData
+            .mapIndexed { index, encoded -> deviceSignedItemKey(index) to encoded }
+            .toMap()
 
     private fun requireTransactionDataAuthorization(
         mdocsCredential: MdocsCredential,

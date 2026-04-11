@@ -4,8 +4,11 @@ package id.walt.policies2.vp.policies
 
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+
+
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -23,8 +26,8 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
     fun `succeeds when presentation hashes match requested transaction data`() = runTest {
         val transactionData = transactionData()
         val presentation = samplePresentation().copy(
-            transactionDataHashes = TransactionDataUtils.calculateTransactionDataHashes(listOf(transactionData)),
-            transactionDataHashesAlg = TransactionDataUtils.DEFAULT_HASH_ALGORITHM,
+            transactionDataHashes = calculateTransactionDataHashes(listOf(transactionData)),
+            transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
         )
 
         val result = policy.runPolicy(
@@ -40,12 +43,45 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         val transactionData = transactionData()
         val presentation = samplePresentation().copy(
             transactionDataHashes = listOf("invalid-hash"),
-            transactionDataHashesAlg = TransactionDataUtils.DEFAULT_HASH_ALGORITHM,
+            transactionDataHashesAlg = DEFAULT_HASH_ALGORITHM,
         )
 
         val result = policy.runPolicy(
             presentation = presentation,
             verificationContext = verificationContext(expectedTransactionData = listOf(transactionData)),
+        )
+
+        assertFalse(result.success)
+        assertTrue(result.errors.any { it.message?.contains("transaction_data_hashes", ignoreCase = true) == true })
+    }
+
+    @Test
+    fun `fails when response algorithm is omitted but request declared transaction_data_hashes_alg`() = runTest {
+        val transactionData = transactionData()
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = calculateTransactionDataHashes(listOf(transactionData)),
+            transactionDataHashesAlg = null,
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = verificationContext(expectedTransactionData = listOf(transactionData)),
+        )
+
+        assertFalse(result.success)
+        assertTrue(result.errors.any { it.message?.contains("transaction_data_hashes_alg", ignoreCase = true) == true })
+    }
+
+    @Test
+    fun `fails when transaction_data_hashes are present without transaction_data request`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = emptyList(),
+            transactionDataHashesAlg = null,
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = verificationContext(expectedTransactionData = null),
         )
 
         assertFalse(result.success)
@@ -79,7 +115,7 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         })
         put("require_cryptographic_holder_binding", true)
         put("transaction_data_hashes_alg", buildJsonArray {
-            add(JsonPrimitive(TransactionDataUtils.DEFAULT_HASH_ALGORITHM))
+            add(JsonPrimitive(DEFAULT_HASH_ALGORITHM))
         })
         put("amount", "42.00")
         put("currency", "EUR")
