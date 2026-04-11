@@ -4,7 +4,13 @@ package id.walt.policies2.vp.policies
 
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
-import id.walt.verifier.openid.TransactionDataUtils
+import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
+import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+import id.walt.verifier.openid.transactiondata.decodeList
+import id.walt.verifier.openid.transactiondata.parseDeviceSignedItemIndex
+import id.walt.verifier.openid.transactiondata.requireContiguousIndices
+import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -27,12 +33,12 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
         }
 
         val expectedTransactionData = verificationContext.expectedTransactionData.orEmpty()
-        val embeddedTransactionData = TransactionDataUtils.extractMdocEmbeddedTransactionData(
+        val embeddedTransactionData = extract(
             deviceSignedItems = document.deviceSigned
                 ?.namespaces
                 ?.value
                 ?.entries
-                ?.get(TransactionDataUtils.MDOC_DEVICE_SIGNED_NAMESPACE)
+                ?.get(MDOC_DEVICE_SIGNED_NAMESPACE)
                 ?.entries
                 ?.associate { it.key to it.value }
                 .orEmpty()
@@ -48,11 +54,9 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
             return success()
         }
 
-        val algorithm = TransactionDataUtils.resolveHashAlgorithm(
-            TransactionDataUtils.decodeTransactionDataList(expectedTransactionData)
-        ) ?: TransactionDataUtils.DEFAULT_HASH_ALGORITHM
-        val expectedHashes = TransactionDataUtils.calculateTransactionDataHashes(expectedTransactionData, algorithm)
-        val embeddedHashes = TransactionDataUtils.calculateTransactionDataHashes(embeddedTransactionData, algorithm)
+        val algorithm = resolveHashAlgorithm(decodeList(expectedTransactionData)) ?: DEFAULT_HASH_ALGORITHM
+        val expectedHashes = calculateTransactionDataHashes(expectedTransactionData, algorithm)
+        val embeddedHashes = calculateTransactionDataHashes(embeddedTransactionData, algorithm)
 
         addResult("transaction_data_hash_algorithm", algorithm)
         addResult("embedded_transaction_data_hashes", embeddedHashes)
@@ -62,5 +66,22 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
         }
 
         return success()
+    }
+
+    private fun extract(deviceSignedItems: Map<String, Any>): List<String> {
+        if (deviceSignedItems.isEmpty()) return emptyList()
+
+        val indexedItems = deviceSignedItems.map { (key, value) ->
+            val index = parseDeviceSignedItemIndex(key)
+                ?: throw IllegalArgumentException("Unsupported mdoc transaction_data entry: $key")
+            val encodedTransactionData = value as? String
+                ?: throw IllegalArgumentException("mdoc transaction_data entries must be strings")
+
+            index to encodedTransactionData
+        }.sortedBy { it.first }
+
+        requireContiguousIndices(indexedItems.map { it.first })
+
+        return indexedItems.map { it.second }
     }
 }

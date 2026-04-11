@@ -19,11 +19,12 @@ import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
-import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.SUPPORTED_TRANSACTION_DATA_TYPES
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
@@ -196,9 +197,9 @@ object VerificationSessionCreator {
                 .credentials
                 .associateBy { credentialQuery -> credentialQuery.id }
         }
-        TransactionDataUtils.validateRequestTransactionData(
+        validateRequestTransactionData(
             transactionData = transactionData,
-            supportedTypes = TransactionDataUtils.SUPPORTED_TRANSACTION_DATA_TYPES,
+            supportedTypes = SUPPORTED_TRANSACTION_DATA_TYPES,
             credentialQueriesById = credentialQueriesById,
         )
 

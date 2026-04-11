@@ -6,8 +6,8 @@ import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCred
 import id.walt.crypto.keys.Key
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
-import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.createKeyBindingJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonPrimitive
@@ -52,7 +52,7 @@ object SdJwtVcPresenter {
             audience = authorizationRequest.clientId,
             selectedDisclosures = disclosuresToPresent,
             holderKey = holderKey,
-            transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+            transactionData = filterTransactionDataForCredentialId(
                 transactionData = authorizationRequest.transactionData,
                 credentialId = matchResult.originalQuery.id,
             ),

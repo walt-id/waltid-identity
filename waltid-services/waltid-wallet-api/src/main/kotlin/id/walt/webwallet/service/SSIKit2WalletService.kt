@@ -38,6 +38,7 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.SUPPORTED_TRANSACTION_DATA_TYPES
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
@@ -1314,7 +1315,6 @@ class SSIKit2WalletService(
                 )
             }
     }
-
     private data class CredentialHolderBinding(
         val publicJwk: JsonObject,
     )
