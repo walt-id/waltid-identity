@@ -17,9 +17,10 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -151,36 +152,10 @@ data class DcSdJwtPresentation(
             val aud = kbJwtPayload["aud"]?.jsonPrimitive?.contentOrNull
             val nonce = kbJwtPayload["nonce"]?.jsonPrimitive?.contentOrNull
             val sdHash = kbJwtPayload["sd_hash"]?.jsonPrimitive?.contentOrNull
-            val transactionDataHashes = when (val transactionDataHashesElement = kbJwtPayload["transaction_data_hashes"]) {
-                null -> null
-                is JsonArray -> transactionDataHashesElement.map { element ->
-                    (element as? JsonPrimitive)
-                        ?.takeIf { it.isString }
-                        ?.content
-                        ?: return Result.failure(
-                            IllegalArgumentException("transaction_data_hashes must be an array of strings"),
-                        )
-                }
-
-                else -> {
-                    return Result.failure(
-                        IllegalArgumentException("transaction_data_hashes must be an array"),
-                    )
-                }
-            }
-            val transactionDataHashesAlg = when (val transactionDataHashesAlgElement = kbJwtPayload["transaction_data_hashes_alg"]) {
-                null -> null
-                is JsonPrimitive -> transactionDataHashesAlgElement
-                    .takeIf { it.isString }
-                    ?.content
-                    ?: return Result.failure(
-                        IllegalArgumentException("transaction_data_hashes_alg must be a string"),
-                    )
-
-                else -> return Result.failure(
-                    IllegalArgumentException("transaction_data_hashes_alg must be a string"),
-                )
-            }
+            val transactionDataHashes = kbJwtPayload.getStringArray("transaction_data_hashes")
+                .getOrElse { return Result.failure(it) }
+            val transactionDataHashesAlg = kbJwtPayload.getString("transaction_data_hashes_alg")
+                .getOrElse { return Result.failure(it) }
 
             val presentedDisclosureString =
                 if (presentedDisclosures.isNotEmpty())
@@ -255,7 +230,20 @@ data class DcSdJwtPresentation(
             }
             return Result.success(Unit)
         }
+
+        private fun JsonElement.asString(key: String): String =
+            (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: throw IllegalArgumentException("$key must be a string")
+
+        private fun JsonObject.getString(key: String): Result<String?> =
+            runCatching { this[key]?.asString(key) }
+
+        private fun JsonObject.getStringArray(key: String): Result<List<String>?> =
+            runCatching {
+                this[key]?.let { element ->
+                    require(element is JsonArray) { "$key must be an array" }
+                    element.map { it.asString(key) }
+                }
+            }
     }
-
-
 }
