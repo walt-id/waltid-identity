@@ -78,9 +78,9 @@ object PresentationVerificationEngine {
     ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> {
         val verifiedPresentations = parsedPresentations.map { (entry, presentation) ->
             val (presentationString, query) = entry
-            val expectedTransactionData = TransactionDataUtils.filterTransactionDataForCredentialQueryId(
+            val expectedTransactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
                 transactionData = session.authorizationRequest.transactionData,
-                credentialQueryId = query.id,
+                credentialId = query.id,
             ).takeIf(List<String>::isNotEmpty)
             val policyResults = verifySinglePresentation(
                 presentation = presentation,

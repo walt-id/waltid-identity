@@ -109,9 +109,9 @@ object MdocPresenter {
         // Determine which namespaces and elements to disclose based on the DCQL match
         val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
             mdocsCredential = mdocsCredential,
-            transactionData = TransactionDataUtils.filterTransactionDataForCredentialQueryId(
+            transactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
                 transactionData = authorizationRequest.transactionData,
-                credentialQueryId = matchResult.originalQuery.id,
+                credentialId = matchResult.originalQuery.id,
             ),
         )
 
