@@ -6,6 +6,9 @@ import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.verifier.openid.TransactionDataUtils
+import id.walt.verifier.openid.TransactionDataUtils.TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH
+import id.walt.verifier.openid.TransactionDataUtils.TransactionDataValidationErrorReason.MISSING_HASHES
+import id.walt.verifier.openid.TransactionDataUtils.TransactionDataValidationException
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -39,13 +42,9 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
         }.exceptionOrNull()
 
         if (validationError != null) {
-            val error = when ((validationError as? TransactionDataUtils.TransactionDataValidationException)?.reason) {
-                TransactionDataUtils.TransactionDataValidationErrorReason.MISSING_HASHES ->
-                    DcSdJwtPresentationValidationError.MISSING_TRANSACTION_DATA_HASHES
-
-                TransactionDataUtils.TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH ->
-                    DcSdJwtPresentationValidationError.TRANSACTION_DATA_HASH_ALGORITHM_MISMATCH
-
+            val error = when ((validationError as? TransactionDataValidationException)?.reason) {
+                MISSING_HASHES -> DcSdJwtPresentationValidationError.MISSING_TRANSACTION_DATA_HASHES
+                HASH_ALGORITHM_MISMATCH -> DcSdJwtPresentationValidationError.TRANSACTION_DATA_HASH_ALGORITHM_MISMATCH
                 else -> DcSdJwtPresentationValidationError.TRANSACTION_DATA_HASHES_MISMATCH
             }
             presentationRequire(false, error) { validationError.message.orEmpty() }
