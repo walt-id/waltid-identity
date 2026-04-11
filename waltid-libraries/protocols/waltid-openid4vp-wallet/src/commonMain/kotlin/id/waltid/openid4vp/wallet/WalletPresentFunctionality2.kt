@@ -498,9 +498,7 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
-        val decodedTransactionData = TransactionDataUtils.validateRequestTransactionData(
-            transactionData = transactionData,
-        )
+        val decodedTransactionData = TransactionDataUtils.validateRequestTransactionData(transactionData)
         val transactionDataHashAlgorithm = TransactionDataUtils.resolveHashAlgorithm(decodedTransactionData)
         val transactionDataHashes = transactionDataHashAlgorithm?.let {
             TransactionDataUtils.calculateTransactionDataHashes(
@@ -522,17 +520,12 @@ object WalletPresentFunctionality2 {
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
             // Add exp if needed
             put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
-            if (!transactionDataHashes.isNullOrEmpty()) {
+            transactionDataHashes?.takeIf { it.isNotEmpty() }?.let { hashes ->
                 put(
                     "transaction_data_hashes",
-                    buildJsonArray {
-                        transactionDataHashes.forEach { add(JsonPrimitive(it)) }
-                    },
+                    buildJsonArray { hashes.forEach { add(JsonPrimitive(it)) } },
                 )
-                if (decodedTransactionData.any {
-                        !it.transactionData.transactionDataHashesAlg.isNullOrEmpty()
-                    }
-                ) {
+                if (decodedTransactionData.any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }) {
                     put(
                         "transaction_data_hashes_alg",
                         JsonPrimitive(transactionDataHashAlgorithm),
