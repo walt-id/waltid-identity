@@ -6,8 +6,8 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
-import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
@@ -78,7 +78,7 @@ object PresentationVerificationEngine {
     ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> {
         val verifiedPresentations = parsedPresentations.map { (entry, presentation) ->
             val (presentationString, query) = entry
-            val expectedTransactionData = TransactionDataUtils.filterTransactionDataForCredentialId(
+            val expectedTransactionData = filterTransactionDataForCredentialId(
                 transactionData = session.authorizationRequest.transactionData,
                 credentialId = query.id,
             ).takeIf(List<String>::isNotEmpty)

@@ -13,10 +13,12 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.verifier.openid.TransactionDataUtils
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
@@ -188,7 +190,7 @@ object WalletPresentFunctionality2 {
         }.getOrThrow()
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
-        TransactionDataUtils.validateRequestTransactionData(
+        validateRequestTransactionData(
             transactionData = authorizationRequest.transactionData,
             supportedTypes = supportedTransactionDataTypes,
             credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
@@ -209,6 +211,8 @@ object WalletPresentFunctionality2 {
 
 
         if (holderPoliciesToRun != null) {
+            // transaction_data checks are intentionally not implemented as HolderPolicy checks:
+            // HolderPolicyEngine receives credentials only and has no authorization-request context.
             // TODO: ----------------- Handle disclosures from DcqlMatchResult
 
             val relevantHolderPolicies = holderPoliciesToRun
@@ -483,10 +487,10 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
-        val decodedTransactionData = TransactionDataUtils.validateRequestTransactionData(transactionData)
-        val transactionDataHashAlgorithm = TransactionDataUtils.resolveHashAlgorithm(decodedTransactionData)
+        val decodedTransactionData = validateRequestTransactionData(transactionData)
+        val transactionDataHashAlgorithm = resolveHashAlgorithm(decodedTransactionData)
         val transactionDataHashes = transactionDataHashAlgorithm?.let {
-            TransactionDataUtils.calculateTransactionDataHashes(
+            calculateTransactionDataHashes(
                 transactionData = transactionData.orEmpty(),
                 algorithm = it,
             )
