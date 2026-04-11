@@ -196,12 +196,6 @@ object TransactionDataUtils {
         decodedExpectedItems.forEach { decodedItem ->
             decodedItem.transactionData.transactionDataHashesAlg?.let { requestedAlgorithms ->
                 requireSupportedHashAlgorithms(requestedAlgorithms)
-                requireValidation(
-                    requestedAlgorithms.any { normalizeHashAlgorithm(it) == expectedAlgorithm },
-                    HASH_ALGORITHM_MISMATCH,
-                ) {
-                    "transaction_data_hashes_alg must match one of the requested transaction_data_hashes_alg values"
-                }
             }
         }
 
