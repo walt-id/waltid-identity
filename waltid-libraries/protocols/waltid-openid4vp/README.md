@@ -30,7 +30,7 @@ The library includes:
 - **Response Types and Modes** - Configuration for how presentations are returned
 - **Credential Format enumerations** - Standard format identifiers (JWT VC JSON, SD-JWT VC, mdoc, etc.)
 - **Client ID Prefix utilities** - Basic utilities for parsing client identifier prefixes
-- **Transaction data components** - Shared request validation, decoding, hashing, selection, and mdoc key conventions (see `openid/transactiondata/readme.md`)
+- **Transaction data components** - Shared request validation, decoding, hashing, selection, and mdoc key conventions (see [transactiondata/readme.md](./src/commonMain/kotlin/id/walt/verifier/openid/transactiondata/readme.md))
 
 ## Main Purpose
 
