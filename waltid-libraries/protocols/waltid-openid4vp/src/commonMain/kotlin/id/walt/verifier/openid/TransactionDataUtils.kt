@@ -4,6 +4,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.verifier.openid.TransactionDataUtils.TransactionDataValidationErrorReason.*
 import id.walt.verifier.openid.models.authorization.TransactionDataItem
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -25,6 +26,11 @@ object TransactionDataUtils {
         "credential_ids",
         "transaction_data_hashes_alg",
         "require_cryptographic_holder_binding",
+    )
+
+    private val supportedTransactionDataFormats = setOf(
+        CredentialFormat.DC_SD_JWT,
+        CredentialFormat.MSO_MDOC,
     )
 
     private val json = Json {
@@ -56,10 +62,7 @@ object TransactionDataUtils {
 
     fun decodeTransactionData(encoded: String): DecodedTransactionData {
         val rawJson = json.parseToJsonElement(encoded.decodeFromBase64Url().decodeToString()).jsonObject
-        val transactionData = json.decodeFromJsonElement(
-            TransactionDataItem.serializer(),
-            rawJson,
-        )
+        val transactionData = json.decodeFromJsonElement(TransactionDataItem.serializer(), rawJson)
 
         return DecodedTransactionData(
             encoded = encoded,
@@ -69,15 +72,15 @@ object TransactionDataUtils {
         )
     }
 
-    fun decodeTransactionDataList(transactionData: List<String>?): List<DecodedTransactionData> =
-        transactionData?.map(::decodeTransactionData).orEmpty()
+    fun decodeTransactionDataList(transactionData: List<String>): List<DecodedTransactionData> =
+        transactionData.map(::decodeTransactionData)
 
     fun validateRequestTransactionData(
         transactionData: List<String>?,
         supportedTypes: Set<String>? = null,
         credentialQueriesById: Map<String, CredentialQuery>? = null,
     ): List<DecodedTransactionData> {
-        val decodedItems = decodeTransactionDataList(transactionData)
+        val decodedItems = decodeTransactionDataList(transactionData.orEmpty())
 
         decodedItems.forEach { decodedItem ->
             val item = decodedItem.transactionData
@@ -112,16 +115,13 @@ object TransactionDataUtils {
     }
 
     fun resolveHashAlgorithm(decodedItems: List<DecodedTransactionData>): String? {
-        if (decodedItems.isEmpty()) {
-            return null
-        }
+        if (decodedItems.isEmpty()) return null
 
-        val requestedAlgorithms = decodedItems
+        decodedItems
             .flatMap { it.transactionData.transactionDataHashesAlg.orEmpty() }
+            .takeIf { it.isNotEmpty() }
+            ?.let(::requireSupportedHashAlgorithms)
 
-        if (requestedAlgorithms.isNotEmpty()) {
-            requireSupportedHashAlgorithms(requestedAlgorithms)
-        }
         return DEFAULT_HASH_ALGORITHM
     }
 
@@ -139,20 +139,15 @@ object TransactionDataUtils {
     fun filterTransactionDataForCredentialId(
         transactionData: List<String>?,
         credentialId: String,
-    ): List<String> = decodeTransactionDataList(transactionData)
+    ): List<String> = decodeTransactionDataList(transactionData.orEmpty())
         .filter { credentialId in it.transactionData.credentialIds }
         .map { it.encoded }
 
-    fun buildMdocEmbeddedTransactionData(transactionData: List<String>): Map<String, String> = transactionData
-        .mapIndexed { index, encodedTransactionData ->
-            mdocDeviceSignedItemKey(index) to encodedTransactionData
-        }
-        .toMap()
+    fun buildMdocEmbeddedTransactionData(transactionData: List<String>): Map<String, String> =
+        transactionData.mapIndexed { index, encoded -> mdocDeviceSignedItemKey(index) to encoded }.toMap()
 
     fun extractMdocEmbeddedTransactionData(deviceSignedItems: Map<String, Any>): List<String> {
-        if (deviceSignedItems.isEmpty()) {
-            return emptyList()
-        }
+        if (deviceSignedItems.isEmpty()) return emptyList()
 
         val indexedItems = deviceSignedItems.map { (key, value) ->
             val index = parseMdocDeviceSignedItemIndex(key)
@@ -173,9 +168,7 @@ object TransactionDataUtils {
     }
 
     fun mdocDeviceSignedItemKeys(transactionDataItemsCount: Int): Set<String> =
-        (0 until transactionDataItemsCount)
-            .map(::mdocDeviceSignedItemKey)
-            .toSet()
+        (0..<transactionDataItemsCount).mapTo(mutableSetOf(), ::mdocDeviceSignedItemKey)
 
     fun validateResponseTransactionData(
         expectedTransactionData: List<String>?,
@@ -184,60 +177,45 @@ object TransactionDataUtils {
     ) {
         val expectedItems = expectedTransactionData.orEmpty()
         if (expectedItems.isEmpty()) {
-            requireValidation(
-                transactionDataHashes == null,
-                TransactionDataValidationErrorReason.HASHES_MISMATCH,
-            ) {
+            requireValidation(transactionDataHashes == null, HASHES_MISMATCH) {
                 "transaction_data_hashes must be omitted when transaction_data is not requested"
             }
-            requireValidation(
-                transactionDataHashesAlg == null,
-                TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH,
-            ) {
+            requireValidation(transactionDataHashesAlg == null, HASH_ALGORITHM_MISMATCH) {
                 "transaction_data_hashes_alg must be omitted when transaction_data is not requested"
             }
             return
         }
 
-        val decodedExpectedItems = decodeTransactionDataList(expectedTransactionData)
+        val decodedExpectedItems = decodeTransactionDataList(expectedItems)
         val expectedAlgorithm = normalizeHashAlgorithm(transactionDataHashesAlg ?: DEFAULT_HASH_ALGORITHM)
-        requireValidation(
-            expectedAlgorithm == DEFAULT_HASH_ALGORITHM,
-            TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH,
-        ) {
+
+        requireValidation(expectedAlgorithm == DEFAULT_HASH_ALGORITHM, HASH_ALGORITHM_MISMATCH) {
             "Unsupported transaction_data hash algorithm: $transactionDataHashesAlg"
         }
+
         decodedExpectedItems.forEach { decodedItem ->
             decodedItem.transactionData.transactionDataHashesAlg?.let { requestedAlgorithms ->
                 requireSupportedHashAlgorithms(requestedAlgorithms)
                 requireValidation(
                     requestedAlgorithms.any { normalizeHashAlgorithm(it) == expectedAlgorithm },
-                    TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH,
+                    HASH_ALGORITHM_MISMATCH,
                 ) {
                     "transaction_data_hashes_alg must match one of the requested transaction_data_hashes_alg values"
                 }
             }
         }
 
-        requireValidation(
-            !transactionDataHashes.isNullOrEmpty(),
-            TransactionDataValidationErrorReason.MISSING_HASHES,
-        ) {
+        requireValidation(!transactionDataHashes.isNullOrEmpty(), MISSING_HASHES) {
             "transaction_data_hashes must be present when transaction_data is requested"
         }
-        val actualTransactionDataHashes = requireNotNull(transactionDataHashes)
-        requireValidation(
-            actualTransactionDataHashes.size == expectedItems.size,
-            TransactionDataValidationErrorReason.HASHES_MISMATCH,
-        ) {
+        val actualTransactionDataHashes = transactionDataHashes!!
+
+        requireValidation(actualTransactionDataHashes.size == expectedItems.size, HASHES_MISMATCH) {
             "transaction_data_hashes must contain one entry per transaction_data item"
         }
 
         val expectedHashes = calculateTransactionDataHashes(expectedItems, expectedAlgorithm)
-        requireValidation(
-            actualTransactionDataHashes == expectedHashes,
-            TransactionDataValidationErrorReason.HASHES_MISMATCH,
-        ) {
+        requireValidation(actualTransactionDataHashes == expectedHashes, HASHES_MISMATCH) {
             "transaction_data_hashes do not match the requested transaction_data"
         }
 
@@ -245,10 +223,7 @@ object TransactionDataUtils {
             .any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }
 
         if (requestedAlgorithmsWereExplicit) {
-            requireValidation(
-                transactionDataHashesAlg != null,
-                TransactionDataValidationErrorReason.HASH_ALGORITHM_MISMATCH,
-            ) {
+            requireValidation(transactionDataHashesAlg != null, HASH_ALGORITHM_MISMATCH) {
                 "transaction_data_hashes_alg is required when transaction_data_hashes_alg is present in the request"
             }
         }
@@ -256,10 +231,8 @@ object TransactionDataUtils {
 
     private fun normalizeHashAlgorithm(algorithm: String): String = algorithm.lowercase()
 
-    private fun isTransactionDataSupportedFormat(format: CredentialFormat): Boolean = format in setOf(
-        CredentialFormat.DC_SD_JWT,
-        CredentialFormat.MSO_MDOC,
-    )
+    private fun isTransactionDataSupportedFormat(format: CredentialFormat): Boolean =
+        format in supportedTransactionDataFormats
 
     private fun mdocDeviceSignedItemKey(index: Int): String = "$MDOC_DEVICE_SIGNED_ITEM_PREFIX$index"
 
@@ -280,8 +253,6 @@ object TransactionDataUtils {
         reason: TransactionDataValidationErrorReason,
         lazyMessage: () -> String,
     ) {
-        if (!condition) {
-            throw TransactionDataValidationException(reason, lazyMessage())
-        }
+        if (!condition) throw TransactionDataValidationException(reason, lazyMessage())
     }
 }
