@@ -103,7 +103,7 @@ class TransactionDataUtilsTest {
     }
 
     @Test
-    fun `filterTransactionDataForCredentialQueryId keeps only matching items`() {
+    fun `filterTransactionDataForCredentialId keeps only matching items`() {
         val paymentCredential = transactionData(
             type = supportedTransactionDataType,
             amount = "42.00",
@@ -120,9 +120,9 @@ class TransactionDataUtilsTest {
             put("currency", "EUR")
         }.toString().encodeToByteArray().encodeToBase64Url()
 
-        val filtered = TransactionDataUtils.filterTransactionDataForCredentialQueryId(
+        val filtered = TransactionDataUtils.filterTransactionDataForCredentialId(
             transactionData = listOf(paymentCredential, loyaltyCredential),
-            credentialQueryId = "payment_credential",
+            credentialId = "payment_credential",
         )
 
         assertEquals(listOf(paymentCredential), filtered)
