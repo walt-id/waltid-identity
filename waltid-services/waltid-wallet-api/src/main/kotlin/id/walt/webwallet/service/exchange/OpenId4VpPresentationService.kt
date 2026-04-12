@@ -44,10 +44,15 @@ class OpenId4VpPresentationService(
 
     suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
         AuthorizationRequestResolver.resolve(request, http).also { resolvedRequest ->
+            val authorizationRequest = resolvedRequest.authorizationRequest
+            if (!authorizationRequest.transactionData.isNullOrEmpty() && authorizationRequest.dcqlQuery == null) {
+                throw IllegalArgumentException("invalid_request: transaction_data requires dcql_query")
+            }
+
             validateRequestTransactionData(
-                transactionData = resolvedRequest.authorizationRequest.transactionData,
+                transactionData = authorizationRequest.transactionData,
                 supportedTypes = supportedTransactionDataTypes,
-                credentialQueriesById = resolvedRequest.authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+                credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
             )
         }
     }
