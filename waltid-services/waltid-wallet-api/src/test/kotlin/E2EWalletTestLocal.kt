@@ -5,7 +5,6 @@ import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import id.walt.webwallet.db.Db
 import id.walt.webwallet.utils.WalletHttpClients
-import id.walt.webwallet.webWalletModule
 import id.walt.webwallet.webWalletSetup
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -15,13 +14,9 @@ import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.testing.*
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.test.Test
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 class E2EWalletTestLocal : E2EWalletTestBase() {
 
@@ -82,14 +77,13 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         /* FIXME
         println("Setup issuer...")
         setupTestIssuer()
-        */
 
         println("Starting application...")
         application {
             webWalletModule()
-            // issuerModule(withPlugins = false)
-            // verifierModule(withPlugins = false)
-        }
+            issuerModule(withPlugins = false)
+            verifierModule(withPlugins = false)
+        }*/
     }
 
     private fun setupTestWebWallet() {
@@ -104,11 +98,11 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
         IssuerConfigManager.loadConfigs(emptyArray())
     }*/
 
-   /* @Test
+    @Test
     fun e2eTestRegisterNewUser() = testApplication {
         runApplication()
         testCreateUser(User(name = "tester", email = "tester@email.com", password = "password", accountType = "email"))
-    }*/
+    }
 
     /* @Test FIXME
      fun e2eTestAuthentication() = testApplication {
@@ -241,112 +235,7 @@ class E2EWalletTestLocal : E2EWalletTestBase() {
 
          // Request credential and store in wallet
          // FIXME: requestCredential(issuanceUri, availableDids.first().did) // WaltId-MikeRichardson: temporarily disabled due to failure caused by ktor client
-     }
-*/
-    /*@Test
-    fun e2eTestImportW3cJwtCredential() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
-
-        localWalletClient = newClient(token)
-
-        // list all wallets for this user
-        listAllWalletsForUser()
-
-        // Create a DID to associate with the imported credential
-        val did = createDid("jwk")
-        println("Created DID: $did")
-
-        // 1. Issue a real credential to get a valid JWT
-        val issuanceUri = issueJwtCredential()
-        val jwtVc = requestCredential(issuanceUri, did)
-
-        // 2. Import the JWT into the wallet
-        println("\nUse Case -> Test Import W3C JWT VC\n")
-        val credentialId = importW3cJwtCredential(jwtVc, did)
-        assertNotNull(credentialId)
-
-        // 3. Verify it's in the list
-        val credentials = listCredentials()
-        assertTrue(credentials.any { it.jsonObject["id"]?.jsonPrimitive?.content == credentialId })
-
-        // 4. Test duplicate import fails
-        testImportDuplicateCredential(jwtVc, did)
-
-        // 5. Test mismatched DID fails
-        testImportCredentialWithMismatchedDid(jwtVc, "did:key:mismatched")
-
-        // Clean up
-        val availableDids = listAllDids()
-        deleteAllDids(availableDids)
-    }
-
-    @Test
-    fun e2eTestImportSdJwtCredential() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
-
-        localWalletClient = newClient(token)
-
-        // list all wallets for this user
-        listAllWalletsForUser()
-
-        // Create a DID to associate with the imported credential
-        val did = createDid("jwk")
-        println("Created DID: $did")
-
-        // 1. Issue a real SD-JWT credential
-        val issuanceUri = issueSdJwtCredential()
-        val sdJwtVc = requestCredential(issuanceUri, did)
-
-        // 2. Import the SD-JWT into the wallet
-        println("\nUse Case -> Test Import SD-JWT VC\n")
-        val credentialId = importSdJwtCredential(sdJwtVc, did)
-        assertNotNull(credentialId)
-
-        // 3. Verify it's in the list
-        val credentials = listCredentials()
-        assertTrue(credentials.any { it.jsonObject["id"]?.jsonPrimitive?.content == credentialId })
-
-        // 4. Test duplicate import fails
-        testImportDuplicateCredential(sdJwtVc, did)
-
-        // Clean up
-        val availableDids = listAllDids()
-        deleteAllDids(availableDids)
-    }
-
-    @Test
-    fun e2eTestImportCredentialValidation() = testApplication {
-        runApplication()
-        login()
-        getTokenFor()
-
-        localWalletClient = newClient(token)
-
-        // list all wallets for this user
-        listAllWalletsForUser()
-
-        // Create a DID for testing
-        val did = createDid("jwk")
-        println("Created DID: $did")
-
-        // Test various invalid JWT formats
-        println("\nUse Case -> Test Import Credential Validation\n")
-        
-        // Test empty JWT
-        testImportInvalidCredential("", did)
-        
-        // Test JWT with wrong number of segments
-        testImportInvalidCredential("only.two.segments.here.too", did)
-        testImportInvalidCredential("one", did)
-        
-        // Clean up
-        val availableDids = listAllDids()
-        deleteAllDids(availableDids)
-    }*/
+     }*/
 
     override var walletClient: HttpClient
         get() = localWalletClient
