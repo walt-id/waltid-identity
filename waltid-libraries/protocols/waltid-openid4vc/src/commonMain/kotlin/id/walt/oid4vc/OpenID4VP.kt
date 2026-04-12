@@ -109,7 +109,13 @@ object OpenID4VP {
         scopeMapping: ((String) -> PresentationDefinition?)? = null
     ): PresentationDefinition =
         authorizationRequest.presentationDefinition ?: authorizationRequest.presentationDefinitionUri?.let { uri ->
-            http.get(uri).bodyAsText().let { PresentationDefinition.fromJSONString(it) }
+            http.get(uri).let { response ->
+                if (response.status.isSuccess()) {
+                    PresentationDefinition.fromJSONString(response.bodyAsText())
+                } else {
+                    error("Unable to retrieve presentation definition from '${uri}' Status: '${response.status}' errorBody: '${response.bodyAsText()}'")
+                }
+            }
         } ?: scopeMapping?.let { authorizationRequest.scope.firstNotNullOfOrNull(it) }
         ?: throw AuthorizationError(
             authorizationRequest = authorizationRequest,

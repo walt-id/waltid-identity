@@ -48,6 +48,7 @@ async function init(): Promise<void> {
   const bearerTokenInput = document.getElementById('bearer-token') as HTMLInputElement | null;
   const statusEl = document.getElementById('status') as HTMLSpanElement | null;
   const logEl = document.getElementById('log-field') as HTMLPreElement | null;
+  const mediationCheckbox = document.getElementById('mediation-required') as HTMLInputElement | null;
 
   if (
     !select ||
@@ -57,7 +58,8 @@ async function init(): Promise<void> {
     !verifierPresetSelect ||
     !bearerTokenInput ||
     !statusEl ||
-    !logEl
+    !logEl ||
+    !mediationCheckbox
   ) {
     throw new Error('Missing required DOM elements');
   }
@@ -122,7 +124,8 @@ async function init(): Promise<void> {
     appendLog(logEl, 'Starting DC API flow...');
     try {
       const config = getRuntimeConfig(verifierPresetSelect, bearerTokenInput);
-      await runDcApiFlow(payloadInput.value, statusEl, logEl, config);
+      const mediationRequired = mediationCheckbox.checked;
+      await runDcApiFlow(payloadInput.value, statusEl, logEl, config, mediationRequired);
       setStatus(statusEl, 'Completed successfully.');
     } catch (error) {
       console.error('[dc-api-test] flow failed', error);
@@ -239,7 +242,8 @@ async function runDcApiFlow(
   payloadJson: string,
   statusEl: HTMLSpanElement,
   logEl: HTMLPreElement,
-  config: RuntimeConfig
+  config: RuntimeConfig,
+  mediationRequired: boolean
 ): Promise<void> {
   setStatus(statusEl, 'Parsing payload...');
   const createPayload = parseJson(payloadJson, 'payload-input');
@@ -293,7 +297,7 @@ async function runDcApiFlow(
   appendPayloadLog(logEl, 'DC API request payload', dcApiRequest);
 
   setStatus(statusEl, 'Calling navigator.credentials.get...');
-  const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest);
+  const dcApiResponse = await invokeDigitalCredentialsApi(dcApiRequest, mediationRequired);
   appendPayloadLog(logEl, 'DC API wallet response', dcApiResponse);
 
   const responseUrls = getResponseUrls(config, sessionId);
@@ -377,7 +381,7 @@ function getInfoStatus(info: unknown): string | null {
   return status.toUpperCase();
 }
 
-async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unknown> {
+async function invokeDigitalCredentialsApi(requestPayload: unknown, mediationRequired: boolean): Promise<unknown> {
   const nav = navigator as Navigator & {
     credentials?: {
       get?: (options: unknown) => Promise<unknown>;
@@ -388,16 +392,22 @@ async function invokeDigitalCredentialsApi(requestPayload: unknown): Promise<unk
     throw new Error('Digital Credentials API is unavailable in this browser (navigator.credentials.get missing).');
   }
 
-  const dcRequestPayload =
+  const digitalPayload =
     requestPayload != null &&
     typeof requestPayload === 'object' &&
     Object.prototype.hasOwnProperty.call(requestPayload, 'digital')
-      ? requestPayload
+      ? (requestPayload as { digital: unknown }).digital
       : {
-          digital: {
-            requests: [requestPayload]
-          }
+          requests: [requestPayload]
         };
+
+  const dcRequestPayload: { mediation?: string; digital: unknown } = {
+    digital: digitalPayload
+  };
+
+  if (mediationRequired) {
+    dcRequestPayload.mediation = 'required';
+  }
 
   console.log('[dc-api-test] dc api request payload', dcRequestPayload);
   const result = await nav.credentials.get(dcRequestPayload);

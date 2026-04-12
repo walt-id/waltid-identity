@@ -38,6 +38,13 @@
         <label for="payload-input">Payload (editable JSON)</label>
         <textarea id="payload-input" spellcheck="false"></textarea>
 
+        <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px; margin:12px 0; width:auto;">
+          <input type="checkbox" id="mediation-required" style="width:auto;" />
+          <label for="mediation-required" style="margin:0; cursor:pointer;">
+            Mediation Required (for Apple Wallet)
+          </label>
+        </div>
+
         <div class="actions">
           <button id="call-dc-api" type="button">Call DC API</button>
           <span id="status">Idle</span>
