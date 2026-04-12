@@ -191,6 +191,29 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `normalized request URL rejects transaction_data when dcql_query is missing`() {
+        HttpClient().use { http ->
+            val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
+            val request = authorizationRequest(
+                transactionData = listOf(
+                    transactionDataItem(
+                        type = supportedTransactionDataType,
+                        credentialIds = listOf("degree"),
+                        amount = "42.00",
+                    ),
+                ),
+                includeDcqlQuery = false,
+            )
+
+            val error = assertFailsWith<IllegalArgumentException> {
+                runBlocking { resolveNormalizedRequestUrl(service, request) }
+            }
+
+            assertEquals("invalid_request: transaction_data requires dcql_query", error.message)
+        }
+    }
+
+    @Test
     fun `normalized request URL preserves signed request objects from request parameter`() {
         HttpClient().use { http ->
             val service = OpenId4VpPresentationService(http, mockk(relaxed = true))
@@ -498,12 +521,13 @@ class OpenId4VpPresentationServiceTest {
 
     private fun authorizationRequest(
         transactionData: List<String>? = null,
+        includeDcqlQuery: Boolean = true,
     ): String = AuthorizationRequest(
         clientId = "verifier2",
         responseMode = OpenID4VPResponseMode.DIRECT_POST,
         responseUri = "https://verifier.example/response",
         nonce = "nonce-123",
-        dcqlQuery = query,
+        dcqlQuery = query.takeIf { includeDcqlQuery },
         transactionData = transactionData,
     ).toHttpUrl().toString()
 
