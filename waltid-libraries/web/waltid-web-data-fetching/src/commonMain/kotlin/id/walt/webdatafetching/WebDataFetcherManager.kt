@@ -7,12 +7,12 @@ object WebDataFetcherManager {
     private val log = KotlinLogging.logger { }
 
     private val fetcherConfigurations = HashMap<String, WebDataFetchingConfiguration>()
-    var defaultConfiguration: WebDataFetchingConfiguration = WebDataFetchingConfiguration.Default
+    var globalDefaultConfiguration: WebDataFetchingConfiguration = WebDataFetchingConfiguration.Default
 
-    fun getConfigurationForId(id: String, defaultConfiguration: WebDataFetchingConfiguration?): WebDataFetchingConfiguration {
+    fun getConfigurationForId(id: String, instanceDefaultConfiguration: WebDataFetchingConfiguration?): WebDataFetchingConfiguration {
         return fetcherConfigurations[id]
-            ?: defaultConfiguration
-            ?: WebDataFetchingConfiguration.Default
+            ?: instanceDefaultConfiguration
+            ?: globalDefaultConfiguration
     }
 
     fun applyConfigurations(configs: Map<String, WebDataFetchingConfiguration>) {
