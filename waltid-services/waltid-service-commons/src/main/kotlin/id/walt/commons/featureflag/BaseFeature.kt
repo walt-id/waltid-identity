@@ -7,6 +7,7 @@ class BaseFeature(
     override val name: String,
     override val description: String,
     override val configs: Map<String, KClass<out WaltConfig>>,
+    override val onEnable: (() -> Unit)? = null
 ) : AbstractFeature(name, description, configs, emptyList()) {
 
     constructor(
