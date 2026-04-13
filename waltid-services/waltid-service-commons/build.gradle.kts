@@ -12,7 +12,9 @@ dependencies {
     // OIDC
     api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
-    api(project(":waltid-libraries:waltid-did"))
+    api(project(":waltid-libraries:web:waltid-web-data-fetching"))
+
+    api(project(":waltid-libraries:waltid-did")) // ???
 
     // Ktor
     api(identityLibs.ktor.server.core)
