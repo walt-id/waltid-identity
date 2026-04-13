@@ -1,8 +1,11 @@
 package id.walt.commons.featureflag
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.WebConfig
+import id.walt.commons.http.ServiceWebDataFetcherConfiguration
 import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
+import id.walt.webdatafetching.WebDataFetcherManager
 import io.klogging.noCoLogger
 
 object CommonsFeatureCatalog : ServiceFeatureCatalog {
@@ -10,6 +13,17 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
     private val log = noCoLogger<CommonsFeatureCatalog>()
 
     val webFeature = BaseFeature("web", "Web service", WebConfig::class)
+    val webDataFetcherFeature =
+        OptionalFeature("httpclient", "HTTP Web Data Fetcher", ServiceWebDataFetcherConfiguration::class, default = true, {
+            val config = ConfigManager.getConfig<ServiceWebDataFetcherConfiguration>()
+            if (config.globalDefault != null) {
+                WebDataFetcherManager.defaultConfiguration = config.globalDefault
+            }
+            if (config.service != null) {
+                WebDataFetcherManager.applyConfigurations(config.service)
+            }
+        })
+
     val persistenceFeature = OptionalFeature("persistence", "Storage", PersistenceConfiguration::class, false)
 
     val featureFlagInformationEndpointFeature = OptionalFeature(
@@ -37,6 +51,7 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
             healthChecksFeature,
             debugEndpointsFeature,
             openApiFeature,
-            authenticationServiceFeature
+            authenticationServiceFeature,
+            webDataFetcherFeature
         )
 }
