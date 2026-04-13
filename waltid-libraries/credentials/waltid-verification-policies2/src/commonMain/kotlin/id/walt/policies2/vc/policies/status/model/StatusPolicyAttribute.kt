@@ -15,22 +15,35 @@ sealed class StatusPolicyArgument
 @Serializable
 @JsonClassDiscriminator("discriminator")
 sealed class StatusPolicyAttribute : StatusPolicyArgument() {
-    abstract val value: UInt
+    abstract val value: UInt?
+    abstract val values: List<UInt>?
+    
+    fun getAllowedValues(): List<UInt> = values?.takeIf { it.isNotEmpty() } ?: listOfNotNull(value)
 }
 
 @Serializable
 @SerialName("w3c")
 data class W3CStatusPolicyAttribute(
-    override val value: UInt,
+    override val value: UInt? = null,
+    override val values: List<UInt>? = null,
     val purpose: String,
     val type: String,
-) : StatusPolicyAttribute()
+) : StatusPolicyAttribute() {
+    init {
+        require(value != null || !values.isNullOrEmpty()) { "Either 'value' or 'values' must be provided" }
+    }
+}
 
 @Serializable
 @SerialName("ietf")
 data class IETFStatusPolicyAttribute(
-    override val value: UInt,
-) : StatusPolicyAttribute()
+    override val value: UInt? = null,
+    override val values: List<UInt>? = null,
+) : StatusPolicyAttribute() {
+    init {
+        require(value != null || !values.isNullOrEmpty()) { "Either 'value' or 'values' must be provided" }
+    }
+}
 
 @Serializable
 @SerialName("w3c-list")

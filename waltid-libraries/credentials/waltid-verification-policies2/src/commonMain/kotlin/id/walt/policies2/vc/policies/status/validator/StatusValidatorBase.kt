@@ -85,8 +85,9 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         }
         val binaryString = bitValue.joinToString("")
         val intValue = binToInt(binaryString)
-        if (intValue.toUInt() != attribute.value) {
-            throw StatusVerificationError("Status validation failed: expected ${attribute.value}, but got $intValue")
+        val allowedValues = attribute.getAllowedValues()
+        if (intValue.toUInt() !in allowedValues) {
+            throw StatusVerificationError("Status validation failed: expected one of $allowedValues, but got $intValue")
         }
     }
 
