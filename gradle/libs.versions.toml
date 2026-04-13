@@ -1,7 +1,7 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.3.10"
-suspend-transform = "2.3.10-0.13.2"
+kotlin = "2.3.20"
+suspend-transform = "2.3.20-0.13.2"
 
 # Used for build-plugins
 java-service = "21"
@@ -13,6 +13,7 @@ npm-publish = "3.5.3"
 jib = "3.5.2"
 android-gradle = "8.12.3"
 gradle-shadow = "9.3.2"
+buildconfig = "6.0.9"
 
 # Plugins / Dependencies
 ktor = "3.3.3"
@@ -30,6 +31,7 @@ kotlinx-serialization-cbor-TEMP = "1.10.1-waltid_20260309-SNAPSHOT"
 kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
 kotlinx-atomicfu = "0.31.0"
+kotlinx-io = "0.9.0"
 
 # Logging
 kotlinlogging = "8.0.01"
@@ -77,6 +79,7 @@ powerassert = { module = "org.jetbrains.kotlin.plugin.power-assert:org.jetbrains
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle" }
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
 mokkery-gradle-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
+buildconfig-plugin = { module="com.github.gmazzo.buildconfig:com.github.gmazzo.buildconfig.gradle.plugin", version.ref="buildconfig" }
 
 # Libraries
 
@@ -140,6 +143,8 @@ kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlinx-coroutines" }
 kotlinx-atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "kotlinx-atomicfu" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinx-io" }
+kotlinx-io-bytestring = { module = "org.jetbrains.kotlinx:kotlinx-io-bytestring", version.ref = "kotlinx-io" }
 
 ## Crypto
 bcprov-lts8on = { group = "org.bouncycastle", name = "bcprov-lts8on", version.ref = "bcprov" }

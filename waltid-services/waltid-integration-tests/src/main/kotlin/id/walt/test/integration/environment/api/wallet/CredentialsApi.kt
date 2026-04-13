@@ -6,6 +6,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.test.integration.expectSuccess
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
+import id.walt.webwallet.web.model.CredentialImportRequest
 import id.walt.webwallet.usecase.credential.CredentialStatusResult
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -103,6 +104,18 @@ class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {
     suspend fun detachCategoriesFromCredential(wallet: Uuid, credential: String, vararg categories: String) {
         detachCategoriesFromCredentialRaw(wallet, credential, *categories).expectSuccess()
     }
+    
+    
+    suspend fun importCredentialRaw(wallet: Uuid, jwt: String, associatedDid: String) =
+        client.post("/wallet-api/wallet/$wallet/credentials/import") {
+            setBody(CredentialImportRequest(jwt, associatedDid))
+        }
+
+    suspend fun importCredential(wallet: Uuid, jwt: String, associatedDid: String) =
+        importCredentialRaw(wallet, jwt, associatedDid).let {
+            it.expectSuccess()
+            it.body<WalletCredential>()
+        }
 
     @Deprecated("Old API")
     suspend fun delete(wallet: Uuid, credential: String, permanent: Boolean = false) =

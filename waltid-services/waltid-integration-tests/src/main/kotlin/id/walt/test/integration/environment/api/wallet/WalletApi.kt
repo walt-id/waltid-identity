@@ -161,5 +161,7 @@ class WalletApi(
 
     suspend fun detachCategoriesFromCredential(credentialId: String, vararg categories: String) =
         credentialApi.detachCategoriesFromCredential(walletId, credentialId, *categories)
-
+ 
+    suspend fun importCredential(jwt: String, associatedDid: String) =
+        credentialApi.importCredential(walletId, jwt, associatedDid)
 }

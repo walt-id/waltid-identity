@@ -15,7 +15,8 @@ object FeatureFlagInformationModule {
     data class FeatureFlagInformations(
         val enabled: FeatureFlagInformation,
         val disabled: FeatureFlagInformation,
-        val defaulted: FeatureFlagInformation,
+        //val defaultedEnabled: FeatureFlagInformation,
+        val defaultedDisabled: FeatureFlagInformation,
     )
 
     @Serializable
@@ -54,19 +55,30 @@ object FeatureFlagInformationModule {
                     val enabled = registered.filterKeys { it in FeatureManager.enabledFeatures }.mapValues { it.value.description }
                     val disabled = registered.filterKeys { it in FeatureManager.disabledFeatures }.mapValues { it.value.description }
 
-                    val defaulted = registered.keys.subtract(enabled.keys).subtract(disabled.keys)
-                        .associateWith { registered[it]!!.description }
+                    val defaulted = registered.keys
+                        .subtract(enabled.keys)
+                        .subtract(disabled.keys)
+                        .associateWith { registered[it]!! }
+
+                    val (defaultedEnabled, defaultedDisabled) = defaulted.entries.partition { it.value.shouldDefaultEnable() }
+                        .associateBoth { (k, v) -> k to v.description }
 
                     call.respond(
                         FeatureFlagInformations(
                             enabled = FeatureFlagInformation(enabled),
                             disabled = FeatureFlagInformation(disabled),
-                            defaulted = FeatureFlagInformation(defaulted)
+                            //defaultedEnabled = FeatureFlagInformation(defaultedEnabled),
+                            defaultedDisabled = FeatureFlagInformation(defaultedDisabled)
                         )
                     )
                 }
             }
         }
     }
+
+    private fun <T, X, R> Pair<Iterable<T>, Iterable<T>>.associateBoth(transform: (T) -> Pair<X, R>): Pair<Map<X, R>, Map<X, R>> = Pair(
+        this.first.associate { transform(it) },
+        this.second.associate { transform(it) }
+    )
 
 }

@@ -1,6 +1,6 @@
 package id.walt.x509
 
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
 import org.bouncycastle.asn1.DEROctetString
 import org.bouncycastle.asn1.x500.X500Name
@@ -122,7 +122,7 @@ class X509V3ExtensionsTest {
 
         val keyPair = genRsaKeyPair()
         val extUtils = JcaX509ExtensionUtils()
-        val expected = extUtils.createSubjectKeyIdentifier(keyPair.public).keyIdentifier.toByteString()
+        val expected = ByteString(extUtils.createSubjectKeyIdentifier(keyPair.public).keyIdentifier)
 
         val cert = generateSelfSignedCert(
             keyPair = keyPair,

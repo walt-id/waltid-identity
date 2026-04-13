@@ -4,9 +4,8 @@ import id.walt.crypto.keys.Key
 import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.blockingBridge
-import okio.ByteString
-import okio.ByteString.Companion.decodeHex
-
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.hexToByteString
 
 /**
  * Decoded view (not validated) of an IACA X.509 certificate.
@@ -53,7 +52,7 @@ data class IACADecodedCertificate internal constructor(
         return IACACertificateInfo(
             certificate = certificate.getCertificateDer().bytes,
             serialNumber = serialNumber,
-            ski = skiHex.decodeHex(),
+            ski = skiHex.hexToByteString(),
             issuingAuthority = extras.issuingAuthority,
             issuingCountry = principalName.country,
             stateOrProvinceName = principalName.stateOrProvinceName,

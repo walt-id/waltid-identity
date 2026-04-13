@@ -66,9 +66,7 @@ actual class JWKKey actual constructor(
             _internalJwk = JWK.parse(jwk)
         }
 
-        if (bouncyCastleProvider !in Security.getProviders()) {
-            Security.addProvider(bouncyCastleProvider)
-        }
+        ensureBouncyCastleSetup()
     }
 
     constructor(jwkObject: JWK) : this(null) {
@@ -522,6 +520,18 @@ actual class JWKKey actual constructor(
 
     actual companion object : JWKKeyCreator() {
 
+        var hasSetupBouncyCastle = false
+        fun ensureBouncyCastleSetup() {
+            if (!hasSetupBouncyCastle) {
+                if (bouncyCastleProvider !in Security.getProviders()) {
+                    Security.addProvider(bouncyCastleProvider)
+                }
+                hasSetupBouncyCastle = true
+            }
+        }
+
+
+
 //        val prettyJson = Json { prettyPrint = true }
 
         @JvmBlocking
@@ -532,6 +542,8 @@ actual class JWKKey actual constructor(
         @JvmBlocking
         @JvmAsync
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> = JvmJWKKeyCreator.importJWK(jwk)
+
+        suspend fun importJWKThrowing(jwk: String): JWKKey = importJWK(jwk).getOrThrow()
 
         @JvmBlocking
         @JvmAsync

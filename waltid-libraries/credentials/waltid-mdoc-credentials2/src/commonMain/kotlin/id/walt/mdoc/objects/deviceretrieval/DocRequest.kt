@@ -24,4 +24,19 @@ data class DocRequest(
 
     @SerialName("readerAuth")
     val readerAuth: CoseSign1? = null,
-)
+) {
+    companion object {
+        fun fromValues(docType: String, requestedElements: Map<String, List<String>>, intentToRetain: Boolean = false) = DocRequest(
+            itemsRequest = ByteStringWrapper(
+                value = ItemsRequest(
+                    docType = docType,
+                    namespaces = requestedElements
+                        .filterValues { it.isNotEmpty() }
+                        .mapValues { (_, elems) ->
+                            ItemsRequestList(elems.distinct().map { ItemRequest(it, intentToRetain) })
+                        }
+                )
+            )
+        )
+    }
+}

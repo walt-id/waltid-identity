@@ -2,6 +2,7 @@ plugins {
     id("waltid.backend") // <-- Applies Kotlin JVM, Toolchain 21, etc.
     id("io.ktor.plugin")
     application
+    id("com.github.gmazzo.buildconfig")
 }
 
 val catalogs = extensions.getByType<VersionCatalogsExtension>()
@@ -30,21 +31,15 @@ tasks.named<CreateStartScripts>("startScripts") {
     }
 }
 
-// Version Properties Generation
-/*val generateVersionProperties by tasks.registering(WriteProperties::class) {
-    destinationFile.set(layout.buildDirectory.file("generated/resources/version.properties"))
-
-    property("version", rootProject.version.toString())
-    comment = "walt.id version store"
-}
-sourceSets.named("main") {
-    resources.srcDir(generateVersionProperties)
-}*/
-
 // Default Application Settings
 application {
     val isDevelopment: Boolean = project.ext.has("development")
     applicationDefaultJvmArgs = listOf("-Dio.ktor.development=$isDevelopment")
+}
+
+buildConfig {
+    useKotlinOutput()
+    buildConfigField("String", "VERSION", "\"${project.version}\"")
 }
 
 tasks.withType<Test> {

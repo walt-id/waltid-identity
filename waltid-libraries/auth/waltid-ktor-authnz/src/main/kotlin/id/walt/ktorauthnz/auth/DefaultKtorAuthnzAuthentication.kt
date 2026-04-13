@@ -1,6 +1,7 @@
 package id.walt.ktorauthnz.auth
 
 import id.walt.ktorauthnz.KtorAuthnzManager
+import io.klogging.logger
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.response.*
@@ -15,10 +16,12 @@ class DefaultKtorAuthnzAuthentication internal constructor(
     config: Config,
 ) : KtorAuthnzAuthenticationProvider(config) {
 
+    val log = logger<DefaultKtorAuthnzAuthentication>()
 //    private val challengeFunction: FormAuthChallengeFunction = config.challengeFunction
 
 
-    fun fail(context: AuthenticationContext, cause: AuthenticationFailedCause) {
+    suspend fun fail(context: AuthenticationContext, cause: AuthenticationFailedCause) {
+        log.debug { "Fail http request auth for: $cause" }
         @Suppress("NAME_SHADOWING")
         context.challenge("ktor-authnz-challenge", cause) { challenge, call ->
             // TODO: better error messages
@@ -35,6 +38,7 @@ class DefaultKtorAuthnzAuthentication internal constructor(
         val effectiveToken = call.getEffectiveRequestAuthToken()
 
         if (effectiveToken == null) {
+            log.debug { "Missing authentication token for request" }
             fail(context, AuthenticationFailedCause.NoCredentials)
             return
         }
@@ -47,6 +51,7 @@ class DefaultKtorAuthnzAuthentication internal constructor(
             context.principal(name, principal)
             return
         } else {
+            log.debug { "Missing principal (Invalid Credentials) for request" }
             fail(context, AuthenticationFailedCause.InvalidCredentials)
         }
     }

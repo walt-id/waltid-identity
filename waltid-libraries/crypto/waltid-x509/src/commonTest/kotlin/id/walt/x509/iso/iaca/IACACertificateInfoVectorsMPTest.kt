@@ -4,7 +4,7 @@ import id.walt.x509.CertificateDer
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
-import okio.ByteString.Companion.decodeHex
+import kotlinx.io.bytestring.hexToByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -33,11 +33,11 @@ class IACACertificateInfoVectorsMPTest {
             val subject = assertNotNull(info.subject)
 
             assertEquals(
-                expected = vector.issuerHex.decodeHex(),
+                expected = vector.issuerHex.hexToByteString(),
                 actual = issuer,
             )
             assertEquals(
-                expected = vector.subjectHex.decodeHex(),
+                expected = vector.subjectHex.hexToByteString(),
                 actual = subject,
             )
 

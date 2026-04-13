@@ -8,6 +8,7 @@ import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.commons.web.modules.FeatureFlagInformationModule
 import id.walt.commons.web.modules.OpenApiModule
 import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
+import id.walt.commons.web.modules.ServiceHealthChecksDebugModule.KtorStatusChecker
 import id.walt.commons.web.plugins.configureSerialization
 import id.walt.commons.web.plugins.configureStatusPages
 import io.klogging.logger
@@ -17,18 +18,21 @@ import io.ktor.server.engine.*
 import java.net.BindException
 
 data class WebService(
-    val module: Application.() -> Unit,
+    val module: suspend Application.() -> Unit,
 ) {
     private val log = logger("WebService")
 
-    val webServiceModule: Application.() -> Unit = {
+    val webServiceModule: suspend Application.() -> Unit = {
+        KtorStatusChecker.run { init() };
+
         { FeatureFlagInformationModule.run { enable() } } whenFeature CommonsFeatureCatalog.featureFlagInformationEndpointFeature
-        { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
         { OpenApiModule.run { enable() } } whenFeature CommonsFeatureCatalog.openApiFeature
         { AuthenticationServiceModule.run { enable() } } whenFeature CommonsFeatureCatalog.authenticationServiceFeature
 
         configureStatusPages()
-        configureSerialization()
+        configureSerialization();
+
+        { ServiceHealthChecksDebugModule.run { enable() } } whenFeature CommonsFeatureCatalog.healthChecksFeature
 
         module.invoke(this)
     }

@@ -483,20 +483,19 @@ data class DcApiAnnexCFlowSetup(
 
                 signedRequest = true,
                 encryptedResponse = false,
-                clientId = "x509_hash:kZ5SI3MAFaLDPRxza8xguw-o6b8LYfmP2ZvrqVSRWng",
+                clientId = "x509_hash:1i4VjAVXdxwhPVuPM19mNtMpWJhQ",
                 x5c = listOf(
-                    "MIIB7TCCAZOgAwIBAgIUXrHFKoaAx6+CFOOHp6fZ7Rs2EzgwCgYIKoZIzj0EAwIwHTEbMBkGA1UEAwwSQ3VzdG9tSW50ZXJtZWRpYXRlMB4XDTI2MDEyMjE1NTY0OFoXDTI3MDEyMjE1NTY0OFowEzERMA8GA1UEAwwIVmVyaWZpZXIwgZswEAYHKoZIzj0CAQYFK4EEACMDgYYABAD1oOE9xUCHiQ/8UDdJGqeTM6e5SdewrYP0/BstuJcDqfxCIQ8wSvTKArn0iCE0aJVpXIxU4908vdQva3LU7kn9BQBJxQyonnLqp2fFzCoLe3RWVkX5szxa4EJmrsJW1wwtJBwmYVe+lToAqFnc30i3oCyhp/pyDQCEaj0fZ9ij6UMCp6N4MHYwDAYDVR0TAQH/BAIwADAOBgNVHQ8BAf8EBAMCB4AwFgYDVR0RBA8wDYILZXhhbXBsZS5jb20wHQYDVR0OBBYEFFAdasyU1haLdvQdEizJEaAO+cmWMB8GA1UdIwQYMBaAFGVh3m3K6y5gABHGIuD7ibTR+AG6MAoGCCqGSM49BAMCA0gAMEUCIQDT9GYMvTTyEOmKDvilHmgejcbLWQ6ACUzlmbZDk67ztAIge2kWDxRetz6xIDtnfg4vlCW6pLbdBWasMrfm1eppDww=",
-                    "MIIBlzCCAT2gAwIBAgIUZFEF4iwIsLuJO7pJ9bU7vo9Dg3kwCgYIKoZIzj0EAwIwFTETMBEGA1UEAwwKQ3VzdG9tUm9vdDAeFw0yNjAxMjIxNTU1NDJaFw0zNjAxMjAxNTU1NDJaMB0xGzAZBgNVBAMMEkN1c3RvbUludGVybWVkaWF0ZTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABAvlBFSSRWetJJSj5rvGoXtPnfw97YRHbJj4/kspQbSwxVN3RtofsSu0DevrISGx2MCPqqxHXdfSeu9SKgen6IOjYzBhMA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgEGMB0GA1UdDgQWBBRlYd5tyusuYAARxiLg+4m00fgBujAfBgNVHSMEGDAWgBQ+D1YkeDpF+qaxAhlnb3XSkGZWCTAKBggqhkjOPQQDAgNIADBFAiEA789kIQsGTa/GJEgYaOID9VVoO0PyeeYEwub7P0a1+ZICIHI9bYi72XTca9e8rqGJuYmKz8qEQodLvaXdgwCfQ4KZ"
+                    "MIIBsTCCAVegAwIBAgIUJklaRrIjkEZlDdPk2+qPneHHD6kwCgYIKoZIzj0EAwIwLjEQMA4GA1UEAwwHRXhhbXBsZTENMAsGA1UECgwEVGVzdDELMAkGA1UEBhMCVVMwHhcNMjYwMzMxMDkwNDMwWhcNMjcwMzMxMDkwNDMwWjAuMRAwDgYDVQQDDAdFeGFtcGxlMQ0wCwYDVQQKDARUZXN0MQswCQYDVQQGEwJVUzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABM4ukI9BoHfMYjKmokWc5GMiN7DJBQAPPZBHXHhwmuQE+JyeRcamM+uCS1N+naE0itVbs7fQ/5xbujSSK9pYdb6jUzBRMB0GA1UdDgQWBBSwjqgulcWH4AqTJwPjBGj3VGIAsTAfBgNVHSMEGDAWgBSwjqgulcWH4AqTJwPjBGj3VGIAsTAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0gAMEUCIQCoWAleGRqR+kb+5SeRt/scogZPiQiM7wJ69tadEPPJwQIgdygIZSMQSXlxXbZ10QKtN6qSjggqFVUV4/Z2/pnBUBk="
                 ),
 
                 key = DirectSerializedKey(
                     KeyManager.resolveSerializedKeyBlocking(
                         """{"type":"jwk","jwk":{
                     "kty": "EC",
-                    "crv": "P-521",
-                    "x": "APWg4T3FQIeJD_xQN0kap5Mzp7lJ17Ctg_T8Gy24lwOp_EIhDzBK9MoCufSIITRolWlcjFTj3Ty91C9rctTuSf0F",
-                    "y": "AEnFDKiecuqnZ8XMKgt7dFZWRfmzPFrgQmauwlbXDC0kHCZhV76VOgCoWdzfSLegLKGn-nINAIRqPR9n2KPpQwKn",
-                    "d": "AZT9f0qOOSMQl25qXwvFs23rq0PIUOV1R8YcG1iqRNKEYYs5k8gXNNuud4W6amuItCGWCrKSXRoHmgj6C5NUDzhA"
+                    "crv": "P-256",
+                    "x": "zi6Qj0Ggd8xiMqaiRZzkYyI3sMkFAA89kEdceHCa5AQ",
+                    "y": "-JyeRcamM-uCS1N-naE0itVbs7fQ_5xbujSSK9pYdb4",
+                    "d": "1xgojLKBT4hmuTjgjhz0l6RTHgmlLlVb5bnwuZkNBaA"
                   }}"""
                     )
                 )

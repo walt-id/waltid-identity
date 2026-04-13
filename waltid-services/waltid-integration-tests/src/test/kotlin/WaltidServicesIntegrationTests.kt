@@ -222,7 +222,7 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
 
     //        @Test
     fun e2ePresDefPolicyTests() = E2ETest().testBlock(
-        config = ServiceConfiguration("e2e-pres-def-tests"),
+        config = ServiceConfiguration("e2e-pres-def-tests", version = "test"),
         features = listOf(
             id.walt.issuer.FeatureCatalog,
             id.walt.verifier.FeatureCatalog,
@@ -247,7 +247,7 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
 
     //@Test
     fun testExternalSignatureAPIs() = E2ETest().testBlock(
-        config = ServiceConfiguration("e2e-test"),
+        config = ServiceConfiguration("e2e-test", version = "test"),
         features = listOf(
             id.walt.issuer.FeatureCatalog,
             id.walt.verifier.FeatureCatalog,
@@ -270,7 +270,7 @@ fun lspVerifierTests() = testBlock(timeout = defaultTestTimeout) {
 
     //@Test
     fun inputDescriptorTest() = E2ETest().testBlock(
-        config = ServiceConfiguration("e2e-test"),
+        config = ServiceConfiguration("e2e-test", version = "test"),
         features = listOf(
             id.walt.issuer.FeatureCatalog,
             id.walt.verifier.FeatureCatalog,

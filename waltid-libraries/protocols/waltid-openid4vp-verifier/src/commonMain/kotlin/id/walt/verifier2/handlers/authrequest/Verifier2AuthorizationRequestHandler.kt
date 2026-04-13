@@ -6,6 +6,7 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
+import io.ktor.http.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
@@ -54,7 +55,7 @@ object Verifier2AuthorizationRequestHandler {
         )
 
         when (formattedSessionResponse) {
-            is JWTStringResponse -> call.respond(formattedSessionResponse.jwt)
+            is JWTStringResponse -> call.respondText(formattedSessionResponse.jwt, ContentType.parse("application/oauth-authz-req+jwt"))
             is JsonObjectResponse -> call.respond(formattedSessionResponse.json)
             is RawAuthorizationRequestResponse -> call.respond(formattedSessionResponse.authorizationRequest)
         }
