@@ -17,7 +17,8 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
         OptionalFeature("httpclient", "HTTP Web Data Fetcher", ServiceWebDataFetcherConfiguration::class, default = true, {
             val config = ConfigManager.getConfig<ServiceWebDataFetcherConfiguration>()
             if (config.globalDefault != null) {
-                WebDataFetcherManager.defaultConfiguration = config.globalDefault
+                WebDataFetcherManager.globalDefaultConfiguration = config.globalDefault
+                log.trace { "Applied default configuration for all new web data fetchers: ${WebDataFetcherManager.globalDefaultConfiguration}" }
             }
             if (config.service != null) {
                 WebDataFetcherManager.applyConfigurations(config.service)
