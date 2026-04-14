@@ -13,6 +13,7 @@ kotlin {
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
+            implementation(identityLibs.ktor.client.cio)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -28,12 +29,41 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(identityLibs.bundles.waltid.kotlintesting)
-            implementation(identityLibs.ktor.client.cio)
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
         }
-        jsTest.dependencies {
+
+        jvmMain.dependencies {
+            implementation(identityLibs.ktor.client.java)
+            implementation(identityLibs.ktor.client.apache5)
+            implementation(identityLibs.ktor.client.okhttp)
+        }
+
+        /* To do:
+        androidMain.dependencies {
+            implementation(identityLibs.ktor.client.android)
+            implementation(identityLibs.ktor.client.okhttp)
+        }
+         */
+
+
+        iosMain.dependencies {
+            implementation(identityLibs.ktor.client.darwin)
+        }
+        macosMain.dependencies {
+            implementation(identityLibs.ktor.client.darwin)
+        }
+
+        linuxMain.dependencies {
+            implementation(identityLibs.ktor.client.curl)
+        }
+
+        mingwMain.dependencies {
+            implementation(identityLibs.ktor.client.winhttp)
+        }
+
+        jsMain.dependencies {
             implementation(identityLibs.ktor.client.js)
         }
     }

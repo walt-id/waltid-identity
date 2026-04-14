@@ -9,7 +9,6 @@ import id.walt.sdjwt.SDPayload
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.w3c.schemes.JwsSignatureScheme.JwsHeader
 import id.walt.w3c.schemes.JwsSignatureScheme.JwsOption
-import io.ktor.utils.io.core.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -76,7 +75,7 @@ data class W3CVC(
             payload,
             SDMapBuilder(disclosureMap.decoyMode).addField(JwsOption.VC, sd = false, children = disclosureMap).build()
         )
-        val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
+        val signable = Json.encodeToString(sdPayload.undisclosedPayload).encodeToByteArray()
 
         val signed = issuerKey.signJws(
             signable, additionalJwtHeaders.plus(

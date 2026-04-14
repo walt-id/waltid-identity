@@ -61,6 +61,11 @@ object FeatureManager {
             it.invoke()
         }
 
+        feature.onEnable?.let {
+            log.info { "Enabling feature \"${feature.name}\"..." }
+            it.invoke()
+        }
+
         return when {
             enabledFeatures.add(feature.name) -> Result.success(true)
             else -> Result.failure(IllegalStateException("Feature \"${feature.name}\" already enabled."))
