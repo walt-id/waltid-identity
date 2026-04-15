@@ -84,6 +84,10 @@ application {
     mainClass.set("id.walt.verifier.MainKt")
 }
 
+buildConfig {
+    packageName("id.walt.verifier")
+}
+
 ktor {
     docker {
         listOf(

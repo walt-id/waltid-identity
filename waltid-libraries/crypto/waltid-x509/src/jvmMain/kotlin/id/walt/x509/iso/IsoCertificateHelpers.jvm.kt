@@ -1,8 +1,7 @@
 package id.walt.x509.iso
 
 import id.walt.crypto.keys.KeyType
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.DERIA5String
 import org.bouncycastle.asn1.x509.CRLDistPoint
@@ -19,7 +18,7 @@ internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
     val random = SecureRandom()
     val randomBytes = ByteArray(ISO_CERT_SERIAL_NUMBER_REQUIRED_LENGTH)
     random.nextBytes(randomBytes)
-    return BigInteger(randomBytes).abs().toByteArray().toByteString()
+    return ByteString(BigInteger(randomBytes).abs().toByteArray())
 }
 
 internal fun getJcaSigningAlgorithmNameFromKeyType(

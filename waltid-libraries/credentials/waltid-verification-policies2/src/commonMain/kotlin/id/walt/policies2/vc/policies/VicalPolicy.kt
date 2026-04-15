@@ -10,6 +10,7 @@ import id.walt.vical.Vical
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.io.bytestring.ByteString
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -19,7 +20,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import okio.ByteString.Companion.toByteString
 
 private val log = KotlinLogging.logger { }
 
@@ -87,7 +87,7 @@ data class VicalPolicy(
 
             // Loading the certificate chain from the provided credential
             val chain = x5cList.x5c.map {
-                CertificateDer(it.base64Der.decodeFromBase64().toByteString())
+                CertificateDer(it.base64Der.decodeFromBase64())
             }.filter { it != signingCert } // Do not put the signing cert in the chain
 
             val vicalBytes: ByteArray = resolveVicalBytes()
@@ -200,44 +200,32 @@ data class VicalPolicy(
         }.getOrNull(0)
             ?: throw IllegalArgumentException("Could not determine document signing credential in x5c list")
 
-        val signingCert = CertificateDer(signingX5CCertificateString.base64Der.decodeFromBase64().toByteString())
+        val signingCert = CertificateDer(signingX5CCertificateString.base64Der.decodeFromBase64())
         return signingCert
     }
 
     /**
-     * Loads a list of trust anchors from raw VICAL CBOR bytes.
-     * The method processes certificate information and returns a list of DER-encoded certificates
-     * to be used as trust anchors. If no anchors are available after processing, returns null.
+     * Loads a list of trust anchors from the provided VICAL data encoded as a Base64 string.
+     * The method decodes the input, processes certificate information, and returns a list of
+     * DER-encoded certificates to be used as trust anchors. If no anchors are available after
+     * processing, the method returns null.
      *
-     * @param vicalBytes The raw CBOR bytes of the signed VICAL.
-     * @param allowedDocType If [enableDocumentTypeValidation] is `true`, the document type to
-     * validate against the VICAL data.
-     * @return A list of DER-encoded certificates (`CertificateDer`), or null if none are available.
+     * @param vicalBase64 The Base64-encoded string representing the VICAL data.
+     * @param allowedDocType If `documentTypeValidation` is `true`, the document type to be validated against the VICAL data.
+     * @return A list of DER-encoded certificates (`CertificateDer`) parsed from the VICAL data, or null if no anchors are available.
      */
-    private fun loadTrustAnchorsFromVicalBytes(vicalBytes: ByteArray, allowedDocType: String): List<CertificateDer>? {
-        val decodedVical = Vical.decode(vicalBytes)
+    private fun loadTrustAnchorsFromVical(vicalBase64: String, allowedDocType: String): List<CertificateDer>? {
+        // decode VICAL
+        val decodedVical = Vical.decode(vicalBase64.decodeFromBase64())
 
         val certificateInfos = if (enableDocumentTypeValidation) {
             log.debug { "Document type validation is enabled" }
             decodedVical.vicalData.certificateInfos.filter { allowedDocType in it.docType }
         } else decodedVical.vicalData.certificateInfos
 
-        val anchorsFromVical: List<CertificateDer> = certificateInfos.map { info -> CertificateDer(info.certificate.toByteString()) }
+        // Build anchors from VICAL certificateInfos
+        val anchorsFromVical: List<CertificateDer> = certificateInfos.map { info -> CertificateDer(info.certificate) }
 
         return anchorsFromVical.ifEmpty { null }
     }
-
-    // ── Legacy compat: keep the old Base64-string overload for existing callers ────────────────
-
-    /**
-     * Loads trust anchors from a Base64-encoded VICAL string (legacy path, used by
-     * [loadTrustAnchorsFromVical] which is kept for source-level backward compatibility).
-     */
-    @Deprecated(
-        "Use loadTrustAnchorsFromVicalBytes with raw bytes instead",
-        ReplaceWith("loadTrustAnchorsFromVicalBytes(vicalBase64.decodeFromBase64(), allowedDocType)")
-    )
-    private fun loadTrustAnchorsFromVical(vicalBase64: String, allowedDocType: String): List<CertificateDer>? =
-        loadTrustAnchorsFromVicalBytes(vicalBase64.decodeFromBase64(), allowedDocType)
 }
-

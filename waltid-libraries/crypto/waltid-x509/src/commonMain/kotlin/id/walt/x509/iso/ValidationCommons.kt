@@ -1,6 +1,6 @@
 package id.walt.x509.iso
 
-import okio.ByteString
+import kotlinx.io.bytestring.ByteString
 
 /**
  * Validate an ISO-compliant X.509 certificate serial number.

@@ -25,7 +25,7 @@ suspend fun main(args: Array<String>) {
     ConfigManager.registerCustomDecoder(ClientMetadataHopliteDecoder())
 
     ServiceMain(
-        ServiceConfiguration("verifier"), ServiceInitialization(
+        ServiceConfiguration("verifier", version = BuildConfig.VERSION), ServiceInitialization(
             features = OSSVerifier2FeatureCatalog,
             init = {
                 DidService.apply {

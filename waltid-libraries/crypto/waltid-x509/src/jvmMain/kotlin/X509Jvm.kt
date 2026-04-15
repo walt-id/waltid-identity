@@ -1,7 +1,7 @@
 package id.walt.x509
 
 import com.nimbusds.jose.util.X509CertUtils
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import java.io.FileInputStream
 import java.security.KeyStore
 import java.security.cert.*
@@ -117,7 +117,7 @@ fun loadTrustAnchorsFromKeyStore(ks: KeyStore): List<CertificateDer> {
     while (aliases.hasMoreElements()) {
         val alias = aliases.nextElement()
         val cert = ks.getCertificate(alias) as? X509Certificate ?: continue
-        list.add(CertificateDer(cert.encoded.toByteString()))
+        list.add(CertificateDer(ByteString(cert.encoded)))
     }
     return list
 }

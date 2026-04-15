@@ -9,6 +9,14 @@ export default defineConfig({
   server: {
     allowedHosts: [...allowedHosts, 'digital-credentials.walt.id'],
     proxy: {
+      /*
+      '/api.json': {
+        target: 'http://192.168.x.y:7003',
+      },
+      '/verification-session/': {
+        target: 'http://192.168.x.y:7003',
+      },
+      */
       '/verifier-api': {
         target: 'https://waltid.enterprise.test.waltid.cloud',
         changeOrigin: true,

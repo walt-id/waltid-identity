@@ -1,7 +1,6 @@
 package id.walt.x509
 
-import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import kotlin.io.encoding.Base64
 
 /**
@@ -10,6 +9,9 @@ import kotlin.io.encoding.Base64
 data class CertificateDer(
     val bytes: ByteString,
 ) {
+
+    constructor(bytes: ByteArray) : this(ByteString(bytes))
+
     /**
      * Convert certificate DER bytes to PEM-encoded string.
      */
@@ -28,9 +30,11 @@ data class CertificateDer(
                 pemEncodedCertificate = pemEncodedCertificate,
             )
             return CertificateDer(
-                bytes = Base64.Pem.decode(
-                    source = base64Payload,
-                ).toByteString(),
+                bytes = ByteString(
+                    Base64.Pem.decode(
+                        source = base64Payload,
+                    )
+                ),
             )
         }
 

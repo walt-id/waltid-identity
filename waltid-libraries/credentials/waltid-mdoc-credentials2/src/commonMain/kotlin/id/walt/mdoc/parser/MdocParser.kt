@@ -33,7 +33,9 @@ object MdocParser {
         }.recoverCatching {
             log.trace { "Parsing mdoc as Document (not DeviceRespons)" }
             coseCompliantCbor.decodeFromByteArray<Document>(signedBytes)
-        }.getOrThrow()
+        }.getOrElse { ex ->
+            throw IllegalArgumentException("Was unable to parse mdoc document: ${ex.message}", ex)
+        }
 
         return document
     }

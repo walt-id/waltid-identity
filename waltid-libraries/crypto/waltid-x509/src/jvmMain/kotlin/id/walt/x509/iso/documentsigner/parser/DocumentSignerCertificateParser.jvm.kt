@@ -10,7 +10,8 @@ import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
 import id.walt.x509.iso.parseFromX509Certificate
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.toHexString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
 import kotlin.time.toKotlinInstant
 
@@ -48,13 +49,13 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         cert.subjectKeyIdentifier
     ) {
         "Subject key identifier must exist as part of the Document Signer X509 certificate, but was found missing"
-    }.hex()
+    }.toHexString()
 
     val akiHex = requireNotNull(
         cert.authorityKeyIdentifier
     ) {
         "Authority key identifier must exist as part of the Document Signer X509 certificate, but was found missing"
-    }.hex()
+    }.toHexString()
 
     return DocumentSignerDecodedCertificate(
         issuerPrincipalName = iacaPrincipalName,
@@ -65,7 +66,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         ),
         issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
         crlDistributionPointUri = crlDistributionPointUri,
-        serialNumber = cert.serialNumber.toByteArray().toByteString(),
+        serialNumber = ByteString(cert.serialNumber.toByteArray()),
         keyUsage = certificateKeyUsages,
         extendedKeyUsage = eku.toSet(),
         akiHex = akiHex,
