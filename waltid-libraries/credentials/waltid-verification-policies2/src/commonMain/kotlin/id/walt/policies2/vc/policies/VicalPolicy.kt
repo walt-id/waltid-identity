@@ -214,9 +214,9 @@ data class VicalPolicy(
      * @param allowedDocType If `documentTypeValidation` is `true`, the document type to be validated against the VICAL data.
      * @return A list of DER-encoded certificates (`CertificateDer`) parsed from the VICAL data, or null if no anchors are available.
      */
-    private fun loadTrustAnchorsFromVical(vicalBase64: String, allowedDocType: String): List<CertificateDer>? {
+    private fun loadTrustAnchorsFromVicalBytes(vicalBytes: ByteArray, allowedDocType: String): List<CertificateDer>? {
         // decode VICAL
-        val decodedVical = Vical.decode(vicalBase64.decodeFromBase64())
+        val decodedVical = Vical.decode(vicalBytes)
 
         val certificateInfos = if (enableDocumentTypeValidation) {
             log.debug { "Document type validation is enabled" }
