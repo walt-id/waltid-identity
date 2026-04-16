@@ -163,11 +163,22 @@ object OSSIssuer2Manager {
     }
 
     suspend fun createCredentialOffer(request: CredentialOfferCreateRequest): IssuanceSession {
+        log.debug { "Creating credential offer for profile: ${request.profileId}" }
+        
         val profile = getProfile(request.profileId)
-            ?: throw IllegalArgumentException("Profile not found: ${request.profileId}")
+        if (profile == null) {
+            log.warn { "Profile not found: ${request.profileId}" }
+            log.debug { "Available profiles: ${getProfiles().map { it.profileId }}" }
+            throw IllegalArgumentException("Profile not found: ${request.profileId}")
+        }
 
         val credentialConfig = getCredentialConfiguration(profile.credentialConfigurationId)
-            ?: throw IllegalArgumentException("Credential configuration not found: ${profile.credentialConfigurationId}")
+        if (credentialConfig == null) {
+            log.warn { "Credential configuration not found: ${profile.credentialConfigurationId}" }
+            log.debug { "Available configurations: ${getCredentialConfigurations().keys}" }
+            throw IllegalArgumentException("Credential configuration not found: ${profile.credentialConfigurationId}")
+        }
+        log.debug { "Found credential configuration: ${profile.credentialConfigurationId}" }
 
         val baseUrl = serviceConfig.baseUrl
         val expiresAt = Clock.System.now().plus(request.expiresInSeconds.seconds)
@@ -177,11 +188,10 @@ object OSSIssuer2Manager {
         val credentialData = request.runtimeOverrides?.credentialData ?: profile.credentialData
         val mapping = request.runtimeOverrides?.mapping ?: profile.mapping
 
-        // Use per-request notifications if provided, otherwise profile-level, otherwise default
-        // Convert config types to library types
         val effectiveNotifications = request.notifications 
             ?: profile.notifications?.toLibraryType() 
             ?: serviceConfig.defaultNotifications?.toLibraryType()
+        log.debug { "Notifications configured: ${effectiveNotifications != null}" }
 
         val issuanceRequest = IssuanceSessionRequest(
             profileId = profile.profileId,
@@ -200,6 +210,7 @@ object OSSIssuer2Manager {
             },
         )
 
+        log.debug { "Creating ${request.authMethod} session" }
         val session = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
                 createPreAuthorizedSession(
@@ -228,7 +239,7 @@ object OSSIssuer2Manager {
         }
 
         sessions[session.id] = session
-        log.info { "Created issuance session: ${session.id} for profile: ${profile.profileId}" }
+        log.info { "Created issuance session: ${session.id} for profile: ${profile.profileId} (auth: ${request.authMethod})" }
         return session
     }
 
@@ -348,7 +359,9 @@ object OSSIssuer2Manager {
         )
     }
 
-    fun getSession(sessionId: String): IssuanceSession? = sessions[sessionId]
+    fun getSession(sessionId: String): IssuanceSession? {
+        return sessions[sessionId]
+    }
 
     fun updateSessionStatus(sessionId: String, status: IssuanceSessionStatus) {
         sessions[sessionId]?.let { session ->

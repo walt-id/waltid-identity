@@ -70,12 +70,20 @@ object OSSIssuer2Service {
         }) {
             get("credential-offer", IssuerRoutesDocs.getCredentialOfferDocs()) {
                 val sessionId = call.request.queryParameters["id"]
-                    ?: return@get call.respond(HttpStatusCode.BadRequest, "Missing session id")
+                if (sessionId == null) {
+                    log.warn { "GET /credential-offer - Missing session id parameter" }
+                    return@get call.respond(HttpStatusCode.BadRequest, "Missing session id")
+                }
+                log.debug { "GET /credential-offer - Session ID: $sessionId" }
 
                 val session = OSSIssuer2Manager.getSession(sessionId)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, "Session not found")
+                if (session == null) {
+                    log.warn { "GET /credential-offer - Session not found: $sessionId" }
+                    return@get call.respond(HttpStatusCode.NotFound, "Session not found")
+                }
 
                 if (session.isExpired()) {
+                    log.info { "GET /credential-offer - Session expired: $sessionId" }
                     OSSIssuer2Manager.updateSessionStatus(sessionId, IssuanceSessionStatus.EXPIRED)
                     val updatedSession = OSSIssuer2Manager.getSession(sessionId)!!
                     updatedSession.toSessionUpdate(IssuanceSessionEvent.SESSION_EXPIRED)
@@ -83,6 +91,7 @@ object OSSIssuer2Service {
                     return@get call.respond(HttpStatusCode.Gone, "Session expired")
                 }
 
+                log.info { "GET /credential-offer - Credential offer resolved for session: $sessionId" }
                 OSSIssuer2Manager.updateSessionStatus(sessionId, IssuanceSessionStatus.CREDENTIAL_OFFER_RESOLVED)
                 val updatedSession = OSSIssuer2Manager.getSession(sessionId)!!
                 updatedSession.toSessionUpdate(IssuanceSessionEvent.OFFER_RESOLVED)
@@ -91,8 +100,10 @@ object OSSIssuer2Service {
             }
 
             get("authorize", IssuerRoutesDocs.getAuthorizationEndpointDocs()) {
+                log.debug { "GET /authorize - Received authorization request" }
                 val parameters = call.request.queryParameters.entries()
                     .associate { it.key to it.value }
+                log.debug { "GET /authorize - Parameters: ${parameters.keys}" }
 
                 val result = OSSIssuer2Manager.oauth2Provider.createAuthorizationRequest(parameters)
 
@@ -100,10 +111,12 @@ object OSSIssuer2Service {
                     is AuthorizationRequestResult.Success -> {
                         val request = result.request
                         val issuerState = request.issuerState
+                        log.debug { "GET /authorize - Issuer state: $issuerState" }
 
                         if (issuerState != null) {
                             val session = OSSIssuer2Manager.getSession(issuerState)
                             if (session != null && session.authMethod == AuthenticationMethod.AUTHORIZED) {
+                                log.debug { "GET /authorize - Found authorized session: ${session.id}" }
                                 val oauthSession = DefaultSession()
                                     .withSubject(issuerState)
                                     .withExpiresAt(TokenType.ACCESS_TOKEN, kotlin.time.Clock.System.now().plus(300.seconds))
@@ -118,6 +131,7 @@ object OSSIssuer2Service {
 
                                 when (responseResult) {
                                     is id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Success -> {
+                                        log.info { "GET /authorize - Authorization successful for session: $issuerState" }
                                         val response = responseResult.response
                                         val httpResponse = OSSIssuer2Manager.oauth2Provider.writeAuthorizationResponse(
                                             request,
@@ -128,6 +142,7 @@ object OSSIssuer2Service {
                                         return@get
                                     }
                                     is id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Failure -> {
+                                        log.warn { "GET /authorize - Authorization failed: ${responseResult.error.description}" }
                                         val httpResponse = OSSIssuer2Manager.oauth2Provider.writeAuthorizationError(
                                             request,
                                             responseResult.error
@@ -137,7 +152,11 @@ object OSSIssuer2Service {
                                         return@get
                                     }
                                 }
+                            } else {
+                                log.warn { "GET /authorize - Session not found or not authorized: $issuerState" }
                             }
+                        } else {
+                            log.warn { "GET /authorize - Missing issuer_state parameter" }
                         }
 
                         call.respond(HttpStatusCode.BadRequest, "Invalid or missing issuer_state")
@@ -152,17 +171,22 @@ object OSSIssuer2Service {
             }
 
             post("token", IssuerRoutesDocs.getTokenEndpointDocs()) {
+                log.debug { "POST /token - Received token request" }
+                
                 val formParameters = call.receiveParameters()
                 val parameters = formParameters.entries()
                     .associate { it.key to it.value }
+                log.debug { "POST /token - Parameters: ${parameters.mapValues { if (it.key.contains("code", ignoreCase = true)) "[REDACTED]" else it.value }}" }
 
                 val grantType = parameters["grant_type"]?.firstOrNull()
                 val preAuthCode = parameters["pre-authorized_code"]?.firstOrNull()
+                log.debug { "POST /token - Grant type: $grantType" }
 
                 var sessionId: String? = null
                 if (grantType == "urn:ietf:params:oauth:grant-type:pre-authorized_code" && preAuthCode != null) {
                     val record = OSSIssuer2Manager.preAuthorizedCodeRepository.getRecord(preAuthCode)
                     sessionId = (record as? id.walt.issuer2.oauth.InMemoryPreAuthorizedCodeRecord)?.sessionId
+                    log.debug { "POST /token - Pre-auth code lookup: sessionId=$sessionId" }
                 }
 
                 val session = sessionId?.let { OSSIssuer2Manager.getSession(it) }
@@ -176,9 +200,11 @@ object OSSIssuer2Service {
 
                 when (result) {
                     is AccessTokenRequestResult.Success -> {
+                        log.debug { "POST /token - Access token request validated" }
                         val tokenResult = OSSIssuer2Manager.oauth2Provider.createAccessTokenResponse(result.request)
                         when (tokenResult) {
                             is AccessTokenResponseResult.Success -> {
+                                log.info { "POST /token - Token issued successfully for session: $sessionId" }
                                 sessionId?.let {
                                     OSSIssuer2Manager.updateSessionStatus(it, IssuanceSessionStatus.TOKEN_REQUESTED)
                                     val updatedSession = OSSIssuer2Manager.getSession(it)
@@ -199,6 +225,7 @@ object OSSIssuer2Service {
                                 )
                             }
                             is AccessTokenResponseResult.Failure -> {
+                                log.warn { "POST /token - Token response failed: ${tokenResult.error}" }
                                 val httpResponse = OSSIssuer2Manager.oauth2Provider.writeAccessTokenError(
                                     result.request,
                                     tokenResult.error
@@ -213,6 +240,7 @@ object OSSIssuer2Service {
                         }
                     }
                     is AccessTokenRequestResult.Failure -> {
+                        log.warn { "POST /token - Token request validation failed: ${result.error.error} - ${result.error.description}" }
                         call.respond(
                             HttpStatusCode.BadRequest,
                             mapOf("error" to result.error.error, "error_description" to result.error.description)
@@ -233,48 +261,62 @@ object OSSIssuer2Service {
             }
 
             post("credential", IssuerRoutesDocs.getCredentialEndpointDocs()) {
+                log.debug { "POST /credential - Received credential request" }
+                
                 val authHeader = call.request.header(HttpHeaders.Authorization)
                 if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                    log.warn { "POST /credential - Missing or invalid Authorization header" }
                     call.respond(HttpStatusCode.Unauthorized, "Missing or invalid Authorization header")
                     return@post
                 }
 
                 val accessToken = authHeader.removePrefix("Bearer ")
+                log.debug { "POST /credential - Access token received (length: ${accessToken.length})" }
 
                 val body = call.receive<JsonObject>()
+                log.debug { "POST /credential - Request body: $body" }
+                
                 val parameters = body.mapValues { listOf(it.value.toString().trim('"')) }
 
                 val credentialConfigId = body["credential_configuration_id"]?.jsonPrimitive?.content
                     ?: body["credential_identifier"]?.jsonPrimitive?.content
 
                 if (credentialConfigId == null) {
+                    log.warn { "POST /credential - Missing credential_configuration_id in request" }
                     call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "invalid_request", "error_description" to "Missing credential_configuration_id")
                     )
                     return@post
                 }
+                log.debug { "POST /credential - Credential config ID: $credentialConfigId" }
 
                 val credentialConfig = OSSIssuer2Manager.getCredentialConfiguration(credentialConfigId)
                 if (credentialConfig == null) {
+                    log.warn { "POST /credential - Unknown credential configuration: $credentialConfigId" }
+                    log.debug { "POST /credential - Available configurations: ${OSSIssuer2Manager.getCredentialConfigurations().keys}" }
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        mapOf("error" to "invalid_request", "error_description" to "Unknown credential configuration")
+                        mapOf("error" to "invalid_request", "error_description" to "Unknown credential configuration: $credentialConfigId")
                     )
                     return@post
                 }
 
                 val session = findSessionByCredentialConfig(credentialConfigId)
                 if (session == null) {
+                    log.warn { "POST /credential - No active session for credential config: $credentialConfigId" }
+                    log.debug { "POST /credential - Active sessions: ${OSSIssuer2Manager.sessions.values.map { "${it.id} -> ${it.credentialConfigurationId} (${it.status})" }}" }
                     call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "invalid_request", "error_description" to "No active session for this credential")
                     )
                     return@post
                 }
+                log.debug { "POST /credential - Found session: ${session.id} (status: ${session.status})" }
 
                 val profile = OSSIssuer2Manager.getProfile(session.profileId)
                 if (profile == null) {
+                    log.error { "POST /credential - Profile not found: ${session.profileId}" }
                     call.respond(
                         HttpStatusCode.BadRequest,
                         mapOf("error" to "server_error", "error_description" to "Profile not found")
@@ -283,8 +325,10 @@ object OSSIssuer2Service {
                 }
 
                 try {
+                    log.debug { "POST /credential - Resolving issuer key for profile: ${profile.profileId}" }
                     val issuerKey = KeyManager.resolveSerializedKey(session.issuanceRequest.issuerKey)
                     val issuerId = session.issuanceRequest.issuerDid ?: OSSIssuer2Manager.getBaseUrl()
+                    log.debug { "POST /credential - Issuer ID: $issuerId" }
 
                     val oauthSession = DefaultSession().withSubject(session.id)
                     val credentialResult = OSSIssuer2Manager.oauth2Provider.createCredentialRequest(
@@ -295,6 +339,7 @@ object OSSIssuer2Service {
 
                     when (credentialResult) {
                         is CredentialRequestResult.Success -> {
+                            log.debug { "POST /credential - Credential request validated successfully" }
                             val sdMap = session.issuanceRequest.selectiveDisclosureJson?.let {
                                 Json.decodeFromJsonElement(SDMap.serializer(), it)
                             }
@@ -313,6 +358,7 @@ object OSSIssuer2Service {
 
                             when (responseResult) {
                                 is CredentialResponseResult.Success -> {
+                                    log.info { "POST /credential - Credential issued successfully for session: ${session.id}" }
                                     OSSIssuer2Manager.updateSessionStatus(session.id, IssuanceSessionStatus.CREDENTIAL_ISSUED)
                                     val updatedSession = OSSIssuer2Manager.getSession(session.id)!!
                                     updatedSession.toSessionUpdate(IssuanceSessionEvent.CREDENTIAL_ISSUED)
@@ -339,6 +385,7 @@ object OSSIssuer2Service {
                                     )
                                 }
                                 is CredentialResponseResult.Failure -> {
+                                    log.warn { "POST /credential - Credential response failed: ${responseResult.error}" }
                                     val httpResponse = OSSIssuer2Manager.oauth2Provider.writeCredentialError(
                                         credentialResult.request,
                                         responseResult.error
@@ -362,6 +409,7 @@ object OSSIssuer2Service {
                             }
                         }
                         is CredentialRequestResult.Failure -> {
+                            log.warn { "POST /credential - Credential request validation failed: ${credentialResult.error.error} - ${credentialResult.error.description}" }
                             call.respond(
                                 HttpStatusCode.BadRequest,
                                 mapOf("error" to credentialResult.error.error, "error_description" to credentialResult.error.description)
@@ -369,7 +417,7 @@ object OSSIssuer2Service {
                         }
                     }
                 } catch (e: Exception) {
-                    log.error(e) { "Error issuing credential" }
+                    log.error(e) { "POST /credential - Error issuing credential for session ${session.id}" }
                     call.respond(
                         HttpStatusCode.InternalServerError,
                         mapOf("error" to "server_error", "error_description" to (e.message ?: "Internal error"))
@@ -384,6 +432,7 @@ object OSSIssuer2Service {
             tags("Issuance Management")
         }) {
             get("", IssuerRoutesDocs.getListProfilesDocs()) {
+                log.debug { "GET /profiles - Listing all profiles" }
                 val profiles = OSSIssuer2Manager.getProfiles().map { profile ->
                     ProfileSummary(
                         profileId = profile.profileId,
@@ -391,13 +440,18 @@ object OSSIssuer2Service {
                         credentialConfigurationId = profile.credentialConfigurationId,
                     )
                 }
+                log.debug { "GET /profiles - Found ${profiles.size} profiles" }
                 call.respond(profiles)
             }
 
             get("{profileId}", IssuerRoutesDocs.getViewProfileDocs()) {
                 val profileId = call.parameters.getOrFail("profileId")
+                log.debug { "GET /profiles/$profileId - Fetching profile details" }
                 val profile = OSSIssuer2Manager.getProfile(profileId)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, "Profile not found")
+                if (profile == null) {
+                    log.warn { "GET /profiles/$profileId - Profile not found" }
+                    return@get call.respond(HttpStatusCode.NotFound, "Profile not found")
+                }
 
                 val credentialConfig = OSSIssuer2Manager.getCredentialConfiguration(profile.credentialConfigurationId)
 
@@ -414,7 +468,9 @@ object OSSIssuer2Service {
 
             post("{profileId}/offers", IssuerRoutesDocs.getCreateCredentialOfferDocs()) {
                 val profileId = call.parameters.getOrFail("profileId")
+                log.debug { "POST /profiles/$profileId/offers - Creating credential offer" }
                 val body = call.receive<CredentialOfferCreateRequestBody>()
+                log.debug { "POST /profiles/$profileId/offers - Request body: authMethod=${body.authMethod}, valueMode=${body.valueMode}" }
 
                 val request = CredentialOfferCreateRequest(
                     profileId = profileId,
@@ -430,16 +486,17 @@ object OSSIssuer2Service {
 
                 try {
                     val session = OSSIssuer2Manager.createCredentialOffer(request)
+                    log.info { "POST /profiles/$profileId/offers - Created session: ${session.id}" }
                     
-                    // Send webhook notification for offer creation
                     session.toSessionUpdate(IssuanceSessionEvent.OFFER_CREATED)
                         .notifySessionUpdate(session.id, session.notifications)
                     
                     call.respond(HttpStatusCode.Created, session.toCreationResponse())
                 } catch (e: IllegalArgumentException) {
+                    log.warn { "POST /profiles/$profileId/offers - Invalid request: ${e.message}" }
                     call.respond(HttpStatusCode.NotFound, e.message ?: "Profile not found")
                 } catch (e: Exception) {
-                    log.error(e) { "Error creating credential offer" }
+                    log.error(e) { "POST /profiles/$profileId/offers - Error creating credential offer" }
                     call.respond(HttpStatusCode.InternalServerError, e.message ?: "Internal error")
                 }
             }
