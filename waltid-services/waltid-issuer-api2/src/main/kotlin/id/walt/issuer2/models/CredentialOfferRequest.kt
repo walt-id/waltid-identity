@@ -1,5 +1,6 @@
 package id.walt.issuer2.models
 
+import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vci.offers.TxCode
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -15,6 +16,7 @@ data class CredentialOfferCreateRequest(
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
     val runtimeOverrides: CredentialOfferRuntimeOverrides? = null,
+    val notifications: KtorSessionNotifications? = null,
 )
 
 @Serializable

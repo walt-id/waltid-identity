@@ -10,7 +10,6 @@ import id.walt.issuer2.config.CredentialProfilesConfig
 import id.walt.issuer2.config.OSSIssuer2ServiceConfig
 import id.walt.issuer2.models.*
 import id.walt.issuer2.oauth.InMemoryAuthorizationCodeRepository
-import id.walt.issuer2.oauth.InMemoryPreAuthorizedCodeRecord
 import id.walt.issuer2.oauth.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
@@ -54,6 +53,7 @@ object OSSIssuer2Manager {
     }
 
     val sessions = ConcurrentHashMap<String, IssuanceSession>()
+    val preAuthCodeToSessionId = ConcurrentHashMap<String, String>()
 
     val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
@@ -116,6 +116,8 @@ object OSSIssuer2Manager {
 
     fun getBaseUrl(): String = serviceConfig.baseUrl
 
+    fun getDefaultNotifications() = serviceConfig.defaultNotifications
+
     fun getProfiles(): List<CredentialProfileConfig> = profilesConfig.profiles
 
     fun getProfile(profileId: String): CredentialProfileConfig? =
@@ -175,6 +177,12 @@ object OSSIssuer2Manager {
         val credentialData = request.runtimeOverrides?.credentialData ?: profile.credentialData
         val mapping = request.runtimeOverrides?.mapping ?: profile.mapping
 
+        // Use per-request notifications if provided, otherwise profile-level, otherwise default
+        // Convert config types to library types
+        val effectiveNotifications = request.notifications 
+            ?: profile.notifications?.toLibraryType() 
+            ?: serviceConfig.defaultNotifications?.toLibraryType()
+
         val issuanceRequest = IssuanceSessionRequest(
             profileId = profile.profileId,
             credentialConfigurationId = profile.credentialConfigurationId,
@@ -203,6 +211,7 @@ object OSSIssuer2Manager {
                     txCode = request.txCode,
                     txCodeValue = request.txCodeValue,
                     valueMode = request.valueMode,
+                    notifications = effectiveNotifications,
                 )
             }
             AuthenticationMethod.AUTHORIZED -> {
@@ -213,6 +222,7 @@ object OSSIssuer2Manager {
                     baseUrl = baseUrl,
                     expiresAt = expiresAt,
                     valueMode = request.valueMode,
+                    notifications = effectiveNotifications,
                 )
             }
         }
@@ -231,6 +241,7 @@ object OSSIssuer2Manager {
         txCode: id.walt.openid4vci.offers.TxCode?,
         txCodeValue: String?,
         valueMode: CredentialOfferValueMode,
+        notifications: id.walt.ktornotifications.core.KtorSessionNotifications?,
     ): IssuanceSession {
         val sessionId = Uuid.random().toString()
         val scope = credentialConfig.scope ?: profile.credentialConfigurationId
@@ -250,21 +261,8 @@ object OSSIssuer2Manager {
             )
         )
 
-        val preAuthRecord = InMemoryPreAuthorizedCodeRecord(
-            code = issueResult.code,
-            clientId = null,
-            txCode = txCode,
-            txCodeValue = issueResult.txCodeValue?.let { hashTxCode(it) },
-            grantedScopes = setOf(scope),
-            grantedAudience = setOf(baseUrl),
-            session = session,
-            expiresAt = issueResult.expiresAt,
-            credentialNonce = issueResult.credentialNonce,
-            credentialNonceExpiresAt = issueResult.credentialNonceExpiresAt,
-            sessionId = sessionId,
-        )
-
-        preAuthorizedCodeRepository.save(preAuthRecord)
+        // Store the mapping from pre-auth code to session ID for later lookup
+        preAuthCodeToSessionId[issueResult.code] = sessionId
 
         val credentialOffer = CredentialOffer(
             credentialIssuer = baseUrl,
@@ -299,6 +297,7 @@ object OSSIssuer2Manager {
             issuanceRequest = issuanceRequest,
             txCode = txCode,
             txCodeValue = issueResult.txCodeValue,
+            notifications = notifications,
             expiresAt = expiresAt,
         )
     }
@@ -310,6 +309,7 @@ object OSSIssuer2Manager {
         baseUrl: String,
         expiresAt: kotlinx.datetime.Instant,
         valueMode: CredentialOfferValueMode,
+        notifications: id.walt.ktornotifications.core.KtorSessionNotifications?,
     ): IssuanceSession {
         val sessionId = Uuid.random().toString()
 
@@ -343,6 +343,7 @@ object OSSIssuer2Manager {
             credentialOffer = credentialOffer,
             credentialOfferUri = credentialOfferUri,
             issuanceRequest = issuanceRequest,
+            notifications = notifications,
             expiresAt = expiresAt,
         )
     }
@@ -353,11 +354,5 @@ object OSSIssuer2Manager {
         sessions[sessionId]?.let { session ->
             sessions[sessionId] = session.copy(status = status)
         }
-    }
-
-    private fun hashTxCode(txCode: String): String {
-        val digest = java.security.MessageDigest.getInstance("SHA-256")
-        val hash = digest.digest(txCode.encodeToByteArray())
-        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
     }
 }

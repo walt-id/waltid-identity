@@ -18,6 +18,8 @@ data class CredentialProfileConfig(
     val credentialData: JsonObject,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
+    val notifications: NotificationsConfig? = null,
+    val authProviderConfiguration: AuthProviderConfiguration? = null,
 )
 
 @Serializable

@@ -33,7 +33,7 @@ class CredentialProfilesConfigDecoder : Decoder<CredentialProfilesConfig> {
                 isLenient = true
             }
             val config = json.decodeFromJsonElement(CredentialProfilesConfig.serializer(), jsonElement)
-            log.debug { "Successfully decoded CredentialProfilesConfig with ${config.profiles.size} profiles" }
+            log.debug { "Successfully decoded CredentialProfilesConfig with ${config.profiles.size} profiles and ${config.credentialConfigurations.size} credential configurations" }
 
             Validated.Valid(config)
         } catch (e: Exception) {

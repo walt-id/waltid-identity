@@ -1,5 +1,6 @@
 package id.walt.issuer2.models
 
+import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
 import kotlinx.datetime.Clock
@@ -47,6 +48,7 @@ data class IssuanceSession(
     val issuanceRequest: IssuanceSessionRequest,
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
+    val notifications: KtorSessionNotifications? = null,
     val createdAt: Instant = Clock.System.now(),
     val expiresAt: Instant = Clock.System.now().plus(5.minutes),
 ) {
@@ -57,7 +59,6 @@ data class IssuanceSession(
 data class IssuanceSessionCreationResponse(
     val sessionId: String,
     val credentialOffer: String,
-    val credentialOfferUri: String,
     val txCodeValue: String? = null,
     val expiresAt: Instant,
 )
@@ -65,7 +66,6 @@ data class IssuanceSessionCreationResponse(
 fun IssuanceSession.toCreationResponse() = IssuanceSessionCreationResponse(
     sessionId = id,
     credentialOffer = credentialOfferUri,
-    credentialOfferUri = credentialOfferUri,
     txCodeValue = txCodeValue,
     expiresAt = expiresAt,
 )
