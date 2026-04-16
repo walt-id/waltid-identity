@@ -79,6 +79,7 @@ dependencies {
 
     // walt.id crypto and DID
     api(project(":waltid-libraries:crypto:waltid-crypto"))
+    api(project(":waltid-libraries:crypto:waltid-cose"))
     implementation(project(":waltid-libraries:crypto:waltid-x509"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
@@ -88,6 +89,7 @@ dependencies {
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
     api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+    api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // Notifications

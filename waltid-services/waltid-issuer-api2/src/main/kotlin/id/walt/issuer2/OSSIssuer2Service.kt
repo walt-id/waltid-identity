@@ -1,18 +1,25 @@
 package id.walt.issuer2
 
+import com.nimbusds.jose.util.X509CertUtils
 import id.walt.commons.web.plugins.httpJson
+import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseKey
+import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
+import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.models.*
 import id.walt.issuer2.openapi.IssuerRoutesDocs
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
+import id.walt.mdoc.issuance.MdocIssuer
+import id.walt.oid4vc.util.JwtUtils
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
-import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
@@ -29,12 +36,18 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import io.ktor.server.util.*
+import io.ktor.util.*
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 import kotlinx.serialization.serializer
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 
 private val log = logger("OSSIssuer2Service")
 
+@OptIn(ExperimentalSerializationApi::class)
 object OSSIssuer2Service {
 
     fun Route.registerRoutes() {
@@ -330,6 +343,33 @@ object OSSIssuer2Service {
                     val issuerId = session.issuanceRequest.issuerDid ?: OSSIssuer2Manager.getBaseUrl()
                     log.debug { "POST /credential - Issuer ID: $issuerId" }
 
+                    val format = credentialConfig.format
+                    log.debug { "POST /credential - Credential format: $format" }
+
+                    // mDOC requires custom handling - the library doesn't support it
+                    if (format == CredentialFormat.MSO_MDOC) {
+                        log.debug { "POST /credential - Using custom mDOC issuance" }
+                        val mdocResponse = issueMdocCredential(
+                            body = body,
+                            session = session,
+                            credentialConfig = credentialConfig,
+                            issuerKey = issuerKey,
+                        )
+                        
+                        OSSIssuer2Manager.updateSessionStatus(session.id, IssuanceSessionStatus.CREDENTIAL_ISSUED)
+                        val updatedSession = OSSIssuer2Manager.getSession(session.id)!!
+                        updatedSession.toSessionUpdate(IssuanceSessionEvent.CREDENTIAL_ISSUED)
+                            .notifySessionUpdate(session.id, session.notifications)
+                        
+                        call.respondText(
+                            mdocResponse.toString(),
+                            ContentType.Application.Json,
+                            HttpStatusCode.OK
+                        )
+                        return@post
+                    }
+
+                    // For other formats (SD-JWT, W3C JWT), use the library
                     val oauthSession = DefaultSession().withSubject(session.id)
                     val credentialResult = OSSIssuer2Manager.oauth2Provider.createCredentialRequest(
                         parameters,
@@ -527,6 +567,116 @@ object OSSIssuer2Service {
                     sseFlow.collect { event -> send(event) }
                 }
             }
+        }
+    }
+
+    /**
+     * Custom mDOC credential issuance.
+     * The waltid-openid4vci library doesn't support mso_mdoc format, so we handle it separately.
+     */
+    private suspend fun issueMdocCredential(
+        body: JsonObject,
+        session: IssuanceSession,
+        credentialConfig: CredentialConfiguration,
+        issuerKey: Key,
+    ): JsonObject {
+        log.debug { "issueMdocCredential - Starting mDOC issuance for session: ${session.id}" }
+        
+        // Extract holder key from proof
+        val proofs = body["proofs"]?.jsonObject
+            ?: throw IllegalArgumentException("'proofs' object is missing for mDOC issuance")
+        
+        val jwtProof = proofs["jwt"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.content
+            ?: throw IllegalArgumentException("'proofs.jwt' is missing or not a string")
+        
+        log.debug { "issueMdocCredential - Extracting holder key from JWT proof" }
+        val holderKey = extractHolderKeyFromJwtProof(jwtProof)
+            ?: throw IllegalArgumentException("Could not extract holder key from proof")
+        
+        // Get doctype from credential configuration
+        val docType = credentialConfig.doctype
+            ?: throw IllegalArgumentException("doctype is missing in credential configuration")
+        log.debug { "issueMdocCredential - DocType: $docType" }
+        
+        // Validate issuer key type
+        if (issuerKey.keyType != KeyType.secp256r1) {
+            throw IllegalArgumentException("Issuer key must be EC secp256r1 for mDOC issuance, got: ${issuerKey.keyType}")
+        }
+        
+        if (!issuerKey.hasPrivateKey) {
+            throw IllegalArgumentException("Issuer key must have private key for mDOC issuance")
+        }
+        
+        // Get X.509 certificate chain
+        val x5Chain = session.issuanceRequest.x5Chain
+            ?: throw IllegalArgumentException("mDOC issuance requires x5Chain parameter with at least one certificate")
+        
+        if (x5Chain.isEmpty()) {
+            throw IllegalArgumentException("mDOC issuance requires x5Chain parameter with at least one certificate")
+        }
+        
+        val issuerCertificateChain = x5Chain.map { pemCertificate ->
+            CoseCertificate(X509CertUtils.parse(pemCertificate).encoded)
+        }
+        log.debug { "issueMdocCredential - Certificate chain size: ${issuerCertificateChain.size}" }
+        
+        // Prepare namespace data from credential data
+        val credentialData = session.issuanceRequest.credentialData
+        val namespaceIdentifiers = credentialData.keys
+        require(namespaceIdentifiers.isNotEmpty()) {
+            "At least one namespace identifier needs to be specified for mDoc issuance"
+        }
+        
+        val namespaceData = namespaceIdentifiers.associateWith { namespaceIdentifier ->
+            val namespaceDataJson = credentialData[namespaceIdentifier]
+                ?: throw IllegalArgumentException("Credential data for namespace $namespaceIdentifier not found")
+            
+            (namespaceDataJson as? JsonObject)
+                ?: throw IllegalArgumentException("Credential data for namespace $namespaceIdentifier must be a JSON object")
+        }
+        log.debug { "issueMdocCredential - Namespaces: ${namespaceData.keys}" }
+        
+        // Issue the mDOC credential
+        val issuedCredential = MdocIssuer.issueUniversal(
+            issuerKey = issuerKey,
+            issuerCertificate = issuerCertificateChain,
+            holderKey = holderKey,
+            docType = docType,
+            data = MdocIssuer.MdocUniversalIssuanceData(namespaceData),
+            validUntil = Clock.System.now().plus(365.days),
+        )
+        
+        // Encode to CBOR and base64url
+        val cborBytes = coseCompliantCbor.encodeToByteArray(issuedCredential)
+        val credentialBase64Url = cborBytes.encodeBase64()
+        
+        log.info { "issueMdocCredential - mDOC credential issued successfully for session: ${session.id}" }
+        
+        // Return OpenID4VCI credential response format
+        return buildJsonObject {
+            put("credential", credentialBase64Url)
+        }
+    }
+    
+    /**
+     * Extract holder's COSE key from JWT proof of possession.
+     */
+    private suspend fun extractHolderKeyFromJwtProof(jwtProof: String): CoseKey? {
+        return try {
+            val header = JwtUtils.parseJWTHeader(jwtProof)
+            val jwkJson = header["jwk"]?.jsonObject
+            
+            if (jwkJson != null) {
+                // Import JWK and convert to CoseKey
+                val jwkKey = JWKKey.importJWK(jwkJson.toString()).getOrNull()
+                jwkKey?.getCosePublicKey()
+            } else {
+                log.warn { "No 'jwk' found in JWT proof header" }
+                null
+            }
+        } catch (e: Exception) {
+            log.error(e) { "Failed to extract holder key from JWT proof" }
+            null
         }
     }
 
