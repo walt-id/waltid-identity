@@ -121,51 +121,34 @@ object IssuerRoutesDocs {
             OAuth 2.0 Authorization Endpoint for the authorization code flow.
             
             This endpoint handles authorization requests from wallets when using the 
-            authorization code grant type. It validates the request and issues an 
-            authorization code that can be exchanged for an access token.
+            authorization code grant type. When an external OAuth provider is configured,
+            it redirects the user to authenticate with that provider (e.g., Keycloak).
             
-            **Supported Parameters:**
-            - client_id: Client identifier
-            - response_type: Must be "code"
-            - redirect_uri: Where to redirect after authorization
-            - scope: Requested scopes
-            - state: Client state for CSRF protection
-            - issuer_state: Links to the credential offer session
-            - code_challenge: PKCE code challenge
-            - code_challenge_method: PKCE method (S256)
+            **Required Configuration:**
+            An `authProviderConfiguration` must be configured either at the service level
+            (in issuer-service.conf) or at the profile level (in profiles.conf) for the
+            authorization code flow to work.
+            
+            **Flow:**
+            1. Wallet calls this endpoint with issuer_state from the credential offer
+            2. Issuer redirects to external OAuth provider for authentication
+            3. User authenticates with external provider
+            4. External provider redirects back to /callback with authorization code
+            5. Issuer exchanges code for tokens and maps ID token claims to credential data
+            6. Issuer issues authorization code back to wallet
         """.trimIndent()
         request {
-            queryParameter<String>("client_id") {
-                description = "Client identifier"
-                required = true
-            }
-            queryParameter<String>("response_type") {
-                description = "Must be 'code'"
-                required = true
-            }
-            queryParameter<String>("redirect_uri") {
-                description = "Redirect URI for the authorization response"
-                required = false
-            }
-            queryParameter<String>("scope") {
-                description = "Requested scopes"
-                required = false
-            }
-            queryParameter<String>("state") {
-                description = "Client state for CSRF protection"
-                required = false
-            }
             queryParameter<String>("issuer_state") {
-                description = "Links to the credential offer session"
-                required = false
+                description = "Session ID from the credential offer (required)"
+                required = true
             }
-            queryParameter<String>("code_challenge") {
-                description = "PKCE code challenge"
-                required = false
+        }
+        response {
+            HttpStatusCode.Found to {
+                description = "Redirect to external OAuth provider"
             }
-            queryParameter<String>("code_challenge_method") {
-                description = "PKCE method (S256)"
-                required = false
+            HttpStatusCode.BadRequest to {
+                description = "Invalid or missing issuer_state, or no auth provider configured"
             }
         }
     }
@@ -176,16 +159,18 @@ object IssuerRoutesDocs {
             Callback endpoint for external OAuth provider integration.
             
             This endpoint receives callbacks from external OAuth providers (e.g., Keycloak, Auth0)
-            after user authentication. It processes the ID token and maps claims to credential data
-            using the `idTokenClaimsToCredentialDataJsonPathMappingConfig` from the profile.
+            after user authentication. It exchanges the authorization code for tokens, extracts
+            claims from the ID token, and maps them to credential data using the 
+            `idTokenClaimsToCredentialDataJsonPathMappingConfig` from the profile.
             
             **Flow:**
-            1. User initiates authorization code flow with external OAuth provider
-            2. User authenticates with the external provider
-            3. External provider redirects to this callback with id_token and state
-            4. This endpoint extracts claims from the ID token
-            5. Claims are mapped to credential data using JSONPath expressions
-            6. Authorization code is issued for the wallet to continue the flow
+            1. User initiates authorization code flow via /authorize
+            2. Issuer redirects to external OAuth provider for authentication
+            3. User authenticates with the external provider
+            4. External provider redirects to this callback with code and state
+            5. This endpoint exchanges the code for tokens (including ID token)
+            6. Claims from the ID token are mapped to credential data using JSONPath expressions
+            7. Authorization code is issued for the wallet to continue the flow
             
             **ID Token Claims Mapping:**
             The `idTokenClaimsToCredentialDataJsonPathMappingConfig` in the profile defines how
@@ -206,12 +191,16 @@ object IssuerRoutesDocs {
                 description = "Session ID (state parameter from the authorization request)"
                 required = true
             }
-            queryParameter<String>("id_token") {
-                description = "ID token from the external OAuth provider containing user claims"
+            queryParameter<String>("code") {
+                description = "Authorization code from the external OAuth provider (exchanged for tokens)"
+                required = true
+            }
+            queryParameter<String>("error") {
+                description = "Error code if authentication failed"
                 required = false
             }
-            queryParameter<String>("code") {
-                description = "Authorization code from the external OAuth provider"
+            queryParameter<String>("error_description") {
+                description = "Human-readable error description"
                 required = false
             }
         }
@@ -220,7 +209,7 @@ object IssuerRoutesDocs {
                 description = "Redirect to wallet with authorization code"
             }
             HttpStatusCode.BadRequest to {
-                description = "Missing state parameter or failed to process ID token claims"
+                description = "Missing state parameter, OAuth error, or failed to process ID token claims"
             }
             HttpStatusCode.NotFound to {
                 description = "Session not found for the given state"

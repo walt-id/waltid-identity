@@ -10,6 +10,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.issuer2.config.AuthProviderConfiguration
 import id.walt.issuer2.models.*
 import id.walt.issuer2.openapi.IssuerRoutesDocs
 import id.walt.issuer2.utils.JsonObjectPathMapper
@@ -31,6 +32,10 @@ import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -131,41 +136,43 @@ object OSSIssuer2Service {
                             val session = OSSIssuer2Manager.getSession(issuerState)
                             if (session != null && session.authMethod == AuthenticationMethod.AUTHORIZED) {
                                 log.debug { "GET /authorize - Found authorized session: ${session.id}" }
-                                val oauthSession = DefaultSession()
-                                    .withSubject(issuerState)
-                                    .withExpiresAt(TokenType.ACCESS_TOKEN, kotlin.time.Clock.System.now().plus(300.seconds))
-
-                                request.grantScopes(request.requestedScopes)
-                                request.grantAudience(setOf(OSSIssuer2Manager.getBaseUrl()))
-
-                                val responseResult = OSSIssuer2Manager.oauth2Provider.createAuthorizationResponse(
-                                    request,
-                                    oauthSession
-                                )
-
-                                when (responseResult) {
-                                    is id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Success -> {
-                                        log.info { "GET /authorize - Authorization successful for session: $issuerState" }
-                                        val response = responseResult.response
-                                        val httpResponse = OSSIssuer2Manager.oauth2Provider.writeAuthorizationResponse(
-                                            request,
-                                            response
+                                
+                                // Check if external auth provider is configured (either at profile or service level)
+                                val authProviderConfig = session.authProviderConfiguration 
+                                    ?: OSSIssuer2Manager.getAuthProviderConfiguration()
+                                
+                                if (authProviderConfig == null) {
+                                    log.error { "GET /authorize - No external auth provider configured for authorization code flow" }
+                                    call.respond(
+                                        HttpStatusCode.BadRequest,
+                                        mapOf(
+                                            "error" to "server_error",
+                                            "error_description" to "Authorization code flow requires an external auth provider configuration (authProviderConfiguration)"
                                         )
-                                        httpResponse.redirectUri?.let { call.respondRedirect(it) }
-                                            ?: call.respond(HttpStatusCode.BadRequest, "No redirect URI")
-                                        return@get
-                                    }
-                                    is id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Failure -> {
-                                        log.warn { "GET /authorize - Authorization failed: ${responseResult.error.description}" }
-                                        val httpResponse = OSSIssuer2Manager.oauth2Provider.writeAuthorizationError(
-                                            request,
-                                            responseResult.error
-                                        )
-                                        httpResponse.redirectUri?.let { call.respondRedirect(it) }
-                                            ?: call.respond(HttpStatusCode.BadRequest, responseResult.error.description ?: "Error")
-                                        return@get
-                                    }
+                                    )
+                                    return@get
                                 }
+                                
+                                // Redirect to external OAuth provider
+                                log.info { "GET /authorize - Redirecting to external OAuth provider: ${authProviderConfig.name}" }
+                                
+                                // Store the original authorization request parameters for later use
+                                val originalParams = parameters.map { (k, v) -> "$k=${v.firstOrNull() ?: ""}" }.joinToString("&")
+                                OSSIssuer2Manager.storeExternalAuthState(issuerState, originalParams)
+                                
+                                // Build the external OAuth authorization URL
+                                val externalAuthUrl = buildString {
+                                    append(authProviderConfig.authorizeUrl)
+                                    append("?response_type=code")
+                                    append("&client_id=${java.net.URLEncoder.encode(authProviderConfig.clientId, "UTF-8")}")
+                                    append("&redirect_uri=${java.net.URLEncoder.encode("${OSSIssuer2Manager.getBaseUrl()}/callback", "UTF-8")}")
+                                    append("&state=$issuerState")
+                                    append("&scope=${java.net.URLEncoder.encode(authProviderConfig.defaultScopes.joinToString(" "), "UTF-8")}")
+                                }
+                                
+                                log.debug { "GET /authorize - External auth URL: $externalAuthUrl" }
+                                call.respondRedirect(externalAuthUrl)
+                                return@get
                             } else {
                                 log.warn { "GET /authorize - Session not found or not authorized: $issuerState" }
                             }
@@ -188,10 +195,17 @@ object OSSIssuer2Service {
                 log.debug { "GET /callback - Received external OAuth callback" }
                 
                 val state = call.request.queryParameters["state"]
-                val idToken = call.request.queryParameters["id_token"]
                 val code = call.request.queryParameters["code"]
+                val error = call.request.queryParameters["error"]
+                val errorDescription = call.request.queryParameters["error_description"]
                 
-                log.debug { "GET /callback - State: $state, has id_token: ${idToken != null}, has code: ${code != null}" }
+                log.debug { "GET /callback - State: $state, has code: ${code != null}, error: $error" }
+                
+                if (error != null) {
+                    log.warn { "GET /callback - OAuth error: $error - $errorDescription" }
+                    call.respond(HttpStatusCode.BadRequest, "OAuth error: $error - $errorDescription")
+                    return@get
+                }
                 
                 if (state == null) {
                     log.warn { "GET /callback - Missing state parameter" }
@@ -206,6 +220,30 @@ object OSSIssuer2Service {
                     return@get
                 }
                 
+                val authProviderConfig = session.authProviderConfiguration
+                    ?: OSSIssuer2Manager.getAuthProviderConfiguration()
+                
+                var idToken: String? = null
+                
+                // If we have a code and auth provider config, exchange the code for tokens
+                if (code != null && authProviderConfig != null) {
+                    log.debug { "GET /callback - Exchanging authorization code for tokens" }
+                    try {
+                        val tokenResponse = exchangeCodeForTokens(
+                            code = code,
+                            authProviderConfig = authProviderConfig,
+                            redirectUri = "${OSSIssuer2Manager.getBaseUrl()}/callback"
+                        )
+                        idToken = tokenResponse["id_token"]?.jsonPrimitive?.content
+                        log.debug { "GET /callback - Token exchange successful, has id_token: ${idToken != null}" }
+                    } catch (e: Exception) {
+                        log.error(e) { "GET /callback - Failed to exchange code for tokens: ${e.message}" }
+                        call.respond(HttpStatusCode.BadRequest, "Failed to exchange authorization code: ${e.message}")
+                        return@get
+                    }
+                }
+                
+                // Process ID token claims mapping if we have an ID token
                 if (idToken != null) {
                     val claimsMappingConfig = session.issuanceRequest.idTokenClaimsToCredentialDataJsonPathMappingConfig
                     
@@ -236,15 +274,27 @@ object OSSIssuer2Service {
                     }
                 }
                 
+                // Get the original authorization request parameters
+                val originalParams = OSSIssuer2Manager.getExternalAuthState(state)
+                OSSIssuer2Manager.removeExternalAuthState(state)
+                
+                // Create the authorization response to redirect back to the wallet
                 val oauthSession = DefaultSession()
                     .withSubject(session.id)
                     .withExpiresAt(TokenType.ACCESS_TOKEN, kotlin.time.Clock.System.now().plus(300.seconds))
                 
+                // Parse original params to get redirect_uri
+                val originalParamsMap = originalParams?.split("&")
+                    ?.associate { 
+                        val parts = it.split("=", limit = 2)
+                        parts[0] to listOf(java.net.URLDecoder.decode(parts.getOrElse(1) { "" }, "UTF-8"))
+                    } ?: emptyMap()
+                
                 val authParams = mapOf(
                     "response_type" to listOf("code"),
-                    "client_id" to listOf(session.credentialOffer.credentialIssuer),
-                    "redirect_uri" to listOf(session.credentialOffer.credentialIssuer + "/callback"),
-                    "state" to listOf(state),
+                    "client_id" to (originalParamsMap["client_id"] ?: listOf(session.credentialOffer.credentialIssuer)),
+                    "redirect_uri" to (originalParamsMap["redirect_uri"] ?: listOf(session.credentialOffer.credentialIssuer + "/callback")),
+                    "state" to (originalParamsMap["state"] ?: listOf(state)),
                     "issuer_state" to listOf(state),
                 )
                 
@@ -297,10 +347,10 @@ object OSSIssuer2Service {
                 val preAuthCode = parameters["pre-authorized_code"]?.firstOrNull()
                 log.debug { "POST /token - Grant type: $grantType" }
 
+                // For pre-authorized code flow, look up session from the code
                 var sessionId: String? = null
                 if (grantType == "urn:ietf:params:oauth:grant-type:pre-authorized_code" && preAuthCode != null) {
-                    val record = OSSIssuer2Manager.preAuthorizedCodeRepository.getRecord(preAuthCode)
-                    sessionId = (record as? id.walt.issuer2.oauth.InMemoryPreAuthorizedCodeRecord)?.sessionId
+                    sessionId = OSSIssuer2Manager.preAuthCodeToSessionId[preAuthCode]
                     log.debug { "POST /token - Pre-auth code lookup: sessionId=$sessionId" }
                 }
 
@@ -319,8 +369,11 @@ object OSSIssuer2Service {
                         val tokenResult = OSSIssuer2Manager.oauth2Provider.createAccessTokenResponse(result.request)
                         when (tokenResult) {
                             is AccessTokenResponseResult.Success -> {
-                                log.info { "POST /token - Token issued successfully for session: $sessionId" }
-                                sessionId?.let {
+                                // Get the session ID from the response - this works for both flows
+                                val responseSessionId = tokenResult.request.session?.subject ?: sessionId
+                                log.info { "POST /token - Token issued successfully for session: $responseSessionId" }
+                                
+                                responseSessionId?.let {
                                     OSSIssuer2Manager.updateSessionStatus(it, IssuanceSessionStatus.TOKEN_REQUESTED)
                                     val updatedSession = OSSIssuer2Manager.getSession(it)
                                     updatedSession?.let { s ->
@@ -388,6 +441,29 @@ object OSSIssuer2Service {
                 val accessToken = authHeader.removePrefix("Bearer ")
                 log.debug { "POST /credential - Access token received (length: ${accessToken.length})" }
 
+                // Decode the access token to get the session ID (subject)
+                val tokenPayload = try {
+                    JwtUtils.parseJWTPayload(accessToken)
+                } catch (e: Exception) {
+                    log.warn { "POST /credential - Failed to decode access token: ${e.message}" }
+                    call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "invalid_token", "error_description" to "Invalid access token")
+                    )
+                    return@post
+                }
+                
+                val sessionId = tokenPayload["sub"]?.jsonPrimitive?.content
+                if (sessionId == null) {
+                    log.warn { "POST /credential - Access token missing subject claim" }
+                    call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "invalid_token", "error_description" to "Access token missing subject claim")
+                    )
+                    return@post
+                }
+                log.debug { "POST /credential - Session ID from token: $sessionId" }
+
                 val body = call.receive<JsonObject>()
                 log.debug { "POST /credential - Request body: $body" }
                 
@@ -417,17 +493,29 @@ object OSSIssuer2Service {
                     return@post
                 }
 
-                val session = findSessionByCredentialConfig(credentialConfigId)
+                // Look up session by the subject from the access token
+                val session = OSSIssuer2Manager.getSession(sessionId)
                 if (session == null) {
-                    log.warn { "POST /credential - No active session for credential config: $credentialConfigId" }
-                    log.debug { "POST /credential - Active sessions: ${OSSIssuer2Manager.sessions.values.map { "${it.id} -> ${it.credentialConfigurationId} (${it.status})" }}" }
+                    log.warn { "POST /credential - Session not found: $sessionId" }
                     call.respond(
                         HttpStatusCode.BadRequest,
-                        mapOf("error" to "invalid_request", "error_description" to "No active session for this credential")
+                        mapOf("error" to "invalid_request", "error_description" to "Session not found")
                     )
                     return@post
                 }
+                
+                // Verify the credential config matches the session
+                if (session.credentialConfigurationId != credentialConfigId) {
+                    log.warn { "POST /credential - Credential config mismatch: requested $credentialConfigId, session has ${session.credentialConfigurationId}" }
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "invalid_request", "error_description" to "Credential configuration does not match session")
+                    )
+                    return@post
+                }
+                
                 log.debug { "POST /credential - Found session: ${session.id} (status: ${session.status})" }
+                log.debug { "POST /credential - Session credential data: ${session.issuanceRequest.credentialData}" }
 
                 val profile = OSSIssuer2Manager.getProfile(session.profileId)
                 if (profile == null) {
@@ -806,15 +894,37 @@ object OSSIssuer2Service {
         }
     }
 
-    private fun findSessionByCredentialConfig(credentialConfigId: String): IssuanceSession? {
-        return OSSIssuer2Manager.sessions.values.find {
-            it.credentialConfigurationId == credentialConfigId &&
-            it.status in listOf(
-                IssuanceSessionStatus.ACTIVE,
-                IssuanceSessionStatus.CREDENTIAL_OFFER_RESOLVED,
-                IssuanceSessionStatus.TOKEN_REQUESTED
-            ) &&
-            !it.isExpired()
+    private suspend fun exchangeCodeForTokens(
+        code: String,
+        authProviderConfig: AuthProviderConfiguration,
+        redirectUri: String,
+    ): JsonObject {
+        log.debug { "Exchanging authorization code for tokens at: ${authProviderConfig.accessTokenUrl}" }
+        
+        val client = HttpClient()
+        try {
+            val response = client.submitForm(
+                url = authProviderConfig.accessTokenUrl,
+                formParameters = parameters {
+                    append("grant_type", "authorization_code")
+                    append("code", code)
+                    append("redirect_uri", redirectUri)
+                    append("client_id", authProviderConfig.clientId)
+                    authProviderConfig.clientSecret?.let { append("client_secret", it) }
+                }
+            )
+            
+            val responseBody = response.bodyAsText()
+            log.debug { "Token exchange response status: ${response.status}" }
+            
+            if (!response.status.isSuccess()) {
+                log.error { "Token exchange failed: $responseBody" }
+                throw IllegalStateException("Token exchange failed: ${response.status} - $responseBody")
+            }
+            
+            return Json.decodeFromString<JsonObject>(responseBody)
+        } finally {
+            client.close()
         }
     }
 }

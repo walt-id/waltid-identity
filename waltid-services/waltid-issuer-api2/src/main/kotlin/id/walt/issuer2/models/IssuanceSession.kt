@@ -1,5 +1,6 @@
 package id.walt.issuer2.models
 
+import id.walt.issuer2.config.AuthProviderConfiguration
 import id.walt.issuer2.config.JsonObjectToCborMappingConfig
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vci.offers.CredentialOffer
@@ -52,6 +53,7 @@ data class IssuanceSession(
     val txCode: TxCode? = null,
     val txCodeValue: String? = null,
     val notifications: KtorSessionNotifications? = null,
+    val authProviderConfiguration: AuthProviderConfiguration? = null,
     val createdAt: Instant = Clock.System.now(),
     val expiresAt: Instant = Clock.System.now().plus(5.minutes),
 ) {

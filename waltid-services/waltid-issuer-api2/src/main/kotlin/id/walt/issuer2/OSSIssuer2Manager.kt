@@ -54,6 +54,7 @@ object OSSIssuer2Manager {
 
     val sessions = ConcurrentHashMap<String, IssuanceSession>()
     val preAuthCodeToSessionId = ConcurrentHashMap<String, String>()
+    val externalAuthStates = ConcurrentHashMap<String, String>()
 
     val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
     val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
@@ -117,6 +118,8 @@ object OSSIssuer2Manager {
     fun getBaseUrl(): String = serviceConfig.baseUrl
 
     fun getDefaultNotifications() = serviceConfig.defaultNotifications
+
+    fun getAuthProviderConfiguration() = serviceConfig.authProviderConfiguration
 
     fun getProfiles(): List<CredentialProfileConfig> = profilesConfig.profiles
 
@@ -348,6 +351,9 @@ object OSSIssuer2Manager {
                 "openid-credential-offer://?credential_offer=${java.net.URLEncoder.encode(offerJson, "UTF-8")}"
         }
 
+        // Use profile-level auth provider config, or fall back to service-level config
+        val effectiveAuthProviderConfig = profile.authProviderConfiguration ?: serviceConfig.authProviderConfiguration
+
         return IssuanceSession(
             id = sessionId,
             profileId = profile.profileId,
@@ -357,6 +363,7 @@ object OSSIssuer2Manager {
             credentialOfferUri = credentialOfferUri,
             issuanceRequest = issuanceRequest,
             notifications = notifications,
+            authProviderConfiguration = effectiveAuthProviderConfig,
             expiresAt = expiresAt,
         )
     }
@@ -373,5 +380,17 @@ object OSSIssuer2Manager {
         sessions[sessionId]?.let { session ->
             sessions[sessionId] = session.copy(status = status)
         }
+    }
+
+    fun storeExternalAuthState(sessionId: String, originalParams: String) {
+        externalAuthStates[sessionId] = originalParams
+    }
+
+    fun getExternalAuthState(sessionId: String): String? {
+        return externalAuthStates[sessionId]
+    }
+
+    fun removeExternalAuthState(sessionId: String) {
+        externalAuthStates.remove(sessionId)
     }
 }
