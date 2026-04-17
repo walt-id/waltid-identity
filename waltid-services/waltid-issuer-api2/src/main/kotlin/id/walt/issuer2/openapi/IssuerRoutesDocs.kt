@@ -170,6 +170,64 @@ object IssuerRoutesDocs {
         }
     }
 
+    fun getCallbackEndpointDocs(): RouteConfig.() -> Unit = {
+        summary = "External OAuth Callback"
+        description = """
+            Callback endpoint for external OAuth provider integration.
+            
+            This endpoint receives callbacks from external OAuth providers (e.g., Keycloak, Auth0)
+            after user authentication. It processes the ID token and maps claims to credential data
+            using the `idTokenClaimsToCredentialDataJsonPathMappingConfig` from the profile.
+            
+            **Flow:**
+            1. User initiates authorization code flow with external OAuth provider
+            2. User authenticates with the external provider
+            3. External provider redirects to this callback with id_token and state
+            4. This endpoint extracts claims from the ID token
+            5. Claims are mapped to credential data using JSONPath expressions
+            6. Authorization code is issued for the wallet to continue the flow
+            
+            **ID Token Claims Mapping:**
+            The `idTokenClaimsToCredentialDataJsonPathMappingConfig` in the profile defines how
+            claims from the ID token are mapped to the credential data. For example:
+            ```json
+            {
+              "$.family_name": "$.credentialSubject.familyName",
+              "$.given_name": "$.credentialSubject.givenName",
+              "$.email": "$.credentialSubject.email"
+            }
+            ```
+            
+            This maps the `family_name` claim from the ID token to `credentialSubject.familyName`
+            in the credential data.
+        """.trimIndent()
+        request {
+            queryParameter<String>("state") {
+                description = "Session ID (state parameter from the authorization request)"
+                required = true
+            }
+            queryParameter<String>("id_token") {
+                description = "ID token from the external OAuth provider containing user claims"
+                required = false
+            }
+            queryParameter<String>("code") {
+                description = "Authorization code from the external OAuth provider"
+                required = false
+            }
+        }
+        response {
+            HttpStatusCode.Found to {
+                description = "Redirect to wallet with authorization code"
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Missing state parameter or failed to process ID token claims"
+            }
+            HttpStatusCode.NotFound to {
+                description = "Session not found for the given state"
+            }
+        }
+    }
+
     fun getTokenEndpointDocs(): RouteConfig.() -> Unit = {
         summary = "Token Endpoint"
         description = """

@@ -20,6 +20,8 @@ data class CredentialProfileConfig(
     val selectiveDisclosure: SDMap? = null,
     val notifications: NotificationsConfig? = null,
     val authProviderConfiguration: AuthProviderConfiguration? = null,
+    val idTokenClaimsToCredentialDataJsonPathMappingConfig: Map<String, String>? = null,
+    val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
 )
 
 @Serializable

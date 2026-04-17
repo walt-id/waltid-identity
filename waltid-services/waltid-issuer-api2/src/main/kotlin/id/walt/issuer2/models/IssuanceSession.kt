@@ -1,5 +1,6 @@
 package id.walt.issuer2.models
 
+import id.walt.issuer2.config.JsonObjectToCborMappingConfig
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.TxCode
@@ -30,9 +31,11 @@ data class IssuanceSessionRequest(
     val issuerKey: JsonObject,
     val issuerDid: String? = null,
     val x5Chain: List<String>? = null,
-    val credentialData: JsonObject,
+    var credentialData: JsonObject,
     val mapping: JsonObject? = null,
     val selectiveDisclosureJson: JsonObject? = null,
+    val idTokenClaimsToCredentialDataJsonPathMappingConfig: Map<String, String>? = null,
+    val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
 )
 
 @OptIn(ExperimentalUuidApi::class)

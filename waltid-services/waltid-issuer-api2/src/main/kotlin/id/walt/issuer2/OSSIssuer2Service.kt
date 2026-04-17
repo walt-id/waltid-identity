@@ -12,6 +12,7 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.models.*
 import id.walt.issuer2.openapi.IssuerRoutesDocs
+import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.mdoc.issuance.MdocIssuer
@@ -179,6 +180,107 @@ object OSSIssuer2Service {
                             HttpStatusCode.BadRequest,
                             mapOf("error" to result.error.error, "error_description" to result.error.description)
                         )
+                    }
+                }
+            }
+
+            get("callback", IssuerRoutesDocs.getCallbackEndpointDocs()) {
+                log.debug { "GET /callback - Received external OAuth callback" }
+                
+                val state = call.request.queryParameters["state"]
+                val idToken = call.request.queryParameters["id_token"]
+                val code = call.request.queryParameters["code"]
+                
+                log.debug { "GET /callback - State: $state, has id_token: ${idToken != null}, has code: ${code != null}" }
+                
+                if (state == null) {
+                    log.warn { "GET /callback - Missing state parameter" }
+                    call.respond(HttpStatusCode.BadRequest, "Missing state parameter")
+                    return@get
+                }
+                
+                val session = OSSIssuer2Manager.getSession(state)
+                if (session == null) {
+                    log.warn { "GET /callback - Session not found for state: $state" }
+                    call.respond(HttpStatusCode.NotFound, "Session not found")
+                    return@get
+                }
+                
+                if (idToken != null) {
+                    val claimsMappingConfig = session.issuanceRequest.idTokenClaimsToCredentialDataJsonPathMappingConfig
+                    
+                    if (claimsMappingConfig != null) {
+                        log.debug { "GET /callback - Applying ID token claims mapping" }
+                        try {
+                            val idTokenClaims = JwtUtils.parseJWTPayload(idToken)
+                            log.debug { "GET /callback - Decoded ID token claims: $idTokenClaims" }
+                            
+                            val updatedCredentialData = JsonObjectPathMapper.fromSourceToDestinationJsonPathsMap(
+                                source = idTokenClaims,
+                                destination = session.issuanceRequest.credentialData,
+                                jsonPathMapConfig = claimsMappingConfig,
+                            )
+                            
+                            session.issuanceRequest.credentialData = updatedCredentialData
+                            OSSIssuer2Manager.updateSession(session)
+                            
+                            log.info { "GET /callback - Successfully mapped ID token claims to credential data for session: ${session.id}" }
+                            log.debug { "GET /callback - Updated credential data: $updatedCredentialData" }
+                        } catch (e: Exception) {
+                            log.error(e) { "GET /callback - Failed to map ID token claims: ${e.message}" }
+                            call.respond(HttpStatusCode.BadRequest, "Failed to process ID token claims: ${e.message}")
+                            return@get
+                        }
+                    } else {
+                        log.debug { "GET /callback - No claims mapping config, skipping ID token processing" }
+                    }
+                }
+                
+                val oauthSession = DefaultSession()
+                    .withSubject(session.id)
+                    .withExpiresAt(TokenType.ACCESS_TOKEN, kotlin.time.Clock.System.now().plus(300.seconds))
+                
+                val authParams = mapOf(
+                    "response_type" to listOf("code"),
+                    "client_id" to listOf(session.credentialOffer.credentialIssuer),
+                    "redirect_uri" to listOf(session.credentialOffer.credentialIssuer + "/callback"),
+                    "state" to listOf(state),
+                    "issuer_state" to listOf(state),
+                )
+                
+                val authResult = OSSIssuer2Manager.oauth2Provider.createAuthorizationRequest(authParams)
+                
+                when (authResult) {
+                    is AuthorizationRequestResult.Success -> {
+                        val request = authResult.request
+                        request.grantScopes(request.requestedScopes)
+                        request.grantAudience(setOf(OSSIssuer2Manager.getBaseUrl()))
+                        
+                        val responseResult = OSSIssuer2Manager.oauth2Provider.createAuthorizationResponse(
+                            request,
+                            oauthSession
+                        )
+                        
+                        when (responseResult) {
+                            is id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Success -> {
+                                log.info { "GET /callback - Authorization successful for session: ${session.id}" }
+                                val response = responseResult.response
+                                val httpResponse = OSSIssuer2Manager.oauth2Provider.writeAuthorizationResponse(
+                                    request,
+                                    response
+                                )
+                                httpResponse.redirectUri?.let { call.respondRedirect(it) }
+                                    ?: call.respond(HttpStatusCode.BadRequest, "No redirect URI")
+                            }
+                            is id.walt.openid4vci.responses.authorization.AuthorizationResponseResult.Failure -> {
+                                log.warn { "GET /callback - Authorization failed: ${responseResult.error.description}" }
+                                call.respond(HttpStatusCode.BadRequest, responseResult.error.description ?: "Authorization failed")
+                            }
+                        }
+                    }
+                    is AuthorizationRequestResult.Failure -> {
+                        log.warn { "GET /callback - Failed to create authorization request: ${authResult.error.description}" }
+                        call.respond(HttpStatusCode.BadRequest, authResult.error.description ?: "Failed to process callback")
                     }
                 }
             }
@@ -627,6 +729,16 @@ object OSSIssuer2Service {
             "At least one namespace identifier needs to be specified for mDoc issuance"
         }
         
+        // Get mDocNameSpacesDataMappingConfig for value mapping
+        val mDocMappingConfig = session.issuanceRequest.mDocNameSpacesDataMappingConfig
+        mDocMappingConfig?.let { config ->
+            require(namespaceIdentifiers.containsAll(config.keys)) {
+                "Invalid mDoc nameSpace data mapping configuration: found data mapping configuration for nameSpace " +
+                        "that is not defined in credentialData namespaces"
+            }
+        }
+        log.debug { "issueMdocCredential - mDocNameSpacesDataMappingConfig present: ${mDocMappingConfig != null}" }
+        
         val namespaceData = namespaceIdentifiers.associateWith { namespaceIdentifier ->
             val namespaceDataJson = credentialData[namespaceIdentifier]
                 ?: throw IllegalArgumentException("Credential data for namespace $namespaceIdentifier not found")
@@ -636,7 +748,7 @@ object OSSIssuer2Service {
         }
         log.debug { "issueMdocCredential - Namespaces: ${namespaceData.keys}" }
         
-        // Issue the mDOC credential
+        // Issue the mDOC credential with value mapping function
         val issuedCredential = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
             issuerCertificate = issuerCertificateChain,
@@ -644,6 +756,20 @@ object OSSIssuer2Service {
             docType = docType,
             data = MdocIssuer.MdocUniversalIssuanceData(namespaceData),
             validUntil = Clock.System.now().plus(365.days),
+            valueMappingFunction = { issuedDocType, namespace, elementIdentifier, elementValueJson ->
+                // Use the mDocNameSpacesDataMappingConfig if available for element-level mapping
+                mDocMappingConfig
+                    ?.get(namespace)
+                    ?.entriesConfigMap
+                    ?.get(elementIdentifier)
+                    ?.executeMapping(elementValueJson)
+                    ?: MdocIssuer.defaultSchemalessMappingFunction(
+                        issuedDocType,
+                        namespace,
+                        elementIdentifier,
+                        elementValueJson,
+                    )
+            }
         )
         
         // Encode to CBOR and base64url

@@ -208,6 +208,8 @@ object OSSIssuer2Manager {
                     it
                 ) as? JsonObject
             },
+            idTokenClaimsToCredentialDataJsonPathMappingConfig = profile.idTokenClaimsToCredentialDataJsonPathMappingConfig,
+            mDocNameSpacesDataMappingConfig = profile.mDocNameSpacesDataMappingConfig,
         )
 
         log.debug { "Creating ${request.authMethod} session" }
@@ -361,6 +363,10 @@ object OSSIssuer2Manager {
 
     fun getSession(sessionId: String): IssuanceSession? {
         return sessions[sessionId]
+    }
+
+    fun updateSession(session: IssuanceSession) {
+        sessions[session.id] = session
     }
 
     fun updateSessionStatus(sessionId: String, status: IssuanceSessionStatus) {

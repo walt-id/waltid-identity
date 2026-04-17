@@ -99,6 +99,10 @@ dependencies {
     implementation(identityLibs.nimbus.jose.jwt)
     implementation(identityLibs.bouncycastle.prov)
     implementation(identityLibs.bouncycastle.pkix)
+
+    // JSONPath (for ID token claims mapping)
+    implementation(identityLibs.jsonpathkt)
+    implementation(identityLibs.jaywayjsonpath)
 }
 
 application {
