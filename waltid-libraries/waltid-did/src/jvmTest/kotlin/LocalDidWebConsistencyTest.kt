@@ -109,7 +109,7 @@ class LocalDidWebConsistencyTest {
 
     private fun ApplicationEngine.Configuration.envConfig() {
         connector {
-            port = 8000
+            port = 8021
         }
         sslConnector(
             keyStore = keyStore,
