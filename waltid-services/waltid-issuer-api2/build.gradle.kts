@@ -117,7 +117,7 @@ ktor {
     docker {
         portMappings.set(
             listOf(
-                DockerPortMapping(7004, 7004, DockerPortMappingProtocol.TCP)
+                DockerPortMapping(7005, 7005, DockerPortMappingProtocol.TCP)
             )
         )
     }
