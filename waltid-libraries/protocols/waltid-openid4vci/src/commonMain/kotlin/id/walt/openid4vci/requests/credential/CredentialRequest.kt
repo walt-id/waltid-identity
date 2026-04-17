@@ -4,6 +4,7 @@ import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.prooftypes.Proofs
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -16,7 +17,8 @@ import kotlinx.serialization.json.JsonObject
  * - issClaim: issuer identifier (DID/base URL) to use for signing
  * - credential configuration is supplied when calling createCredentialResponse for now
  */
-interface CredentialRequest {
+@Serializable
+sealed interface CredentialRequest {
     val id: String
     val requestedAt: Instant
     val client: Client
