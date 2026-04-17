@@ -8,11 +8,11 @@ java-service = "21"
 java-library = "17"
 
 # Plugins
-vanniktech-publish = "0.35.0"
+vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.2"
 android-gradle = "8.12.3"
-gradle-shadow = "9.3.2"
+gradle-shadow = "9.4.1"
 buildconfig = "6.0.9"
 
 # Plugins / Dependencies
@@ -21,16 +21,16 @@ ktor = "3.3.3"
 # ...
 
 # Ktor external plugins
-cohort = "2.8.3"
+cohort = "2.9.1"
 smiley-openapi = "5.6.0"
 
 # Kotlinx
-kotlinx-serialization = "1.10.1-waltid_20260309-SNAPSHOT"
-kotlinx-serialization-cbor-TEMP = "1.10.1-waltid_20260309-SNAPSHOT"
+kotlinx-serialization = "1.11.0"
+kotlinx-serialization-cbor-TEMP = "1.11.0"
 
 kotlinx-datetime = "0.7.1"
 kotlinx-coroutines = "1.10.2"
-kotlinx-atomicfu = "0.31.0"
+kotlinx-atomicfu = "0.32.1"
 kotlinx-io = "0.9.0"
 
 # Logging
@@ -43,13 +43,13 @@ cache4k = "0.14.0"
 
 # Crypto
 bouncycastle = "2.73.10"
-nimbus-jose = "10.8"
+nimbus-jose = "10.9"
 jose-npm = "5.10.0"
 bcprov = "2.73.10"
 bcpkix = "2.73.10"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
-tink = "1.20.0"
+tink = "1.21.0"
 
 # Testing
 junit-jupiter = "6.0.3"
