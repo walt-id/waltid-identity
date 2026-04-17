@@ -598,18 +598,16 @@ object OSSIssuer2Service {
                                         credentialResult.request,
                                         responseResult.response
                                     )
-                                    val responseBody = httpResponse.payload.mapValues { (_, v) ->
-                                        when (v) {
-                                            is String -> JsonPrimitive(v)
-                                            is Number -> JsonPrimitive(v)
-                                            is Boolean -> JsonPrimitive(v)
-                                            is JsonElement -> v
-                                            null -> kotlinx.serialization.json.JsonNull
-                                            else -> JsonPrimitive(v.toString())
+                                    
+                                    // Properly serialize the response payload
+                                    val responseBody = buildJsonObject {
+                                        httpResponse.payload.forEach { (key, value) ->
+                                            put(key, convertToJsonElement(value))
                                         }
                                     }
+                                    
                                     call.respondText(
-                                        JsonObject(responseBody).toString(),
+                                        responseBody.toString(),
                                         ContentType.Application.Json,
                                         HttpStatusCode.OK
                                     )
@@ -620,18 +618,13 @@ object OSSIssuer2Service {
                                         credentialResult.request,
                                         responseResult.error
                                     )
-                                    val responseBody = httpResponse.payload.mapValues { (_, v) ->
-                                        when (v) {
-                                            is String -> JsonPrimitive(v)
-                                            is Number -> JsonPrimitive(v)
-                                            is Boolean -> JsonPrimitive(v)
-                                            is JsonElement -> v
-                                            null -> kotlinx.serialization.json.JsonNull
-                                            else -> JsonPrimitive(v.toString())
+                                    val responseBody = buildJsonObject {
+                                        httpResponse.payload.forEach { (key, value) ->
+                                            put(key, convertToJsonElement(value))
                                         }
                                     }
                                     call.respondText(
-                                        JsonObject(responseBody).toString(),
+                                        responseBody.toString(),
                                         ContentType.Application.Json,
                                         HttpStatusCode.BadRequest
                                     )
@@ -926,6 +919,31 @@ object OSSIssuer2Service {
         } finally {
             client.close()
         }
+    }
+    
+    /**
+     * Recursively converts Any? to JsonElement for proper JSON serialization.
+     */
+    private fun convertToJsonElement(value: Any?): JsonElement = when (value) {
+        null -> JsonNull
+        is JsonElement -> value
+        is String -> JsonPrimitive(value)
+        is Number -> JsonPrimitive(value)
+        is Boolean -> JsonPrimitive(value)
+        is Map<*, *> -> buildJsonObject {
+            value.forEach { (k, v) ->
+                if (k is String) {
+                    put(k, convertToJsonElement(v))
+                }
+            }
+        }
+        is List<*> -> buildJsonArray {
+            value.forEach { add(convertToJsonElement(it)) }
+        }
+        is Array<*> -> buildJsonArray {
+            value.forEach { add(convertToJsonElement(it)) }
+        }
+        else -> JsonPrimitive(value.toString())
     }
 }
 
