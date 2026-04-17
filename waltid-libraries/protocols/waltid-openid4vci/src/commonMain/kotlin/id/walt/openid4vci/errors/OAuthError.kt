@@ -1,5 +1,8 @@
 package id.walt.openid4vci.errors
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class OAuthError(
     val error: String,
     val description: String? = null,
