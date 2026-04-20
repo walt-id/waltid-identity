@@ -164,28 +164,30 @@ object OpenApiModule {
         }
 
         routing {
-            route("api.json") {
-                openApi()
-            }
-
-            route("swagger") {
-                swaggerUI("/api.json") {
-                    filter = true
-                    // onlineSpecValidator()
+            route("waltid/verifier") {
+                route("api.json") {
+                    openApi()
                 }
-            }
 
-            route("redoc") {
-                redoc("/api.json")
-            }
+                route("swagger") {
+                    swaggerUI("/waltid/verifier/api.json") {
+                        filter = true
+                        // onlineSpecValidator()
+                    }
+                }
 
-            get("/", {
-                // This is hidden, because in the api.json would be strange empty URL if
-                // this is enabled.
-                hidden = true
-                summary = "Redirect to swagger interface for API documentation"
-            }) {
-                call.respondRedirect("swagger")
+                route("redoc") {
+                    redoc("/waltid/verifier/api.json")
+                }
+
+                get("/", {
+                    // This is hidden, because in the api.json would be strange empty URL if
+                    // this is enabled.
+                    hidden = true
+                    summary = "Redirect to swagger interface for API documentation"
+                }) {
+                    call.respondRedirect("swagger")
+                }
             }
         }
     }
