@@ -4,6 +4,8 @@ import id.walt.trust.model.*
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import java.security.MessageDigest
+import java.util.Base64
 
 /**
  * Parses TS 119 602-style LoTE JSON sources into normalized trust model objects.
@@ -152,6 +154,18 @@ object LoteJsonParser {
                 serviceId = serviceId,
                 certificateSha256Hex = value.removePrefix("sha256:")
             )
+            "CERTIFICATE_PEM", "CERTIFICATE_DER" -> {
+                // Compute SHA-256 from PEM or DER certificate
+                val sha256 = computeCertificateSha256(value)
+                ServiceIdentity(
+                    identityId = identityId,
+                    sourceId = sourceId,
+                    entityId = entityId,
+                    serviceId = serviceId,
+                    certificateSha256Hex = sha256,
+                    metadata = if (sha256 == null) mapOf("rawMatchType" to matchType, "rawValue" to value) else emptyMap()
+                )
+            }
             "SUBJECT_DN" -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,
@@ -173,6 +187,31 @@ object LoteJsonParser {
                 serviceId = serviceId,
                 metadata = mapOf("rawMatchType" to matchType, "rawValue" to value)
             )
+        }
+    }
+
+    /**
+     * Computes the SHA-256 fingerprint of a certificate in PEM or base64-encoded DER format.
+     */
+    private fun computeCertificateSha256(pemOrDer: String): String? {
+        return try {
+            val certBytes = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
+                // PEM format - extract base64 content between headers
+                val base64 = pemOrDer
+                    .replace("-----BEGIN CERTIFICATE-----", "")
+                    .replace("-----END CERTIFICATE-----", "")
+                    .replace("\\s".toRegex(), "")
+                Base64.getDecoder().decode(base64)
+            } else {
+                // Assume base64-encoded DER
+                Base64.getDecoder().decode(pemOrDer.replace("\\s".toRegex(), ""))
+            }
+            
+            MessageDigest.getInstance("SHA-256")
+                .digest(certBytes)
+                .joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            null
         }
     }
 
