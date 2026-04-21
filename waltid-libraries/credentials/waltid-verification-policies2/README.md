@@ -355,6 +355,65 @@ Validates mdoc credentials using VICAL (Verifiable Issuer Certificate Authority 
 
 ---
 
+### `etsi-trust-list`
+Validates credential issuer certificates against an ETSI Trust List via the `waltid-trust-registry-service`.
+
+**Use case:** Verify that credential issuers are trusted according to EU/ETSI trust frameworks (TSL/LoTE). Particularly useful for PID providers, wallet providers, and attestation providers in eIDAS 2.0 contexts.
+
+**How it works:**
+1. Extracts the full certificate chain from the credential's x5c header (COSE for mDoc, JWT header for SD-JWT/W3C VC)
+2. Iterates through the chain (leaf → root) and queries the trust registry for each certificate
+3. If any certificate in the chain is found in the trust list, the credential is trusted
+
+**Example:**
+```json
+{
+  "policy": "etsi-trust-list",
+  "trustRegistryUrl": "http://localhost:7005",
+  "expectedEntityType": "PID_PROVIDER",
+  "expectedServiceType": null,
+  "allowStaleSource": false,
+  "requireAuthenticated": false
+}
+```
+
+**Configuration options:**
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `trustRegistryUrl` | string | *required* | Base URL of the `waltid-trust-registry-service` |
+| `expectedEntityType` | string | null | Filter: require specific entity type (`PID_PROVIDER`, `WALLET_PROVIDER`, `ATTESTATION_PROVIDER`, etc.) |
+| `expectedServiceType` | string | null | Filter: require specific service type |
+| `allowStaleSource` | boolean | false | If true, accept credentials from stale (but not expired) trust sources |
+| `requireAuthenticated` | boolean | false | If true, require trust source authenticity to be `VALIDATED` (not just `SKIPPED_DEMO`) |
+
+**Supported credential types:**
+- mDoc credentials with COSE signatures and x5c chain
+- SD-JWT credentials with x5c in JWT header  
+- W3C JWT VCs with x5c in JWT header
+
+**Success result:**
+```json
+{
+  "trusted": true,
+  "decision": "TRUSTED",
+  "matchedEntity": {
+    "entityId": "example-iaca",
+    "entityType": "PID_PROVIDER",
+    "legalName": "Example IACA",
+    "country": "DE"
+  },
+  "matchedService": {
+    "serviceId": "mdl-issuing",
+    "serviceType": "MDL_ISSUER",
+    "status": "GRANTED"
+  },
+  "sourceFreshness": "FRESH",
+  "authenticity": "SKIPPED_DEMO"
+}
+```
+
+---
+
 ### `webhook`
 Calls an external HTTP endpoint to verify the credential.
 
