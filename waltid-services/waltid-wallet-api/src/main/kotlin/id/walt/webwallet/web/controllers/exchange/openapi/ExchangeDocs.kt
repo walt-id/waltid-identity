@@ -4,6 +4,7 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.OpenIDProviderMetadata
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.sdjwt.metadata.type.SdJwtVcTypeMetadataDraft04
+import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.usecase.exchange.FilterData
 import id.walt.webwallet.web.controllers.exchange.UsePresentationRequest
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -60,6 +61,27 @@ object ExchangeDocs {
             HttpStatusCode.OK to {
                 description = "Filters that failed to fulfill the presentation definition"
                 body<List<FilterData>>()
+            }
+        }
+    }
+
+    fun getMatchCredentialsForPresentationRequestDocs(): RouteConfig.() -> Unit = {
+        summary = "Returns the credentials stored in the wallet that match the passed presentation request"
+
+        request {
+            body<String> {
+                required = true
+                description = "Presentation request to match credentials against"
+            }
+        }
+        response {
+            HttpStatusCode.OK to {
+                description = "Credentials that match the presentation request"
+                body<List<WalletCredential>>()
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Presentation request could not be processed"
+                body<String>()
             }
         }
     }
