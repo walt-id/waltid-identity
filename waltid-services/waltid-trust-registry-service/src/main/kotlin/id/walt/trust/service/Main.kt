@@ -9,11 +9,12 @@ import id.walt.trust.service.plugins.configureHTTP
 import id.walt.trust.service.plugins.configureMonitoring
 import id.walt.trust.service.plugins.configureRouting
 import id.walt.trust.service.routes.trustRegistryRoutes
+import id.walt.waltid_trust_registry_service.BuildConfig
 import io.ktor.server.application.*
 
 suspend fun main(args: Array<String>) {
     ServiceMain(
-        ServiceConfiguration("trust-registry"),
+        ServiceConfiguration("trust-registry", version = BuildConfig.VERSION),
         ServiceInitialization(
             features = FeatureCatalog,
             init = {
