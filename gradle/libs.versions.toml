@@ -182,6 +182,7 @@ clikt-markdown = { module = "com.github.ajalt.clikt:clikt-markdown", version.ref
 ## JSON handling
 optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.4" }
 jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "3.0.2" }
+jaywayjsonpath = { module = "com.jayway.jsonpath:json-path", version = "2.9.0" }
 
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }

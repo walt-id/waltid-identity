@@ -87,6 +87,12 @@ jobs:
         with:
           name: issuer-api
           path: ${{ runner.temp }}
+      - name: Download issuer-api2 artifact
+        if: ${{ env.use-artifact }}
+        uses: actions/download-artifact@v6
+        with:
+          name: issuer-api2
+          path: ${{ runner.temp }}
       - name: Download verifier-api artifact
         if: ${{ env.use-artifact }}
         uses: actions/download-artifact@v6
@@ -109,6 +115,7 @@ jobs:
         if: ${{ env.use-artifact }}
         run: |
           gunzip ${{ runner.temp }}/issuer-api.tar.gz
+          gunzip ${{ runner.temp }}/issuer-api2.tar.gz
           gunzip ${{ runner.temp }}/verifier-api.tar.gz
           gunzip ${{ runner.temp }}/verifier-api2.tar.gz
           gunzip ${{ runner.temp }}/wallet-api.tar.gz
@@ -116,6 +123,7 @@ jobs:
         if: ${{ env.use-artifact }}
         run: |
           docker load --input ${{ runner.temp }}/issuer-api.tar
+          docker load --input ${{ runner.temp }}/issuer-api2.tar
           docker load --input ${{ runner.temp }}/verifier-api.tar
           docker load --input ${{ runner.temp }}/verifier-api2.tar
           docker load --input ${{ runner.temp }}/wallet-api.tar
