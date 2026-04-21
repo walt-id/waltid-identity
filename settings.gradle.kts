@@ -41,7 +41,8 @@ val modules = listOfNotNull(
         "waltid-verification-policies2-vp",
         "waltid-holder-policies",
         "waltid-vical",
-        "waltid-mdoc-credentials2"
+        "waltid-mdoc-credentials2",
+        "waltid-trust-registry"
     ),
 
     * "$libraries:protocols".group(
@@ -89,6 +90,7 @@ val modules = listOfNotNull(
     "$services:waltid-verifier-api",
     "$services:waltid-verifier-api2",
     "$services:waltid-wallet-api",
+    "$services:waltid-trust-registry-service",
 
     // Service tests
     "$services:waltid-e2e-tests",
