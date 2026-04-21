@@ -49,6 +49,10 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
         value = value
     )
 
+    override fun createAttributeWithValues(scenario: TestScenario, values: List<UInt>) = IETFStatusPolicyAttribute(
+        values = values
+    )
+
     override fun createStatusContent(scenario: TestScenario, size: Int) = IETFStatusContent(
         list = "encoded_ietf_list_default",
         size = size
