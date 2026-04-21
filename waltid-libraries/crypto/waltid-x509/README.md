@@ -30,6 +30,27 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
   - **Pluggable trust model**: validate against:
     - your **organization trust store** (recommended), or
     - an explicit **pinned root** included in the `x5c` chain (private PKI / pinning).
+- **Generic X.509 profile foundation (KMP)**:
+  - generic `X509CertificateProfile` abstraction
+  - reusable `X509ProfileId`
+  - `profileId` as the primary semantic identifier
+  - generic subject / SAN / EKU / validity policy models for future profile-driven issuance
+- **Profile-driven issuance foundation (JVM)**:
+  - initial support for a profile-driven issuer/resolver model
+  - current practical profile set includes:
+    - `iso.iaca`
+    - `iso.document-signer`
+    - `generic-ca`
+    - `generic-end-entity`
+  - additional known profile definitions show the generic model can also represent:
+    - `etsi.qwac`
+    - `etsi.qsealc`
+    - `etsi.psd2.transport`
+- **Certificate Signing Request support (core-lib, JVM)**:
+  - common CSR models, builder, PEM/DER helpers, and compatibility checks
+  - JVM CSR generation, parsing, and signature validation
+  - requested `subjectAltName`, `keyUsage`, `extendedKeyUsage`, and `basicConstraints` reuse the generic X.509 models
+  - custom CSR attributes and custom requested extensions are supported as raw DER payloads
 - **[ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (JVM)**:
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
@@ -38,9 +59,241 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 
 ---
 
+## Generic profile-driven API
+
+The library now provides a profile-driven X.509 core API with pragmatic validation helpers.
+
+### Built-in profile IDs
+- `iso.iaca`
+- `iso.document-signer`
+- `generic-ca`
+- `generic-end-entity`
+- `etsi.qwac`
+- `etsi.qsealc`
+- `etsi.psd2.transport`
+
+### Core APIs added for profile hardening
+- `X509CertificateProfile.validateDefinition()` validates built-in profile metadata.
+- `X509CertificateBuildData.checkCompatibility(profile)` validates generation inputs before issuance.
+- `X509CertificateIssuanceSpec.checkCompatibility(...)` validates self-signed vs issuer-signed shape and issuer compatibility.
+- `X509IssuedCertificateData.checkCompatibility(profile)` validates the generated certificate data against the selected profile.
+- `X509CertificateSigningRequestBuilder.applyProfile(...)` copies profile-managed extensions into a CSR builder.
+- `X509CertificateSigningRequestData.checkCompatibility(profile)` now performs stricter known-profile checks.
+
+### What is fully implemented in the core lib
+- profile modeling for all built-in profile IDs listed above
+- JVM profile-driven certificate issuance for:
+  - `iso.iaca`
+  - `iso.document-signer`
+  - `generic-ca`
+  - `generic-end-entity`
+- common profile/build-data/issued-certificate validation helpers for:
+  - `iso.iaca`
+  - `iso.document-signer`
+  - `generic-ca`
+  - `generic-end-entity`
+  - `etsi.qwac`
+  - `etsi.qsealc`
+  - `etsi.psd2.transport`
+- CSR generation/parsing/signature validation on JVM
+- stricter CSR compatibility checks for the supported profile set
+
+### Important note
+For `iso.iaca` and `iso.document-signer`, the generic issuer intentionally routes through the existing ISO-specific implementation path. Those ISO-specific builders/parsers/validators remain authoritative for now. See `docs/iso-parity-gate.md`.
+
+### Example: generate and validate a generic CA + end-entity certificate
+
+```kotlin
+val issuer = X509ProfileDrivenIssuer()
+
+val caIssued = issuer.issue(
+    X509SelfSignedCertificateIssuanceSpec(
+        profileId = X509KnownProfileIds.GenericCa,
+        certificateData = X509CertificateBuildData(
+            subject = x509SubjectOf(
+                X509SubjectAttributes.country("AT"),
+                X509SubjectAttributes.commonName("Example Generic CA"),
+            ),
+            validityPeriod = X509ValidityPeriod(
+                notBefore = Instant.parse("2026-01-01T00:00:00Z"),
+                notAfter = Instant.parse("2030-01-01T00:00:00Z"),
+            ),
+        ),
+        signingKey = caKey,
+    )
+)
+
+val eeSpec = X509IssuerSignedCertificateIssuanceSpec(
+    profileId = X509KnownProfileIds.GenericEndEntity,
+    certificateData = X509CertificateBuildData(
+        subject = x509SubjectOf(
+            X509SubjectAttributes.country("AT"),
+            X509SubjectAttributes.commonName("service.example.org"),
+        ),
+        validityPeriod = X509ValidityPeriod(
+            notBefore = Instant.parse("2026-01-02T00:00:00Z"),
+            notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+        ),
+        subjectAlternativeNames = setOf(
+            X509SubjectAlternativeName.DnsName("service.example.org"),
+        ),
+    ),
+    publicKey = eeKey.getPublicKey(),
+    issuer = X509CertificateSignerSpec(
+        profileId = X509KnownProfileIds.GenericCa,
+        certificateData = X509CertificateBuildData(
+            subject = caIssued.certificateData.subject,
+            validityPeriod = caIssued.certificateData.validityPeriod,
+            subjectAlternativeNames = caIssued.certificateData.subjectAlternativeNames,
+            issuerAlternativeNames = caIssued.certificateData.issuerAlternativeNames,
+            crlDistributionPointUri = caIssued.certificateData.crlDistributionPointUri,
+        ),
+        signingKey = caKey,
+    ),
+)
+
+eeSpec.checkCompatibility().requireValid()
+val eeIssued = issuer.issue(eeSpec)
+eeIssued.certificateData.checkCompatibility(eeIssued.profile).requireValid()
+
+validateCertificateChain(
+    leaf = eeIssued.certificateDer,
+    chain = listOf(caIssued.certificateDer),
+    trustAnchors = listOf(caIssued.certificateDer),
+)
+```
+
+### Example: generate and validate an ISO IACA certificate
+
+```kotlin
+val issuer = X509ProfileDrivenIssuer()
+
+val iacaSpec = X509SelfSignedCertificateIssuanceSpec(
+    profileId = X509KnownProfileIds.IsoIaca,
+    certificateData = X509CertificateBuildData(
+        subject = x509SubjectOf(
+            X509SubjectAttributes.country("AT"),
+            X509SubjectAttributes.commonName("Example IACA"),
+        ),
+        validityPeriod = X509ValidityPeriod(
+            notBefore = Instant.parse("2026-01-01T00:00:00Z"),
+            notAfter = Instant.parse("2030-01-01T00:00:00Z"),
+        ),
+        issuerAlternativeNames = setOf(
+            X509SubjectAlternativeName.Uri("https://iaca.example.org"),
+        ),
+    ),
+    signingKey = iacaKey,
+)
+
+iacaSpec.checkCompatibility().requireValid()
+val iacaIssued = issuer.issue(iacaSpec)
+iacaIssued.certificateData.checkCompatibility(iacaIssued.profile).requireValid()
+
+val iacaDecoded = IACACertificateParser().parse(iacaIssued.certificateDer)
+IACAValidator().validate(iacaDecoded)
+```
+
+### Example: generate and validate an ISO Document Signer certificate
+
+```kotlin
+val issuer = X509ProfileDrivenIssuer()
+
+val dsSpec = X509IssuerSignedCertificateIssuanceSpec(
+    profileId = X509KnownProfileIds.IsoDocumentSigner,
+    certificateData = X509CertificateBuildData(
+        subject = x509SubjectOf(
+            X509SubjectAttributes.country("AT"),
+            X509SubjectAttributes.commonName("Example Document Signer"),
+            X509SubjectAttributes.locality("Vienna"),
+        ),
+        validityPeriod = X509ValidityPeriod(
+            notBefore = Instant.parse("2026-01-02T00:00:00Z"),
+            notAfter = Instant.parse("2027-03-31T00:00:00Z"),
+        ),
+        crlDistributionPointUri = "https://iaca.example.org/crl",
+    ),
+    publicKey = dsPublicKey,
+    issuer = X509CertificateSignerSpec(
+        profileId = X509KnownProfileIds.IsoIaca,
+        certificateData = X509CertificateBuildData(
+            subject = iacaIssued.certificateData.subject,
+            validityPeriod = iacaIssued.certificateData.validityPeriod,
+            subjectAlternativeNames = iacaIssued.certificateData.subjectAlternativeNames,
+            issuerAlternativeNames = iacaIssued.certificateData.issuerAlternativeNames,
+            crlDistributionPointUri = iacaIssued.certificateData.crlDistributionPointUri,
+        ),
+        signingKey = iacaKey,
+    ),
+)
+
+dsSpec.checkCompatibility().requireValid()
+val dsIssued = issuer.issue(dsSpec)
+dsIssued.certificateData.checkCompatibility(dsIssued.profile).requireValid()
+
+val dsDecoded = DocumentSignerCertificateParser().parse(dsIssued.certificateDer)
+DocumentSignerValidator().validate(dsDecoded, iacaDecoded)
+```
+
+### Example: generate and validate a profile-aware CSR
+
+```kotlin
+val csrData = X509CertificateSigningRequestBuilder(
+    subject = x509SubjectOf(
+        X509SubjectAttributes.country("DE"),
+        X509SubjectAttributes.commonName("bank.example"),
+    ),
+).applyProfile(X509KnownProfileIds.Qwac)
+    .addSubjectAlternativeName(X509SubjectAlternativeName.DnsName("bank.example"))
+    .build()
+
+val csrDer = X509CertificateSigningRequestGenerator().generate(
+    X509CertificateSigningRequestSpec(
+        csrData = csrData,
+        signingKey = key,
+    )
+)
+
+val decoded = X509CertificateSigningRequestParser().parse(csrDer)
+validateCertificateSigningRequestSignature(csrDer)
+val compatibility = decoded.checkCompatibility(X509KnownCertificateProfiles.Qwac)
+require(compatibility.isCompatible) { compatibility.issues.joinToString() }
+```
+
+### Example: generate an ISO Document Signer CSR
+
+```kotlin
+val csrData = X509CertificateSigningRequestBuilder(
+    subject = x509SubjectOf(
+        X509SubjectAttributes.country("AT"),
+        X509SubjectAttributes.commonName("Example Document Signer"),
+        X509SubjectAttributes.locality("Vienna"),
+    ),
+).applyProfile(X509KnownProfileIds.IsoDocumentSigner)
+    .build()
+
+val csrDer = X509CertificateSigningRequestGenerator().generate(
+    X509CertificateSigningRequestSpec(
+        csrData = csrData,
+        signingKey = documentSignerKey,
+    )
+)
+
+val decoded = X509CertificateSigningRequestParser().parse(csrDer)
+validateCertificateSigningRequestSignature(csrDer)
+val compatibility = decoded.checkCompatibility(X509KnownCertificateProfiles.IsoDocumentSigner)
+require(compatibility.isCompatible) { compatibility.issues.joinToString() }
+```
+
+### Intentionally out of scope in this batch
+- JVM profile-driven issuance for `etsi.qwac`, `etsi.qsealc`, and `etsi.psd2.transport`
+- a full policy engine for arbitrary profile authoring
+- Enterprise profile work
+- claiming full ETSI/CABF/PSD2 compliance beyond the checks enforced in code and tests
+
 ## Targets
 
-- **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
+- **JVM / Android**: Full chain validation, generic CSR generation/parsing/validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
 - **iOS**: Chain validation stub; ISO tooling not implemented yet.
 - **JS**: Chain validation stub; ISO tooling not implemented yet.
 
@@ -138,6 +391,10 @@ The `id.walt.x509.iso` package provides the following:
 - Parser classes for IACA (via `IACACertificateParser`) and Document Signer (via `DocumentSignerCertificateParser`) DER-encoded (via the `CertificateDer` platform-agnostic wrapper) X.509 certificates. **Note:** Decoded certificates **are not validated** by the parsers; use the validator classes for validation.
 - Validator classes for IACA (via `IACAValidator`) and Document Signer (via `DocumentSignerValidator`) decoded certificate instances (`IACADecodedCertificate` and `DocumentSignerDecodedCertificate` respectively) with a simple and flexible validation configuration tuning (refer to `IACAValidationConfig` and `DocumentSignerValidationConfig` for the respective configuration options).
 - VICAL-aligned IACA certificate info extraction (via `IACADecodedCertificate.toIacaCertificateInfo()`), returning structured certificate info data required for VICALs, including issuer/subject DER and issuing authority string (JVM).
+
+### Authoritative ISO implementation note
+
+The generic/profile-driven issuer can issue `iso.iaca` and `iso.document-signer`, but those profile IDs are still backed by the existing ISO-specific implementation path. That is deliberate: the specific ISO builders/parsers/validators remain the source of truth until semantic parity is proven convincingly enough for deprecation. The parity gate currently requires coverage for decoded subject/issuer data, validity, key usage, EKU, basic constraints, issuer/subject alternative names where applicable, CRL distribution points where applicable, and validator or roundtrip acceptance behavior.
 
 ### IACA X.509 Certificate Generation
 

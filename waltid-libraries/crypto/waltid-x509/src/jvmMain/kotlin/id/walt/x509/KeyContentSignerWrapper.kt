@@ -10,9 +10,8 @@ import java.io.OutputStream
 
 internal class KeyContentSignerWrapper(
     val key: Key,
+    private val algorithmIdentifier: AlgorithmIdentifier = getJcaSigningAlgorithmNameFromKeyType(key.keyType),
 ) : ContentSigner {
-
-    private val algorithmIdentifier = getJcaSigningAlgorithmNameFromKeyType(key.keyType)
     private val outputStream = ByteArrayOutputStream()
 
     override fun getAlgorithmIdentifier(): AlgorithmIdentifier = algorithmIdentifier
