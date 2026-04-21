@@ -10,7 +10,7 @@
       <div v-if="matchedCredentials.length == 0">
         <span class="text-red-600 animate-pulse flex items-center gap-1 py-1">
           <Icon name="heroicons:exclamation-circle" class="h-6 w-6" />
-          You don't have any credentials matching this presentation definition
+          You don't have any credentials matching this presentation request
           in your wallet.
         </span>
       </div>
@@ -30,9 +30,11 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <VerifiableCredentialCard :key="index" :credential="{
-            document: matchedCredentials[index].document,
-          }" class="sm:w-[400px]" />
+          <VerifiableCredentialCard
+            :key="index"
+            :credential="matchedCredentials[index]"
+            class="sm:w-[400px]"
+          />
           <button v-if="matchedCredentials.length > 1" @click="index++" class="mt-4 text-[#002159] font-bold bg-white"
             :disabled="index === matchedCredentials.length - 1" :class="{
               'cursor-not-allowed opacity-50':
@@ -48,6 +50,34 @@
           {{ index + 1 }} of {{ matchedCredentials.length }}
         </div>
         <div class="sm:w-[80%] md:w-[60%] mx-auto">
+          <div
+            v-if="transactionDataItems.length"
+            class="border border-[#E4E7EB] rounded-2xl p-5 mb-6 bg-[#F8FBFF]"
+          >
+            <div class="text-[#0F172A] text-lg font-semibold">Transaction details</div>
+            <div class="text-[#52606D] mt-1">
+              Review the transaction details before authorizing this presentation.
+            </div>
+            <div
+              v-for="(transactionDataItem, itemIndex) in transactionDataItems"
+              :key="`${transactionDataItem.type}-${itemIndex}`"
+              class="mt-4"
+            >
+              <div class="text-sm font-semibold text-[#1F2933]">
+                {{ transactionDataItem.type }}
+              </div>
+              <div
+                v-for="([field, value], fieldIndex) in transactionDataEntries(transactionDataItem)"
+                :key="`${itemIndex}-${fieldIndex}`"
+                class="flex justify-between gap-6 py-1 text-sm"
+              >
+                <span class="text-[#616E7C]">{{ formatTransactionDataField(field) }}</span>
+                <span class="text-[#1F2933] text-right break-all">
+                  {{ formatTransactionDataValue(value) }}
+                </span>
+              </div>
+            </div>
+          </div>
           <div class="text-gray-500 mt-8 sm:mt-0">
             {{
               matchedCredentials.length > 1 ? "Credentials" : "Credential"
@@ -86,7 +116,7 @@
       <div
         class="fixed sm:relative bottom-0 w-full p-4 bg-white shadow-md sm:shadow-none sm:flex sm:justify-end sm:gap-4">
         <button @click="acceptPresentation" class="w-full sm:w-44 py-3 mt-4 text-white bg-[#002159] rounded-xl">
-          {{ matchedCredentials.length > 1 ? "Disclose All" : "Disclose" }}
+          {{ confirmButtonText }}
         </button>
         <button @click="navigateTo(`/wallet/${walletId}`)"
           class="w-full sm:w-44 py-3 mt-4 bg-white sm:border sm:border-gray-400 sm:rounded-xl">
@@ -99,11 +129,11 @@
 
 <script lang="ts" setup>
 import {useTitle} from "@vueuse/core";
-import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
-import {usePresentation} from "@waltid-web-wallet/composables/presentation.ts";
+import {usePresentation, transactionDataEntries, formatTransactionDataField, formatTransactionDataValue} from "@waltid-web-wallet/composables/presentation.ts";
 import LoadingIndicator from "@waltid-web-wallet/components/loading/LoadingIndicator.vue";
 import VerifiableCredentialCard from "@waltid-web-wallet/components/credentials/VerifiableCredentialCard.vue";
+import {parseJwt} from "@waltid-web-wallet/utils/jwt.ts";
 
 const immediateAccept = ref(false);
 const mobileView = ref(window.innerWidth < 650);
@@ -121,19 +151,40 @@ const {
   removeDisclosure,
   matchedCredentials,
   index,
+  transactionDataItems,
   acceptPresentation,
   failed,
 } = await usePresentation(query);
+
+const confirmButtonText = computed(() => {
+  if (transactionDataItems.length) {
+    return matchedCredentials.length > 1 ? "Authorize and disclose" : "Authorize";
+  }
+  return matchedCredentials.length > 1 ? "Disclose All" : "Disclose";
+});
+
+
+
 const groupedCredentialsByType = computed(() => {
   const groups: Record<string, {
     id: string;
     document: string;
-    parsedDocument?: string;
+    parsedDocument?: Record<string, unknown>;
     disclosures?: string;
+    format?: string;
   }[]> = {};
   for (const credential of matchedCredentials) {
-    const parsedDocument = parseJwt(credential.document);
-    const types = (credential.parsedDocument ?? parsedDocument.vc ?? parsedDocument).type ?? parsedDocument.vct ? [parsedDocument.vct] : undefined;
+    const credentialPayload = resolveCredentialPayload(credential);
+    const typeValue = credentialPayload?.type;
+    const types = Array.isArray(typeValue)
+      ? typeValue
+      : typeof typeValue === "string"
+        ? [typeValue]
+        : typeof credentialPayload?.vct === "string"
+          ? [credentialPayload.vct]
+          : typeof credentialPayload?.docType === "string"
+            ? [credentialPayload.docType]
+            : undefined;
     const typeKey = Array.isArray(types) && types.length > 0 ? types.at(-1) : "unknown";
     if (!groups[typeKey]) {
       groups[typeKey] = [];
@@ -152,6 +203,23 @@ watch(groupedCredentialsByType, (newValue) => {
     }
   }
 }, { immediate: true });
+
+function resolveCredentialPayload(credential: {
+  document: string;
+  parsedDocument?: Record<string, unknown>;
+}) {
+  if (credential.parsedDocument) {
+    const parsed = credential.parsedDocument as Record<string, any>;
+    return (parsed.vc ?? parsed.verifiableCredential ?? parsed) as Record<string, any>;
+  }
+
+  if (!credential.document.includes(".")) {
+    return null;
+  }
+
+  const parsed = parseJwt(credential.document);
+  return (parsed?.vc ?? parsed?.verifiableCredential ?? parsed) as Record<string, any>;
+}
 
 if (query.accept) {
   immediateAccept.value = true;

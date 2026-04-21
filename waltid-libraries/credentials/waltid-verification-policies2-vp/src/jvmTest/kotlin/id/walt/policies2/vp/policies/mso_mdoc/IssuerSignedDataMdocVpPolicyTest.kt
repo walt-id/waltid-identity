@@ -189,6 +189,7 @@ class IssuerSignedDataMdocVpPolicyTest {
         expectedNonce = "nonce",
         expectedAudience = null,
         expectedOrigins = null,
+        expectedTransactionData = null,
         responseUri = null,
         responseMode = OpenID4VPResponseMode.DIRECT_POST,
         isSigned = true,

@@ -2,7 +2,11 @@
 
 package id.waltid.openid4vp.wallet.presentation
 
-import id.walt.cose.*
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseAlgorithm
+import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
@@ -17,11 +21,16 @@ import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.elements.DeviceSignedItem
+import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
+import id.walt.verifier.openid.transactiondata.deviceSignedItemKey
+import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -102,7 +111,13 @@ object MdocPresenter {
         val sessionTranscript = buildSessionTranscript(authorizationRequest, responseUri)
 
         // Determine which namespaces and elements to disclose based on the DCQL match
-        val disclosedDeviceNamespaces = DeviceNameSpaces(emptyMap()) // Assuming selective disclosure for device data
+        val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
+            mdocsCredential = mdocsCredential,
+            transactionData = filterTransactionDataForCredentialId(
+                transactionData = authorizationRequest.transactionData,
+                credentialId = matchResult.originalQuery.id,
+            ),
+        )
 
         val deviceAuth = buildDeviceAuth(
             sessionTranscript = sessionTranscript,
@@ -179,4 +194,42 @@ object MdocPresenter {
         return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
     }
 
+    private fun buildTransactionDataNamespaces(
+        mdocsCredential: MdocsCredential,
+        transactionData: List<String>,
+    ): DeviceNameSpaces = transactionData
+        .takeIf { it.isNotEmpty() }
+        ?.let(::buildMdocEmbeddedTransactionData)
+        ?.also { requireTransactionDataAuthorization(mdocsCredential, it) }
+        ?.let(::buildDeviceNameSpaces)
+        ?: DeviceNameSpaces(emptyMap())
+
+    private fun buildMdocEmbeddedTransactionData(transactionData: List<String>): Map<String, String> =
+        transactionData
+            .mapIndexed { index, encoded -> deviceSignedItemKey(index) to encoded }
+            .toMap()
+
+    private fun requireTransactionDataAuthorization(
+        mdocsCredential: MdocsCredential,
+        embeddedTransactionData: Map<String, String>,
+    ) {
+        val keyAuthorizations = requireNotNull(mdocsCredential.documentMso.deviceKeyInfo.keyAuthorizations) {
+            "transaction_data requires mdoc keyAuthorizations for docType ${mdocsCredential.docType}"
+        }
+        val namespace = MDOC_DEVICE_SIGNED_NAMESPACE
+        val isNamespaceAuthorized = keyAuthorizations.namespaces?.contains(namespace) == true
+        val authorizedElements = keyAuthorizations.dataElements?.get(namespace).orEmpty().toSet()
+
+        require(isNamespaceAuthorized || authorizedElements.containsAll(embeddedTransactionData.keys)) {
+            "transaction_data type is not authorized for mdoc docType ${mdocsCredential.docType}"
+        }
+    }
+
+    private fun buildDeviceNameSpaces(embeddedTransactionData: Map<String, String>): DeviceNameSpaces = DeviceNameSpaces(
+        mapOf(
+            MDOC_DEVICE_SIGNED_NAMESPACE to DeviceSignedItemList(
+                embeddedTransactionData.map { (key, value) -> DeviceSignedItem(key, value) }
+            ),
+        )
+    )
 }
