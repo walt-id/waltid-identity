@@ -2,7 +2,9 @@ package id.walt.policies2.vc.policies
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.signatures.CoseCredentialSignature
+import id.walt.credentials.signatures.JwtBasedSignature
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
@@ -60,8 +62,12 @@ private val log = KotlinLogging.logger { }
  *
  * ## Supported Credential Types
  *
- * Currently supports mDoc credentials with COSE signatures containing an x5c chain.
- * Future versions may add support for SD-JWT and W3C VC formats.
+ * - **mDoc credentials** with COSE signatures containing an x5c chain
+ * - **SD-JWT credentials** with x5c header in the JWT
+ * - **W3C JWT VCs** with x5c header in the JWT
+ *
+ * Note: Credentials using DID-based or .well-known issuer resolution without x5c
+ * are not currently supported for trust list verification.
  *
  * @see <a href="https://www.etsi.org/deliver/etsi_ts/119600_119699/119612/">ETSI TS 119 612</a>
  * @see <a href="https://www.etsi.org/deliver/etsi_ts/119600_119699/119602/">ETSI TS 119 602</a>
@@ -112,21 +118,45 @@ data class ETSITrustListPolicy(
     /**
      * Extracts the signing certificate from the credential's x5c chain.
      * Returns the certificate in PEM format.
+     *
+     * Supports:
+     * - mDoc credentials with COSE signatures (x5c in COSE header)
+     * - SD-JWT credentials with x5c in JWT header
+     * - W3C JWT VCs with x5c in JWT header
      */
     private suspend fun extractSigningCertificate(credential: DigitalCredential): String {
-        val credentialSignature = credential.signature
+        val signature = credential.signature
         
-        if (!(credential is MdocsCredential && credentialSignature is CoseCredentialSignature)) {
-            throw ETSITrustListPolicyException(
-                "ETSI Trust List policy currently only supports mDoc credentials with COSE signatures"
-            )
+        return when {
+            // mDoc with COSE signature
+            credential is MdocsCredential && signature is CoseCredentialSignature -> {
+                extractFromCoseSignature(signature)
+            }
+            
+            // SD-JWT or JWT-based credentials with x5c header
+            signature is JwtBasedSignature -> {
+                extractFromJwtHeader(signature.jwtHeader)
+            }
+            
+            else -> {
+                throw ETSITrustListPolicyException(
+                    "Unsupported credential type for ETSI Trust List verification. " +
+                    "Supported: mDoc with COSE x5c, SD-JWT with x5c header, JWT VC with x5c header. " +
+                    "Got: ${credential::class.simpleName} with ${signature?.let { it::class.simpleName } ?: "no signature"}"
+                )
+            }
         }
+    }
 
-        val x5cList = credentialSignature.x5cList
-            ?: throw ETSITrustListPolicyException("Credential has no x5c certificate chain")
+    /**
+     * Extracts the signing certificate from a COSE signature's x5c chain (mDoc).
+     */
+    private suspend fun extractFromCoseSignature(signature: CoseCredentialSignature): String {
+        val x5cList = signature.x5cList
+            ?: throw ETSITrustListPolicyException("mDoc credential has no x5c certificate chain in COSE header")
 
         // Find the signing certificate by matching the signer key thumbprint
-        val signerKeyThumbprint = credentialSignature.signerKey.key.getThumbprint()
+        val signerKeyThumbprint = signature.signerKey.key.getThumbprint()
         if (signerKeyThumbprint.isEmpty()) {
             throw ETSITrustListPolicyException("Could not determine signer key thumbprint")
         }
@@ -136,11 +166,42 @@ data class ETSITrustListPolicy(
                 .getOrNull()?.getThumbprint()
             certThumbprint == signerKeyThumbprint
         }?.base64Der ?: throw ETSITrustListPolicyException(
-            "Could not find signing certificate in x5c chain"
+            "Could not find signing certificate in COSE x5c chain"
         )
 
         // Convert to PEM format
         val derBytes = signingCertBase64.decodeFromBase64()
+        return buildPemCertificate(derBytes)
+    }
+
+    /**
+     * Extracts the signing certificate from a JWT header's x5c array.
+     * Per RFC 7515, the first certificate in x5c is the signing certificate (leaf).
+     */
+    private fun extractFromJwtHeader(jwtHeader: JsonObject?): String {
+        if (jwtHeader == null) {
+            throw ETSITrustListPolicyException("JWT credential has no header")
+        }
+        
+        val x5cElement = jwtHeader["x5c"]
+            ?: throw ETSITrustListPolicyException(
+                "JWT has no x5c certificate chain in header. " +
+                "ETSI Trust List verification requires an x5c header with the issuer's certificate chain."
+            )
+        
+        val x5cArray = x5cElement.jsonArray
+        if (x5cArray.isEmpty()) {
+            throw ETSITrustListPolicyException("JWT x5c header is empty")
+        }
+        
+        // Per RFC 7515 Section 4.1.6: The certificate containing the public key
+        // corresponding to the key used to sign the JWS MUST be the first certificate.
+        val leafCertBase64 = x5cArray[0].jsonPrimitive.content
+        
+        log.debug { "Extracted leaf certificate from JWT x5c header (chain length: ${x5cArray.size})" }
+        
+        // x5c certificates are base64-encoded DER
+        val derBytes = leafCertBase64.decodeFromBase64()
         return buildPemCertificate(derBytes)
     }
 
