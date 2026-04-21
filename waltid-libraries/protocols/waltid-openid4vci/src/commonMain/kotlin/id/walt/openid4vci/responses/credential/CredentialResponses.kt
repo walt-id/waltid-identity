@@ -1,12 +1,14 @@
 package id.walt.openid4vci.responses.credential
 
 import id.walt.openid4vci.errors.OAuthError
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
  * Credential response per OpenID4VCI credential endpoint.
  * Fields match the specification response body.
  */
+@Serializable
 data class CredentialResponse(
     val credentials: List<IssuedCredential>? = null,
     val transactionId: String? = null,
@@ -14,6 +16,7 @@ data class CredentialResponse(
     val notificationId: String? = null,
 )
 
+@Serializable
 data class IssuedCredential(
     val credential: JsonElement,
 )

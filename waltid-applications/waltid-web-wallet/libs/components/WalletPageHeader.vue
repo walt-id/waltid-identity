@@ -40,6 +40,15 @@
                 <QrCodeIcon class="h-5 w-5 mr-1"/>
                 Scan to receive or present credentials
             </NuxtLink>
+          <NuxtLink
+
+            class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+            :to="`/wallet/${currentWallet}/import`"
+            type="button"
+          >
+            <ArrowDownIcon class="h-5 w-5 mr-1"/>
+            Import credential (JWT)
+          </NuxtLink>
         </template>
     </PageHeader>
 </template>
@@ -47,7 +56,7 @@
 <script setup>
 import {useNow} from "@vueuse/core";
 import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts";
-import {ArrowDownOnSquareStackIcon, QrCodeIcon} from "@heroicons/vue/24/outline";
+import {ArrowDownOnSquareStackIcon, QrCodeIcon,ArrowDownIcon} from "@heroicons/vue/24/outline";
 import PageHeader from "./PageHeader.vue";
 import {useUserStore} from "../stores/user.ts";
 import {storeToRefs} from "pinia";
