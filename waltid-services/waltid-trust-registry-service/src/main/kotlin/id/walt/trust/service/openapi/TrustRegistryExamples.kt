@@ -1,7 +1,6 @@
 package id.walt.trust.service.openapi
 
 import id.walt.trust.model.*
-import id.walt.trust.service.routes.LoadSourceFromUrlRequest
 import id.walt.trust.service.routes.LoadSourceRequest
 import id.walt.trust.service.routes.ResolveCertificateRequest
 import id.walt.trust.service.routes.ResolveProviderRequest
@@ -111,47 +110,47 @@ object TrustRegistryExamples {
     )
 
     // ---------------------------------------------------------------------------
-    // Load from URL requests (real trust lists)
+    // Load from URL requests (real trust lists) - unified LoadSourceRequest
     // ---------------------------------------------------------------------------
 
-    val loadSourceFromUrlAustriaTsl = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlAustriaTsl = LoadSourceRequest(
         sourceId = "at-national-tsl",
         url = "https://www.signatur.rtr.at/currenttl.xml",
         validateSignature = true,
     )
 
-    val loadSourceFromUrlItalyTsl = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlItalyTsl = LoadSourceRequest(
         sourceId = "it-national-tsl",
         url = "https://eidas.agid.gov.it/TL/TSL-IT.xml",
         validateSignature = true,
     )
 
-    val loadSourceFromUrlBelgiumTsl = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlBelgiumTsl = LoadSourceRequest(
         sourceId = "be-national-tsl",
         url = "https://tsl.belgium.be/tsl-be.xml",
         validateSignature = true,
     )
 
-    val loadSourceFromUrlEuLotl = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlEuLotl = LoadSourceRequest(
         sourceId = "eu-lotl",
         url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
         validateSignature = true,
     )
 
-    val loadSourceFromUrlGermanTsl = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlGermanTsl = LoadSourceRequest(
         sourceId = "de-national-tsl",
         url = "https://www.nrca-ds.de/st/TSL-XML.xml",
         validateSignature = true,
     )
 
     // EWC LSP Trust List - has WALLET_PROVIDER, PID_PROVIDER, ATTESTATION_PROVIDER (EAA)
-    val loadSourceFromUrlEwcPilot = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlEwcPilot = LoadSourceRequest(
         sourceId = "ewc-lsp-pilot",
         url = "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL",
         validateSignature = false, // Pilot list, not signed
     )
 
-    val loadSourceFromUrlNoValidation = LoadSourceFromUrlRequest(
+    val loadSourceFromUrlNoValidation = LoadSourceRequest(
         sourceId = "test-source",
         url = "https://example.com/test-trust-list.xml",
         validateSignature = false,

@@ -1,7 +1,6 @@
 package id.walt.trust.service.openapi
 
 import id.walt.trust.model.*
-import id.walt.trust.service.routes.LoadSourceFromUrlRequest
 import id.walt.trust.service.routes.LoadSourceRequest
 import id.walt.trust.service.routes.ResolveCertificateRequest
 import id.walt.trust.service.routes.ResolveProviderRequest
@@ -161,71 +160,21 @@ object TrustRegistryDocs {
 
     fun loadSourceDocs(): RouteConfig.() -> Unit = {
         tags = listOf("Source Management")
-        summary = "Load a trust source from content"
+        summary = "Load a trust source"
         description = """
-            Parses and loads a trust list into the registry. The service auto-detects the format:
+            Loads a trust list into the registry. Provide **either** `content` (raw trust list)
+            **or** `url` (to fetch from HTTP). The service auto-detects the format:
             
             - **TSL XML** — EU Trusted List XML (ETSI TS 119 612)
             - **LoTE JSON** — EUDI List of Trusted Entities JSON (ETSI TS 119 602)
             - **LoTE XML** — EUDI List of Trusted Entities XML
             
-            The `sourceId` is a caller-chosen identifier used to reference this source in
-            subsequent refresh or health queries. If a source with the same ID already exists,
-            it is replaced.
-            
-            The optional `sourceUrl` is stored as metadata and used as the fetch URL when
-            `POST /sources/{sourceId}/refresh` is called later.
-        """.trimIndent()
-
-        request {
-            body<LoadSourceRequest> {
-                required = true
-                description = "Source content to load"
-                example("Load LoTE JSON source") {
-                    value = TrustRegistryExamples.loadSourceLoteJson
-                }
-                example("Load TSL XML source") {
-                    value = TrustRegistryExamples.loadSourceTslXml
-                }
-            }
-        }
-        response {
-            HttpStatusCode.OK to {
-                description = "Source loaded successfully"
-                body<RefreshResult> {
-                    example("Successful load") {
-                        value = TrustRegistryExamples.refreshResultSuccess
-                    }
-                }
-            }
-            HttpStatusCode.UnprocessableEntity to {
-                description = "Source could not be parsed or loaded"
-                body<RefreshResult> {
-                    example("Parse failure") {
-                        value = TrustRegistryExamples.refreshResultFailure
-                    }
-                }
-            }
-        }
-    }
-
-    // ---------------------------------------------------------------------------
-    // Sources: Load from URL
-    // ---------------------------------------------------------------------------
-
-    fun loadSourceFromUrlDocs(): RouteConfig.() -> Unit = {
-        tags = listOf("Source Management")
-        summary = "Load a trust source from URL"
-        description = """
-            Fetches and loads a trust list directly from a URL. This is the recommended way to
-            load production trust sources. The service will:
-            
-            1. Fetch the content via HTTP(S)
-            2. Auto-detect the format (TSL XML, LoTE JSON, LoTE XML)
-            3. Parse and validate the content
-            4. Validate XMLDSig signature for TSL sources (if enabled)
-            5. Store the entities, services, and identities
-            6. Register the URL for future `refresh` calls
+            **Loading from URL (recommended for production):**
+            1. Fetches the content via HTTP(S)
+            2. Auto-detects the format
+            3. Validates XMLDSig signature for TSL sources (if enabled)
+            4. Stores entities, services, and identities
+            5. Registers the URL for future `refresh` calls
             
             **Working EU National Trust Lists:**
             - Austria: `https://www.signatur.rtr.at/currenttl.xml` (fast, ~9 TSPs)
@@ -239,33 +188,34 @@ object TrustRegistryDocs {
               - Unsigned (use `validateSignature: false`)
             
             **Note:** The EU LoTL (`eu-lotl.xml`) is a "List of Lists" — it contains pointers
-            to member state trust lists, not actual Trust Service Providers. Use national
-            TSLs to get actual entities.
+            to member state trust lists, not actual Trust Service Providers.
             
-            Set `validateSignature: false` for testing or when working with unsigned lists.
+            Set `validateSignature: false` for unsigned lists or testing.
         """.trimIndent()
 
         request {
-            body<LoadSourceFromUrlRequest> {
+            body<LoadSourceRequest> {
                 required = true
-                description = "URL-based source load request"
-                example("Load Austrian TSL (recommended - fast & reliable)") {
+                description = "Source load request. Provide either 'content' or 'url'."
+                // URL-based examples
+                example("Load from URL: Austrian TSL (recommended)") {
                     value = TrustRegistryExamples.loadSourceFromUrlAustriaTsl
                 }
-                example("Load Italian TSL (large - 57 TSPs)") {
+                example("Load from URL: Italian TSL (large)") {
                     value = TrustRegistryExamples.loadSourceFromUrlItalyTsl
                 }
-                example("Load Belgian TSL") {
-                    value = TrustRegistryExamples.loadSourceFromUrlBelgiumTsl
-                }
-                example("Load EWC Pilot (Wallet/PID/EAA providers)") {
+                example("Load from URL: EWC Pilot (Wallet/PID/EAA)") {
                     value = TrustRegistryExamples.loadSourceFromUrlEwcPilot
                 }
-                example("Load EU LoTL (pointers only, no TSPs)") {
+                example("Load from URL: EU LoTL (pointers only)") {
                     value = TrustRegistryExamples.loadSourceFromUrlEuLotl
                 }
-                example("Load without signature validation") {
-                    value = TrustRegistryExamples.loadSourceFromUrlNoValidation
+                // Content-based examples
+                example("Load from content: LoTE JSON") {
+                    value = TrustRegistryExamples.loadSourceLoteJson
+                }
+                example("Load from content: TSL XML") {
+                    value = TrustRegistryExamples.loadSourceTslXml
                 }
             }
         }
@@ -279,8 +229,8 @@ object TrustRegistryDocs {
                     example("Successful load from EWC Pilot") {
                         value = TrustRegistryExamples.loadSourceFromUrlSuccessEwcPilot
                     }
-                    example("Successful load from EU LoTL (pointers only)") {
-                        value = TrustRegistryExamples.loadSourceFromUrlSuccessEuLotl
+                    example("Successful load from content") {
+                        value = TrustRegistryExamples.refreshResultSuccess
                     }
                 }
             }
@@ -292,6 +242,17 @@ object TrustRegistryDocs {
                     }
                     example("Signature validation failure") {
                         value = TrustRegistryExamples.loadSourceFromUrlSignatureFailure
+                    }
+                    example("Parse failure") {
+                        value = TrustRegistryExamples.refreshResultFailure
+                    }
+                }
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Neither 'content' nor 'url' provided"
+                body<String> {
+                    example("Missing parameter") {
+                        value = "Provide either 'content' or 'url'"
                     }
                 }
             }

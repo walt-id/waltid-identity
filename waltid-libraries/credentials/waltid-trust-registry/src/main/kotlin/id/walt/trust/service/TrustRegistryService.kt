@@ -70,11 +70,17 @@ interface TrustRegistryService {
 
     /**
      * Load a source from raw content (for bootstrapping / demo).
+     * 
+     * @param sourceId Unique identifier for this trust source
+     * @param content Raw trust list content (TSL XML, LoTE JSON/XML)
+     * @param sourceUrl Optional URL to store for future refresh calls
+     * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)
      */
     suspend fun loadSourceFromContent(
         sourceId: String,
         content: String,
-        sourceUrl: String? = null
+        sourceUrl: String? = null,
+        validateSignature: Boolean = true
     ): RefreshResult
 
     /**

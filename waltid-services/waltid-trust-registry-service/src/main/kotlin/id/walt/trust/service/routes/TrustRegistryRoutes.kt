@@ -54,14 +54,13 @@ data class ResolveProviderRequest(
 @Serializable
 data class LoadSourceRequest(
     val sourceId: String,
-    val content: String,
-    val sourceUrl: String? = null
-)
-
-@Serializable
-data class LoadSourceFromUrlRequest(
-    val sourceId: String,
-    val url: String,
+    /** Raw content (TSL XML, LoTE JSON/XML). Provide either content OR url, not both. */
+    val content: String? = null,
+    /** URL to fetch trust list from. Provide either content OR url, not both. */
+    val url: String? = null,
+    /** Stored for refresh calls when using content; ignored when using url (url is stored instead). */
+    val sourceUrl: String? = null,
+    /** Validate XMLDSig signature for TSL sources. Default: true */
     val validateSignature: Boolean = true
 )
 
@@ -134,25 +133,31 @@ private fun Route.sourceRoutes() {
 
         post("/load", TrustRegistryDocs.loadSourceDocs()) {
             val req = call.receive<LoadSourceRequest>()
-            val result = TrustRegistryConfig.service.loadSourceFromContent(
-                sourceId = req.sourceId,
-                content = req.content,
-                sourceUrl = req.sourceUrl
-            )
-            if (result.success) {
-                call.respond(HttpStatusCode.OK, result)
-            } else {
-                call.respond(HttpStatusCode.UnprocessableEntity, result)
+            
+            val result = when {
+                req.url != null -> {
+                    // Load from URL
+                    TrustRegistryConfig.service.loadSourceFromUrl(
+                        sourceId = req.sourceId,
+                        url = req.url,
+                        validateSignature = req.validateSignature
+                    )
+                }
+                req.content != null -> {
+                    // Load from content
+                    TrustRegistryConfig.service.loadSourceFromContent(
+                        sourceId = req.sourceId,
+                        content = req.content,
+                        sourceUrl = req.sourceUrl,
+                        validateSignature = req.validateSignature
+                    )
+                }
+                else -> {
+                    call.respond(HttpStatusCode.BadRequest, "Provide either 'content' or 'url'")
+                    return@post
+                }
             }
-        }
-
-        post("/load-from-url", TrustRegistryDocs.loadSourceFromUrlDocs()) {
-            val req = call.receive<LoadSourceFromUrlRequest>()
-            val result = TrustRegistryConfig.service.loadSourceFromUrl(
-                sourceId = req.sourceId,
-                url = req.url,
-                validateSignature = req.validateSignature
-            )
+            
             if (result.success) {
                 call.respond(HttpStatusCode.OK, result)
             } else {

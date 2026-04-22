@@ -188,9 +188,10 @@ class DefaultTrustRegistryService(
     override suspend fun loadSourceFromContent(
         sourceId: String,
         content: String,
-        sourceUrl: String?
+        sourceUrl: String?,
+        validateSignature: Boolean
     ): RefreshResult {
-        return loadSourceFromContentInternal(sourceId, content, sourceUrl, validateSignature = true)
+        return loadSourceFromContentInternal(sourceId, content, sourceUrl, validateSignature)
     }
 
     override suspend fun loadSourceFromUrl(
