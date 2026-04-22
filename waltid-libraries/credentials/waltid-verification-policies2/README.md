@@ -384,7 +384,7 @@ Validates credential issuer certificates against an ETSI Trust List via the `wal
 | `expectedEntityType` | string | null | Filter: require specific entity type (`PID_PROVIDER`, `WALLET_PROVIDER`, `ATTESTATION_PROVIDER`, etc.) |
 | `expectedServiceType` | string | null | Filter: require specific service type |
 | `allowStaleSource` | boolean | false | If true, accept credentials from stale (but not expired) trust sources |
-| `requireAuthenticated` | boolean | false | If true, require trust source authenticity to be `VALIDATED` (not just `SKIPPED_DEMO`) |
+| `requireAuthenticated` | boolean | false | If true, require trust source signature to be `VALIDATED` (XMLDSig verified) |
 
 **Supported credential types:**
 - mDoc credentials with COSE signatures and x5c chain
@@ -408,9 +408,14 @@ Validates credential issuer certificates against an ETSI Trust List via the `wal
     "status": "GRANTED"
   },
   "sourceFreshness": "FRESH",
-  "authenticity": "SKIPPED_DEMO"
+  "authenticity": "VALIDATED"
 }
 ```
+
+**Authenticity values:**
+- `VALIDATED` — Trust list XMLDSig signature verified successfully
+- `FAILED` — Signature validation failed
+- `SKIPPED_DEMO` — Signature validation was disabled (testing/demo mode)
 
 ---
 
