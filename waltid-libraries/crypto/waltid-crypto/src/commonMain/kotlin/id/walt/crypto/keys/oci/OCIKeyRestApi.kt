@@ -125,7 +125,7 @@ class OCIKeyRestApi(
             KeyType.RSA -> "SHA_256_RSA_PKCS1_V1_5"
             KeyType.RSA3072 -> "SHA_384_RSA_PKCS1_V1_5"
             KeyType.RSA4096 -> "SHA_512_RSA_PKCS1_V1_5"
-            KeyType.RSA6144 -> "SHA_512_RSA_PKCS1_V1_5"
+            KeyType.RSA6144 -> throw KeyTypeNotSupportedException(keyType.name)
             KeyType.secp256k1, KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }

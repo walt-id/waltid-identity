@@ -59,15 +59,23 @@ enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?
     // TODO: X448(jwsAlg = "X448", oid = null)
 }
 
+
 object KeyTypes {
     val EC_KEYS = KeyType.entries.filter { it.jwkKty == "EC" }
     val RSA_KEYS = KeyType.entries.filter { it.jwkKty == "RSA" }
 
-    /** kty -> crv mapping */
-    val JWK_MAPPING = KeyType.entries.associateBy { it.jwkKty to it.jwkCurve }
+    /** (kty, crv) mapping for key types that are uniquely identifiable via JWK metadata. */
+    val JWK_MAPPING = KeyType.entries
+        .filterNot { it.jwkKty == "RSA" }
+        .associateBy { it.jwkKty to it.jwkCurve }
 
+    /**
+     * Resolves key type from JWK kty/crv metadata only.
+     * RSA sizes cannot be distinguished this way, so RSA defaults to KeyType.RSA.
+     */
     fun getKeyTypeByJwkId(jwkKty: String, jwkCrv: String?): KeyType =
         when (jwkKty) {
+            "RSA" -> KeyType.RSA
             "EC" if jwkCrv == "P-256K" -> KeyType.secp256k1
             else -> JWK_MAPPING[jwkKty to jwkCrv]
                 ?: throw IllegalArgumentException("Unknown JWK combination: kty=$jwkKty, crv=$jwkCrv")
