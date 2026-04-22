@@ -76,7 +76,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().decodedX
-        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> getRsaPublicKeyBytes(_internalJwk.toRSAKey().toPublicKey())
         KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> getECPublicKeyBytes(
             _internalJwk.toECKey().toECPublicKey()
         )
@@ -118,7 +118,7 @@ actual class JWKKey actual constructor(
 
             KeyType.Ed25519 -> throw NotImplementedError("Ed25519 keys cannot be exported as PEM yet.")
 
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().let {
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> _internalJwk.toRSAKey().let {
                 if (hasPrivateKey) {
                     pemObjects.add(PemObject("RSA PRIVATE KEY", it.toRSAPrivateKey().encoded))
                     pemObjects.add(
@@ -154,7 +154,7 @@ actual class JWKKey actual constructor(
 
             KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> ECDSASigner(_internalJwk as ECKey)
 
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> RSASSASigner(_internalJwk as RSAKey)
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> RSASSASigner(_internalJwk as RSAKey)
         }
     }
 
@@ -168,7 +168,7 @@ actual class JWKKey actual constructor(
 
             KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> ECDSAVerifier(_internalJwk as ECKey)
 
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> RSASSAVerifier(_internalJwk as RSAKey)
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> RSASSAVerifier(_internalJwk as RSAKey)
         }
     }
 
@@ -182,6 +182,7 @@ actual class JWKKey actual constructor(
             KeyType.RSA -> JWSAlgorithm.RS256
             KeyType.RSA3072 -> JWSAlgorithm.RS384
             KeyType.RSA4096 -> JWSAlgorithm.RS512
+            KeyType.RSA6144 -> JWSAlgorithm.RS512
         }
     }
 
@@ -409,9 +410,13 @@ actual class JWKKey actual constructor(
         when (_internalJwk.keyType) {
             com.nimbusds.jose.jwk.KeyType.RSA -> {
                 when (val bitLength = _internalJwk.toRSAKey().modulus.decodeToBigInteger().bitLength()) {
-                    1024, 2048 -> KeyType.RSA
-                    3072 -> KeyType.RSA3072
-                    4096 -> KeyType.RSA4096
+                    // For RSA built from two equal-size primes, the modulus can be either:
+                    // - the nominal size (e.g. 2048), or
+                    // - one bit shorter (e.g. 2047) if the highest bit is 0
+                    in 1023..1024, in 2047..2048 -> KeyType.RSA
+                    in 3071..3072 -> KeyType.RSA3072
+                    in 4095..4096 -> KeyType.RSA4096
+                    in 6143..6144 -> KeyType.RSA6144
                     else -> throw IllegalArgumentException("RSA key has invalid bit size: $bitLength")
                 }
             }
@@ -461,7 +466,7 @@ actual class JWKKey actual constructor(
     private fun getPrivateKey() = when (keyType) {
         KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> _internalJwk.toECKey().toPrivateKey()
         KeyType.Ed25519 -> decodeEd25519RawPrivateKey(_internalJwk.toOctetKeyPair().d.toString())
-        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toPrivateKey()
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> _internalJwk.toRSAKey().toPrivateKey()
     }
 
     fun getInternalPublicKey(): PublicKey = when (keyType) {
@@ -469,7 +474,7 @@ actual class JWKKey actual constructor(
         KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
 //        KeyType.Ed25519 -> decodeEd25519RawPublicKey(_internalJwk.toOctetKeyPair())
 //        KeyType.Ed25519 -> _internalJwk.toOctetKeyPair().toPublicKey()
-        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> _internalJwk.toRSAKey().toRSAPublicKey()
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> _internalJwk.toRSAKey().toRSAPublicKey()
 //        else -> TODO("Not yet supported: $keyType")
     }
 
@@ -484,6 +489,7 @@ actual class JWKKey actual constructor(
             KeyType.RSA -> Signature.getInstance("SHA256withRSA") // RSASSA-PKCS1-v1_5
             KeyType.RSA3072 -> Signature.getInstance("SHA384withRSA") // RSASSA-PKCS1-v1_5
             KeyType.RSA4096 -> Signature.getInstance("SHA512withRSA") // RSASSA-PKCS1-v1_5
+            KeyType.RSA6144 -> Signature.getInstance("SHA512withRSA") // RSASSA-PKCS1-v1_5
         }
 
     private fun decodeEd25519RawPrivateKey(base64: String): PrivateKey {
