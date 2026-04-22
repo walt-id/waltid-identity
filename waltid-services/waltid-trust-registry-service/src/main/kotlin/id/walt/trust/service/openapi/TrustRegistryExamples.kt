@@ -144,6 +144,13 @@ object TrustRegistryExamples {
         validateSignature = true,
     )
 
+    // EWC LSP Trust List - has WALLET_PROVIDER, PID_PROVIDER, ATTESTATION_PROVIDER (EAA)
+    val loadSourceFromUrlEwcPilot = LoadSourceFromUrlRequest(
+        sourceId = "ewc-lsp-pilot",
+        url = "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL",
+        validateSignature = false, // Pilot list, not signed
+    )
+
     val loadSourceFromUrlNoValidation = LoadSourceFromUrlRequest(
         sourceId = "test-source",
         url = "https://example.com/test-trust-list.xml",
@@ -164,6 +171,14 @@ object TrustRegistryExamples {
         entitiesLoaded = 0, // LoTL has pointers to member states, not direct TSPs
         servicesLoaded = 0,
         identitiesLoaded = 0,
+    )
+
+    val loadSourceFromUrlSuccessEwcPilot = RefreshResult(
+        sourceId = "ewc-lsp-pilot",
+        success = true,
+        entitiesLoaded = 15, // Wallet Providers, PID Providers, EAA Providers
+        servicesLoaded = 30,
+        identitiesLoaded = 30,
     )
 
     val loadSourceFromUrlFetchFailure = RefreshResult(

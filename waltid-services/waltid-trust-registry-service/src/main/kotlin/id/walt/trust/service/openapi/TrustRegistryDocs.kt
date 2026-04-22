@@ -233,6 +233,11 @@ object TrustRegistryDocs {
             - Belgium: `https://tsl.belgium.be/tsl-be.xml`
             - Finland: `https://dp.trustedlist.fi/fi-tl.xml`
             
+            **EUDI Wallet Pilot Trust List (EWC LSP):**
+            - EWC: `https://ewc-consortium.github.io/ewc-trust-list/EWC-TL`
+              - Contains WALLET_PROVIDER, PID_PROVIDER, ATTESTATION_PROVIDER (EAA)
+              - Unsigned (use `validateSignature: false`)
+            
             **Note:** The EU LoTL (`eu-lotl.xml`) is a "List of Lists" — it contains pointers
             to member state trust lists, not actual Trust Service Providers. Use national
             TSLs to get actual entities.
@@ -253,6 +258,9 @@ object TrustRegistryDocs {
                 example("Load Belgian TSL") {
                     value = TrustRegistryExamples.loadSourceFromUrlBelgiumTsl
                 }
+                example("Load EWC Pilot (Wallet/PID/EAA providers)") {
+                    value = TrustRegistryExamples.loadSourceFromUrlEwcPilot
+                }
                 example("Load EU LoTL (pointers only, no TSPs)") {
                     value = TrustRegistryExamples.loadSourceFromUrlEuLotl
                 }
@@ -267,6 +275,9 @@ object TrustRegistryDocs {
                 body<RefreshResult> {
                     example("Successful load from Austrian TSL") {
                         value = TrustRegistryExamples.loadSourceFromUrlSuccessAustria
+                    }
+                    example("Successful load from EWC Pilot") {
+                        value = TrustRegistryExamples.loadSourceFromUrlSuccessEwcPilot
                     }
                     example("Successful load from EU LoTL (pointers only)") {
                         value = TrustRegistryExamples.loadSourceFromUrlSuccessEuLotl
