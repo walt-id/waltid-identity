@@ -5,7 +5,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.submitForm
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -72,13 +72,18 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
         val parsedResponse: Res = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
             val body = httpResponse.bodyAsText()
-            runCatching {
-                dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
-            }.getOrElse { ex ->
-                throw DataFetchingException(
-                    "Server answered request with non-/invalid JSON: $body (to request to $url)",
-                    cause = ex
-                )
+            if (Res::class == String::class) {
+                @Suppress("UNCHECKED_CAST")
+                body as Res
+            } else {
+                runCatching {
+                    dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
+                }.getOrElse { ex ->
+                    throw DataFetchingException(
+                        "Server answered request with non-/invalid JSON: $body (to request to $url)",
+                        cause = ex,
+                    )
+                }
             }
         } else {
             runCatching {
@@ -121,9 +126,8 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
 
         return httpResponse
     }
-    suspend inline fun rawFetch(urlString: String): HttpResponse {
-        return rawFetch(UrlUtils.parseUrl(urlString))
-    }
+
+    suspend inline fun rawFetch(urlString: String): HttpResponse = rawFetch(UrlUtils.parseUrl(urlString))
 
     /**
      * Send data to a remote URL
