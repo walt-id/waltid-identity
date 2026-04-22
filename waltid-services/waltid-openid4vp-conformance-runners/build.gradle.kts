@@ -68,7 +68,7 @@ dependencies {
     implementation(identityLibs.slf4j.julbridge)
     implementation(identityLibs.klogging)
     implementation(identityLibs.slf4j.klogging)
-    implementation("io.ktor:ktor-client-encoding:3.2.2")
+    implementation("io.ktor:ktor-client-encoding:3.4.2")
 
     // Test
 
