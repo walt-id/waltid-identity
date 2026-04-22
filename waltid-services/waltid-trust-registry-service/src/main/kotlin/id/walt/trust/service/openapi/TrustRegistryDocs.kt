@@ -227,9 +227,15 @@ object TrustRegistryDocs {
             5. Store the entities, services, and identities
             6. Register the URL for future `refresh` calls
             
-            **Real-world trust list URLs:**
-            - EU List of Trusted Lists (LoTL): `https://ec.europa.eu/tools/lotl/eu-lotl.xml`
-            - German National TSL: `https://www.nrca-ds.de/st/TSL-XML.xml`
+            **Working EU National Trust Lists:**
+            - Austria: `https://www.signatur.rtr.at/currenttl.xml` (fast, ~9 TSPs)
+            - Italy: `https://eidas.agid.gov.it/TL/TSL-IT.xml` (large, ~57 TSPs)
+            - Belgium: `https://tsl.belgium.be/tsl-be.xml`
+            - Finland: `https://dp.trustedlist.fi/fi-tl.xml`
+            
+            **Note:** The EU LoTL (`eu-lotl.xml`) is a "List of Lists" — it contains pointers
+            to member state trust lists, not actual Trust Service Providers. Use national
+            TSLs to get actual entities.
             
             Set `validateSignature: false` for testing or when working with unsigned lists.
         """.trimIndent()
@@ -238,11 +244,17 @@ object TrustRegistryDocs {
             body<LoadSourceFromUrlRequest> {
                 required = true
                 description = "URL-based source load request"
-                example("Load EU LoTL (with signature validation)") {
-                    value = TrustRegistryExamples.loadSourceFromUrlEuLotl
+                example("Load Austrian TSL (recommended - fast & reliable)") {
+                    value = TrustRegistryExamples.loadSourceFromUrlAustriaTsl
                 }
-                example("Load German TSL (with signature validation)") {
-                    value = TrustRegistryExamples.loadSourceFromUrlGermanTsl
+                example("Load Italian TSL (large - 57 TSPs)") {
+                    value = TrustRegistryExamples.loadSourceFromUrlItalyTsl
+                }
+                example("Load Belgian TSL") {
+                    value = TrustRegistryExamples.loadSourceFromUrlBelgiumTsl
+                }
+                example("Load EU LoTL (pointers only, no TSPs)") {
+                    value = TrustRegistryExamples.loadSourceFromUrlEuLotl
                 }
                 example("Load without signature validation") {
                     value = TrustRegistryExamples.loadSourceFromUrlNoValidation
@@ -253,7 +265,10 @@ object TrustRegistryDocs {
             HttpStatusCode.OK to {
                 description = "Source loaded successfully"
                 body<RefreshResult> {
-                    example("Successful load from EU LoTL") {
+                    example("Successful load from Austrian TSL") {
+                        value = TrustRegistryExamples.loadSourceFromUrlSuccessAustria
+                    }
+                    example("Successful load from EU LoTL (pointers only)") {
                         value = TrustRegistryExamples.loadSourceFromUrlSuccessEuLotl
                     }
                 }

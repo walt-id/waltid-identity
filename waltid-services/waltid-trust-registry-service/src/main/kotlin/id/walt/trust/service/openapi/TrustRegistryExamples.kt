@@ -114,6 +114,24 @@ object TrustRegistryExamples {
     // Load from URL requests (real trust lists)
     // ---------------------------------------------------------------------------
 
+    val loadSourceFromUrlAustriaTsl = LoadSourceFromUrlRequest(
+        sourceId = "at-national-tsl",
+        url = "https://www.signatur.rtr.at/currenttl.xml",
+        validateSignature = true,
+    )
+
+    val loadSourceFromUrlItalyTsl = LoadSourceFromUrlRequest(
+        sourceId = "it-national-tsl",
+        url = "https://eidas.agid.gov.it/TL/TSL-IT.xml",
+        validateSignature = true,
+    )
+
+    val loadSourceFromUrlBelgiumTsl = LoadSourceFromUrlRequest(
+        sourceId = "be-national-tsl",
+        url = "https://tsl.belgium.be/tsl-be.xml",
+        validateSignature = true,
+    )
+
     val loadSourceFromUrlEuLotl = LoadSourceFromUrlRequest(
         sourceId = "eu-lotl",
         url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
@@ -132,12 +150,20 @@ object TrustRegistryExamples {
         validateSignature = false,
     )
 
+    val loadSourceFromUrlSuccessAustria = RefreshResult(
+        sourceId = "at-national-tsl",
+        success = true,
+        entitiesLoaded = 9,
+        servicesLoaded = 42,
+        identitiesLoaded = 42,
+    )
+
     val loadSourceFromUrlSuccessEuLotl = RefreshResult(
         sourceId = "eu-lotl",
         success = true,
-        entitiesLoaded = 27,
-        servicesLoaded = 27,
-        identitiesLoaded = 0, // LoTL has pointers, not direct TSPs
+        entitiesLoaded = 0, // LoTL has pointers to member states, not direct TSPs
+        servicesLoaded = 0,
+        identitiesLoaded = 0,
     )
 
     val loadSourceFromUrlFetchFailure = RefreshResult(
