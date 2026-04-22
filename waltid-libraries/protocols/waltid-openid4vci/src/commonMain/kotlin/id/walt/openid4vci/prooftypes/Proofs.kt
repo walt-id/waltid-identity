@@ -1,5 +1,7 @@
 package id.walt.openid4vci.prooftypes
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -11,9 +13,13 @@ import kotlinx.serialization.json.jsonPrimitive
  * Only JWT proofs are supported by the handlers for now, but the model keeps the other
  * proof types to stay aligned with the specification.
  */
+@Serializable
 data class Proofs(
+    @SerialName("jwt")
     val jwt: List<String>? = null,
+    @SerialName("di_vp")
     val diVp: List<JsonObject>? = null,
+    @SerialName("attestation")
     val attestation: List<String>? = null,
     val additional: Map<String, JsonElement> = emptyMap(),
 ) {

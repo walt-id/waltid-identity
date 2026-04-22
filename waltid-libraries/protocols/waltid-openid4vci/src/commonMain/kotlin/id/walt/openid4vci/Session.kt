@@ -1,5 +1,7 @@
 package id.walt.openid4vci
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /**
@@ -8,8 +10,11 @@ import kotlin.time.Instant
  * into the persisted AuthorizationCodeRecord; the token handler restores it so the access request
  * inherits subject/expiry info before minting tokens.
  */
-interface Session {
+@Serializable
+sealed interface Session {
+    @SerialName("subject")
     val subject: String?
+    @SerialName("expires_at")
     val expiresAt: Map<TokenType, Instant>
 
     fun withExpiresAt(tokenType: TokenType, instant: Instant): Session
@@ -23,8 +28,11 @@ enum class TokenType {
     AUTHORIZATION_CODE,
 }
 
+@Serializable
 data class DefaultSession(
-    override val expiresAt: MutableMap<TokenType, Instant> = mutableMapOf(),
+    @SerialName("expires_at")
+    override val expiresAt: Map<TokenType, Instant> = emptyMap(),
+    @SerialName("subject")
     override val subject: String? = null,
 ) : Session {
     override fun withExpiresAt(tokenType: TokenType, instant: Instant): Session =
