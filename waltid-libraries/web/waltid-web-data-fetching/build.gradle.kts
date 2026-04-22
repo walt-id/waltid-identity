@@ -38,6 +38,7 @@ kotlin {
             implementation(identityLibs.ktor.client.java)
             implementation(identityLibs.ktor.client.apache5)
             implementation(identityLibs.ktor.client.okhttp)
+            //implementation(identityLibs.ktor.client.jetty)
         }
 
         /* To do:

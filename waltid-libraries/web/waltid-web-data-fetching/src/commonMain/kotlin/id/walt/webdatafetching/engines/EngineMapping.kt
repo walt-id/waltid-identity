@@ -10,6 +10,7 @@ object EngineMapping {
         HttpEngine.Apache5 -> Apache5Engine
         HttpEngine.OkHttp -> OkHttpEngine
         HttpEngine.Native -> NativeEngine
+        //HttpEngine.Jetty -> JettyEngine // Temporarily disabled
     }
 
 }
