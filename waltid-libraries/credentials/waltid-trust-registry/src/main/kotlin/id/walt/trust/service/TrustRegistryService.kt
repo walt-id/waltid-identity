@@ -76,4 +76,18 @@ interface TrustRegistryService {
         content: String,
         sourceUrl: String? = null
     ): RefreshResult
+
+    /**
+     * Load a source directly from a URL.
+     * Fetches the content via HTTP and parses it.
+     * 
+     * @param sourceId Unique identifier for this trust source
+     * @param url URL to fetch the trust list from
+     * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)
+     */
+    suspend fun loadSourceFromUrl(
+        sourceId: String,
+        url: String,
+        validateSignature: Boolean = true
+    ): RefreshResult
 }

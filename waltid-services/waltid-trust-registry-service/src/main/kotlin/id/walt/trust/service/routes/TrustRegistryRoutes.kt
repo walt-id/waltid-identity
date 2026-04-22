@@ -58,6 +58,13 @@ data class LoadSourceRequest(
     val sourceUrl: String? = null
 )
 
+@Serializable
+data class LoadSourceFromUrlRequest(
+    val sourceId: String,
+    val url: String,
+    val validateSignature: Boolean = true
+)
+
 // ---------------------------------------------------------------------------
 // Resolve routes
 // ---------------------------------------------------------------------------
@@ -131,6 +138,20 @@ private fun Route.sourceRoutes() {
                 sourceId = req.sourceId,
                 content = req.content,
                 sourceUrl = req.sourceUrl
+            )
+            if (result.success) {
+                call.respond(HttpStatusCode.OK, result)
+            } else {
+                call.respond(HttpStatusCode.UnprocessableEntity, result)
+            }
+        }
+
+        post("/load-from-url", TrustRegistryDocs.loadSourceFromUrlDocs()) {
+            val req = call.receive<LoadSourceFromUrlRequest>()
+            val result = TrustRegistryConfig.service.loadSourceFromUrl(
+                sourceId = req.sourceId,
+                url = req.url,
+                validateSignature = req.validateSignature
             )
             if (result.success) {
                 call.respond(HttpStatusCode.OK, result)

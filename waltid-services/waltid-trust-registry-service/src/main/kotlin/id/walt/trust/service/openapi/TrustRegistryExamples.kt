@@ -1,6 +1,7 @@
 package id.walt.trust.service.openapi
 
 import id.walt.trust.model.*
+import id.walt.trust.service.routes.LoadSourceFromUrlRequest
 import id.walt.trust.service.routes.LoadSourceRequest
 import id.walt.trust.service.routes.ResolveCertificateRequest
 import id.walt.trust.service.routes.ResolveProviderRequest
@@ -107,6 +108,48 @@ object TrustRegistryExamples {
         sourceId = "at-national-tl",
         content = """<?xml version="1.0"?><TrustServiceStatusList xmlns="http://uri.etsi.org/02231/v2#"><SchemeInformation><SchemeTerritory>AT</SchemeTerritory></SchemeInformation></TrustServiceStatusList>""",
         sourceUrl = "https://ec.europa.eu/tools/lotl/at-tl.xml",
+    )
+
+    // ---------------------------------------------------------------------------
+    // Load from URL requests (real trust lists)
+    // ---------------------------------------------------------------------------
+
+    val loadSourceFromUrlEuLotl = LoadSourceFromUrlRequest(
+        sourceId = "eu-lotl",
+        url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
+        validateSignature = true,
+    )
+
+    val loadSourceFromUrlGermanTsl = LoadSourceFromUrlRequest(
+        sourceId = "de-national-tsl",
+        url = "https://www.nrca-ds.de/st/TSL-XML.xml",
+        validateSignature = true,
+    )
+
+    val loadSourceFromUrlNoValidation = LoadSourceFromUrlRequest(
+        sourceId = "test-source",
+        url = "https://example.com/test-trust-list.xml",
+        validateSignature = false,
+    )
+
+    val loadSourceFromUrlSuccessEuLotl = RefreshResult(
+        sourceId = "eu-lotl",
+        success = true,
+        entitiesLoaded = 27,
+        servicesLoaded = 27,
+        identitiesLoaded = 0, // LoTL has pointers, not direct TSPs
+    )
+
+    val loadSourceFromUrlFetchFailure = RefreshResult(
+        sourceId = "unreachable-source",
+        success = false,
+        error = "Failed to fetch from https://example.com/trust-list.xml: Connection timed out",
+    )
+
+    val loadSourceFromUrlSignatureFailure = RefreshResult(
+        sourceId = "tampered-source",
+        success = false,
+        error = "XMLDSig signature validation failed: Signature validation failed - digest mismatch",
     )
 
     val refreshResultSuccess = RefreshResult(

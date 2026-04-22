@@ -1,6 +1,7 @@
 package id.walt.trust.service.openapi
 
 import id.walt.trust.model.*
+import id.walt.trust.service.routes.LoadSourceFromUrlRequest
 import id.walt.trust.service.routes.LoadSourceRequest
 import id.walt.trust.service.routes.ResolveCertificateRequest
 import id.walt.trust.service.routes.ResolveProviderRequest
@@ -202,6 +203,69 @@ object TrustRegistryDocs {
                 body<RefreshResult> {
                     example("Parse failure") {
                         value = TrustRegistryExamples.refreshResultFailure
+                    }
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Sources: Load from URL
+    // ---------------------------------------------------------------------------
+
+    fun loadSourceFromUrlDocs(): RouteConfig.() -> Unit = {
+        tags = listOf("Source Management")
+        summary = "Load a trust source from URL"
+        description = """
+            Fetches and loads a trust list directly from a URL. This is the recommended way to
+            load production trust sources. The service will:
+            
+            1. Fetch the content via HTTP(S)
+            2. Auto-detect the format (TSL XML, LoTE JSON, LoTE XML)
+            3. Parse and validate the content
+            4. Validate XMLDSig signature for TSL sources (if enabled)
+            5. Store the entities, services, and identities
+            6. Register the URL for future `refresh` calls
+            
+            **Real-world trust list URLs:**
+            - EU List of Trusted Lists (LoTL): `https://ec.europa.eu/tools/lotl/eu-lotl.xml`
+            - German National TSL: `https://www.nrca-ds.de/st/TSL-XML.xml`
+            
+            Set `validateSignature: false` for testing or when working with unsigned lists.
+        """.trimIndent()
+
+        request {
+            body<LoadSourceFromUrlRequest> {
+                required = true
+                description = "URL-based source load request"
+                example("Load EU LoTL (with signature validation)") {
+                    value = TrustRegistryExamples.loadSourceFromUrlEuLotl
+                }
+                example("Load German TSL (with signature validation)") {
+                    value = TrustRegistryExamples.loadSourceFromUrlGermanTsl
+                }
+                example("Load without signature validation") {
+                    value = TrustRegistryExamples.loadSourceFromUrlNoValidation
+                }
+            }
+        }
+        response {
+            HttpStatusCode.OK to {
+                description = "Source loaded successfully"
+                body<RefreshResult> {
+                    example("Successful load from EU LoTL") {
+                        value = TrustRegistryExamples.loadSourceFromUrlSuccessEuLotl
+                    }
+                }
+            }
+            HttpStatusCode.UnprocessableEntity to {
+                description = "Source could not be fetched, parsed, or validated"
+                body<RefreshResult> {
+                    example("Fetch failure") {
+                        value = TrustRegistryExamples.loadSourceFromUrlFetchFailure
+                    }
+                    example("Signature validation failure") {
+                        value = TrustRegistryExamples.loadSourceFromUrlSignatureFailure
                     }
                 }
             }

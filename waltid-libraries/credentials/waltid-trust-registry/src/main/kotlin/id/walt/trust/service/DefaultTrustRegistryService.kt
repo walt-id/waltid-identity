@@ -190,14 +190,54 @@ class DefaultTrustRegistryService(
         content: String,
         sourceUrl: String?
     ): RefreshResult {
+        return loadSourceFromContentInternal(sourceId, content, sourceUrl, validateSignature = true)
+    }
+
+    override suspend fun loadSourceFromUrl(
+        sourceId: String,
+        url: String,
+        validateSignature: Boolean
+    ): RefreshResult {
+        log.info { "Loading trust source from URL: $url" }
+        
+        val fetchResult = SourceFetcher.fetch(url)
+        if (!fetchResult.success || fetchResult.content == null) {
+            return RefreshResult(
+                sourceId = sourceId,
+                success = false,
+                error = fetchResult.error ?: "Failed to fetch from $url"
+            )
+        }
+        
+        // Register this source for future refreshes
+        val sourceFamily = detectSourceFamily(fetchResult.content)
+        registerSource(sourceId, url, sourceFamily)
+        
+        return loadSourceFromContentInternal(
+            sourceId = sourceId,
+            content = fetchResult.content,
+            sourceUrl = url,
+            validateSignature = validateSignature
+        )
+    }
+
+    private suspend fun loadSourceFromContentInternal(
+        sourceId: String,
+        content: String,
+        sourceUrl: String?,
+        validateSignature: Boolean
+    ): RefreshResult {
         return try {
             val format = SourceFetcher.detectFormat(null, content)
             
             val parsed = when {
                 // Detect if it's TSL (TrustServiceStatusList) or LoTE
                 content.contains("TrustServiceStatusList") || content.contains("TrustServiceProviderList") -> {
-                    log.info { "Parsing TSL XML for source: $sourceId" }
-                    val result = TslXmlParser.parse(content, sourceId, sourceUrl)
+                    log.info { "Parsing TSL XML for source: $sourceId (validateSignature=$validateSignature)" }
+                    val config = id.walt.trust.parser.tsl.TslParseConfig(
+                        validateSignature = validateSignature
+                    )
+                    val result = TslXmlParser.parse(content, sourceId, sourceUrl, config)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
                 content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity") && format == SourceFetcher.SourceFormat.XML -> {
@@ -364,5 +404,14 @@ class DefaultTrustRegistryService(
         )
 
         private fun now(): Instant = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+    }
+
+    private fun detectSourceFamily(content: String): SourceFamily {
+        return when {
+            content.contains("TrustServiceStatusList") || content.contains("TrustServiceProviderList") -> SourceFamily.TSL
+            content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity") -> SourceFamily.LOTE
+            content.trimStart().startsWith("{") || content.trimStart().startsWith("[") -> SourceFamily.LOTE
+            else -> SourceFamily.PILOT
+        }
     }
 }
