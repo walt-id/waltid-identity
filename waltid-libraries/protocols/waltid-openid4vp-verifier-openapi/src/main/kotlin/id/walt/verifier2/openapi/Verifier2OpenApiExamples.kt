@@ -319,6 +319,32 @@ object Verifier2OpenApiExamples {
 
     // ISO Examples
 
+    val openid4vpHttpIsoPhotoIdMinimal = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "my_photoid",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(
+                            doctypeValue = "org.iso.23220.photoid.1"
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                            ClaimsQuery(
+                                pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
+                                values = listOf("AT").map { JsonPrimitive(it) }
+                            ),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "travel_document_number"))
+                        )
+                    )
+                )
+            )
+        )
+    )
+
 
     val openid4vpHttpIsoPhotoIdVical = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
