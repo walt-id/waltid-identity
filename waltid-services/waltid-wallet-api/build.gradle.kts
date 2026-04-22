@@ -84,8 +84,6 @@ dependencies {
 
     implementation(project(":waltid-libraries:auth:waltid-ktor-authnz"))
 
-    implementation(project(":waltid-libraries:waltid-core-wallet"))
-
     testImplementation(project(":waltid-services:waltid-issuer-api"))
     testImplementation(project(":waltid-services:waltid-verifier-api"))
 

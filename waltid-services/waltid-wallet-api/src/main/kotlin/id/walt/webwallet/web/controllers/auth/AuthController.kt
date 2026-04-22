@@ -15,7 +15,6 @@ import id.walt.commons.web.UnauthorizedException
 import id.walt.commons.web.WebException
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
-import id.walt.entrawallet.core.utils.UuidSerializer
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.oid4vc.definitions.JWTClaims
 import id.walt.webwallet.FeatureCatalog
@@ -24,6 +23,7 @@ import id.walt.webwallet.db.models.AccountWalletMappings
 import id.walt.webwallet.db.models.AccountWalletPermissions
 import id.walt.webwallet.service.WalletServiceManager
 import id.walt.webwallet.service.account.*
+import id.walt.webwallet.utils.UuidSerializer
 import id.walt.webwallet.web.InsufficientPermissionsException
 import id.walt.webwallet.web.model.AccountRequest
 import id.walt.webwallet.web.model.EmailAccountRequest
