@@ -1,28 +1,72 @@
 package id.walt.trust.parser.tsl
 
 import id.walt.trust.model.*
+import id.walt.trust.signature.SignatureValidationConfig
+import id.walt.trust.signature.SignatureValidationResult
+import id.walt.trust.signature.XmlDsigValidator
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlin.time.Instant
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.NodeList
 import java.io.StringReader
 import java.security.MessageDigest
+import java.security.cert.X509Certificate
 import java.util.*
 import javax.xml.parsers.DocumentBuilderFactory
+
+private val logger = KotlinLogging.logger {}
+
+/**
+ * Configuration for TSL parsing.
+ */
+data class TslParseConfig(
+    /**
+     * Validate XMLDSig signature on the TSL.
+     * If false, signature is not checked and authenticityState = SKIPPED_DEMO.
+     */
+    val validateSignature: Boolean = true,
+    
+    /**
+     * Signature validation configuration.
+     * Only used if validateSignature = true.
+     */
+    val signatureConfig: SignatureValidationConfig = SignatureValidationConfig(),
+    
+    /**
+     * If true, reject TSLs with invalid signatures.
+     * If false, parse anyway but set authenticityState = FAILED.
+     */
+    val strictSignatureValidation: Boolean = false
+)
 
 /**
  * Parses TS 119 612-style Trusted Lists (TSL/TL) XML into normalized trust model objects.
  *
- * This is an MVP parser — it handles the core structure but does not implement:
- * - full signature validation (set to SKIPPED_DEMO)
- * - all optional extensions
- * - complete historical status replay
+ * This parser handles:
+ * - Full TSL structure parsing (entities, services, identities)
+ * - XMLDSig signature validation (configurable)
+ * - Status mapping from ETSI URIs to normalized enum
  *
  * Input format matches EU LOTL / national TL structure.
  */
 object TslXmlParser {
 
-    fun parse(xml: String, sourceId: String, sourceUrl: String? = null): ParsedTslSource {
+    /**
+     * Parse a TSL XML document.
+     *
+     * @param xml The TSL XML content as a string
+     * @param sourceId Unique identifier for this trust source
+     * @param sourceUrl Optional URL where the TSL was fetched from
+     * @param config Parsing configuration (signature validation, etc.)
+     * @return ParsedTslSource containing the parsed data and validation result
+     */
+    fun parse(
+        xml: String,
+        sourceId: String,
+        sourceUrl: String? = null,
+        config: TslParseConfig = TslParseConfig()
+    ): ParsedTslSource {
         val doc = parseXml(xml)
         val root = doc.documentElement
 
@@ -34,6 +78,41 @@ object TslXmlParser {
         val sequenceNumber = schemeInfo?.getTextContent("TSLSequenceNumber")
         val versionId = schemeInfo?.getTextContent("TSLVersionIdentifier")
 
+        // Validate signature if configured
+        val signatureResult: SignatureValidationResult? = if (config.validateSignature) {
+            logger.debug { "Validating XMLDSig signature for TSL $sourceId" }
+            XmlDsigValidator.validate(xml, config.signatureConfig)
+        } else {
+            logger.debug { "Signature validation skipped for TSL $sourceId" }
+            null
+        }
+        
+        // Determine authenticity state
+        val authenticityState = when {
+            signatureResult == null -> AuthenticityState.SKIPPED_DEMO
+            signatureResult.state == AuthenticityState.VALIDATED -> AuthenticityState.VALIDATED
+            else -> AuthenticityState.FAILED
+        }
+        
+        // Log validation result
+        if (signatureResult != null) {
+            logger.info { 
+                "TSL $sourceId signature validation: ${signatureResult.state}" +
+                (signatureResult.details?.let { " - $it" } ?: "") 
+            }
+            signatureResult.warnings.forEach { warning ->
+                logger.warn { "TSL $sourceId signature warning: $warning" }
+            }
+        }
+        
+        // If strict validation is enabled and signature is invalid, throw
+        if (config.strictSignatureValidation && authenticityState == AuthenticityState.FAILED) {
+            throw TslSignatureValidationException(
+                "TSL signature validation failed: ${signatureResult?.details}",
+                signatureResult
+            )
+        }
+        
         val source = TrustSource(
             sourceId = sourceId,
             sourceFamily = SourceFamily.TSL,
@@ -43,10 +122,15 @@ object TslXmlParser {
             issueDate = issueDate,
             nextUpdate = nextUpdate,
             sequenceNumber = sequenceNumber,
-            authenticityState = AuthenticityState.SKIPPED_DEMO,
+            authenticityState = authenticityState,
             freshnessState = FreshnessState.UNKNOWN,
             metadata = buildMap {
                 versionId?.let { put("tslVersion", it) }
+                signatureResult?.signerCertificate?.let { cert ->
+                    put("signerSubjectDN", cert.subjectX500Principal.name)
+                    put("signerIssuerDN", cert.issuerX500Principal.name)
+                    put("signerSerialNumber", cert.serialNumber.toString())
+                }
             }
         )
 
@@ -116,7 +200,13 @@ object TslXmlParser {
             }
         }
 
-        return ParsedTslSource(source, entities, services, identities)
+        return ParsedTslSource(
+            source = source,
+            entities = entities,
+            services = services,
+            identities = identities,
+            signatureValidation = signatureResult
+        )
     }
 
     // ---------------------------------------------------------------------------
@@ -194,9 +284,25 @@ object TslXmlParser {
     }
 }
 
+/**
+ * Result of parsing a TSL document.
+ */
 data class ParsedTslSource(
     val source: TrustSource,
     val entities: List<TrustedEntity>,
     val services: List<TrustedService>,
-    val identities: List<ServiceIdentity>
-)
+    val identities: List<ServiceIdentity>,
+    val signatureValidation: SignatureValidationResult? = null
+) {
+    /** The signing certificate, if signature was validated */
+    val signerCertificate: X509Certificate?
+        get() = signatureValidation?.signerCertificate
+}
+
+/**
+ * Exception thrown when TSL signature validation fails in strict mode.
+ */
+class TslSignatureValidationException(
+    message: String,
+    val validationResult: SignatureValidationResult?
+) : Exception(message)
