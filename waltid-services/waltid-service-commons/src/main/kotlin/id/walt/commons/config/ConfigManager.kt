@@ -84,7 +84,6 @@ object ConfigManager {
                     customDecoders.forEach { addDecoder(it) }
                 }
                 .addCommandLineSource(args)
-                .addDefaultParsers()
                 .addEnvironmentSource(allowUppercaseNames = false)
                 // Check for system property config.file.<id> first, then fall back to default path
                 .apply {
