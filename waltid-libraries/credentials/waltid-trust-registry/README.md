@@ -21,6 +21,7 @@ A Kotlin/JVM library for parsing and querying trust registries, enabling trust-l
 ## Features
 
 - **Multi-format parsing** — Parse EU Trusted Lists (TSL XML), LoTE JSON, and LoTE XML formats
+- **XMLDSig signature validation** — Validate enveloped XMLDSig signatures on TSL documents (JSR-105 API)
 - **Unified trust model** — Normalize diverse trust list formats into a consistent data model
 - **Certificate resolution** — Resolve trust status by certificate SHA-256, subject DN, or subject key identifier
 - **Provider ID lookup** — Query trust status by entity/provider identifier
@@ -72,6 +73,7 @@ val trustService = DefaultTrustRegistryService(store)
 
 ```kotlin
 import id.walt.trust.model.SourceFamily
+import id.walt.trust.parser.tsl.TslParseConfig
 
 // Register a source URL for periodic refresh
 trustService.registerSource(
@@ -84,21 +86,50 @@ trustService.registerSource(
 val result = trustService.refreshSource("at-tsl")
 println("Loaded ${result.entitiesLoaded} entities, ${result.servicesLoaded} services")
 
-// Or load directly from content
-val tslXml = """
-<?xml version="1.0" encoding="UTF-8"?>
-<TrustServiceStatusList>
-    <SchemeInformation>
-        <SchemeTerritory>AT</SchemeTerritory>
-        <ListIssueDateTime>2026-01-15T00:00:00Z</ListIssueDateTime>
-        <NextUpdate><dateTime>2026-07-15T00:00:00Z</dateTime></NextUpdate>
-    </SchemeInformation>
-    <TrustServiceProviderList>
-        <!-- TSP entries -->
-    </TrustServiceProviderList>
-</TrustServiceStatusList>
-"""
-val loadResult = trustService.loadSourceFromContent("at-tsl", tslXml, "https://example.com/at-tsl.xml")
+// Or load directly from content with signature validation
+val tslXml = """..."""
+
+// Configure signature validation (enabled by default)
+val config = TslParseConfig(
+    validateSignature = true,           // Enable XMLDSig validation
+    strictSignatureValidation = false   // false = continue parsing on failure, true = throw
+)
+
+val loadResult = trustService.loadSourceFromContent("at-tsl", tslXml, "https://example.com/at-tsl.xml", config)
+println("Authenticity: ${loadResult.source.authenticityState}")
+// VALIDATED, FAILED, or SKIPPED_DEMO
+```
+
+### Validate TSL Signatures Directly
+
+```kotlin
+import id.walt.trust.signature.XmlDsigValidator
+import id.walt.trust.signature.SignatureValidationConfig
+import id.walt.trust.model.AuthenticityState
+
+// Fetch and validate a trust list signature
+val tslXml = fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml")
+val result = XmlDsigValidator.validate(tslXml)
+
+when (result.state) {
+    AuthenticityState.VALIDATED -> {
+        println("✅ Signature is valid")
+        println("Signer: ${result.signerCertificate?.subjectX500Principal}")
+    }
+    AuthenticityState.FAILED -> {
+        println("❌ Signature validation failed: ${result.details}")
+    }
+    else -> println("Unexpected state: ${result.state}")
+}
+
+// With custom configuration
+val config = SignatureValidationConfig(
+    requireTrustedCertificate = true,
+    trustedAnchors = setOf(euRootCert),
+    allowExpiredCertificates = false,
+    secureValidation = true
+)
+val customResult = XmlDsigValidator.validate(tslXml, config)
 ```
 
 ### Parse and Load LoTE Sources (JSON)
@@ -313,6 +344,12 @@ The library follows a layered architecture:
 │  │ TslXmlParser│  │LoteJsonParser│  │ LoteXmlParser│       │
 │  │   (TSL)     │  │   (LoTE)     │  │   (LoTE)     │       │
 │  └─────────────┘  └──────────────┘  └──────────────┘       │
+│        │                                                    │
+│        ▼                                                    │
+│  ┌──────────────────┐                                       │
+│  │ XmlDsigValidator │  ← Validates TSL XMLDSig signatures   │
+│  │  (JSR-105 API)   │                                       │
+│  └──────────────────┘                                       │
 ├─────────────────────────────────────────────────────────────┤
 │                      Trust Model                            │
 │  TrustSource, TrustedEntity, TrustedService,               │
@@ -330,6 +367,7 @@ The library follows a layered architecture:
 | `ServiceIdentity` | Cryptographic identifiers (cert SHA-256, subject DN, SKI) for matching |
 | `TrustDecision` | Result of a trust resolution query with evidence and warnings |
 | `EntityFilter` | Query filter for listing entities |
+| `SignatureValidationResult` | Result of XMLDSig signature validation |
 | `TrustSourceHealth` | Health metrics for a loaded source |
 
 ### Trust Status Values
@@ -345,6 +383,15 @@ The library follows a layered architecture:
 | `WITHDRAWN` | Service has been withdrawn |
 | `DEPRECATED` | Service is deprecated |
 | `EXPIRED` | Service trust has expired |
+
+### Authenticity States
+
+| State | Description |
+|-------|-------------|
+| `VALIDATED` | XMLDSig signature verified successfully |
+| `FAILED` | Signature validation failed or signature missing |
+| `SKIPPED_DEMO` | Signature validation was disabled |
+| `UNKNOWN` | Authenticity not determined |
 
 ### Entity Types
 
