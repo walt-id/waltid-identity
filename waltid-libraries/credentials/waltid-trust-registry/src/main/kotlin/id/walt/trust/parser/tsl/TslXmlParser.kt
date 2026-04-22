@@ -221,12 +221,20 @@ object TslXmlParser {
     }
 
     private fun Element.getFirstChild(tagName: String): Element? {
-        val nodes = getElementsByTagName(tagName)
+        // Try exact match first
+        var nodes = getElementsByTagName(tagName)
         for (i in 0 until nodes.length) {
             val node = nodes.item(i)
             if (node is Element && node.parentNode == this) return node
         }
-        // fallback: search recursively (handles namespace variations)
+        // Fallback: search by local name (handles namespace prefixes like tsl:SchemeTerritory)
+        nodes = getElementsByTagNameNS("*", tagName)
+        for (i in 0 until nodes.length) {
+            val node = nodes.item(i)
+            if (node is Element && node.parentNode == this) return node
+        }
+        // Last resort: any match (recursive)
+        nodes = getElementsByTagNameNS("*", tagName)
         for (i in 0 until nodes.length) {
             val node = nodes.item(i)
             if (node is Element) return node
@@ -236,10 +244,19 @@ object TslXmlParser {
 
     private fun Element.getChildren(tagName: String): List<Element> {
         val result = mutableListOf<Element>()
-        val nodes = getElementsByTagName(tagName)
+        // Try exact match first
+        var nodes = getElementsByTagName(tagName)
         for (i in 0 until nodes.length) {
             val node = nodes.item(i)
             if (node is Element) result += node
+        }
+        // If no results, try namespace-aware search
+        if (result.isEmpty()) {
+            nodes = getElementsByTagNameNS("*", tagName)
+            for (i in 0 until nodes.length) {
+                val node = nodes.item(i)
+                if (node is Element) result += node
+            }
         }
         return result
     }
