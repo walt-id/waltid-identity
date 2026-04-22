@@ -33,7 +33,8 @@ object Verifier2SessionCredentialPolicyValidation {
         val generalPolicyJobs = validatedCredentials.flatMap { (queryId, credentials) ->
             credentials.flatMap { credential ->
                 policies.vc_policies?.policies.orEmpty().map { policy ->
-                    async(Dispatchers.Default) {
+                    // Use coroutineContext + Dispatchers.Default to inherit context elements
+                    async(coroutineContext + Dispatchers.Default) {
                         log.trace { "Validating '$queryId' credential with policy '${policy.id}': $credential" }
                         val result = policy.verify(credential)
                         log.trace { "'$queryId' credential '${policy.id}' result: $result" }
@@ -55,7 +56,8 @@ object Verifier2SessionCredentialPolicyValidation {
 
             credentials.flatMap { specificCredential ->
                 queryPolicies.policies.map { policy ->
-                    async(Dispatchers.Default) {
+                    // Use coroutineContext + Dispatchers.Default to inherit context elements
+                    async(coroutineContext + Dispatchers.Default) {
                         val result = policy.verify(specificCredential)
 
                         queryId to CredentialPolicyResult(
