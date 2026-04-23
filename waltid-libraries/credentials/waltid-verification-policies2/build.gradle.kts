@@ -50,6 +50,10 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
         }
+        jvmMain.dependencies {
+            // Trust Registry library for inline trust list resolution
+            implementation(project(":waltid-libraries:credentials:waltid-trust-registry"))
+        }
         jvmTest.dependencies {
             implementation("org.slf4j:slf4j-simple:2.0.17")
             implementation(identityLibs.kotlinx.serialization.json)

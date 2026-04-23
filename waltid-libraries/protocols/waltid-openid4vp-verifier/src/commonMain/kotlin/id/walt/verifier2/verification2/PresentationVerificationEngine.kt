@@ -228,7 +228,8 @@ object PresentationVerificationEngine {
 
             // Map every presentation to an async task
             itemsToProcess.map { presentationJsonElement ->
-                async(Dispatchers.Default) {
+                // Use coroutineContext + Dispatchers.Default to inherit context elements
+                async(coroutineContext + Dispatchers.Default) {
                     val result = verifySinglePresentationOldPresentationValidator(
                         presentationString = presentationJsonElement,
                         originalCredentialQuery = originalCredentialQuery,
