@@ -1,17 +1,46 @@
-# walt.id OpenID4VCI Wallet Library
+<div align="center">
+<h1>OpenID for Verifiable Credential Issuance (OpenID4VCI) Wallet Library</h1>
+ <span>by </span><a href="https://walt.id">walt.id</a>
+ <p>Kotlin Multiplatform library implementing the Wallet (Holder) role for OpenID4VCI 1.0</p>
 
-Kotlin Multiplatform library implementing the **Wallet (Holder)** role in the OpenID for Verifiable Credential
-Issuance (OpenID4VCI) 1.0 protocol.
+<a href="https://walt.id/community">
+<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
+</a>
+<a href="https://www.linkedin.com/company/walt-id/">
+<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
+</a>
+  
+  <h2>Status</h2>
+  <p align="center">
+    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <br/>
+    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+  </p>
+</div>
 
-## Overview
+## What This Library Contains
 
-This library provides a complete implementation of the wallet-side OpenID4VCI flow, allowing applications to:
+This library provides a complete implementation of the **Wallet (Holder) role** for **OpenID for Verifiable Credential Issuance (OpenID4VCI) 1.0**. It allows applications to:
 
-- Parse and resolve credential offers
-- Discover issuer metadata
-- Perform OAuth 2.0 authorization flows (authorization code & pre-authorized code)
-- Generate cryptographic proofs of possession
-- Request and receive verifiable credentials
+- **Parse and resolve credential offers** - Handle `openid-credential-offer://` URLs and fetch remote offers
+- **Discover issuer metadata** - Resolve issuer and authorization server metadata from `.well-known` endpoints
+- **OAuth 2.0 Client** - Complete client implementation with PKCE and state management
+- **Authorization Requests** - Handle authorization code and pre-authorized code flows
+- **Token Exchange** - Exchange codes for access tokens with OpenID4VCI extensions
+- **Proof of Possession** - Generate cryptographic proofs of possession (JWT-based)
+- **Credential Requests** - Request and receive verifiable credentials from Issuers
+
+Learn more about OpenID4VCI [here](https://docs.walt.id/concepts/data-exchange-protocols/openid4vci).
+
+## Main Purpose
+
+This library serves as the foundation for building OpenID4VCI Wallet implementations. It provides a framework-agnostic set of components that handle the complex flows required by the OpenID4VCI specification.
+
+**Use this library when:**
+- You're building an OpenID4VCI Wallet application
+- You need to support both authorization code and pre-authorized code grant flows
+- You want a multiplatform wallet library that works on JVM, JavaScript, and iOS
+- You need to generate compliant proofs of possession for credential issuance
 
 ## Architecture
 
@@ -24,68 +53,40 @@ waltid-openid4vci-wallet
 ├── metadata/                # Issuer metadata discovery (§11.2)
 ├── authorization/           # Authorization requests (§5)
 ├── token/                   # Token exchange (§6)
-├── proof/                   # Proof of possession (§7.2)
-├── credential/              # Credential requests (§7)
-├── nonce/                   # Nonce management (§7.2.1)
-├── deferred/                # Deferred issuance (§9)
-└── notification/            # Notification endpoint (§10)
+└── proof/                   # Proof of possession (§7.2)
 ```
 
-## Dependencies
+## Assumptions and Dependencies
 
-- `waltid-openid4vci`: Shared protocol models (CredentialOffer, CredentialIssuerMetadata, etc.)
-- `waltid-crypto`: Cryptographic key operations and proof signing
-- `ktor-client`: HTTP client for API calls
-- `kotlinx-serialization`: JSON serialization
-- `kotlinx-datetime`: Timestamp handling
-- `kotlinx-coroutines`: Async operations
+### Multiplatform Support
 
-## Key Components
+Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableIosBuild=true` Gradle property).
 
-### OAuth 2.0 Client (`oauth/`)
+### Dependencies
 
-- **`ClientConfiguration`**: OAuth 2.0 client identity and redirect URIs
-- **`PKCEManager`**: PKCE (RFC 7636) code verifier/challenge generation
-- **`StateManager`**: CSRF state generation and validation
+- **waltid-openid4vci** - Shared protocol models (CredentialOffer, CredentialIssuerMetadata, etc.)
+- **waltid-crypto** - Cryptographic key operations and proof signing
+- **Ktor Client** - For HTTP requests
+- **Kotlinx Serialization** - For JSON serialization
+- **Kotlin Logging** - For logging support
+- **Kotlinx DateTime** - For timestamp handling
+- **Kotlinx Coroutines** - For asynchronous operations
 
-### Credential Offer Handling (`offer/`)
+### Protocol Version
 
-- **`CredentialOfferParser`**: Parses `openid-credential-offer://` URLs
-- **`CredentialOfferResolver`**: Fetches credential offers from URIs
+This library implements **OpenID for Verifiable Credential Issuance 1.0** (final specification), building on OAuth2 2.0 and OpenID Connect.
 
-### Metadata Discovery (`metadata/`)
+## How to Use This Library
 
-- **`IssuerMetadataResolver`**: Fetches issuer and authorization server metadata from `.well-known` endpoints
-- **`OfferedCredentialResolver`**: Matches offered credentials against issuer capabilities
-
-### Authorization (`authorization/`)
-
-- **`AuthorizationRequestBuilder`**: Constructs OAuth 2.0 authorization requests with OpenID4VCI extensions
-    - Supports `authorization_details` (RFC 9396)
-    - PKCE support
-    - Pushed Authorization Requests (PAR)
-- **`AuthorizationResponseParser`**: Parses authorization responses and validates state
-
-### Token Exchange (`token/`)
-
-- **`TokenRequestBuilder`**: Exchanges codes for access tokens
-    - Authorization code grant
-    - Pre-authorized code grant
-    - Parses `c_nonce` for proof generation
-
-### Proof of Possession (`proof/`)
-
-- **`ProofOfPossessionBuilder`**: Interface for proof generation
-- **`JwtProofBuilder`**: Generates JWT proofs (§7.2.1)
-    - Supports DID-based binding (kid header)
-    - Supports JWK-based binding (jwk header)
-    - Implements `openid4vci-proof+jwt` type
-
-## Usage Example
+### Basic Usage
 
 ```kotlin
 import id.waltid.openid4vci.wallet.*
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
+import id.waltid.openid4vci.wallet.offer.*
+import id.waltid.openid4vci.wallet.metadata.*
+import id.waltid.openid4vci.wallet.token.*
+import id.waltid.openid4vci.wallet.proof.*
 import io.ktor.client.*
 import id.walt.crypto.keys.KeyManager
 
@@ -134,64 +135,46 @@ if (preAuthGrant != null) {
         nonce = tokenResponse.c_nonce!!
     )
 
-    // 8. Request credential (implementation in progress)
+    // 8. Request credential (Implementation coming soon)
     // ...
 }
 ```
 
-## Implementation Status
+## Key Source Files
 
-### ✅ Completed Components
-
-- [x] Build configuration (KMP setup)
-- [x] OAuth 2.0 client components (ClientConfiguration, PKCEManager, StateManager)
-- [x] Credential offer parsing and resolution (WF-01)
-- [x] Issuer metadata discovery (WF-02)
-- [x] Offered credential resolution (WF-03)
-- [x] Authorization request builder (WF-04)
-- [x] Authorization response parser (WF-04)
-- [x] Token request builder and response parser (WF-05)
-- [x] Proof of possession builder interface (WF-06)
-- [x] JWT proof builder implementation (WF-06)
-
-### 🚧 In Progress / Planned
-
-- [ ] CWT proof builder (WF-06)
-- [ ] Credential request builder (WF-07)
-- [ ] Credential response parser (WF-07)
-- [ ] Nonce client (WF-08)
-- [ ] Deferred credential client (WF-09)
-- [ ] Notification client (WF-10)
-- [ ] Main wallet issuance orchestrator (WF-11)
-- [ ] Batch credential issuance support
-- [ ] Credential response encryption/decryption
-
-## Specification Compliance
-
-This library implements:
-
-- **OpenID for Verifiable Credential Issuance 1.0
-  ** ([spec](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html))
-- **RFC 6749**: OAuth 2.0 Authorization Framework
-- **RFC 7636**: Proof Key for Code Exchange (PKCE)
-- **RFC 9396**: OAuth 2.0 Rich Authorization Requests (authorization_details)
-
-## Platform Support
-
-- **JVM** (Java, Kotlin, Android)
-- **JS** (Browser, Node.js)
-- **Native** (iOS, macOS - if enabled)
-
-## License
-
-Apache License 2.0
-
-## Contributing
-
-Contributions are welcome! This library is part of the walt.id identity infrastructure project.
+- `oauth/` - OAuth 2.0 client components (PKCE, State management)
+- `offer/` - Credential offer parsing and resolution
+- `metadata/` - Issuer and authorization server metadata discovery
+- `authorization/` - Authorization request building and response parsing
+- `token/` - Token exchange logic for both grant types
+- `proof/` - Proof of possession building (JWT-based)
 
 ## Related Libraries
 
-- `waltid-openid4vci`: Issuer-side OpenID4VCI implementation
-- `waltid-openid4vp-wallet`: Wallet-side OpenID4VP implementation
-- `waltid-crypto`: Cryptographic key operations
+This library is part of the walt.id OpenID4VCI ecosystem:
+
+### Supporting Libraries
+
+- **[waltid-openid4vci](../waltid-openid4vci/README.md)** - Shared protocol models and Issuer-side implementation
+- **[waltid-crypto](../../crypto/waltid-crypto/README.md)** - Cryptographic key operations
+- **[waltid-openid4vp-wallet](../waltid-openid4vp-wallet/README.md)** - Wallet-side OpenID4VP implementation
+
+## Documentation
+
+- [OpenID for Verifiable Credential Issuance 1.0 Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+- [OAuth 2.0 Authorization Framework](https://datatracker.ietf.org/doc/html/rfc6749)
+- [walt.id Documentation](https://docs.walt.id)
+
+## Join the community
+
+* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+* Find more indepth documentation on our [docs site](https://docs.walt.id)
+
+## License
+
+Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+
+<div align="center">
+<img src="../../../assets/walt-banner.png" alt="walt.id banner" />
+</div>
