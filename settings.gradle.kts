@@ -89,8 +89,7 @@ val modules = listOfNotNull(
     "$services:waltid-issuer-api",
     "$services:waltid-verifier-api",
     "$services:waltid-verifier-api2",
-    "$services:waltid-wallet-api",
-    "$services:waltid-trust-registry-service",
+    "$services:waltid-wallet-api"
 
     // Service tests
     "$services:waltid-e2e-tests",
