@@ -74,7 +74,7 @@ Works on JVM (Kotlin/Java), JavaScript, and iOS platforms (iOS requires `enableI
 
 ### Protocol Version
 
-This library implements **OpenID for Verifiable Credential Issuance 1.0** (final specification), building on OAuth2 2.0 and OpenID Connect.
+This library implements **OpenID for Verifiable Credential Issuance 1.0** (final specification), building on OAuth 2.0 and OpenID Connect.
 
 ## How to Use This Library
 
