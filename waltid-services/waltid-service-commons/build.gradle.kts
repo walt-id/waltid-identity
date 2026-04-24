@@ -54,7 +54,7 @@ dependencies {
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")
-    api("redis.clients:jedis:5.2.0")
+    api("redis.clients:jedis:7.4.0")
 
     // Testing
     testImplementation(identityLibs.bundles.waltid.ktortesting)
