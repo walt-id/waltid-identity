@@ -12,6 +12,8 @@ import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
 import id.walt.commons.web.WebException
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonObject
@@ -33,6 +35,10 @@ import id.walt.oid4vc.requests.AuthorizationRequest
 import id.walt.oid4vc.requests.CredentialOfferRequest
 import id.walt.oid4vc.responses.AuthorizationErrorCode
 import id.walt.oid4vc.responses.TokenResponse
+import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.dcql.DcqlMatcher
+import id.walt.dcql.RawDcqlCredential
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
@@ -47,6 +53,7 @@ import id.walt.webwallet.service.events.EventDataNotAvailable
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.IssuanceService
+import id.walt.webwallet.service.exchange.OpenId4VpPresentationService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webwallet.service.keys.SingleKeyResponse
 import id.walt.webwallet.service.oidc4vc.TestCredentialWallet
@@ -60,6 +67,10 @@ import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.klogging.Klogging
 import io.ktor.client.*
 import io.ktor.client.request.forms.*
@@ -68,6 +79,7 @@ import io.ktor.http.*
 import io.ktor.server.plugins.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.core.eq
@@ -98,6 +110,7 @@ class SSIKit2WalletService(
     private val credentialService = CredentialsService()
     private val eventService = EventService()
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
+    private val openId4VpPresentationService = OpenId4VpPresentationService(http, credentialService)
 
     companion object {
         val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
@@ -348,6 +361,11 @@ class SSIKit2WalletService(
      * @return redirect uri
      */
     override suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?> {
+        val resolvedV1 = resolveOpenId4VpAuthorizationRequest(parameter.request)
+        if (resolvedV1 != null) {
+            return useOpenId4VpPresentationRequest(parameter, resolvedV1)
+        }
+
         val credentialWallet = getCredentialWallet(accountId, walletId, parameter.did)
 
         val authorizationRequest =
@@ -497,12 +515,23 @@ class SSIKit2WalletService(
     }.getOrDefault(false)
 
     override suspend fun resolvePresentationRequest(request: String): String {
+        val resolvedV1 = resolveOpenId4VpAuthorizationRequest(request)
+        if (resolvedV1 != null) {
+            return openId4VpPresentationService.buildWalletPresentationRequest(
+                request = request,
+                resolvedRequest = resolvedV1,
+            ).toString()
+        }
+
         val credentialWallet = getCredentialWallet(accountId, walletId, "did:test:test")
         return Url(request)
             .protocolWithAuthority
             .plus("?")
             .plus(credentialWallet.parsePresentationRequest(request).toHttpQueryString())
     }
+
+    override suspend fun matchCredentialsForPresentationRequest(request: String): List<WalletCredential> =
+        openId4VpPresentationService.matchCredentialsForPresentationRequest(walletId, request)
 
     suspend fun useOfferRequest(
         offer: String, did: String, requireUserInput: Boolean,
@@ -1087,5 +1116,206 @@ class SSIKit2WalletService(
             )
         )
     }
-}
 
+    private suspend fun resolveOpenId4VpAuthorizationRequest(request: String) =
+        openId4VpPresentationService.tryResolveAuthorizationRequest(request)
+            .fold(
+                onSuccess = { it.takeIf { resolved -> resolved.authorizationRequest.dcqlQuery != null } },
+                onFailure = { error ->
+                    if (shouldFallBackToLegacyDraftRequest(error)) return@fold null
+                    if (OpenId4VpPresentationService.isOpenId4VpRequestCandidate(request)) throw error
+                    null
+                },
+            )
+
+    private fun shouldFallBackToLegacyDraftRequest(error: Throwable): Boolean =
+        error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
+            (error.clientIdError as? ClientIdError.UnsupportedPrefix)?.prefix in setOf("http", "https")
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun useOpenId4VpPresentationRequest(
+        parameter: PresentationRequestParameter,
+        resolvedRequest: ResolvedAuthorizationRequest,
+    ): Result<String?> {
+        if (resolvedRequest.authorizationRequest.responseMode == OpenID4VPResponseMode.FORM_POST) {
+            return Result.failure(IllegalArgumentException("OpenID4VP response_mode=form_post is not supported by wallet-api"))
+        }
+
+        val walletCredentials = credentialService.list(walletId, CredentialFilterObject.default)
+        val presentationBinding = resolveOpenId4VpPresentationBinding(
+            selectedCredentials = walletCredentials,
+            selectedCredentialIds = parameter.selectedCredentials.toSet(),
+            fallbackDid = parameter.did,
+        )
+        var selectedMatches: Map<String, List<DcqlMatcher.DcqlMatchResult>>? = null
+
+        return WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = presentationBinding.key,
+            holderDid = presentationBinding.did,
+            presentationRequestUrl = openId4VpPresentationService.buildWalletPresentationRequest(
+                request = parameter.request,
+                resolvedRequest = resolvedRequest,
+            ),
+            selectCredentialsForQuery = { query ->
+                openId4VpPresentationService.matchCredentialResults(
+                    query = query,
+                    credentials = walletCredentials,
+                    selectedCredentialIds = parameter.selectedCredentials.toSet(),
+                ).also { selectedMatches = it }
+                    .ifEmpty { throw IllegalArgumentException("No matching credentials found for the presentation request") }
+            },
+            holderPoliciesToRun = null,
+            runPolicies = null,
+        ).mapCatching { result ->
+            val redirect = extractRedirect(result)
+            logPresentedCredentials(
+                resolvedRequest = resolvedRequest.authorizationRequest,
+                note = parameter.note,
+                walletCredentials = walletCredentials,
+                selectedMatches = selectedMatches,
+            )
+            redirect
+        }
+    }
+
+    private fun extractRedirect(result: WalletPresentFunctionality2.WalletPresentResult): String? =
+        when {
+            result.getUrl != null -> result.getUrl
+            result.redirectTo != null -> result.redirectTo
+            result.transmissionSuccess == false -> throw IllegalStateException("OpenID4VP presentation transmission failed")
+            result.formPostHtml != null -> throw UnsupportedOperationException("OpenID4VP form_post is not supported by wallet-api")
+            else -> null
+        }
+
+    private suspend fun resolveOpenId4VpPresentationBinding(
+        selectedCredentials: List<WalletCredential>,
+        selectedCredentialIds: Set<String>,
+        fallbackDid: String,
+    ): PresentationBinding {
+        val fallbackBinding = PresentationBinding(
+            key = getKeyByDid(fallbackDid),
+            did = fallbackDid,
+        )
+
+        val selectedHolderBindings = buildList {
+            for (credential in selectedCredentials) {
+                if (credential.id !in selectedCredentialIds) continue
+                credential.resolveSdJwtHolderBindingOrNull()?.let(::add)
+            }
+        }.distinctBy { binding -> jwkComparable(binding.publicJwk) }
+
+        if (selectedHolderBindings.isEmpty()) {
+            return fallbackBinding
+        }
+
+        require(selectedHolderBindings.size == 1) {
+            "Selected credentials require different holder bindings and cannot be presented together."
+        }
+
+        return resolveWalletBindingForPublicJwk(selectedHolderBindings.single().publicJwk)
+            ?: throw IllegalArgumentException("No wallet key matches the selected credential holder binding.")
+    }
+
+    private suspend fun resolveWalletBindingForPublicJwk(publicJwk: JsonObject): PresentationBinding? {
+        val comparableJwk = jwkComparable(publicJwk)
+
+        for (walletDid in DidsService.list(walletId)) {
+            val key = runCatching { getKey(walletDid.keyId) }.getOrNull() ?: continue
+            val publicKeyJwk = runCatching { key.getPublicKey().exportJWKObject() }.getOrNull() ?: continue
+            if (jwkComparable(publicKeyJwk) == comparableJwk) {
+                return PresentationBinding(
+                    key = key,
+                    did = walletDid.did,
+                )
+            }
+        }
+
+        return null
+    }
+
+    private suspend fun WalletCredential.resolveSdJwtHolderBindingOrNull(): CredentialHolderBinding? {
+        val credential = runCatching { CredentialParser.parseOnly(buildRawCredential()) }.getOrNull() as? SdJwtCredential
+            ?: return null
+        val holderKey = credential.getHolderKey() ?: return null
+        return CredentialHolderBinding(holderKey.getPublicKey().exportJWKObject())
+    }
+
+    private fun WalletCredential.buildRawCredential(): String =
+        document + disclosures
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "~$it" }
+            .orEmpty()
+
+    private fun jwkComparable(j: JsonObject): Map<String, String> {
+        val kty = j["kty"]?.jsonPrimitive?.content ?: return emptyMap()
+        return when (kty) {
+            "OKP" -> mapOf(
+                "kty" to kty,
+                "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                "x" to (j["x"]?.jsonPrimitive?.content ?: "")
+            )
+
+            "EC" -> mapOf(
+                "kty" to kty,
+                "crv" to (j["crv"]?.jsonPrimitive?.content ?: ""),
+                "x" to (j["x"]?.jsonPrimitive?.content ?: ""),
+                "y" to (j["y"]?.jsonPrimitive?.content ?: "")
+            )
+
+            "RSA" -> mapOf(
+                "kty" to kty,
+                "n" to (j["n"]?.jsonPrimitive?.content ?: ""),
+                "e" to (j["e"]?.jsonPrimitive?.content ?: "")
+            )
+
+            else -> j.mapValues { it.value.jsonPrimitive.contentOrNull ?: it.value.toString() }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun logPresentedCredentials(
+        resolvedRequest: OpenId4VpAuthorizationRequest,
+        note: String?,
+        walletCredentials: List<WalletCredential>,
+        selectedMatches: Map<String, List<DcqlMatcher.DcqlMatchResult>>?,
+    ) {
+        val presentedCredentialIds = selectedMatches
+            ?.values
+            ?.asSequence()
+            ?.flatten()
+            ?.mapTo(mutableSetOf()) { it.credential.id }
+            .orEmpty()
+
+        if (presentedCredentialIds.isEmpty()) return
+
+        walletCredentials
+            .asSequence()
+            .filter { it.id in presentedCredentialIds }
+            .forEach { credential ->
+                eventUseCase.log(
+                    action = EventType.Credential.Present,
+                    originator = resolvedRequest.clientMetadata?.clientName ?: EventDataNotAvailable,
+                    tenant = tenant,
+                    accountId = accountId,
+                    walletId = walletId,
+                    data = eventUseCase.credentialEventData(
+                        credential = credential,
+                        subject = eventUseCase.subjectData(credential),
+                        organization = eventUseCase.verifierData(resolvedRequest),
+                        type = null,
+                    ),
+                    credentialId = credential.id,
+                    note = note,
+                )
+            }
+    }
+
+    private data class CredentialHolderBinding(
+        val publicJwk: JsonObject,
+    )
+
+    private data class PresentationBinding(
+        val key: Key,
+        val did: String?,
+    )
+}
