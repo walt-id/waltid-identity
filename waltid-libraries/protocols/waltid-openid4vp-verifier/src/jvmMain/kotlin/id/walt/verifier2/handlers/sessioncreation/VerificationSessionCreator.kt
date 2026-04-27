@@ -23,6 +23,8 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.SUPPORTED_TRANSACTION_DATA_TYPES
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
@@ -189,6 +191,17 @@ object VerificationSessionCreator {
             nonce = null, // not required in the initial request yet
             responseType = null
         )
+        val transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null
+        val credentialQueriesById = transactionData?.let {
+            requireNotNull(setup.core.dcqlQuery) { "transaction_data requires a dcql_query" }
+                .credentials
+                .associateBy { credentialQuery -> credentialQuery.id }
+        }
+        validateRequestTransactionData(
+            transactionData = transactionData,
+            supportedTypes = SUPPORTED_TRANSACTION_DATA_TYPES,
+            credentialQueriesById = credentialQueriesById,
+        )
 
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) OpenID4VPResponseType.VP_TOKEN else null,
@@ -233,7 +246,7 @@ object VerificationSessionCreator {
              * containing details about the transaction the Verifier is requesting the End-User to authorize.
              * The decoded JSON object structure is represented by [TransactionDataItem].
              */
-            transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null, // List of base64url encoded JSON strings
+            transactionData = transactionData, // List of base64url encoded JSON strings
 
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.

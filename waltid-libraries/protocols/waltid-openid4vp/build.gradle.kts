@@ -24,6 +24,7 @@ kotlin {
             /*
              * walt.id:
              */
+            implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
         }
         commonTest.dependencies {
