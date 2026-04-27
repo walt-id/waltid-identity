@@ -36,11 +36,54 @@ This library implements support for the following standards:
 
 | Standard | Description |
 |----------|-------------|
-| **ETSI TS 119 612 V2.4.1** | EU Trusted List format (TSL) |
-| **ETSI TS 119 615 V1.3.1** | Procedures for EU Member State national trusted lists |
-| **ETSI TS 119 602 V1.1.1** | Lists of Trusted Entities (LoTE) data model |
+| **ETSI TS 119 612** | EU Trusted List format (TSL) — XML format with XMLDSig signatures |
+| **ETSI TS 119 615** | Procedures for EU Member State national trusted lists |
+| **ETSI TS 119 602** | Lists of Trusted Entities (LoTE) — JSON and XML data models |
 | **EU LOTL** | List of Trusted Lists (aggregated EU trust anchors) |
 | **EUDI LoTE** | EUDI Wallet Lists of Trusted Entities |
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph API["TrustRegistryService API"]
+        RESOLVE["resolve trust<br/>(certificate, providerId)"]
+        QUERY["query entities<br/>(list, filter, health)"]
+        MANAGE["manage sources<br/>(load, refresh)"]
+    end
+
+    subgraph STORE["TrustStore"]
+        INMEM["InMemoryTrustStore<br/>(default)"]
+        CUSTOM["Custom Implementation<br/>(enterprise)"]
+    end
+
+    subgraph PARSERS["Format Parsers"]
+        TSL["TslXmlParser<br/>(ETSI TS 119 612)"]
+        LOTE_JSON["LoteJsonParser<br/>(ETSI TS 119 602)"]
+        LOTE_XML["LoteXmlParser<br/>(ETSI TS 119 602)"]
+    end
+
+    subgraph VALIDATION["Signature Validation"]
+        XMLDSIG["XmlDsigValidator<br/>(JSR-105 API)"]
+    end
+
+    subgraph MODEL["Trust Model"]
+        SOURCE["TrustSource"]
+        ENTITY["TrustedEntity"]
+        SERVICE["TrustedService"]
+        IDENTITY["ServiceIdentity"]
+    end
+
+    RESOLVE --> STORE
+    QUERY --> STORE
+    MANAGE --> PARSERS
+    
+    PARSERS --> MODEL
+    TSL --> XMLDSIG
+    
+    MODEL --> STORE
+    INMEM -.-> CUSTOM
+```
 
 ## Installation
 
@@ -56,245 +99,296 @@ dependencies {
 }
 ```
 
-## Usage
+## Quick Start
 
-### Initialize the Trust Registry Service
+### Initialize the Service
 
 ```kotlin
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
 
-// Create the service with an in-memory store
-val store = InMemoryTrustStore()
-val trustService = DefaultTrustRegistryService(store)
+val trustService = DefaultTrustRegistryService(InMemoryTrustStore())
 ```
 
-### Parse and Load EU Trusted Lists (TSL)
+### Load a Trust List
 
 ```kotlin
-import id.walt.trust.model.SourceFamily
-import id.walt.trust.parser.tsl.TslParseConfig
-
-// Register a source URL for periodic refresh
-trustService.registerSource(
-    sourceId = "at-tsl",
-    url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
-    sourceFamily = SourceFamily.TSL
+// Load from URL (auto-detects format)
+val result = trustService.loadSourceFromUrl(
+    sourceId = "ewc-pilot",
+    url = "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL"
 )
-
-// Refresh the source (fetches and parses)
-val result = trustService.refreshSource("at-tsl")
-println("Loaded ${result.entitiesLoaded} entities, ${result.servicesLoaded} services")
-
-// Or load directly from content with signature validation
-val tslXml = """..."""
-
-// Configure signature validation (enabled by default)
-val config = TslParseConfig(
-    validateSignature = true,           // Enable XMLDSig validation
-    strictSignatureValidation = false   // false = continue parsing on failure, true = throw
-)
-
-val loadResult = trustService.loadSourceFromContent("at-tsl", tslXml, "https://example.com/at-tsl.xml", config)
-println("Authenticity: ${loadResult.source.authenticityState}")
-// VALIDATED, FAILED, or SKIPPED_DEMO
+println("Loaded ${result.entitiesLoaded} entities")
 ```
 
-### Validate TSL Signatures Directly
+### Resolve Trust
 
 ```kotlin
-import id.walt.trust.signature.XmlDsigValidator
-import id.walt.trust.signature.SignatureValidationConfig
-import id.walt.trust.model.AuthenticityState
-
-// Fetch and validate a trust list signature
-val tslXml = fetchUrl("https://ec.europa.eu/tools/lotl/eu-lotl.xml")
-val result = XmlDsigValidator.validate(tslXml)
-
-when (result.state) {
-    AuthenticityState.VALIDATED -> {
-        println("✅ Signature is valid")
-        println("Signer: ${result.signerCertificate?.subjectX500Principal}")
-    }
-    AuthenticityState.FAILED -> {
-        println("❌ Signature validation failed: ${result.details}")
-    }
-    else -> println("Unexpected state: ${result.state}")
-}
-
-// With custom configuration
-val config = SignatureValidationConfig(
-    requireTrustedCertificate = true,
-    trustedAnchors = setOf(euRootCert),
-    allowExpiredCertificates = false,
-    secureValidation = true
-)
-val customResult = XmlDsigValidator.validate(tslXml, config)
-```
-
-### Parse and Load LoTE Sources (JSON)
-
-```kotlin
-val loteJson = """
-{
-    "listMetadata": {
-        "listId": "eu-wallet-providers",
-        "listType": "WALLET_PROVIDERS",
-        "territory": "EU",
-        "issueDate": "2026-01-01T00:00:00Z",
-        "nextUpdate": "2026-07-01T00:00:00Z"
-    },
-    "trustedEntities": [
-        {
-            "entityId": "AT-WALLET-001",
-            "entityType": "WALLET_PROVIDER",
-            "legalName": "Demo Wallet Provider GmbH",
-            "country": "AT",
-            "services": [
-                {
-                    "serviceId": "wallet-service",
-                    "serviceType": "WALLET_INSTANCE_ATTESTATION",
-                    "status": "GRANTED",
-                    "identities": [
-                        {
-                            "matchType": "CERTIFICATE_SHA256",
-                            "value": "9f3df3b70633c3d23f5ef04d5d1e7f1d715b9683d8744cd38ec1a8114ec99f00"
-                        }
-                    ]
-                }
-            ]
-        }
-    ]
-}
-"""
-
-val result = trustService.loadSourceFromContent("eu-wallets", loteJson)
-println("Success: ${result.success}, Entities: ${result.entitiesLoaded}")
-```
-
-### Parse LoTE Sources (XML)
-
-```kotlin
-val loteXml = """
-<?xml version="1.0" encoding="UTF-8"?>
-<ListOfTrustedEntities>
-    <ListMetadata>
-        <ListId>eu-pid-providers</ListId>
-        <Territory>EU</Territory>
-        <IssueDate>2026-01-01T00:00:00Z</IssueDate>
-        <NextUpdate>2026-07-01T00:00:00Z</NextUpdate>
-    </ListMetadata>
-    <TrustedEntity>
-        <EntityId>AT-PID-001</EntityId>
-        <EntityType>PID_PROVIDER</EntityType>
-        <LegalName>Demo PID Provider</LegalName>
-        <Country>AT</Country>
-        <TrustedService>
-            <ServiceId>pid-issuance</ServiceId>
-            <ServiceType>PID_PROVIDER_ACCESS</ServiceType>
-            <Status>GRANTED</Status>
-            <Identity>
-                <MatchType>CERTIFICATE_SHA256</MatchType>
-                <Value>2f18886f6fd62dfd0f9015ec6b7b0af2870d3f6070c810f545f8d85f37eb8d11</Value>
-            </Identity>
-        </TrustedService>
-    </TrustedEntity>
-</ListOfTrustedEntities>
-"""
-
-val result = trustService.loadSourceFromContent("eu-pid", loteXml)
-```
-
-### Resolve Trust for a Certificate
-
-```kotlin
-import id.walt.trust.model.TrustDecisionCode
-import id.walt.trust.model.TrustedEntityType
-import kotlinx.datetime.Clock
-
-// Resolve by certificate SHA-256 fingerprint
 val decision = trustService.resolveByCertificateSha256(
-    sha256Hex = "9f3df3b70633c3d23f5ef04d5d1e7f1d715b9683d8744cd38ec1a8114ec99f00",
-    instant = Clock.System.now(),
-    expectedEntityType = TrustedEntityType.WALLET_PROVIDER  // Optional filter
-)
-
-when (decision.decision) {
-    TrustDecisionCode.TRUSTED -> {
-        println("Certificate is trusted!")
-        println("Entity: ${decision.matchedEntity?.legalName}")
-        println("Service status: ${decision.matchedService?.status}")
-    }
-    TrustDecisionCode.NOT_TRUSTED -> {
-        println("Certificate is NOT trusted")
-        decision.evidence.forEach { println("  - ${it.type}: ${it.value}") }
-    }
-    TrustDecisionCode.STALE_SOURCE -> {
-        println("Source is stale/expired - trust decision may be outdated")
-    }
-    TrustDecisionCode.MULTIPLE_MATCHES -> {
-        println("Multiple entities matched - ambiguous result")
-    }
-    else -> println("Unknown/error: ${decision.decision}")
-}
-
-// Resolve by raw certificate (PEM or base64 DER)
-val pemCertificate = """
------BEGIN CERTIFICATE-----
-MIIBkTCB+wIJAKHBfpE...
------END CERTIFICATE-----
-"""
-val certDecision = trustService.resolveByCertificate(
-    certificatePemOrDer = pemCertificate,
+    sha256Hex = "9f3df3b70633c3d23f5ef04d5d1e7f1d...",
     instant = Clock.System.now()
-)
-```
-
-### Resolve Trust by Provider ID
-
-```kotlin
-val decision = trustService.resolveByProviderId(
-    providerId = "AT-WALLET-001",
-    instant = Clock.System.now(),
-    expectedEntityType = TrustedEntityType.WALLET_PROVIDER
 )
 
 if (decision.decision == TrustDecisionCode.TRUSTED) {
-    println("Provider ${decision.matchedEntity?.legalName} is trusted")
-    println("Country: ${decision.matchedEntity?.country}")
+    println("Trusted! Entity: ${decision.matchedEntity?.legalName}")
 }
 ```
 
-### Query the Trust Store
+## Working Examples with Real Trust Lists
+
+### Example 1: Austrian National TSL (ETSI TS 119 612 XML)
+
+The Austrian Trusted List contains qualified trust service providers and their services with XMLDSig signatures.
 
 ```kotlin
-import id.walt.trust.model.EntityFilter
-import id.walt.trust.model.SourceFamily
+// Load Austrian TSL with signature validation
+val result = trustService.loadSourceFromUrl(
+    sourceId = "at-tsl",
+    url = "https://www.signatur.rtr.at/currenttl.xml",
+    validateSignature = true  // Validates XMLDSig → AuthenticityState.VALIDATED
+)
 
-// List all trusted entities
-val allEntities = trustService.listTrustedEntities()
+println("Austria TSL: ${result.entitiesLoaded} providers, ${result.servicesLoaded} services")
+println("Authenticity: ${trustService.listSources().first().authenticityState}")
+// Output: Authenticity: VALIDATED
 
-// Filter by entity type
+// Query Austrian trust service providers
+val austrianProviders = trustService.listTrustedEntities(
+    EntityFilter(country = "AT", entityType = TrustedEntityType.TRUST_SERVICE_PROVIDER)
+)
+austrianProviders.forEach { println("  - ${it.legalName}") }
+```
+
+### Example 2: EWC Pilot Trust List (LoTE JSON)
+
+The European Wallet Consortium pilot trust list uses the LoTE JSON format for wallet and PID providers.
+
+```kotlin
+// Load EWC Pilot (LoTE JSON format - no signature)
+val result = trustService.loadSourceFromUrl(
+    sourceId = "ewc-pilot",
+    url = "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL",
+    validateSignature = false  // LoTE JSON is unsigned → AuthenticityState.SKIPPED_DEMO
+)
+
+println("EWC Pilot: ${result.entitiesLoaded} entities")
+
+// Query wallet providers
 val walletProviders = trustService.listTrustedEntities(
     EntityFilter(entityType = TrustedEntityType.WALLET_PROVIDER)
 )
 
-// Filter by country
-val austrianEntities = trustService.listTrustedEntities(
-    EntityFilter(country = "AT")
+// Resolve by provider ID
+val decision = trustService.resolveByProviderId(
+    providerId = "ewc-wallet-demo",
+    instant = Clock.System.now()
+)
+```
+
+### Example 3: Custom LoTE JSON (Self-Created)
+
+Create your own trust list for testing or internal use:
+
+```kotlin
+val customLoTE = """
+{
+  "version": "1.0",
+  "trustList": {
+    "listId": "my-org-trust-list",
+    "name": "My Organization Trust List",
+    "territory": "DE",
+    "issueDate": "2026-01-01T00:00:00Z",
+    "nextUpdate": "2027-01-01T00:00:00Z"
+  },
+  "trustedEntities": [
+    {
+      "entityId": "my-issuer-001",
+      "entityType": "PID_PROVIDER",
+      "name": "My PID Issuer",
+      "country": "DE",
+      "services": [
+        {
+          "serviceId": "pid-issuance",
+          "serviceType": "PID_PROVIDER",
+          "status": "granted",
+          "digitalIdentities": [
+            {
+              "x509CertificateSha256": "a1b2c3d4e5f6..."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+"""
+
+val result = trustService.loadSourceFromContent(
+    sourceId = "my-org",
+    content = customLoTE
 )
 
-// Filter by source family
-val tslEntities = trustService.listTrustedEntities(
-    EntityFilter(sourceFamily = SourceFamily.TSL)
+// Now you can resolve certificates against your trust list
+val decision = trustService.resolveByCertificateSha256("a1b2c3d4e5f6...")
+```
+
+### Example 4: EU List of Trusted Lists (EU LOTL)
+
+The EU LOTL aggregates pointers to all member state trusted lists:
+
+```kotlin
+// Load EU LOTL (contains pointers to member state TSLs)
+val result = trustService.loadSourceFromUrl(
+    sourceId = "eu-lotl",
+    url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
+    validateSignature = true
 )
 
-// Filter only currently trusted (active status)
-val activeOnly = trustService.listTrustedEntities(
-    EntityFilter(onlyCurrentlyTrusted = true)
-)
+// Note: EU LOTL contains TSLPointers, not entities directly
+// Use it to discover member state TSL URLs
+```
 
-// Combine filters
+## Verification Policy Integration
+
+This library powers the **`etsi-trust-list`** verification policy in [waltid-verification-policies2](../waltid-verification-policies2). The policy validates that credential issuer certificates are trusted according to loaded trust lists.
+
+### Policy Configuration
+
+```json
+{
+  "policy": "etsi-trust-list",
+  "trustLists": [
+    "https://www.signatur.rtr.at/currenttl.xml",
+    "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL"
+  ],
+  "expectedEntityType": "PID_PROVIDER",
+  "requireAuthenticated": false,
+  "validateSignatures": true
+}
+```
+
+**How it works:**
+1. Extracts the certificate chain from the credential's `x5c` header (COSE for mDoc, JWT for SD-JWT/VC)
+2. Iterates through the chain (leaf → root) resolving trust for each certificate
+3. If any certificate is found trusted in the configured trust lists, verification passes
+
+**Key options:**
+- `trustLists`: URLs or inline content of trust lists to load
+- `expectedEntityType`: Filter to specific entity type (e.g., `PID_PROVIDER`, `WALLET_PROVIDER`)
+- `requireAuthenticated`: If `true`, only accept trust lists with `VALIDATED` XMLDSig signatures
+- `validateSignatures`: Enable/disable XMLDSig validation when loading trust lists
+
+See the [waltid-verification-policies2 README](../waltid-verification-policies2/README.md#etsi-trust-list) for full documentation.
+
+## Data Model Reference
+
+### Key Types
+
+| Type | Description |
+|------|-------------|
+| `TrustSource` | Metadata about a trust list (URL, territory, freshness, authenticity) |
+| `TrustedEntity` | An organization in the trust list (TSP, Wallet Provider, PID Provider, etc.) |
+| `TrustedService` | A service offered by an entity with its trust status |
+| `ServiceIdentity` | Cryptographic identifiers (cert SHA-256, subject DN, SKI) for certificate matching |
+| `TrustDecision` | Result of a trust resolution query with matched entity/service and evidence |
+
+### Trust Status Values
+
+These values are mapped from ETSI TS 119 612 `ServiceStatus` URIs. The original URIs follow the pattern:  
+`http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/<status>`
+
+| Status | ETSI URI Pattern | Description |
+|--------|------------------|-------------|
+| `GRANTED` | `.../granted` | Service is currently trusted (qualified under eIDAS) |
+| `RECOGNIZED` | `.../recognisedatnationallevel` | Recognized under national law / mutual recognition |
+| `ACCREDITED` | `.../accredited` | Service is accredited |
+| `SUPERVISED` | `.../undersupervision` | Service is under supervision |
+| `SUSPENDED` | `.../suspended` | Service trust temporarily suspended |
+| `REVOKED` | `.../revoked` | Service trust permanently revoked |
+| `WITHDRAWN` | `.../withdrawn` | Service has been withdrawn from the list |
+| `DEPRECATED` | `.../deprecatedbynationallaw` | Deprecated by national legislation |
+| `EXPIRED` | (computed) | Service validity period has ended |
+| `UNKNOWN` | (fallback) | Status URI not recognized |
+
+> **Source:** ETSI TS 119 612 V2.4.1, Section 5.5.4 "Service current status"  
+> Full URI example: `http://uri.etsi.org/TrstSvc/TrustedList/Svcstatus/granted`
+
+### Authenticity States
+
+These are library-defined values representing XMLDSig signature validation results:
+
+| State | Description |
+|-------|-------------|
+| `VALIDATED` | XMLDSig signature verified successfully |
+| `FAILED` | Signature validation failed or signature missing when required |
+| `SKIPPED_DEMO` | Signature validation was disabled (e.g., for testing/demo) |
+| `UNKNOWN` | Authenticity not yet determined |
+
+### Freshness States
+
+Library-defined values based on the `nextUpdate` timestamp in trust lists:
+
+| State | Description |
+|-------|-------------|
+| `FRESH` | Current time is before `nextUpdate` |
+| `STALE` | Current time is past `nextUpdate` (should refresh) |
+| `EXPIRED` | Source is significantly past `nextUpdate` |
+| `UNKNOWN` | No `nextUpdate` timestamp available |
+
+### Entity Types
+
+Mapped from ETSI TS 119 602 and EUDI wallet specifications:
+
+| Type | Description |
+|------|-------------|
+| `TRUST_SERVICE_PROVIDER` | Qualified trust service provider (eIDAS) |
+| `WALLET_PROVIDER` | EUDI Wallet provider |
+| `PID_PROVIDER` | Person Identification Data provider |
+| `ATTESTATION_PROVIDER` | Attestation provider (QEAA) |
+| `ACCESS_CERTIFICATE_PROVIDER` | Access certificate provider |
+| `RELYING_PARTY_PROVIDER` | Relying party provider |
+| `OTHER` | Other entity type |
+
+### Decision Codes
+
+Library-defined resolution outcomes:
+
+| Code | Description |
+|------|-------------|
+| `TRUSTED` | Certificate/provider found in trust list with active status |
+| `NOT_TRUSTED` | Not found or found with non-active status |
+| `STALE_SOURCE` | Trust source is stale (past `nextUpdate`) |
+| `MULTIPLE_MATCHES` | Ambiguous: multiple entities matched |
+| `UNSUPPORTED_SOURCE` | Source format not supported |
+| `PROCESSING_ERROR` | Error during resolution |
+| `UNKNOWN` | Could not determine trust status |
+
+## Advanced Usage
+
+### XMLDSig Signature Validation
+
+Validate trust list signatures directly:
+
+```kotlin
+import id.walt.trust.signature.XmlDsigValidator
+
+val tslXml = fetchUrl("https://www.signatur.rtr.at/currenttl.xml")
+val result = XmlDsigValidator.validate(tslXml)
+
+when (result.state) {
+    AuthenticityState.VALIDATED -> {
+        println("Signature valid!")
+        println("Signer: ${result.signerCertificate?.subjectX500Principal}")
+    }
+    AuthenticityState.FAILED -> println("Invalid: ${result.details}")
+    else -> println("Unexpected: ${result.state}")
+}
+```
+
+### Entity Filtering
+
+```kotlin
+// Combine multiple filters
 val activePidProvidersInAT = trustService.listTrustedEntities(
     EntityFilter(
         entityType = TrustedEntityType.PID_PROVIDER,
@@ -304,109 +398,16 @@ val activePidProvidersInAT = trustService.listTrustedEntities(
 )
 ```
 
-### Check Source Health
+### Health Monitoring
 
 ```kotlin
-// Get health status for all loaded sources
-val healthReport = trustService.getSourceHealth()
-
-healthReport.forEach { health ->
-    println("Source: ${health.displayName} (${health.sourceId})")
-    println("  Family: ${health.sourceFamily}")
-    println("  Freshness: ${health.freshnessState}")
-    println("  Authenticity: ${health.authenticityState}")
-    println("  Next Update: ${health.nextUpdate}")
-    println("  Entities: ${health.entityCount}")
-    println("  Services: ${health.serviceCount}")
-}
-
-// List all registered sources
-val sources = trustService.listSources()
-sources.forEach { source ->
-    println("${source.displayName}: ${source.territory} - ${source.freshnessState}")
+val health = trustService.getSourceHealth()
+health.forEach { h ->
+    println("${h.displayName}: ${h.freshnessState}, ${h.authenticityState}")
+    println("  Entities: ${h.entityCount}, Services: ${h.serviceCount}")
+    println("  Next update: ${h.nextUpdate}")
 }
 ```
-
-## Architecture
-
-The library follows a layered architecture:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    TrustRegistryService                     │
-│  (resolve trust, list entities, manage sources)             │
-├─────────────────────────────────────────────────────────────┤
-│                        TrustStore                           │
-│  (storage abstraction - InMemoryTrustStore for MVP)         │
-├─────────────────────────────────────────────────────────────┤
-│                         Parsers                             │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │ TslXmlParser│  │LoteJsonParser│  │ LoteXmlParser│       │
-│  │   (TSL)     │  │   (LoTE)     │  │   (LoTE)     │       │
-│  └─────────────┘  └──────────────┘  └──────────────┘       │
-│        │                                                    │
-│        ▼                                                    │
-│  ┌──────────────────┐                                       │
-│  │ XmlDsigValidator │  ← Validates TSL XMLDSig signatures   │
-│  │  (JSR-105 API)   │                                       │
-│  └──────────────────┘                                       │
-├─────────────────────────────────────────────────────────────┤
-│                      Trust Model                            │
-│  TrustSource, TrustedEntity, TrustedService,               │
-│  ServiceIdentity, TrustDecision, EntityFilter              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Key Types
-
-| Type | Description |
-|------|-------------|
-| `TrustSource` | Metadata about a trust list (URL, territory, freshness, timestamps) |
-| `TrustedEntity` | An organization in the trust list (TSP, Wallet Provider, PID Provider, etc.) |
-| `TrustedService` | A service offered by an entity with its trust status |
-| `ServiceIdentity` | Cryptographic identifiers (cert SHA-256, subject DN, SKI) for matching |
-| `TrustDecision` | Result of a trust resolution query with evidence and warnings |
-| `EntityFilter` | Query filter for listing entities |
-| `SignatureValidationResult` | Result of XMLDSig signature validation |
-| `TrustSourceHealth` | Health metrics for a loaded source |
-
-### Trust Status Values
-
-| Status | Description |
-|--------|-------------|
-| `GRANTED` | Service is currently trusted |
-| `RECOGNIZED` | Service is recognized under mutual recognition |
-| `ACCREDITED` | Service is accredited |
-| `SUPERVISED` | Service is under supervision |
-| `SUSPENDED` | Service is temporarily suspended |
-| `REVOKED` | Service trust has been revoked |
-| `WITHDRAWN` | Service has been withdrawn |
-| `DEPRECATED` | Service is deprecated |
-| `EXPIRED` | Service trust has expired |
-
-### Authenticity States
-
-| State | Description |
-|-------|-------------|
-| `VALIDATED` | XMLDSig signature verified successfully |
-| `FAILED` | Signature validation failed or signature missing |
-| `SKIPPED_DEMO` | Signature validation was disabled |
-| `UNKNOWN` | Authenticity not determined |
-
-### Entity Types
-
-| Type | Description |
-|------|-------------|
-| `TRUST_SERVICE_PROVIDER` | Traditional qualified trust service provider |
-| `WALLET_PROVIDER` | EUDI Wallet provider |
-| `PID_PROVIDER` | Person Identification Data provider |
-| `ATTESTATION_PROVIDER` | Attestation provider |
-| `ACCESS_CERTIFICATE_PROVIDER` | Access certificate provider |
-| `RELYING_PARTY_PROVIDER` | Relying party provider |
-
-## Related Modules
-
-- **waltid-trust-registry-service** — Ktor-based REST API exposing trust registry functionality
 
 ## Join the community
 
