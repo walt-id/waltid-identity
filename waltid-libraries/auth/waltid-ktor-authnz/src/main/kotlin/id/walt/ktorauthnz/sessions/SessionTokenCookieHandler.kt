@@ -22,7 +22,7 @@ object SessionTokenCookieHandler {
             path = "/",
             httpOnly = true,
             secure = secure,
-            extensions = mapOf("SameSite" to "Strict")
+            extensions = mapOf("SameSite" to "Lax")
         )
     }
 
@@ -36,7 +36,7 @@ object SessionTokenCookieHandler {
             path = "/",
             httpOnly = true,
             secure = secure,
-            extensions = mapOf("SameSite" to "Strict")
+            extensions = mapOf("SameSite" to "Lax")
         )
     }
 
