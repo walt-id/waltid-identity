@@ -1,6 +1,7 @@
 import WaltidServicesE2ETests.Companion.ieftSdjwtPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.nameFieldSchemaPresentationRequestPayload
 import WaltidServicesE2ETests.Companion.sdjwtIETFCredential
+import WaltidServicesE2ETests.Companion.sdjwtIETFCredentialWithArrayDisclosure
 import WaltidServicesE2ETests.Companion.sdjwtIETFCredentialWithoutDisclosures
 import WaltidServicesE2ETests.Companion.sdjwtW3CCredential
 import id.walt.crypto.keys.jwk.JWKKey
@@ -217,6 +218,32 @@ class E2ESdJwtTest(
         //endregion -Exchange / presentation-
 
         //delete credential
+        credentialsApi.delete(wallet, newCredential.id)
+    }
+
+    fun testIEFTSDJWTVCWithArrayDisclosure(wallet: Uuid, did: String) = runTest {
+        val issuanceRequest = Json.decodeFromJsonElement<IssuanceRequest>(sdjwtIETFCredentialWithArrayDisclosure)
+        val newCredential = executePreAuthorizedFlow(wallet, issuanceRequest)
+
+        // Wire: each nationalities element is `{"...":"<digest>"}`.
+        val natWire = newCredential.parsedDocument!!["nationalities"]!!.jsonArray
+        assertEquals(2, natWire.size)
+        assertTrue(natWire.all { el ->
+            el is JsonObject && el.size == 1 && el.containsKey("...") &&
+                    (el["..."] as? JsonPrimitive)?.isString == true
+        }, "expected wrappers, got $natWire")
+
+        // Resolved with disclosures: original values.
+        val fullSdJwt = newCredential.document + (newCredential.disclosures?.let { "~$it" } ?: "")
+        val resolved = SDJwtVC.parse(fullSdJwt).fullPayload["nationalities"]!!.jsonArray
+            .map { it.jsonPrimitive.content }
+        assertEquals(listOf("US", "DE"), resolved)
+
+        val verificationId = executePresentation(wallet, ieftSdjwtPresentationRequestPayload, newCredential, did)
+        sessionApi.get(verificationId) {
+            assertTrue(it.tokenResponse?.presentationSubmission != null)
+            assertEquals(it.verificationResult, true)
+        }
         credentialsApi.delete(wallet, newCredential.id)
     }
 
