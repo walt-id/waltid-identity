@@ -407,7 +407,8 @@ object VerificationSessionCreator {
             expirationDate = expiration,
             retentionDate = retentionDate,
 
-            status = if (expiration != null) Verification2Session.VerificationSessionStatus.UNUSED else Verification2Session.VerificationSessionStatus.ACTIVE,
+            //status = if (expiration != null) Verification2Session.VerificationSessionStatus.UNUSED else Verification2Session.VerificationSessionStatus.ACTIVE,
+            status = Verification2Session.VerificationSessionStatus.UNUSED,
 
             bootstrapAuthorizationRequest = if (!isAnnexC) bootstrapAuthorizationRequest else null,
             bootstrapAuthorizationRequestUrl = if (!isAnnexC) bootstrapAuthorizationRequestUrl else null,
