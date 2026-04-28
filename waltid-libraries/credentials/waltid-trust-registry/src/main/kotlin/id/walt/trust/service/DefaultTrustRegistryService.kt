@@ -313,9 +313,48 @@ class DefaultTrustRegistryService(
             }
         }
 
-        val identity = identities.first()
-        val entity = store.getEntity(identity.entityId)
-        val source = entity?.let { store.getSource(it.sourceId) }
+        // Evaluate ALL matching identities and pick the best result
+        // Priority: TRUSTED > STALE_SOURCE > NOT_TRUSTED (with matching types preferred)
+        val candidates = identities.mapNotNull { identity ->
+            evaluateIdentity(identity, instant, expectedEntityType, expectedServiceType)
+        }
+        
+        if (candidates.isEmpty()) {
+            // All identities failed to resolve
+            return TrustDecision(
+                decision = TrustDecisionCode.NOT_TRUSTED,
+                evidence = listOf(
+                    TrustEvidence("NO_VALID_IDENTITY", "No valid identity could be resolved")
+                )
+            )
+        }
+        
+        // Sort by decision priority: TRUSTED first, then STALE_SOURCE, then NOT_TRUSTED
+        // Within same decision, prefer type-matched results
+        return candidates.sortedWith(
+            compareBy(
+                { decisionPriority(it.decision) },
+                { if (it.evidence.any { e -> e.type.contains("MISMATCH") }) 1 else 0 }
+            )
+        ).first()
+    }
+    
+    private fun decisionPriority(decision: TrustDecisionCode): Int = when (decision) {
+        TrustDecisionCode.TRUSTED -> 0
+        TrustDecisionCode.STALE_SOURCE -> 1
+        TrustDecisionCode.NOT_TRUSTED -> 2
+        TrustDecisionCode.MULTIPLE_MATCHES -> 3
+        else -> 4
+    }
+    
+    private suspend fun evaluateIdentity(
+        identity: ServiceIdentity,
+        instant: Instant,
+        expectedEntityType: TrustedEntityType?,
+        expectedServiceType: String?
+    ): TrustDecision? {
+        val entity = store.getEntity(identity.entityId) ?: return null
+        val source = store.getSource(entity.sourceId)
         val service = identity.serviceId?.let { store.getService(it) }
 
         // Type filtering
