@@ -221,12 +221,11 @@ object OIDC : AuthenticationMethod("oidc") {
                 )
 
                 val accountId = identifier.resolveIfExists() ?: run {
-                    require(runCatching { UUID.fromString(subject) }.isSuccess) {
-                        "OIDC subject must be a UUID-compatible account id, but got: $subject"
-                    }
-
-                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(subject, identifier)
-                    subject
+                    // No existing account found - use Registration amendment to create one
+                    val registrationFunction = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
+                        ?: error("No existing account found for OIDC identifier $identifier, and no registration amendment is configured.")
+                    registrationFunction.invoke(identifier)
+                    identifier.resolveToAccountId()
                 }
 
                 val authContext = authContext(call)
