@@ -1,6 +1,10 @@
 package id.walt.trust.parser.tsl
 
 import id.walt.trust.model.*
+import id.walt.trust.parser.SecureXmlParser
+import id.walt.trust.parser.getChildrenByLocalName
+import id.walt.trust.parser.getFirstChildByLocalName
+import id.walt.trust.parser.getChildTextContent
 import id.walt.trust.signature.SignatureValidationConfig
 import id.walt.trust.signature.SignatureValidationResult
 import id.walt.trust.signature.XmlDsigValidator
@@ -13,7 +17,6 @@ import java.io.StringReader
 import java.security.MessageDigest
 import java.security.cert.X509Certificate
 import java.util.*
-import javax.xml.parsers.DocumentBuilderFactory
 
 private val logger = KotlinLogging.logger {}
 
@@ -67,16 +70,16 @@ object TslXmlParser {
         sourceUrl: String? = null,
         config: TslParseConfig = TslParseConfig()
     ): ParsedTslSource {
-        val doc = parseXml(xml)
+        val doc = SecureXmlParser.parseXml(xml)
         val root = doc.documentElement
 
         // Extract scheme information
-        val schemeInfo = root.getFirstChild("SchemeInformation")
-        val territory = schemeInfo?.getTextContent("SchemeTerritory")
-        val issueDate = schemeInfo?.getTextContent("ListIssueDateTime")?.parseInstant()
-        val nextUpdate = schemeInfo?.getFirstChild("NextUpdate")?.getTextContent("dateTime")?.parseInstant()
-        val sequenceNumber = schemeInfo?.getTextContent("TSLSequenceNumber")
-        val versionId = schemeInfo?.getTextContent("TSLVersionIdentifier")
+        val schemeInfo = root.getFirstChildByLocalName("SchemeInformation")
+        val territory = schemeInfo?.getChildTextContent("SchemeTerritory")
+        val issueDate = schemeInfo?.getChildTextContent("ListIssueDateTime")?.parseInstant()
+        val nextUpdate = schemeInfo?.getFirstChildByLocalName("NextUpdate")?.getChildTextContent("dateTime")?.parseInstant()
+        val sequenceNumber = schemeInfo?.getChildTextContent("TSLSequenceNumber")
+        val versionId = schemeInfo?.getChildTextContent("TSLVersionIdentifier")
 
         // Validate signature if configured
         val signatureResult: SignatureValidationResult? = if (config.validateSignature) {
@@ -139,10 +142,10 @@ object TslXmlParser {
         val identities = mutableListOf<ServiceIdentity>()
 
         // Parse TrustServiceProviderList
-        val tspList = root.getFirstChild("TrustServiceProviderList")
-        tspList?.getChildren("TrustServiceProvider")?.forEach { tspElement ->
-            val tspInfo = tspElement.getFirstChild("TSPInformation")
-            val tspName = tspInfo?.getTextContent("TSPName") ?: "Unknown TSP"
+        val tspList = root.getFirstChildByLocalName("TrustServiceProviderList")
+        tspList?.getChildrenByLocalName("TrustServiceProvider")?.forEach { tspElement ->
+            val tspInfo = tspElement.getFirstChildByLocalName("TSPInformation")
+            val tspName = tspInfo?.getChildTextContent("TSPName") ?: "Unknown TSP"
             val entityId = generateEntityId(sourceId, tspName)
 
             entities += TrustedEntity(
@@ -154,12 +157,12 @@ object TslXmlParser {
             )
 
             // Parse TSPServices
-            val tspServices = tspElement.getFirstChild("TSPServices")
-            tspServices?.getChildren("TSPService")?.forEachIndexed { svcIdx, svcElement ->
-                val svcInfo = svcElement.getFirstChild("ServiceInformation")
-                val serviceType = svcInfo?.getTextContent("ServiceTypeIdentifier") ?: "unknown"
-                val statusUri = svcInfo?.getTextContent("ServiceStatus") ?: ""
-                val statusStart = svcInfo?.getTextContent("StatusStartingTime")?.parseInstant()
+            val tspServices = tspElement.getFirstChildByLocalName("TSPServices")
+            tspServices?.getChildrenByLocalName("TSPService")?.forEachIndexed { svcIdx, svcElement ->
+                val svcInfo = svcElement.getFirstChildByLocalName("ServiceInformation")
+                val serviceType = svcInfo?.getChildTextContent("ServiceTypeIdentifier") ?: "unknown"
+                val statusUri = svcInfo?.getChildTextContent("ServiceStatus") ?: ""
+                val statusStart = svcInfo?.getChildTextContent("StatusStartingTime")?.parseInstant()
 
                 val serviceId = "$entityId::svc-$svcIdx"
                 val status = mapTslStatus(statusUri)
@@ -175,11 +178,11 @@ object TslXmlParser {
                 )
 
                 // Parse ServiceDigitalIdentity
-                val digitalIdentity = svcInfo?.getFirstChild("ServiceDigitalIdentity")
-                digitalIdentity?.getChildren("DigitalId")?.forEachIndexed { idIdx, digitalIdElement ->
-                    val x509Cert = digitalIdElement.getTextContent("X509Certificate")
-                    val x509Ski = digitalIdElement.getTextContent("X509SKI")
-                    val x509SubjectName = digitalIdElement.getTextContent("X509SubjectName")
+                val digitalIdentity = svcInfo?.getFirstChildByLocalName("ServiceDigitalIdentity")
+                digitalIdentity?.getChildrenByLocalName("DigitalId")?.forEachIndexed { idIdx, digitalIdElement ->
+                    val x509Cert = digitalIdElement.getChildTextContent("X509Certificate")
+                    val x509Ski = digitalIdElement.getChildTextContent("X509SKI")
+                    val x509SubjectName = digitalIdElement.getChildTextContent("X509SubjectName")
 
                     if (x509Cert != null || x509Ski != null || x509SubjectName != null) {
                         val identityId = "$serviceId::id-$idIdx"
@@ -212,58 +215,6 @@ object TslXmlParser {
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
-
-    private fun parseXml(xml: String): Document {
-        val factory = DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = true
-        }
-        return factory.newDocumentBuilder().parse(xml.reader().let { org.xml.sax.InputSource(it) })
-    }
-
-    private fun Element.getFirstChild(tagName: String): Element? {
-        // Try exact match first
-        var nodes = getElementsByTagName(tagName)
-        for (i in 0 until nodes.length) {
-            val node = nodes.item(i)
-            if (node is Element && node.parentNode == this) return node
-        }
-        // Fallback: search by local name (handles namespace prefixes like tsl:SchemeTerritory)
-        nodes = getElementsByTagNameNS("*", tagName)
-        for (i in 0 until nodes.length) {
-            val node = nodes.item(i)
-            if (node is Element && node.parentNode == this) return node
-        }
-        // Last resort: any match (recursive)
-        nodes = getElementsByTagNameNS("*", tagName)
-        for (i in 0 until nodes.length) {
-            val node = nodes.item(i)
-            if (node is Element) return node
-        }
-        return null
-    }
-
-    private fun Element.getChildren(tagName: String): List<Element> {
-        val result = mutableListOf<Element>()
-        // Try exact match first
-        var nodes = getElementsByTagName(tagName)
-        for (i in 0 until nodes.length) {
-            val node = nodes.item(i)
-            if (node is Element) result += node
-        }
-        // If no results, try namespace-aware search
-        if (result.isEmpty()) {
-            nodes = getElementsByTagNameNS("*", tagName)
-            for (i in 0 until nodes.length) {
-                val node = nodes.item(i)
-                if (node is Element) result += node
-            }
-        }
-        return result
-    }
-
-    private fun Element.getTextContent(tagName: String): String? {
-        return getFirstChild(tagName)?.textContent?.trim()?.takeIf { it.isNotEmpty() }
-    }
 
     private fun String.parseInstant(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
 

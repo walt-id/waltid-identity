@@ -1,6 +1,7 @@
 package id.walt.trust.signature
 
 import id.walt.trust.model.AuthenticityState
+import id.walt.trust.parser.SecureXmlParser
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.w3c.dom.Document
 import org.w3c.dom.NodeList
@@ -14,7 +15,6 @@ import javax.xml.crypto.*
 import javax.xml.crypto.dsig.*
 import javax.xml.crypto.dsig.dom.DOMValidateContext
 import javax.xml.crypto.dsig.keyinfo.X509Data
-import javax.xml.parsers.DocumentBuilderFactory
 
 private val logger = KotlinLogging.logger {}
 
@@ -228,14 +228,8 @@ object XmlDsigValidator {
     }
     
     private fun parseXml(xml: String): Document {
-        val factory = DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = true
-            // Security: disable external entities
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            setFeature("http://xml.org/sax/features/external-general-entities", false)
-            setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-        }
-        val doc = factory.newDocumentBuilder().parse(xml.byteInputStream())
+        // Use SecureXmlParser for XXE protection, then register Id attributes
+        val doc = SecureXmlParser.parseXml(xml)
         
         // Register Id attributes for XAdES signatures
         // XAdES uses "Id" attributes on various elements that need to be resolvable by URI reference

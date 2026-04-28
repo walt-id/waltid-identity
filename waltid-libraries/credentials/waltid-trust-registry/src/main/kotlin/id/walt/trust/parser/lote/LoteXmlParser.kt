@@ -1,10 +1,13 @@
 package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
+import id.walt.trust.parser.SecureXmlParser
+import id.walt.trust.parser.getChildrenByLocalName
+import id.walt.trust.parser.getFirstChildByLocalName
+import id.walt.trust.parser.getChildTextContent
 import kotlin.time.Instant
 import org.w3c.dom.Document
 import org.w3c.dom.Element
-import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Parses TS 119 602-style LoTE XML sources into normalized trust model objects.
@@ -15,17 +18,17 @@ import javax.xml.parsers.DocumentBuilderFactory
 object LoteXmlParser {
 
     fun parse(xml: String, sourceId: String, sourceUrl: String? = null): ParsedLoteSource {
-        val doc = parseXml(xml)
+        val doc = SecureXmlParser.parseXml(xml)
         val root = doc.documentElement
 
         // Extract list metadata
-        val metaElement = root.getFirstChild("ListMetadata")
-        val listId = metaElement?.getTextContent("ListId") ?: sourceId
-        val listType = metaElement?.getTextContent("ListType")
-        val territory = metaElement?.getTextContent("Territory")
-        val issueDate = metaElement?.getTextContent("IssueDate")?.parseInstant()
-        val nextUpdate = metaElement?.getTextContent("NextUpdate")?.parseInstant()
-        val sequenceNumber = metaElement?.getTextContent("SequenceNumber")
+        val metaElement = root.getFirstChildByLocalName("ListMetadata")
+        val listId = metaElement?.getChildTextContent("ListId") ?: sourceId
+        val listType = metaElement?.getChildTextContent("ListType")
+        val territory = metaElement?.getChildTextContent("Territory")
+        val issueDate = metaElement?.getChildTextContent("IssueDate")?.parseInstant()
+        val nextUpdate = metaElement?.getChildTextContent("NextUpdate")?.parseInstant()
+        val sequenceNumber = metaElement?.getChildTextContent("SequenceNumber")
 
         val source = TrustSource(
             sourceId = sourceId,
@@ -47,11 +50,11 @@ object LoteXmlParser {
         val services = mutableListOf<TrustedService>()
         val identities = mutableListOf<ServiceIdentity>()
 
-        root.getChildren("TrustedEntity").forEach { entityElement ->
-            val entityId = entityElement.getTextContent("EntityId") ?: return@forEach
-            val entityTypeRaw = entityElement.getTextContent("EntityType") ?: "OTHER"
-            val legalName = entityElement.getTextContent("LegalName") ?: "Unknown"
-            val country = entityElement.getTextContent("Country")
+        root.getChildrenByLocalName("TrustedEntity").forEach { entityElement ->
+            val entityId = entityElement.getChildTextContent("EntityId") ?: return@forEach
+            val entityTypeRaw = entityElement.getChildTextContent("EntityType") ?: "OTHER"
+            val legalName = entityElement.getChildTextContent("LegalName") ?: "Unknown"
+            val country = entityElement.getChildTextContent("Country")
 
             entities += TrustedEntity(
                 entityId = entityId,
@@ -61,12 +64,12 @@ object LoteXmlParser {
                 country = country
             )
 
-            entityElement.getChildren("TrustedService").forEach { svcElement ->
-                val svcId = svcElement.getTextContent("ServiceId") ?: return@forEach
+            entityElement.getChildrenByLocalName("TrustedService").forEach { svcElement ->
+                val svcId = svcElement.getChildTextContent("ServiceId") ?: return@forEach
                 val serviceId = "$entityId::$svcId"
-                val serviceType = svcElement.getTextContent("ServiceType") ?: "unknown"
-                val statusRaw = svcElement.getTextContent("Status") ?: "UNKNOWN"
-                val statusStart = svcElement.getTextContent("StatusStart")?.parseInstant()
+                val serviceType = svcElement.getChildTextContent("ServiceType") ?: "unknown"
+                val statusRaw = svcElement.getChildTextContent("Status") ?: "UNKNOWN"
+                val statusStart = svcElement.getChildTextContent("StatusStart")?.parseInstant()
 
                 services += TrustedService(
                     serviceId = serviceId,
@@ -77,9 +80,9 @@ object LoteXmlParser {
                     statusStart = statusStart
                 )
 
-                svcElement.getChildren("Identity").forEachIndexed { idx, idElement ->
-                    val matchType = idElement.getTextContent("MatchType") ?: return@forEachIndexed
-                    val value = idElement.getTextContent("Value") ?: return@forEachIndexed
+                svcElement.getChildrenByLocalName("Identity").forEachIndexed { idx, idElement ->
+                    val matchType = idElement.getChildTextContent("MatchType") ?: return@forEachIndexed
+                    val value = idElement.getChildTextContent("Value") ?: return@forEachIndexed
                     val identityId = "$serviceId::id-$idx"
 
                     identities += buildServiceIdentity(
@@ -100,36 +103,6 @@ object LoteXmlParser {
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
-
-    private fun parseXml(xml: String): Document {
-        val factory = DocumentBuilderFactory.newInstance().apply {
-            isNamespaceAware = true
-        }
-        return factory.newDocumentBuilder().parse(xml.reader().let { org.xml.sax.InputSource(it) })
-    }
-
-    private fun Element.getFirstChild(tagName: String): Element? {
-        val nodes = getElementsByTagName(tagName)
-        for (i in 0 until nodes.length) {
-            val node = nodes.item(i)
-            if (node is Element) return node
-        }
-        return null
-    }
-
-    private fun Element.getChildren(tagName: String): List<Element> {
-        val result = mutableListOf<Element>()
-        val nodes = getElementsByTagName(tagName)
-        for (i in 0 until nodes.length) {
-            val node = nodes.item(i)
-            if (node is Element) result += node
-        }
-        return result
-    }
-
-    private fun Element.getTextContent(tagName: String): String? {
-        return getFirstChild(tagName)?.textContent?.trim()?.takeIf { it.isNotEmpty() }
-    }
 
     private fun String.parseInstant(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
 
