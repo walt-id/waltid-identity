@@ -221,10 +221,9 @@ object OIDC : AuthenticationMethod("oidc") {
                 )
 
                 val accountId = identifier.resolveIfExists() ?: run {
-                    // No existing account found - use Registration amendment to create one
-                    val registrationFunction = functionAmendments?.get(AuthMethodFunctionAmendments.Registration)
-                        ?: error("No existing account found for OIDC identifier $identifier, and no registration amendment is configured.")
-                    registrationFunction.invoke(identifier)
+                    // No existing account found - use addAccountIdentifierToAccount to create one
+                    // The AccountStore implementation (e.g., Enterprise) handles JIT provisioning
+                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(subject, identifier)
                     identifier.resolveToAccountId()
                 }
 
