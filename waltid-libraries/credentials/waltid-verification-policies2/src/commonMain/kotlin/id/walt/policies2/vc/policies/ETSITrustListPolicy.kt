@@ -584,8 +584,8 @@ expect object ETSITrustListInlineResolver {
 }
 
 /**
- * Certificate chain validation - uses expect/actual for platform-specific implementation.
- * Validates that each certificate in the chain [0..trustedIndex] is signed by the next.
+ * Certificate chain validation - uses waltid-x509 library for PKIX path validation.
+ * Validates that the leaf certificate chains up to the trusted certificate.
  * 
  * @param certificateChain List of PEM-encoded certificates
  * @param trustedIndex Index of the trusted certificate in the chain

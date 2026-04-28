@@ -4,14 +4,14 @@ import id.walt.trust.model.TrustDecision
 import id.walt.trust.model.TrustedEntityType
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
+import id.walt.x509.CertificateDer
+import id.walt.x509.X509ValidationException
+import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.*
-import java.io.ByteArrayInputStream
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
 import kotlin.time.Clock
 
 private val log = KotlinLogging.logger { }
@@ -200,8 +200,8 @@ actual object ETSITrustListInlineResolver {
 }
 
 /**
- * JVM implementation of certificate chain validation.
- * Validates that each certificate in the chain [0..trustedIndex] is signed by the next certificate.
+ * JVM implementation of certificate chain validation using waltid-x509 library.
+ * Uses PKIX path building and validation for proper certificate chain verification.
  */
 actual fun validateCertificateChainToIndex(
     certificateChain: List<String>,
@@ -217,38 +217,28 @@ actual fun validateCertificateChainToIndex(
     }
     
     try {
-        val certFactory = CertificateFactory.getInstance("X.509")
-        
-        // Parse all certificates in the chain up to and including the trusted one
+        // Convert PEM strings to CertificateDer
         val certs = certificateChain.take(trustedIndex + 1).map { pem ->
-            val pemContent = pem
-                .replace("-----BEGIN CERTIFICATE-----", "")
-                .replace("-----END CERTIFICATE-----", "")
-                .replace("\\s".toRegex(), "")
-            val derBytes = java.util.Base64.getDecoder().decode(pemContent)
-            certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
+            CertificateDer.fromPEMEncodedString(pem)
         }
         
-        // Validate the chain: each cert should be signed by the next one
-        for (i in 0 until certs.size - 1) {
-            val subject = certs[i]
-            val issuer = certs[i + 1]
-            
-            try {
-                // Verify that subject is signed by issuer's public key
-                subject.verify(issuer.publicKey)
-            } catch (e: Exception) {
-                return false to "Certificate at index $i is not signed by certificate at index ${i + 1}: ${e.message}"
-            }
-            
-            // Also verify issuer DN matches
-            if (subject.issuerX500Principal != issuer.subjectX500Principal) {
-                return false to "Certificate at index $i has issuer DN '${subject.issuerX500Principal}' " +
-                        "but certificate at index ${i + 1} has subject DN '${issuer.subjectX500Principal}'"
-            }
-        }
+        val leaf = certs.first()
+        val chain = certs.drop(1).dropLast(1)  // Intermediates (exclude leaf and trust anchor)
+        val trustAnchor = listOf(certs.last())  // The trusted certificate is our anchor
+        
+        // Use waltid-x509 PKIX validation
+        validateCertificateChain(
+            leaf = leaf,
+            chain = chain,
+            trustAnchors = trustAnchor,
+            enableTrustedChainRoot = false,  // We provide explicit trust anchor
+            enableSystemTrustAnchors = false,
+            enableRevocation = false  // TODO: Consider enabling for production
+        )
         
         return true to null
+    } catch (e: X509ValidationException) {
+        return false to "Certificate chain validation failed: ${e.message}"
     } catch (e: Exception) {
         return false to "Certificate chain validation error: ${e.message}"
     }
