@@ -84,8 +84,18 @@ object SourceFetcher {
                 if (config.blockLinkLocal && addr.isLinkLocalAddress) {
                     throw UnknownHostException("Link-local addresses are blocked: $hostname")
                 }
-                if (config.blockPrivateIPs && addr.isSiteLocalAddress) {
-                    throw UnknownHostException("Private/site-local addresses are blocked: $hostname")
+                if (config.blockPrivateIPs) {
+                    if (addr.isSiteLocalAddress) {
+                        throw UnknownHostException("Private/site-local addresses are blocked: $hostname")
+                    }
+                    // Check for IPv6 Unique Local Addresses (fc00::/7)
+                    if (addr is java.net.Inet6Address) {
+                        val bytes = addr.address
+                        val firstByte = bytes[0].toInt() and 0xFF
+                        if (firstByte == 0xFC || firstByte == 0xFD) {
+                            throw UnknownHostException("IPv6 Unique Local Addresses (ULA) are blocked: $hostname")
+                        }
+                    }
                 }
                 // Block cloud metadata endpoints
                 if (config.blockLinkLocal) {
@@ -235,14 +245,22 @@ object SourceFetcher {
                 return false to "Link-local addresses are blocked"
             }
             
-            // Check for private/site-local addresses
-            if (config.blockPrivateIPs && addr.isSiteLocalAddress) {
-                return false to "Private/site-local addresses are blocked"
+            // Check for private/site-local addresses (IPv4) and ULA (IPv6)
+            if (config.blockPrivateIPs) {
+                if (addr.isSiteLocalAddress) {
+                    return false to "Private/site-local addresses are blocked"
+                }
+                // Check for IPv6 Unique Local Addresses (fc00::/7, includes fd00::/8)
+                // Java's isSiteLocalAddress only covers deprecated fec0::/10
+                if (addr is java.net.Inet6Address && isIPv6UniqueLocalAddress(addr)) {
+                    return false to "IPv6 Unique Local Addresses (ULA) are blocked"
+                }
             }
             
-            // Additional check for cloud metadata endpoint (169.254.169.254)
+            // Additional check for cloud metadata endpoints
             if (config.blockLinkLocal) {
                 val addrStr = addr.hostAddress
+                // AWS/GCP/Azure metadata endpoints
                 if (addrStr == "169.254.169.254" || addrStr == "fd00:ec2::254") {
                     return false to "Cloud metadata endpoints are blocked"
                 }
@@ -250,6 +268,21 @@ object SourceFetcher {
         }
         
         return true to null
+    }
+    
+    /**
+     * Check if an IPv6 address is a Unique Local Address (ULA) per RFC 4193.
+     * ULA range is fc00::/7 (binary prefix 1111110x), which includes:
+     * - fc00::/8 (not currently assigned)
+     * - fd00::/8 (locally assigned)
+     * 
+     * Java's isSiteLocalAddress() only covers the deprecated fec0::/10 range.
+     */
+    private fun isIPv6UniqueLocalAddress(addr: java.net.Inet6Address): Boolean {
+        val bytes = addr.address
+        // fc00::/7 means first 7 bits are 1111110x, i.e., first byte is 0xFC or 0xFD
+        val firstByte = bytes[0].toInt() and 0xFF
+        return firstByte == 0xFC || firstByte == 0xFD
     }
 
     /**
