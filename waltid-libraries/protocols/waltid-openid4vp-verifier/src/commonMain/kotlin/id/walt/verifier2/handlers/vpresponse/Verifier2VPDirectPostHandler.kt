@@ -28,6 +28,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
 
 object Verifier2VPDirectPostHandler {
 
@@ -185,6 +186,10 @@ object Verifier2VPDirectPostHandler {
 
         if (verificationSession == null) {
             Verifier2Response.Verifier2Error.UNKNOWN_VERIFICATION_SESSION.throwAsError()
+        }
+
+        verificationSession.expirationDate?.let { expirationDate ->
+            require(expirationDate >= Clock.System.now()) { "This verification session is expired." }
         }
 
         val result = handleDirectPost(

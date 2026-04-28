@@ -262,7 +262,7 @@ object VerificationSessionCreator {
         val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
 
         val now = Clock.System.now()
-        val expiration = now.plus(5, DateTimeUnit.MINUTE, TimeZone.UTC)
+        val expiration = setup.core.expirationDate
         val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
 
         val signedAuthorizationRequest = if (isSignedRequest) {
