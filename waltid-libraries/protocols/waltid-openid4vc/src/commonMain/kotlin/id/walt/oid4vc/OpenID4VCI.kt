@@ -726,6 +726,7 @@ object OpenID4VCI {
                 mapping = dataMapping ?: JsonObject(emptyMap()),
                 context = mapOf(
                     "subjectDid" to holderDid,
+                    "issuerDid" to issuerId,
                     "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                 ).filterValues {
                     when (it) {
@@ -827,6 +828,21 @@ object OpenID4VCI {
         } ?: mapOf()
 
         return W3CVC(credentialData).let { vc ->
+            val context = mapOf(
+                "subjectDid" to holderDid,
+                "issuerDid" to issuerId,
+                "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+            ).filterValues {
+                when (it) {
+                    is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
+                    else -> it != null && it.toString().isNotEmpty()
+                }
+            }.mapValues { (_, value) ->
+                when (value) {
+                    is JsonElement -> value
+                    else -> JsonPrimitive(value.toString())
+                }
+            }
             when (selectiveDisclosure.isNullOrEmpty()) {
                 true -> vc.mergingJwtIssue(
                     issuerKey = issuerKey,
@@ -835,7 +851,8 @@ object OpenID4VCI {
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeader = additionalJwtHeaders,
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    additionalJwtOptions = emptyMap()
+                    additionalJwtOptions = emptyMap(),
+                    context = context
                 )
 
                 else -> vc.mergingSdJwtIssue(
@@ -846,7 +863,8 @@ object OpenID4VCI {
                     additionalJwtHeaders = additionalJwtHeaders,
                     additionalJwtOptions = emptyMap(),
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    disclosureMap = selectiveDisclosure
+                    disclosureMap = selectiveDisclosure,
+                    context = context
                 )
             }
         }
