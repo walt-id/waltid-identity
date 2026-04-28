@@ -261,11 +261,13 @@ class DefaultTrustRegistryService(
             val freshness = evaluateFreshness(parsed.source, now())
             val sourceWithFreshness = parsed.source.copy(freshnessState = freshness)
 
-            // Store everything
-            store.upsertSource(sourceWithFreshness)
-            store.upsertEntities(parsed.entities)
-            store.upsertServices(parsed.services)
-            store.upsertIdentities(parsed.identities)
+            // Store everything atomically to prevent partial state on failure
+            store.replaceSourceData(
+                source = sourceWithFreshness,
+                entities = parsed.entities,
+                services = parsed.services,
+                identities = parsed.identities
+            )
 
             log.info { "Loaded source $sourceId: ${parsed.entities.size} entities, ${parsed.services.size} services, ${parsed.identities.size} identities" }
 

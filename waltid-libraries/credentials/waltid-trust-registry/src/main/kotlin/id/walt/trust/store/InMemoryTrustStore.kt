@@ -36,6 +36,26 @@ class InMemoryTrustStore : TrustStore {
     override suspend fun upsertIdentities(identities: List<ServiceIdentity>) = mutex.withLock {
         identities.forEach { this.identities[it.identityId] = it }
     }
+    
+    override suspend fun replaceSourceData(
+        source: TrustSource,
+        entities: List<TrustedEntity>,
+        services: List<TrustedService>,
+        identities: List<ServiceIdentity>
+    ) = mutex.withLock {
+        val sourceId = source.sourceId
+        
+        // Remove existing data for this source
+        this.entities.entries.removeIf { it.value.sourceId == sourceId }
+        this.services.entries.removeIf { it.value.sourceId == sourceId }
+        this.identities.entries.removeIf { it.value.sourceId == sourceId }
+        
+        // Insert new data atomically (within same lock)
+        this.sources[sourceId] = source
+        entities.forEach { this.entities[it.entityId] = it }
+        services.forEach { this.services[it.serviceId] = it }
+        identities.forEach { this.identities[it.identityId] = it }
+    }
 
     override suspend fun updateSourceFreshness(sourceId: String, freshnessState: FreshnessState): Unit = mutex.withLock {
         sources[sourceId]?.let { sources[sourceId] = it.copy(freshnessState = freshnessState) }
