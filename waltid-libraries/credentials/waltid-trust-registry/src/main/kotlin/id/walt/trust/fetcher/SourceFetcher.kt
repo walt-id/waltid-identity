@@ -2,12 +2,15 @@ package id.walt.trust.fetcher
 
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.github.oshai.kotlinlogging.KotlinLogging
+import okhttp3.Dns
 import java.net.InetAddress
 import java.net.URI
+import java.net.UnknownHostException
 
 private val log = KotlinLogging.logger {}
 
@@ -48,18 +51,79 @@ data class FetcherSecurityConfig(
 
 /**
  * Fetches trust source documents from remote URLs with SSRF protection.
+ * 
+ * Security measures:
+ * - URL scheme validation (https/http only)
+ * - Hostname allow-listing (optional)
+ * - Private IP blocking at DNS resolution time
+ * - DNS pinning to prevent TOCTOU/rebinding attacks
+ * - Request timeouts to prevent resource exhaustion
  */
 object SourceFetcher {
-
-    private val client = HttpClient(OkHttp) {
-        expectSuccess = false
-    }
     
     /**
      * Default security configuration - restrictive by default.
      * Override with a custom config for specific deployment needs.
      */
     var securityConfig = FetcherSecurityConfig()
+    
+    /**
+     * Custom DNS resolver that validates resolved IPs against security policy.
+     * This prevents DNS rebinding attacks by enforcing the same IP validation
+     * at actual connection time, not just at preflight check time.
+     */
+    private class SecureDns(private val config: FetcherSecurityConfig) : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            val addresses = Dns.SYSTEM.lookup(hostname)
+            
+            // Validate each resolved address against security policy
+            for (addr in addresses) {
+                if (config.blockLoopback && addr.isLoopbackAddress) {
+                    throw UnknownHostException("Loopback addresses are blocked: $hostname")
+                }
+                if (config.blockLinkLocal && addr.isLinkLocalAddress) {
+                    throw UnknownHostException("Link-local addresses are blocked: $hostname")
+                }
+                if (config.blockPrivateIPs && addr.isSiteLocalAddress) {
+                    throw UnknownHostException("Private/site-local addresses are blocked: $hostname")
+                }
+                // Block cloud metadata endpoints
+                if (config.blockLinkLocal) {
+                    val addrStr = addr.hostAddress
+                    if (addrStr == "169.254.169.254" || addrStr == "fd00:ec2::254") {
+                        throw UnknownHostException("Cloud metadata endpoints are blocked: $hostname")
+                    }
+                }
+            }
+            
+            return addresses
+        }
+    }
+    
+    /**
+     * Creates an HttpClient with security configuration applied at the OkHttp engine level.
+     * This ensures SSRF protection is enforced at actual connection time.
+     */
+    private fun createClient(config: FetcherSecurityConfig): HttpClient {
+        return HttpClient(OkHttp) {
+            expectSuccess = false
+            
+            // Add request timeouts to prevent resource exhaustion
+            install(HttpTimeout) {
+                connectTimeoutMillis = 10_000
+                requestTimeoutMillis = 30_000
+                socketTimeoutMillis = 30_000
+            }
+            
+            engine {
+                // Use custom DNS resolver that validates IPs at connection time
+                // This prevents DNS rebinding/TOCTOU attacks
+                config {
+                    dns(SecureDns(config))
+                }
+            }
+        }
+    }
 
     data class FetchResult(
         val success: Boolean,
@@ -70,7 +134,7 @@ object SourceFetcher {
     )
 
     suspend fun fetch(url: String, config: FetcherSecurityConfig = securityConfig): FetchResult {
-        // Validate URL before fetching
+        // Validate URL format and scheme before fetching
         val validationResult = validateUrl(url, config)
         if (!validationResult.first) {
             log.warn { "URL validation failed for $url: ${validationResult.second}" }
@@ -79,6 +143,10 @@ object SourceFetcher {
                 error = "URL validation failed: ${validationResult.second}"
             )
         }
+        
+        // Create a client with security config applied at engine level
+        // This ensures DNS rebinding protection via SecureDns
+        val client = createClient(config)
         
         return try {
             log.info { "Fetching trust source from: $url" }
@@ -98,12 +166,21 @@ object SourceFetcher {
                     error = "HTTP ${response.status.value}: ${response.status.description}"
                 )
             }
+        } catch (e: UnknownHostException) {
+            // This is thrown by SecureDns when a blocked address is detected
+            log.warn { "SSRF protection blocked request to $url: ${e.message}" }
+            FetchResult(
+                success = false,
+                error = "Blocked by security policy: ${e.message}"
+            )
         } catch (e: Exception) {
             log.error(e) { "Failed to fetch trust source from $url" }
             FetchResult(
                 success = false,
                 error = e.message ?: "Unknown error"
             )
+        } finally {
+            client.close()
         }
     }
     

@@ -343,11 +343,13 @@ class DefaultTrustRegistryService(
         val freshness = evaluateFreshness(source, instant)
         val isTrusted = service?.status in TRUSTED_STATUSES
 
+        // Don't return STALE_SOURCE for untrusted services - they're simply NOT_TRUSTED
+        // STALE_SOURCE should only be returned when the service *would be* trusted but the source is expired
         return TrustDecision(
             decision = when {
+                !isTrusted -> TrustDecisionCode.NOT_TRUSTED
                 freshness == FreshnessState.EXPIRED -> TrustDecisionCode.STALE_SOURCE
-                isTrusted -> TrustDecisionCode.TRUSTED
-                else -> TrustDecisionCode.NOT_TRUSTED
+                else -> TrustDecisionCode.TRUSTED
             },
             sourceFreshness = freshness,
             authenticity = source?.authenticityState ?: AuthenticityState.UNKNOWN,

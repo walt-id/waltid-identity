@@ -202,8 +202,13 @@ object XmlDsigValidator {
             return false to "Certificate expired or not yet valid: ${e.message}"
         }
         
-        // Check against trusted anchors
-        if (config.trustedAnchors.isNotEmpty()) {
+        // Check against trusted anchors (required when requireTrustedCertificate is true)
+        if (config.requireTrustedCertificate) {
+            // Fail closed: if trusted cert is required but no anchors are configured, reject
+            if (config.trustedAnchors.isEmpty()) {
+                return false to "requireTrustedCertificate is true but no trusted anchors configured"
+            }
+            
             // Simple check: is this cert signed by one of our trusted anchors?
             for (anchor in config.trustedAnchors) {
                 try {
@@ -222,7 +227,7 @@ object XmlDsigValidator {
             return false to "Certificate not signed by any trusted anchor"
         }
         
-        // No trusted anchors configured - just accept
+        // requireTrustedCertificate is false - accept any valid (non-expired) certificate
         return true to null
     }
     
@@ -310,11 +315,15 @@ object XmlDsigValidator {
             val algorithm = method.algorithm
             val keyAlg = key.algorithm
             
+            // Check if the algorithm in the signature method matches the key type
+            val isRsa = algorithm.contains("rsa", ignoreCase = true)
+            val isDsa = algorithm.contains("dsa", ignoreCase = true)
+            val isEc = algorithm.contains("ecdsa", ignoreCase = true) || algorithm.contains("ec", ignoreCase = true)
+            
             return when {
-                algorithm.contains("rsa", ignoreCase = true) && keyAlg.equals("RSA", ignoreCase = true) -> true
-                algorithm.contains("dsa", ignoreCase = true) && keyAlg.equals("DSA", ignoreCase = true) -> true
-                algorithm.contains("ecdsa", ignoreCase = true) && keyAlg.equals("EC", ignoreCase = true) -> true
-                algorithm.contains("ec", ignoreCase = true) && keyAlg.equals("EC", ignoreCase = true) -> true
+                isRsa -> keyAlg.equals("RSA", ignoreCase = true)
+                isDsa -> keyAlg.equals("DSA", ignoreCase = true)
+                isEc -> keyAlg.equals("EC", ignoreCase = true)
                 else -> true // Be permissive for unknown algorithms
             }
         }
