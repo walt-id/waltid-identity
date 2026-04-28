@@ -144,7 +144,11 @@ object XmlDsigValidator {
         
         // Certificate validation (if required)
         if (config.requireTrustedCertificate && signerCert != null) {
-            val certValidation = validateCertificate(signerCert, config)
+            val certValidation = validateCertificateChain(
+                signerCert, 
+                keySelector.certificateChain,
+                config
+            )
             if (!certValidation.first) {
                 return SignatureValidationResult(
                     state = AuthenticityState.FAILED,
@@ -192,11 +196,15 @@ object XmlDsigValidator {
         }
     }
     
-    private fun validateCertificate(cert: X509Certificate, config: SignatureValidationConfig): Pair<Boolean, String?> {
-        // Basic validity check
+    private fun validateCertificateChain(
+        signerCert: X509Certificate,
+        chain: List<X509Certificate>,
+        config: SignatureValidationConfig
+    ): Pair<Boolean, String?> {
+        // Basic validity check on the signer cert
         try {
             if (!config.allowExpiredCertificates) {
-                cert.checkValidity()
+                signerCert.checkValidity()
             }
         } catch (e: Exception) {
             return false to "Certificate expired or not yet valid: ${e.message}"
@@ -209,22 +217,62 @@ object XmlDsigValidator {
                 return false to "requireTrustedCertificate is true but no trusted anchors configured"
             }
             
-            // Simple check: is this cert signed by one of our trusted anchors?
+            // Check if the signer cert itself is a trusted anchor
+            if (config.trustedAnchors.any { it.encoded.contentEquals(signerCert.encoded) }) {
+                return true to null
+            }
+            
+            // Use PKIX path validation for proper chain verification
+            try {
+                val anchors = config.trustedAnchors.map { java.security.cert.TrustAnchor(it, null) }.toSet()
+                
+                // Build intermediates from chain (exclude signer cert)
+                val intermediates = chain.filter { !it.encoded.contentEquals(signerCert.encoded) }
+                
+                val selector = java.security.cert.X509CertSelector().apply { 
+                    certificate = signerCert 
+                }
+                val store = java.security.cert.CertStore.getInstance(
+                    "Collection",
+                    java.security.cert.CollectionCertStoreParameters(intermediates)
+                )
+                
+                val params = java.security.cert.PKIXBuilderParameters(anchors, selector).apply {
+                    addCertStore(store)
+                    isRevocationEnabled = false  // Revocation checking is separate concern
+                }
+                
+                val builder = java.security.cert.CertPathBuilder.getInstance("PKIX")
+                val result = builder.build(params) as java.security.cert.PKIXCertPathBuilderResult
+                
+                // Validate the path
+                val validator = java.security.cert.CertPathValidator.getInstance("PKIX")
+                validator.validate(result.certPath, params)
+                
+                return true to null
+            } catch (e: java.security.cert.CertPathBuilderException) {
+                // PKIX path building failed - fall back to direct signing check
+                logger.debug { "PKIX path building failed: ${e.message}, trying direct signing check" }
+            } catch (e: java.security.cert.CertPathValidatorException) {
+                return false to "Certificate path validation failed: ${e.message}"
+            } catch (e: Exception) {
+                logger.debug { "PKIX validation error: ${e.message}, trying direct signing check" }
+            }
+            
+            // Fallback: direct signing check (for cases where chain has no intermediates)
             for (anchor in config.trustedAnchors) {
                 try {
-                    cert.verify(anchor.publicKey)
-                    return true to null
+                    signerCert.verify(anchor.publicKey)
+                    // Also verify issuer DN matches
+                    if (signerCert.issuerX500Principal == anchor.subjectX500Principal) {
+                        return true to null
+                    }
                 } catch (_: Exception) {
                     // Not signed by this anchor, try next
                 }
             }
             
-            // Also check if the cert itself is a trusted anchor
-            if (config.trustedAnchors.any { it.encoded.contentEquals(cert.encoded) }) {
-                return true to null
-            }
-            
-            return false to "Certificate not signed by any trusted anchor"
+            return false to "Certificate not signed by any trusted anchor and no valid chain found"
         }
         
         // requireTrustedCertificate is false - accept any valid (non-expired) certificate
@@ -264,11 +312,14 @@ object XmlDsigValidator {
     
     /**
      * KeySelector that extracts X.509 certificates from KeyInfo for signature validation.
-     * Stores the selected certificate for later retrieval.
+     * Stores all certificates found for chain validation.
      */
     private class X509KeySelector : KeySelector() {
         var selectedCertificate: X509Certificate? = null
             private set
+        
+        /** All certificates found in KeyInfo (for chain validation) */
+        val certificateChain = mutableListOf<X509Certificate>()
         
         override fun select(
             keyInfo: javax.xml.crypto.dsig.keyinfo.KeyInfo?,
@@ -280,29 +331,35 @@ object XmlDsigValidator {
                 throw KeySelectorException("Null KeyInfo - no key information in signature")
             }
             
+            // Collect all certificates from KeyInfo
+            certificateChain.clear()
+            
             for (content in keyInfo.content) {
                 when (content) {
                     is X509Data -> {
                         for (x509Content in content.content) {
                             when (x509Content) {
                                 is X509Certificate -> {
-                                    val cert = x509Content
-                                    if (isAlgorithmCompatible(method, cert.publicKey)) {
-                                        selectedCertificate = cert
-                                        return SimpleKeySelectorResult(cert.publicKey)
-                                    }
+                                    certificateChain.add(x509Content)
                                 }
                                 is ByteArray -> {
                                     // DER-encoded certificate
                                     val cert = parseCertificate(x509Content)
-                                    if (cert != null && isAlgorithmCompatible(method, cert.publicKey)) {
-                                        selectedCertificate = cert
-                                        return SimpleKeySelectorResult(cert.publicKey)
+                                    if (cert != null) {
+                                        certificateChain.add(cert)
                                     }
                                 }
                             }
                         }
                     }
+                }
+            }
+            
+            // Select the signing certificate (first one that matches algorithm)
+            for (cert in certificateChain) {
+                if (isAlgorithmCompatible(method, cert.publicKey)) {
+                    selectedCertificate = cert
+                    return SimpleKeySelectorResult(cert.publicKey)
                 }
             }
             
