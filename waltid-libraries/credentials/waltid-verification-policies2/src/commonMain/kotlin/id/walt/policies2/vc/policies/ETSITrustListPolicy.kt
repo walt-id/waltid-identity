@@ -175,6 +175,7 @@ data class ETSITrustListPolicy(
 
     private suspend fun resolveViaRemoteService(certificateChain: List<String>): Result<JsonElement> {
         // Query trust registry with each certificate in the chain, starting from leaf
+        // But ONLY accept trust if we can validate the chain from leaf to trusted cert
         for ((index, certPem) in certificateChain.withIndex()) {
             log.debug { "Checking certificate at index $index via remote service" }
             
@@ -182,6 +183,19 @@ data class ETSITrustListPolicy(
             
             if (decision.decision == "TRUSTED" || 
                 (decision.decision == "STALE_SOURCE" && allowStaleSource)) {
+                
+                // Security check: if the trusted certificate is not the leaf (index 0),
+                // we must verify the chain from leaf to this trusted certificate
+                if (index > 0) {
+                    val chainValidation = validateCertificateChainToIndex(certificateChain, index)
+                    if (!chainValidation.first) {
+                        log.warn { "Certificate chain validation failed: ${chainValidation.second}" }
+                        // Continue checking other certificates in the chain
+                        continue
+                    }
+                    log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
+                }
+                
                 log.debug { "Found trusted certificate at chain index $index" }
                 return evaluateDecision(decision)
             }
@@ -191,7 +205,7 @@ data class ETSITrustListPolicy(
         
         return Result.failure(ETSITrustListPolicyException(
             "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
-            "was found in the ETSI trust list"
+            "was found in the ETSI trust list, or chain validation failed"
         ))
     }
 
@@ -233,6 +247,19 @@ data class ETSITrustListPolicy(
             
             if (decision.decision == "TRUSTED" || 
                 (decision.decision == "STALE_SOURCE" && allowStaleSource)) {
+                
+                // Security check: if the trusted certificate is not the leaf (index 0),
+                // we must verify the chain from leaf to this trusted certificate
+                if (index > 0) {
+                    val chainValidation = validateCertificateChainToIndex(certificateChain, index)
+                    if (!chainValidation.first) {
+                        log.warn { "Certificate chain validation failed: ${chainValidation.second}" }
+                        // Continue checking other certificates in the chain
+                        continue
+                    }
+                    log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
+                }
+                
                 log.debug { "Found trusted certificate at chain index $index" }
                 return evaluateDecision(decision)
             }
@@ -242,7 +269,7 @@ data class ETSITrustListPolicy(
         
         return Result.failure(ETSITrustListPolicyException(
             "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
-            "was found in the enterprise trust registry"
+            "was found in the enterprise trust registry, or chain validation failed"
         ))
     }
 
@@ -555,3 +582,16 @@ expect object ETSITrustListInlineResolver {
         validateSignatures: Boolean
     ): Result<JsonElement>
 }
+
+/**
+ * Certificate chain validation - uses expect/actual for platform-specific implementation.
+ * Validates that each certificate in the chain [0..trustedIndex] is signed by the next.
+ * 
+ * @param certificateChain List of PEM-encoded certificates
+ * @param trustedIndex Index of the trusted certificate in the chain
+ * @return Pair of (isValid, errorMessage)
+ */
+expect fun validateCertificateChainToIndex(
+    certificateChain: List<String>,
+    trustedIndex: Int
+): Pair<Boolean, String?>

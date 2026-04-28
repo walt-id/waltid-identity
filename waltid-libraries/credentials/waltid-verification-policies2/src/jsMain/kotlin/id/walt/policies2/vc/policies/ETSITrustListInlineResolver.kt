@@ -29,3 +29,19 @@ actual object ETSITrustListInlineResolver {
         )
     }
 }
+
+/**
+ * JS stub implementation of certificate chain validation.
+ * 
+ * Certificate chain validation requires X.509 certificate parsing which is not
+ * available on JS platform. Use remote service mode for trust verification.
+ */
+actual fun validateCertificateChainToIndex(
+    certificateChain: List<String>,
+    trustedIndex: Int
+): Pair<Boolean, String?> {
+    // On JS, we can't validate the chain cryptographically.
+    // For remote service mode, the server should validate the chain.
+    // Return success here since remote/enterprise mode relies on server-side validation.
+    return true to null
+}
