@@ -3,6 +3,7 @@ package id.walt.trust
 import id.walt.trust.model.*
 import id.walt.trust.parser.lote.LoteJsonParser
 import id.walt.trust.parser.lote.LoteXmlParser
+import id.walt.trust.parser.tsl.TslParseConfig
 import id.walt.trust.parser.tsl.TslXmlParser
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +19,11 @@ class ParserTest {
     private fun loadResource(name: String): String =
         this::class.java.classLoader.getResource(name)?.readText()
             ?: error("Test resource not found: $name")
+    
+    /** Config for synthetic test fixtures that have no XMLDSig signature */
+    private val unsignedTslConfig = TslParseConfig(
+        validateSignature = false
+    )
 
     // ---------------------------------------------------------------------------
     // LoTE JSON parser
@@ -142,7 +148,7 @@ class ParserTest {
     @Test
     fun `TSL XML parser -- parses Austrian TL`() {
         val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl")
+        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
 
         assertEquals("test-tsl", result.source.sourceId)
         assertEquals(SourceFamily.TSL, result.source.sourceFamily)
@@ -164,7 +170,7 @@ class ParserTest {
     @Test
     fun `TSL XML parser -- maps service statuses correctly`() {
         val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl")
+        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
 
         val grantedService = result.services.find { "CA/QC" in it.serviceType }
         assertNotNull(grantedService)
@@ -178,7 +184,7 @@ class ParserTest {
     @Test
     fun `TSL XML parser -- extracts subject DN from digital identity`() {
         val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl")
+        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
 
         val dnIdentities = result.identities.filter { it.subjectDn != null }
         assertTrue(dnIdentities.isNotEmpty(), "Should extract at least one subject DN")
@@ -191,7 +197,7 @@ class ParserTest {
     @Test
     fun `TSL XML parser -- preserves raw status URI in metadata`() {
         val xml = loadResource("sample-tl.xml")
-        val result = TslXmlParser.parse(xml, "test-tsl")
+        val result = TslXmlParser.parse(xml, "test-tsl", config = unsignedTslConfig)
 
         val grantedService = result.services.find { it.status == TrustStatus.GRANTED }
         assertNotNull(grantedService)

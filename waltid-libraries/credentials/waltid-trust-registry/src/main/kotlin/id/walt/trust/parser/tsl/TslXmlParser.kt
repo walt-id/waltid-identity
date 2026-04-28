@@ -40,8 +40,17 @@ data class TslParseConfig(
     /**
      * If true, reject TSLs with invalid signatures.
      * If false, parse anyway but set authenticityState = FAILED.
+     * Note: "invalid" means signature present but fails validation.
+     * For unsigned documents, see [requireSignature].
      */
-    val strictSignatureValidation: Boolean = false
+    val strictSignatureValidation: Boolean = true,
+    
+    /**
+     * If true, require that the TSL has a signature.
+     * If false, unsigned TSLs are accepted with authenticityState = SKIPPED_DEMO.
+     * Only applies when validateSignature = true.
+     */
+    val requireSignature: Boolean = true
 )
 
 /**
@@ -92,9 +101,11 @@ object TslXmlParser {
         }
         
         // Determine authenticity state
+        val isUnsigned = signatureResult?.details?.contains("No Signature element") == true
         val authenticityState = when {
             signatureResult == null -> AuthenticityState.SKIPPED_DEMO
             signatureResult.state == AuthenticityState.VALIDATED -> AuthenticityState.VALIDATED
+            isUnsigned && !config.requireSignature -> AuthenticityState.SKIPPED_DEMO
             else -> AuthenticityState.FAILED
         }
         

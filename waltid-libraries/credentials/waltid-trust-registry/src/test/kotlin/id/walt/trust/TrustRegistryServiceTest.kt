@@ -58,7 +58,8 @@ class TrustRegistryServiceTest {
         val service = createService()
         val xml = loadResource("sample-tl.xml")
 
-        val result = service.loadSourceFromContent("demo-tsl", xml)
+        // Synthetic test fixture has no signature, so skip validation
+        val result = service.loadSourceFromContent("demo-tsl", xml, validateSignature = false)
 
         assertTrue(result.success)
         assertEquals(1, result.entitiesLoaded)
@@ -253,7 +254,8 @@ class TrustRegistryServiceTest {
         val json = loadResource("sample-lote-wallet-providers.json")
         val xml = loadResource("sample-tl.xml")
         service.loadSourceFromContent("lote-demo", json)
-        service.loadSourceFromContent("tsl-demo", xml)
+        // Synthetic test fixture has no signature, so skip validation
+        service.loadSourceFromContent("tsl-demo", xml, validateSignature = false)
 
         val sources = service.listSources()
         assertEquals(2, sources.size)
