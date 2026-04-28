@@ -7,9 +7,10 @@ import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.store.TrustStore
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
-import java.security.MessageDigest
-import java.util.*
+import org.kotlincrypto.hash.sha2.SHA256
 
 private val log = KotlinLogging.logger {}
 
@@ -373,22 +374,22 @@ class DefaultTrustRegistryService(
         }
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private fun computeCertificateSha256(pemOrDer: String): String? {
         return try {
             val certBytes = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
                 // PEM format
-                val base64 = pemOrDer
+                val base64Content = pemOrDer
                     .replace("-----BEGIN CERTIFICATE-----", "")
                     .replace("-----END CERTIFICATE-----", "")
                     .replace("\\s".toRegex(), "")
-                Base64.getDecoder().decode(base64)
+                Base64.decode(base64Content)
             } else {
                 // Assume base64-encoded DER
-                Base64.getDecoder().decode(pemOrDer.replace("\\s".toRegex(), ""))
+                Base64.decode(pemOrDer.replace("\\s".toRegex(), ""))
             }
             
-            MessageDigest.getInstance("SHA-256")
-                .digest(certBytes)
+            SHA256().digest(certBytes)
                 .joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
             log.warn(e) { "Failed to compute certificate SHA-256" }

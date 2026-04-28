@@ -20,6 +20,9 @@ dependencies {
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)
 
+    // Crypto (SHA-256)
+    implementation(identityLibs.kotlincrypto.hash.sha2)
+
     // Test
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)

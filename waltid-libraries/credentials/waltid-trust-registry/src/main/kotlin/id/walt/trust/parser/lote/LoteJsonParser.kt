@@ -1,11 +1,12 @@
 package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import java.security.MessageDigest
-import java.util.Base64
+import org.kotlincrypto.hash.sha2.SHA256
 
 /**
  * Parses TS 119 602-style LoTE JSON sources into normalized trust model objects.
@@ -16,6 +17,7 @@ import java.util.Base64
  * Note: this parser handles the MVP JSON shape. It is intentionally lenient —
  * unknown fields are ignored. The format is provisional pending TS 119 605 stabilisation.
  */
+@OptIn(ExperimentalEncodingApi::class)
 object LoteJsonParser {
 
     // ---------------------------------------------------------------------------
@@ -197,18 +199,17 @@ object LoteJsonParser {
         return try {
             val certBytes = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
                 // PEM format - extract base64 content between headers
-                val base64 = pemOrDer
+                val base64Content = pemOrDer
                     .replace("-----BEGIN CERTIFICATE-----", "")
                     .replace("-----END CERTIFICATE-----", "")
                     .replace("\\s".toRegex(), "")
-                Base64.getDecoder().decode(base64)
+                Base64.decode(base64Content)
             } else {
                 // Assume base64-encoded DER
-                Base64.getDecoder().decode(pemOrDer.replace("\\s".toRegex(), ""))
+                Base64.decode(pemOrDer.replace("\\s".toRegex(), ""))
             }
             
-            MessageDigest.getInstance("SHA-256")
-                .digest(certBytes)
+            SHA256().digest(certBytes)
                 .joinToString("") { "%02x".format(it) }
         } catch (e: Exception) {
             null

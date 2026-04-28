@@ -10,7 +10,6 @@ import java.io.StringReader
 import java.security.PublicKey
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Base64
 import javax.xml.crypto.*
 import javax.xml.crypto.dsig.*
 import javax.xml.crypto.dsig.dom.DOMValidateContext

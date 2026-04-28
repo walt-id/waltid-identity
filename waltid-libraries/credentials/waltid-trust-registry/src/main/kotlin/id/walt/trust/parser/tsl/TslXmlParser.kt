@@ -9,14 +9,15 @@ import id.walt.trust.signature.SignatureValidationConfig
 import id.walt.trust.signature.SignatureValidationResult
 import id.walt.trust.signature.XmlDsigValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
+import org.kotlincrypto.hash.sha2.SHA256
 import org.w3c.dom.Document
 import org.w3c.dom.Element
 import org.w3c.dom.NodeList
 import java.io.StringReader
-import java.security.MessageDigest
 import java.security.cert.X509Certificate
-import java.util.*
 
 private val logger = KotlinLogging.logger {}
 
@@ -219,18 +220,17 @@ object TslXmlParser {
     private fun String.parseInstant(): Instant? = runCatching { Instant.parse(this) }.getOrNull()
 
     private fun generateEntityId(sourceId: String, name: String): String {
-        val hash = MessageDigest.getInstance("SHA-256")
-            .digest("$sourceId:$name".toByteArray())
+        val hash = SHA256().digest("$sourceId:$name".toByteArray())
             .take(8)
             .joinToString("") { "%02x".format(it) }
         return "tsp-$hash"
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     private fun computeCertSha256(base64Cert: String): String? {
         return runCatching {
-            val decoded = Base64.getDecoder().decode(base64Cert.replace("\\s".toRegex(), ""))
-            MessageDigest.getInstance("SHA-256")
-                .digest(decoded)
+            val decoded = Base64.decode(base64Cert.replace("\\s".toRegex(), ""))
+            SHA256().digest(decoded)
                 .joinToString("") { "%02x".format(it) }
         }.getOrNull()
     }
