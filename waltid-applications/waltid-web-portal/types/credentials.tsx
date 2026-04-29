@@ -42,14 +42,20 @@ export const MDOC_ISSUANCE_DEFAULTS = {
   ],
 };
 
-export function inferDocTypeFromMdocData(
-  mdocData: Record<string, unknown>
-): string | undefined {
-  if ('eu.europa.ec.eudi.pid.1' in mdocData) return 'eu.europa.ec.eudi.pid.1';
-  if ('eu.europa.ec.av.1' in mdocData) return 'eu.europa.ec.av.1';
-  if ('at.gv.id-austria.2023' in mdocData) return 'at.gv.id-austria.2023.iso';
-  if ('org.iso.23220.1' in mdocData) return 'org.iso.23220.photoid.1';
-  if ('org.iso.18013.5.1' in mdocData) return 'org.iso.18013.5.1.mDL';
+export function inferDocTypeFromMdocData(mdocData: unknown): string | undefined {
+  if (
+    mdocData == null ||
+    typeof mdocData !== 'object' ||
+    Array.isArray(mdocData)
+  ) {
+    return undefined;
+  }
+  const namespaces = mdocData as Record<string, unknown>;
+  if ('eu.europa.ec.eudi.pid.1' in namespaces) return 'eu.europa.ec.eudi.pid.1';
+  if ('eu.europa.ec.av.1' in namespaces) return 'eu.europa.ec.av.1';
+  if ('at.gv.id-austria.2023' in namespaces) return 'at.gv.id-austria.2023.iso';
+  if ('org.iso.23220.1' in namespaces) return 'org.iso.23220.photoid.1';
+  if ('org.iso.18013.5.1' in namespaces) return 'org.iso.18013.5.1.mDL';
   return undefined;
 }
 
