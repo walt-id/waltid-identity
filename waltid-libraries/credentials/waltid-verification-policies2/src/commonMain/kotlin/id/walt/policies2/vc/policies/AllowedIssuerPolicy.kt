@@ -35,7 +35,10 @@ data class AllowedIssuerPolicy(
         override val claim: String
     ) : PolicyClaimChecker.ClaimCheckResultSuccess()
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
             val issuer = credential.issuer
             val allowedIssuers = getAllowedIssuers()

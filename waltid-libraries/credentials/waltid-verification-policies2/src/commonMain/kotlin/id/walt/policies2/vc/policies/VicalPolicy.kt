@@ -72,7 +72,10 @@ data class VicalPolicy(
         }
     }
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         log.debug { "Verifying credential with VICAL policy" }
         try {
             val credentialSignature = credential.signature
