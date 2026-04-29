@@ -782,21 +782,15 @@ object OSSIssuer2Service {
         log.debug { "issueMdocCredential - DocType: $docType" }
         
         // Validate issuer key type
-        if (issuerKey.keyType != KeyType.secp256r1) {
-            throw IllegalArgumentException("Issuer key must be EC secp256r1 for mDOC issuance, got: ${issuerKey.keyType}")
-        }
+        require(issuerKey.keyType == KeyType.secp256r1) { "Issuer key must be EC secp256r1 for mDOC issuance, got: ${issuerKey.keyType}" }
         
-        if (!issuerKey.hasPrivateKey) {
-            throw IllegalArgumentException("Issuer key must have private key for mDOC issuance")
-        }
+        require(issuerKey.hasPrivateKey) { "Issuer key must have private key for mDOC issuance" }
         
         // Get X.509 certificate chain
         val x5Chain = session.issuanceRequest.x5Chain
             ?: throw IllegalArgumentException("mDOC issuance requires x5Chain parameter with at least one certificate")
         
-        if (x5Chain.isEmpty()) {
-            throw IllegalArgumentException("mDOC issuance requires x5Chain parameter with at least one certificate")
-        }
+        require(!(x5Chain.isEmpty())) { "mDOC issuance requires x5Chain parameter with at least one certificate" }
         
         val issuerCertificateChain = x5Chain.map { pemCertificate ->
             CoseCertificate(X509CertUtils.parse(pemCertificate).encoded)
@@ -937,11 +931,13 @@ object OSSIssuer2Service {
                 }
             }
         }
-        is List<*> -> buildJsonArray {
-            value.forEach { add(convertToJsonElement(it)) }
-        }
-        is Array<*> -> buildJsonArray {
-            value.forEach { add(convertToJsonElement(it)) }
+        is List<*>, is Array<*> -> buildJsonArray {
+            val items = when (value) {
+                is List<*> -> value
+                is Array<*> -> value.asList()
+                else -> emptyList()
+            }
+            items.forEach { add(convertToJsonElement(it)) }
         }
         else -> JsonPrimitive(value.toString())
     }
