@@ -1,4 +1,4 @@
-package id.walt.integrationtests
+package id.walt.test.integration.tests
 
 import id.walt.commons.testing.utils.ServiceTestUtils.loadResource
 import id.walt.issuer.issuance.IssuanceRequest
@@ -6,7 +6,6 @@ import id.walt.issuer.issuance.openapi.issuerapi.MdocDocs
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.util.JwtUtils
 import id.walt.test.integration.loadJsonResource
-import id.walt.test.integration.tests.AbstractIntegrationTest
 import id.walt.w3c.schemes.JwsSignatureScheme
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -27,7 +26,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-/** Credential-status issuance ([IssuanceRequest] injection); package avoids Gradle exclude `id/walt/test/integration/**` unless `-PrunIntegrationTests`. */
 class IssuanceCredentialStatusIntegrationTest : AbstractIntegrationTest() {
 
     @Test
