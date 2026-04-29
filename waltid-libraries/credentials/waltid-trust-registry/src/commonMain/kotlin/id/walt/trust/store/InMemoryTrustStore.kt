@@ -1,12 +1,17 @@
 package id.walt.trust.store
 
 import id.walt.trust.model.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
  * Thread-safe in-memory implementation of [TrustStore].
  * Suitable for MVP / demo use. Not persistent across restarts.
+ *
+ * Flow-returning methods snapshot the relevant collection under the mutex and
+ * emit from the snapshot, so the lock is not held during downstream consumption.
  */
 class InMemoryTrustStore : TrustStore {
 
@@ -36,7 +41,7 @@ class InMemoryTrustStore : TrustStore {
     override suspend fun upsertIdentities(identities: List<ServiceIdentity>) = mutex.withLock {
         identities.forEach { this.identities[it.identityId] = it }
     }
-    
+
     override suspend fun replaceSourceData(
         source: TrustSource,
         entities: List<TrustedEntity>,
@@ -44,7 +49,7 @@ class InMemoryTrustStore : TrustStore {
         identities: List<ServiceIdentity>
     ) = mutex.withLock {
         val sourceId = source.sourceId
-        
+
         // Remove existing data for this source (removeIf is JVM-only; use iterator-based removal for KMP)
         val entityKeys = this.entities.entries.filter { it.value.sourceId == sourceId }.map { it.key }
         entityKeys.forEach { this.entities.remove(it) }
@@ -52,7 +57,7 @@ class InMemoryTrustStore : TrustStore {
         serviceKeys.forEach { this.services.remove(it) }
         val identityKeys = this.identities.entries.filter { it.value.sourceId == sourceId }.map { it.key }
         identityKeys.forEach { this.identities.remove(it) }
-        
+
         // Insert new data atomically (within same lock)
         this.sources[sourceId] = source
         entities.forEach { this.entities[it.entityId] = it }
@@ -78,37 +83,36 @@ class InMemoryTrustStore : TrustStore {
         sources[sourceId]
     }
 
-    override suspend fun listSources(): List<TrustSource> = mutex.withLock {
-        sources.values.toList()
-    }
+    override suspend fun listSources(): Flow<TrustSource> =
+        snapshotFlow { sources.values.toList() }
 
     // ---------------------------------------------------------------------------
     // Identity lookups
     // ---------------------------------------------------------------------------
 
-    override suspend fun findIdentitiesByCertificateSha256(sha256Hex: String): List<ServiceIdentity> =
-        mutex.withLock {
+    override suspend fun findIdentitiesByCertificateSha256(sha256Hex: String): Flow<ServiceIdentity> =
+        snapshotFlow {
             identities.values.filter {
                 it.certificateSha256Hex?.equals(sha256Hex, ignoreCase = true) == true
             }
         }
 
-    override suspend fun findIdentitiesBySubjectDn(subjectDn: String): List<ServiceIdentity> =
-        mutex.withLock {
+    override suspend fun findIdentitiesBySubjectDn(subjectDn: String): Flow<ServiceIdentity> =
+        snapshotFlow {
             identities.values.filter {
                 it.subjectDn?.equals(subjectDn, ignoreCase = true) == true
             }
         }
 
-    override suspend fun findIdentitiesBySkiHex(skiHex: String): List<ServiceIdentity> =
-        mutex.withLock {
+    override suspend fun findIdentitiesBySkiHex(skiHex: String): Flow<ServiceIdentity> =
+        snapshotFlow {
             identities.values.filter {
                 it.subjectKeyIdentifierHex?.equals(skiHex, ignoreCase = true) == true
             }
         }
 
-    override suspend fun findIdentitiesByIssuerAndSerial(issuerDn: String, serialNumber: String): List<ServiceIdentity> =
-        mutex.withLock {
+    override suspend fun findIdentitiesByIssuerAndSerial(issuerDn: String, serialNumber: String): Flow<ServiceIdentity> =
+        snapshotFlow {
             identities.values.filter {
                 it.issuerDn?.equals(issuerDn, ignoreCase = true) == true &&
                         it.serialNumber?.equals(serialNumber, ignoreCase = true) == true
@@ -123,14 +127,15 @@ class InMemoryTrustStore : TrustStore {
         entities[entityId]
     }
 
-    override suspend fun listEntities(filter: EntityFilter): List<TrustedEntity> = mutex.withLock {
-        entities.values.filter { entity ->
-            (filter.sourceFamily == null || sources[entity.sourceId]?.sourceFamily == filter.sourceFamily) &&
-                    (filter.entityType == null || entity.entityType == filter.entityType) &&
-                    (filter.country == null || entity.country?.equals(filter.country, ignoreCase = true) == true) &&
-                    (!filter.onlyCurrentlyTrusted || isCurrentlyTrusted(entity.entityId))
+    override suspend fun listEntities(filter: EntityFilter): Flow<TrustedEntity> =
+        snapshotFlow {
+            entities.values.filter { entity ->
+                (filter.sourceFamily == null || sources[entity.sourceId]?.sourceFamily == filter.sourceFamily) &&
+                        (filter.entityType == null || entity.entityType == filter.entityType) &&
+                        (filter.country == null || entity.country?.equals(filter.country, ignoreCase = true) == true) &&
+                        (!filter.onlyCurrentlyTrusted || isCurrentlyTrusted(entity.entityId))
+            }
         }
-    }
 
     private fun isCurrentlyTrusted(entityId: String): Boolean =
         services.values.any { svc ->
@@ -147,9 +152,8 @@ class InMemoryTrustStore : TrustStore {
         services[serviceId]
     }
 
-    override suspend fun listServicesForEntity(entityId: String): List<TrustedService> = mutex.withLock {
-        services.values.filter { it.entityId == entityId }
-    }
+    override suspend fun listServicesForEntity(entityId: String): Flow<TrustedService> =
+        snapshotFlow { services.values.filter { it.entityId == entityId } }
 
     // ---------------------------------------------------------------------------
     // Count helpers (for health reporting)
@@ -162,4 +166,18 @@ class InMemoryTrustStore : TrustStore {
     override suspend fun countServices(sourceId: String): Int = mutex.withLock {
         services.values.count { it.sourceId == sourceId }
     }
+
+    // ---------------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Takes a snapshot of data under the mutex and emits it as a Flow.
+     * The lock is held only for the duration of the snapshot, not during consumption.
+     */
+    private fun <T> snapshotFlow(snapshot: () -> List<T>): Flow<T> =
+        flow {
+            val items = mutex.withLock { snapshot() }
+            items.forEach { emit(it) }
+        }
 }

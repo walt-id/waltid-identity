@@ -1,7 +1,9 @@
 package id.walt.trust.service
 
-import id.walt.trust.model.*
+import id.walt.trust.model.AuthenticityState
+import id.walt.trust.model.SourceFamily
 import id.walt.trust.store.InMemoryTrustStore
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -21,38 +23,38 @@ class LoadFromUrlIntegrationTest {
     fun `load Austrian TSL from URL with signature validation`() = runBlocking {
         val store = InMemoryTrustStore()
         val service = DefaultTrustRegistryService(store)
-        
+
         val result = service.loadSourceFromUrl(
             sourceId = "at-tsl",
             url = "https://www.signatur.rtr.at/currenttl.xml",
             validateSignature = true
         )
-        
+
         println("=== Austrian TSL Load Result ===")
         println("Success: ${result.success}")
         println("Entities: ${result.entitiesLoaded}")
         println("Services: ${result.servicesLoaded}")
         println("Identities: ${result.identitiesLoaded}")
         result.error?.let { println("Error: $it") }
-        
+
         assertTrue(result.success, "Should successfully load Austrian TSL: ${result.error}")
         assertTrue(result.entitiesLoaded > 0, "Should have entities")
         assertTrue(result.servicesLoaded > 0, "Should have services")
-        
+
         // Check source metadata
-        val sources = service.listSources()
+        val sources = service.listSources().toList()
         val atSource = sources.find { it.sourceId == "at-tsl" }
         assertNotNull(atSource)
         assertEquals("AT", atSource.territory)
         assertEquals(SourceFamily.TSL, atSource.sourceFamily)
         assertEquals(AuthenticityState.VALIDATED, atSource.authenticityState, "Signature should be validated")
-        
+
         println("Territory: ${atSource.territory}")
         println("Authenticity: ${atSource.authenticityState}")
         println("Freshness: ${atSource.freshnessState}")
-        
+
         // List some entities
-        val entities = service.listTrustedEntities()
+        val entities = service.listTrustedEntities().toList()
         println("\n=== Sample Entities ===")
         entities.take(5).forEach { entity ->
             println("  - ${entity.legalName} (${entity.entityType})")
@@ -64,20 +66,20 @@ class LoadFromUrlIntegrationTest {
     fun `load Italian TSL from URL with signature validation`() = runBlocking {
         val store = InMemoryTrustStore()
         val service = DefaultTrustRegistryService(store)
-        
+
         val result = service.loadSourceFromUrl(
             sourceId = "it-tsl",
             url = "https://eidas.agid.gov.it/TL/TSL-IT.xml",
             validateSignature = true
         )
-        
+
         println("=== Italian TSL Load Result ===")
         println("Success: ${result.success}")
         println("Entities: ${result.entitiesLoaded}")
         println("Services: ${result.servicesLoaded}")
         println("Identities: ${result.identitiesLoaded}")
         result.error?.let { println("Error: $it") }
-        
+
         assertTrue(result.success, "Should successfully load Italian TSL: ${result.error}")
         assertTrue(result.entitiesLoaded > 10, "Italy should have many TSPs")
     }
@@ -87,23 +89,23 @@ class LoadFromUrlIntegrationTest {
     fun `load EU LoTL from URL - expect 0 entities (pointers only)`() = runBlocking {
         val store = InMemoryTrustStore()
         val service = DefaultTrustRegistryService(store)
-        
+
         val result = service.loadSourceFromUrl(
             sourceId = "eu-lotl",
             url = "https://ec.europa.eu/tools/lotl/eu-lotl.xml",
             validateSignature = true
         )
-        
+
         println("=== EU LoTL Load Result ===")
         println("Success: ${result.success}")
         println("Entities: ${result.entitiesLoaded}")
         println("Note: EU LoTL contains pointers to member state TSLs, not actual TSPs")
-        
+
         assertTrue(result.success, "Should successfully load EU LoTL")
         assertEquals(0, result.entitiesLoaded, "LoTL should have 0 direct entities (it has pointers)")
-        
+
         // Check signature is validated
-        val sources = service.listSources()
+        val sources = service.listSources().toList()
         val euSource = sources.find { it.sourceId == "eu-lotl" }
         assertNotNull(euSource)
         assertEquals(AuthenticityState.VALIDATED, euSource.authenticityState)
@@ -115,7 +117,7 @@ class LoadFromUrlIntegrationTest {
         // Network tests are enabled via RUN_NETWORK_TESTS=true
         val store = InMemoryTrustStore()
         val service = DefaultTrustRegistryService(store)
-        
+
         // Verify the method signature exists
         runBlocking {
             val result = service.loadSourceFromUrl(

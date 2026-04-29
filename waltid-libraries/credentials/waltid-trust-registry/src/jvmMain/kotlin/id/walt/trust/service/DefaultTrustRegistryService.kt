@@ -9,6 +9,10 @@ import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.store.TrustStore
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -64,7 +68,7 @@ class DefaultTrustRegistryService(
     ): TrustDecision {
         val normalizedSha256 = sha256Hex.lowercase().removePrefix("sha256:").removePrefix("sha256").replace(":", "")
 
-        val matchedIdentities = store.findIdentitiesByCertificateSha256(normalizedSha256)
+        val matchedIdentities = store.findIdentitiesByCertificateSha256(normalizedSha256).toList()
 
         if (matchedIdentities.isEmpty()) {
             return TrustDecision(
@@ -113,8 +117,7 @@ class DefaultTrustRegistryService(
         }
 
         val source = store.getSource(entity.sourceId)
-        val services = store.listServicesForEntity(entity.entityId)
-        val trustedService = services.find { it.status in TRUSTED_STATUSES }
+        val trustedService = store.listServicesForEntity(entity.entityId).firstOrNull { it.status in TRUSTED_STATUSES }
 
         val freshness = evaluateFreshness(source, instant)
 
@@ -149,16 +152,14 @@ class DefaultTrustRegistryService(
     // List operations
     // ---------------------------------------------------------------------------
 
-    override suspend fun listTrustedEntities(filter: EntityFilter): List<TrustedEntity> {
-        return store.listEntities(filter)
-    }
+    override suspend fun listTrustedEntities(filter: EntityFilter): Flow<TrustedEntity> =
+        store.listEntities(filter)
 
-    override suspend fun listSources(): List<TrustSource> {
-        return store.listSources()
-    }
+    override suspend fun listSources(): Flow<TrustSource> =
+        store.listSources()
 
-    override suspend fun getSourceHealth(): List<TrustSourceHealth> {
-        return store.listSources().map { source ->
+    override suspend fun getSourceHealth(): Flow<TrustSourceHealth> =
+        store.listSources().map { source ->
             TrustSourceHealth(
                 sourceId = source.sourceId,
                 displayName = source.displayName,
@@ -170,7 +171,6 @@ class DefaultTrustRegistryService(
                 serviceCount = store.countServices(source.sourceId)
             )
         }
-    }
 
     // ---------------------------------------------------------------------------
     // Refresh operations
@@ -244,16 +244,19 @@ class DefaultTrustRegistryService(
                     val result = TslXmlParser.parse(content, sourceId, sourceUrl, config)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
-                (content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity")                ) && format == SourceFormat.XML -> {
+
+                (content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity")) && format == SourceFormat.XML -> {
                     log.info { "Parsing LoTE XML for source: $sourceId" }
                     val result = LoteXmlParser.parse(content, sourceId, sourceUrl)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
+
                 format == SourceFormat.JSON -> {
                     log.info { "Parsing LoTE JSON for source: $sourceId" }
                     val result = LoteJsonParser.parse(content, sourceId, sourceUrl)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
+
                 else -> {
                     return RefreshResult(sourceId, success = false, error = "Unknown source format")
                 }

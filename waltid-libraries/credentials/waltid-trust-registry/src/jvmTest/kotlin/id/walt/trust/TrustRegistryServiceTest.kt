@@ -3,9 +3,10 @@ package id.walt.trust
 import id.walt.trust.model.*
 import id.walt.trust.service.DefaultTrustRegistryService
 import id.walt.trust.store.InMemoryTrustStore
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Instant
 import kotlin.test.*
+import kotlin.time.Instant
 
 /**
  * Integration tests for [DefaultTrustRegistryService].
@@ -257,7 +258,7 @@ class TrustRegistryServiceTest {
         // Synthetic test fixture has no signature, so skip validation
         service.loadSourceFromContent("tsl-demo", xml, validateSignature = false)
 
-        val sources = service.listSources()
+        val sources = service.listSources().toList()
         assertEquals(2, sources.size)
     }
 
@@ -267,7 +268,7 @@ class TrustRegistryServiceTest {
         val json = loadResource("sample-lote-wallet-providers.json")
         service.loadSourceFromContent("demo", json)
 
-        val health = service.getSourceHealth()
+        val health = service.getSourceHealth().toList()
         assertEquals(1, health.size)
         assertEquals("demo", health.first().sourceId)
         assertEquals(3, health.first().entityCount)
@@ -280,13 +281,13 @@ class TrustRegistryServiceTest {
         val json = loadResource("sample-lote-wallet-providers.json")
         service.loadSourceFromContent("demo", json)
 
-        val all = service.listTrustedEntities()
+        val all = service.listTrustedEntities().toList()
         assertEquals(3, all.size)
 
-        val walletOnly = service.listTrustedEntities(EntityFilter(entityType = TrustedEntityType.WALLET_PROVIDER))
+        val walletOnly = service.listTrustedEntities(EntityFilter(entityType = TrustedEntityType.WALLET_PROVIDER)).toList()
         assertEquals(2, walletOnly.size) // AT-WALLET-001 + DE-SUSPENDED-001
 
-        val atOnly = service.listTrustedEntities(EntityFilter(country = "AT"))
+        val atOnly = service.listTrustedEntities(EntityFilter(country = "AT")).toList()
         assertEquals(2, atOnly.size) // AT-WALLET-001 + AT-PID-001
     }
 }

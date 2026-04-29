@@ -1,6 +1,8 @@
 package id.walt.trust
 
-import id.walt.trust.model.*
+import id.walt.trust.model.SourceFamily
+import id.walt.trust.model.TrustStatus
+import id.walt.trust.model.TrustedEntityType
 import id.walt.trust.parser.lote.LoteJsonParser
 import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslParseConfig
@@ -19,7 +21,7 @@ class ParserTest {
     private fun loadResource(name: String): String =
         this::class.java.classLoader.getResource(name)?.readText()
             ?: error("Test resource not found: $name")
-    
+
     /** Config for synthetic test fixtures that have no XMLDSig signature */
     private val unsignedTslConfig = TslParseConfig(
         validateSignature = false

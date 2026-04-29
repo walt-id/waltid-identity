@@ -2,9 +2,11 @@ package id.walt.trust
 
 import id.walt.trust.model.*
 import id.walt.trust.store.InMemoryTrustStore
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
-import kotlin.time.Instant
-import kotlin.test.*
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
 /**
  * Tests for [InMemoryTrustStore].
@@ -58,7 +60,7 @@ class InMemoryTrustStoreTest {
         store.upsertSource(testSource)
         store.upsertSource(testSource.copy(sourceId = "src-2", displayName = "Source 2"))
 
-        val sources = store.listSources()
+        val sources = store.listSources().toList()
         assertEquals(2, sources.size)
     }
 
@@ -90,7 +92,7 @@ class InMemoryTrustStoreTest {
 
         val results = store.findIdentitiesByCertificateSha256(
             "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
-        )
+        ).toList()
         assertEquals(1, results.size)
         assertEquals("id-1", results.first().identityId)
     }
@@ -102,7 +104,7 @@ class InMemoryTrustStoreTest {
 
         val results = store.findIdentitiesByCertificateSha256(
             "ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890ABCDEF1234567890"
-        )
+        ).toList()
         assertEquals(1, results.size)
     }
 
@@ -115,7 +117,7 @@ class InMemoryTrustStoreTest {
         )
         store.upsertIdentities(listOf(identityWithDn))
 
-        val results = store.findIdentitiesBySubjectDn("CN=Test,O=Test Corp,C=AT")
+        val results = store.findIdentitiesBySubjectDn("CN=Test,O=Test Corp,C=AT").toList()
         assertEquals(1, results.size)
     }
 
@@ -128,7 +130,7 @@ class InMemoryTrustStoreTest {
         )
         store.upsertIdentities(listOf(identityWithSki))
 
-        val results = store.findIdentitiesBySkiHex("AA11BB22CC33")
+        val results = store.findIdentitiesBySkiHex("AA11BB22CC33").toList()
         assertEquals(1, results.size)
     }
 
@@ -142,7 +144,7 @@ class InMemoryTrustStoreTest {
         )
         store.upsertIdentities(listOf(identityWithIssuerSerial))
 
-        val results = store.findIdentitiesByIssuerAndSerial("CN=Issuer CA,C=AT", "12345")
+        val results = store.findIdentitiesByIssuerAndSerial("CN=Issuer CA,C=AT", "12345").toList()
         assertEquals(1, results.size)
     }
 
@@ -156,11 +158,11 @@ class InMemoryTrustStoreTest {
         )
         store.upsertEntities(listOf(testEntity, pidEntity))
 
-        val walletProviders = store.listEntities(EntityFilter(entityType = TrustedEntityType.WALLET_PROVIDER))
+        val walletProviders = store.listEntities(EntityFilter(entityType = TrustedEntityType.WALLET_PROVIDER)).toList()
         assertEquals(1, walletProviders.size)
         assertEquals("entity-1", walletProviders.first().entityId)
 
-        val pidProviders = store.listEntities(EntityFilter(entityType = TrustedEntityType.PID_PROVIDER))
+        val pidProviders = store.listEntities(EntityFilter(entityType = TrustedEntityType.PID_PROVIDER)).toList()
         assertEquals(1, pidProviders.size)
         assertEquals("pid-1", pidProviders.first().entityId)
     }
@@ -172,7 +174,7 @@ class InMemoryTrustStoreTest {
         val deEntity = testEntity.copy(entityId = "entity-de", country = "DE")
         store.upsertEntities(listOf(atEntity, deEntity))
 
-        val atResults = store.listEntities(EntityFilter(country = "AT"))
+        val atResults = store.listEntities(EntityFilter(country = "AT")).toList()
         assertEquals(1, atResults.size)
     }
 
@@ -189,7 +191,7 @@ class InMemoryTrustStoreTest {
             )
         )
 
-        val trusted = store.listEntities(EntityFilter(onlyCurrentlyTrusted = true))
+        val trusted = store.listEntities(EntityFilter(onlyCurrentlyTrusted = true)).toList()
         assertEquals(1, trusted.size)
         assertEquals("granted-e", trusted.first().entityId)
     }
@@ -225,7 +227,7 @@ class InMemoryTrustStoreTest {
             )
         )
 
-        val services = store.listServicesForEntity("entity-1")
+        val services = store.listServicesForEntity("entity-1").toList()
         assertEquals(2, services.size)
     }
 

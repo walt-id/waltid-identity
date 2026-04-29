@@ -1,6 +1,7 @@
 package id.walt.trust.service
 
 import id.walt.trust.model.*
+import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
 /**
@@ -51,17 +52,17 @@ interface TrustRegistryService {
     /**
      * List trusted entities with optional filtering.
      */
-    suspend fun listTrustedEntities(filter: EntityFilter = EntityFilter()): List<TrustedEntity>
+    suspend fun listTrustedEntities(filter: EntityFilter = EntityFilter()): Flow<TrustedEntity>
 
     /**
      * List all registered trust sources.
      */
-    suspend fun listSources(): List<TrustSource>
+    suspend fun listSources(): Flow<TrustSource>
 
     /**
      * Get health information for all sources.
      */
-    suspend fun getSourceHealth(): List<TrustSourceHealth>
+    suspend fun getSourceHealth(): Flow<TrustSourceHealth>
 
     /**
      * Refresh a specific source by ID.
