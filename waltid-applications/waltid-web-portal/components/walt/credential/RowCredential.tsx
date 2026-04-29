@@ -12,7 +12,9 @@ import React from "react";
 type Props = {
   credentialToEdit: AvailableCredential;
   credentialsToIssue: AvailableCredential[];
-  setCredentialsToIssue: (credentials: AvailableCredential[]) => void;
+  setCredentialsToIssue: React.Dispatch<
+    React.SetStateAction<AvailableCredential[]>
+  >;
 };
 
 function formatsForCredential(c: AvailableCredential): string[] {
@@ -23,7 +25,7 @@ function formatsForCredential(c: AvailableCredential): string[] {
 
 export default function RowCredential({
   credentialToEdit,
-  credentialsToIssue,
+  credentialsToIssue: _credentialsToIssue,
   setCredentialsToIssue,
 }: Props) {
   const initialSubject =
@@ -35,16 +37,20 @@ export default function RowCredential({
     React.useState(initialSubject);
   const formatChoices = formatsForCredential(credentialToEdit);
   const [selectedFormat, setSelectedFormat] = React.useState(
-    credentialToEdit.kind === "mdoc"
-      ? ISO_MDOC_CREDENTIAL_FORMAT
-      : CredentialFormats[0]
+    String(
+      credentialToEdit.kind === "mdoc"
+        ? ISO_MDOC_CREDENTIAL_FORMAT
+        : credentialToEdit.selectedFormat ?? CredentialFormats[0]
+    )
   );
-  const [selectedDID, setSelectedDID] = React.useState(DIDMethods[0]);
+  const [selectedDID, setSelectedDID] = React.useState(
+    String(credentialToEdit.selectedDID ?? DIDMethods[0])
+  );
   const [modalVisible, setModalVisible] = React.useState(false);
 
   React.useEffect(() => {
-    setCredentialsToIssue(
-      credentialsToIssue.map((credential) => {
+    setCredentialsToIssue((prev) =>
+      prev.map((credential) => {
         if (credential.id !== credentialToEdit.id) {
           return credential;
         }
@@ -65,7 +71,14 @@ export default function RowCredential({
         return updatedCredential;
       })
     );
-  }, [credentialSubject, selectedFormat, selectedDID]);
+  }, [
+    credentialSubject,
+    selectedFormat,
+    selectedDID,
+    credentialToEdit.id,
+    credentialToEdit.kind,
+    setCredentialsToIssue,
+  ]);
 
   return (
     <>
