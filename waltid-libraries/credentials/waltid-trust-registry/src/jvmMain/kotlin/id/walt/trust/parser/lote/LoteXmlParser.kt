@@ -2,12 +2,10 @@ package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
 import id.walt.trust.parser.SecureXmlParser
+import id.walt.trust.parser.getChildTextContent
 import id.walt.trust.parser.getChildrenByLocalName
 import id.walt.trust.parser.getFirstChildByLocalName
-import id.walt.trust.parser.getChildTextContent
 import kotlin.time.Instant
-import org.w3c.dom.Document
-import org.w3c.dom.Element
 
 /**
  * Parses TS 119 602-style LoTE XML sources into normalized trust model objects.
@@ -122,6 +120,7 @@ object LoteXmlParser {
                 serviceId = serviceId,
                 certificateSha256Hex = value.removePrefix("sha256:")
             )
+
             "SUBJECT_DN" -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,
@@ -129,6 +128,7 @@ object LoteXmlParser {
                 serviceId = serviceId,
                 subjectDn = value
             )
+
             "SKI" -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,
@@ -136,6 +136,7 @@ object LoteXmlParser {
                 serviceId = serviceId,
                 subjectKeyIdentifierHex = value
             )
+
             else -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,

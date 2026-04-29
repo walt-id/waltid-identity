@@ -8,7 +8,7 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 /**
  * Secure XML parsing utilities with XXE protection.
- * 
+ *
  * All XML parsing in the trust-registry module should use these methods
  * to ensure consistent security hardening against:
  * - XXE (XML External Entity) attacks
@@ -17,10 +17,10 @@ import javax.xml.parsers.DocumentBuilderFactory
  * - XInclude processing
  */
 object SecureXmlParser {
-    
+
     /**
      * Creates a hardened DocumentBuilderFactory with XXE protections enabled.
-     * 
+     *
      * Security features enabled:
      * - Disallows DOCTYPE declarations entirely (strongest protection)
      * - Disables external general entities
@@ -34,32 +34,32 @@ object SecureXmlParser {
         return DocumentBuilderFactory.newInstance().apply {
             // Enable namespace awareness for proper XML handling
             isNamespaceAware = true
-            
+
             // XXE Protection: Disable DTD processing entirely
             // This is the strongest protection - TSL/LoTE documents don't use DTDs
             setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-            
+
             // XXE Protection: Disable external entities
             setFeature("http://xml.org/sax/features/external-general-entities", false)
             setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            
+
             // XXE Protection: Disable external DTD loading
             setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-            
+
             // Enable secure processing (limits entity expansion, etc.)
             setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
-            
+
             // Disable XInclude processing
             isXIncludeAware = false
-            
+
             // Disable entity reference expansion
             isExpandEntityReferences = false
         }
     }
-    
+
     /**
      * Parses an XML string into a Document with XXE protections.
-     * 
+     *
      * @param xml The XML content to parse
      * @return Parsed DOM Document
      * @throws org.xml.sax.SAXException if the XML is malformed or contains blocked features (like DOCTYPE)
@@ -68,10 +68,10 @@ object SecureXmlParser {
         val factory = createSecureDocumentBuilderFactory()
         return factory.newDocumentBuilder().parse(InputSource(xml.reader()))
     }
-    
+
     /**
      * Parses an XML byte array into a Document with XXE protections.
-     * 
+     *
      * @param xml The XML content to parse
      * @return Parsed DOM Document
      */

@@ -8,7 +8,7 @@ import kotlin.time.Instant
  * See: waltid-architecture/enterprise/trust-lists/05-api-design.md
  */
 interface TrustRegistryService {
-    
+
     /**
      * Resolve trust status for a certificate (by PEM or DER base64).
      */
@@ -70,7 +70,7 @@ interface TrustRegistryService {
 
     /**
      * Load a source from raw content (for bootstrapping / demo).
-     * 
+     *
      * @param sourceId Unique identifier for this trust source
      * @param content Raw trust list content (TSL XML, LoTE JSON/XML)
      * @param sourceUrl Optional URL to store for future refresh calls
@@ -86,7 +86,7 @@ interface TrustRegistryService {
     /**
      * Load a source directly from a URL.
      * Fetches the content via HTTP and parses it.
-     * 
+     *
      * @param sourceId Unique identifier for this trust source
      * @param url URL to fetch the trust list from
      * @param validateSignature Whether to validate XMLDSig signatures (for TSL sources)

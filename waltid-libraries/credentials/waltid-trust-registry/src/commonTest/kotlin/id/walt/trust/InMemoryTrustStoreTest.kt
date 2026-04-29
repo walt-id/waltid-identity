@@ -182,10 +182,12 @@ class InMemoryTrustStoreTest {
         val grantedEntity = testEntity.copy(entityId = "granted-e")
         val revokedEntity = testEntity.copy(entityId = "revoked-e")
         store.upsertEntities(listOf(grantedEntity, revokedEntity))
-        store.upsertServices(listOf(
-            testService.copy(serviceId = "svc-granted", entityId = "granted-e", status = TrustStatus.GRANTED),
-            testService.copy(serviceId = "svc-revoked", entityId = "revoked-e", status = TrustStatus.REVOKED)
-        ))
+        store.upsertServices(
+            listOf(
+                testService.copy(serviceId = "svc-granted", entityId = "granted-e", status = TrustStatus.GRANTED),
+                testService.copy(serviceId = "svc-revoked", entityId = "revoked-e", status = TrustStatus.REVOKED)
+            )
+        )
 
         val trusted = store.listEntities(EntityFilter(onlyCurrentlyTrusted = true))
         assertEquals(1, trusted.size)
@@ -215,11 +217,13 @@ class InMemoryTrustStoreTest {
     @Test
     fun `list services for entity`() = runTest {
         val store = createStore()
-        store.upsertServices(listOf(
-            testService,
-            testService.copy(serviceId = "svc-2", entityId = "entity-1"),
-            testService.copy(serviceId = "svc-other", entityId = "entity-other")
-        ))
+        store.upsertServices(
+            listOf(
+                testService,
+                testService.copy(serviceId = "svc-2", entityId = "entity-1"),
+                testService.copy(serviceId = "svc-other", entityId = "entity-other")
+            )
+        )
 
         val services = store.listServicesForEntity("entity-1")
         assertEquals(2, services.size)
@@ -228,15 +232,19 @@ class InMemoryTrustStoreTest {
     @Test
     fun `count entities and services for source`() = runTest {
         val store = createStore()
-        store.upsertEntities(listOf(
-            testEntity,
-            testEntity.copy(entityId = "entity-2")
-        ))
-        store.upsertServices(listOf(
-            testService,
-            testService.copy(serviceId = "svc-2"),
-            testService.copy(serviceId = "svc-3")
-        ))
+        store.upsertEntities(
+            listOf(
+                testEntity,
+                testEntity.copy(entityId = "entity-2")
+            )
+        )
+        store.upsertServices(
+            listOf(
+                testService,
+                testService.copy(serviceId = "svc-2"),
+                testService.copy(serviceId = "svc-3")
+            )
+        )
 
         assertEquals(2, store.countEntities("src-1"))
         assertEquals(3, store.countServices("src-1"))

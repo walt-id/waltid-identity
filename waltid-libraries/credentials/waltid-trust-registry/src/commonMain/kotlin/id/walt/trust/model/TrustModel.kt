@@ -1,7 +1,7 @@
 package id.walt.trust.model
 
-import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 // ---------------------------------------------------------------------------
 // Source families

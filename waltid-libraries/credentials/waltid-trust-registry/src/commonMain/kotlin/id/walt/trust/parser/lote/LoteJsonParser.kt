@@ -155,6 +155,7 @@ object LoteJsonParser {
                 serviceId = serviceId,
                 certificateSha256Hex = value.removePrefix("sha256:")
             )
+
             "CERTIFICATE_PEM", "CERTIFICATE_DER" -> {
                 // Compute SHA-256 from PEM or DER certificate
                 val sha256 = computeCertificateSha256(value)
@@ -167,6 +168,7 @@ object LoteJsonParser {
                     metadata = if (sha256 == null) mapOf("rawMatchType" to matchType, "rawValue" to value) else emptyMap()
                 )
             }
+
             "SUBJECT_DN" -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,
@@ -174,6 +176,7 @@ object LoteJsonParser {
                 serviceId = serviceId,
                 subjectDn = value
             )
+
             "SKI" -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,
@@ -181,6 +184,7 @@ object LoteJsonParser {
                 serviceId = serviceId,
                 subjectKeyIdentifierHex = value
             )
+
             else -> ServiceIdentity(
                 identityId = identityId,
                 sourceId = sourceId,

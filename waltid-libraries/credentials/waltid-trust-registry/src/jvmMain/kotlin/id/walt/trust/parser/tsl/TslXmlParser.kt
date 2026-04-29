@@ -2,22 +2,18 @@ package id.walt.trust.parser.tsl
 
 import id.walt.trust.model.*
 import id.walt.trust.parser.SecureXmlParser
+import id.walt.trust.parser.getChildTextContent
 import id.walt.trust.parser.getChildrenByLocalName
 import id.walt.trust.parser.getFirstChildByLocalName
-import id.walt.trust.parser.getChildTextContent
 import id.walt.trust.signature.SignatureValidationConfig
 import id.walt.trust.signature.SignatureValidationResult
 import id.walt.trust.signature.XmlDsigValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.kotlincrypto.hash.sha2.SHA256
+import java.security.cert.X509Certificate
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
-import org.kotlincrypto.hash.sha2.SHA256
-import org.w3c.dom.Document
-import org.w3c.dom.Element
-import org.w3c.dom.NodeList
-import java.io.StringReader
-import java.security.cert.X509Certificate
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,13 +26,13 @@ data class TslParseConfig(
      * If false, signature is not checked and authenticityState = SKIPPED_DEMO.
      */
     val validateSignature: Boolean = true,
-    
+
     /**
      * Signature validation configuration.
      * Only used if validateSignature = true.
      */
     val signatureConfig: SignatureValidationConfig = SignatureValidationConfig(),
-    
+
     /**
      * If true, reject TSLs with invalid signatures.
      * If false, parse anyway but set authenticityState = FAILED.
@@ -44,7 +40,7 @@ data class TslParseConfig(
      * For unsigned documents, see [requireSignature].
      */
     val strictSignatureValidation: Boolean = true,
-    
+
     /**
      * If true, require that the TSL has a signature.
      * If false, unsigned TSLs are accepted with authenticityState = SKIPPED_DEMO.
@@ -99,7 +95,7 @@ object TslXmlParser {
             logger.debug { "Signature validation skipped for TSL $sourceId" }
             null
         }
-        
+
         // Determine authenticity state
         val isUnsigned = signatureResult?.details?.contains("No Signature element") == true
         val authenticityState = when {
@@ -108,18 +104,18 @@ object TslXmlParser {
             isUnsigned && !config.requireSignature -> AuthenticityState.SKIPPED_DEMO
             else -> AuthenticityState.FAILED
         }
-        
+
         // Log validation result
         if (signatureResult != null) {
-            logger.info { 
+            logger.info {
                 "TSL $sourceId signature validation: ${signatureResult.state}" +
-                (signatureResult.details?.let { " - $it" } ?: "") 
+                        (signatureResult.details?.let { " - $it" } ?: "")
             }
             signatureResult.warnings.forEach { warning ->
                 logger.warn { "TSL $sourceId signature warning: $warning" }
             }
         }
-        
+
         // If strict validation is enabled and signature is invalid, throw
         if (config.strictSignatureValidation && authenticityState == AuthenticityState.FAILED) {
             throw TslSignatureValidationException(
@@ -127,7 +123,7 @@ object TslXmlParser {
                 signatureResult
             )
         }
-        
+
         val source = TrustSource(
             sourceId = sourceId,
             sourceFamily = SourceFamily.TSL,

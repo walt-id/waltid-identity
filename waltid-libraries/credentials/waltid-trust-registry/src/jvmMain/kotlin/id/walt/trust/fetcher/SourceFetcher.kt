@@ -1,15 +1,15 @@
 package id.walt.trust.fetcher
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Dns
-import java.net.InetAddress
 import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.URI
 import java.net.UnknownHostException
 

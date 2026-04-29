@@ -12,7 +12,7 @@ interface TrustStore {
     suspend fun upsertEntities(entities: List<TrustedEntity>)
     suspend fun upsertServices(services: List<TrustedService>)
     suspend fun upsertIdentities(identities: List<ServiceIdentity>)
-    
+
     /**
      * Atomically replace all data for a source.
      * Removes existing entities/services/identities for the sourceId, then inserts new ones.
