@@ -101,7 +101,10 @@ object XmlDsigValidator {
         }
         
         if (signatureNodes.length > 1) {
-            logger.warn { "Multiple Signature elements found, validating first one only" }
+            return SignatureValidationResult(
+                state = AuthenticityState.FAILED,
+                details = "Multiple Signature elements found (${signatureNodes.length}); document must contain exactly one"
+            )
         }
         
         val signatureNode = signatureNodes.item(0)
