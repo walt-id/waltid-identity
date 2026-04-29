@@ -15,7 +15,10 @@ class CredentialSignaturePolicy : CredentialVerificationPolicy2() {
         private val log = KotlinLogging.logger { }
     }
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonObject> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonObject> {
         /* TODO: Cleanup and extend result messages and logging
 
         val issuer = credential.issuer
