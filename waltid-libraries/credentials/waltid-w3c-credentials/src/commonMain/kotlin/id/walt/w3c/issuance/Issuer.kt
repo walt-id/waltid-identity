@@ -67,12 +67,14 @@ object Issuer {
         additionalJwtOptions: Map<String, JsonElement>,
         display: JsonArray = JsonArray(emptyList()),
         completeJwtWithDefaultCredentialData: Boolean = true,
+        context: Map<String, JsonElement>? = null,
     ) = mergingToVc(
         issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
         display = display,
-        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData
+        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
+        context = context
     ).run {
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(
@@ -106,12 +108,14 @@ object Issuer {
 
         completeJwtWithDefaultCredentialData: Boolean = true,
         disclosureMap: SDMap,
+        context: Map<String, JsonElement>? = null,
     ) = mergingToVc(
         issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
         display = display,
-        completeJwtWithDefaultCredentialData
+        completeJwtWithDefaultCredentialData,
+        context = context
     ).run {
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
@@ -149,8 +153,9 @@ object Issuer {
         mappings: JsonObject,
         display: JsonArray? = null,
         completeJwtWithDefaultCredentialData: Boolean = true,
+        context: Map<String, JsonElement>? = null,
     ): IssuanceInformation {
-        val context = mapOf(
+        val mergedContext = mapOf(
             "issuerId" to issuerId,
             "issuerDid" to (if (DidUtils.isDidUrl(issuerId)) issuerId else null),
             "subjectDid" to subjectDid,
@@ -163,15 +168,16 @@ object Issuer {
 
                 else -> value.toString().isNotEmpty()
             }
-        }
-            .mapValues { (_, value) ->
-                when (value) {
-                    is JsonElement -> value
-                    else -> JsonPrimitive(value.toString())
-                }
+        }.mapValues { (_, value) ->
+            when (value) {
+                is JsonElement -> value
+                else -> JsonPrimitive(value.toString())
             }
+        }.toMutableMap().apply {
+            context?.let { putAll(it) }
+        }
 
-        val mapped = this.mergeWithMapping(mappings, context, dataFunctions)
+        val mapped = this.mergeWithMapping(mappings, mergedContext, dataFunctions)
 
         val vc = mapped.vc
         val jwtRes = mapped.results.mapKeys { it.key.removePrefix("jwt:") }.toMutableMap()
