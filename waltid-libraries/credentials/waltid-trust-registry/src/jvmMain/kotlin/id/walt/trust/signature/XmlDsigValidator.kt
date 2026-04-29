@@ -294,21 +294,35 @@ object XmlDsigValidator {
     }
     
     /**
-     * Recursively register Id attributes so XMLDSig can resolve URI references like #xades-xxx
+     * Recursively register Id attributes so XMLDSig can resolve URI references like #xades-xxx.
+     *
+     * Throws [IllegalStateException] if the same ID value appears more than once in the document.
+     * Duplicate IDs make URI-reference resolution ambiguous and are a known vector for
+     * XML signature wrapping attacks.
      */
-    private fun registerIdAttributes(element: org.w3c.dom.Element) {
+    private fun registerIdAttributes(
+        element: org.w3c.dom.Element,
+        seenIds: MutableSet<String> = mutableSetOf()
+    ) {
         // Check for Id attribute (case-sensitive per XML standards, but also check "id" for compatibility)
         val idAttr = element.getAttributeNode("Id") ?: element.getAttributeNode("id")
         if (idAttr != null && idAttr.value.isNotEmpty()) {
+            val idValue = idAttr.value
+            if (!seenIds.add(idValue)) {
+                throw IllegalStateException(
+                    "Duplicate ID value '$idValue' found in document; " +
+                    "URI reference resolution would be ambiguous"
+                )
+            }
             element.setIdAttributeNode(idAttr, true)
         }
-        
+
         // Recurse into child elements
         val children = element.childNodes
         for (i in 0 until children.length) {
             val child = children.item(i)
             if (child is org.w3c.dom.Element) {
-                registerIdAttributes(child)
+                registerIdAttributes(child, seenIds)
             }
         }
     }
