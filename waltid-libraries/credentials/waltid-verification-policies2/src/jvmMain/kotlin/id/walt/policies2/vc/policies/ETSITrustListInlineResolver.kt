@@ -34,10 +34,11 @@ actual object ETSITrustListInlineResolver {
         val trustStore = InMemoryTrustStore()
         val trustService = DefaultTrustRegistryService(trustStore)
         
-        // Load all trust lists
+        // Load all trust lists, counting how many succeed
+        var loadedCount = 0
         for ((index, source) in trustLists.withIndex()) {
             val sourceId = "inline-source-$index"
-            
+
             try {
                 val result = if (isUrl(source)) {
                     log.debug { "Loading trust list from URL: $source" }
@@ -55,15 +56,25 @@ actual object ETSITrustListInlineResolver {
                         validateSignature = validateSignatures
                     )
                 }
-                
+
                 if (!result.success) {
                     log.warn { "Failed to load trust list source $sourceId: ${result.error}" }
                 } else {
+                    loadedCount++
                     log.debug { "Loaded source $sourceId: ${result.entitiesLoaded} entities, ${result.servicesLoaded} services" }
                 }
             } catch (e: Exception) {
                 log.warn(e) { "Error loading trust list source $sourceId" }
             }
+        }
+
+        // Fail with a distinct error if no sources could be loaded at all — this is a
+        // configuration/network problem, not a negative trust decision.
+        if (loadedCount == 0) {
+            return Result.failure(ETSITrustListPolicyException(
+                "No trust list sources could be loaded (${trustLists.size} attempted, 0 succeeded). " +
+                "Check trust list URLs and network connectivity."
+            ))
         }
         
         // Parse expected entity type
