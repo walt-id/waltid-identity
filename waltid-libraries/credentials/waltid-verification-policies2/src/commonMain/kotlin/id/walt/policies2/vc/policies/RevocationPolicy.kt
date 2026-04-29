@@ -24,6 +24,9 @@ class RevocationPolicy : CredentialVerificationPolicy2() {
     )
 
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> =
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> =
         verifyWithAttributes(credential, attribute)
 }

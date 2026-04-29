@@ -7,6 +7,7 @@ import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.store.TrustStore
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
@@ -22,8 +23,9 @@ class DefaultTrustRegistryService(
     private val store: TrustStore
 ) : TrustRegistryService {
 
-    // Configured source URLs (for refresh)
-    private val configuredSources = mutableMapOf<String, SourceConfig>()
+    // Configured source URLs (for refresh). Concurrent to tolerate registration
+    // from arbitrary coroutine contexts while resolve/refresh calls read it.
+    private val configuredSources = ConcurrentHashMap<String, SourceConfig>()
 
     data class SourceConfig(
         val sourceId: String,
