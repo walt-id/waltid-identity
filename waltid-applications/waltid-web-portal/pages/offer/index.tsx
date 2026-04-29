@@ -1,4 +1,4 @@
-import QRCode from "react-qr-code";
+import { QRCode } from "react-qr-code";
 import Button from "@/components/walt/button/Button";
 import Icon from "@/components/walt/logo/Icon";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
@@ -7,7 +7,7 @@ import {useRouter} from "next/router";
 import {CredentialsContext, EnvContext} from "@/pages/_app";
 import {sendToWebWallet} from "@/utils/sendToWebWallet";
 import {getOfferUrl} from "@/utils/getOfferUrl";
-import nextConfig from "@/next.config";
+import { publicEnvDefaults } from "@/utils/publicEnvDefaults";
 import BackButton from "@/components/walt/button/BackButton";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
@@ -48,10 +48,10 @@ export default function Offer() {
           credentials,
           env.NEXT_PUBLIC_VC_REPO
             ? env.NEXT_PUBLIC_VC_REPO
-            : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO,
+            : publicEnvDefaults.NEXT_PUBLIC_VC_REPO,
           env.NEXT_PUBLIC_ISSUER
             ? env.NEXT_PUBLIC_ISSUER
-            : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER,
+            : publicEnvDefaults.NEXT_PUBLIC_ISSUER,
           router.query.authenticationMethod as string,
           router.query.vpRequestValue as string,
           router.query.vpProfile as string
@@ -83,7 +83,7 @@ export default function Offer() {
     sendToWebWallet(
       env.NEXT_PUBLIC_WALLET
         ? env.NEXT_PUBLIC_WALLET
-        : (nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_WALLET as string),
+        : publicEnvDefaults.NEXT_PUBLIC_WALLET,
       'api/siop/initiateIssuance',
       offerURL
     );
