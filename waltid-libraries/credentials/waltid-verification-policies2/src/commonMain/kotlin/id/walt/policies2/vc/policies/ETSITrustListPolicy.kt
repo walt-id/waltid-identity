@@ -9,6 +9,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -32,8 +33,10 @@ private val log = KotlinLogging.logger { }
  *
  * 1. **Remote Service Mode** (`trustRegistryUrl`): Query a hosted trust-registry service
  * 2. **Inline Trust Lists Mode** (`trustLists`): Load and resolve within the request
- * 3. **Enterprise Mode**: When neither is provided and running in enterprise stack,
- *    uses the linked TrustRegistryEnterpriseService (set via `trustRegistryServiceResolver`)
+ * 3. **Injected Resolver Mode**: When neither is provided, the policy looks up a
+ *    [TrustRegistryServiceResolver] in the [PolicyExecutionContext] passed to
+ *    [verify] under the [PolicyServiceKey.TRUST_REGISTRY_RESOLVER] key. The enterprise
+ *    verifier supplies such a resolver per request.
  *
  * ## Configuration
  *
@@ -121,14 +124,21 @@ data class ETSITrustListPolicy(
         }
     }
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         log.debug { "Verifying credential with ETSI Trust List policy" }
-        
+
         try {
             // Extract the full certificate chain from credential
             val certificateChain = extractCertificateChain(credential)
             log.debug { "Certificate chain has ${certificateChain.size} certificate(s)" }
-            
+
+            // Look up an injected TrustRegistryServiceResolver (e.g. provided by the enterprise verifier)
+            val injectedResolver =
+                context.getService<TrustRegistryServiceResolver>(PolicyServiceKey.TRUST_REGISTRY_RESOLVER)
+
             // Determine resolution mode (in order of precedence)
             return when {
                 // 1. Remote service mode (explicit URL takes precedence)
@@ -136,30 +146,31 @@ data class ETSITrustListPolicy(
                     log.debug { "Using remote trust registry: $trustRegistryUrl" }
                     resolveViaRemoteService(certificateChain)
                 }
-                
+
                 // 2. Inline trust lists mode
                 !trustLists.isNullOrEmpty() -> {
                     log.debug { "Using inline trust lists (${trustLists.size} sources)" }
                     resolveViaInlineTrustLists(certificateChain)
                 }
-                
-                // 3. Enterprise service mode (via resolver)
-                trustRegistryServiceResolver != null -> {
-                    log.debug { "Using enterprise trust registry service" }
-                    resolveViaEnterpriseService(certificateChain)
+
+                // 3. Injected resolver mode (supplied via PolicyExecutionContext by e.g. the enterprise verifier)
+                injectedResolver != null -> {
+                    log.debug { "Using injected trust registry service resolver" }
+                    resolveViaInjectedResolver(certificateChain, injectedResolver)
                 }
-                
+
                 // 4. No trust source configured
                 else -> {
                     Result.failure(ETSITrustListPolicyException(
                         "No trust source configured. Provide either 'trustRegistryUrl', 'trustLists', " +
-                        "or ensure enterprise TrustRegistryService is available."
+                        "or pass a TrustRegistryServiceResolver via PolicyExecutionContext."
                     ))
                 }
             }
-            
+
         } catch (e: ETSITrustListPolicyException) {
-            throw e
+            // Return as-is — preserve the original message rather than re-wrapping.
+            return Result.failure(e)
         } catch (e: Exception) {
             log.error(e) { "ETSI Trust List policy verification failed" }
             return Result.failure(ETSITrustListPolicyException(
@@ -227,27 +238,25 @@ data class ETSITrustListPolicy(
     }
 
     // ---------------------------------------------------------------------------
-    // Resolution Mode: Enterprise Service
+    // Resolution Mode: Injected Resolver (supplied via PolicyExecutionContext)
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveViaEnterpriseService(certificateChain: List<String>): Result<JsonElement> {
-        val resolver = trustRegistryServiceResolver
-            ?: return Result.failure(ETSITrustListPolicyException(
-                "Enterprise trust registry service not available"
-            ))
-        
+    private suspend fun resolveViaInjectedResolver(
+        certificateChain: List<String>,
+        resolver: TrustRegistryServiceResolver
+    ): Result<JsonElement> {
         for ((index, certPem) in certificateChain.withIndex()) {
-            log.debug { "Checking certificate at index $index via enterprise service" }
-            
+            log.debug { "Checking certificate at index $index via injected resolver" }
+
             val decision = resolver.resolveCertificate(
                 certificatePem = certPem,
                 expectedEntityType = expectedEntityType,
                 expectedServiceType = expectedServiceType
             )
-            
-            if (decision.decision == "TRUSTED" || 
+
+            if (decision.decision == "TRUSTED" ||
                 (decision.decision == "STALE_SOURCE" && allowStaleSource)) {
-                
+
                 // Security check: if the trusted certificate is not the leaf (index 0),
                 // we must verify the chain from leaf to this trusted certificate
                 if (index > 0) {
@@ -259,17 +268,17 @@ data class ETSITrustListPolicy(
                     }
                     log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
                 }
-                
+
                 log.debug { "Found trusted certificate at chain index $index" }
                 return evaluateDecision(decision)
             }
-            
+
             log.debug { "Certificate at index $index not trusted (decision: ${decision.decision})" }
         }
-        
+
         return Result.failure(ETSITrustListPolicyException(
             "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
-            "was found in the enterprise trust registry, or chain validation failed"
+            "was found in the injected trust registry, or chain validation failed"
         ))
     }
 
@@ -342,31 +351,25 @@ data class ETSITrustListPolicy(
 
     private suspend fun queryTrustRegistry(certificatePem: String, baseUrl: String): TrustDecisionResponse {
         val url = "${baseUrl.trimEnd('/')}/trust-registry/resolve/certificate"
-        
+
         log.debug { "Querying trust registry at: $url" }
-        
-        HttpClient {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-        }.use { client ->
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(TrustResolveRequest(
-                    certificatePemOrDer = certificatePem,
-                    expectedEntityType = expectedEntityType,
-                    expectedServiceType = expectedServiceType
-                ))
-            }
-            
-            if (!response.status.isSuccess()) {
-                throw ETSITrustListPolicyException(
-                    "Trust registry returned HTTP ${response.status.value}: ${response.status.description}"
-                )
-            }
-            
-            return response.body()
+
+        val response = sharedHttpClient.post(url) {
+            contentType(ContentType.Application.Json)
+            setBody(TrustResolveRequest(
+                certificatePemOrDer = certificatePem,
+                expectedEntityType = expectedEntityType,
+                expectedServiceType = expectedServiceType
+            ))
         }
+
+        if (!response.status.isSuccess()) {
+            throw ETSITrustListPolicyException(
+                "Trust registry returned HTTP ${response.status.value}: ${response.status.description}"
+            )
+        }
+
+        return response.body()
     }
 
     // ---------------------------------------------------------------------------
@@ -540,16 +543,34 @@ data class ETSITrustListPolicy(
 
     companion object {
         /**
-         * Enterprise service resolver - set by enterprise stack to provide
-         * TrustRegistryEnterpriseService resolution without explicit URL.
+         * Shared HTTP client for remote trust-registry queries.
+         * Reused across calls to avoid repeated TLS setup overhead.
+         * Timeout values are chosen to bound worst-case latency per certificate lookup.
          */
-        var trustRegistryServiceResolver: TrustRegistryServiceResolver? = null
+        private val sharedHttpClient: HttpClient by lazy {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
+                }
+                install(HttpTimeout) {
+                    connectTimeoutMillis = 5_000
+                    requestTimeoutMillis = 10_000
+                    socketTimeoutMillis = 10_000
+                }
+            }
+        }
     }
 }
 
 /**
- * Interface for enterprise service resolution.
- * Implemented by enterprise stack to wire up TrustRegistryEnterpriseService.
+ * Bridges [ETSITrustListPolicy] to an external (typically enterprise-backed) trust
+ * registry service without requiring the policy to depend on enterprise code.
+ *
+ * Callers of the verification pipeline (e.g. an enterprise verifier) supply an
+ * implementation per request through [PolicyExecutionContext] under the
+ * [PolicyServiceKey.TRUST_REGISTRY_RESOLVER] key; [ETSITrustListPolicy] looks it up
+ * and invokes [resolveCertificate] when neither `trustRegistryUrl` nor `trustLists`
+ * is configured on the policy itself.
  */
 interface TrustRegistryServiceResolver {
     suspend fun resolveCertificate(

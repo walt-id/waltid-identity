@@ -37,7 +37,10 @@ data class JsonSchemaPolicy(
         }
     }
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         val currentSchema = getCurrentSchema()
 
         val jsonSchema = JsonSchema.fromJsonElement(currentSchema, defaultType)
