@@ -69,12 +69,16 @@ export default function VerificationSection() {
       params.append('vps', vps.join(','));
     }
 
-    params.append(
-      'format',
-      (credentialsToIssue[0]?.kind === 'mdoc'
+    const formatsOrdered = idsToIssue.map((id) => {
+      const cred = credentialsToIssue.find(
+        (c) => c.id.toString() === id.toString()
+      );
+      if (!cred) return 'JWT + W3C VC';
+      return cred.kind === 'mdoc'
         ? ISO_MDOC_CREDENTIAL_FORMAT
-        : (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC')) as string
-    );
+        : String(cred.selectedFormat ?? 'JWT + W3C VC');
+    });
+    params.append('format', formatsOrdered.join(','));
     router.push(`/verify?${params.toString()}`);
   }
 

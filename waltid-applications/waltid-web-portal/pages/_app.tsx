@@ -46,7 +46,15 @@ export default function App({ Component, pageProps }: AppProps) {
         axios
           .get(`${response.data.NEXT_PUBLIC_VC_REPO}/api/mdoc/list`)
           .then((mdocTitles) => {
-            (mdocTitles.data as string[]).forEach((title: string) => {
+            const titles = mdocTitles.data;
+            if (!Array.isArray(titles)) {
+              console.error(
+                '[waltid-web-portal] /api/mdoc/list returned non-array response:',
+                titles
+              );
+              return;
+            }
+            titles.forEach((title: string) => {
               axios
                 .get(
                   `${response.data.NEXT_PUBLIC_VC_REPO}/api/mdoc/${encodeURIComponent(
@@ -67,10 +75,21 @@ export default function App({ Component, pageProps }: AppProps) {
                       },
                     },
                   ]);
+                })
+                .catch((err) => {
+                  console.error(
+                    `[waltid-web-portal] Failed to fetch mDoc "${title}" from VC repo:`,
+                    err
+                  );
                 });
             });
           })
-          .catch(() => {});
+          .catch((err) => {
+            console.error(
+              '[waltid-web-portal] Failed to fetch /api/mdoc/list from VC repo:',
+              err
+            );
+          });
       } else {
         throw new Error('Env variables not found');
       }
