@@ -244,7 +244,7 @@ class DefaultTrustRegistryService(
                     val result = TslXmlParser.parse(content, sourceId, sourceUrl, config)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
-                content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity") && format == SourceFetcher.SourceFormat.XML -> {
+                (content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity")) && format == SourceFetcher.SourceFormat.XML -> {
                     log.info { "Parsing LoTE XML for source: $sourceId" }
                     val result = LoteXmlParser.parse(content, sourceId, sourceUrl)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
