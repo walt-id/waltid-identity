@@ -25,10 +25,7 @@ class InMemoryAuthorizationCodeRepository : AuthorizationCodeRepository {
     private val records = ConcurrentHashMap<String, InMemoryAuthorizationCodeRecord>()
 
     override suspend fun save(record: AuthorizationCodeRecord) {
-        if (records.containsKey(record.code)) {
-            throw DuplicateCodeException()
-        }
-        records[record.code] = when (record) {
+        val newRecord = when (record) {
             is InMemoryAuthorizationCodeRecord -> record
             else -> InMemoryAuthorizationCodeRecord(
                 code = record.code,
@@ -40,6 +37,10 @@ class InMemoryAuthorizationCodeRepository : AuthorizationCodeRepository {
                 expiresAt = record.expiresAt,
                 sessionId = "",
             )
+        }
+        val existing = records.putIfAbsent(newRecord.code, newRecord)
+        if (existing != null) {
+            throw DuplicateCodeException()
         }
     }
 
