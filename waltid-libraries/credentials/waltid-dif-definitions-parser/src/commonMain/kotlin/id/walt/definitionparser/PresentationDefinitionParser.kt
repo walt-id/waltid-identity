@@ -79,8 +79,9 @@ object PresentationDefinitionParser {
         log.trace { "--- Checking descriptor (name ${inputDescriptor.name}, id ${inputDescriptor.id}) --" }
 
         val enquirer = JsonObjectEnquirer()
+        val fields = inputDescriptor.constraints.fields ?: emptyList()
 
-        return enquirer.filterDocumentsByConstraints(credentials, inputDescriptor.constraints.fields!!)
+        return enquirer.filterDocumentsByConstraints(credentials, fields)
 
     }
 
