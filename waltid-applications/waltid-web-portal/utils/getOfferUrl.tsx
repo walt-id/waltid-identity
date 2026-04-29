@@ -18,6 +18,10 @@ const getOfferUrl = async (
   vpRequestValue?: string,
   vpProfile?: string
 ) => {
+  if (!credentials?.length) {
+    throw new Error('No credentials selected for issuance.');
+  }
+
   const data = await fetch(
     `${NEXT_PUBLIC_ISSUER}/draft13/.well-known/openid-credential-issuer`
   ).then((data) => {
@@ -191,6 +195,10 @@ const getOfferUrl = async (
     })
   );
 
+  if (!payload.length) {
+    throw new Error('Issuance payload is empty.');
+  }
+
   const first = credentials[0];
   const sel = String(
     first.selectedFormat ??
@@ -209,7 +217,10 @@ const getOfferUrl = async (
   const issueUrl =
     NEXT_PUBLIC_ISSUER +
     `/openid4vc/${pathSegment}/${batchAllowed ? 'issueBatch' : 'issue'}`;
-  return axios.post(issueUrl, payload.length > 1 ? payload : payload[0]);
+  return axios.post(
+    issueUrl,
+    batchAllowed ? payload : payload[0]
+  );
 };
 
 export { getOfferUrl };
