@@ -1,12 +1,11 @@
 package id.walt.trust.parser.lote
 
 import id.walt.trust.model.*
-import kotlin.io.encoding.Base64
+import id.walt.trust.utils.HashUtils.computeCertificateSha256
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
-import org.kotlincrypto.hash.sha2.SHA256
 
 /**
  * Parses TS 119 602-style LoTE JSON sources into normalized trust model objects.
@@ -189,30 +188,6 @@ object LoteJsonParser {
                 serviceId = serviceId,
                 metadata = mapOf("rawMatchType" to matchType, "rawValue" to value)
             )
-        }
-    }
-
-    /**
-     * Computes the SHA-256 fingerprint of a certificate in PEM or base64-encoded DER format.
-     */
-    private fun computeCertificateSha256(pemOrDer: String): String? {
-        return try {
-            val certBytes = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
-                // PEM format - extract base64 content between headers
-                val base64Content = pemOrDer
-                    .replace("-----BEGIN CERTIFICATE-----", "")
-                    .replace("-----END CERTIFICATE-----", "")
-                    .replace("\\s".toRegex(), "")
-                Base64.decode(base64Content)
-            } else {
-                // Assume base64-encoded DER
-                Base64.decode(pemOrDer.replace("\\s".toRegex(), ""))
-            }
-            
-            SHA256().digest(certBytes)
-                .joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            null
         }
     }
 

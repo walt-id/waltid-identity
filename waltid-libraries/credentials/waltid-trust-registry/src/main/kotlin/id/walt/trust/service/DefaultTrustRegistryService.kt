@@ -6,12 +6,11 @@ import id.walt.trust.parser.lote.LoteJsonParser
 import id.walt.trust.parser.lote.LoteXmlParser
 import id.walt.trust.parser.tsl.TslXmlParser
 import id.walt.trust.store.TrustStore
+import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.time.Clock
 import kotlin.time.Instant
-import org.kotlincrypto.hash.sha2.SHA256
 
 private val log = KotlinLogging.logger {}
 
@@ -52,7 +51,7 @@ class DefaultTrustRegistryService(
                 decision = TrustDecisionCode.PROCESSING_ERROR,
                 warnings = listOf("Failed to parse certificate")
             )
-        
+
         return resolveByCertificateSha256(sha256, instant, expectedEntityType, expectedServiceType)
     }
 
@@ -63,9 +62,9 @@ class DefaultTrustRegistryService(
         expectedServiceType: String?
     ): TrustDecision {
         val normalizedSha256 = sha256Hex.lowercase().removePrefix("sha256:").removePrefix("sha256").replace(":", "")
-        
+
         val matchedIdentities = store.findIdentitiesByCertificateSha256(normalizedSha256)
-        
+
         if (matchedIdentities.isEmpty()) {
             return TrustDecision(
                 decision = TrustDecisionCode.NOT_TRUSTED,
@@ -203,7 +202,7 @@ class DefaultTrustRegistryService(
         validateSignature: Boolean
     ): RefreshResult {
         log.info { "Loading trust source from URL: $url" }
-        
+
         val fetchResult = SourceFetcher.fetch(url)
         if (!fetchResult.success || fetchResult.content == null) {
             return RefreshResult(
@@ -212,11 +211,11 @@ class DefaultTrustRegistryService(
                 error = fetchResult.error ?: "Failed to fetch from $url"
             )
         }
-        
+
         // Register this source for future refreshes
         val sourceFamily = detectSourceFamily(fetchResult.content)
         registerSource(sourceId, url, sourceFamily)
-        
+
         return loadSourceFromContentInternal(
             sourceId = sourceId,
             content = fetchResult.content,
@@ -233,7 +232,7 @@ class DefaultTrustRegistryService(
     ): RefreshResult {
         return try {
             val format = SourceFetcher.detectFormat(null, content)
-            
+
             val parsed = when {
                 // Detect if it's TSL (TrustServiceStatusList) or LoTE
                 content.contains("TrustServiceStatusList") || content.contains("TrustServiceProviderList") -> {
@@ -322,7 +321,7 @@ class DefaultTrustRegistryService(
         val candidates = identities.mapNotNull { identity ->
             evaluateIdentity(identity, instant, expectedEntityType, expectedServiceType)
         }
-        
+
         if (candidates.isEmpty()) {
             // All identities failed to resolve
             return TrustDecision(
@@ -332,7 +331,7 @@ class DefaultTrustRegistryService(
                 )
             )
         }
-        
+
         // Sort by decision priority: TRUSTED first, then STALE_SOURCE, then NOT_TRUSTED
         // Within same decision, prefer type-matched results
         return candidates.sortedWith(
@@ -342,7 +341,7 @@ class DefaultTrustRegistryService(
             )
         ).first()
     }
-    
+
     private fun decisionPriority(decision: TrustDecisionCode): Int = when (decision) {
         TrustDecisionCode.TRUSTED -> 0
         TrustDecisionCode.STALE_SOURCE -> 1
@@ -350,7 +349,7 @@ class DefaultTrustRegistryService(
         TrustDecisionCode.MULTIPLE_MATCHES -> 3
         else -> 4
     }
-    
+
     private suspend fun evaluateIdentity(
         identity: ServiceIdentity,
         instant: Instant,
@@ -410,35 +409,12 @@ class DefaultTrustRegistryService(
     private fun evaluateFreshness(source: TrustSource?, instant: Instant): FreshnessState {
         if (source == null) return FreshnessState.UNKNOWN
         val nextUpdate = source.nextUpdate ?: return FreshnessState.UNKNOWN
-        
+
         return when {
             instant > nextUpdate -> FreshnessState.EXPIRED
             // Consider "stale" if within 24 hours of nextUpdate
             instant > nextUpdate.minus(kotlin.time.Duration.parse("24h")) -> FreshnessState.STALE
             else -> FreshnessState.FRESH
-        }
-    }
-
-    @OptIn(ExperimentalEncodingApi::class)
-    private fun computeCertificateSha256(pemOrDer: String): String? {
-        return try {
-            val certBytes = if (pemOrDer.contains("BEGIN CERTIFICATE")) {
-                // PEM format
-                val base64Content = pemOrDer
-                    .replace("-----BEGIN CERTIFICATE-----", "")
-                    .replace("-----END CERTIFICATE-----", "")
-                    .replace("\\s".toRegex(), "")
-                Base64.decode(base64Content)
-            } else {
-                // Assume base64-encoded DER
-                Base64.decode(pemOrDer.replace("\\s".toRegex(), ""))
-            }
-            
-            SHA256().digest(certBytes)
-                .joinToString("") { "%02x".format(it) }
-        } catch (e: Exception) {
-            log.warn(e) { "Failed to compute certificate SHA-256" }
-            null
         }
     }
 
@@ -450,7 +426,7 @@ class DefaultTrustRegistryService(
             TrustStatus.SUPERVISED
         )
 
-        private fun now(): Instant = Instant.fromEpochMilliseconds(System.currentTimeMillis())
+        private fun now(): Instant = Clock.System.now()
     }
 
     private fun detectSourceFamily(content: String): SourceFamily {
