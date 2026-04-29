@@ -62,12 +62,62 @@ jobs:
             -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
             -e "s#8443#443#g" \
             "$FILE"
+
+      - name: Check if Google Chrome is installed
+        id: check-browser
+        run: |
+          if [ -x /usr/bin/google-chrome ] || [ -x /usr/bin/google-chrome-stable ]; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+            echo "Google Chrome is already installed"
+          else
+            echo "installed=false" >> $GITHUB_OUTPUT
+            echo "Google Chrome is not installed"
+          fi
+
+      - name: Install Google Chrome stable
+        if: steps.check-browser.outputs.installed == 'false'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | \
+            sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Export CHROME_BIN
+        run: |
+          if [ -x /usr/bin/google-chrome ]; then
+            CHROME_BIN=/usr/bin/google-chrome
+          elif [ -x /usr/bin/google-chrome-stable ]; then
+            CHROME_BIN=/usr/bin/google-chrome-stable
+          else
+            CHROME_BIN=""
+          fi
+          if [ -z "$CHROME_BIN" ]; then
+            echo "Could not determine Google Chrome binary path"
+            exit 1
+          fi
+          echo "CHROME_BIN=$CHROME_BIN" >> $GITHUB_ENV
+          echo "SELENIUM_BROWSER=chrome" >> $GITHUB_ENV
+          echo "Using CHROME_BIN=$CHROME_BIN"
+
       - name: Clean and build with all tests
         if: ${{ runner.os != 'macos' }}
-        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --parallel --max-workers=3 --continue
+        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --max-workers=3
         env:
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-reports
+          path: |
+            **/build/reports/tests/test/
+            **/build/reports/tests/allTests/
+          retention-days: 30
 
       - name: Build iOS Simulator Framework (ARM64)
         if: ${{ runner.os == 'macos'}}

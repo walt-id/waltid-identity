@@ -1,13 +1,11 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.documentsigner.certificate
 
 import id.walt.crypto.keys.Key
 import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
-import okio.ByteString
-import kotlin.time.ExperimentalTime
+import kotlinx.io.bytestring.ByteString
+
 
 /**
  * Decoded view (not validated) of a Document Signer X.509 certificate.

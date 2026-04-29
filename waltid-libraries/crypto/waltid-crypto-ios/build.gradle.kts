@@ -1,3 +1,6 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     kotlin("multiplatform")
     kotlin("native.cocoapods")
@@ -6,6 +9,7 @@ plugins {
 
 kotlin {
 
+    applyDefaultHierarchyTemplate()
     iosArm64()
     iosSimulatorArm64()
 
@@ -36,19 +40,12 @@ kotlin {
             languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
         }
 
-        val iosArm64Main by getting
-        val iosSimulatorArm64Main by getting
-
-        val iosMain by creating {
-            this.dependsOn(commonMain.get())
-            iosArm64Main.dependsOn(this)
-            iosSimulatorArm64Main.dependsOn(this)
-            dependencies {
-                api(project(":waltid-libraries:crypto:waltid-crypto"))
-                api(project(":waltid-libraries:crypto:waltid-target-ios"))
+        iosMain.dependencies {
+            api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:crypto:waltid-target-ios"))
         }
     }
 }
 
 
-task("testClasses")
+tasks.register("testClasses")

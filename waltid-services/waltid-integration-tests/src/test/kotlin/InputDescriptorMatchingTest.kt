@@ -76,6 +76,10 @@ class InputDescriptorMatchingTest(
         // Request: $.credentialSubject.degree.type: "UniversityDegree",
         // --> match should return 0, presentation should be rejected
         verifyCredential(getPresentationRequestByDegreeType("UniversityDegree"), wallet, did, newCredential1, false)
+
+        // Request: $.vc.type with contains filter for array type
+        // --> match should return 1, presentation should be accepted
+        verifyCredential(getPresentationRequestWithContainsFilter("UniversityDegree"), wallet, did, newCredential1, true)
     }
 
     @OptIn(ExperimentalUuidApi::class)
@@ -306,6 +310,50 @@ class InputDescriptorMatchingTest(
                 }
               ],
               "limit_disclosure": "required"
+            }
+          }
+        }
+      ]
+    }
+  """.trimIndent()
+
+
+    /**
+     * Creates a presentation request with contains.const filter structure.
+     */
+    fun getPresentationRequestWithContainsFilter(typeToMatch: String) = """
+    {
+      "vp_policies": [
+        "signature",
+        "expired",
+        "not-before",
+        "presentation-definition"
+      ],
+      "vc_policies": [
+        "signature",
+        "expired",
+        "not-before",
+        "revoked-status-list"
+      ],
+      "request_credentials": [
+        {
+          "format": "jwt_vc",
+          "input_descriptor": {
+            "id": "e3d700aa-0988-4eb6-b9c9-e00f4b27f1d8",
+            "constraints": {
+              "fields": [
+                {
+                  "path": [
+                    "${'$'}.vc.type"
+                  ],
+                  "filter": {
+                    "contains": {
+                      "const": "$typeToMatch"
+                    },
+                    "type": "array"
+                  }
+                }
+              ]
             }
           }
         }

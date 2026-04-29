@@ -47,9 +47,11 @@ class VpJvmTest {
         }
         followRedirects = false
     }
+
     companion object {
         private lateinit var testWallet: TestCredentialWallet
         private lateinit var testVerifier: VPTestVerifier
+
         @BeforeAll
         @JvmStatic
         fun init() = runTest {
@@ -86,12 +88,13 @@ class VpJvmTest {
         assertEquals(expected = "example with selective disclosure", actual = pd2.id)
         assertEquals(expected = DisclosureLimitation.required, actual = pd2.inputDescriptors.first().constraints!!.limitDisclosure)
         assertEquals(expected = 4, actual = pd2.inputDescriptors.first().constraints!!.fields!!.size)
-        assertContentEquals(expected = listOf(
-            "\$.type",
-            "\$.credentialSubject.given_name",
-            "\$.credentialSubject.family_name",
-            "\$.credentialSubject.birthdate"
-        ), actual = pd2.inputDescriptors.first().constraints!!.fields!!.flatMap { it.path })
+        assertContentEquals(
+            expected = listOf(
+                "\$.type",
+                "\$.credentialSubject.given_name",
+                "\$.credentialSubject.family_name",
+                "\$.credentialSubject.birthdate"
+            ), actual = pd2.inputDescriptors.first().constraints!!.fields!!.flatMap { it.path })
         // parse example 3
         val pd3 = PresentationDefinition.fromJSONString(presentationDefinitionExample3)
         println("pd3: $pd3")
@@ -322,7 +325,8 @@ class VpJvmTest {
         println(encoded)
 
         println("Submitting...")
-        val resp = http.submitForm(siopSession.authorizationRequest!!.responseUri!!,
+        val resp = http.submitForm(
+            siopSession.authorizationRequest!!.responseUri!!,
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     println("submitForm param: ${entry.key} -> ${entry.value}")
@@ -373,7 +377,8 @@ class VpJvmTest {
         println(encoded)
 
         println("Submitting...")
-        val resp = http.submitForm(siopSession.authorizationRequest!!.responseUri!!,
+        val resp = http.submitForm(
+            siopSession.authorizationRequest!!.responseUri!!,
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     println("submitForm param: ${entry.key} -> ${entry.value}")
@@ -446,15 +451,15 @@ class VpJvmTest {
                 issuerState = requestPayload["issuer_state"]?.jsonPrimitive?.contentOrNull,
                 requestUri = null,
                 presentationDefinition =
-                (requestPayload["presentation_definition"]?.jsonPrimitive?.contentOrNull)?.let {
-                    PresentationDefinition.fromJSONString(
-                        it
-                    )
-                }
-                    ?: (PresentationDefinition.fromJSON(
-                        requestPayload["claims"]?.jsonObject?.get("vp_token")?.jsonObject?.get("presentation_definition")?.jsonObject
-                            ?: throw IllegalArgumentException("Could not find a presentation_definition!")
-                    )),
+                    (requestPayload["presentation_definition"]?.jsonPrimitive?.contentOrNull)?.let {
+                        PresentationDefinition.fromJSONString(
+                            it
+                        )
+                    }
+                        ?: (PresentationDefinition.fromJSON(
+                            requestPayload["claims"]?.jsonObject?.get("vp_token")?.jsonObject?.get("presentation_definition")?.jsonObject
+                                ?: throw IllegalArgumentException("Could not find a presentation_definition!")
+                        )),
                 presentationDefinitionUri = requestPayload["presentation_definition_uri"]?.jsonPrimitive?.contentOrNull,
                 clientIdScheme = requestPayload["client_id_scheme"]?.jsonPrimitive?.contentOrNull?.let {
                     ClientIdScheme.fromValue(
@@ -519,7 +524,8 @@ class VpJvmTest {
         println(encoded)
 
         println("Submitting...")
-        val resp = http.submitForm(siopSession.authorizationRequest!!.responseUri!!,
+        val resp = http.submitForm(
+            siopSession.authorizationRequest!!.responseUri!!,
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     println("submitForm param: ${entry.key} -> ${entry.value}")
@@ -563,7 +569,8 @@ class VpJvmTest {
         assertNotNull(actual = tokenResponse.vpToken)
         assertNotNull(actual = tokenResponse.presentationSubmission)
 
-        val resp = http.submitForm(walletSession.authorizationRequest!!.responseUri!!,
+        val resp = http.submitForm(
+            walletSession.authorizationRequest!!.responseUri!!,
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
@@ -592,7 +599,8 @@ class VpJvmTest {
         println("Token response: $tokenResponse")
         assertNotNull(actual = tokenResponse.vpToken)
         assertNotNull(actual = tokenResponse.presentationSubmission)
-        val resp = http.submitForm(walletSession.authorizationRequest!!.responseUri!!,
+        val resp = http.submitForm(
+            walletSession.authorizationRequest!!.responseUri!!,
             parameters {
                 tokenResponse.toHttpParameters().forEach { entry ->
                     entry.value.forEach { append(entry.key, it) }
@@ -770,7 +778,8 @@ class VpJvmTest {
 
         val tokenResponse = testWallet.processImplicitFlowAuthorization(authReq)
         val resp =
-            http.submitForm(authReq.responseUri ?: authReq.redirectUri ?: throw Exception("response_uri or redirect_uri must be set"),
+            http.submitForm(
+                authReq.responseUri ?: authReq.redirectUri ?: throw Exception("response_uri or redirect_uri must be set"),
                 parameters {
                     tokenResponse.toHttpParameters().forEach { entry ->
                         entry.value.forEach { append(entry.key, it) }

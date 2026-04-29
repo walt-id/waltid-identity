@@ -76,3 +76,14 @@ jobs:
           helm upgrade --install waltid-helm-release ./helm-charts/waltid \
             --namespace ${{ inputs.namespace }} \
             -f helm-values.json
+      - name: Add deployment URLs to summary
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "## Deployment URLs" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
+          echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+          echo "| Issuer | https://issuer.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Verifier | https://verifier.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Wallet | https://wallet.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Portal | https://portal.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Wallet Dev | https://wallet-dev.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY

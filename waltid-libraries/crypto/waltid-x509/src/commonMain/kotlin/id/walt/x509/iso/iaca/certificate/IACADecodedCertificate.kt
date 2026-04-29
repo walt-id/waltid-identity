@@ -1,12 +1,11 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca.certificate
 
 import id.walt.crypto.keys.Key
 import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
-import okio.ByteString
-import kotlin.time.ExperimentalTime
+import id.walt.x509.iso.blockingBridge
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.hexToByteString
 
 /**
  * Decoded view (not validated) of an IACA X.509 certificate.
@@ -42,6 +41,34 @@ data class IACADecodedCertificate internal constructor(
         issuerAlternativeName = issuerAlternativeName,
         crlDistributionPointUri = crlDistributionPointUri,
     )
+
+    /**
+     * Extract from the IACA certificate data related to the CertificateInfo VICAL structure.
+     */
+    suspend fun toIACACertificateInfo(): IACACertificateInfo {
+        val extras = platformExtractIACACertificateInfoExtras(
+            certificateHandle = certificate,
+        )
+        return IACACertificateInfo(
+            certificate = certificate.getCertificateDer().bytes,
+            serialNumber = serialNumber,
+            ski = skiHex.hexToByteString(),
+            issuingAuthority = extras.issuingAuthority,
+            issuingCountry = principalName.country,
+            stateOrProvinceName = principalName.stateOrProvinceName,
+            issuer = extras.issuer,
+            subject = extras.subject,
+            notBefore = validityPeriod.notBefore,
+            notAfter = validityPeriod.notAfter,
+        )
+    }
+
+    /**
+     * Blocking variant of [toIACACertificateInfo].
+     */
+    fun toIACACertificateInfoBlocking(): IACACertificateInfo = blockingBridge {
+        toIACACertificateInfo()
+    }
 
     /**
      * Verify the certificate signature.

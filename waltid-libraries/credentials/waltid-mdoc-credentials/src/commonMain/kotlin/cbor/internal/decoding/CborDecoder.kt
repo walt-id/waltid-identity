@@ -26,14 +26,15 @@ private open class CborListReader(cbor: Cbor, decoder: CborDecoder) : CborReader
     override fun skipBeginToken() = setSize(decoder.startArray())
 
     override fun decodeElementIndex(descriptor: SerialDescriptor): Int {
-        if(descriptor.serialName == "kotlin.collections.ArrayList") {
+        if (descriptor.serialName == "kotlin.collections.ArrayList") {
             decodeByteArrayAsByteString = descriptor.isByteString(0) || descriptor.getElementDescriptor(0).let {
                 it.elementsCount > 0 && it.isByteString(0)
             }
-        } else if(descriptor.serialName == "kotlin.collections.LinkedHashMap") {
-            decodeByteArrayAsByteString = descriptor.isByteString(0) || descriptor.isByteString(1) || descriptor.getElementDescriptor(1).let {
-                it.elementsCount > 0 && it.isByteString(0)
-            }
+        } else if (descriptor.serialName == "kotlin.collections.LinkedHashMap") {
+            decodeByteArrayAsByteString =
+                descriptor.isByteString(0) || descriptor.isByteString(1) || descriptor.getElementDescriptor(1).let {
+                    it.elementsCount > 0 && it.isByteString(0)
+                }
         }
         return if (!finiteMode && decoder.isEnd() || (finiteMode && ind >= size)) CompositeDecoder.DECODE_DONE else ind++
     }
@@ -145,21 +146,21 @@ internal open class CborReader(private val cbor: Cbor, protected val decoder: Cb
 }
 
 fun Decoder.peek(): Int {
-    if(this is CborReader) {
+    if (this is CborReader) {
         return this.peek()
     }
     throw SerializationException("Can peek decoder byte only for CborReader")
 }
 
 fun Decoder.decodeByteString(): ByteArray {
-    if(this is CborReader) {
+    if (this is CborReader) {
         return this.decodeByteString()
     }
     throw SerializationException("Decoding of ByteString is only supported for CborReader")
 }
 
 fun Decoder.decodeTag(): Long {
-    if(this is CborReader) {
+    if (this is CborReader) {
         return this.decodeTag()
     }
     throw SerializationException("Decoding of Tag number only supported for CborReader")

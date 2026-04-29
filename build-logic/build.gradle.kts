@@ -25,6 +25,12 @@ dependencies {
     // Suspend-transform
     implementation(identityLibs.loveforte.suspendtransform)
 
+    // Buildconfig
+    implementation(identityLibs.buildconfig.plugin)
+
+    // Gradle Shadow
+    implementation(identityLibs.gradle.shadow)
+
     // Power-assert
     implementation(identityLibs.powerassert)
 

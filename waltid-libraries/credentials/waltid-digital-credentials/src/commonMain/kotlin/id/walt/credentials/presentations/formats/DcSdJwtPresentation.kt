@@ -47,7 +47,7 @@ data class DcSdJwtPresentation(
     val sdHash: String?,
     val presentationStringHashable: String, // If only the single hash variant is allowed
     //val hashablePresentationStringVariants: List<String> // If multiple hash variants would be allowed
-) : VerifiablePresentation(format = PresentationFormat.`dc+sd-jwt`) {
+) : VerifiablePresentation(format = PresentationFormat.dc_sd_jwt) {
 
     suspend fun presentationVerification(
         expectedAudience: String?,

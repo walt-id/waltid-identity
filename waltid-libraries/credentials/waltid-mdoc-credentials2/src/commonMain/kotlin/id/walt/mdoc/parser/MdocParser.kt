@@ -12,7 +12,7 @@ import kotlinx.serialization.decodeFromByteArray
 
 object MdocParser {
 
-    private val log = KotlinLogging.logger {  }
+    private val log = KotlinLogging.logger { }
 
     @OptIn(ExperimentalSerializationApi::class)
     fun parseToDocument(signed: String): Document {
@@ -33,7 +33,9 @@ object MdocParser {
         }.recoverCatching {
             log.trace { "Parsing mdoc as Document (not DeviceRespons)" }
             coseCompliantCbor.decodeFromByteArray<Document>(signedBytes)
-        }.getOrThrow()
+        }.getOrElse { ex ->
+            throw IllegalArgumentException("Was unable to parse mdoc document: ${ex.message}", ex)
+        }
 
         return document
     }

@@ -1,29 +1,18 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.documentsigner.parser
 
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.x509.CertificateDer
-import id.walt.x509.JcaX509CertificateHandle
-import id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
-import id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
-import id.walt.x509.iso.parseFromX509Certificate
-import id.walt.x509.X509ValidityPeriod
-import id.walt.x509.authorityKeyIdentifier
-import id.walt.x509.criticalX509V3ExtensionOIDs
+import id.walt.x509.*
 import id.walt.x509.iso.IssuerAlternativeName
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
+import id.walt.x509.iso.documentsigner.certificate.parseFromJcaX500Name
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
+import id.walt.x509.iso.iaca.certificate.parseFromJcaX500Name
 import id.walt.x509.iso.parseCrlDistributionPointUriFromCert
-import id.walt.x509.nonCriticalX509V3ExtensionOIDs
-import id.walt.x509.subjectKeyIdentifier
-import id.walt.x509.toJcaX509Certificate
-import id.walt.x509.x509BasicConstraints
-import id.walt.x509.x509KeyUsages
-import okio.ByteString.Companion.toByteString
+import id.walt.x509.iso.parseFromX509Certificate
+import kotlinx.io.bytestring.ByteString
+import kotlinx.io.bytestring.toHexString
 import org.bouncycastle.cert.jcajce.JcaX500NameUtil
-import kotlin.time.ExperimentalTime
 import kotlin.time.toKotlinInstant
 
 internal actual suspend fun platformParseDocumentSignerCertificate(
@@ -60,13 +49,13 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         cert.subjectKeyIdentifier
     ) {
         "Subject key identifier must exist as part of the Document Signer X509 certificate, but was found missing"
-    }.hex()
+    }.toHexString()
 
     val akiHex = requireNotNull(
         cert.authorityKeyIdentifier
     ) {
         "Authority key identifier must exist as part of the Document Signer X509 certificate, but was found missing"
-    }.hex()
+    }.toHexString()
 
     return DocumentSignerDecodedCertificate(
         issuerPrincipalName = iacaPrincipalName,
@@ -77,7 +66,7 @@ internal actual suspend fun platformParseDocumentSignerCertificate(
         ),
         issuerAlternativeName = IssuerAlternativeName.parseFromX509Certificate(cert),
         crlDistributionPointUri = crlDistributionPointUri,
-        serialNumber = cert.serialNumber.toByteArray().toByteString(),
+        serialNumber = ByteString(cert.serialNumber.toByteArray()),
         keyUsage = certificateKeyUsages,
         extendedKeyUsage = eku.toSet(),
         akiHex = akiHex,

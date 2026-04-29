@@ -1,3 +1,4 @@
+import com.android.build.api.dsl.androidLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -11,9 +12,7 @@ val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion
 
 // Configure KMP to have an Android Target
 kotlin {
-    androidTarget {
-        publishLibraryVariants("release")
-
+    androidLibrary {
         compilations.all {
             compileTaskProvider.configure {
                 compilerOptions {

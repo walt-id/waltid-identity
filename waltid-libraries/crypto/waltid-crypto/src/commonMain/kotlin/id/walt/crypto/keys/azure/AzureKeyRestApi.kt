@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.crypto.keys.azure
 
 import id.walt.crypto.keys.*
@@ -29,13 +27,11 @@ import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }
@@ -46,9 +42,9 @@ private val logger = KotlinLogging.logger { }
 @SerialName("azure-rest-api")
 class AzureKeyRestApi(
     val id: String,
-    val auth: AzureAuth,
+    var auth: AzureAuth? = null,
     private var _keyType: KeyType? = null,
-    private var _publicKey: DirectSerializedKey? = null,
+    var _publicKey: DirectSerializedKey? = null,
 ) : Key() {
 
     @Transient
@@ -68,7 +64,7 @@ class AzureKeyRestApi(
 
     @JsExport.Ignore
     suspend fun updateAccessToken() {
-        val accessTokenResponse = fetchAccessToken(auth)
+        val accessTokenResponse = fetchAccessToken(auth!!)
 
         accessToken = accessTokenResponse.accessToken
         accessTokenExpiration = accessTokenResponse.expiration
@@ -76,13 +72,23 @@ class AzureKeyRestApi(
 
     @JsExport.Ignore
     suspend fun ensureAccessTokenValid() {
-        if (!this::accessToken.isInitialized || accessTokenExpiration >= Clock.System.now()) {
+        if (auth?.clientSecret.isNullOrBlank()) {
+            logger.warn { "Cannot refresh Azure access token: clientSecret is not available" }
+            return
+        }
+
+        if (!this::accessToken.isInitialized || accessTokenExpiration <= Clock.System.now()) {
             updateAccessToken()
         }
     }
 
     @JsExport.Ignore
     override suspend fun init() {
+        if (auth?.clientSecret.isNullOrBlank()) {
+            logger.debug { "Skipping Azure key init: credentials not available" }
+            return
+        }
+
         ensureAccessTokenValid()
 
         if (_publicKey == null) fetchAndUpdatePublicKey()
@@ -98,7 +104,7 @@ class AzureKeyRestApi(
     override val hasPrivateKey: Boolean
         get() = true
 
-    override fun toString(): String = "[Azure ${keyType.name} key @ ${auth.keyVaultUrl} - $id]"
+    override fun toString(): String = "[Azure ${keyType.name} key @ ${auth?.keyVaultUrl} - $id]"
 
     @JvmBlocking
     @JvmAsync
@@ -140,6 +146,7 @@ class AzureKeyRestApi(
      * @param ieeeP1363Signature set to true to leave signature in Azure IEEE P1363 format (no conversion)
      */
     suspend fun signRawAzure(plaintext: ByteArray, ieeeP1363Signature: Boolean): ByteArray {
+        require(!auth?.clientSecret.isNullOrBlank()) { "Azure clientSecret is required for signing operations" }
         ensureAccessTokenValid()
 
         val sha256Digest: ByteArray = SHA256().digest(plaintext)
@@ -180,7 +187,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun signJws(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>
@@ -196,7 +202,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
 
         val publicKey = getPublicKey()
@@ -210,7 +215,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val publicKey = getPublicKey()
         val verification = publicKey.verifyJws(signedJws)
@@ -310,7 +314,6 @@ class AzureKeyRestApi(
         @JsPromise
         @JsExport.Ignore
         suspend fun fetchAccessToken(auth: AzureAuth): AzureTokenResponseParsed {
-            require(auth.tenantId.all { it.lowercase() in "abcdef0123456789-" }) { "Tenant id contains invalid characters: ${auth.tenantId}" }
 
             val time = Clock.System.now()
             val response = client.post("https://login.microsoftonline.com/${auth.tenantId}/oauth2/v2.0/token") {
@@ -319,7 +322,7 @@ class AzureKeyRestApi(
                     listOf(
                         "grant_type" to "client_credentials",
                         "client_id" to auth.clientId,
-                        "client_secret" to auth.clientSecret,
+                        "client_secret" to (auth.clientSecret),
                         "scope" to "https://vault.azure.net/.default"
                     ).formUrlEncode()
                 )
@@ -375,7 +378,10 @@ class AzureKeyRestApi(
     companion object : AzureKeyCreator {
         private val client = HttpClient {
             install(ContentNegotiation) {
-                json(Json { prettyPrint = true })
+                json(Json {
+                    prettyPrint = true
+                    ignoreUnknownKeys = true
+                })
             }
         }
 
@@ -384,7 +390,6 @@ class AzureKeyRestApi(
             val keyName = metadata.name ?: Random.nextInt().toString()
 
             val accessTokenResponse = fetchAccessToken(metadata.auth)
-
             val (kty, crv) = keyTypeToAzureKeyMapping(type)
             val keyRequestBody = if (kty == "RSA") {
                 KeyCreateRequest(
@@ -407,12 +412,15 @@ class AzureKeyRestApi(
 
             val keyId = parsedAzurePublicKey.kid
 
-            return AzureKeyRestApi(
+            val createdKey = AzureKeyRestApi(
                 id = keyId,
                 auth = metadata.auth,
                 _keyType = parsedAzurePublicKey.keyType,
                 _publicKey = DirectSerializedKey(parsedAzurePublicKey.publicKey)
             )
+            createdKey.auth?.clientSecret = metadata.auth.clientSecret
+
+            return createdKey
         }
     }
 }

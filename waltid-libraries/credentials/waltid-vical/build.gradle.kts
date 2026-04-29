@@ -1,5 +1,4 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 plugins {
@@ -18,11 +17,10 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.serialization.cbor)
             implementation(identityLibs.kotlinx.coroutines.core)
 
-            // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation(identityLibs.kotlinx.datetime)
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -33,7 +31,7 @@ kotlin {
             implementation(kotlin("test-annotations-common"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
         }
         jvmMain.dependencies {
 
@@ -45,8 +43,8 @@ kotlin {
             // Test
             implementation(kotlin("test"))
 
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.params)
         }
         jsMain.dependencies {
 

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.crypto.keys.aws
 
 import id.walt.crypto.exceptions.KeyNotFoundException
@@ -31,12 +29,10 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }
@@ -60,10 +56,10 @@ var timeoutAt: Instant? = null
 @Serializable
 @SerialName("aws-rest-api")
 class AWSKeyRestAPI(
-    val config: AWSKeyMetadata,
+    var config: AWSKeyMetadata? = null,
     val id: String,
-    private var _publicKey: String? = null,
-    private var _keyType: KeyType? = null
+    var _publicKey: String? = null,
+    private var _keyType: KeyType? = null,
 ) : Key() {
 
 
@@ -76,7 +72,7 @@ class AWSKeyRestAPI(
     override val hasPrivateKey: Boolean
         get() = true
 
-    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
+    override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config?.auth?.region} - $id]"
 
     @JvmBlocking
     @JvmAsync
@@ -128,7 +124,7 @@ class AWSKeyRestAPI(
     @JsExport.Ignore
     @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (!awsSigningAlgorithm.endsWith("_SHA_256")){
+        if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
         val digestedMessage = sha256(plaintext)
@@ -144,17 +140,17 @@ class AWSKeyRestAPI(
         val headers = buildSigV4Headers(
             HttpMethod.Post,
             payload = body,
-            config = config
+            config = config!!
         )
 
-        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config!!.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Sign" }
 
         val signature = client.post("https://$awsKmsUrl/") {
             headers {
                 headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                append(HttpHeaders.Host, "kms.${config.auth.region}.amazonaws.com")
+                append(HttpHeaders.Host, "kms.${config!!.auth.region}.amazonaws.com")
                 append("X-Amz-Target", "TrentService.Sign") // Specific KMS action for CreateKey
                 _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
                     append("X-Amz-Security-Token", it)
@@ -198,7 +194,8 @@ class AWSKeyRestAPI(
     @JsPromise
     @JsExport.Ignore
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
-        val messageToVerify = detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
+        val messageToVerify =
+            detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
 
         // Calculate SHA-256 hash to handle payloads larger than 4KB
         val digestedMessage = sha256(messageToVerify)
@@ -215,10 +212,10 @@ class AWSKeyRestAPI(
         val headers = buildSigV4Headers(
             HttpMethod.Post,
             payload = body,
-            config = config
+            config = config!!
         )
 
-        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config!!.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.Verify" }
 
@@ -292,10 +289,10 @@ class AWSKeyRestAPI(
         val headers = buildSigV4Headers(
             HttpMethod.Post,
             payload = body,
-            config = config
+            config = config!!
         )
 
-        val awsKmsUrl = "kms.${config.auth.region}.amazonaws.com"
+        val awsKmsUrl = "kms.${config!!.auth.region}.amazonaws.com"
 
         logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.ScheduleKeyDeletion" }
 
@@ -310,7 +307,6 @@ class AWSKeyRestAPI(
         logger.debug { "Key $id scheduled for deletion" }
         return response.status == HttpStatusCode.OK
     }
-
 
 
     companion object : AWSKeyCreator {
@@ -539,7 +535,6 @@ ${sha256Hex(canonicalRequest)}
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        @OptIn(ExperimentalEncodingApi::class)
         suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
             val method = HttpMethod.Post
             val body = """
@@ -666,14 +661,19 @@ $public
 
             if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
 
-            val publicKey = getPublicKey(metadata, keyId.toString())
+            val publicKey = getPublicKey(metadata, keyId)
 
-            return AWSKeyRestAPI(
+            val createdKey = AWSKeyRestAPI(
                 config = metadata,
-                id = keyId.toString(),
+                id = keyId,
                 _publicKey = publicKey.exportJWK(),
                 _keyType = awsKeyToKeyTypeMapping(keyType)
             )
+
+            createdKey.config?.auth?.accessKeyId = metadata.auth.accessKeyId
+            createdKey.config?.auth?.secretAccessKey = metadata.auth.secretAccessKey
+
+            return createdKey
         }
 
     }

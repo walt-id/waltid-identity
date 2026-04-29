@@ -53,7 +53,7 @@ object RADIUS : UserPassBasedAuthMethod("radius") {
         )
 
         val responsePacket: Packet = radiusClient.send(accessRequest)
-        authCheck(responsePacket is AccessAccept , RadiusAuthException())
+        authCheck(responsePacket is AccessAccept, RadiusAuthException())
 
         return identifier
     }

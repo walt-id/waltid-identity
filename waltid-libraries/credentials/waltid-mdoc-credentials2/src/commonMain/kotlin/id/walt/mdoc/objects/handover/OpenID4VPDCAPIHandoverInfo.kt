@@ -5,10 +5,10 @@ package id.walt.mdoc.objects.handover
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborObjectAsArray
 
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class OpenID4VPDCAPIHandoverInfo(
     /** verifier's origin - without 'origin:' prefix (e.g., https://verifier.example.com) */
     val origin: String?,
@@ -19,7 +19,7 @@ data class OpenID4VPDCAPIHandoverInfo(
     /** SHA-256 thumbprint of the ephemeral public encryption key of client_metadata */
     @ByteString
     val jwkThumbprint: ByteArray?
-): BaseHandoverInfo {
+) : BaseHandoverInfo {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is OpenID4VPDCAPIHandoverInfo) return false

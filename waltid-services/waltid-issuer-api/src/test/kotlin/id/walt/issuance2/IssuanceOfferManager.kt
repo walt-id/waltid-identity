@@ -2,7 +2,6 @@
 
 package id.walt.issuance2
 
-
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.issuer.issuance.NewIssuanceRequest
 import id.walt.oid4vc.data.CredentialOffer
@@ -14,15 +13,18 @@ import kotlin.uuid.Uuid
 
 object IssuanceOfferManager {
 
-    val offerPersistence = ConfiguredPersistence<NewIssuanceRequest>("offer", 5.minutes,
+    val offerPersistence = ConfiguredPersistence<NewIssuanceRequest>(
+        "offer", 5.minutes,
         encoding = { Json.encodeToString(it) },
         decoding = { Json.decodeFromString(it) }
     )
-    val sessionTypePersistence = ConfiguredPersistence<String>("session_type", 5.minutes,
+    val sessionTypePersistence = ConfiguredPersistence<String>(
+        "session_type", 5.minutes,
         encoding = { it },
         decoding = { it }
     )
-    val sessionTypeDocumentPersistence = ConfiguredPersistence<String>("session_type_document", 5.minutes,
+    val sessionTypeDocumentPersistence = ConfiguredPersistence<String>(
+        "session_type_document", 5.minutes,
         encoding = { it },
         decoding = { it }
     )

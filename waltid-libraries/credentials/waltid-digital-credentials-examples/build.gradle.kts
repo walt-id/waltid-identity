@@ -10,9 +10,6 @@ plugins {
 
 group = "id.walt.credentials"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
 
 kotlin {
     js(IR) {
@@ -22,14 +19,14 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -45,8 +42,8 @@ kotlin {
             api(project(":waltid-libraries:waltid-did"))
 
             // Hashing
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-            implementation("org.kotlincrypto.hash:sha2")
+            
+            implementation(identityLibs.kotlincrypto.hash.sha2)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

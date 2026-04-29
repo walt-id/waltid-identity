@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 import id.walt.cose.CoseSign1
 import id.walt.cose.coseCompliantCbor
@@ -9,11 +9,13 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.deviceretrieval.ItemsRequestList
 import id.walt.mdoc.objects.digest.ValueDigestList
 import id.walt.mdoc.objects.elements.IssuerSignedItem
-import id.walt.mdoc.objects.elements.IssuerSignedItemSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import id.walt.mdoc.schema.MdocsSchemaMappingFunction.toCborElement
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborArray
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlin.random.Random
@@ -21,10 +23,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTime::class)
 class MdlCborTest {
 
     @Test
@@ -315,33 +315,33 @@ class MdlCborTest {
         val issuerSignedList = document.issuerSigned.namespaces?.get("org.iso.18013.5.1")
         assertNotNull(issuerSignedList)
         assertEquals(issuerSignedList.findItem(0U).elementIdentifier, "family_name")
-        assertEquals(issuerSignedList.findItem(0U).elementValue, "Doe")
+        assertEquals(CborString("Doe"), issuerSignedList.findItem(0U).elementValue)
         assertEquals(issuerSignedList.findItem(3U).elementIdentifier, "issue_date")
-        assertEquals(issuerSignedList.findItem(3U).elementValue, LocalDate.parse("2019-10-20"))
+        assertEquals(CborString(LocalDate.parse("2019-10-20").toString(), 1004UL), issuerSignedList.findItem(3U).elementValue)
         assertEquals(issuerSignedList.findItem(4U).elementIdentifier, "expiry_date")
-        assertEquals(issuerSignedList.findItem(4U).elementValue, LocalDate.parse("2024-10-20"))
+        assertEquals(CborString(LocalDate.parse("2024-10-20").toString(), 1004UL), issuerSignedList.findItem(4U).elementValue)
         assertEquals(issuerSignedList.findItem(7U).elementIdentifier, "document_number")
-        assertEquals(issuerSignedList.findItem(7U).elementValue, "123456789")
+        assertEquals(CborString("123456789"), issuerSignedList.findItem(7U).elementValue)
         assertEquals(issuerSignedList.findItem(8U).elementIdentifier, "portrait")
 
         assertNotNull(issuerSignedList.findItem(8U).elementValue)
 
         assertEquals(issuerSignedList.findItem(9U).elementIdentifier, "driving_privileges")
-        val drivingPrivilege = issuerSignedList.findItem(9U).elementValue as List<DrivingPrivilege>
+        val drivingPrivilege = issuerSignedList.findItem(9U).elementValue as CborArray
         assertNotNull(drivingPrivilege)
         assertContains(
             drivingPrivilege, DrivingPrivilege(
                 vehicleCategoryCode = "A",
                 issueDate = LocalDate.parse("2018-08-09"),
                 expiryDate = LocalDate.parse("2024-10-20")
-            )
+            ).toCborElement()
         )
         assertContains(
             drivingPrivilege, DrivingPrivilege(
                 vehicleCategoryCode = "B",
                 issueDate = LocalDate.parse("2017-02-23"),
                 expiryDate = LocalDate.parse("2024-10-20")
-            )
+            ).toCborElement()
         )
         val mso = document.issuerSigned.issuerAuth.decodeIsoPayload<MobileSecurityObject>()
 
@@ -353,12 +353,24 @@ class MdlCborTest {
         assertEquals(mso.validityInfo.validUntil, Instant.parse("2021-10-01T13:30:02Z"))
         val valueDigestList = mso.valueDigests["org.iso.18013.5.1"]
         assertNotNull(valueDigestList)
-        assertEquals(valueDigestList.findItem(0U).toHexString().uppercase(), "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF")
-        assertEquals(valueDigestList.findItem(1U).toHexString().uppercase(), "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571")
+        assertEquals(
+            valueDigestList.findItem(0U).toHexString().uppercase(),
+            "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF"
+        )
+        assertEquals(
+            valueDigestList.findItem(1U).toHexString().uppercase(),
+            "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571"
+        )
         val valueDigestListUs = mso.valueDigests["${"org.iso.18013.5.1"}.US"]
         assertNotNull(valueDigestListUs)
-        assertEquals(valueDigestListUs.findItem(0U).toHexString().uppercase(), "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C")
-        assertEquals(valueDigestListUs.findItem(1U).toHexString().uppercase(), "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34")
+        assertEquals(
+            valueDigestListUs.findItem(0U).toHexString().uppercase(),
+            "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C"
+        )
+        assertEquals(
+            valueDigestListUs.findItem(1U).toHexString().uppercase(),
+            "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34"
+        )
 
         assertNotNull(document.deviceSigned?.deviceAuth?.deviceMac)
 
@@ -407,10 +419,7 @@ class MdlCborTest {
         val inputDecoded = input.hexToByteArray()
 
         val deserialized = coseCompliantCbor.decodeFromByteArray(
-            IssuerSignedItemSerializer(
-                "org.iso.18013.5.1",
-                "issue_date"
-            ), inputDecoded
+            IssuerSignedItem.serializer(), inputDecoded
         )
         val serialized = deserialized.serialize("org.iso.18013.5.1")
 
@@ -476,10 +485,7 @@ class MdlCborTest {
 
         val inputDecoded = input.hexToByteArray()
         val deserialized = coseCompliantCbor.decodeFromByteArray(
-            IssuerSignedItemSerializer(
-                "org.iso.18013.5.1",
-                "driving_privileges"
-            ), inputDecoded
+            IssuerSignedItem.serializer(), inputDecoded
         )
         val serialized = deserialized.serialize("org.iso.18013.5.1")
 
@@ -608,12 +614,24 @@ class MdlCborTest {
         assertEquals(mso.validityInfo.validUntil, Instant.parse("2021-10-01T13:30:02Z"))
         val valueDigestList = mso.valueDigests["org.iso.18013.5.1"]
         assertNotNull(valueDigestList)
-        assertEquals(valueDigestList.findItem(0U).toHexString().uppercase(), "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF")
-        assertEquals(valueDigestList.findItem(1U).toHexString().uppercase(), "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571")
+        assertEquals(
+            valueDigestList.findItem(0U).toHexString().uppercase(),
+            "75167333B47B6C2BFB86ECCC1F438CF57AF055371AC55E1E359E20F254ADCEBF"
+        )
+        assertEquals(
+            valueDigestList.findItem(1U).toHexString().uppercase(),
+            "67E539D6139EBD131AEF441B445645DD831B2B375B390CA5EF6279B205ED4571"
+        )
         val valueDigestListUs = mso.valueDigests["${"org.iso.18013.5.1"}.US"]
         assertNotNull(valueDigestListUs)
-        assertEquals(valueDigestListUs.findItem(0U).toHexString().uppercase(), "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C")
-        assertEquals(valueDigestListUs.findItem(1U).toHexString().uppercase(), "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34")
+        assertEquals(
+            valueDigestListUs.findItem(0U).toHexString().uppercase(),
+            "D80B83D25173C484C5640610FF1A31C949C1D934BF4CF7F18D5223B15DD4F21C"
+        )
+        assertEquals(
+            valueDigestListUs.findItem(1U).toHexString().uppercase(),
+            "4D80E1E2E4FB246D97895427CE7000BB59BB24C8CD003ECF94BF35BBD2917E34"
+        )
 
         assertEquals(coseSigned.serialize().toHexString().uppercase(), input)
     }
@@ -631,4 +649,4 @@ private fun IssuerSignedList.findItem(digestId: UInt) =
 
 
 private fun IssuerSignedItem.serialize(namespace: String): ByteArray =
-    coseCompliantCbor.encodeToByteArray(IssuerSignedItemSerializer(namespace, elementIdentifier), this)
+    coseCompliantCbor.encodeToByteArray(IssuerSignedItem.serializer(), this)

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalJsExport::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalJsExport::class)
 
 package id.walt.policies
 
@@ -9,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @JsExport

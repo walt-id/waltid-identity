@@ -6,7 +6,7 @@ import id.walt.webdatafetching.WebDataFetcher
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.SchemaType
 import io.github.optimumcode.json.schema.ValidationError
-import io.ktor.http.Url
+import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -37,7 +37,10 @@ data class JsonSchemaPolicy(
         }
     }
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         val currentSchema = getCurrentSchema()
 
         val jsonSchema = JsonSchema.fromJsonElement(currentSchema, defaultType)

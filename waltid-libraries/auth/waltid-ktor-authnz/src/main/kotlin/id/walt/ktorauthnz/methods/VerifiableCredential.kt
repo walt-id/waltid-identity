@@ -8,7 +8,6 @@ import id.walt.ktorauthnz.methods.config.VerifiableCredentialAuthConfiguration
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -23,7 +22,6 @@ import io.ktor.server.util.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 object VerifiableCredential : AuthenticationMethod("vc") {
 
@@ -70,7 +68,7 @@ data class VerificationResultStatus(
 
 object Verifier {
 
-    private val client = HttpClient(CIO) {
+    private val client = HttpClient {
         install(ContentNegotiation) {
             json()
         }
@@ -105,7 +103,6 @@ object Verifier {
         return VerificationSessionResponse(presentationRequest, state)
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     suspend fun getVerificationResult(verifierUrl: String, id: String, requestedClaims: List<String>): VerificationResultStatus {
         val resp = client.get("$verifierUrl/openid4vc/session/$id").body<JsonObject>()
 

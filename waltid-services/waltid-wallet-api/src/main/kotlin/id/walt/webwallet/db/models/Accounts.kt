@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.db.models
 
@@ -9,7 +9,6 @@ import kotlinx.serialization.Transient
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi
@@ -17,6 +16,7 @@ import kotlin.uuid.Uuid
 
 object Accounts : Table("accounts") {
     val tenant = varchar("tenant", 128).default("")
+
     @OptIn(ExperimentalUuidApi::class)
     val id = kotlinxUuid("id").uniqueIndex()
 

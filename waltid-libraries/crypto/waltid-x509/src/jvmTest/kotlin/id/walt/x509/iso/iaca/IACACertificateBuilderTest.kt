@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca
 
 import id.walt.crypto.keys.Key
@@ -14,7 +12,7 @@ import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
 import id.walt.x509.toJcaX509Certificate
 import kotlinx.coroutines.test.runTest
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.ASN1Primitive
 import org.bouncycastle.asn1.DERIA5String
@@ -23,7 +21,7 @@ import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
 import kotlin.test.*
-import kotlin.time.ExperimentalTime
+
 
 /*
 The "main" purpose of this test is to check that the data that was input in the
@@ -117,7 +115,7 @@ class IACACertificateBuilderTest {
         val cert = generatedCertificate.toJcaX509Certificate()
 
         assertBuildersSerialNoCompliance(
-            serialNo = cert.serialNumber.toByteArray().toByteString(),
+            serialNo = ByteString(cert.serialNumber.toByteArray()),
         )
 
         assertContentEquals(

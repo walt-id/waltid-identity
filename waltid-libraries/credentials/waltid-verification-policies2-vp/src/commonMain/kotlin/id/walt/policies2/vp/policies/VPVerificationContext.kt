@@ -2,6 +2,7 @@ package id.walt.policies2.vp.policies
 
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /*sealed class VPVerificationRequest {
     abstract val base: BaseVerificationSessionContext
@@ -20,7 +21,9 @@ data class VerificationSessionContext(
 
     val isSigned: Boolean,
     val isEncrypted: Boolean,
-    val jwkThumbprint: String?
+    val jwkThumbprint: String?,
+    val customData: JsonObject? = null,
+    val isAnnexC: Boolean,
 ) {
     val isDcApi
         get() = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES

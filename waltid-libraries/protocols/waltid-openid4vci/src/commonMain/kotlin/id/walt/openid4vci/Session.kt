@@ -1,5 +1,7 @@
 package id.walt.openid4vci
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /**
@@ -8,12 +10,16 @@ import kotlin.time.Instant
  * into the persisted AuthorizationCodeRecord; the token handler restores it so the access request
  * inherits subject/expiry info before minting tokens.
  */
-interface Session {
-    fun setExpiresAt(tokenType: TokenType, expiresAt: Instant)
-    fun getExpiresAt(tokenType: TokenType): Instant?
-    fun setSubject(subject: String)
-    fun getSubject(): String?
-    fun cloneSession(): Session
+@Serializable
+sealed interface Session {
+    @SerialName("subject")
+    val subject: String?
+    @SerialName("expires_at")
+    val expiresAt: Map<TokenType, Instant>
+
+    fun withExpiresAt(tokenType: TokenType, instant: Instant): Session
+    fun withSubject(subject: String?): Session
+    fun copy(): Session
 }
 
 enum class TokenType {
@@ -22,25 +28,19 @@ enum class TokenType {
     AUTHORIZATION_CODE,
 }
 
-class DefaultSession(
-    private val expiresAt: MutableMap<TokenType, Instant> = mutableMapOf(),
-    private var subject: String? = null,
+@Serializable
+data class DefaultSession(
+    @SerialName("expires_at")
+    override val expiresAt: Map<TokenType, Instant> = emptyMap(),
+    @SerialName("subject")
+    override val subject: String? = null,
 ) : Session {
+    override fun withExpiresAt(tokenType: TokenType, instant: Instant): Session =
+        copy(expiresAt = expiresAt.toMutableMap().apply { this[tokenType] = instant })
 
-    override fun setExpiresAt(tokenType: TokenType, expiresAt: Instant) {
-        this.expiresAt[tokenType] = expiresAt
-    }
+    override fun withSubject(subject: String?): Session = copy(subject = subject)
 
-    override fun getExpiresAt(tokenType: TokenType): Instant? = expiresAt[tokenType]
-
-    override fun setSubject(subject: String) {
-        this.subject = subject
-    }
-
-    override fun getSubject(): String? = subject
-
-    override fun cloneSession(): Session = DefaultSession(
+    override fun copy(): Session = this.copy(
         expiresAt = expiresAt.toMutableMap(),
-        subject = subject,
     )
 }

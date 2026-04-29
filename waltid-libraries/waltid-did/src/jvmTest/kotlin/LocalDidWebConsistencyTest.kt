@@ -82,7 +82,8 @@ class LocalDidWebConsistencyTest {
 
     private fun populateTestData(): List<TestEntry> = runBlocking {
         println("-- Populating test data --")
-        val keyList: List<JWKKey> = KeyType.entries.map { keyType -> JWKKey.generate(keyType).also { println("Created JWKKey for $keyType: $it") } }
+        val keyList: List<JWKKey> =
+            KeyType.entries.map { keyType -> JWKKey.generate(keyType).also { println("Created JWKKey for $keyType: $it") } }
         val domain = "localhost:3021"
         keyList.map {
             val path = it.keyType.toString().lowercase()
@@ -108,7 +109,7 @@ class LocalDidWebConsistencyTest {
 
     private fun ApplicationEngine.Configuration.envConfig() {
         connector {
-            port = 8000
+            port = 8021
         }
         sslConnector(
             keyStore = keyStore,

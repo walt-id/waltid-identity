@@ -11,6 +11,7 @@ interface EditableAccountStore : AccountStore {
 
     suspend fun addAccountIdentifierToAccount(account: Account, newAccountIdentifier: AccountIdentifier) =
         addAccountIdentifierToAccount(account.id, newAccountIdentifier)
+
     suspend fun removeAccountIdentifierFromAccount(accountIdentifier: AccountIdentifier)
 
     //suspend fun addAccountStoredData(accountIdentifier: AccountIdentifier, data: Pair<AuthenticationMethod, AuthMethodStoredData>)

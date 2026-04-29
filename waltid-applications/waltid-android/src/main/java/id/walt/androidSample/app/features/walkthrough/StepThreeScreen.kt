@@ -130,7 +130,8 @@ fun StepThreeScreen(
             WaltSecondaryButton(
                 text = stringResource(R.string.label_generate_did),
                 onClick = {
-                    val isBiometricAvailable = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                    val isBiometricAvailable =
+                        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK)
                     authenticateWithBiometric(
                         context = ctx as FragmentActivity,
                         onAuthenticated = viewModel::onGenerateDIDClick,

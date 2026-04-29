@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.onboarding.service
 
 import id.walt.crypto.keys.KeyManager
@@ -16,7 +14,6 @@ import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonObject
-import okio.ByteString.Companion.toByteString
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.assertEquals
@@ -24,7 +21,6 @@ import kotlin.test.assertFails
 import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class IsoMdlOnboardingTests {
@@ -91,7 +87,7 @@ class IsoMdlOnboardingTests {
     private fun pemToCertificateDer(pem: String) = CertificateDer(
         bytes = JWKKey.convertDERorPEMtoByteArray(
             derOrPem = pem,
-        ).toByteString(),
+        )
     )
 
     @Test

@@ -60,7 +60,7 @@ abstract class E2EWalletTestBase {
         }
     }
 
-    protected suspend fun requestCredential(issuanceUri: String, did: String) {
+    protected suspend fun requestCredential(issuanceUri: String, did: String): String {
         println("\nUse Case -> Use Offer Request")
         val result = walletClient.post("$walletUrl/wallet-api/wallet/$walletId/exchange/useOfferRequest") {
             parameter("did", did)
@@ -69,6 +69,23 @@ abstract class E2EWalletTestBase {
         }
         println("Claim result: $result")
         assertEquals(HttpStatusCode.OK, result.status)
+        val credentials = result.body<JsonArray>()
+        assertTrue(credentials.isNotEmpty(), "No credentials returned after claim")
+        return credentials[0].jsonObject["document"]?.jsonPrimitive?.content ?: error("No document in claimed credential")
+    }
+
+    protected suspend fun issueSdJwtCredential(): String = run {
+        val endpoint = "$issuerUrl/openid4vc/sdjwt/issue"
+        println("POST ($endpoint)\n")
+
+        println("Calling issuer...")
+        val issuanceUri = walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            setBody(IssuanceExamples.sdJwtVCData)
+        }.bodyAsText()
+
+        println("Issuance (Offer) URI: $issuanceUri\n")
+        return issuanceUri
     }
 
     protected suspend fun issueJwtCredential(): String = run {
@@ -309,5 +326,117 @@ abstract class E2EWalletTestBase {
                 assertEquals(HttpStatusCode.Accepted, response.status)
             }
         }
+    }
+
+    /**
+     * Import a credential (W3C JWT or SD-JWT) into the wallet.
+     * The credential must be bound to a DID that exists in this wallet.
+     */
+    protected suspend fun importCredential(credential: String, associatedDid: String): String {
+        println("\nUse Case -> Import Credential\n")
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/credentials/import"
+        println("POST $endpoint")
+
+        val response = walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            setBody(mapOf(
+                "jwt" to credential,
+                "associated_did" to associatedDid
+            ))
+        }
+        
+        assertEquals(HttpStatusCode.Created, response.status)
+        val result = response.body<JsonObject>()
+        val credentialId = result["id"]?.jsonPrimitive?.content ?: error("No credential ID in response")
+        
+        println("Credential imported successfully with ID: $credentialId")
+        return credentialId
+    }
+
+    /**
+     * Import a W3C JWT VC into the wallet
+     */
+    protected suspend fun importW3cJwtCredential(jwtVc: String, associatedDid: String): String {
+        println("\nUse Case -> Import W3C JWT VC Credential\n")
+        return importCredential(jwtVc, associatedDid)
+    }
+
+    /**
+     * Import an SD-JWT VC into the wallet
+     * The credential string should include the JWT and any disclosures (format: jwt~disclosure1~disclosure2~)
+     */
+    protected suspend fun importSdJwtCredential(sdJwtVc: String, associatedDid: String): String {
+        println("\nUse Case -> Import SD-JWT VC Credential\n")
+        assertTrue(sdJwtVc.contains("~"), "SD-JWT credential should contain disclosures (~ separator)")
+        return importCredential(sdJwtVc, associatedDid)
+    }
+
+    /**
+     * Test importing a credential with a DID mismatch (should fail)
+     */
+    protected suspend fun testImportCredentialWithMismatchedDid(credential: String, wrongDid: String) {
+        println("\nUse Case -> Test Import Credential with Mismatched DID (should fail)\n")
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/credentials/import"
+        println("POST $endpoint")
+
+        val response = walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            setBody(mapOf(
+                "jwt" to credential,
+                "associated_did" to wrongDid
+            ))
+        }
+        
+        // Should fail with BadRequest or NotFound
+        assertTrue(
+            response.status == HttpStatusCode.BadRequest || response.status == HttpStatusCode.NotFound,
+            "Expected BadRequest or NotFound but got ${response.status}"
+        )
+        println("Import correctly failed with status: ${response.status}")
+    }
+
+    /**
+     * Test importing a credential with an invalid JWT (should fail)
+     */
+    protected suspend fun testImportInvalidCredential(invalidJwt: String, associatedDid: String) {
+        println("\nUse Case -> Test Import Invalid Credential (should fail)\n")
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/credentials/import"
+        println("POST $endpoint")
+
+        val response = walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            setBody(mapOf(
+                "jwt" to invalidJwt,
+                "associated_did" to associatedDid
+            ))
+        }
+        
+        assertEquals(HttpStatusCode.BadRequest, response.status, "Invalid JWT should return BadRequest")
+        println("Import correctly failed with BadRequest")
+    }
+
+    /**
+     * Test importing a duplicate credential (should fail with Conflict)
+     */
+    protected suspend fun testImportDuplicateCredential(credential: String, associatedDid: String) {
+        println("\nUse Case -> Test Import Duplicate Credential (should fail)\n")
+        
+        // First import should succeed
+        importCredential(credential, associatedDid)
+        
+        // Second import should fail with Conflict
+        val endpoint = "$walletUrl/wallet-api/wallet/$walletId/credentials/import"
+        println("POST $endpoint (second attempt)")
+
+        val response = walletClient.post(endpoint) {
+            contentType(ContentType.Application.Json)
+            setBody(mapOf(
+                "jwt" to credential,
+                "associated_did" to associatedDid
+            ))
+        }
+        
+        assertEquals(HttpStatusCode.Conflict, response.status, "Duplicate credential should return Conflict")
+        println("Duplicate import correctly failed with Conflict")
     }
 }

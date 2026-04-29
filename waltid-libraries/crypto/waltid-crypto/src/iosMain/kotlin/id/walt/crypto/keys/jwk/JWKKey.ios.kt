@@ -138,4 +138,36 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         }
 
     }
+
+    override fun hashCode(): Int {
+        var result = _keyId?.hashCode() ?: 0
+        val jsonHash = _jwkObj.toString().hashCode()
+        result = 31 * result + jsonHash
+        return result
+    }
+
+    actual suspend fun decryptJwe(jweString: String): ByteArray {
+        TODO("Not yet implemented")
+    }
+
+    actual suspend fun encryptJwe(plaintext: ByteArray): String {
+        TODO("Not yet implemented")
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || this::class != other::class) return false
+        if (!super.equals(other)) return false
+
+        other as JWKKey
+
+        if (jwk != other.jwk) return false
+        if (_keyId != other._keyId) return false
+        if (_jwkObj != other._jwkObj) return false
+        if (privateParameters != other.privateParameters) return false
+        if (hasPrivateKey != other.hasPrivateKey) return false
+        if (keyType != other.keyType) return false
+
+        return true
+    }
 }

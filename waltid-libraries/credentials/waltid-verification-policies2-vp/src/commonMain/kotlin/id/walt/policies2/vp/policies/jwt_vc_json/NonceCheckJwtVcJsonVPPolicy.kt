@@ -24,8 +24,10 @@ class NonceCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
 
     override suspend fun VPPolicyRunContext.verifyJwtVcJsonPolicy(
         presentation: JwtVcJsonPresentation,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> {
+        requireNotNull(verificationContext) { "Verification context needs to be provided for NonceCheck JwtVcJson VP Policy" }
+
         presentationRequire(
             presentation.nonce == verificationContext.expectedNonce,
             W3CPresentationValidationError.NONCE_MISMATCH

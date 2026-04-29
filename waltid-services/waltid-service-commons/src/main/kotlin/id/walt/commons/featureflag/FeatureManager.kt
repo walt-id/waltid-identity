@@ -28,9 +28,13 @@ object FeatureManager {
 
     private val log = logger("FeatureManager")
 
-    suspend fun enableFeatureAndIfNotSucceededRun(feature: AbstractFeature, ifNotSucceeded: (AbstractFeature, Throwable) -> Unit = { _, _ -> }) {
-        enableFeature (feature).ifResultNotSucceeded(feature) { ex -> ifNotSucceeded.invoke(feature, ex) }
+    suspend fun enableFeatureAndIfNotSucceededRun(
+        feature: AbstractFeature,
+        ifNotSucceeded: (AbstractFeature, Throwable) -> Unit = { _, _ -> }
+    ) {
+        enableFeature(feature).ifResultNotSucceeded(feature) { ex -> ifNotSucceeded.invoke(feature, ex) }
     }
+
     suspend fun enableFeature(feature: AbstractFeature): Result<Boolean> {
         feature.dependsOn // todo: handle this
 
@@ -71,7 +75,7 @@ object FeatureManager {
         return enabledFeatures.contains(featureName) || (!disabledFeatures.contains(featureName) && when (val registeredFeature =
             registeredFeatures[featureName]) {
             is BaseFeature -> true
-            is OptionalFeature -> registeredFeature.default
+            is OptionalFeature -> registeredFeature.default.value
             else -> false
         })
     }
@@ -185,7 +189,7 @@ object FeatureManager {
 
         log.info { "Defaulted features (${getDefaultedFeatures().size}): ${getDefaultedFeatures().joinToString()}" }
         getDefaultedAbstractFeatures().forEach { feature ->
-            if ((feature is BaseFeature || (feature is OptionalFeature && feature.default)) && !failed.any { it.first == feature }) {
+            if (feature.shouldDefaultEnable() && !failed.any { it.first == feature }) {
                 log.info { "Enabling default feature \"${feature.name}\"..." }
                 enableFeatureAndIfNotSucceededRun(feature) { _, ex ->
                     failed += feature to ex

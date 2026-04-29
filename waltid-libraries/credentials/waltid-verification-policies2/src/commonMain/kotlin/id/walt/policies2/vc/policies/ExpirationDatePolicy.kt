@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.policies2.vc.policies
 
 import com.nfeld.jsonpathkt.JsonPath
@@ -16,7 +14,6 @@ import kotlinx.serialization.json.long
 import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @Serializable
@@ -46,7 +43,10 @@ class ExpirationDatePolicy : CredentialVerificationPolicy2() {
         override val claim: String
     ) : PolicyClaimChecker.ClaimCheckResultSuccess()
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 

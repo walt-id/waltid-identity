@@ -1,9 +1,8 @@
 package id.walt.x509
 
-import okio.ByteString.Companion.toByteString
 import java.security.KeyStore
 import java.security.cert.X509Certificate
-import java.util.*
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -13,10 +12,10 @@ class X509Test {
 
     fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer> =
         x5cBase64.map {
-            CertificateDer(Base64.getDecoder().decode(it).toByteString())
+            CertificateDer(Base64.getDecoder().decode(it))
         }
 
-    fun der(cert: X509Certificate) = CertificateDer(cert.encoded.toByteString())
+    fun der(cert: X509Certificate) = CertificateDer(cert.encoded)
     fun b64(cert: X509Certificate): String = Base64.getEncoder().encodeToString(cert.encoded)
 
     @Test

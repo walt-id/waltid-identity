@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc.requests
 
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
@@ -11,9 +9,8 @@ import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 data class EntraIssuanceRequest(
     val authorizationRequest: AuthorizationRequest,
@@ -23,7 +20,6 @@ data class EntraIssuanceRequest(
     val issuerReturnAddress
         get() = manifest["input"]!!.jsonObject["credentialIssuer"]!!.jsonPrimitive.content
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun getHashedPin(pin: String): String? {
         return (authorizationRequest.customParameters["pin"]?.firstOrNull()?.let {
             Json.parseToJsonElement(it)

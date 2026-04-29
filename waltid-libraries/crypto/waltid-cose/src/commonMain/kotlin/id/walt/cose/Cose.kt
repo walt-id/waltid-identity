@@ -2,12 +2,13 @@
 
 package id.walt.cose
 
+import id.walt.crypto.keys.KeyType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
-import kotlinx.serialization.cbor.CborArray
 import kotlinx.serialization.cbor.CborLabel
+import kotlinx.serialization.cbor.CborObjectAsArray
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
@@ -17,7 +18,7 @@ import kotlin.io.encoding.Base64
 interface CoseMessage
 
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class CoseSign1(
     @ByteString val protected: ByteArray,
     val unprotected: CoseHeaders,
@@ -215,7 +216,7 @@ data class CoseSign1(
 }
 
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class CoseMac0(
     @ByteString val protected: ByteArray,
     val unprotected: CoseHeaders,
@@ -464,7 +465,7 @@ data class CoseKey(
 
 /** Represents a COSE Key Set. Aligned with RFC 8152, Section 7. */
 @Serializable
-@CborArray
+@CborObjectAsArray
 data class CoseKeySet(val keys: List<CoseKey>)
 
 
@@ -531,10 +532,13 @@ object Cose {
         // HMAC:
         /** HMAC w/ SHA-256 truncated to 64 bits */
         const val HMAC_256_64 = 4
+
         /** HMAC w/ SHA-256 */
         const val HMAC_256 = 5
+
         /** HMAC w/ SHA-384 */
         const val HMAC_384 = 6
+
         /** HMAC w/ SHA-512 */
         const val HMAC_512 = 7
     }
@@ -618,6 +622,15 @@ object Cose {
 
         /** SECG secp256k1 curve */
         const val secp256k1 = 8
+
+        fun ellipticCurveForKeyType(keyType: KeyType) = when (keyType) {
+            KeyType.secp256r1 -> P_256
+            KeyType.secp384r1 -> P_384
+            KeyType.secp521r1 -> P_521
+            KeyType.secp256k1 -> secp256k1
+            KeyType.Ed25519 -> Ed25519
+            else -> throw IllegalArgumentException("Unsupported/unknown key type for COSE elliptic curve conversion: $keyType")
+        }
     }
 
 }

@@ -27,7 +27,7 @@ RUN gradle buildFatJar --no-daemon
 
 # Stage 3: Create the Runtime Image
 FROM amazoncorretto:22 AS runtime
-WORKDIR /app
+WORKDIR /waltid-issuer-api
 
 # Create an unprivileged user and group
 RUN yum install -y shadow-utils \
@@ -37,8 +37,8 @@ RUN yum install -y shadow-utils \
 
 COPY --chown=app:app --from=build \
   /home/gradle/src/waltid-services/waltid-issuer-api/build/libs/*.jar \
-  /app/issuer-api.jar
+  /waltid-issuer-api/issuer-api.jar
 
 USER app
 EXPOSE 7002
-ENTRYPOINT ["java","-jar","/app/issuer-api.jar"]
+ENTRYPOINT ["java","-jar","/waltid-issuer-api/issuer-api.jar"]

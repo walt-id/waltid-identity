@@ -80,6 +80,7 @@ class AndroidKey() : Key() {
                     toString()
                 }
             }
+
             else -> throw IllegalArgumentException("KeyType $internalKeyType is not supported in Android KeyStore")
         }
     }

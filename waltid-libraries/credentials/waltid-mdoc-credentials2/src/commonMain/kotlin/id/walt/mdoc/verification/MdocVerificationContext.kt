@@ -1,5 +1,7 @@
 package id.walt.mdoc.verification
 
+import kotlinx.serialization.json.JsonObject
+
 /**
  * A data class to hold the context required for a specific verification transaction.
  * This makes the verifier's public API cleaner.
@@ -16,4 +18,7 @@ data class MdocVerificationContext(
     val jwkThumbprint: String? = null,
     val isEncrypted: Boolean = false,
     val isDcApi: Boolean = false,
+    val isAnnexC: Boolean = false,
+
+    val data: JsonObject? = null
 )

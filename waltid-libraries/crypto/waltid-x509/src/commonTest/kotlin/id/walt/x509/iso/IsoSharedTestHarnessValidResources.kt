@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso
 
 import id.walt.crypto.keys.Key
@@ -19,7 +17,7 @@ import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
+
 
 object IsoSharedTestHarnessValidResources {
 

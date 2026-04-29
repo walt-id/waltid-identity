@@ -9,6 +9,7 @@ enum class ResponseMode {
     fragment,
     form_post,
     direct_post,
+
     @SerialName("direct_post.jwt")
     direct_post_jwt,
     post;

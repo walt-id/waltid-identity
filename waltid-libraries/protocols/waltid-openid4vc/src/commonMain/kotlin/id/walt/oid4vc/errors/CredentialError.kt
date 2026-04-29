@@ -10,9 +10,12 @@ import kotlin.time.Duration
 class CredentialError(
     credentialRequest: CredentialRequest?,
     val errorCode: CredentialErrorCode,
-    val errorUri: String? = null, val cNonce: String? = null, val cNonceExpiresIn: Duration? = null,
-    override val message: String? = null
-) : Exception() {
+    val errorUri: String? = null,
+    val cNonce: String? = null,
+    val cNonceExpiresIn: Duration? = null,
+    message: String? = null,
+    rootCause: Throwable? = null
+) : Exception(message, rootCause) {
     fun toCredentialErrorResponse() = CredentialResponse.error(errorCode, message, errorUri, cNonce, cNonceExpiresIn)
 }
 

@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.ktorauthnz.sessions
 
 import id.walt.crypto.utils.UuidUtils.randomUUIDString
@@ -8,7 +6,7 @@ import id.walt.ktorauthnz.flows.AuthFlow
 import id.walt.ktorauthnz.utils.ExternalMappingList
 import kotlinx.coroutines.flow.asFlow
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+
 
 object SessionManager {
 

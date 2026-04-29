@@ -28,6 +28,7 @@ data class CoseHmacKey(val keyBytes: ByteArray) {
                     val fullTag = HmacSHA256(keyBytes).doFinal(dataToMac)
                     fullTag.copyOf(8)
                 }
+
                 Cose.Algorithm.HMAC_256 -> HmacSHA256(keyBytes).doFinal(dataToMac)
                 Cose.Algorithm.HMAC_384 -> HmacSHA384(keyBytes).doFinal(dataToMac)
                 Cose.Algorithm.HMAC_512 -> HmacSHA512(keyBytes).doFinal(dataToMac)

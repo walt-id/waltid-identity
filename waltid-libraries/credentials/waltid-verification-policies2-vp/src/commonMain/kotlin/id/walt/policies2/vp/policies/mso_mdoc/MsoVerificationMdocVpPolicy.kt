@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
 @file:Suppress("PackageDirectoryMismatch")
 
 package id.walt.policies2.vp.policies
@@ -9,7 +8,7 @@ import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.time.ExperimentalTime
+
 
 private const val policyId = "mso_mdoc/mso"
 
@@ -27,7 +26,7 @@ class MsoVerificationMdocVpPolicy : MdocVPPolicy() {
     override suspend fun VPPolicyRunContext.verifyMdocPolicy(
         document: Document,
         mso: MobileSecurityObject,
-        verificationContext: VerificationSessionContext
+        verificationContext: VerificationSessionContext?
     ): Result<Unit> {
         log.trace { "--- Verifying MSO ---" }
         val timestamps = mso.validityInfo

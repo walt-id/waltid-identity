@@ -5,7 +5,7 @@ import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.WaltIdJWTCryptoProvider
 
 actual object JWTCryptoProviderManager {
-  actual fun getDefaultJWTCryptoProvider(keys: Map<String, Key>): JWTCryptoProvider {
-    return WaltIdJWTCryptoProvider(keys)
-  }
+    actual fun getDefaultJWTCryptoProvider(keys: Map<String, Key>): JWTCryptoProvider {
+        return WaltIdJWTCryptoProvider(keys)
+    }
 }

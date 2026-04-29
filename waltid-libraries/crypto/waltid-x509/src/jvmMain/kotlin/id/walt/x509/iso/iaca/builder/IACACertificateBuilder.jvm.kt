@@ -1,32 +1,22 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.x509.iso.iaca.builder
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
-import id.walt.x509.CertificateDer
-import id.walt.x509.JcaX509CertificateHandle
-import id.walt.x509.KeyContentSignerWrapper
-import id.walt.x509.X509KeyUsage
-import id.walt.x509.iso.iaca.certificate.toJcaX500Name
-import id.walt.x509.X509ValidityPeriod
-import id.walt.x509.criticalX509V3ExtensionOIDs
+import id.walt.x509.*
 import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
 import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
+import id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
-import id.walt.x509.nonCriticalX509V3ExtensionOIDs
-import id.walt.x509.x509BasicConstraints
-import okio.ByteString.Companion.toByteString
+import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
 import java.math.BigInteger
-import java.util.*
-import kotlin.time.ExperimentalTime
+import java.util.Date
 import kotlin.time.Instant
 
 
@@ -119,7 +109,7 @@ internal actual suspend fun platformSignIACACertificate(
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
     val certificateDer = CertificateDer(
-        bytes = certificate.encoded.toByteString(),
+        bytes = ByteString(certificate.encoded),
     )
 
     return IACACertificateBundle(
@@ -131,7 +121,7 @@ internal actual suspend fun platformSignIACACertificate(
                 notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
             ),
             issuerAlternativeName = profileData.issuerAlternativeName,
-            serialNumber = serialNo.toByteArray().toByteString(),
+            serialNumber = ByteString(serialNo.toByteArray()),
             basicConstraints = certificate.x509BasicConstraints,
             keyUsage = setOf(
                 X509KeyUsage.KeyCertSign,

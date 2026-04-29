@@ -3,13 +3,13 @@
 package id.walt.mdoc.issuersigned
 
 import id.walt.mdoc.dataelement.*
-import korlibs.crypto.SecureRandom
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import org.kotlincrypto.random.CryptoRand
 
 /**
  * Issuer signed item
@@ -61,11 +61,12 @@ data class IssuerSignedItem(
             elementIdentifier: String,
             elementValue: AnyDataElement
         ): IssuerSignedItem {
+            val randomBytes = ByteArray(16)
             return IssuerSignedItem(
-                digestID.toDataElement(),
-                SecureRandom.nextBytes(16).toDataElement(),
-                elementIdentifier.toDataElement(),
-                elementValue
+                digestID = digestID.toDataElement(),
+                random = CryptoRand.nextBytes(randomBytes).toDataElement(),
+                elementIdentifier = elementIdentifier.toDataElement(),
+                elementValue = elementValue
             )
         }
     }

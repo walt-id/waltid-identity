@@ -1,3 +1,5 @@
+import org.gradle.kotlin.dsl.register
+
 listOf("iosArm64", "iosSimulatorArm64").forEach { target ->
 
     tasks.register<Exec>("implementation-$target-pod-install") {
@@ -49,7 +51,7 @@ listOf("iosArm64", "iosSimulatorArm64").forEach { target ->
     }
 }
 
-tasks.create<Delete>("clean") {
+tasks.register<Delete>("clean") {
     group = "build"
 
     delete(

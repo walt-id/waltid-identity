@@ -3,18 +3,20 @@ package id.walt.mdoc.objects.document
 import id.walt.cose.CoseSign1
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.elements.NamespacedIssuerSignedListSerializer
 import id.walt.mdoc.objects.mso.MobileSecurityObject
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.putJsonObject
 import kotlin.io.encoding.Base64
@@ -53,8 +55,12 @@ data class IssuerSigned private constructor(
      * @return The parsed [MobileSecurityObject].
      * @throws Exception if the payload cannot be decoded.
      */
-    fun decodeMobileSecurityObject() =
+    fun decodeMobileSecurityObject() = runCatching {
         issuerAuth.decodeIsoPayload<MobileSecurityObject>()
+    }.getOrElse { ex ->
+        log.trace(ex) { "Unable to parse MSO with decodeMobileSecurityObject(), MSO is: ${issuerAuth.payload?.toHexString()}" }
+        throw IllegalArgumentException("Unable to parse MSO (mobile security object) of IssuerSigned: ${ex.message}", ex)
+    }
 
     /**
      * A utility function to convert the structured, CBOR-oriented `namespaces` map into a
@@ -76,11 +82,11 @@ data class IssuerSigned private constructor(
                         ?.runCatching {
                             Json.encodeToJsonElement(this as KSerializer<Any?>, item.elementValue)
                         }?.getOrElse { println("Error encoding with custom serializer: ${it.stackTraceToString()}"); null }
-                        ?: item.elementValue.toJsonElement()
+                        ?: item.elementValue.toSerializedJsonElement()
 
-                    put(item.elementIdentifier, serialized)
+                    if (serialized != JsonNull)
+                        put(item.elementIdentifier, serialized)
                 }
-
             }
         }
     }
@@ -92,11 +98,12 @@ data class IssuerSigned private constructor(
 
     suspend fun getParsedIssuerAuth(): ParsedIssuerAuth {
         val containedX5c = issuerAuth.unprotected.x5chain
-        requireNotNull(containedX5c) { "Missingg x5c X509 certificate chain in Mdocs credential" }
+        requireNotNull(containedX5c) { "Missing x5c X509 certificate chain in Mdocs credential" }
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
 
-        val signerKeyCertificate = containedX5c.firstOrNull() ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
+        val signerKeyCertificate = containedX5c.firstOrNull()
+            ?: throw IllegalArgumentException("Contained x5c X509 certificate chain in Mdocs credentials is empty (no signer element)")
         val signerKey = JWKKey.importFromDerCertificate(signerKeyCertificate.rawBytes)
             .getOrThrow()
 
@@ -105,6 +112,8 @@ data class IssuerSigned private constructor(
 
 
     companion object {
+        val log = KotlinLogging.logger {  }
+
         /**
          * The primary factory method for creating an [IssuerSigned] instance.
          * Using a factory method with a private constructor ensures that the object is always

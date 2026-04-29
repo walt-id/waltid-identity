@@ -25,9 +25,9 @@ data class VPPolicyList(
         @Suppress("UNCHECKED_CAST")
         fun splitFromVPPolicyList(mixedPolicies: List<VPPolicy2>): VPPolicyList =
             VPPolicyList(
-                jwtVcJson = mixedPolicies.filter { it is JwtVcJsonVPPolicy } as List<JwtVcJsonVPPolicy>,
-                dcSdJwt = mixedPolicies.filter { it is DcSdJwtVPPolicy } as List<DcSdJwtVPPolicy>,
-                msoMdoc = mixedPolicies.filter { it is MdocVPPolicy } as List<MdocVPPolicy>
+                jwtVcJson = mixedPolicies.filterIsInstance<JwtVcJsonVPPolicy>(),
+                dcSdJwt = mixedPolicies.filterIsInstance<DcSdJwtVPPolicy>(),
+                msoMdoc = mixedPolicies.filterIsInstance<MdocVPPolicy>()
             )
     }
 }
@@ -46,7 +46,10 @@ object VPPolicyListSerializer : KSerializer<VPPolicyList> {
         val elem = jsonInput.decodeJsonElement()
 
         val allPolicies = when (elem) {
-            is JsonObject -> elem.values.flatMap { it as? JsonArray ?: throw SerializationException("Expected a JsonArray, but was: $elem") }
+            is JsonObject -> elem.values.flatMap {
+                it as? JsonArray ?: throw SerializationException("Expected a JsonArray, but was: $elem")
+            }
+
             is JsonArray -> elem.map { it }
             else -> throw SerializationException("Invalid JSON structure of VPPolicyList, was: $elem")
         }

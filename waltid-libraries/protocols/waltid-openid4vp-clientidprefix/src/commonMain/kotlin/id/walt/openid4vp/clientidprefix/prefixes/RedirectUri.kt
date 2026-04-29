@@ -3,7 +3,6 @@ package id.walt.openid4vp.clientidprefix.prefixes
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
 

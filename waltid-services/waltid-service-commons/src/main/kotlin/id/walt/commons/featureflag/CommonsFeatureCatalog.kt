@@ -3,8 +3,11 @@ package id.walt.commons.featureflag
 import id.walt.commons.config.list.WebConfig
 import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.commons.web.modules.ServiceHealthChecksDebugModule
+import io.klogging.noCoLogger
 
 object CommonsFeatureCatalog : ServiceFeatureCatalog {
+
+    private val log = noCoLogger<CommonsFeatureCatalog>()
 
     val webFeature = BaseFeature("web", "Web service", WebConfig::class)
     val persistenceFeature = OptionalFeature("persistence", "Storage", PersistenceConfiguration::class, false)
@@ -19,7 +22,7 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
     val debugEndpointsFeature = OptionalFeature(
         "debug-endpoints",
         "Enables various debug endpoints",
-        default = false,
+        default = lazy { log.isDebugEnabled() },
         config = ServiceHealthChecksDebugModule.ServiceDebugModuleConfiguration::class
     )
     val openApiFeature = OptionalFeature("openapi", "Enables openapi endpoints", default = true)
@@ -28,5 +31,12 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
 
     override val baseFeatures: List<BaseFeature> = listOf(webFeature)
     override val optionalFeatures: List<OptionalFeature> =
-        listOf(persistenceFeature, featureFlagInformationEndpointFeature, healthChecksFeature, debugEndpointsFeature, openApiFeature, authenticationServiceFeature)
+        listOf(
+            persistenceFeature,
+            featureFlagInformationEndpointFeature,
+            healthChecksFeature,
+            debugEndpointsFeature,
+            openApiFeature,
+            authenticationServiceFeature
+        )
 }

@@ -4,6 +4,7 @@ import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.SessionTranscript
+import id.walt.mdoc.objects.dcapi.DCAPIHandover
 import id.walt.mdoc.objects.document.DeviceAuthentication
 import id.walt.mdoc.objects.document.DeviceAuthentication.Companion.DEVICE_AUTHENTICATION_TYPE
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
@@ -63,6 +64,41 @@ object MdocCryptoHelper {
         log.trace { "Reconstructed CBOR handoverInfoBytes (hex): ${handoverInfoBytes.toHexString()}" }
 
         return reconstructSessionTranscript(handoverInfo, handoverInfoBytes)
+    }
+
+    fun reconstructAnnexCSessionTranscript(
+        context: MdocVerificationContext,
+        // You MUST pass the raw string you sent to the frontend here
+        base64EncryptionInfo: String
+    ): SessionTranscript {
+        log.trace { "Reconstructing Annex C Session Transcript" }
+
+        // 1. Prepare the structure to be hashed
+        // The spec requires [Base64EncryptionInfo, SerializedOrigin]
+        val handoverInfo = AnnexCDcapiHandoverInfo(
+            base64EncryptionInfo = base64EncryptionInfo,
+            origin = context.expectedAudience?.trim()?.trimEnd('/')
+                ?: error("Missing origin for Annex C transcript")
+        )
+        log.trace { "Handover info: $handoverInfo" }
+
+        // 2. Serialize this structure to CBOR
+        val dcapiInfoBytes = coseCompliantCbor.encodeToByteArray(handoverInfo)
+        log.trace { "Info bytes (hex): ${dcapiInfoBytes.toHexString()}" }
+
+        // 3. Calculate SHA-256 Hash
+        val infoHash = dcapiInfoBytes.sha256()
+        log.trace { "Info hash (sha256) (hex): ${infoHash.toHexString()}" }
+
+        // 4. Create the Handover object
+        val handover = DCAPIHandover(
+            type = DCAPIHandover.HandoverType.dcapi,
+            dcapiInfoHash = infoHash
+        )
+        log.trace { "Handover: $handover" }
+
+        // 5. Return the SessionTranscript using your existing factory
+        return SessionTranscript.forDcApi(handover).also { log.trace { "Session transcript: $it" } }
     }
 
     /**

@@ -6,8 +6,8 @@ import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidationConfig
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.ByteString
 import kotlinx.serialization.json.Json
-import okio.ByteString.Companion.toByteString
 import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertFails
@@ -77,7 +77,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
         }.forEach { derEncodedCertificate ->
             val iacaDecodedCertificate = iacaParser.parse(
                 certificate = CertificateDer(
-                    bytes = derEncodedCertificate.toByteString(),
+                    bytes = ByteString(derEncodedCertificate),
                 ),
             )
 
@@ -129,7 +129,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
                 val iacaDecodedCertificate = iacaParser.parse(
                     certificate = CertificateDer(
-                        bytes = Base64.Mime.decode(it).toByteString(),
+                        bytes = ByteString(Base64.Mime.decode(it)),
                     ),
                 )
 
@@ -213,7 +213,7 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
             val iacaDecodedCertificate = iacaParser.parse(
                 certificate = CertificateDer(
-                    bytes = Base64.Mime.decode(it).toByteString(),
+                    bytes = ByteString(Base64.Mime.decode(it)),
                 ),
             )
 

@@ -1,0 +1,16 @@
+package id.walt.verifier2.handlers.sessioncreation
+
+import io.ktor.http.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+
+@Serializable
+data class VerificationSessionCreationResponse(
+    val sessionId: String,
+    val bootstrapAuthorizationRequestUrl: Url? = null,
+    val fullAuthorizationRequestUrl: Url? = null,
+    val creationTarget: String? = null,
+
+    // Custom data:
+    val data: JsonElement? = null,
+)

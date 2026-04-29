@@ -12,7 +12,7 @@ jobs:
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@dc1fe980edefa8711c265113325a1ace3cd5e73d
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@3953e60730aeeb1d918bdf24318a1fcf9d180830
     secrets: inherit
     needs: version
     with:
@@ -34,7 +34,7 @@ jobs:
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@3a0b58287aa318e34845cd7f8279a1441ae8cbe2
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@807020d067847768f59cdd493703bcb88748b598
     secrets: inherit
     needs: [ version, api-docker-matrix ]
     with:
@@ -42,7 +42,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@bb9c77ab6b1053c03e49c1652a1e7162f7e57d9e
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@10c95cc4f730fa248edf233ca05427293d044a4c
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:

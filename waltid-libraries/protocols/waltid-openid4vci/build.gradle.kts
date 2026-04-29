@@ -6,61 +6,54 @@ plugins {
 
 group = "id.walt.openid4vci"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-    const val COROUTINES_VERSION = "1.10.2"
-}
 
 kotlin {
     sourceSets {
         commonMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
+            implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
-            implementation("io.ktor:ktor-http:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.http)
 
-            implementation("io.github.oshai:kotlin-logging:7.0.13")
+            implementation(identityLibs.oshai.kotlinlogging)
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // -- Multiplatform --
-            // Multiplatform / Uuid
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
 
             // Multiplatform / Date & time
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+            implementation(identityLibs.kotlinx.datetime)
 
             // Multiplatform / Hashes
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-            implementation("org.kotlincrypto.hash:sha2")
+            implementation(identityLibs.kotlincrypto.hash.sha2)
 
             // Multiplatform / Secure Random
-            implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
+            implementation(identityLibs.kotlincrypto.random)
 
-            implementation("org.jetbrains.kotlinx:atomicfu:0.24.0")
+            implementation(identityLibs.kotlinx.atomicfu)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${Versions.COROUTINES_VERSION}")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
-            implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.okhttp)
         }
         jvmTest.dependencies {
             implementation(kotlin("test-junit5"))
-            implementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
-            runtimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+            implementation(identityLibs.junit.jupiter.api)
         }
         jsMain.dependencies {
             implementation(npm("jose", "5.10.0"))
-            implementation("io.ktor:ktor-client-js:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.js)
         }
         jsTest.dependencies {
         }

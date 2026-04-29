@@ -22,6 +22,7 @@ object ExampleAccountStore : EditableAccountStore {
 
     /** Account identifier -> auth method -> data */
     private val wip_accountIdentifierStoredData = HashMap<AccountIdentifier, HashMap<String, AuthMethodStoredData>>()
+
     /** Account uuid (does not need account identifier) -> auth method -> data */
     private val wip_accountStoredData = HashMap<String, HashMap<String, AuthMethodStoredData>>()
 
@@ -58,18 +59,27 @@ object ExampleAccountStore : EditableAccountStore {
     override suspend fun addAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData) {
         updateAccountIdentifierStoredData(accountIdentifier, method, data)
     }
+
     override suspend fun addAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData) {
         updateAccountStoredData(accountId, method, data)
     }
-    override suspend fun updateAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData) {
+
+    override suspend fun updateAccountIdentifierStoredData(
+        accountIdentifier: AccountIdentifier,
+        method: String,
+        data: AuthMethodStoredData
+    ) {
         wip_accountIdentifierStoredData.getOrPut(accountIdentifier) { HashMap() }[method] = data.transformSavable()
     }
+
     override suspend fun updateAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData) {
         wip_accountStoredData.getOrPut(accountId) { HashMap() }[method] = data.transformSavable()
     }
+
     override suspend fun deleteAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String) {
         wip_accountIdentifierStoredData.remove(accountIdentifier)
     }
+
     override suspend fun deleteAccountStoredData(accountId: String, method: String) {
         wip_accountStoredData.remove(accountId)
     }
@@ -83,7 +93,10 @@ object ExampleAccountStore : EditableAccountStore {
     }
 
     // TODO
-    override suspend fun lookupStoredDataForAccountIdentifier(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData? {
+    override suspend fun lookupStoredDataForAccountIdentifier(
+        identifier: AccountIdentifier,
+        method: AuthenticationMethod
+    ): AuthMethodStoredData? {
         //val uuid = wip_account_ids[identifier] ?: error("No account for identifier: $identifier")
         val storedData = wip_accountIdentifierStoredData[identifier]?.get(method.id)
         println("Lookup stored data for method $method for identifier $identifier: $storedData")

@@ -355,6 +355,96 @@ Validates mdoc credentials using VICAL (Verifiable Issuer Certificate Authority 
 
 ---
 
+### `etsi-trust-list`
+Validates credential issuer certificates against an ETSI Trust List (TSL/LoTE).
+
+**Use case:** Verify that credential issuers are trusted according to EU/ETSI trust frameworks. Particularly useful for PID providers, wallet providers, and attestation providers in eIDAS 2.0 contexts.
+
+**Resolution Modes (in order of precedence):**
+
+1. **Remote Service** (`trustRegistryUrl`): Query a hosted trust-registry service
+2. **Inline Trust Lists** (`trustLists`): Load and resolve within the request (JVM only)
+3. **Enterprise Service**: When neither is provided and running in enterprise stack, uses the linked TrustRegistryEnterpriseService
+
+**How it works:**
+1. Extracts the full certificate chain from the credential's x5c header (COSE for mDoc, JWT header for SD-JWT/W3C VC)
+2. Iterates through the chain (leaf → root) and resolves trust for each certificate
+3. If any certificate in the chain is found trusted, the credential passes
+
+**Example 1: Remote Service**
+```json
+{
+  "policy": "etsi-trust-list",
+  "trustRegistryUrl": "http://localhost:7005",
+  "expectedEntityType": "PID_PROVIDER"
+}
+```
+
+**Example 2: Inline Trust Lists (OSS - no service needed)**
+```json
+{
+  "policy": "etsi-trust-list",
+  "trustLists": [
+    "https://www.signatur.rtr.at/currenttl.xml",
+    "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL"
+  ],
+  "expectedEntityType": "WALLET_PROVIDER",
+  "validateSignatures": false
+}
+```
+
+**Example 3: Enterprise (linked service - minimal config)**
+```json
+{
+  "policy": "etsi-trust-list",
+  "expectedEntityType": "PID_PROVIDER"
+}
+```
+
+**Configuration options:**
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `trustRegistryUrl` | string | null | Base URL of a hosted trust-registry service |
+| `trustLists` | string[] | null | List of trust list URLs or raw content to load inline |
+| `expectedEntityType` | string | null | Filter: require specific entity type (`PID_PROVIDER`, `WALLET_PROVIDER`, `ATTESTATION_PROVIDER`, etc.) |
+| `expectedServiceType` | string | null | Filter: require specific service type |
+| `allowStaleSource` | boolean | false | If true, accept credentials from stale (but not expired) trust sources |
+| `requireAuthenticated` | boolean | false | If true, require trust source signature to be `VALIDATED` (XMLDSig verified) |
+| `validateSignatures` | boolean | true | Validate XMLDSig signatures when loading inline trust lists |
+
+**Supported credential types:**
+- mDoc credentials with COSE signatures and x5c chain
+- SD-JWT credentials with x5c in JWT header  
+- W3C JWT VCs with x5c in JWT header
+
+**Success result:**
+```json
+{
+  "trusted": true,
+  "decision": "TRUSTED",
+  "matchedEntity": {
+    "entityId": "example-iaca",
+    "entityType": "PID_PROVIDER",
+    "legalName": "Example IACA",
+    "country": "DE"
+  },
+  "matchedService": {
+    "serviceId": "mdl-issuing",
+    "serviceType": "MDL_ISSUER",
+    "status": "GRANTED"
+  },
+  "sourceFreshness": "FRESH",
+  "authenticity": "VALIDATED"
+}
+```
+
+**Authenticity values:**
+- `VALIDATED` — Trust list XMLDSig signature verified successfully
+- `FAILED` — Signature validation failed
+- `SKIPPED_DEMO` — Signature validation was disabled (testing/demo mode)
+
+---
+
 ### `webhook`
 Calls an external HTTP endpoint to verify the credential.
 

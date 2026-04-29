@@ -1,12 +1,9 @@
 @file:Suppress("PackageDirectoryMismatch")
+@file:OptIn(ExperimentalUnsignedTypes::class, ExperimentalSerializationApi::class)
 
 package id.walt.policies2.vp.policies
 
-import id.walt.cose.Cose
-import id.walt.cose.CoseHeaders
-import id.walt.cose.CoseKey
-import id.walt.cose.CoseSign1
-import id.walt.cose.coseCompliantCbor
+import id.walt.cose.*
 import id.walt.credentials.examples.MdocsExamples
 import id.walt.mdoc.objects.digest.ValueDigest
 import id.walt.mdoc.objects.digest.ValueDigestList
@@ -19,20 +16,16 @@ import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.cbor.CborString
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.io.encoding.Base64
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
+import kotlin.test.*
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
-import kotlin.time.ExperimentalTime
+
 
 class IssuerSignedDataMdocVpPolicyTest {
 
@@ -45,7 +38,7 @@ class IssuerSignedDataMdocVpPolicyTest {
             digestId = 1u,
             random = ByteArray(16) { 0x01 },
             elementIdentifier = elementId,
-            elementValue = "Inga",
+            elementValue = CborString("Inga"),
         )
 
         val policy = IssuerSignedDataMdocVpPolicy()
@@ -84,7 +77,7 @@ class IssuerSignedDataMdocVpPolicyTest {
             digestId = 1u,
             random = ByteArray(16) { 0x01 },
             elementIdentifier = elementId,
-            elementValue = "Inga",
+            elementValue = CborString("Inga"),
         )
         val correctDigest = ValueDigest.fromIssuerSignedItem(item, namespace, "SHA-256")
         val wrongDigestBytes = correctDigest.value.copyOf().also { it[0] = (it[0].toInt() xor 0x01).toByte() }
@@ -111,9 +104,8 @@ class IssuerSignedDataMdocVpPolicyTest {
         assertEquals("IllegalArgumentException", result.errors.first().error)
     }
 
-    @OptIn(ExperimentalEncodingApi::class, ExperimentalSerializationApi::class)
     @Test
-    fun shouldNotFailWhenNonPrimitivesMismatches() = runTest {
+    fun shouldFailWhenNonPrimitivesMismatches() = runTest {
         val namespace = "org.iso.18013.5.1"
         val targetElementId = "driving_privileges"
 
@@ -150,17 +142,13 @@ class IssuerSignedDataMdocVpPolicyTest {
         val policy = IssuerSignedDataMdocVpPolicy()
         val result = policy.runPolicy(document, tamperedMso, dummyVerificationContext())
 
-        assertTrue(result.success)
+        assertFalse(result.success)
 
         val unmatchedNonPrimitive = result.results["unmatched_non_primitive"]?.jsonObject
-        assertNotNull(unmatchedNonPrimitive)
-
-        val ids = unmatchedNonPrimitive[namespace]?.jsonArray
-        assertNotNull(ids)
-        assertTrue(JsonPrimitive(targetElementId) in ids)
+        assertNull(unmatchedNonPrimitive)
     }
 
-    @OptIn(ExperimentalTime::class)
+
     private fun dummyMsoWithDigests(
         docType: String,
         digestAlgorithm: String,
@@ -206,5 +194,7 @@ class IssuerSignedDataMdocVpPolicyTest {
         isSigned = true,
         isEncrypted = false,
         jwkThumbprint = null,
+        isAnnexC = false,
+        customData = null
     )
 }

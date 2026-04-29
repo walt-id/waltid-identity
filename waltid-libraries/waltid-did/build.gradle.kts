@@ -5,31 +5,35 @@ plugins {
 
 group = "id.walt.did"
 
-object Versions {
-    const val KTOR_VERSION = "3.3.3"
-}
+
+fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
+val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
+    applyDefaultHierarchyTemplate()
+
     js(IR) {
         outputModuleName = "dids"
+    }
+
+    if (enableIosBuild) {
+        iosArm64()
+        iosSimulatorArm64()
     }
 
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Date
-            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-
-            // Uuid
-            implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+            implementation(identityLibs.kotlinx.datetime)
 
             // Crypto
             api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -42,11 +46,11 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation("io.ktor:ktor-client-okhttp:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.okhttp)
 
             // Json canonicalization
             implementation("io.github.erdtman:java-json-canonicalization:1.1")
@@ -55,22 +59,25 @@ kotlin {
             // implementation("com.github.multiformats:java-multibase:v1.1.1")
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
 
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
             implementation(kotlin("test"))
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
-            implementation("io.ktor:ktor-server-test-host:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-content-negotiation:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-server-netty:${Versions.KTOR_VERSION}")
-            implementation("io.ktor:ktor-network-tls-certificates:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.junit.jupiter.params)
+            implementation(identityLibs.ktor.server.test.host)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.netty)
+            implementation(identityLibs.ktor.network.tls.certificates)
         }
         jsMain.dependencies {
-            implementation("io.ktor:ktor-client-js:${Versions.KTOR_VERSION}")
+            implementation(identityLibs.ktor.client.js)
 
             implementation(npm("canonicalize", "2.0.0"))
             implementation(npm("uuid", "9.0.1"))
+        }
+        if (enableIosBuild) {
+            iosMain.dependencies { }
         }
     }
 }

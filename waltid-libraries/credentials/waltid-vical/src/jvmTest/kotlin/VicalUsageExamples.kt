@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
 import id.walt.cose.toCoseSigner
@@ -15,7 +13,6 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 class VicalUsageExamples {

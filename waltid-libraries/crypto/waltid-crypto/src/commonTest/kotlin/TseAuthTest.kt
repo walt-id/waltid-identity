@@ -29,12 +29,12 @@ class TseAuthTest {
         check(verified.isSuccess)
     }
 
-//    @Test
+    //    @Test
     fun testAppRole() = runTest {
         testKeyUsage(TSEAuth(roleId = "6823b3c7-60f7-db0b-c663-7359f17c0c30", secretId = "aba4f28b-524c-db63-bae2-67a0e094f46a"))
     }
 
-//    @Test
+    //    @Test
     fun testUserPass() = runTest {
         testKeyUsage(TSEAuth(username = "myuser", password = "mypassword"))
     }

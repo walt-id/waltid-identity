@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.issuer.services.onboarding.models
 
 import id.walt.x509.X509ValidityPeriod
@@ -9,7 +7,6 @@ import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import kotlinx.serialization.Serializable
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @Serializable

@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.mdoc.objects.elements
 
@@ -15,7 +15,6 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.descriptors.mapSerialDescriptor
 import kotlinx.serialization.encoding.*
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
@@ -98,9 +97,9 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
         is Boolean -> Boolean.serializer()
         is ByteArray -> ByteArraySerializer()
         is Any -> MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
-            ?: error("serializer not found for $elementIdentifier, with value $elementValue")
+            ?: error("DeviceSignedItemListSerializer: Custom serializer not found for $elementIdentifier, with value $elementValue")
 
-        else -> error("serializer not found for $elementIdentifier, with value $elementValue")
+        else -> error("DeviceSignedItemListSerializer: Standard serializer not found for $elementIdentifier, with value $elementValue")
     }
 
     override fun deserialize(decoder: Decoder): DeviceSignedItemList {

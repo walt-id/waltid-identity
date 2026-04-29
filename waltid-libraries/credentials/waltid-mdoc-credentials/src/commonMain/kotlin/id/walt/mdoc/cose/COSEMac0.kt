@@ -1,13 +1,13 @@
 package id.walt.mdoc.cose
 
 import id.walt.mdoc.dataelement.*
-import korlibs.crypto.HMAC
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Serializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import org.kotlincrypto.macs.hmac.sha2.HmacSHA256
 
 /**
  * COSE_Mac0 data structure, with built-in support for creating and verifying HMAC-256 macs
@@ -31,7 +31,7 @@ class COSEMac0(
         val mac0Content =
             createMacStructure(protectedHeader, payload ?: throw Exception("No payload given"), externalData).toCBOR()
         val tag = when (algorithm) {
-            HMAC256 -> HMAC.hmacSHA256(sharedSecret, mac0Content).bytes
+            HMAC256 -> HmacSHA256(sharedSecret).doFinal(mac0Content)
             else -> throw Exception("Algorithm $algorithm currently not supported, only supported algorithm is HMAC256 ($HMAC256)")
         }
         return signatureOrTag.contentEquals(tag)
@@ -71,7 +71,7 @@ class COSEMac0(
             ).toDataElement().toCBOR()
 
             val mac0Content = createMacStructure(protectedHeaderData, payload, externalData).toCBOR()
-            val tag = HMAC.hmacSHA256(sharedSecret, mac0Content).bytes
+            val tag = HmacSHA256(sharedSecret).doFinal(mac0Content)
             return COSEMac0(
                 listOf(
                     ByteStringElement(protectedHeaderData),

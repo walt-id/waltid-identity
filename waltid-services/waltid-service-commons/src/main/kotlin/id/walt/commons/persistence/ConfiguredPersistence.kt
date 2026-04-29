@@ -17,7 +17,8 @@ class ConfiguredPersistence<V : Any>(
 ) : Persistence<V>(discriminator, defaultExpiration) {
 
     companion object {
-        private val config = if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.persistenceFeature)) ConfigManager.getConfig<PersistenceConfiguration>() else PersistenceConfiguration()
+        private val config =
+            if (FeatureManager.isFeatureEnabled(CommonsFeatureCatalog.persistenceFeature)) ConfigManager.getConfig<PersistenceConfiguration>() else PersistenceConfiguration()
     }
 
     val underlyingPersistence: Persistence<V> = when (config.type) {
@@ -61,8 +62,10 @@ class ConfiguredPersistence<V : Any>(
      * @param id The key to store the value under
      * @param value The value to store
      */
-    override operator fun set(id: String, value: V) { underlyingPersistence[id] = value }
-    
+    override operator fun set(id: String, value: V) {
+        underlyingPersistence[id] = value
+    }
+
     /**
      * Store a value with a specified expiration.
      * @param id The key to store the value under

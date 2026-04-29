@@ -2,7 +2,6 @@
 
 package id.walt.webwallet.usecase.claim
 
-
 import TestUtils
 import id.walt.crypto.utils.UuidUtils.randomUUID
 import id.walt.oid4vc.providers.CredentialWalletConfig

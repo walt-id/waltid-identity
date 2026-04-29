@@ -8,7 +8,7 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
-import java.util.*
+import java.util.Base64
 import java.util.stream.Stream
 import kotlin.test.assertEquals
 
@@ -44,6 +44,7 @@ class Rfc9901SampleTest {
 
             assertEquals(testCase.sha256, sut.asHashed2())
         }
+
     @ParameterizedTest
     @MethodSource("rfcExamples")
     fun givenDisclosureVerifyHashUsingWaltHashed3(testCase: SampleData) =

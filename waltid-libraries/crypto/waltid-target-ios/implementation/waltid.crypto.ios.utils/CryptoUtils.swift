@@ -249,6 +249,43 @@ public class ECKeyUtils: NSObject {
     @objc static func pem(privateKeyRepresentation: Data) -> String {
         return try! P256.Signing.PrivateKey(x963Representation: privateKeyRepresentation).pemRepresentation
     }
+
+    @objc static func raw(_ pem: String) -> Data? {
+        let cleanPem = pem
+            .replacingOccurrences(of: "-----BEGIN PRIVATE KEY-----", with: "")
+            .replacingOccurrences(of: "-----END PRIVATE KEY-----", with: "")
+            .replacingOccurrences(of: "-----BEGIN EC PRIVATE KEY-----", with: "")
+            .replacingOccurrences(of: "-----END EC PRIVATE KEY-----", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\r", with: "")
+            .trimmingCharacters(in: .whitespaces)
+
+        // Create DER data from clean PEM
+        guard let derData = Data(base64Encoded: cleanPem) else {
+            print("ECKeyUtils Error: Base64 PEM encoding failed")
+            return nil
+        }
+
+        do {
+            // Initialize P256 Private Key from DER
+            // CryptoKit usually expects PKCS#8 or SEC1 formats here.
+            let privateKey = try P256.Signing.PrivateKey(derRepresentation: derData)
+            // Extract components
+            // x963Representation returns 0x04 || X || Y (65 bytes)
+            let publicBytes = privateKey.publicKey.x963Representation
+            // rawRepresentation returns K (32 bytes)
+            let privateBytes = privateKey.rawRepresentation
+            // Concatenate: [0x04 | X | Y] + [K]
+            var combined = Data()
+            combined.append(publicBytes)
+            combined.append(privateBytes)
+
+            return combined
+        } catch {
+            print("ECKeyUtils Error: Creating P256 Key from DER failed")
+            return nil
+        }
+    }
 }
 
 extension OSStatus: Error {}

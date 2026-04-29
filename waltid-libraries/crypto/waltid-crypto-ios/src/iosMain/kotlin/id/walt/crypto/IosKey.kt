@@ -182,10 +182,10 @@ class IosKey private constructor(
         check(hasPrivateKey) { "Only private key can do signing." }
 
         return when (options.keyType) {
-                KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
-                KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid)
-                KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid)
-                else -> error("Not implemented key type ${options.keyType}")
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement)
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid)
+            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid)
+            else -> error("Not implemented key type ${options.keyType}")
 
         }.signJws(plaintext, headers)
     }
@@ -194,18 +194,18 @@ class IosKey private constructor(
         signed: ByteArray, detachedPlaintext: ByteArray?,
         customSignatureAlgorithm: String?
     ): Result<ByteArray> = when (options.keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
-            else -> error("Not implemented key type ${options.keyType}")
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
+        else -> error("Not implemented key type ${options.keyType}")
     }.verifyRaw(signed, detachedPlaintext!!)
 
 
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (options.keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
-            else -> error("Not implemented key type ${options.keyType}")
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
+        else -> error("Not implemented key type ${options.keyType}")
 
     }.verifyJws(signedJws)
 
@@ -213,10 +213,10 @@ class IosKey private constructor(
     override suspend fun getPublicKey(): Key = IosKey(options, false)
 
     override suspend fun getPublicKeyRepresentation(): ByteArray = when (options.keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
-            KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
-            else -> error("Not implemented key type ${options.keyType}")
+        KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(options.kid, options.inSecureElement).publicKey()
+        KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(options.kid).publicKey()
+        KeyType.RSA -> RSA.PrivateKey.loadFromKeychain(options.kid).publicKey()
+        else -> error("Not implemented key type ${options.keyType}")
 
     }.externalRepresentation()
 

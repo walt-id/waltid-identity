@@ -35,10 +35,9 @@ import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTime::class)
+
 object OIDC : AuthenticationMethod("oidc") {
 
     private val log = logger("OIDC")
@@ -198,13 +197,21 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 val identifier = OIDCIdentifier(oidcConfig.issuer, subject)
 
+                val externalRoles = OidcExternalRoleExtractor.extract(
+                    idTokenPayload = idTokenPayload,
+                    config = config,
+                    issuer = oidcConfig.issuer,
+                    subject = subject,
+                )
+
                 session.setSessionData(
                     this@OIDC, OidcSessionAuthenticatedData(
                         tokenValidationData = TokenValidationData(
                             idpJwksUrl = oidcConfig.jwksUri,
                             idpIss = oidcConfig.issuer,
                         ),
-                        oidcIdentifier = identifier
+                        oidcIdentifier = identifier,
+                        externalRoles = externalRoles,
                     )
                 )
 

@@ -25,7 +25,8 @@ kotlin {
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
-            implementation(identityLibs.okio)
+            implementation(identityLibs.kotlinx.io.core)
+            implementation(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.serialization.json)
 
         }
@@ -43,6 +44,9 @@ kotlin {
         jvmTest.dependencies {
             // Logging
             implementation(identityLibs.slf4j.simple)
+
+            // Ktor client
+            implementation(identityLibs.ktor.client.okhttp)
 
             // Test
             implementation(kotlin("test"))

@@ -1,7 +1,4 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.webwallet.service.account
-
 
 import com.auth0.jwk.Jwk
 import com.auth0.jwt.JWT
@@ -31,7 +28,6 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid

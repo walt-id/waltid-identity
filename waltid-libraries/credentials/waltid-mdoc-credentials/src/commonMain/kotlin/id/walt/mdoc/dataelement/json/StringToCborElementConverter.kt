@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.mdoc.dataelement.json
 
 import id.walt.mdoc.dataelement.ByteStringElement
@@ -7,7 +5,6 @@ import id.walt.mdoc.dataelement.FullDateElement
 import id.walt.mdoc.dataelement.TDateElement
 import kotlinx.datetime.LocalDate
 import kotlin.io.encoding.Base64
-import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 internal object StringToCborElementConverter {

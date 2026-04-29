@@ -1,5 +1,4 @@
 @file:Suppress("ExtractKtorModule")
-@file:OptIn(ExperimentalTime::class)
 
 package id.walt.issuer.issuance
 
@@ -62,7 +61,7 @@ import org.cose.java.OneKey
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.ExperimentalTime
+
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.

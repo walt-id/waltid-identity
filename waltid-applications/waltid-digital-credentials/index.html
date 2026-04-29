@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DC API Test App</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <main>
+        <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:12px;">
+        <img src="/waltid-logo.svg" alt="walt.id logo" style="height:60px; width:auto;" />
+        <h1 style="margin:0;">DC API Test App</h1>
+        </div>
+      <p>
+        Loads <code>dc_api</code> examples from verifier Swagger and runs the browser Digital Credentials API flow.
+      </p>
+
+      <section class="card">
+        <label for="verifier-preset">Verifier</label>
+        <select id="verifier-preset">
+          <option value="open-source">
+            Verifier - Open Source (https://verifier2.portal.test.waltid.cloud)
+          </option>
+          <option value="enterprise">
+            Verifier - Enterprise Stack (https://waltid.enterprise.test.waltid.cloud/)
+          </option>
+        </select>
+
+        <label for="bearer-token">Bearer Token (optional)</label>
+        <input id="bearer-token" type="text" spellcheck="false" />
+
+        <button id="reload-examples" type="button">Reload Swagger Examples</button>
+
+        <label for="example-select">Swagger Example</label>
+        <select id="example-select"></select>
+
+        <label for="payload-input">Payload (editable JSON)</label>
+        <textarea id="payload-input" spellcheck="false"></textarea>
+
+        <div style="display:flex; align-items:center; justify-content:flex-start; gap:8px; margin:12px 0; width:auto;">
+          <input type="checkbox" id="mediation-required" style="width:auto;" />
+          <label for="mediation-required" style="margin:0; cursor:pointer;">
+            Mediation Required (for Apple Wallet)
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="call-dc-api" type="button">Call DC API</button>
+          <span id="status">Idle</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <label for="log-field">Result Log</label>
+        <pre id="log-field" class="log-field">(no run yet)</pre>
+      </section>
+    </main>
+  </body>
+</html>

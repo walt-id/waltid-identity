@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalTime::class)
-
 package id.walt.oid4vc.providers
 
 import id.walt.crypto.keys.Key
@@ -16,7 +14,7 @@ import id.walt.oid4vc.util.ShortIdUtils
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
+
 
 abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
     ISessionCache<PresentationSession> {

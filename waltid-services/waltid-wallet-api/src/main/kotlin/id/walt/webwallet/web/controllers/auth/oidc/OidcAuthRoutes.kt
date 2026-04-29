@@ -26,7 +26,7 @@ fun Application.oidcAuthRoutes() = webWalletRoute {
                     description = "Redirect to OIDC provider for login"
                     response { HttpStatusCode.Found }
                 }) {
-                oidcLog.trace {"OIDC login with provider OK" }
+                oidcLog.trace { "OIDC login with provider OK" }
                 call.respondRedirect("oidc-session")
             }
         }

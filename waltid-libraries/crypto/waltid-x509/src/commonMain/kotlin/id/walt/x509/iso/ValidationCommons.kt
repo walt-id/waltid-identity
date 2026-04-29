@@ -1,6 +1,6 @@
 package id.walt.x509.iso
 
-import okio.ByteString
+import kotlinx.io.bytestring.ByteString
 
 /**
  * Validate an ISO-compliant X.509 certificate serial number.
@@ -13,7 +13,7 @@ import okio.ByteString
 internal fun validateSerialNo(
     serialNo: ByteString,
 ) {
-    require(serialNo.size <= 20 && (serialNo.size*8) >= 63) {
+    require(serialNo.size <= 20 && (serialNo.size * 8) >= 63) {
         "Serial number must have a size of maximum 20 octets and at least 63 bits, but was " +
                 "found to have a size of: ${serialNo.size} octets"
     }

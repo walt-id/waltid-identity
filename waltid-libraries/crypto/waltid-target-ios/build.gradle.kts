@@ -6,7 +6,7 @@ plugins {
 }
 
 kotlin {
-
+    applyDefaultHierarchyTemplate()
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -54,19 +54,9 @@ kotlin {
             languageSettings.optIn("kotlin.io.encoding.ExperimentalEncodingApi")
         }
 
-        commonMain.dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
-            }
-        }
-
-        val iosArm64Main by getting
-        val iosSimulatorArm64Main by getting
-
-        val iosMain by creating {
-            this.dependsOn(commonMain)
-            iosArm64Main.dependsOn(this)
-            iosSimulatorArm64Main.dependsOn(this)
+        iosMain.dependencies {
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.coroutines.core)
         }
     }
 }

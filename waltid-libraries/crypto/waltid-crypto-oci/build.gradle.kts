@@ -9,14 +9,14 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.core)
 
             // Crypto
-            implementation(project.dependencies.platform("org.kotlincrypto.hash:bom:0.6.1"))
-            implementation("org.kotlincrypto.hash:sha2")
+
+            implementation(identityLibs.kotlincrypto.hash.sha2)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -34,24 +34,24 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2")
 
             // OCI
-            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.57.1")
+            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.81.2")
 
             // JOSE
-            implementation("com.nimbusds:nimbus-jose-jwt:10.6")
+            implementation(identityLibs.nimbus.jose.jwt)
 
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         jvmTest.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation(identityLibs.kotlinx.serialization.json)
 
             // Logging
             implementation("org.slf4j:slf4j-simple:2.0.17")
 
             // Test
             implementation(kotlin("test"))
-            implementation("org.junit.jupiter:junit-jupiter-api:5.11.4")
-            implementation("org.junit.jupiter:junit-jupiter-params:5.11.4")
+            implementation(identityLibs.junit.jupiter.api)
+            implementation(identityLibs.junit.jupiter.params)
         }
     }
 }

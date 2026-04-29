@@ -89,6 +89,7 @@ class AzureKey(
             throw SigningException("Failed to sign with Azure Key Vault: ${e.message}", e)
         }
     }
+
     override suspend fun signJws(
         plaintext: ByteArray,
         headers: Map<String, JsonElement>,
@@ -137,6 +138,7 @@ class AzureKey(
             Result.failure(VerificationException("Failed to verify with Azure Key Vault: ${e.message}", e))
         }
     }
+
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val publicKey = getPublicKey()
         return publicKey.verifyJws(signedJws)

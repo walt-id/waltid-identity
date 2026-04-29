@@ -1,8 +1,6 @@
 import io.ktor.plugin.features.*
 
 object Versions {
-    const val KTOR_VERSION = "3.3.3"
-    const val COROUTINES_VERSION = "1.10.2"
     const val HOPLITE_VERSION = "2.9.0"
 }
 
@@ -19,45 +17,42 @@ dependencies {
     /* -- KTOR -- */
 
     // Ktor server
-    implementation("io.ktor:ktor-server-core-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-auth-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-sessions-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-auth-jwt-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-auto-head-response-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-double-receive-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-host-common-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-status-pages-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-compression-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-cors-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-forwarded-header-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-call-logging-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-call-id-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-content-negotiation-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-cio-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-server-sse-jvm:${Versions.KTOR_VERSION}")
+    implementation(identityLibs.ktor.server.core)
+    implementation(identityLibs.ktor.server.auth)
+    implementation(identityLibs.ktor.server.sessions)
+    implementation(identityLibs.ktor.server.authjwt)
+    implementation(identityLibs.ktor.server.auto.head.response)
+    implementation(identityLibs.ktor.server.double.receive)
+    implementation(identityLibs.ktor.server.host.common)
+    implementation(identityLibs.ktor.server.status.pages)
+    implementation(identityLibs.ktor.server.compression)
+    implementation(identityLibs.ktor.server.cors)
+    implementation(identityLibs.ktor.server.forwarded.header)
+    implementation(identityLibs.ktor.server.call.logging)
+    implementation(identityLibs.ktor.server.call.id)
+    implementation(identityLibs.ktor.server.content.negotiation)
+    implementation(identityLibs.ktor.server.cio)
+    implementation(identityLibs.ktor.server.sse)
 
     // Ktor client
-    implementation("io.ktor:ktor-client-core-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-serialization-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-content-negotiation:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-json-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-okhttp-jvm:${Versions.KTOR_VERSION}")
-    implementation("io.ktor:ktor-client-logging-jvm:${Versions.KTOR_VERSION}")
+    implementation(identityLibs.ktor.client.core)
+    implementation(identityLibs.ktor.client.serialization)
+    implementation(identityLibs.ktor.client.content.negotiation)
+    implementation(identityLibs.ktor.client.json)
+    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.logging)
 
 
     /* -- Kotlin -- */
 
     // Kotlinx.serialization
-    implementation("io.ktor:ktor-serialization-kotlinx-json-jvm:${Versions.KTOR_VERSION}")
+    implementation(identityLibs.ktor.serialization.kotlinx.json)
 
     // Date
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+    implementation(identityLibs.kotlinx.datetime)
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${Versions.COROUTINES_VERSION}")
-
-    // Uuid
-    implementation("app.softwork:kotlinx-uuid-core:0.1.6")
+    implementation(identityLibs.kotlinx.coroutines.core)
 
     /* -- Misc --*/
 
@@ -66,14 +61,16 @@ dependencies {
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")
 
     // Logging
-    implementation("io.github.oshai:kotlin-logging-jvm:7.0.5")
-    implementation("org.slf4j:jul-to-slf4j:2.0.17")
-    implementation("io.klogging:klogging-jvm:0.11.6")
-    implementation("io.klogging:slf4j-klogging:0.11.6")
+    implementation(identityLibs.oshai.kotlinlogging)
+    implementation(identityLibs.slf4j.julbridge)
+    implementation(identityLibs.klogging)
+    implementation(identityLibs.slf4j.klogging)
 
     // Test
     testImplementation(identityLibs.bundles.waltid.ktortesting)
-
+    testImplementation(identityLibs.kotlinx.coroutines.test)
+    testImplementation(identityLibs.kotlinx.serialization.cbor)
+    testImplementation("org.bouncycastle:bcprov-lts8on:2.73.9")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
@@ -82,15 +79,21 @@ dependencies {
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     api(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+    api(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
     api(project(":waltid-libraries:credentials:waltid-vical"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier"))
     api(project(":waltid-libraries:protocols:waltid-openid4vp-verifier-openapi"))
+    implementation(project(":waltid-libraries:protocols:waltid-18013-7-verifier"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
 }
 
 application {
-    mainClass.set("id.walt.openid4vp.verifier.MainKt")
+    mainClass.set("id.walt.verifier2.MainKt")
+}
+
+buildConfig {
+    packageName("id.walt.verifier2")
 }
 
 ktor {

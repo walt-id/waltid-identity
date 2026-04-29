@@ -53,6 +53,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.measureTimedValue
 
 object OpenID4VCI {
     private val log = KotlinLogging.logger { }
@@ -168,10 +170,18 @@ object OpenID4VCI {
     suspend fun resolveCIProviderMetadata(credentialOffer: CredentialOffer) =
         resolveCIProviderMetadata(credentialOffer.credentialIssuer)
 
-    suspend fun resolveCIProviderMetadata(issuerBaseUrl: String) =
-        http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {
-            OpenIDProviderMetadata.fromJSONString(it)
+    suspend fun resolveCIProviderMetadata(issuerBaseUrl: String): OpenIDProviderMetadata {
+        log.debug { "Resolving OpenID Provider Metadata from '$issuerBaseUrl'" }
+        val (response, duration) = measureTimedValue {
+            http.get(getCIProviderMetadataUrl(issuerBaseUrl)).bodyAsText().let {
+                OpenIDProviderMetadata.fromJSONString(it)
+            }
         }
+        if (duration.minus(300.milliseconds).isPositive()) {
+            log.warn { "Resolving OpenID Provider Metadata from '$issuerBaseUrl' took more than 300ms" }
+        }
+        return response
+    }
 
     fun resolveOfferedCredentials(
         credentialOffer: CredentialOffer,
@@ -231,11 +241,16 @@ object OpenID4VCI {
 
         }
 
-        val response = http.submitForm(
-            url = tokenEndpoint,
-            formParameters = parametersOf(tokenRequest.toHttpParameters())
-        )
-
+        log.debug { "Sending token request to '${tokenEndpoint}'" }
+        val (response, duration) = measureTimedValue {
+            http.submitForm(
+                url = tokenEndpoint,
+                formParameters = parametersOf(tokenRequest.toHttpParameters())
+            )
+        }
+        if (duration.minus(300.milliseconds).isPositive()) {
+            log.warn { "Requesting token from '${tokenEndpoint}' took '${duration}' which is more than expected 300ms" }
+        }
         if (!response.status.isSuccess()) {
             throw IllegalArgumentException("Failed to get token: ${response.status.value} - ${response.bodyAsText()}")
         }
@@ -672,6 +687,7 @@ object OpenID4VCI {
         dataMapping: JsonObject? = null,
         x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
+        sdJwtTypeHeader: String? = null,
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
@@ -710,6 +726,7 @@ object OpenID4VCI {
                 mapping = dataMapping ?: JsonObject(emptyMap()),
                 context = mapOf(
                     "subjectDid" to holderDid,
+                    "issuerDid" to issuerId,
                     "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                 ).filterValues {
                     when (it) {
@@ -759,7 +776,7 @@ object OpenID4VCI {
 
         val headers = mapOf(
             JWTClaims.Header.keyID to getKidHeader(issuerKey, issuerDid),
-            JWTClaims.Header.type to SD_JWT_VC_TYPE_HEADER
+            JWTClaims.Header.type to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
         ).plus(x5Chain?.let {
             mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf())
@@ -811,6 +828,21 @@ object OpenID4VCI {
         } ?: mapOf()
 
         return W3CVC(credentialData).let { vc ->
+            val context = mapOf(
+                "subjectDid" to holderDid,
+                "issuerDid" to issuerId,
+                "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+            ).filterValues {
+                when (it) {
+                    is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
+                    else -> it != null && it.toString().isNotEmpty()
+                }
+            }.mapValues { (_, value) ->
+                when (value) {
+                    is JsonElement -> value
+                    else -> JsonPrimitive(value.toString())
+                }
+            }
             when (selectiveDisclosure.isNullOrEmpty()) {
                 true -> vc.mergingJwtIssue(
                     issuerKey = issuerKey,
@@ -819,7 +851,8 @@ object OpenID4VCI {
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeader = additionalJwtHeaders,
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    additionalJwtOptions = emptyMap()
+                    additionalJwtOptions = emptyMap(),
+                    context = context
                 )
 
                 else -> vc.mergingSdJwtIssue(
@@ -830,7 +863,8 @@ object OpenID4VCI {
                     additionalJwtHeaders = additionalJwtHeaders,
                     additionalJwtOptions = emptyMap(),
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    disclosureMap = selectiveDisclosure
+                    disclosureMap = selectiveDisclosure,
+                    context = context
                 )
             }
         }

@@ -2,7 +2,6 @@ package id.walt.sdjwt
 
 import id.walt.sdjwt.utils.SdjwtStringUtils.decodeFromBase64Url
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 import kotlin.js.JsName
@@ -231,7 +230,6 @@ open class SDJwt internal constructor(
         /**
          * Parse SD-JWT from a token string
          */
-        @OptIn(ExperimentalEncodingApi::class)
         fun parse(sdJwt: String): SDJwt {
             val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt)
                 ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
