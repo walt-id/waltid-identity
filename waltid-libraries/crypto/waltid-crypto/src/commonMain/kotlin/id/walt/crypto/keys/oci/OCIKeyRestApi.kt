@@ -125,6 +125,7 @@ class OCIKeyRestApi(
             KeyType.RSA -> "SHA_256_RSA_PKCS1_V1_5"
             KeyType.RSA3072 -> "SHA_384_RSA_PKCS1_V1_5"
             KeyType.RSA4096 -> "SHA_512_RSA_PKCS1_V1_5"
+            KeyType.RSA6144 -> throw KeyTypeNotSupportedException(keyType.name)
             KeyType.secp256k1, KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }
@@ -284,7 +285,8 @@ class OCIKeyRestApi(
 
         private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
             KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> "ECDSA"
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> "RSA"
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096  -> "RSA"
+            KeyType.RSA6144 -> throw KeyTypeNotSupportedException(type.name) // OCI doesn't support RSA larger than 4096
             KeyType.Ed25519, KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
         }
 
@@ -311,6 +313,7 @@ class OCIKeyRestApi(
                     KeyType.RSA -> 256
                     KeyType.RSA3072 -> 384
                     KeyType.RSA4096 -> 512
+                    KeyType.RSA6144 -> throw KeyTypeNotSupportedException(type.name) // OCI doesn't support RSA6144
                     KeyType.Ed25519, KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
                 }
                 val requestBody = JsonObject(

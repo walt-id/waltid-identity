@@ -36,6 +36,7 @@ object JvmJWKKeyCreator : JWKKeyCreator() {
             KeyType.RSA -> RSAKeyGenerator(metadata?.keySize ?: 2048)
             KeyType.RSA3072 -> RSAKeyGenerator(metadata?.keySize ?: 3072)
             KeyType.RSA4096 -> RSAKeyGenerator(metadata?.keySize ?: 4096)
+            KeyType.RSA6144 -> RSAKeyGenerator(metadata?.keySize ?: 6144)
         }.run {
             if (type == KeyType.secp256k1) {
                 provider(BouncyCastleProviderSingleton.getInstance())
@@ -55,7 +56,7 @@ object JvmJWKKeyCreator : JWKKeyCreator() {
                 KeyType.secp256r1 -> ecRawToJwk(rawPublicKey, Curve.P_256)
                 KeyType.secp384r1 -> ecRawToJwk(rawPublicKey, Curve.P_384)
                 KeyType.secp521r1 -> ecRawToJwk(rawPublicKey, Curve.P_521)
-                KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> rawRsaToJwk(rawPublicKey)
+                KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> rawRsaToJwk(rawPublicKey)
             }
         )
 
