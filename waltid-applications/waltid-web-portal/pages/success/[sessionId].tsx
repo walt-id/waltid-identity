@@ -3,7 +3,7 @@ import {CheckCircleIcon} from "@heroicons/react/24/outline";
 import {useContext, useEffect, useState} from "react";
 import {useRouter} from "next/router";
 import axios from "axios";
-import { publicEnvDefaults } from "@/utils/publicEnvDefaults";
+import nextConfig from "@/next.config";
 import Modal from "@/components/walt/modal/BaseModal";
 import {EnvContext} from "@/pages/_app";
 
@@ -51,7 +51,7 @@ export default function Success() {
     if (!router.isReady) return;
     axios
       .get(
-        `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : publicEnvDefaults.NEXT_PUBLIC_VERIFIER}/openid4vc/session/${router.query.sessionId}`
+        `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/session/${router.query.sessionId}`
       )
       .then((response) => {
         let parsedToken = parseJwt(response.data.tokenResponse.vp_token);

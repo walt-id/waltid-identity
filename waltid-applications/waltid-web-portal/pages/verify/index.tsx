@@ -4,10 +4,10 @@ import Button from "@/components/walt/button/Button";
 import {CredentialsContext, EnvContext} from "@/pages/_app";
 import Icon from "@/components/walt/logo/Icon";
 import {useRouter} from "next/router";
-import { QRCode } from "react-qr-code";
+import QRCode from "react-qr-code";
 import axios from "axios";
 import {sendToWebWallet} from "@/utils/sendToWebWallet";
-import { publicEnvDefaults } from "@/utils/publicEnvDefaults";
+import nextConfig from "@/next.config";
 import BackButton from "@/components/walt/button/BackButton";
 import {
   CredentialFormats,
@@ -52,8 +52,7 @@ export default function Verification() {
         'draft11': 'credentials_supported',
       }
 
-      const issuerMetadata = await axios.get(`${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : publicEnvDefaults.NEXT_PUBLIC_ISSUER}/${standardVersion}/.well-known/openid-credential-issuer`);
-      const mappedFormat = mapFormat(format);
+      const issuerMetadata = await axios.get(`${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}/${standardVersion}/.well-known/openid-credential-issuer`);
       const request_credentials = credentials.map((credential) => {
         if (credential.kind === 'mdoc') {
           const raw =
@@ -114,7 +113,7 @@ export default function Verification() {
       }
 
       const response = await axios.post(
-        `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : publicEnvDefaults.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
+        `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
         requestBody,
         {
           headers: verifyHeaders,
@@ -125,7 +124,7 @@ export default function Verification() {
 
       const state = getStateFromUrl(response.data);
       if (state) {
-        checkVerificationResult(env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : publicEnvDefaults.NEXT_PUBLIC_VERIFIER, state).then((result) => {
+        checkVerificationResult(env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER, state).then((result) => {
           if (result) {
             router.push(`/success/${state}`);
           }
@@ -153,7 +152,7 @@ export default function Verification() {
     sendToWebWallet(
       env.NEXT_PUBLIC_WALLET
         ? env.NEXT_PUBLIC_WALLET
-        : publicEnvDefaults.NEXT_PUBLIC_WALLET,
+        : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_WALLET,
       'api/siop/initiatePresentation',
       verifyURL
     );

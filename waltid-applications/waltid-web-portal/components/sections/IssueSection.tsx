@@ -10,7 +10,7 @@ import React, {useState} from "react";
 import {useRouter} from "next/router";
 import {getOfferUrl} from "@/utils/getOfferUrl";
 import {sendToWebWallet} from "@/utils/sendToWebWallet";
-import { publicEnvDefaults } from "@/utils/publicEnvDefaults";
+import nextConfig from "@/next.config";
 import {LockClosedIcon} from "@heroicons/react/24/outline";
 
 export default function IssueSection() {
@@ -63,9 +63,9 @@ export default function IssueSection() {
       const offer = await getOfferUrl(
         credentialsToIssue,
         env.NEXT_PUBLIC_VC_REPO ??
-          publicEnvDefaults.NEXT_PUBLIC_VC_REPO,
+          nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VC_REPO,
         env.NEXT_PUBLIC_ISSUER ??
-          publicEnvDefaults.NEXT_PUBLIC_ISSUER
+          nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER
       );
       sendToWebWallet(
         decodeURI(params.callback!.toString()),
