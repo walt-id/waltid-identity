@@ -56,6 +56,12 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
         type = scenario.statusType
     )
 
+    override fun createAttributeWithValues(scenario: TestScenario, values: List<UInt>) = W3CStatusPolicyAttribute(
+        values = values,
+        purpose = "revocation",
+        type = scenario.statusType
+    )
+
     override fun createStatusContent(scenario: TestScenario, size: Int) = W3CStatusContent(
         type = scenario.statusType,
         purpose = "revocation",
