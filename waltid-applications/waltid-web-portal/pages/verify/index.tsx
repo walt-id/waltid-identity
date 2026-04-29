@@ -9,7 +9,11 @@ import axios from "axios";
 import {sendToWebWallet} from "@/utils/sendToWebWallet";
 import { publicEnvDefaults } from "@/utils/publicEnvDefaults";
 import BackButton from "@/components/walt/button/BackButton";
-import {CredentialFormats, mapFormat} from "@/types/credentials";
+import {
+  CredentialFormats,
+  inferDocTypeFromMdocData,
+  mapFormat,
+} from "@/types/credentials";
 import {checkVerificationResult, getStateFromUrl} from "@/utils/checkVerificationResult";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
@@ -49,17 +53,37 @@ export default function Verification() {
       }
 
       const issuerMetadata = await axios.get(`${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : publicEnvDefaults.NEXT_PUBLIC_ISSUER}/${standardVersion}/.well-known/openid-credential-issuer`);
+      const mappedFormat = mapFormat(format);
       const request_credentials = credentials.map((credential) => {
-        if (mapFormat(format) === 'vc+sd-jwt') {
+        if (credential.kind === 'mdoc') {
+          const raw =
+            credential.offer?.mdocData ??
+            (credential.offer as Record<string, unknown>);
+          const docType =
+            (typeof credential.offer?.docType === 'string' &&
+              credential.offer.docType) ||
+            inferDocTypeFromMdocData(raw as Record<string, unknown>);
+          if (!docType) {
+            throw new Error(
+              'Could not infer ISO mDoc document type from credential namespaces.'
+            );
+          }
+          return {
+            format: 'mso_mdoc',
+            doc_type: docType,
+            id: credential.id.replace(/^mdoc:/, '').replace(/\s+/g, '_'),
+          };
+        }
+        if (mappedFormat === 'vc+sd-jwt') {
           let url = issuerMetadata.data[issuerMetadataConfigSelector[standardVersion]][`${credential.offer.type[credential.offer.type.length - 1]}_vc+sd-jwt`].vct;
           return {
             vct: url,
-            format: mapFormat(format),
+            format: mappedFormat,
           };
         } else {
           return {
             type: credential.offer.type[credential.offer.type.length - 1],
-            format: mapFormat(format),
+            format: mappedFormat,
           };
         }
       });
@@ -68,7 +92,7 @@ export default function Verification() {
         request_credentials: request_credentials,
       };
 
-      if (mapFormat(format) !== 'vc+sd-jwt') {
+      if (mappedFormat !== 'vc+sd-jwt' && mappedFormat !== 'mso_mdoc') {
         requestBody.vc_policies = vps.map((vp) => {
           if (vp.includes('=')) {
             return {
@@ -81,14 +105,19 @@ export default function Verification() {
         });
       }
 
+      const verifyHeaders: Record<string, string> = {
+        successRedirectUri: `${window.location.origin}/success/$id`,
+        errorRedirectUri: `${window.location.origin}/success/$id`,
+      };
+      if (mappedFormat === 'mso_mdoc') {
+        verifyHeaders.openId4VPProfile = 'ISO_18013_7_MDOC';
+      }
+
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : publicEnvDefaults.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
         requestBody,
         {
-          headers: {
-            successRedirectUri: `${window.location.origin}/success/$id`,
-            errorRedirectUri: `${window.location.origin}/success/$id`,
-          },
+          headers: verifyHeaders,
         }
       );
       setverifyURL(response.data);

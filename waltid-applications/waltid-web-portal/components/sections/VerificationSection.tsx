@@ -1,6 +1,6 @@
 import RowCredential from "@/components/walt/credential/RowCredential";
 import PolicyListItem from "@/components/walt/policy/PolicyListItem";
-import {AvailableCredential} from "@/types/credentials";
+import { AvailableCredential, ISO_MDOC_CREDENTIAL_FORMAT } from "@/types/credentials";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
 import InputField from "@/components/walt/forms/Input";
 import Button from "@/components/walt/button/Button";
@@ -71,7 +71,9 @@ export default function VerificationSection() {
 
     params.append(
       'format',
-      (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC') as string
+      (credentialsToIssue[0]?.kind === 'mdoc'
+        ? ISO_MDOC_CREDENTIAL_FORMAT
+        : (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC')) as string
     );
     router.push(`/verify?${params.toString()}`);
   }
@@ -100,7 +102,7 @@ export default function VerificationSection() {
             credentialToEdit={credential}
             credentialsToIssue={credentialsToIssue}
             setCredentialsToIssue={setCredentialsToIssue}
-            key={credential.title}
+            key={credential.id}
           />
         ))}
       </div>

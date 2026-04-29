@@ -1,4 +1,9 @@
-import {AvailableCredential, CredentialFormats, DIDMethods} from "@/types/credentials";
+import {
+  AvailableCredential,
+  CredentialFormats,
+  DIDMethods,
+  ISO_MDOC_CREDENTIAL_FORMAT,
+} from "@/types/credentials";
 import EditCredentialModal from "../modal/EditCredentialModal";
 import {PencilSquareIcon} from "@heroicons/react/24/outline";
 import Dropdown from "@/components/walt/forms/Dropdown";
@@ -10,16 +15,29 @@ type Props = {
   setCredentialsToIssue: (credentials: AvailableCredential[]) => void;
 };
 
+function formatsForCredential(c: AvailableCredential): string[] {
+  return c.kind === "mdoc"
+    ? [ISO_MDOC_CREDENTIAL_FORMAT]
+    : CredentialFormats.filter((f) => f !== ISO_MDOC_CREDENTIAL_FORMAT);
+}
+
 export default function RowCredential({
   credentialToEdit,
   credentialsToIssue,
   setCredentialsToIssue,
 }: Props) {
-  const [credentialSubject, setCredentialSubject] = React.useState(
-    credentialToEdit.offer.credentialSubject
-  );
+  const initialSubject =
+    credentialToEdit.kind === "mdoc"
+      ? credentialToEdit.offer?.mdocData ?? credentialToEdit.offer ?? {}
+      : credentialToEdit.offer?.credentialSubject ?? {};
+
+  const [credentialSubject, setCredentialSubject] =
+    React.useState(initialSubject);
+  const formatChoices = formatsForCredential(credentialToEdit);
   const [selectedFormat, setSelectedFormat] = React.useState(
-    CredentialFormats[0]
+    credentialToEdit.kind === "mdoc"
+      ? ISO_MDOC_CREDENTIAL_FORMAT
+      : CredentialFormats[0]
   );
   const [selectedDID, setSelectedDID] = React.useState(DIDMethods[0]);
   const [modalVisible, setModalVisible] = React.useState(false);
@@ -27,21 +45,24 @@ export default function RowCredential({
   React.useEffect(() => {
     setCredentialsToIssue(
       credentialsToIssue.map((credential) => {
-        if (credential.offer.id == credentialToEdit.offer.id) {
-          let updatedCredential = { ...credential };
-
-          if (credentialSubject !== credential.offer.credentialSubject) {
-            updatedCredential.offer.credentialSubject = credentialSubject;
-          }
-          updatedCredential.selectedFormat = selectedFormat;
-          updatedCredential.selectedDID = selectedDID;
-
-          return updatedCredential;
-        } else {
-          let updatedCredential = { ...credential };
-          updatedCredential.selectedFormat = selectedFormat;
-          return updatedCredential;
+        if (credential.id !== credentialToEdit.id) {
+          return credential;
         }
+        const updatedCredential = { ...credential };
+        updatedCredential.selectedFormat = selectedFormat;
+        updatedCredential.selectedDID = selectedDID;
+        if (credentialToEdit.kind === "mdoc") {
+          updatedCredential.offer = {
+            ...credential.offer,
+            mdocData: credentialSubject,
+          };
+        } else {
+          updatedCredential.offer = {
+            ...credential.offer,
+            credentialSubject,
+          };
+        }
+        return updatedCredential;
       })
     );
   }, [credentialSubject, selectedFormat, selectedDID]);
@@ -65,18 +86,20 @@ export default function RowCredential({
           <div className="hidden lg:block w-[2px] h-[2px] bg-gray-200"></div>
           <div className="w-full">
             <Dropdown
-              values={CredentialFormats}
+              values={formatChoices}
               selected={selectedFormat}
               setSelected={setSelectedFormat}
             />
           </div>
-          <div className="w-full">
-            <Dropdown
-              values={DIDMethods}
-              selected={selectedDID}
-              setSelected={setSelectedDID}
-            />
-          </div>
+          {credentialToEdit.kind !== "mdoc" && (
+            <div className="w-full">
+              <Dropdown
+                values={DIDMethods}
+                selected={selectedDID}
+                setSelected={setSelectedDID}
+              />
+            </div>
+          )}
         </div>
       </div>
       <EditCredentialModal

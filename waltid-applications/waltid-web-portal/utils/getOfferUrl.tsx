@@ -1,6 +1,14 @@
 import axios from "axios";
 import {v4 as uuidv4} from "uuid";
-import {AvailableCredential, CredentialFormats, DIDMethods, DIDMethodsConfig} from "@/types/credentials";
+import {
+  AvailableCredential,
+  CredentialFormats,
+  DIDMethods,
+  DIDMethodsConfig,
+  ISO_MDOC_CREDENTIAL_FORMAT,
+  MDOC_ISSUANCE_DEFAULTS,
+  resolveMdocCredentialConfigurationId,
+} from "@/types/credentials";
 
 const getOfferUrl = async (
   credentials: Array<AvailableCredential>,
@@ -22,9 +30,54 @@ const getOfferUrl = async (
     credentials.map(async (c) => {
       c = {
         ...c,
-        selectedFormat: c.selectedFormat ?? CredentialFormats[0],
+        selectedFormat:
+          c.selectedFormat ??
+          (c.kind === 'mdoc'
+            ? ISO_MDOC_CREDENTIAL_FORMAT
+            : CredentialFormats[0]),
         selectedDID: c.selectedDID ?? DIDMethods[0],
       };
+
+      if (c.kind === 'mdoc') {
+        const mdocData =
+          c.offer?.mdocData ?? (c.offer as Record<string, unknown>);
+        const explicitDocType =
+          typeof c.offer?.docType === 'string' ? c.offer.docType : undefined;
+        const credentialConfigurationId = resolveMdocCredentialConfigurationId(
+          credential_configurations_supported,
+          mdocData as Record<string, unknown>,
+          explicitDocType
+        );
+        if (!credentialConfigurationId) {
+          throw new Error(
+            "This issuer does not advertise a matching mDoc configuration for the credential namespaces in the VC repository data."
+          );
+        }
+        const mdocPayload: {
+          issuerKey: typeof MDOC_ISSUANCE_DEFAULTS.issuerKey;
+          credentialConfigurationId: string;
+          mdocData: Record<string, unknown>;
+          x5Chain: string[];
+          authenticationMethod?: string;
+          vpRequestValue?: string;
+          vpProfile?: string;
+        } = {
+          issuerKey: MDOC_ISSUANCE_DEFAULTS.issuerKey,
+          credentialConfigurationId,
+          mdocData: mdocData as Record<string, unknown>,
+          x5Chain: MDOC_ISSUANCE_DEFAULTS.x5Chain,
+        };
+        if (authenticationMethod) {
+          mdocPayload.authenticationMethod = authenticationMethod;
+        }
+        if (vpRequestValue) {
+          mdocPayload.vpRequestValue = vpRequestValue;
+        }
+        if (vpProfile) {
+          mdocPayload.vpProfile = vpProfile;
+        }
+        return mdocPayload;
+      }
 
       const offer = { ...c.offer, id: uuidv4() };
       let payload: {
@@ -138,9 +191,24 @@ const getOfferUrl = async (
     })
   );
 
+  const first = credentials[0];
+  const sel = String(
+    first.selectedFormat ??
+      (first.kind === 'mdoc'
+        ? ISO_MDOC_CREDENTIAL_FORMAT
+        : CredentialFormats[0])
+  );
+  const pathSegment =
+    first.kind === 'mdoc' || sel === ISO_MDOC_CREDENTIAL_FORMAT
+      ? 'mdoc'
+      : sel === 'SD-JWT + W3C VC' || sel === 'SD-JWT + IETF SD-JWT VC'
+        ? 'sdjwt'
+        : 'jwt';
+  const batchAllowed =
+    payload.length > 1 && pathSegment !== 'mdoc';
   const issueUrl =
     NEXT_PUBLIC_ISSUER +
-    `/openid4vc/${credentials[0].selectedFormat === 'SD-JWT + W3C VC' || credentials[0].selectedFormat === 'SD-JWT + IETF SD-JWT VC' ? 'sdjwt' : 'jwt'}/${payload.length > 1 ? 'issueBatch' : 'issue'}`;
+    `/openid4vc/${pathSegment}/${batchAllowed ? 'issueBatch' : 'issue'}`;
   return axios.post(issueUrl, payload.length > 1 ? payload : payload[0]);
 };
 
