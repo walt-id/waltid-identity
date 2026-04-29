@@ -9,6 +9,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -168,7 +169,8 @@ data class ETSITrustListPolicy(
             }
 
         } catch (e: ETSITrustListPolicyException) {
-            throw e
+            // Return as-is — preserve the original message rather than re-wrapping.
+            return Result.failure(e)
         } catch (e: Exception) {
             log.error(e) { "ETSI Trust List policy verification failed" }
             return Result.failure(ETSITrustListPolicyException(
@@ -349,31 +351,25 @@ data class ETSITrustListPolicy(
 
     private suspend fun queryTrustRegistry(certificatePem: String, baseUrl: String): TrustDecisionResponse {
         val url = "${baseUrl.trimEnd('/')}/trust-registry/resolve/certificate"
-        
+
         log.debug { "Querying trust registry at: $url" }
-        
-        HttpClient {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-        }.use { client ->
-            val response = client.post(url) {
-                contentType(ContentType.Application.Json)
-                setBody(TrustResolveRequest(
-                    certificatePemOrDer = certificatePem,
-                    expectedEntityType = expectedEntityType,
-                    expectedServiceType = expectedServiceType
-                ))
-            }
-            
-            if (!response.status.isSuccess()) {
-                throw ETSITrustListPolicyException(
-                    "Trust registry returned HTTP ${response.status.value}: ${response.status.description}"
-                )
-            }
-            
-            return response.body()
+
+        val response = sharedHttpClient.post(url) {
+            contentType(ContentType.Application.Json)
+            setBody(TrustResolveRequest(
+                certificatePemOrDer = certificatePem,
+                expectedEntityType = expectedEntityType,
+                expectedServiceType = expectedServiceType
+            ))
         }
+
+        if (!response.status.isSuccess()) {
+            throw ETSITrustListPolicyException(
+                "Trust registry returned HTTP ${response.status.value}: ${response.status.description}"
+            )
+        }
+
+        return response.body()
     }
 
     // ---------------------------------------------------------------------------
@@ -544,6 +540,26 @@ data class ETSITrustListPolicy(
         val type: String,
         val value: String
     )
+
+    companion object {
+        /**
+         * Shared HTTP client for remote trust-registry queries.
+         * Reused across calls to avoid repeated TLS setup overhead.
+         * Timeout values are chosen to bound worst-case latency per certificate lookup.
+         */
+        private val sharedHttpClient: HttpClient by lazy {
+            HttpClient {
+                install(ContentNegotiation) {
+                    json(Json { ignoreUnknownKeys = true })
+                }
+                install(HttpTimeout) {
+                    connectTimeoutMillis = 5_000
+                    requestTimeoutMillis = 10_000
+                    socketTimeoutMillis = 10_000
+                }
+            }
+        }
+    }
 }
 
 /**
