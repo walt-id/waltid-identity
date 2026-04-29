@@ -1,32 +1,42 @@
 plugins {
-    id("waltid.jvm.library")
+    id("waltid.multiplatform.library")
     id("waltid.publish.maven")
 }
 
 group = "id.walt.credentials"
 
-dependencies {
-    // Serialization
-    implementation(identityLibs.kotlinx.serialization.json)
-    implementation(identityLibs.kotlinx.datetime)
-    implementation(identityLibs.kotlinx.coroutines.core)
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            // Serialization
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlinx.coroutines.core)
 
-    // HTTP fetching
-    implementation(identityLibs.ktor.client.core)
-    implementation(identityLibs.ktor.client.okhttp)
-    implementation(identityLibs.ktor.client.content.negotiation)
-    implementation(identityLibs.ktor.serialization.kotlinx.json)
+            // HTTP fetching (KMP Ktor client core)
+            implementation(identityLibs.bundles.waltid.ktor.client)
 
-    // Logging
-    implementation(identityLibs.oshai.kotlinlogging)
+            // Logging
+            implementation(identityLibs.oshai.kotlinlogging)
 
-    // Crypto (SHA-256)
-    implementation(identityLibs.kotlincrypto.hash.sha2)
+            // Crypto (SHA-256) — multiplatform
+            implementation(identityLibs.kotlincrypto.hash.sha2)
+        }
 
-    // Test
-    testImplementation(kotlin("test"))
-    testImplementation(identityLibs.kotlinx.coroutines.test)
-    testImplementation("org.slf4j:slf4j-simple:2.0.17")
+        jvmMain.dependencies {
+            // OkHttp engine for JVM (SSRF-safe DNS resolver requires OkHttp)
+            implementation(identityLibs.ktor.client.okhttp)
+        }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(identityLibs.kotlinx.coroutines.test)
+        }
+
+        jvmTest.dependencies {
+            implementation("org.slf4j:slf4j-simple:2.0.17")
+        }
+    }
 }
 
 tasks.withType<Test> {

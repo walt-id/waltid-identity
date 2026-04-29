@@ -1,6 +1,7 @@
 package id.walt.trust.service
 
 import id.walt.trust.fetcher.SourceFetcher
+import id.walt.trust.fetcher.SourceFormat
 import id.walt.trust.model.*
 import id.walt.trust.parser.lote.LoteJsonParser
 import id.walt.trust.parser.lote.LoteXmlParser
@@ -243,12 +244,12 @@ class DefaultTrustRegistryService(
                     val result = TslXmlParser.parse(content, sourceId, sourceUrl, config)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
-                (content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity")) && format == SourceFetcher.SourceFormat.XML -> {
+                (content.contains("ListOfTrustedEntities") || content.contains("TrustedEntity")                ) && format == SourceFormat.XML -> {
                     log.info { "Parsing LoTE XML for source: $sourceId" }
                     val result = LoteXmlParser.parse(content, sourceId, sourceUrl)
                     ParsedContent(result.source, result.entities, result.services, result.identities)
                 }
-                format == SourceFetcher.SourceFormat.JSON -> {
+                format == SourceFormat.JSON -> {
                     log.info { "Parsing LoTE JSON for source: $sourceId" }
                     val result = LoteJsonParser.parse(content, sourceId, sourceUrl)
                     ParsedContent(result.source, result.entities, result.services, result.identities)

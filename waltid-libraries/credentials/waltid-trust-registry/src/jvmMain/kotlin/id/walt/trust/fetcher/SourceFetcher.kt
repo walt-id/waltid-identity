@@ -9,64 +9,26 @@ import io.ktor.http.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Dns
 import java.net.InetAddress
+import java.net.Inet6Address
 import java.net.URI
 import java.net.UnknownHostException
 
 private val log = KotlinLogging.logger {}
 
 /**
- * Configuration for URL validation to prevent SSRF attacks.
- */
-data class FetcherSecurityConfig(
-    /**
-     * If non-empty, only URLs with hostnames in this list are allowed.
-     * Use this for strict allow-listing of trusted trust list providers.
-     */
-    val allowedHosts: Set<String> = emptySet(),
-    
-    /**
-     * Block requests to private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, etc.)
-     * Enabled by default to prevent SSRF attacks.
-     */
-    val blockPrivateIPs: Boolean = true,
-    
-    /**
-     * Block requests to link-local addresses (169.254.x.x) including cloud metadata endpoints.
-     * Enabled by default to prevent SSRF attacks against cloud metadata services.
-     */
-    val blockLinkLocal: Boolean = true,
-    
-    /**
-     * Block requests to loopback addresses (127.x.x.x, ::1).
-     * Enabled by default to prevent SSRF attacks against localhost services.
-     */
-    val blockLoopback: Boolean = true,
-    
-    /**
-     * Allowed URL schemes. Defaults to HTTPS only for trust lists.
-     * Add "http" only if you need to support legacy trust list providers.
-     */
-    val allowedSchemes: Set<String> = setOf("https", "http")
-)
-
-/**
- * Fetches trust source documents from remote URLs with SSRF protection.
- * 
+ * JVM implementation of [SourceFetcher] using OkHttp.
+ *
  * Security measures:
  * - URL scheme validation (https/http only)
  * - Hostname allow-listing (optional)
- * - Private IP blocking at DNS resolution time
+ * - Private IP blocking at DNS resolution time via [SecureDns]
  * - DNS pinning to prevent TOCTOU/rebinding attacks
  * - Request timeouts to prevent resource exhaustion
  */
-object SourceFetcher {
-    
-    /**
-     * Default security configuration - restrictive by default.
-     * Override with a custom config for specific deployment needs.
-     */
-    var securityConfig = FetcherSecurityConfig()
-    
+actual object SourceFetcher {
+
+    actual var securityConfig: FetcherSecurityConfig = FetcherSecurityConfig()
+
     /**
      * Custom DNS resolver that validates resolved IPs against security policy.
      * This prevents DNS rebinding attacks by enforcing the same IP validation
@@ -75,8 +37,7 @@ object SourceFetcher {
     private class SecureDns(private val config: FetcherSecurityConfig) : Dns {
         override fun lookup(hostname: String): List<InetAddress> {
             val addresses = Dns.SYSTEM.lookup(hostname)
-            
-            // Validate each resolved address against security policy
+
             for (addr in addresses) {
                 if (config.blockLoopback && addr.isLoopbackAddress) {
                     throw UnknownHostException("Loopback addresses are blocked: $hostname")
@@ -88,8 +49,7 @@ object SourceFetcher {
                     if (addr.isSiteLocalAddress) {
                         throw UnknownHostException("Private/site-local addresses are blocked: $hostname")
                     }
-                    // Check for IPv6 Unique Local Addresses (fc00::/7)
-                    if (addr is java.net.Inet6Address) {
+                    if (addr is Inet6Address) {
                         val bytes = addr.address
                         val firstByte = bytes[0].toInt() and 0xFF
                         if (firstByte == 0xFC || firstByte == 0xFD) {
@@ -97,7 +57,6 @@ object SourceFetcher {
                         }
                     }
                 }
-                // Block cloud metadata endpoints
                 if (config.blockLinkLocal) {
                     val addrStr = addr.hostAddress
                     if (addrStr == "169.254.169.254" || addrStr == "fd00:ec2::254") {
@@ -105,29 +64,20 @@ object SourceFetcher {
                     }
                 }
             }
-            
+
             return addresses
         }
     }
-    
-    /**
-     * Creates an HttpClient with security configuration applied at the OkHttp engine level.
-     * This ensures SSRF protection is enforced at actual connection time.
-     */
+
     private fun createClient(config: FetcherSecurityConfig): HttpClient {
         return HttpClient(OkHttp) {
             expectSuccess = false
-            
-            // Add request timeouts to prevent resource exhaustion
             install(HttpTimeout) {
                 connectTimeoutMillis = 10_000
                 requestTimeoutMillis = 30_000
                 socketTimeoutMillis = 30_000
             }
-            
             engine {
-                // Use custom DNS resolver that validates IPs at connection time
-                // This prevents DNS rebinding/TOCTOU attacks
                 config {
                     dns(SecureDns(config))
                 }
@@ -135,16 +85,7 @@ object SourceFetcher {
         }
     }
 
-    data class FetchResult(
-        val success: Boolean,
-        val content: String? = null,
-        val contentType: String? = null,
-        val statusCode: Int? = null,
-        val error: String? = null
-    )
-
-    suspend fun fetch(url: String, config: FetcherSecurityConfig = securityConfig): FetchResult {
-        // Validate URL format and scheme before fetching
+    actual suspend fun fetch(url: String, config: FetcherSecurityConfig): FetchResult {
         val validationResult = validateUrl(url, config)
         if (!validationResult.first) {
             log.warn { "URL validation failed for $url: ${validationResult.second}" }
@@ -153,15 +94,13 @@ object SourceFetcher {
                 error = "URL validation failed: ${validationResult.second}"
             )
         }
-        
-        // Create a client with security config applied at engine level
-        // This ensures DNS rebinding protection via SecureDns
+
         val client = createClient(config)
-        
+
         return try {
             log.info { "Fetching trust source from: $url" }
             val response = client.get(url)
-            
+
             if (response.status.isSuccess()) {
                 FetchResult(
                     success = true,
@@ -177,125 +116,21 @@ object SourceFetcher {
                 )
             }
         } catch (e: UnknownHostException) {
-            // This is thrown by SecureDns when a blocked address is detected
             log.warn { "SSRF protection blocked request to $url: ${e.message}" }
-            FetchResult(
-                success = false,
-                error = "Blocked by security policy: ${e.message}"
-            )
+            FetchResult(success = false, error = "Blocked by security policy: ${e.message}")
         } catch (e: Exception) {
             log.error(e) { "Failed to fetch trust source from $url" }
-            FetchResult(
-                success = false,
-                error = e.message ?: "Unknown error"
-            )
+            FetchResult(success = false, error = e.message ?: "Unknown error")
         } finally {
             client.close()
         }
     }
-    
-    /**
-     * Validates a URL for SSRF protection.
-     * 
-     * @return Pair of (isValid, errorMessage)
-     */
-    internal fun validateUrl(url: String, config: FetcherSecurityConfig = securityConfig): Pair<Boolean, String?> {
-        val uri = try {
-            URI(url)
-        } catch (e: Exception) {
-            return false to "Invalid URL format: ${e.message}"
-        }
-        
-        // Check scheme
-        val scheme = uri.scheme?.lowercase()
-        if (scheme == null || scheme !in config.allowedSchemes) {
-            return false to "Scheme '$scheme' not allowed. Allowed: ${config.allowedSchemes}"
-        }
-        
-        // Check host
-        val host = uri.host
-        if (host.isNullOrBlank()) {
-            return false to "No host specified in URL"
-        }
-        
-        // If allowlist is configured, check it
-        if (config.allowedHosts.isNotEmpty()) {
-            if (host.lowercase() !in config.allowedHosts.map { it.lowercase() }) {
-                return false to "Host '$host' not in allowed hosts list"
-            }
-            // If host is explicitly allowed, skip IP validation
-            return true to null
-        }
-        
-        // Resolve hostname to IP for validation
-        val addresses = try {
-            InetAddress.getAllByName(host)
-        } catch (e: Exception) {
-            return false to "Failed to resolve hostname: ${e.message}"
-        }
-        
-        for (addr in addresses) {
-            // Check for loopback
-            if (config.blockLoopback && addr.isLoopbackAddress) {
-                return false to "Loopback addresses are blocked"
-            }
-            
-            // Check for link-local (169.254.x.x for IPv4, fe80:: for IPv6)
-            if (config.blockLinkLocal && addr.isLinkLocalAddress) {
-                return false to "Link-local addresses are blocked"
-            }
-            
-            // Check for private/site-local addresses (IPv4) and ULA (IPv6)
-            if (config.blockPrivateIPs) {
-                if (addr.isSiteLocalAddress) {
-                    return false to "Private/site-local addresses are blocked"
-                }
-                // Check for IPv6 Unique Local Addresses (fc00::/7, includes fd00::/8)
-                // Java's isSiteLocalAddress only covers deprecated fec0::/10
-                if (addr is java.net.Inet6Address && isIPv6UniqueLocalAddress(addr)) {
-                    return false to "IPv6 Unique Local Addresses (ULA) are blocked"
-                }
-            }
-            
-            // Additional check for cloud metadata endpoints
-            if (config.blockLinkLocal) {
-                val addrStr = addr.hostAddress
-                // AWS/GCP/Azure metadata endpoints
-                if (addrStr == "169.254.169.254" || addrStr == "fd00:ec2::254") {
-                    return false to "Cloud metadata endpoints are blocked"
-                }
-            }
-        }
-        
-        return true to null
-    }
-    
-    /**
-     * Check if an IPv6 address is a Unique Local Address (ULA) per RFC 4193.
-     * ULA range is fc00::/7 (binary prefix 1111110x), which includes:
-     * - fc00::/8 (not currently assigned)
-     * - fd00::/8 (locally assigned)
-     * 
-     * Java's isSiteLocalAddress() only covers the deprecated fec0::/10 range.
-     */
-    private fun isIPv6UniqueLocalAddress(addr: java.net.Inet6Address): Boolean {
-        val bytes = addr.address
-        // fc00::/7 means first 7 bits are 1111110x, i.e., first byte is 0xFC or 0xFD
-        val firstByte = bytes[0].toInt() and 0xFF
-        return firstByte == 0xFC || firstByte == 0xFD
-    }
 
-    /**
-     * Detect source format from content type or content inspection.
-     */
-    fun detectFormat(contentType: String?, content: String): SourceFormat {
-        // Check content type first
+    actual fun detectFormat(contentType: String?, content: String): SourceFormat {
         contentType?.let {
             if ("json" in it.lowercase()) return SourceFormat.JSON
             if ("xml" in it.lowercase()) return SourceFormat.XML
         }
-        
-        // Fallback to content inspection
         val trimmed = content.trimStart()
         return when {
             trimmed.startsWith("{") || trimmed.startsWith("[") -> SourceFormat.JSON
@@ -304,5 +139,68 @@ object SourceFetcher {
         }
     }
 
-    enum class SourceFormat { JSON, XML, UNKNOWN }
+    /**
+     * Validates a URL for SSRF protection (JVM-only, uses Java's InetAddress).
+     */
+    internal fun validateUrl(url: String, config: FetcherSecurityConfig = securityConfig): Pair<Boolean, String?> {
+        val uri = try {
+            URI(url)
+        } catch (e: Exception) {
+            return false to "Invalid URL format: ${e.message}"
+        }
+
+        val scheme = uri.scheme?.lowercase()
+        if (scheme == null || scheme !in config.allowedSchemes) {
+            return false to "Scheme '$scheme' not allowed. Allowed: ${config.allowedSchemes}"
+        }
+
+        val host = uri.host
+        if (host.isNullOrBlank()) {
+            return false to "No host specified in URL"
+        }
+
+        if (config.allowedHosts.isNotEmpty()) {
+            if (host.lowercase() !in config.allowedHosts.map { it.lowercase() }) {
+                return false to "Host '$host' not in allowed hosts list"
+            }
+            return true to null
+        }
+
+        val addresses = try {
+            InetAddress.getAllByName(host)
+        } catch (e: Exception) {
+            return false to "Failed to resolve hostname: ${e.message}"
+        }
+
+        for (addr in addresses) {
+            if (config.blockLoopback && addr.isLoopbackAddress) {
+                return false to "Loopback addresses are blocked"
+            }
+            if (config.blockLinkLocal && addr.isLinkLocalAddress) {
+                return false to "Link-local addresses are blocked"
+            }
+            if (config.blockPrivateIPs) {
+                if (addr.isSiteLocalAddress) {
+                    return false to "Private/site-local addresses are blocked"
+                }
+                if (addr is Inet6Address && isIPv6UniqueLocalAddress(addr)) {
+                    return false to "IPv6 Unique Local Addresses (ULA) are blocked"
+                }
+            }
+            if (config.blockLinkLocal) {
+                val addrStr = addr.hostAddress
+                if (addrStr == "169.254.169.254" || addrStr == "fd00:ec2::254") {
+                    return false to "Cloud metadata endpoints are blocked"
+                }
+            }
+        }
+
+        return true to null
+    }
+
+    private fun isIPv6UniqueLocalAddress(addr: Inet6Address): Boolean {
+        val bytes = addr.address
+        val firstByte = bytes[0].toInt() and 0xFF
+        return firstByte == 0xFC || firstByte == 0xFD
+    }
 }

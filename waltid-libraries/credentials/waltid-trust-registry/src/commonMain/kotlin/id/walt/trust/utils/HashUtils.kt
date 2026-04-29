@@ -25,7 +25,7 @@ object HashUtils {
         }
 
         SHA256().digest(certBytes)
-            .joinToString("") { "%02x".format(it) }
+            .joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
     } catch (e: Exception) {
         log.warn(e) { "Failed to compute certificate SHA-256" }
         null

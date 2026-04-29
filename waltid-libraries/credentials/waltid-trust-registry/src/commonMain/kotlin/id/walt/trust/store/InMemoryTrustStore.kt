@@ -45,10 +45,13 @@ class InMemoryTrustStore : TrustStore {
     ) = mutex.withLock {
         val sourceId = source.sourceId
         
-        // Remove existing data for this source
-        this.entities.entries.removeIf { it.value.sourceId == sourceId }
-        this.services.entries.removeIf { it.value.sourceId == sourceId }
-        this.identities.entries.removeIf { it.value.sourceId == sourceId }
+        // Remove existing data for this source (removeIf is JVM-only; use iterator-based removal for KMP)
+        val entityKeys = this.entities.entries.filter { it.value.sourceId == sourceId }.map { it.key }
+        entityKeys.forEach { this.entities.remove(it) }
+        val serviceKeys = this.services.entries.filter { it.value.sourceId == sourceId }.map { it.key }
+        serviceKeys.forEach { this.services.remove(it) }
+        val identityKeys = this.identities.entries.filter { it.value.sourceId == sourceId }.map { it.key }
+        identityKeys.forEach { this.identities.remove(it) }
         
         // Insert new data atomically (within same lock)
         this.sources[sourceId] = source
