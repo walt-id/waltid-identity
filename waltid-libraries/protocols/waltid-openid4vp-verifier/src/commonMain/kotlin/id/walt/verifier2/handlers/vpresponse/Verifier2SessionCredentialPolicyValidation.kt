@@ -2,6 +2,7 @@ package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.CredentialPolicyResult
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,8 @@ object Verifier2SessionCredentialPolicyValidation {
 
     suspend fun validateCredentialPolicies(
         policies: Verification2Session.DefinedVerificationPolicies,
-        validatedCredentials: Map<String, List<DigitalCredential>>
+        validatedCredentials: Map<String, List<DigitalCredential>>,
+        context: PolicyExecutionContext = PolicyExecutionContext.Empty
     ): CredentialPolicyResults = coroutineScope {
 
         // --- General VC Policies ---
@@ -35,7 +37,7 @@ object Verifier2SessionCredentialPolicyValidation {
                 policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
                         log.trace { "Validating '$queryId' credential with policy '${policy.id}': $credential" }
-                        val result = policy.verify(credential)
+                        val result = policy.verify(credential, context)
                         log.trace { "'$queryId' credential '${policy.id}' result: $result" }
 
                         CredentialPolicyResult(
@@ -56,7 +58,7 @@ object Verifier2SessionCredentialPolicyValidation {
             credentials.flatMap { specificCredential ->
                 queryPolicies.policies.map { policy ->
                     async(Dispatchers.Default) {
-                        val result = policy.verify(specificCredential)
+                        val result = policy.verify(specificCredential, context)
 
                         queryId to CredentialPolicyResult(
                             policy = policy,

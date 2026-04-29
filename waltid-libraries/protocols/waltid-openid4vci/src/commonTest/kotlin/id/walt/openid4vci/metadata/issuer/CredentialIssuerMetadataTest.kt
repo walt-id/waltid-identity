@@ -38,14 +38,13 @@ class CredentialIssuerMetadataTest {
     // credential_endpoint can be any scheme; validation only ensures host is present
 
     @Test
-    fun `credential configurations supported must not be empty`() {
-        assertFailsWith<IllegalArgumentException> {
-            CredentialIssuerMetadata(
-                credentialIssuer = "https://issuer.example",
-                credentialEndpoint = "https://issuer.example/credential",
-                credentialConfigurationsSupported = emptyMap(),
-            )
-        }
+    fun `credential configurations supported may be empty`() {
+        val metadata = CredentialIssuerMetadata(
+            credentialIssuer = "https://issuer.example",
+            credentialEndpoint = "https://issuer.example/credential",
+            credentialConfigurationsSupported = emptyMap(),
+        )
+        assertEquals(emptyMap(), metadata.credentialConfigurationsSupported)
     }
 
     @Test

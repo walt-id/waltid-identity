@@ -16,6 +16,9 @@ class StatusPolicy(
 
     override val id: String = "credential-status"
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> =
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> =
         verifyWithAttributes(credential, argument)
 }

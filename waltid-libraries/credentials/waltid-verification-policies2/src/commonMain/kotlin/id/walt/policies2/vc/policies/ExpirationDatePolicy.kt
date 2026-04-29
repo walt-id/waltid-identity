@@ -43,7 +43,10 @@ class ExpirationDatePolicy : CredentialVerificationPolicy2() {
         override val claim: String
     ) : PolicyClaimChecker.ClaimCheckResultSuccess()
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
