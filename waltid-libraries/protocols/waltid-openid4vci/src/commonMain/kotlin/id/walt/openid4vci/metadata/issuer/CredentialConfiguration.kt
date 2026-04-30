@@ -52,19 +52,11 @@ data class CredentialConfiguration(
     val proofTypesSupported: Map<String, ProofType>? = null,
     @SerialName("credential_metadata")
     val credentialMetadata: CredentialMetadata? = null,
-    @SerialName("display")
-    val display: List<CredentialDisplay>? = null,
     val customParameters: Map<String, JsonElement>? = null,
 ) {
     init {
         scope?.let { value ->
             require(value.isNotBlank()) { "scope must not be blank" }
-        }
-        display?.let { entries ->
-            val locales = entries.mapNotNull { it.locale }
-            require(locales.size == locales.distinct().size) {
-                "display entries must not duplicate locales"
-            }
         }
         cryptographicBindingMethodsSupported?.let { methods ->
             require(methods.isNotEmpty()) {
@@ -162,10 +154,6 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
             value.credentialMetadata?.let {
                 put("credential_metadata", Json.encodeToJsonElement(CredentialMetadata.serializer(), it))
             }
-            value.display?.let {
-                val serializer = ListSerializer(CredentialDisplay.serializer())
-                put("display", Json.encodeToJsonElement(serializer, it))
-            }
         }
         val merged = value.customParameters?.let { extras ->
             buildJsonObject {
@@ -208,10 +196,6 @@ internal object CredentialConfigurationSerializer : KSerializer<CredentialConfig
             },
             credentialMetadata = jsonObject["credential_metadata"]?.let {
                 lenientJson.decodeFromJsonElement(CredentialMetadata.serializer(), it)
-            },
-            display = jsonObject["display"]?.let {
-                val serializer = ListSerializer(CredentialDisplay.serializer())
-                lenientJson.decodeFromJsonElement(serializer, it)
             },
             customParameters = customParameters,
         )

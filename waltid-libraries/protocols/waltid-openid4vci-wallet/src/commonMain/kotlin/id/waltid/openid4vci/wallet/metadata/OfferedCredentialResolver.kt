@@ -106,7 +106,7 @@ object OfferedCredentialResolver {
      * @return Display name or null if not available
      */
     fun getDisplayName(resolvedOffer: ResolvedCredentialOffer): String? {
-        return resolvedOffer.configuration.display?.firstOrNull()?.name
+        return resolvedOffer.configuration.credentialMetadata?.display?.firstOrNull()?.name
     }
 
     /**
