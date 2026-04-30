@@ -1,10 +1,12 @@
 package id.walt.ktorauthnz.methods
 
+import com.sun.tools.javac.code.TypeAnnotationPosition.field
 import id.walt.crypto.keys.jwk.JwkKeyProvider
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
@@ -36,6 +38,7 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import java.util.UUID
 
 
 object OIDC : AuthenticationMethod("oidc") {
@@ -212,17 +215,19 @@ object OIDC : AuthenticationMethod("oidc") {
                         ),
                         oidcIdentifier = identifier,
                         externalRoles = externalRoles,
+                        idTokenClaims = idTokenPayload,
+                        userInfoClaims = userInfo,
                     )
                 )
 
-                val accountId = identifier.resolveIfExists()
+                val accountId = identifier.resolveIfExists() ?: run {
+                    require(runCatching { UUID.fromString(subject) }.isSuccess) {
+                        "OIDC subject must be a UUID-compatible account id, but got: $subject"
+                    }
 
-                /*if (accountId == null) {
-
-                    // TODO: Create account if it does not exist
-                    Account("", "")
-                    ExampleAccountStore.registerAccount()
-                }*/
+                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(subject, identifier)
+                    subject
+                }
 
                 val authContext = authContext(call)
 
@@ -244,7 +249,10 @@ object OIDC : AuthenticationMethod("oidc") {
             }
 
             // --- Provider-Initiated Logout Routes ---
-
+            // NOTE: These endpoints are for OIDC provider-initiated logout interoperability.
+            // - logout/backchannel is called by the IdP with a logout_token.
+            // - logout/frontchannel is called by the IdP/browser flow with iss + sid.
+            // They should not be used as the primary user-triggered logout endpoints in client apps.
             post("logout/backchannel") {
                 log.trace { "OIDC: Backchannel-logout" }
                 val logoutTokenStr = call.receiveParameters()["logout_token"]
