@@ -8,7 +8,6 @@ import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner.Companion.b
 import id.walt.openid4vp.conformance.utils.JsonUtils.fromJson
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -26,7 +25,7 @@ class ConformanceInterface(
     val conformancePort: Int
 ) {
 
-    val conformanceHttp = HttpClient(OkHttp) {
+    val conformanceHttp = HttpClient() {
         followRedirects = false
 
         defaultRequest {

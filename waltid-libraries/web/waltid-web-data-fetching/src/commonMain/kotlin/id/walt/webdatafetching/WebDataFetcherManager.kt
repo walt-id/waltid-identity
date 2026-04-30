@@ -1,15 +1,22 @@
 package id.walt.webdatafetching
 
+import io.github.oshai.kotlinlogging.KotlinLogging
+
 object WebDataFetcherManager {
 
-    private val fetcherConfigurations = HashMap<String, WebDataFetchingConfiguration>()
-    private val defaultConfiguration: WebDataFetchingConfiguration = WebDataFetchingConfiguration.Default
+    private val log = KotlinLogging.logger { }
 
-    fun getConfigurationForId(id: String): WebDataFetchingConfiguration {
-        return fetcherConfigurations[id] ?: defaultConfiguration
+    private val fetcherConfigurations = HashMap<String, WebDataFetchingConfiguration>()
+    var globalDefaultConfiguration: WebDataFetchingConfiguration = WebDataFetchingConfiguration.Default
+
+    fun getConfigurationForId(id: String, instanceDefaultConfiguration: WebDataFetchingConfiguration?): WebDataFetchingConfiguration {
+        return fetcherConfigurations[id]
+            ?: instanceDefaultConfiguration
+            ?: globalDefaultConfiguration
     }
 
     fun applyConfigurations(configs: Map<String, WebDataFetchingConfiguration>) {
+        log.trace { "Applying configurations for ${configs.keys}" }
         fetcherConfigurations.putAll(configs)
     }
 
