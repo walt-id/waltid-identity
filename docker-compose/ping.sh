@@ -22,3 +22,4 @@ ping()
 ping wallet 7001
 ping issuer 7002
 ping verifier 7003
+ping issuer2 7005

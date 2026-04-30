@@ -64,6 +64,20 @@ services:
     volumes:
       - ./verifier-api2/config:/waltid-verifier-api2/config
 
+  issuer-api2:
+    image: ${IMAGE_PREFIX}waltid/issuer-api2:${VERSION_TAG:-latest}
+    profiles:
+      - services
+      - identity
+      - all
+    pull_policy: missing
+    depends_on:
+      - caddy
+    env_file:
+      - .env
+    volumes:
+      - ./issuer-api2/config:/waltid-issuer-api2/config
+
 
   waltid-demo-wallet:
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
@@ -248,6 +262,11 @@ services:
 
       - target: "$VERIFIER_API2_PORT"
         published: $VERIFIER_API2_PORT # verifier-api2
+        protocol: tcp
+        mode: host
+
+      - target: "$ISSUER_API2_PORT"
+        published: $ISSUER_API2_PORT # issuer-api2
         protocol: tcp
         mode: host
 

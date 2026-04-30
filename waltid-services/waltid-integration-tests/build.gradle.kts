@@ -20,6 +20,7 @@ dependencies {
     // Libraries to test
     implementation(project(":waltid-services:waltid-service-commons-test"))
     implementation(project(":waltid-services:waltid-issuer-api"))
+    implementation(project(":waltid-services:waltid-issuer-api2"))
     implementation(project(":waltid-services:waltid-verifier-api"))
     implementation(project(":waltid-services:waltid-wallet-api"))
 

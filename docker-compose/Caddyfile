@@ -23,6 +23,11 @@
     reverse_proxy http://verifier-api2:{$VERIFIER_API2_PORT}
 }
 
+# Issuer API2
+:{$ISSUER_API2_PORT} {
+    reverse_proxy http://issuer-api2:{$ISSUER_API2_PORT}
+}
+
 
 # Web Demo Wallet Frontend
 :{$DEMO_WALLET_FRONTEND_PORT} {
