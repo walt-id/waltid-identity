@@ -113,6 +113,12 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
             }
         }.onFailure { it.printStackTrace() }
             .getOrNull()
+
+        fun mdocDocumentForPresentationDefinitionMatching(document: String, id: String): JsonObject? =
+            runCatching {
+                MDoc.fromCBORHex(document).toPresentationDefinitionMatchJson(id)
+            }.onFailure { it.printStackTrace() }
+                .getOrNull()
     }
 
 

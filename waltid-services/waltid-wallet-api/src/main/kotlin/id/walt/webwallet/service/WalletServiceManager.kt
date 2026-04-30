@@ -3,6 +3,7 @@ package id.walt.webwallet.service
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.definitionparser.PresentationDefinitionParser
+import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.dif.PresentationDefinition
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.OidcConfiguration
@@ -59,6 +60,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
@@ -238,15 +241,56 @@ object WalletServiceManager {
         val matches = credentialService.list(walletId, CredentialFilterObject.default).filter { cred ->
             val timerId = Uuid.random().toString()
             Stopwatch.startTimer(timerId)
-            val fullDoc = WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
+            val fullDoc = when (cred.format) {
+                CredentialFormat.mso_mdoc ->
+                    WalletCredential.mdocDocumentForPresentationDefinitionMatching(cred.document, cred.id)
+                else -> WalletCredential.parseFullDocument(cred.document, cred.disclosures, cred.id, cred.format)
+            }
             Stopwatch.addTiming(timerId, "parseCredential")
             val result = fullDoc != null &&
-                    pd.inputDescriptors.any { inputDesc ->
-                        PresentationDefinitionParser.matchCredentialsForInputDescriptor(flowOf(fullDoc), inputDesc).toList().isNotEmpty()
+                pd.inputDescriptors.any { inputDesc ->
+                    if (!inputDescriptorFormatAllowsCredential(inputDesc.format, cred.format)) {
+                        false
+                    } else {
+                        val fields = inputDesc.constraints.fields
+                        if (fields.isNullOrEmpty()) {
+                            true
+                        } else {
+                            PresentationDefinitionParser.matchCredentialsForInputDescriptor(
+                                flowOf(fullDoc),
+                                inputDesc,
+                            ).toList().isNotEmpty()
+                        }
                     }
+                }
             Stopwatch.addTiming(timerId, "matched")
             result
         }
         return matches
+    }
+
+    private fun credentialFormatPresentationDefinitionKeys(format: CredentialFormat): Set<String> = when (format) {
+        CredentialFormat.mso_mdoc -> setOf("mso_mdoc")
+        CredentialFormat.sd_jwt_vc -> setOf("sd_jwt_vc", "vc+sd-jwt")
+        CredentialFormat.jwt_vc_json -> setOf("jwt_vc_json")
+        CredentialFormat.jwt_vc_json_ld -> setOf("jwt_vc_json-ld")
+        CredentialFormat.ldp_vc -> setOf("ldp_vc")
+        CredentialFormat.sd_jwt_dc -> setOf("dc+sd-jwt")
+        CredentialFormat.jwt_vc -> setOf("jwt_vc")
+        CredentialFormat.jwt_vp_json -> setOf("jwt_vp_json")
+        CredentialFormat.jwt_vp_json_ld -> setOf("jwt_vp_json-ld")
+        CredentialFormat.ldp_vp -> setOf("ldp_vp")
+        CredentialFormat.jwt_vp -> setOf("jwt_vp")
+    }
+
+    private fun inputDescriptorFormatAllowsCredential(
+        descriptorFormat: JsonElement?,
+        credentialFormat: CredentialFormat,
+    ): Boolean {
+        if (descriptorFormat == null) return true
+        val obj = descriptorFormat as? JsonObject ?: return true
+        if (obj.isEmpty()) return true
+        val allowed = credentialFormatPresentationDefinitionKeys(credentialFormat)
+        return obj.keys.any { it in allowed }
     }
 }

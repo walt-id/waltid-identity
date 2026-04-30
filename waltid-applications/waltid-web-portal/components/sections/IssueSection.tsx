@@ -1,6 +1,6 @@
 import RowCredential from "@/components/walt/credential/RowCredential";
 import Dropdown from "@/components/walt/forms/Dropdown";
-import {AuthenticationMethods, AvailableCredential, VpProfiles} from "@/types/credentials";
+import {AuthenticationMethods, AvailableCredential, issuanceCombinationAllowed, VpProfiles} from "@/types/credentials";
 import Checkbox from "@/components/walt/forms/Checkbox";
 import InputField from "@/components/walt/forms/Input";
 import Button from "@/components/walt/button/Button";
@@ -117,7 +117,7 @@ export default function IssueSection() {
             credentialToEdit={credential}
             credentialsToIssue={credentialsToIssue}
             setCredentialsToIssue={setCredentialsToIssue}
-            key={credential.title}
+            key={credential.id}
           />
         ))}
       </div>
@@ -196,22 +196,7 @@ export default function IssueSection() {
           Cancel
         </Button>
         <Button
-          disabled={
-            !(
-              credentialsToIssue.length > 0 &&
-              (credentialsToIssue.length < 2 ||
-                credentialsToIssue.filter(
-                  (cred) =>
-                    cred.selectedFormat === 'SD-JWT + W3C VC' ||
-                    cred.selectedFormat === 'SD-JWT + IETF SD-JWT VC'
-                ).length === credentialsToIssue.length ||
-                credentialsToIssue.filter(
-                  (cred) =>
-                    !cred.selectedFormat ||
-                    cred.selectedFormat === 'JWT + W3C VC'
-                ).length === credentialsToIssue.length)
-            )
-          }
+          disabled={!issuanceCombinationAllowed(credentialsToIssue)}
           onClick={handleIssue}
         >
           Issue

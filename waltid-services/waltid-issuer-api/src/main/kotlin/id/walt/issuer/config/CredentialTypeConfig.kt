@@ -131,6 +131,56 @@ data class CredentialTypeConfig(
                 docType = MDocTypes.ISO_MDL
             )
         ),
+        MDocTypes.ISO_23220_PHOTO_ID to vc(
+            CredentialSupported(
+                format = CredentialFormat.mso_mdoc,
+                cryptographicBindingMethodsSupported = setOf("cose_key"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
+                proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.ISO_23220_PHOTO_ID)),
+                docType = MDocTypes.ISO_23220_PHOTO_ID
+            )
+        ),
+        MDocTypes.EU_EUDI_PID_1 to vc(
+            CredentialSupported(
+                format = CredentialFormat.mso_mdoc,
+                cryptographicBindingMethodsSupported = setOf("cose_key"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
+                proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.EU_EUDI_PID_1)),
+                docType = MDocTypes.EU_EUDI_PID_1
+            )
+        ),
+        MDocTypes.EU_EC_AV_1 to vc(
+            CredentialSupported(
+                format = CredentialFormat.mso_mdoc,
+                cryptographicBindingMethodsSupported = setOf("cose_key"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
+                proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.EU_EC_AV_1)),
+                docType = MDocTypes.EU_EC_AV_1
+            )
+        ),
+        MDocTypes.AT_ID_AUSTRIA_2023_ISO to vc(
+            CredentialSupported(
+                format = CredentialFormat.mso_mdoc,
+                cryptographicBindingMethodsSupported = setOf("cose_key"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
+                proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.AT_ID_AUSTRIA_2023_ISO)),
+                docType = MDocTypes.AT_ID_AUSTRIA_2023_ISO
+            )
+        ),
+        MDocTypes.GOOGLE_WALLET_IDCARD_1 to vc(
+            CredentialSupported(
+                format = CredentialFormat.mso_mdoc,
+                cryptographicBindingMethodsSupported = setOf("cose_key"),
+                credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
+                proofTypesSupported = mapOf(ProofType.cwt to ProofTypeMetadata(setOf("ES256"))),
+                credentialDefinition = CredentialDefinition(type = listOf(MDocTypes.GOOGLE_WALLET_IDCARD_1)),
+                docType = MDocTypes.GOOGLE_WALLET_IDCARD_1
+            )
+        ),
         "urn:eu.eur1opa.ec.eudi:pid:1" to vc(
             CredentialSupported(
                 format = CredentialFormat.sd_jwt_vc,

@@ -9,7 +9,13 @@ import axios from "axios";
 import {sendToWebWallet} from "@/utils/sendToWebWallet";
 import nextConfig from "@/next.config";
 import BackButton from "@/components/walt/button/BackButton";
-import {CredentialFormats, mapFormat} from "@/types/credentials";
+import {
+  AvailableCredential,
+  CredentialFormats,
+  ISO_MDOC_CREDENTIAL_FORMAT,
+  inferDocTypeFromMdocData,
+  mapFormat,
+} from "@/types/credentials";
 import {checkVerificationResult, getStateFromUrl} from "@/utils/checkVerificationResult";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
@@ -30,45 +36,104 @@ export default function Verification() {
 
   useEffect(() => {
     const getverifyURL = async () => {
-      let vps = router.query.vps?.toString().split(',') ?? [];
-      let ids = router.query.ids?.toString().split(',') ?? [];
-      let format = router.query.format?.toString() ?? CredentialFormats[0];
-      let credentials = AvailableCredentials.filter((cred) => {
-        for (const id of ids) {
-          if (id.toString() == cred.id.toString()) {
-            return true;
-          }
-        }
-        return false;
-      });
+      const vps = router.query.vps?.toString().split(',') ?? [];
+      const ids = router.query.ids?.toString().split(',') ?? [];
+      const formatParam =
+        router.query.format?.toString() ?? CredentialFormats[0];
+      let formatParts = formatParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      if (formatParts.length === 0) {
+        formatParts = [CredentialFormats[0]];
+      }
+
+      const credentials = ids
+        .map((id) =>
+          AvailableCredentials.find((c) => c.id.toString() === id.toString())
+        )
+        .filter((c): c is AvailableCredential => Boolean(c));
+
+      const portalLabelForIndex = (index: number): string => {
+        const cred = credentials[index];
+        if (cred?.kind === 'mdoc') return ISO_MDOC_CREDENTIAL_FORMAT;
+        return (
+          formatParts[index] ??
+          formatParts[0] ??
+          CredentialFormats[0]
+        );
+      };
+
+      const mappedFormats = credentials.map((_, index) =>
+        mapFormat(portalLabelForIndex(index))
+      );
 
       const standardVersion = 'draft13'; // ['draft13', 'draft11']
       const issuerMetadataConfigSelector = {
-        'draft13': 'credential_configurations_supported',
-        'draft11': 'credentials_supported',
-      }
+        draft13: 'credential_configurations_supported',
+        draft11: 'credentials_supported',
+      };
 
-      const issuerMetadata = await axios.get(`${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}/${standardVersion}/.well-known/openid-credential-issuer`);
-      const request_credentials = credentials.map((credential) => {
-        if (mapFormat(format) === 'vc+sd-jwt') {
-          let url = issuerMetadata.data[issuerMetadataConfigSelector[standardVersion]][`${credential.offer.type[credential.offer.type.length - 1]}_vc+sd-jwt`].vct;
+      const issuerMetadata = await axios.get(
+        `${env.NEXT_PUBLIC_ISSUER ? env.NEXT_PUBLIC_ISSUER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_ISSUER}/${standardVersion}/.well-known/openid-credential-issuer`
+      );
+
+      const request_credentials = credentials.map((credential, index) => {
+        const mappedFormat = mappedFormats[index];
+
+        if (credential.kind === 'mdoc') {
+          const raw =
+            credential.offer?.mdocData ??
+            (credential.offer as Record<string, unknown>);
+          const docType =
+            (typeof credential.offer?.docType === 'string' &&
+              credential.offer.docType) ||
+            inferDocTypeFromMdocData(raw as Record<string, unknown>);
+          if (!docType) {
+            throw new Error(
+              'Could not infer ISO mDoc document type from credential namespaces.'
+            );
+          }
           return {
-            vct: url,
-            format: mapFormat(format),
-          };
-        } else {
-          return {
-            type: credential.offer.type[credential.offer.type.length - 1],
-            format: mapFormat(format),
+            format: 'mso_mdoc',
+            doc_type: docType,
+            id: credential.id.replace(/^mdoc:/, '').replace(/\s+/g, '_'),
           };
         }
+        if (mappedFormat === 'vc+sd-jwt') {
+          const url =
+            issuerMetadata.data[
+              issuerMetadataConfigSelector[
+                standardVersion as keyof typeof issuerMetadataConfigSelector
+              ]
+            ][
+              `${
+                credential.offer.type[credential.offer.type.length - 1]
+              }_vc+sd-jwt`
+            ].vct;
+          return {
+            vct: url,
+            format: mappedFormat,
+          };
+        }
+        return {
+          type: credential.offer.type[credential.offer.type.length - 1],
+          format: mappedFormat,
+        };
       });
 
-      let requestBody: any = {
+      const requestBody: {
+        request_credentials: typeof request_credentials;
+        vc_policies?: unknown;
+      } = {
         request_credentials: request_credentials,
       };
 
-      if (mapFormat(format) !== 'vc+sd-jwt') {
+      const needsVcPolicies = mappedFormats.some(
+        (mf) => mf !== 'vc+sd-jwt' && mf !== 'mso_mdoc'
+      );
+
+      if (needsVcPolicies) {
         requestBody.vc_policies = vps.map((vp) => {
           if (vp.includes('=')) {
             return {
@@ -81,14 +146,19 @@ export default function Verification() {
         });
       }
 
+      const verifyHeaders: Record<string, string> = {
+        successRedirectUri: `${window.location.origin}/success/$id`,
+        errorRedirectUri: `${window.location.origin}/success/$id`,
+      };
+      if (mappedFormats.some((mf) => mf === 'mso_mdoc')) {
+        verifyHeaders.openId4VPProfile = 'ISO_18013_7_MDOC';
+      }
+
       const response = await axios.post(
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/verify`,
         requestBody,
         {
-          headers: {
-            successRedirectUri: `${window.location.origin}/success/$id`,
-            errorRedirectUri: `${window.location.origin}/success/$id`,
-          },
+          headers: verifyHeaders,
         }
       );
       setverifyURL(response.data);
@@ -96,15 +166,21 @@ export default function Verification() {
 
       const state = getStateFromUrl(response.data);
       if (state) {
-        checkVerificationResult(env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER, state).then((result) => {
+        checkVerificationResult(
+          env.NEXT_PUBLIC_VERIFIER
+            ? env.NEXT_PUBLIC_VERIFIER
+            : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER,
+          state
+        ).then((result) => {
           if (result) {
             router.push(`/success/${state}`);
           }
         });
       }
     };
+    if (!router.isReady) return;
     getverifyURL();
-  }, []);
+  }, [router.isReady, router.query, AvailableCredentials, env, router]);
 
   async function copyCurrentURLToClipboard() {
     navigator.clipboard.writeText(verifyURL).then(
