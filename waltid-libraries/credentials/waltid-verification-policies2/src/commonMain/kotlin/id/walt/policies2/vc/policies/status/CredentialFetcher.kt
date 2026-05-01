@@ -6,38 +6,59 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 
+/**
+ * Represents fetched status list content, supporting both text (JWT) and binary (CWT) formats.
+ */
+sealed class StatusListContent {
+    /**
+     * Text-based content (e.g., JWT status lists).
+     */
+    data class Text(val content: String) : StatusListContent()
+    
+    /**
+     * Binary content (e.g., CWT status lists as raw CBOR bytes).
+     */
+    data class Binary(val content: ByteArray) : StatusListContent() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Binary) return false
+            return content.contentEquals(other.content)
+        }
+        
+        override fun hashCode(): Int = content.contentHashCode()
+    }
+}
+
 class CredentialFetcher(
     private val client: HttpClient
 ) {
     private val logger = KotlinLogging.logger { }
 
-    suspend fun fetch(url: String): Result<String> = runCatching {
+    /**
+     * Fetches status list content from the given URL.
+     * Returns [StatusListContent.Binary] for CWT content types and [StatusListContent.Text] for others.
+     */
+    suspend fun fetch(url: String): Result<StatusListContent> = runCatching {
         logger.debug { "Fetching content from URL: $url" }
         val response = download(url)
         val contentType = response.contentType()
         
-        // Handle binary CWT content - convert to hex for internal processing
         if (contentType?.match(ContentType("application", "statuslist+cwt")) == true) {
-            logger.debug { "Received CWT content, converting to hex" }
-            response.readRawBytes().toHexString()
+            logger.debug { "Received binary CWT content" }
+            StatusListContent.Binary(response.readRawBytes())
         } else {
-            response.bodyAsText()
+            logger.debug { "Received text content" }
+            StatusListContent.Text(response.bodyAsText())
         }
     }.onFailure { logger.error { "Failed to fetch content from URL: $url" } }
 
     private suspend fun download(url: String): HttpResponse {
         val response = client.get(url) {
             headers {
-                // Accept both text and binary status list formats
                 append(HttpHeaders.Accept, "application/statuslist+jwt, application/statuslist+cwt, text/plain, */*")
             }
         }
         return response.takeIf { it.status.isSuccess() }
             ?: throw IllegalStateException("URL $url returned unexpected status: ${response.status}")
-    }
-    
-    private fun ByteArray.toHexString(): String = joinToString("") { byte ->
-        val hex = (byte.toInt() and 0xFF).toString(16)
-        if (hex.length == 1) "0$hex" else hex
     }
 }
