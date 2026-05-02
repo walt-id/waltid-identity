@@ -48,7 +48,7 @@ class SDJwtTestJVM {
         assertEquals(expected = 1, actual = sdJwt.disclosures.size)
         assertEquals(
             expected = "sub",
-            actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key
+            actual = (sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!! as ObjectPropertyDisclosure).key
         )
         assertContentEquals(
             expected = Json.parseToJsonElement(originalClaimsSet.toString()).jsonObject.toSortedMap().asIterable(),
@@ -113,7 +113,7 @@ class SDJwtTestJVM {
         println(parsedDisclosedJwtVerifyResult.sdJwt.fullPayload.toString())
 
         val forgedDisclosure =
-            parsedDisclosedJwtVerifyResult.sdJwt.jwt + "~" + forgeDislosure(parsedDisclosedJwtVerifyResult.sdJwt.disclosureObjects.first())
+            parsedDisclosedJwtVerifyResult.sdJwt.jwt + "~" + forgeDisclosure(parsedDisclosedJwtVerifyResult.sdJwt.disclosureObjects.first() as ObjectPropertyDisclosure)
         val forgedDisclosureVerifyResult = SDJwt.verifyAndParse(
             forgedDisclosure, cryptoProvider
         )
@@ -122,7 +122,7 @@ class SDJwtTestJVM {
         assertFalse(forgedDisclosureVerifyResult.disclosuresVerified)
     }
 
-    fun forgeDislosure(disclosure: SDisclosure): String {
+    fun forgeDisclosure(disclosure: ObjectPropertyDisclosure): String {
         return Base64.UrlSafe.encode(buildJsonArray {
             add(disclosure.salt)
             add(disclosure.key)
@@ -176,5 +176,34 @@ class SDJwtTestJVM {
             presentedJwtWithKb.keyBindingJwt.sdHash
         )
 
+    }
+
+    /**
+     * End-to-end array-element selective-disclosure flow used as the README example.
+     * Issue an SD-JWT where each `nationalities` element is independently disclosable, then
+     * present revealing only the first. The verifier sees `nationalities = ["US"]`.
+     */
+    @Test
+    fun testArrayElementDisclosureFlow() {
+        val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+
+        // Issuer payload: each element of `nationalities` is independently disclosable.
+        val fullPayload = buildJsonObject {
+            put("sub", "123")
+            put("nationalities", buildJsonArray { add("US"); add("DE") })
+        }
+        val issuanceMap = SDMap.generateSDMap(listOf("nationalities.[]"))
+        val sdPayload = SDPayload.createSDPayload(fullPayload, issuanceMap)
+        val sdJwt = SDJwt.sign(sdPayload, cryptoProvider)
+
+        // Holder presents only nationalities[0] = "US".
+        val presentationMap = SDMap.generateSDMap(listOf("nationalities.[0]"))
+        val presented = sdJwt.present(presentationMap)
+
+        // Verifier sees `sub` (plain) and `nationalities = ["US"]`.
+        val verified = SDJwt.verifyAndParse(presented.toString(), cryptoProvider)
+        val payload = verified.sdJwt.fullPayload
+        assertEquals("123", payload["sub"]!!.jsonPrimitive.content)
+        assertEquals(listOf("US"), payload["nationalities"]!!.jsonArray.map { it.jsonPrimitive.content })
     }
 }

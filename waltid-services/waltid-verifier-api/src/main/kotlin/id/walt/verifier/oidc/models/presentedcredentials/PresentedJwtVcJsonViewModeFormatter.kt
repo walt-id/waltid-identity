@@ -1,6 +1,7 @@
 package id.walt.verifier.oidc.models.presentedcredentials
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.sdjwt.ObjectPropertyDisclosure
 import id.walt.sdjwt.SDJwtVC
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -49,7 +50,7 @@ object PresentedJwtVcJsonViewModeFormatter {
                                     ParsedDisclosure(
                                         disclosure = entry.value.disclosure,
                                         salt = entry.value.salt,
-                                        key = entry.value.key,
+                                        key = (entry.value as? ObjectPropertyDisclosure)?.key,
                                         value = entry.value.value,
                                     )
                                 }
