@@ -32,6 +32,7 @@ data class OidcSessionAuthenticatedData(
     val externalRoles: OidcExternalRoles? = null,
     val idTokenClaims: JsonObject? = null,
     val userInfoClaims: JsonObject? = null,
+    val idTokenRaw: String? = null,  // Raw ID token for logout (id_token_hint)
 ) : SessionData {
 
     @Serializable

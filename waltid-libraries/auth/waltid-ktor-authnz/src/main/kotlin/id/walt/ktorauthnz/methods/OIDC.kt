@@ -1,6 +1,5 @@
 package id.walt.ktorauthnz.methods
 
-import com.sun.tools.javac.code.TypeAnnotationPosition.field
 import id.walt.crypto.keys.jwk.JwkKeyProvider
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.AuthContext
@@ -14,6 +13,7 @@ import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticationStepData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
 import id.walt.ktorauthnz.sessions.SessionManager
+import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.client.*
@@ -38,7 +38,6 @@ import kotlin.io.encoding.Base64
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
-import java.util.UUID
 
 
 object OIDC : AuthenticationMethod("oidc") {
@@ -222,6 +221,7 @@ object OIDC : AuthenticationMethod("oidc") {
                         externalRoles = externalRoles,
                         idTokenClaims = idTokenPayload,
                         userInfoClaims = userInfo,
+                        idTokenRaw = tokenResponse.idToken,
                     )
                 )
 
@@ -310,6 +310,94 @@ object OIDC : AuthenticationMethod("oidc") {
                 }
 
                 call.respond(HttpStatusCode.OK, "Session cookie cleared.")
+            }
+
+            // --- RP-Initiated Logout (User-triggered) ---
+            // Terminates local session and returns IdP's end_session_endpoint for full SSO logout.
+            // Client should redirect to end_session_url if provided.
+            get("logout") {
+                log.trace { "OIDC: RP-initiated logout" }
+
+                val postLogoutRedirect = call.request.queryParameters["post_logout_redirect_uri"]
+
+                // Get token from cookie or header
+                val token = call.request.cookies[SessionTokenCookieHandler.cookieName]
+                    ?: call.request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
+
+                var idTokenRaw: String? = null
+                var endSessionEndpoint: String? = null
+                var clientId: String? = null
+                var validatedPostLogout: String? = null
+
+                if (token != null) {
+                    try {
+                        val session = KtorAuthnzManager.tokenHandler.resolveTokenToSession(token)
+                        val oidcSessionData = session.getSessionData<OidcSessionAuthenticatedData>(this@OIDC)
+
+                        // Get id_token for logout hint
+                        idTokenRaw = oidcSessionData?.idTokenRaw
+
+                        // Resolve OIDC config to get end_session_endpoint
+                        val issuer = oidcSessionData?.tokenValidationData?.idpIss
+                        if (issuer != null) {
+                            // Construct discovery URL from issuer
+                            val discoveryUrl = Url("$issuer/.well-known/openid-configuration")
+                            val oidcConfig = resolveConfiguration(discoveryUrl)
+                            endSessionEndpoint = oidcConfig.endSessionEndpoint
+                        }
+
+                        // Get clientId from registered flows (if available in session)
+                        session.flows?.firstOrNull { it.method == id }?.config?.let { flowConfig ->
+                            try {
+                                val config = Json.decodeFromJsonElement<OidcAuthConfiguration>(flowConfig)
+                                clientId = config.clientId
+                                validatedPostLogout = postLogoutRedirect?.let { uri ->
+                                    config.allowedPostLogoutRedirectUrls.takeIf { it.isNotEmpty() }?.let {
+                                        config.validateRedirectUrl(uri)?.toString()
+                                    }
+                                } ?: config.postLogoutRedirectUri?.toString()
+                            } catch (e: Exception) {
+                                log.debug { "Could not parse OIDC config from session flow: ${e.message}" }
+                            }
+                        }
+
+                        // Terminate local session
+                        session.run {
+                            call.logoutAndDeleteCookie()
+                        }
+                        log.trace { "OIDC: Local session terminated" }
+                    } catch (e: Exception) {
+                        log.debug { "OIDC logout: Could not resolve session: ${e.message}" }
+                        // Still delete the cookie even if session resolution fails
+                        SessionTokenCookieHandler.run { call.deleteCookie() }
+                    }
+                } else {
+                    // No token - just clear cookie if present
+                    SessionTokenCookieHandler.run { call.deleteCookie() }
+                }
+
+                // Build response
+                if (endSessionEndpoint == null) {
+                    call.respond(HttpStatusCode.OK, mapOf(
+                        "status" to "logged_out",
+                        "message" to "Local session terminated. No IdP end_session_endpoint available."
+                    ))
+                    return@get
+                }
+
+                val endSessionUrl = URLBuilder(endSessionEndpoint).apply {
+                    idTokenRaw?.let { parameters.append("id_token_hint", it) }
+                    clientId?.let { parameters.append("client_id", it) }
+                    validatedPostLogout?.let { parameters.append("post_logout_redirect_uri", it) }
+                }.build()
+
+                log.trace { "OIDC: IdP end_session_endpoint: $endSessionUrl" }
+
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "status" to "logged_out",
+                    "end_session_url" to endSessionUrl.toString(),
+                    "message" to "Local session terminated. Redirect to end_session_url for full SSO logout."
+                ))
             }
         }
     }

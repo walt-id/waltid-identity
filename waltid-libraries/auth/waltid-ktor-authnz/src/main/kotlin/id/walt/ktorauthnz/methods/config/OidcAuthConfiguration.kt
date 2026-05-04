@@ -38,6 +38,12 @@ data class OidcAuthConfiguration(
     /** Allowed redirect URL patterns for client-specified redirects (redirect_to parameter). Empty = no dynamic redirects allowed. */
     val allowedRedirectUrls: List<String> = emptyList(),
 
+    /** Default post-logout redirect URI for RP-initiated logout */
+    val postLogoutRedirectUri: Url? = null,
+
+    /** Allowed post-logout redirect URL patterns. Empty = no dynamic post-logout redirects allowed. */
+    val allowedPostLogoutRedirectUrls: List<String> = emptyList(),
+
     /** The claim to use for the unique account identifier. 'sub' is the standard. */
     val accountIdentifierClaim: String = "sub",
 
