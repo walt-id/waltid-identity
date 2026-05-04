@@ -814,6 +814,7 @@ object OpenID4VCI {
         dataMapping: JsonObject? = null,
         x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
+        credentialStatus: JsonElement? = null,
         w3cVersion: String? = null
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
@@ -832,7 +833,11 @@ object OpenID4VCI {
             mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf()
 
-        return W3CVC(credentialData).let { vc ->
+        val vcPayload = credentialStatus?.let { status ->
+            JsonObject(credentialData.toMutableMap().apply { put("credentialStatus", status) })
+        } ?: credentialData
+
+        return W3CVC(vcPayload).let { vc ->
             val builderType = w3cVersion?.let {
                 CredentialBuilderType.valueOf(it)
             }
@@ -863,7 +868,6 @@ object OpenID4VCI {
                     builder.buildW3C()
                 } ?: vc
             }
-
             val context = mapOf(
                 "subjectDid" to holderDid,
                 "issuerDid" to issuerId,
