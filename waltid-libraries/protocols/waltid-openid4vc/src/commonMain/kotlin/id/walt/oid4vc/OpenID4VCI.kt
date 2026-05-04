@@ -34,6 +34,8 @@ import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDJwtVC.Companion.defaultPayloadProperties
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDPayload
+import id.walt.w3c.CredentialBuilder
+import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.getKidHeader
 import id.walt.w3c.issuance.Issuer.mergingJwtIssue
 import id.walt.w3c.issuance.Issuer.mergingSdJwtIssue
@@ -809,7 +811,8 @@ object OpenID4VCI {
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
         x5Chain: List<String>? = null,
-        display: List<DisplayProperties>? = null
+        display: List<DisplayProperties>? = null,
+        w3cVersion: String? = null
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
@@ -828,6 +831,31 @@ object OpenID4VCI {
         } ?: mapOf()
 
         return W3CVC(credentialData).let { vc ->
+            val builderType = w3cVersion?.let {
+                CredentialBuilderType.valueOf(it)
+            }
+            val w3cVc = when (builderType) {
+                CredentialBuilderType.W3CV2CredentialBuilder -> {
+                    val base = if (vc.isV2()) vc.toMutableMap() else {
+                        val existing = credentialData["@context"]
+                            ?.let { if (it is JsonArray) it.map { e -> e.jsonPrimitive.content } else listOf(it.jsonPrimitive.content) }
+                            ?: emptyList()
+                        val merged = (listOf(id.walt.w3c.vc.vcs.W3CV2DataModel.defaultContext.first()) + existing).distinct()
+                        credentialData.toMutableMap().also { map ->
+                            map["@context"] = JsonArray(merged.map { JsonPrimitive(it) })
+                        }
+                    }
+                    base.remove("issuanceDate")?.let { v -> if ("validFrom" !in base) base["validFrom"] = v }
+                    base.remove("expirationDate")?.let { v -> if ("validUntil" !in base) base["validUntil"] = v }
+                    W3CVC(base)
+                }
+                else -> builderType?.let {
+                    val builder = CredentialBuilder(it)
+                    builder.useCredentialSubject(credentialData)
+                    builder.buildW3C()
+                } ?: vc
+            }
+
             val context = mapOf(
                 "subjectDid" to holderDid,
                 "issuerDid" to issuerId,
@@ -844,7 +872,7 @@ object OpenID4VCI {
                 }
             }
             when (selectiveDisclosure.isNullOrEmpty()) {
-                true -> vc.mergingJwtIssue(
+                true -> w3cVc.mergingJwtIssue(
                     issuerKey = issuerKey,
                     issuerId = issuerId,
                     subjectDid = holderDid ?: "",
@@ -855,7 +883,7 @@ object OpenID4VCI {
                     context = context
                 )
 
-                else -> vc.mergingSdJwtIssue(
+                else -> w3cVc.mergingSdJwtIssue(
                     issuerKey = issuerKey,
                     issuerId = issuerId,
                     subjectDid = holderDid ?: "",

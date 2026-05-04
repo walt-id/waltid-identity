@@ -47,6 +47,15 @@ data class W3CVC(
     fun toJson(): String = Json.encodeToString(content)
     fun toPrettyJson(): String = prettyJson.encodeToString(content)
 
+    fun isV2(): Boolean {
+        val context = get("@context") ?: return false
+        return when (context) {
+            is JsonArray -> context.any { it.jsonPrimitive.contentOrNull == "https://www.w3.org/ns/credentials/v2" }
+            is JsonPrimitive -> context.contentOrNull == "https://www.w3.org/ns/credentials/v2"
+            else -> false
+        }
+    }
+
     @JvmBlocking
     @JvmAsync
     @JsPromise
@@ -63,18 +72,28 @@ data class W3CVC(
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
         val kid = issuerKid ?: issuerKey.getKeyId()
+        val wrapInVc = !isV2()
         val payload = JwsSignatureScheme().toPayload(
             data = this.toJsonObject(),
             jwtOptions = mapOf(
                 JwsOption.ISSUER to JsonPrimitive(issuerId),
                 JwsOption.SUBJECT to JsonPrimitive(subjectDid),
                 *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
-            )
+            ),
+            wrapInVc = wrapInVc
         )
 
         val sdPayload = SDPayload.createSDPayload(
             payload,
-            SDMapBuilder(disclosureMap.decoyMode).addField(JwsOption.VC, sd = false, children = disclosureMap).build()
+            if (wrapInVc) {
+                SDMapBuilder(disclosureMap.decoyMode).addField(
+                    JwsOption.VC,
+                    sd = false,
+                    children = disclosureMap
+                ).build()
+            } else {
+                disclosureMap
+            }
         )
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).toByteArray()
 
@@ -119,6 +138,7 @@ data class W3CVC(
                 JwsOption.SUBJECT to JsonPrimitive(subjectDid),
                 *(additionalJwtOptions.entries.map { it.toPair() }.toTypedArray())
             ),
+            wrapInVc = !isV2()
         )
     }
 

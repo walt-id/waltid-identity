@@ -85,6 +85,7 @@ interface OAuth2Provider {
         selectiveDisclosure: SDMap? = null,
         x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
+        w3cVersion: String? = null,
     ): CredentialResponseResult
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp

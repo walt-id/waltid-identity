@@ -179,7 +179,13 @@ object Issuer {
 
         val mapped = this.mergeWithMapping(mappings, mergedContext, dataFunctions)
 
-        val vc = mapped.vc
+        // For VCDM 2.0, rename V1.1-only date fields to their VCDM 2.0 equivalents
+        val vc = if (mapped.vc.isV2()) {
+            val m = mapped.vc.toMutableMap()
+            m.remove("issuanceDate")?.let { v -> if ("validFrom" !in m) m["validFrom"] = v }
+            m.remove("expirationDate")?.let { v -> if ("validUntil" !in m) m["validUntil"] = v }
+            W3CVC(m)
+        } else mapped.vc
         val jwtRes = mapped.results.mapKeys { it.key.removePrefix("jwt:") }.toMutableMap()
 
         fun completeJwtAttributes(attribute: String, completer: () -> JsonElement?) {
@@ -200,14 +206,12 @@ object Issuer {
                     ?: vc[VcClaims.V2.NotAfter.getValue()]?.let { Instant.parse(it.jsonPrimitive.content) }
                         ?.epochSeconds?.let { JsonPrimitive(it) }
             }
-            completeJwtAttributes("iat") {
-                vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
-                    ?.epochSeconds?.let { JsonPrimitive(it) }
-            }
-            completeJwtAttributes("nbf") {
-                vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
-                    ?.epochSeconds?.let { JsonPrimitive(it) }
-            }
+            // V1.1 uses issuanceDate, V2.0 uses validFrom — try both
+            val issuanceInstant =
+                (vc[VcClaims.V1.NotBefore.getValue()] ?: vc[VcClaims.V2.NotBefore.getValue()])
+                    ?.let { Instant.parse(it.jsonPrimitive.content) }
+            completeJwtAttributes("iat") { issuanceInstant?.epochSeconds?.let { JsonPrimitive(it) } }
+            completeJwtAttributes("nbf") { issuanceInstant?.epochSeconds?.let { JsonPrimitive(it) } }
         }
 
         return IssuanceInformation(vc, jwtRes)
