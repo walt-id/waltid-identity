@@ -82,9 +82,7 @@ object Issuer {
             issuerId = issuerId,
             issuerKid = getKidHeader(issuerKey, issuerDid),
             subjectDid = subjectDid,
-            additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
-                put("typ", "JWT".toJsonElement())
-            },
+            additionalJwtHeader = additionalJwtHeader,
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)
             }
