@@ -125,14 +125,16 @@ data class W3CVC(
         additionalJwtOptions: Map<String, JsonElement> = emptyMap()
     ): String {
         val kid = issuerKid ?: issuerKey.getKeyId()
+        val typHeader = if (isV2()) "vc+jwt" else "JWT"
+        val baseHeaders = mapOf(
+            JwsHeader.KEY_ID to kid.toJsonElement(),
+            "typ" to typHeader.toJsonElement(),
+        )
 
         return JwsSignatureScheme().sign(
             data = this.toJsonObject(),
             key = issuerKey,
-            jwtHeaders = mapOf(
-                JwsHeader.KEY_ID to kid.toJsonElement(),
-                *(additionalJwtHeader.entries.map { it.toPair() }.toTypedArray())
-            ),
+            jwtHeaders = baseHeaders + additionalJwtHeader,
             jwtOptions = mapOf(
                 JwsOption.ISSUER to JsonPrimitive(issuerId),
                 JwsOption.SUBJECT to JsonPrimitive(subjectDid),
