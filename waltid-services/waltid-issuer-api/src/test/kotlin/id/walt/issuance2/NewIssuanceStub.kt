@@ -219,10 +219,18 @@ suspend fun main() {
     println("// parse and verify credential")
     val credential = credentialResponse.credential!!.jsonPrimitive.content
     println(">>> Issued credential: $credential")
-    verifyIssuerAndSubjectId(
-        SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
-        testIssuerDid, TEST_WALLET_DID_WEB1
-    )
+    val fullPayload = SDJwt.parse(credential).fullPayload
+    if (fullPayload.containsKey("vc")) {
+        verifyIssuerAndSubjectId(
+            fullPayload["vc"]?.jsonObject!!,
+            testIssuerDid, TEST_WALLET_DID_WEB1
+        )
+    } else {
+        verifyIssuerAndSubjectId(
+            fullPayload,
+            testIssuerDid, TEST_WALLET_DID_WEB1
+        )
+    }
     check(JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
 }
 
