@@ -103,11 +103,15 @@ object OIDC : AuthenticationMethod("oidc") {
 
     /**
      * @param createdSession: Implicitly created session (containing flow method OIDC)
+     * @param redirectTo: Optional client-specified redirect URL after successful auth
      * @return Auth URL to be returned to the user
      */
-    suspend fun startOidcSession(createdSession: AuthSession): Url {
+    suspend fun startOidcSession(createdSession: AuthSession, redirectTo: String? = null): Url {
         val config = createdSession.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
         val oidcConfig = config.getOpenIdConfiguration()
+
+        // Validate client-specified redirect URL against allowlist
+        val validatedRedirectTo = config.validateRedirectUrl(redirectTo)?.toString()
 
         val state = generateSecureRandomString()
         val nonce = generateSecureRandomString()
@@ -119,7 +123,7 @@ object OIDC : AuthenticationMethod("oidc") {
             codeChallenge = generatePkceChallenge(codeVerifier)
         }
 
-        createdSession.setSessionData(OIDC, OidcSessionAuthenticationStepData(state, nonce, codeVerifier))
+        createdSession.setSessionData(OIDC, OidcSessionAuthenticationStepData(state, nonce, codeVerifier, validatedRedirectTo))
         createdSession.storeExternalIdMapping(OIDC_STATE_NAMESPACE, state)
 
         val authUrl = URLBuilder(oidcConfig.authorizationEndpoint).apply {
@@ -148,7 +152,8 @@ object OIDC : AuthenticationMethod("oidc") {
             // 1. Start of the login flow
             get("auth") {
                 val session = call.getAuthSession(authContext) // starts implicit session
-                val authUrl = startOidcSession(session)
+                val redirectTo = call.request.queryParameters["redirect_to"]
+                val authUrl = startOidcSession(session, redirectTo)
 
                 val nextStepInfo = AuthSessionNextStepRedirectData(
                     url = authUrl
@@ -229,13 +234,15 @@ object OIDC : AuthenticationMethod("oidc") {
 
                 val authContext = authContext(call)
 
-                // Redirect if a URL was configured:
-                if (config.redirectAfterLogin != null) {
+                // Determine redirect URL: client-specified (from session) > config default > none
+                val redirectUrl = tempSessionData.redirectTo?.let { Url(it) } ?: config.redirectAfterLogin
+
+                if (redirectUrl != null) {
                     call.handleAuthSuccessAndRedirect(
                         session = session,
                         authContext = authContext,
                         accountId = accountId,
-                        redirectUrl = config.redirectAfterLogin
+                        redirectUrl = redirectUrl
                     )
                 } else {
                     call.handleAuthSuccess(

@@ -11,7 +11,8 @@ import kotlinx.serialization.json.JsonObject
 data class OidcSessionAuthenticationStepData(
     val state: String,
     val nonce: String,
-    val codeVerifier: String? = null, // For PKCE
+    val codeVerifier: String? = null,
+    val redirectTo: String? = null,
 ) : SessionData
 
 @Serializable

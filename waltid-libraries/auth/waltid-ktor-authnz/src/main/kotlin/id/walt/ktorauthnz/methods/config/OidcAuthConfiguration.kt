@@ -18,7 +18,7 @@ data class OidcExternalRoleExtractionConfiguration(
 @Serializable
 @SerialName("oidc-config")
 data class OidcAuthConfiguration(
-    /** EITHER provide the discovery URL for automatic configuration, e.g., "https://idp.example.com/realms/my-realm/.well-known/openid-configuration" */
+    /** EITHER provide the discovery URL for automatic configuration */
     val openIdConfigurationUrl: Url? = null,
     /** OR provide the configuration manually. */
     var openIdConfiguration: OIDC.OpenIdConfiguration? = null,
@@ -26,22 +26,22 @@ data class OidcAuthConfiguration(
     val clientId: String,
     val clientSecret: String,
 
-    /**
-    The URI where the Ktor app will handle the callback from the IdP. Must be registered with the IdP.
-    e.g., "http://localhost:8080/auth/oidc/callback"
-     */
+    /** The callback URI registered with the IdP */
     val callbackUri: String,
 
-    /** Enables Proof Key for Code Exchange (PKCE). Highly recommended for all clients. */
+    /** Enables PKCE. Highly recommended for all clients. */
     val pkceEnabled: Boolean = true,
 
-    /** Where to redirect to after the IDP redirected us to the authnz callback? (usually a frontend URL) */
+    /** Default redirect URL after successful login (fallback if client doesn't specify redirect_to) */
     val redirectAfterLogin: Url? = null,
 
-    /** The claim in the user info response to use for the unique account identifier. 'sub' is the standard. */
+    /** Allowed redirect URL patterns for client-specified redirects (redirect_to parameter). Empty = no dynamic redirects allowed. */
+    val allowedRedirectUrls: List<String> = emptyList(),
+
+    /** The claim to use for the unique account identifier. 'sub' is the standard. */
     val accountIdentifierClaim: String = "sub",
 
-    /** Optional extraction of external roles from OIDC ID token claims (e.g. Keycloak realm/client roles). */
+    /** Optional extraction of external roles from OIDC ID token claims */
     val externalRoleExtraction: OidcExternalRoleExtractionConfiguration = OidcExternalRoleExtractionConfiguration(),
 ) : AuthMethodConfiguration {
 
@@ -70,6 +70,63 @@ data class OidcAuthConfiguration(
                 openIdConfiguration = it
             }
         }
+    }
+
+    /**
+     * Validates if a client-specified redirect URL is allowed.
+     * Returns the validated URL or null if not allowed.
+     */
+    fun validateRedirectUrl(redirectTo: String?): Url? {
+        if (redirectTo == null) return null
+        if (allowedRedirectUrls.isEmpty()) return null
+
+        val requestedUrl = try {
+            Url(redirectTo)
+        } catch (e: Exception) {
+            return null
+        }
+
+        for (pattern in allowedRedirectUrls) {
+            if (matchesPattern(requestedUrl, pattern)) {
+                return requestedUrl
+            }
+        }
+
+        return null
+    }
+
+    private fun matchesPattern(url: Url, pattern: String): Boolean {
+        if (url.toString() == pattern || url.toString().trimEnd('/') == pattern.trimEnd('/')) {
+            return true
+        }
+
+        val patternUrl = try {
+            Url(pattern.replace("*", "__WILDCARD__"))
+        } catch (e: Exception) {
+            return false
+        }
+
+        if (url.protocol != patternUrl.protocol) return false
+
+        val patternHost = patternUrl.host.replace("__WILDCARD__", "*")
+        if (patternHost.startsWith("*.")) {
+            val suffix = patternHost.drop(1)
+            if (!url.host.endsWith(suffix) && url.host != suffix.drop(1)) return false
+        } else if (patternHost != url.host) {
+            return false
+        }
+
+        if (patternUrl.port != url.port) return false
+
+        val patternPath = patternUrl.encodedPath.replace("__WILDCARD__", "*")
+        if (patternPath.endsWith("/*")) {
+            val prefix = patternPath.dropLast(1)
+            if (!url.encodedPath.startsWith(prefix)) return false
+        } else if (patternPath != "*" && patternPath != url.encodedPath) {
+            return false
+        }
+
+        return true
     }
 
     override fun authMethod() = OIDC
