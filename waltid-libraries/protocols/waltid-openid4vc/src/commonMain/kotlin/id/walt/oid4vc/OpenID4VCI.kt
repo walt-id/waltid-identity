@@ -692,6 +692,7 @@ object OpenID4VCI {
         x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
         sdJwtTypeHeader: String? = null,
+        sdJwtCredentialClaims: JsonObject? = null,
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
@@ -772,9 +773,10 @@ object OpenID4VCI {
         }
 
 
-        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+        val extraClaims = sdJwtCredentialClaims ?: emptyMap()
+        val undisclosedPayload = sdPayload.undisclosedPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
-        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).let { JsonObject(it) }
+        val fullPayload = sdPayload.fullPayload.plus(defaultPayloadProperties).plus(extraClaims).let { JsonObject(it) }
 
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
 
