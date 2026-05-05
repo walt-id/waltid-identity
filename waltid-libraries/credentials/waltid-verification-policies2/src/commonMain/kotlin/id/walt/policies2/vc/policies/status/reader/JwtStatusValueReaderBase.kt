@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.policies.status.reader
 
+import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.content.ContentParser
 import id.walt.policies2.vc.policies.status.model.StatusContent
 import id.walt.policies2.vc.policies.status.reader.format.FormatMatcher
@@ -22,8 +23,12 @@ abstract class JwtStatusValueReaderBase<T : StatusContent>(
         }
     }
 
-    override fun read(response: String) = runCatching {
-        val payload = parser.parse(response)
+    override fun read(content: StatusListContent) = runCatching {
+        val textContent = when (content) {
+            is StatusListContent.Text -> content.content
+            is StatusListContent.Binary -> throw IllegalArgumentException("JWT reader requires text content")
+        }
+        val payload = parser.parse(textContent)
         logger.debug { "Payload: $payload" }
         val statusList = parseStatusList(payload)
         logger.debug { "EncodedList: ${statusList.list}" }
