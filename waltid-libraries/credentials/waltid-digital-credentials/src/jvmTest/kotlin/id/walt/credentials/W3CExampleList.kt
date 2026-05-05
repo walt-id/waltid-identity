@@ -12,17 +12,32 @@ object W3CExampleList {
             CredentialPrimaryDataType.W3C,
             W3CSubType.W3C_2,
             CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED
-        ), // unsigned
+        ), // unsigned V2
+        W3CExamples.w3cV11Credential to W3CExamples.w3cV11CredentialValues to CredentialDetectionResult(
+            CredentialPrimaryDataType.W3C,
+            W3CSubType.W3C_1_1,
+            CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED
+        ), // unsigned V1.1
         W3CExamples.dipEcdsaSignedW3CCredential to W3CExamples.dipEcdsaSignedW3CCredentialValues to CredentialDetectionResult(
             CredentialPrimaryDataType.W3C,
             W3CSubType.W3C_2,
             CredentialDetectorTypes.SignaturePrimaryType.DATA_INTEGRITY_PROOF
-        ), // DataIntegrityProof: ECDSA
+        ), // DataIntegrityProof: ECDSA (V2)
+        W3CExamples.dipEcdsaSignedW3CV11Credential to W3CExamples.dipEcdsaSignedW3CV11CredentialValues to CredentialDetectionResult(
+            CredentialPrimaryDataType.W3C,
+            W3CSubType.W3C_1_1,
+            CredentialDetectorTypes.SignaturePrimaryType.DATA_INTEGRITY_PROOF
+        ), // DataIntegrityProof: ECDSA (V1.1)
         W3CExamples.dipEddsaSignedW3CCredential to W3CExamples.dipEddsaSignedW3CCredentialValues to CredentialDetectionResult(
             CredentialPrimaryDataType.W3C,
             W3CSubType.W3C_2,
             CredentialDetectorTypes.SignaturePrimaryType.DATA_INTEGRITY_PROOF
-        ), // DataIntegrityProof: EdDSA
+        ), // DataIntegrityProof: EdDSA (V2)
+        W3CExamples.dipEddsaSignedW3CV11Credential to W3CExamples.dipEddsaSignedW3CV11CredentialValues to CredentialDetectionResult(
+            CredentialPrimaryDataType.W3C,
+            W3CSubType.W3C_1_1,
+            CredentialDetectorTypes.SignaturePrimaryType.DATA_INTEGRITY_PROOF
+        ), // DataIntegrityProof: EdDSA (V1.1)
         W3CExamples.dipEcdsaSdSignedW3CCredential to W3CExamples.dipEcdsaSdSignedW3CCredentialValues to CredentialDetectionResult(
             CredentialPrimaryDataType.W3C,
             W3CSubType.W3C_2,
