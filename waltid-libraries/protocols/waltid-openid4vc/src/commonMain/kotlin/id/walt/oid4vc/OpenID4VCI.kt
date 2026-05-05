@@ -840,19 +840,37 @@ object OpenID4VCI {
         } ?: credentialData
 
         return W3CVC(vcPayload).let { vc ->
-            val builderType = w3cVersion?.let {
-                CredentialBuilderType.valueOf(it)
+            val builderType = w3cVersion?.let { version ->
+                val serialNameMap = mapOf(
+                    "W3CV11" to CredentialBuilderType.W3CV11CredentialBuilder,
+                    "W3CV2" to CredentialBuilderType.W3CV2CredentialBuilder,
+                )
+                CredentialBuilderType.entries.firstOrNull { it.name == version }
+                    ?: serialNameMap[version]
+                    ?: CredentialBuilderType.entries.firstOrNull {
+                        it.name.equals(version, ignoreCase = true)
+                    }
+                    ?: serialNameMap.entries.firstOrNull {
+                        it.key.equals(version, ignoreCase = true)
+                    }?.value
+                    ?: throw CredentialError(
+                        credentialRequest = credentialRequest,
+                        errorCode = CredentialErrorCode.unsupported_credential_type,
+                        message = "Unsupported w3cVersion: '$version'. Supported values: ${
+                            (CredentialBuilderType.entries.map { it.name } + serialNameMap.keys).joinToString { "'$it'" }
+                        }"
+                    )
             }
             val w3cVc = when (builderType) {
                 CredentialBuilderType.W3CV2CredentialBuilder -> {
                     val v2ContextUri = W3CV2DataModel.defaultContext.first()
                     val v11ContextUri = W3CV11DataModel.defaultContext.first()
                     val base = if (vc.isV2()) vc.toMutableMap() else {
-                        val existing = credentialData["@context"]
+                        val existing = vcPayload["@context"]
                             ?.let { if (it is JsonArray) it.map { e -> e.jsonPrimitive.content } else listOf(it.jsonPrimitive.content) }
                             ?: emptyList()
                         val merged = (listOf(v2ContextUri) + existing).distinct()
-                        credentialData.toMutableMap().also { map ->
+                        vcPayload.toMutableMap().also { map ->
                             map["@context"] = JsonArray(merged.map { JsonPrimitive(it) })
                         }
                     }
@@ -866,7 +884,7 @@ object OpenID4VCI {
                 }
                 else -> builderType?.let {
                     val builder = CredentialBuilder(it)
-                    builder.useCredentialSubject(credentialData)
+                    builder.useCredentialSubject(vcPayload)
                     builder.buildW3C()
                 } ?: vc
             }
