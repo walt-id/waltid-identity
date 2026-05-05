@@ -463,20 +463,35 @@ object CredentialParser {
                         proofElement["cryptosuite"]?.jsonPrimitive?.content ?: error("Invalid proof (no cryptosuite)")
 
                         when (proofType) {
-                            "DataIntegrityProof" -> CredentialDetectionResult(
-                                CredentialPrimaryDataType.W3C, W3CSubType.W3C_2, // DataIntegrityProof was introduced with DM 2
-                                SignaturePrimaryType.DATA_INTEGRITY_PROOF
-                            ) to W3C2(
-                                disclosables = containedDisclosablesSaveable,
-                                disclosures = null,
-                                signature = DataIntegrityProofCredentialSignature(proofElement),
-                                signed = credential,
-                                signedWithDisclosures = null,
-                                credentialData = parsedJson,
-
-                                issuer = getCredentialDataIssuer(parsedJson),
-                                subject = getCredentialDataSubject(parsedJson)
-                            )
+                            "DataIntegrityProof" -> {
+                                val dipVersion = detectW3CDataModelVersion(parsedJson)
+                                val signature = DataIntegrityProofCredentialSignature(proofElement)
+                                CredentialDetectionResult(
+                                    CredentialPrimaryDataType.W3C, dipVersion,
+                                    SignaturePrimaryType.DATA_INTEGRITY_PROOF
+                                ) to when (dipVersion) {
+                                    W3CSubType.W3C_2 -> W3C2(
+                                        disclosables = containedDisclosablesSaveable,
+                                        disclosures = null,
+                                        signature = signature,
+                                        signed = credential,
+                                        signedWithDisclosures = null,
+                                        credentialData = parsedJson,
+                                        issuer = getCredentialDataIssuer(parsedJson),
+                                        subject = getCredentialDataSubject(parsedJson)
+                                    )
+                                    W3CSubType.W3C_1_1 -> W3C11(
+                                        disclosables = containedDisclosablesSaveable,
+                                        disclosures = null,
+                                        signature = signature,
+                                        signed = credential,
+                                        signedWithDisclosures = null,
+                                        credentialData = parsedJson,
+                                        issuer = getCredentialDataIssuer(parsedJson),
+                                        subject = getCredentialDataSubject(parsedJson)
+                                    )
+                                }
+                            }
 
                             else -> throw NotImplementedError("Unknown W3C proofType: $proofType")
                         }
