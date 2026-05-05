@@ -1,6 +1,7 @@
 package id.walt.policies2.vc.status.validator
 
 import id.walt.policies2.vc.policies.status.CredentialFetcher
+import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.Values.BITSTRING_STATUS_LIST
 import id.walt.policies2.vc.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import id.walt.policies2.vc.policies.status.Values.REVOCATION_LIST_2020
@@ -35,7 +36,7 @@ import kotlin.reflect.KClass
 abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribute, T : StatusContent> {
 
     protected val uri = "https://example.com/status"
-    protected val statusListContent = "jwt_content"
+    protected val statusListContent = StatusListContent.Text("jwt_content")
     protected val index = 1uL
 
     protected abstract fun getTestScenarios(): Stream<Arguments>
