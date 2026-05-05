@@ -9,7 +9,7 @@ data:
     webHost = "0.0.0.0"
     webPort = 3000
   verifier-service.conf: |
-    clientId: "verifier2"
+    clientId: "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2Iiwia2lkIjoiX25kLVQyWVJZTFNtdUtrSlpsUkk2NDF6ckNJSkxUcGlIZXFNd1h1dmR1ZyIsIngiOiJHX1RnQmMwQmttTWlwaVFfNmdrYW1JbjNtbXA3aGNUclp1eXJMVG1rblAwIiwieSI6IlZrUk1aZFhZWFNNZmY1QUpMcm5IaU4weDVNVjZ1Xzh2ckFjeXRHVWU0ejQifQ"
     clientMetadata: {}
     urlPrefix: "https://verifier2.demo.walt.id/verification-session"
     baseUrl = "https://verifier2.demo.walt.id"
