@@ -19,7 +19,12 @@ object SdJwtExampleList {
             CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED,
             containsDisclosables = true
         ),
-        SdJwtExamples.sdJwtVcDmExample to CredentialDetectionResult(
+        SdJwtExamples.sdJwtVcDmV2Example to CredentialDetectionResult(
+            CredentialPrimaryDataType.SDJWTVC,
+            SDJWTVCSubType.sdjwtvcdm,
+            CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED
+        ),
+        SdJwtExamples.sdJwtVcDmV11Example to CredentialDetectionResult(
             CredentialPrimaryDataType.SDJWTVC,
             SDJWTVCSubType.sdjwtvcdm,
             CredentialDetectorTypes.SignaturePrimaryType.UNSIGNED
