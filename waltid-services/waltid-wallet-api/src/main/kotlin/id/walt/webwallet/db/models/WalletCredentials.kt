@@ -4,6 +4,7 @@ package id.walt.webwallet.db.models
 
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.mdoc.dataelement.json.toJsonElement
+import id.walt.mdoc.dataelement.json.toUIJson
 import id.walt.mdoc.doc.MDoc
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.sdjwt.SDJwt
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.*
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
+import java.util.Base64
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
 import kotlin.uuid.ExperimentalUuidApi
@@ -61,7 +63,7 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
     companion object {
         fun parseDocument(document: String, id: String, format: CredentialFormat) =
             runCatching {
-                when (format) {
+                val parsed = when (format) {
                     CredentialFormat.ldp_vc ->
                         Json.parseToJsonElement(document).jsonObject
 
@@ -72,17 +74,79 @@ data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
                     CredentialFormat.jwt_vc_json_ld ->
                         document.decodeJws().payload.run { jsonObject["vc"]?.jsonObject ?: jsonObject }
 
-                    CredentialFormat.mso_mdoc ->
-                        MDoc.fromCBORHex(document).toMapElement().toJsonElement().jsonObject
+                    CredentialFormat.mso_mdoc -> {
+                        val mdoc = MDoc.fromCBORHex(document)
+                        return@runCatching buildJsonObject {
+                            put("id", JsonPrimitive(id))
+                            put("docType", JsonPrimitive(mdoc.docType.value))
+                            mdoc.issuerSigned.toUIJson().let { issuerNamespaces ->
+                                put("issuerSigned", buildJsonObject {
+                                    put("nameSpaces", enhanceForUI(issuerNamespaces))
+                                })
+                            }
+                        }
+                    }
 
                     else -> throw IllegalArgumentException("Unknown credential format: " + format.value)
-                }.toMutableMap().also {
+                }
+                
+                parsed.toMutableMap().also {
                     it.putIfAbsent("id", JsonPrimitive(id))
                 }.let {
                     JsonObject(it)
                 }
             }.onFailure { it.printStackTrace() }
                 .getOrNull()
+
+        private fun enhanceForUI(issuerNamespaces: JsonObject): JsonObject = buildJsonObject {
+            issuerNamespaces.forEach { (namespace, claims) ->
+                put(namespace, claims.jsonObject.mapValues { (_, value) ->
+                    enhanceClaimValueForUI(value)
+                }.let { JsonObject(it) })
+            }
+        }
+
+        private fun enhanceClaimValueForUI(value: JsonElement): JsonElement = when {
+            // Already a base64 string (check common base64 image prefixes)
+            value is JsonPrimitive && value.isString && value.content.let {
+                it.startsWith("iVBOR") || it.startsWith("/9j/") || it.startsWith("R0lG") || it.startsWith("UklG")
+            } -> {
+                // Convert raw base64 to data URL
+                val base64 = value.content
+                val mimeType = when {
+                    base64.startsWith("iVBOR") -> "image/png"
+                    base64.startsWith("/9j/") -> "image/jpeg"
+                    base64.startsWith("R0lG") -> "image/gif"
+                    base64.startsWith("UklG") -> "image/webp"
+                    else -> "image/jpeg"
+                }
+                JsonPrimitive("data:$mimeType;base64,$base64")
+            }
+            // ByteString array → base64 data URL for images
+            value is JsonArray && value.all { it is JsonPrimitive && it.intOrNull != null } -> {
+                val bytes = value.map { it.jsonPrimitive.int.toByte() }.toByteArray()
+                if (bytes.size > 100) {
+                    val base64 = Base64.getEncoder().encodeToString(bytes)
+                    val mimeType = when {
+                        bytes.size > 4 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() -> "image/png"
+                        bytes.size > 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() -> "image/jpeg"
+                        else -> "image/jpeg"
+                    }
+                    JsonPrimitive("data:$mimeType;base64,$base64")
+                } else {
+                    value
+                }
+            }
+            // Arrays of objects → keep as array
+            value is JsonArray -> value
+            // Nested objects → recursively enhance
+            value is JsonObject -> buildJsonObject {
+                value.forEach { (key, nestedValue) ->
+                    put(key, enhanceClaimValueForUI(nestedValue))
+                }
+            }
+            else -> value
+        }
 
         fun tryParseManifest(manifest: String?) = runCatching {
             manifest?.let { ManifestProvider.json.decodeFromString<JsonObject>(it) }

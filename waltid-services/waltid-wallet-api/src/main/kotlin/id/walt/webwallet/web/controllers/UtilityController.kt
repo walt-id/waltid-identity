@@ -1,7 +1,9 @@
 package id.walt.webwallet.web.controllers
 
+import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.DataElement
 import id.walt.mdoc.dataelement.json.toJsonElement
+import id.walt.mdoc.dataelement.json.toUIJson
 import id.walt.webwallet.web.WebBaseRoutes.webWalletRoute
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -9,6 +11,8 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import kotlinx.serialization.json.*
+import java.util.Base64
 
 fun Application.utility() {
     webWalletRoute {
@@ -28,9 +32,73 @@ fun Application.utility() {
                     HttpStatusCode.OK to { description = "MDoc successfully parsed to JSON" }
                 }
             }) {
-                val mdoc = call.receive<String>()
-                call.respond(DataElement.fromCBORHex<DataElement>(mdoc).toJsonElement())
+                val mdocHex = call.receive<String>()
+                val mdoc = id.walt.mdoc.doc.MDoc.fromCBORHex(mdocHex)
+                val uiJson = buildJsonObject {
+                    put("docType", JsonPrimitive(mdoc.docType.value))
+                    mdoc.issuerSigned.toUIJson().let { issuerNamespaces ->
+                        put("issuerSigned", buildJsonObject {
+                            put("nameSpaces", enhanceForUI(issuerNamespaces))
+                        })
+                    }
+                    mdoc.deviceSigned?.let {
+                        put("deviceSigned", it.toMapElement().toJsonElement())
+                    }
+                }
+                call.respond(uiJson)
             }
         }
     }
+}
+
+private fun enhanceForUI(issuerNamespaces: JsonObject): JsonObject = buildJsonObject {
+    issuerNamespaces.forEach { (namespace, claims) ->
+        put(namespace, claims.jsonObject.mapValues { (_, value) ->
+            enhanceClaimValueForUI(value)
+        }.let { JsonObject(it) })
+    }
+}
+
+private fun enhanceClaimValueForUI(value: JsonElement): JsonElement = when {
+    // Already a base64 string (check common base64 image prefixes)
+    value is JsonPrimitive && value.isString && value.content.let { 
+        it.startsWith("iVBOR") || it.startsWith("/9j/") || it.startsWith("R0lG") || it.startsWith("UklG")
+    } -> {
+        // Convert raw base64 to data URL
+        val base64 = value.content
+        val mimeType = when {
+            base64.startsWith("iVBOR") -> "image/png"
+            base64.startsWith("/9j/") -> "image/jpeg"
+            base64.startsWith("R0lG") -> "image/gif"
+            base64.startsWith("UklG") -> "image/webp"
+            else -> "image/jpeg"
+        }
+        JsonPrimitive("data:$mimeType;base64,$base64")
+    }
+    // ByteString array → base64 data URL for images (portrait, signature_usual_mark)
+    value is JsonArray && value.all { it is JsonPrimitive && it.intOrNull != null } -> {
+        val bytes = value.map { it.jsonPrimitive.int.toByte() }.toByteArray()
+        if (bytes.size > 100) {
+            // Likely binary data (image) → data URL
+            val base64 = Base64.getEncoder().encodeToString(bytes)
+            val mimeType = when {
+                bytes.size > 4 && bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() -> "image/png"
+                bytes.size > 2 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() -> "image/jpeg"
+                else -> "image/jpeg"
+            }
+            JsonPrimitive("data:$mimeType;base64,$base64")
+        } else {
+            // Short byte arrays stay as-is
+            value
+        }
+    }
+    // Arrays of objects (driving_privileges) → keep as array
+    value is JsonArray -> value
+    // Nested objects → recursively enhance
+    value is JsonObject -> buildJsonObject {
+        value.forEach { (key, nestedValue) ->
+            put(key, enhanceClaimValueForUI(nestedValue))
+        }
+    }
+    else -> value
 }

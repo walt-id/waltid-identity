@@ -93,6 +93,14 @@ export async function useIssuance(query: any) {
             const nameOrDescription = data.name ?? data.description ?? data.vct ?? null
             credentialTypes.push(nameOrDescription);
         }
+
+        // Handle mDoc credentials (doctype field)
+        if (typeof credentialListElement["doctype"] !== 'undefined') {
+            const doctype = credentialListElement["doctype"] as string;
+            // Format doctype nicely: "org.iso.18013.5.1.mDL" -> "mDL"
+            const formattedDoctype = doctype.split('.').pop() || doctype;
+            credentialTypes.push(formattedDoctype);
+        }
     }
     const credentialCount = credentialTypes.length;
 

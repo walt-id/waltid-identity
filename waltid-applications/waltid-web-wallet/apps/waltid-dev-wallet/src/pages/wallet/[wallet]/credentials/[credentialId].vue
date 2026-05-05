@@ -253,12 +253,17 @@
           <hr class="my-5" />
           <div
             class="md:flex text-gray-500 mb-3 md:mb-1"
-            v-for="elem in jwtJson.issuerSigned.nameSpaces[
-              Object.keys(jwtJson.issuerSigned.nameSpaces)[0]
-            ]"
+            v-for="claim in mdocClaims"
+            :key="claim.key"
           >
-            <div class="min-w-[19vw]">{{ elem.elementIdentifier }}</div>
-            <div class="font-bold">{{ elem.elementValue }}</div>
+            <div class="min-w-[19vw]">{{ formatClaimKey(claim.key) }}</div>
+            <div v-if="claim.isImage" class="font-bold">
+              <img :src="claim.value" alt="Portrait" class="max-w-xs rounded" />
+            </div>
+            <div v-else-if="claim.isObject" class="font-bold">
+              <pre class="text-xs bg-gray-100 p-2 rounded">{{ claim.displayValue }}</pre>
+            </div>
+            <div v-else class="font-bold">{{ claim.displayValue }}</div>
           </div>
         </div>
 
@@ -462,6 +467,7 @@ import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import {JSONPath} from "jsonpath-plus";
 import QrcodeVue from "qrcode.vue";
 import {ref} from "vue";
+import {useMdocClaims} from "@waltid-web-wallet/composables/mdocClaims.ts";
 
 const route = useRoute();
 const credentialId = route.params.credentialId as string;
@@ -490,6 +496,8 @@ const {
   manifest,
   manifestClaims,
 } = useCredential(credential);
+
+const { mdocClaims, formatClaimKey } = useMdocClaims(jwtJson);
 
 async function deleteCredential() {
   await $fetch(
