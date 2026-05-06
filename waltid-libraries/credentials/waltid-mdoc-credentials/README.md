@@ -309,7 +309,9 @@ val identifierListEntry = Status(
 )
 ```
 
-Note that the two revocation methods discussed here are **mutually exclusive**.
+Note that **ISO/IEC 18013-5 clause 9.1.2.6 (MSO revocation)** requires a single mechanism per MSO: the
+status element shall contain `identifier_list` when using the identifier list mechanism, and shall
+contain `status_list` when using the status list mechanism — the two are therefore **mutually exclusive**.
 
 #### Create, parse and verify a mdoc (mDL) request
 

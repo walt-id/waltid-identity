@@ -1,6 +1,7 @@
 package id.walt.policies2.vc.status.validator
 
 import id.walt.policies2.vc.policies.status.CredentialFetcher
+import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.Values.BITSTRING_STATUS_LIST
 import id.walt.policies2.vc.policies.status.Values.BITSTRING_STATUS_LIST_ENTRY
 import id.walt.policies2.vc.policies.status.Values.REVOCATION_LIST_2020
@@ -35,7 +36,7 @@ import kotlin.reflect.KClass
 abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribute, T : StatusContent> {
 
     protected val uri = "https://example.com/status"
-    protected val statusListContent = "jwt_content"
+    protected val statusListContent = StatusListContent.Text("jwt_content")
     protected val index = 1uL
 
     protected abstract fun getTestScenarios(): Stream<Arguments>
@@ -43,6 +44,7 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
     protected abstract fun createStatusValidator(): StatusValidator<M, K>
     protected abstract fun createEntry(scenario: TestScenario, size: Int = 1): M
     protected abstract fun createAttribute(scenario: TestScenario, value: UInt): K
+    protected abstract fun createAttributeWithValues(scenario: TestScenario, values: List<UInt>): K
     protected abstract fun createStatusContent(scenario: TestScenario, size: Int): T
     protected abstract fun getBitRepresentationStrategy(): BitRepresentationStrategy
     protected abstract fun setupBitValueReader(statusSize: Int, scenario: TestScenario, bitValue: List<Char>)
@@ -86,6 +88,56 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
         @DisplayName("Should successfully validate zero values")
         fun shouldValidateZeroValues(scenario: TestScenario) = runTest {
             testSuccessfulValidation(scenario, statusSize = 1, bitValue = listOf('0'), expectedValue = 0u)
+        }
+    }
+
+    @Nested
+    @DisplayName("Multi-value validation scenarios")
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+    inner class MultiValueValidationScenarios {
+
+        fun getTestScenarios() = this@StatusValidatorTestsBase.getTestScenarios()
+
+        @ParameterizedTest
+        @MethodSource("getTestScenarios")
+        @DisplayName("Should successfully validate when actual value matches one of multiple allowed values")
+        fun shouldValidateWhenValueMatchesOneOfMultiple(scenario: TestScenario) = runTest {
+            val entry = createEntry(scenario, size = 2)
+            val attribute = createAttributeWithValues(scenario, listOf(0u, 1u, 2u)) // Allow 0, 1, or 2
+            val content = createStatusContent(scenario, size = 2)
+
+            setupValidationScenario(scenario, content, listOf('1', '0'), 2) // binary 10 = 2
+
+            val result = sut.validate(entry, attribute)
+            assertTrue(result.isSuccess)
+        }
+
+        @ParameterizedTest
+        @MethodSource("getTestScenarios")
+        @DisplayName("Should successfully validate when actual value matches first of multiple allowed values")
+        fun shouldValidateWhenValueMatchesFirst(scenario: TestScenario) = runTest {
+            val entry = createEntry(scenario, size = 1)
+            val attribute = createAttributeWithValues(scenario, listOf(0u, 1u)) // Allow 0 or 1
+            val content = createStatusContent(scenario, size = 1)
+
+            setupValidationScenario(scenario, content, listOf('0'), 1) // binary 0 = 0
+
+            val result = sut.validate(entry, attribute)
+            assertTrue(result.isSuccess)
+        }
+
+        @ParameterizedTest
+        @MethodSource("getTestScenarios")
+        @DisplayName("Should fail validation when actual value not in allowed values list")
+        fun shouldFailWhenValueNotInAllowedList(scenario: TestScenario) = runTest {
+            val entry = createEntry(scenario, size = 2)
+            val attribute = createAttributeWithValues(scenario, listOf(0u, 1u)) // Allow only 0 or 1
+            val content = createStatusContent(scenario, size = 2)
+
+            setupValidationScenario(scenario, content, listOf('1', '1'), 2) // binary 11 = 3
+
+            val exception = assertThrows<StatusVerificationError> { sut.validate(entry, attribute).getOrThrow() }
+            assertEquals("Status validation failed: expected one of [0, 1], but got 3", exception.message)
         }
     }
 
@@ -201,7 +253,7 @@ abstract class StatusValidatorTestsBase<M : StatusEntry, K : StatusPolicyAttribu
             setupBitValueReader(3, scenario, listOf('1', '0', '1')) // binary 101 = 5
 
             val exception = assertThrows<StatusVerificationError> { sut.validate(entry, attribute).getOrThrow() }
-            assertEquals("Status validation failed: expected 7, but got 5", exception.message)
+            assertEquals("Status validation failed: expected one of [7], but got 5", exception.message)
         }
     }
 
