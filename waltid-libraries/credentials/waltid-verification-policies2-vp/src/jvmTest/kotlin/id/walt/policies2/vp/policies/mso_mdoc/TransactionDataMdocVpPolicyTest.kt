@@ -77,6 +77,28 @@ class TransactionDataMdocVpPolicyTest {
         assertFalse(result.success)
     }
 
+    @Test
+    fun `succeeds without verification context when no transaction data is embedded`() = runTest {
+        val result = policy.runPolicy(
+            document = documentWithEmbeddedTransactionData(emptyList()),
+            mso = dummyMso(),
+            verificationContext = null,
+        )
+
+        assertTrue(result.success)
+    }
+
+    @Test
+    fun `fails without verification context when transaction data is embedded`() = runTest {
+        val result = policy.runPolicy(
+            document = documentWithEmbeddedTransactionData(transactionData),
+            mso = dummyMso(),
+            verificationContext = null,
+        )
+
+        assertFalse(result.success)
+    }
+
     private fun documentWithEmbeddedTransactionData(transactionData: List<String>): Document {
         val embeddedTransactionData = transactionData.mapIndexed { index, encoded ->
             deviceSignedItemKey(index) to encoded

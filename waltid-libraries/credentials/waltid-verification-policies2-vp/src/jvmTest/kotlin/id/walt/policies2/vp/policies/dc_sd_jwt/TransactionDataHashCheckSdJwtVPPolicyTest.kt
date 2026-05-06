@@ -87,6 +87,37 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         assertTrue(result.errors.any { it.message?.contains("transaction_data_hashes", ignoreCase = true) == true })
     }
 
+    @Test
+    fun `succeeds without verification context when no transaction data hashes are present`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = null,
+            transactionDataHashesAlg = null,
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = null,
+        )
+
+        assertTrue(result.success)
+    }
+
+    @Test
+    fun `fails without verification context when transaction data hashes are present`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = listOf("unexpected-hash"),
+            transactionDataHashesAlg = null,
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = null,
+        )
+
+        assertFalse(result.success)
+        assertTrue(result.errors.any { it.message?.contains("transaction_data_hashes", ignoreCase = true) == true })
+    }
+
     private fun verificationContext(expectedTransactionData: List<String>? = null) = VerificationSessionContext(
         vpToken = "vp_token",
         expectedNonce = "3c04c5fc-9306-40fa-b544-0e00474ace09",
