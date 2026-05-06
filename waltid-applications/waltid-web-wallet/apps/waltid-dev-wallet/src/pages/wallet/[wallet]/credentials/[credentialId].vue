@@ -33,14 +33,9 @@
         />
       </div>
       <div class="px-7 py-1">
-        <div v-if="jwtJson?.type">
+        <div v-if="jwtJson?.type || jwtJson?.docType">
           <div class="text-gray-600 font-bold">
-            {{
-              jwtJson?.type[jwtJson?.type.length - 1].replace(
-                /([a-z0-9])([A-Z])/g,
-                "$1 $2",
-              )
-            }}
+            {{ titleTitelized }}
             Details
           </div>
 
@@ -495,6 +490,7 @@ const {
   issuanceDate,
   manifest,
   manifestClaims,
+  titleTitelized,
 } = useCredential(credential);
 
 const { mdocClaims, formatClaimKey } = useMdocClaims(jwtJson);

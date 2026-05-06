@@ -89,9 +89,32 @@ const props = defineProps<{
 }>();
 
 const type = computed(() => {
-    const parsed = props.credential.parsedDocument ?? parseJwt(props.credential.document).vc ?? parseJwt(props.credential.document);
-    return parsed?.type?.at(-1) ?? parsed.vct.split('/').pop() ?? "Unknown";
+    // For mDocs, use docType from parsedDocument
+    if (props.credential.parsedDocument && typeof props.credential.parsedDocument === 'object') {
+        const parsed = props.credential.parsedDocument as any;
+        if (parsed.docType) {
+            return parsed.docType.split('.').pop() || parsed.docType;
+        }
+        if (parsed.type) {
+            return Array.isArray(parsed.type) ? parsed.type.at(-1) : parsed.type;
+        }
+        if (parsed.vct) {
+            return parsed.vct.split('/').pop() || parsed.vct;
+        }
+    }
+    
+    // For JWT credentials, parse the document
+    try {
+        const jwtParsed = parseJwt(props.credential.document);
+        const parsed = jwtParsed.vc ?? jwtParsed;
+        return parsed?.type?.at(-1) ?? (parsed?.vct ? parsed.vct.split('/').pop() : "Unknown");
+    } catch (error) {
+        console.error("Error parsing credential type:", error);
+        return "Unknown";
+    }
 });
-const displayType = computed(() => type.value.replace(/([a-z0-9])([A-Z])/g, "$1 $2"));
+const displayType = computed(() => {
+    return type.value?.replace(/([a-z0-9])([A-Z])/g, "$1 $2") || type.value || "Unknown";
+});
 const disclosureList = computed(() => parseDisclosures(props.credential.disclosures || ""));
 </script>

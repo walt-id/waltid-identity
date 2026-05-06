@@ -36,6 +36,7 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
                         body: credential.value.document,
                     });
                     parsed = await resp.json();
+                    return parsed; // Return directly for mDocs
                 } catch (error) {
                     console.error("Error parsing mDoc:", error);
                     return null;
@@ -45,9 +46,9 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
                 // For other formats, use parsedDocument if available
                 if (credential.value.parsedDocument) return credential.value.parsedDocument;
                 parsed = parseJwt(credential.value.document);
+                
+                if (parsed.vc) return parsed.vc; else return parsed;
             }
-
-            if (parsed.vc) return parsed.vc; else return parsed;
         } else return null;
     });
 

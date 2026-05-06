@@ -15,6 +15,7 @@ import {
   ISO_MDOC_CREDENTIAL_FORMAT,
   inferDocTypeFromMdocData,
   mapFormat,
+  MDOC_ISSUANCE_DEFAULTS,
 } from "@/types/credentials";
 import {checkVerificationResult, getStateFromUrl} from "@/utils/checkVerificationResult";
 
@@ -94,10 +95,31 @@ export default function Verification() {
               'Could not infer ISO mDoc document type from credential namespaces.'
             );
           }
+          
+          // Build a proper input descriptor with fields for mDoc
           return {
-            format: 'mso_mdoc',
-            doc_type: docType,
             id: credential.id.replace(/^mdoc:/, '').replace(/\s+/g, '_'),
+            input_descriptor: {
+              id: docType,
+              format: {
+                mso_mdoc: {
+                  alg: ['ES256'],
+                },
+              },
+              constraints: {
+                limit_disclosure: 'required',
+                fields: Object.keys(raw).flatMap((namespace) => {
+                  const nsData = raw[namespace];
+                  if (typeof nsData === 'object' && nsData !== null) {
+                    return Object.keys(nsData).map((field) => ({
+                      path: [`$['${namespace}']['${field}']`],
+                      intent_to_retain: false,
+                    }));
+                  }
+                  return [];
+                }),
+              },
+            },
           };
         }
         if (mappedFormat === 'vc+sd-jwt') {
@@ -125,6 +147,8 @@ export default function Verification() {
       const requestBody: {
         request_credentials: typeof request_credentials;
         vc_policies?: unknown;
+        vp_policies?: unknown;
+        trusted_root_cas?: string[];
       } = {
         request_credentials: request_credentials,
       };
@@ -146,12 +170,21 @@ export default function Verification() {
         });
       }
 
+      // For mDocs, explicitly set empty policies to avoid JWT policy defaults
+      // and add trusted root CAs for certificate chain verification
+      if (mappedFormats.some((mf) => mf === 'mso_mdoc')) {
+        requestBody.vp_policies = [];
+        requestBody.vc_policies = [];
+        requestBody.trusted_root_cas = [MDOC_ISSUANCE_DEFAULTS.iacaRootCertificate];
+      }
+
       const verifyHeaders: Record<string, string> = {
         successRedirectUri: `${window.location.origin}/success/$id`,
         errorRedirectUri: `${window.location.origin}/success/$id`,
       };
       if (mappedFormats.some((mf) => mf === 'mso_mdoc')) {
         verifyHeaders.openId4VPProfile = 'ISO_18013_7_MDOC';
+        verifyHeaders.responseMode = 'direct_post_jwt';
       }
 
       const response = await axios.post(
