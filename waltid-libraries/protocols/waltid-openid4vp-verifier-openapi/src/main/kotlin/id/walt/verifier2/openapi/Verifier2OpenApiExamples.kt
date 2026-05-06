@@ -17,6 +17,7 @@ import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies2.vp.policies.*
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.UrlConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
@@ -377,6 +378,31 @@ object Verifier2OpenApiExamples {
                     ),
                     msoMdoc = listOf()
                 )
+            )
+        )
+    )
+
+    val openid4vpHttpSdJwtVcTransactionData = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "pid",
+                        format = CredentialFormat.DC_SD_JWT,
+                        meta = SdJwtVcMeta(
+                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("given_name")),
+                            ClaimsQuery(pathStrings = listOf("family_name")),
+                        )
+                    )
+                )
+            )
+        ),
+        openid = OpenId4VPConfig(
+            transactionData = listOf(
+                "eyJ0eXBlIjoib3JnLndhbHRpZC50cmFuc2FjdGlvbi1kYXRhLnBheW1lbnQtYXV0aG9yaXphdGlvbiIsImNyZWRlbnRpYWxfaWRzIjpbInBpZCJdLCJyZXF1aXJlX2NyeXB0b2dyYXBoaWNfaG9sZGVyX2JpbmRpbmciOnRydWUsInRyYW5zYWN0aW9uX2RhdGFfaGFzaGVzX2FsZyI6WyJzaGEtMjU2Il0sImFtb3VudCI6IjQyLjAwIiwiY3VycmVuY3kiOiJFVVIiLCJwYXllZSI6IkFDTUUgQ29ycCIsInJlZmVyZW5jZSI6IklOVi0yMDI2LTA0MiJ9"
             )
         )
     )
