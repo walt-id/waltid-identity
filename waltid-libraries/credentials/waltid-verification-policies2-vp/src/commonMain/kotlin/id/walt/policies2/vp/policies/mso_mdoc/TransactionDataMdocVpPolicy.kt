@@ -28,11 +28,6 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
         mso: MobileSecurityObject,
         verificationContext: VerificationSessionContext?
     ): Result<Unit> {
-        requireNotNull(verificationContext) {
-            "Verification context needs to be provided for TransactionData mdoc VP Policy"
-        }
-
-        val expectedTransactionData = verificationContext.expectedTransactionData.orEmpty()
         val embeddedTransactionData = extract(
             deviceSignedItems = document.deviceSigned
                 ?.namespaces
@@ -43,9 +38,17 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
                 ?.associate { it.key to it.value }
                 .orEmpty()
         )
+        val expectedTransactionData = verificationContext?.expectedTransactionData.orEmpty()
 
         addResult("expected_transaction_data_items", expectedTransactionData.size)
         addResult("embedded_transaction_data_items", embeddedTransactionData.size)
+
+        if (verificationContext == null) {
+            require(embeddedTransactionData.isEmpty()) {
+                "mdoc transaction_data entries must be omitted when verification context is not provided"
+            }
+            return success()
+        }
 
         if (expectedTransactionData.isEmpty()) {
             require(embeddedTransactionData.isEmpty()) {

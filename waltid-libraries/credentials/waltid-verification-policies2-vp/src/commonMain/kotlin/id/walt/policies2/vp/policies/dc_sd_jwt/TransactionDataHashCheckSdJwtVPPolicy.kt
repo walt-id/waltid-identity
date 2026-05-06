@@ -37,13 +37,16 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
         presentation: DcSdJwtPresentation,
         verificationContext: VerificationSessionContext?
     ): Result<Unit> {
-        requireNotNull(verificationContext) {
-            "Verification context needs to be provided for TransactionDataHashCheck SD-JWT VP Policy"
-        }
-
-        addResult("expected_transaction_data_items", verificationContext.expectedTransactionData?.size ?: 0)
+        addResult("expected_transaction_data_items", verificationContext?.expectedTransactionData?.size ?: 0)
         addResult("presentation_transaction_data_hashes", presentation.transactionDataHashes)
         addResult("presentation_transaction_data_hashes_alg", presentation.transactionDataHashesAlg)
+
+        if (verificationContext == null) {
+            require(presentation.transactionDataHashes == null && presentation.transactionDataHashesAlg == null) {
+                "transaction_data_hashes must be omitted when verification context is not provided"
+            }
+            return success()
+        }
 
         val validationError = runCatching {
             validate(
