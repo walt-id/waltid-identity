@@ -88,7 +88,7 @@ class JwsSignatureScheme : SignatureScheme {
     @JsPromise
     @JsExport.Ignore
     suspend fun getIssuerKeysInfo(jws: String): KeysInfo {
-        val jwsParsed = jws.decodeJws()
+        val jwsParsed = jws.substringBefore("~").decodeJws()
         val keyId =
             jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
         val issuerId = (jwsParsed.payload[JwsOption.ISSUER]?.jsonPrimitive?.content ?: keyId)
