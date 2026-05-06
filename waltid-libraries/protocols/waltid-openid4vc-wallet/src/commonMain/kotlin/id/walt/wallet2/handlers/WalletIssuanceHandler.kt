@@ -25,9 +25,13 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -231,8 +235,10 @@ data class ExchangeCodeRequest(
 @OptIn(ExperimentalUuidApi::class)
 object WalletIssuanceHandler {
 
+    private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+
     private fun defaultHttpClient() = HttpClient {
-        install(ContentNegotiation) { json() }
+        install(ContentNegotiation) { json(lenientJson) }
     }
 
     /**
@@ -261,14 +267,17 @@ object WalletIssuanceHandler {
 
         // 1. Parse and resolve offer
         val offerString = request.getEffectiveOfferString()
+        log.trace { "Parsing offer string: ${offerString.take(120)}..." }
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
         val offer = CredentialOfferResolver(httpClient).resolveCredentialOffer(
             credentialOffer = offerRequest.credentialOffer,
             credentialOfferUri = offerRequest.credentialOfferUri
         )
+        log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
 
         // 2. Fetch issuer metadata
+        log.trace { "Fetching issuer metadata from ${offer.credentialIssuer}" }
         val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         log.debug { "Offer contains ${offeredCredentials.size} credential(s)" }
@@ -276,55 +285,63 @@ object WalletIssuanceHandler {
         // 3. Pre-authorized code grant only (auth-code handled by separate flow)
         val preAuthGrant = offer.grants?.preAuthorizedCode
             ?: error("Only pre-authorized code grant is currently supported. Offer grants: ${offer.grants}")
+        log.trace { "Using pre-authorized code grant" }
 
         // 4. Request token
         val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
+        log.trace { "Requesting token from $tokenEndpoint" }
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
             txCode = request.txCode
         )
+        log.trace { "Token obtained, c_nonce=${tokenResponse.c_nonce}" }
         onEvent(WalletSessionEvent.issuance_token_obtained)
 
         // 5. Fetch c_nonce
         val cNonce = issuerMetadata.nonceEndpoint
             ?.let { fetchCNonce(httpClient, it) }
             ?: tokenResponse.c_nonce
+        log.trace { "Using nonce: $cNonce (from ${if (issuerMetadata.nonceEndpoint != null) "nonce endpoint" else "token response"})" }
 
         val credentialEndpoint = issuerMetadata.credentialEndpoint
             ?: error("Issuer metadata contains no credential_endpoint")
+        log.trace { "Credential endpoint: $credentialEndpoint" }
 
-        // 6. Issue each offered credential — parallel using channelFlow concurrency
+        // 6. Issue each offered credential
         for (offeredCredential in offeredCredentials) {
+            log.trace { "Issuing credential configId=${offeredCredential.credentialConfigurationId}, format=${offeredCredential.configuration.format}" }
             val proofs = if (offeredCredential.configuration.proofTypesSupported?.isNotEmpty() == true) {
                 val nonce = cNonce ?: tokenResponse.access_token
+                log.trace { "Building proof JWT, did=$did, nonce=$nonce" }
                 if (did != null) {
                     proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, keyId = did)
                 } else {
                     proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, includeJwk = true)
                 }
             } else null
+            log.trace { "Proof JWT present: ${proofs?.jwt?.firstOrNull()?.take(40)}..." }
             onEvent(WalletSessionEvent.issuance_proof_signed)
 
-            val credentialRequest = DefaultCredentialRequest(
-                client = DefaultClient(
-                    id = request.clientId,
-                    redirectUris = listOf(request.redirectUri.toString()),
-                    grantTypes = emptySet<String>(),
-                    responseTypes = emptySet<String>()
-                ),
-                credentialIdentifier = null,
-                credentialConfigurationId = offeredCredential.credentialConfigurationId,
-                proofs = proofs,
-                credentialResponseEncryption = null
-            )
+            // Build the credential request JSON manually to ensure proofs serializes correctly.
+            // Using DefaultCredentialRequest + setBody risks proofs being serialized as null
+            // due to Proofs.additional: Map<String,JsonElement> interacting with encodeDefaults=false.
+            val credentialRequestJson = buildJsonObject {
+                put("credential_configuration_id", offeredCredential.credentialConfigurationId)
+                proofs?.jwt?.firstOrNull()?.let { jwt ->
+                    putJsonObject("proofs") {
+                        put("jwt", buildJsonArray { add(JsonPrimitive(jwt)) })
+                    }
+                }
+            }
+            log.trace { "Posting to credential endpoint: ${credentialRequestJson.toString().take(200)}" }
 
             val credentialResponse = httpClient.post(credentialEndpoint) {
                 header(HttpHeaders.Authorization, "Bearer ${tokenResponse.access_token}")
                 contentType(ContentType.Application.Json)
-                setBody(credentialRequest)
+                setBody(credentialRequestJson.toString())
             }.let { response ->
                 if (!response.status.isSuccess()) {
                     error("Credential endpoint returned ${response.status}: ${response.bodyAsText()}")
@@ -436,24 +453,19 @@ object WalletIssuanceHandler {
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult {
         val httpClient = defaultHttpClient()
-        val credentialRequest = DefaultCredentialRequest(
-            client = DefaultClient(
-                id = request.clientId,
-                redirectUris = listOf("openid://"),
-                grantTypes = emptySet<String>(),
-                responseTypes = emptySet<String>()
-            ),
-            credentialIdentifier = null,
-            credentialConfigurationId = request.credentialConfigurationId,
-            proofs = request.proofJwt?.let {
-                id.walt.openid4vci.prooftypes.Proofs(jwt = listOf(it))
-            },
-            credentialResponseEncryption = null
-        )
+        // Build JSON manually to avoid Proofs serialization issue
+        val credentialRequestJson = buildJsonObject {
+            put("credential_configuration_id", request.credentialConfigurationId)
+            request.proofJwt?.let { jwt ->
+                putJsonObject("proofs") {
+                    put("jwt", buildJsonArray { add(JsonPrimitive(jwt)) })
+                }
+            }
+        }
         val response = httpClient.post(request.credentialEndpoint.toString()) {
             header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
             contentType(ContentType.Application.Json)
-            setBody(credentialRequest)
+            setBody(credentialRequestJson.toString())
         }
         if (!response.status.isSuccess()) {
             error("Credential endpoint returned ${response.status}: ${response.bodyAsText()}")

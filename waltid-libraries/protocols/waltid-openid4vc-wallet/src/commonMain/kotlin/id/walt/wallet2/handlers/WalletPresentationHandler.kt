@@ -159,6 +159,8 @@ object WalletPresentationHandler {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
+        val keyId = key.getKeyId()
+        log.trace { "presentCredential: keyId=$keyId, did=$did, requestUrl=${request.requestUrl}" }
 
         onEvent(WalletSessionEvent.presentation_request_parsed)
 
@@ -167,8 +169,12 @@ object WalletPresentationHandler {
             holderDid = did,
             presentationRequestUrl = Url(request.getEffectiveRequestUrl()),
             selectCredentialsForQuery = { query ->
+                log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
                 selectFromStores(wallet, query)
-                    .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
+                    .also { matched ->
+                        log.trace { "DCQL matched queryIds: ${matched.keys}" }
+                        onEvent(WalletSessionEvent.presentation_credentials_selected)
+                    }
             },
             holderPoliciesToRun = null,
             runPolicies = request.runPolicies
@@ -333,12 +339,15 @@ object WalletPresentationHandler {
         val rawCredentials = mutableListOf<RawDcqlCredential>()
         var idx = 0
         wallet.streamAllCredentials().collect { stored ->
+            log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
             rawCredentials += stored.credential.toRawDcqlCredential(idx.toString())
             idx++
         }
 
-        log.debug { "DCQL matching against $idx stored credential(s)" }
-        return DcqlMatcher.match(query, rawCredentials).getOrThrow()
+        log.debug { "DCQL matching against $idx stored credential(s), queries=${query.credentials.map { it.id }}" }
+        val matched = DcqlMatcher.match(query, rawCredentials).getOrThrow()
+        log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
+        return matched
     }
 
     private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
