@@ -471,7 +471,7 @@ class TestCredentialWallet(
 
         DescriptorMapping(
             id = presentationDefinition?.inputDescriptors
-                ?.getOrNull(index)?.id   
+                ?.getOrNull(index)?.id
                 ?: getDescriptorId(type, presentationDefinition),
             format = VCFormat.jwt_vp,  // jwt_vp_json
             path = rootPath,
