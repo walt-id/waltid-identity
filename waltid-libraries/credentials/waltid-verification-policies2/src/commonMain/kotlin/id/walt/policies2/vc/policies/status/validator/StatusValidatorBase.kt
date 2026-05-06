@@ -1,6 +1,7 @@
 package id.walt.policies2.vc.policies.status.validator
 
 import id.walt.policies2.vc.policies.status.CredentialFetcher
+import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.model.StatusContent
 import id.walt.policies2.vc.policies.status.model.StatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.StatusRetrievalError
@@ -18,18 +19,15 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
 
     override suspend fun validate(entry: M, attribute: T): Result<Unit> = runCatching {
         logger.debug { "Credential URL: ${entry.uri}" }
-        // download status credential
         val statusListContent = fetcher.fetch(entry.uri)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential download error") }
         
-        // verify signature if verifier is provided
         signatureVerifier?.let { verifier ->
             verifySignature(verifier, statusListContent)
         }
         
         val matchingReader = reader.firstOrNull { it.canHandle(statusListContent) }
         requireNotNull(matchingReader) { "No available reader to handle the status list content." }
-        // parse status list
         val statusList = matchingReader.read(statusListContent)
             .getOrElse { throw StatusRetrievalError(it.message ?: "Status credential parsing error") }
         val bitValue = getBitValue(statusList, entry)
@@ -38,23 +36,23 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         statusValidations(bitValue, attribute)
     }
     
-    private suspend fun verifySignature(verifier: StatusListSignatureVerifier, content: String) {
+    private suspend fun verifySignature(verifier: StatusListSignatureVerifier, content: StatusListContent) {
         logger.debug { "Verifying status list signature" }
         
-        // Determine format and verify accordingly
-        when {
-            isJwt(content) -> {
-                verifier.verifyJwt(content).getOrElse {
-                    throw StatusVerificationError("Status list JWT signature verification failed: ${it.message}")
+        when (content) {
+            is StatusListContent.Text -> {
+                if (isJwt(content.content)) {
+                    verifier.verifyJwt(content.content).getOrElse {
+                        throw StatusVerificationError("Status list JWT signature verification failed: ${it.message}")
+                    }
+                } else {
+                    logger.warn { "Unknown text status list format, skipping signature verification" }
                 }
             }
-            isCwt(content) -> {
-                verifier.verifyCwtFromHex(content).getOrElse {
+            is StatusListContent.Binary -> {
+                verifier.verifyCwt(content.content).getOrElse {
                     throw StatusVerificationError("Status list CWT signature verification failed: ${it.message}")
                 }
-            }
-            else -> {
-                logger.warn { "Unknown status list format, skipping signature verification" }
             }
         }
         
@@ -63,12 +61,6 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
     
     private fun isJwt(content: String): Boolean {
         return content.startsWith("ey") && content.count { it == '.' } == 2
-    }
-    
-    private fun isCwt(content: String): Boolean {
-        // CWT is typically hex-encoded and starts with d2 (COSE_Sign1 tag) or 84 (array of 4)
-        val trimmed = content.trim().lowercase()
-        return trimmed.startsWith("d2") || trimmed.startsWith("84")
     }
 
     protected abstract suspend fun getBitValue(statusList: K, entry: M): List<Char>
@@ -79,14 +71,14 @@ abstract class StatusValidatorBase<K : StatusContent, M : id.walt.policies2.vc.p
         if (bitValue.isEmpty()) {
             throw StatusVerificationError("Null or empty bit value")
         }
-        // ensure bitValue always consists of valid binary characters (0,1)
         if (!isBinaryValue(bitValue)) {
             throw StatusVerificationError("Invalid bit value: $bitValue")
         }
         val binaryString = bitValue.joinToString("")
         val intValue = binToInt(binaryString)
-        if (intValue.toUInt() != attribute.value) {
-            throw StatusVerificationError("Status validation failed: expected ${attribute.value}, but got $intValue")
+        val allowedValues = attribute.getAllowedValues()
+        if (intValue.toUInt() !in allowedValues) {
+            throw StatusVerificationError("Status validation failed: expected one of $allowedValues, but got $intValue")
         }
     }
 

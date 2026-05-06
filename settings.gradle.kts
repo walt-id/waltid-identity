@@ -41,7 +41,8 @@ val modules = listOfNotNull(
         "waltid-verification-policies2-vp",
         "waltid-holder-policies",
         "waltid-vical",
-        "waltid-mdoc-credentials2"
+        "waltid-mdoc-credentials2",
+        "waltid-trust-registry"
     ),
 
     * "$libraries:protocols".group(

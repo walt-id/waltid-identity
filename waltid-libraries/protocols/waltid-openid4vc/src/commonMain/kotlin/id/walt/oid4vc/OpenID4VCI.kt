@@ -688,6 +688,7 @@ object OpenID4VCI {
         x5Chain: List<String>? = null,
         display: List<DisplayProperties>? = null,
         sdJwtTypeHeader: String? = null,
+        sdJwtCredentialClaims: JsonObject? = null,
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
@@ -721,11 +722,18 @@ object OpenID4VCI {
             if (!it.isNullOrEmpty() && DidUtils.isDidUrl(it)) it.substringBefore("#") else null
         }
 
+        val credentialPayload = sdJwtCredentialClaims?.let { extra ->
+            JsonObject(credentialData.toMutableMap().apply {
+                extra.forEach { (k, v) -> put(k, v) }
+            })
+        } ?: credentialData
+
         val sdPayload = SDPayload.createSDPayload(
-            fullPayload = credentialData.mergeSDJwtVCPayloadWithMapping(
+            fullPayload = credentialPayload.mergeSDJwtVCPayloadWithMapping(
                 mapping = dataMapping ?: JsonObject(emptyMap()),
                 context = mapOf(
                     "subjectDid" to holderDid,
+                    "issuerDid" to issuerId,
                     "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                 ).filterValues {
                     when (it) {
@@ -808,7 +816,8 @@ object OpenID4VCI {
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
         x5Chain: List<String>? = null,
-        display: List<DisplayProperties>? = null
+        display: List<DisplayProperties>? = null,
+        credentialStatus: JsonElement? = null,
     ): String {
         val proofHeader = credentialRequest.proof?.jwt?.let { JwtUtils.parseJWTHeader(it) }
             ?: throw CredentialError(
@@ -826,7 +835,26 @@ object OpenID4VCI {
             mapOf(JWTClaims.Header.x5c to JsonArray(it.map { cert -> cert.toJsonElement() }))
         } ?: mapOf()
 
-        return W3CVC(credentialData).let { vc ->
+        val vcPayload = credentialStatus?.let { status ->
+            JsonObject(credentialData.toMutableMap().apply { put("credentialStatus", status) })
+        } ?: credentialData
+
+        return W3CVC(vcPayload).let { vc ->
+            val context = mapOf(
+                "subjectDid" to holderDid,
+                "issuerDid" to issuerId,
+                "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
+            ).filterValues {
+                when (it) {
+                    is JsonElement -> it !is JsonNull && (it !is JsonObject || it.jsonObject.isNotEmpty()) && (it !is JsonArray || it.jsonArray.isNotEmpty())
+                    else -> it != null && it.toString().isNotEmpty()
+                }
+            }.mapValues { (_, value) ->
+                when (value) {
+                    is JsonElement -> value
+                    else -> JsonPrimitive(value.toString())
+                }
+            }
             when (selectiveDisclosure.isNullOrEmpty()) {
                 true -> vc.mergingJwtIssue(
                     issuerKey = issuerKey,
@@ -835,7 +863,8 @@ object OpenID4VCI {
                     mappings = dataMapping ?: JsonObject(emptyMap()),
                     additionalJwtHeader = additionalJwtHeaders,
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    additionalJwtOptions = emptyMap()
+                    additionalJwtOptions = emptyMap(),
+                    context = context
                 )
 
                 else -> vc.mergingSdJwtIssue(
@@ -846,7 +875,8 @@ object OpenID4VCI {
                     additionalJwtHeaders = additionalJwtHeaders,
                     additionalJwtOptions = emptyMap(),
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
-                    disclosureMap = selectiveDisclosure
+                    disclosureMap = selectiveDisclosure,
+                    context = context
                 )
             }
         }

@@ -66,9 +66,6 @@ data class CredentialIssuerMetadata(
         notificationEndpoint?.let { validateEndpointUrl("notification_endpoint", it) }
         nonceEndpoint?.let { validateEndpointUrl("nonce_endpoint", it) }
 
-        require(credentialConfigurationsSupported.isNotEmpty()) {
-            "credential_configurations_supported must not be empty"
-        }
         require(credentialConfigurationsSupported.keys.all { it.isNotBlank() }) {
             "credential_configurations_supported keys must not be blank"
         }

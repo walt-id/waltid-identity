@@ -4,6 +4,7 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.*
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
@@ -274,7 +275,8 @@ object PresentationVerificationEngine {
     suspend fun executeAllVerification(
         vpTokenContents: ParsedVpToken, session: Verification2Session,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
-        failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit
+        failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
+        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty
     ) {
         // syntax sugar:
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
@@ -372,7 +374,8 @@ object PresentationVerificationEngine {
 
         val credentialPolicyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
             session.policies,
-            allSuccessfullyValidatedAndProcessedData
+            allSuccessfullyValidatedAndProcessedData,
+            policyContext
         )
 
         val verificationSessionPolicyResults = Verifier2PolicyResults(

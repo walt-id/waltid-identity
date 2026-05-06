@@ -44,7 +44,10 @@ data class WebhookPolicy(
         )
     )
 
-    override suspend fun verify(credential: DigitalCredential): Result<JsonElement> {
+    override suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext
+    ): Result<JsonElement> {
         val responseResult = runCatching {
             web.send<DigitalCredential, JsonElement>(url, credential)
         }
