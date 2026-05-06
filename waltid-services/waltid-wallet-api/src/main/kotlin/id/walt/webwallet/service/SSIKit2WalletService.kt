@@ -1130,7 +1130,11 @@ class SSIKit2WalletService(
 
     private fun shouldFallBackToLegacyDraftRequest(error: Throwable): Boolean =
         error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
-            (error.clientIdError as? ClientIdError.UnsupportedPrefix)?.prefix in setOf("http", "https")
+            when (val clientIdError = error.clientIdError) {
+                is ClientIdError.UnsupportedPrefix -> clientIdError.prefix in setOf("http", "https")
+                is ClientIdError.PreRegisteredClientNotFound -> true
+                else -> false
+            }
 
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun useOpenId4VpPresentationRequest(
