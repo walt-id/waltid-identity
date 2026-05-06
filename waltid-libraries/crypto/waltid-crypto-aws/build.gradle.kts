@@ -19,7 +19,7 @@ dependencies {
     implementation(identityLibs.kotlinx.coroutines.core)
 
     // AWS
-    implementation("aws.sdk.kotlin:kms-jvm:1.6.39")
+    implementation("aws.sdk.kotlin:kms-jvm:1.6.70")
 
     // JOSE
     implementation(identityLibs.nimbus.jose.jwt)

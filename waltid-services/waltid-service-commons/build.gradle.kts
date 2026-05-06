@@ -43,14 +43,14 @@ dependencies {
     api(identityLibs.sksamuel.cohort)
 
     // OpenAPI
-    api("io.github.smiley4:ktor-openapi:5.6.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
-    implementation("io.github.smiley4:ktor-redoc:5.6.0")
+    api("io.github.smiley4:ktor-openapi:5.7.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.7.0")
+    implementation("io.github.smiley4:ktor-redoc:5.7.0")
 
-    implementation("io.github.smiley4:schema-kenerator-core:2.6.0")
-    implementation("io.github.smiley4:schema-kenerator-swagger:2.6.0")
-    implementation("io.github.smiley4:schema-kenerator-serialization:2.6.0")
-    implementation("io.github.smiley4:schema-kenerator-reflection:2.6.0")
+    implementation("io.github.smiley4:schema-kenerator-core:2.7.2")
+    implementation("io.github.smiley4:schema-kenerator-swagger:2.7.2")
+    implementation("io.github.smiley4:schema-kenerator-serialization:2.7.2")
+    implementation("io.github.smiley4:schema-kenerator-reflection:2.7.2")
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")

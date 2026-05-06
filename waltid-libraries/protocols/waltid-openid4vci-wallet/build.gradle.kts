@@ -23,7 +23,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
             // JSON
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
 
             implementation(identityLibs.kotlincrypto.hash.sha2)
