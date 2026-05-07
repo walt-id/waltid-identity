@@ -231,6 +231,7 @@ class DefaultOAuth2Provider(
         selectiveDisclosure: SDMap?,
         x5Chain: List<String>?,
         display: List<DisplayProperties>?,
+        w3cVersion: String?,
     ): CredentialResponseResult {
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
@@ -249,6 +250,7 @@ class DefaultOAuth2Provider(
             selectiveDisclosure = selectiveDisclosure,
             x5Chain = x5Chain,
             display = display,
+            w3cVersion = w3cVersion,
         )
     }
 

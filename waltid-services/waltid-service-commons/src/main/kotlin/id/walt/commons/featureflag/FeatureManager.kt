@@ -61,10 +61,21 @@ object FeatureManager {
             it.invoke()
         }
 
-        return when {
-            enabledFeatures.add(feature.name) -> Result.success(true)
-            else -> Result.failure(IllegalStateException("Feature \"${feature.name}\" already enabled."))
+        if (!enabledFeatures.add(feature.name)) {
+            return Result.failure(IllegalStateException("Feature \"${feature.name}\" already enabled."))
         }
+
+        try {
+            feature.onEnable?.let {
+                log.info { "Enabling feature \"${feature.name}\"..." }
+                it.invoke()
+            }
+        } catch (ex: Throwable) {
+            enabledFeatures.remove(feature.name)
+            return Result.failure(ex)
+        }
+
+        return Result.success(true)
     }
 
     fun disableFeature(feature: AbstractFeature) {

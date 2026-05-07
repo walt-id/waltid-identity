@@ -262,7 +262,7 @@ object VerificationSessionCreator {
         val bootstrapAuthorizationRequestUrl = bootstrapAuthorizationRequest?.toHttpUrl(URLBuilder(urlHost))
 
         val now = Clock.System.now()
-        val expiration = now.plus(5, DateTimeUnit.MINUTE, TimeZone.UTC)
+        val expiration = setup.core.expirationDate
         val retentionDate = now.plus(10, DateTimeUnit.YEAR, TimeZone.UTC)
 
         val signedAuthorizationRequest = if (isSignedRequest) {
@@ -407,7 +407,8 @@ object VerificationSessionCreator {
             expirationDate = expiration,
             retentionDate = retentionDate,
 
-            status = if (expiration != null) Verification2Session.VerificationSessionStatus.UNUSED else Verification2Session.VerificationSessionStatus.ACTIVE,
+            //status = if (expiration != null) Verification2Session.VerificationSessionStatus.UNUSED else Verification2Session.VerificationSessionStatus.ACTIVE,
+            status = Verification2Session.VerificationSessionStatus.UNUSED,
 
             bootstrapAuthorizationRequest = if (!isAnnexC) bootstrapAuthorizationRequest else null,
             bootstrapAuthorizationRequestUrl = if (!isAnnexC) bootstrapAuthorizationRequestUrl else null,

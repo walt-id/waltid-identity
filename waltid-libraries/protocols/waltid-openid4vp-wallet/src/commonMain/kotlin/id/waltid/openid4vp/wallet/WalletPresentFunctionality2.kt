@@ -19,6 +19,8 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
@@ -47,11 +49,8 @@ object WalletPresentFunctionality2 {
 
     private val log = KotlinLogging.logger { }
 
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-    }
+    private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+    private val webPostToken = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_POST_TOKEN)
 
     /**
      * @param matchedData: Credentials that were choosen by the DCQL query
@@ -173,7 +172,7 @@ object WalletPresentFunctionality2 {
         val authorizationRequest: AuthorizationRequest = if (presentationRequestUrl.parameters.contains("request_uri")) {
             val requestUri = presentationRequestUrl.parameters["request_uri"]!!
             log.trace { "Resolving AuthorizationRequest from URI: $requestUri" }
-            val httpResponse = http.get(requestUri)
+            val httpResponse = webResolveAuthReq.rawFetch(requestUri)
 
             check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}" }
 
@@ -435,7 +434,7 @@ object WalletPresentFunctionality2 {
                 }.build()
 
                 log.trace { "Submitting direct_post form to Verifier: ${authorizationRequest.responseUri}" }
-                val response = http.submitForm(authorizationRequest.responseUri!!, parameters)
+                val response = webPostToken.sendForm(authorizationRequest.responseUri!!, parameters)
                 log.trace { "Verifier direct_post response: $response" }
 
                 val responseBody = response.bodyAsText()
@@ -495,7 +494,7 @@ object WalletPresentFunctionality2 {
                 }.build()
 
                 log.trace { "Submitting direct_post.jwt (encrypted) to Verifier: ${authorizationRequest.responseUri}" }
-                val response = http.submitForm(authorizationRequest.responseUri!!, parameters)
+                val response = webPostToken.sendForm(authorizationRequest.responseUri!!, parameters)
 
                 log.trace { "Verifier direct_post.jwt response status: ${response.status}" }
 

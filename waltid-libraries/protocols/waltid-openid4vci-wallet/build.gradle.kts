@@ -17,7 +17,6 @@ kotlin {
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
-            implementation(identityLibs.slf4j.simple)
 
             // Kotlinx
             implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
@@ -38,6 +37,9 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(identityLibs.bundles.waltid.ktortesting)
+        }
+        jvmTest.dependencies {
+            implementation(identityLibs.slf4j.simple)
         }
     }
 }

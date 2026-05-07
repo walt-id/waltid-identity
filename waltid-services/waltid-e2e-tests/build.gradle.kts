@@ -11,7 +11,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
     testImplementation(identityLibs.ktor.server.test.host)
-    testImplementation(identityLibs.ktor.client.cio)
+    testImplementation(identityLibs.ktor.client.java)
     testImplementation(identityLibs.ktor.client.content.negotiation)
     testImplementation(identityLibs.ktor.client.logging)
 

@@ -22,7 +22,7 @@ dependencies {
 
     // Ktor client
     implementation(identityLibs.ktor.client.core)
-    implementation("io.ktor:ktor-client-cio")
+    implementation(identityLibs.ktor.client.java)
     implementation(identityLibs.ktor.client.content.negotiation)
 
     // JSON

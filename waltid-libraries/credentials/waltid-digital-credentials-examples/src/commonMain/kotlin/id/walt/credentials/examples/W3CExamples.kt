@@ -4,6 +4,8 @@ import id.walt.credentials.formats.AbstractW3C
 import kotlinx.serialization.json.Json
 
 object W3CExamples {
+
+    // ── W3C V2 (unsigned) ──
     //language=JSON
     val w3cCredential = """
         {
@@ -25,6 +27,32 @@ object W3CExamples {
         }
     """.trimIndent()
     val w3cCredentialValues = mapOf(
+        "issuer" to "https://university.example/issuers/565049",
+        "subject" to "did:example:ebfeb1f712ebc6f1c276e12ec21"
+    )
+
+    // ── W3C V1.1 (unsigned) ──
+    //language=JSON
+    val w3cV11Credential = """
+        {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://www.w3.org/2018/credentials/examples/v1"
+          ],
+          "id": "http://university.example/credentials/3732",
+          "type": ["VerifiableCredential", "ExampleDegreeCredential"],
+          "issuer": "https://university.example/issuers/565049",
+          "issuanceDate": "2010-01-01T00:00:00Z",
+          "credentialSubject": {
+            "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+            "degree": {
+              "type": "ExampleBachelorDegree",
+              "name": "Bachelor of Arts"
+            }
+          }
+        }
+    """.trimIndent()
+    val w3cV11CredentialValues = mapOf(
         "issuer" to "https://university.example/issuers/565049",
         "subject" to "did:example:ebfeb1f712ebc6f1c276e12ec21"
     )
@@ -66,6 +94,43 @@ object W3CExamples {
         "subject" to "did:example:ebfeb1f712ebc6f1c276e12ec21"
     )
 
+    // application/vc (V1.1)
+    //language=JSON
+    val dipEcdsaSignedW3CV11Credential = """
+        {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://www.w3.org/2018/credentials/examples/v1"
+          ],
+          "id": "http://university.example/credentials/3732",
+          "type": [
+            "VerifiableCredential",
+            "ExampleDegreeCredential"
+          ],
+          "issuer": "https://university.example/issuers/565049",
+          "issuanceDate": "2010-01-01T00:00:00Z",
+          "credentialSubject": {
+            "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+            "degree": {
+              "type": "ExampleBachelorDegree",
+              "name": "Bachelor of Science and Arts"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "created": "2025-02-25T01:47:38Z",
+            "verificationMethod": "did:key:zDnaehK1RvsyuH7E1qSEp17iUwzYUvMnaz4vXTtXunvBzNZNk",
+            "cryptosuite": "ecdsa-rdfc-2019",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "zjV78p6RWm6uZCoFyx4D5xLg5GMdEnhtrG4LJU5PH6Tf3kHAHoSmqvXNipsZbRtV1KuCwt83zr9qLjX3zuNkHCwW"
+          }
+        }
+    """.trimIndent()
+    val dipEcdsaSignedW3CV11CredentialValues = mapOf(
+        "issuer" to "https://university.example/issuers/565049",
+        "subject" to "did:example:ebfeb1f712ebc6f1c276e12ec21"
+    )
+
     // application/vc
     //language=JSON
     val dipEddsaSignedW3CCredential = """
@@ -99,6 +164,43 @@ object W3CExamples {
         }
     """.trimIndent()
     val dipEddsaSignedW3CCredentialValues = mapOf(
+        "issuer" to "https://university.example/issuers/565049",
+        "subject" to "did:example:ebfeb1f712ebc6f1c276e12ec21"
+    )
+
+    // application/vc (V1.1)
+    //language=JSON
+    val dipEddsaSignedW3CV11Credential = """
+        {
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://www.w3.org/2018/credentials/examples/v1"
+          ],
+          "id": "http://university.example/credentials/3732",
+          "type": [
+            "VerifiableCredential",
+            "ExampleDegreeCredential"
+          ],
+          "issuer": "https://university.example/issuers/565049",
+          "issuanceDate": "2010-01-01T00:00:00Z",
+          "credentialSubject": {
+            "id": "did:example:ebfeb1f712ebc6f1c276e12ec21",
+            "degree": {
+              "type": "ExampleBachelorDegree",
+              "name": "Bachelor of Science and Arts"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "created": "2025-02-25T01:47:38Z",
+            "verificationMethod": "did:key:z6MkkZwCZavHWfRQAu9WbrDGJrSyxQV6Y3v44GdJeX8X3Vtu",
+            "cryptosuite": "eddsa-rdfc-2022",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "z2SLLvvKkaiM23MphyzXZ3AMiWRHop7VJR8mtWDnH2YUC6K33QFE3rxaJhuLrdAfCVFAiajRY3FyiDRqKmTM2C8rk"
+          }
+        }
+    """.trimIndent()
+    val dipEddsaSignedW3CV11CredentialValues = mapOf(
         "issuer" to "https://university.example/issuers/565049",
         "subject" to "did:example:ebfeb1f712ebc6f1c276e12ec21"
     )

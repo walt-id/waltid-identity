@@ -24,9 +24,6 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.optimumcode.jsonschemavalidator)
 
-            // Ktor client
-            implementation(identityLibs.bundles.waltid.ktor.client)
-
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
@@ -40,19 +37,21 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
+            api(project(":waltid-libraries:web:waltid-web-data-fetching"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+
+            // Ktor client
+            implementation(identityLibs.bundles.waltid.ktor.client)
+            implementation(identityLibs.ktor.client.cio)
         }
         jvmMain.dependencies {
             // Json canonicalization
             implementation("io.github.erdtman:java-json-canonicalization:1.1")
         }
         jvmTest.dependencies {
-            // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
-
             implementation(identityLibs.kotlinx.serialization.json)
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }

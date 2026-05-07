@@ -3,13 +3,15 @@ package id.walt.policies2.vc.policies
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.JsonSchemaVerificationException
 import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.HttpEngine
 import io.github.optimumcode.json.schema.JsonSchema
 import io.github.optimumcode.json.schema.SchemaType
 import io.github.optimumcode.json.schema.ValidationError
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -26,12 +28,16 @@ data class JsonSchemaPolicy(
         require(schema != null || schemaUrl != null) { "Schema or Schema URL has to be provided" }
     }
 
-    @Transient
-    private val schemaFetcher = schemaUrl?.let { WebDataFetcher<JsonObject>("schema-policy") }
+    companion object {
+        private val schemaFetcher = WebDataFetcher(
+            WebDataFetcherId.SCHEMA_POLICY,
+            defaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.Native)
+        )
+    }
 
     suspend fun getCurrentSchema(): JsonObject {
         return when {
-            schemaUrl != null -> schemaFetcher!!.fetch<JsonObject>(schemaUrl)
+            schemaUrl != null -> schemaFetcher.fetch<JsonObject>(schemaUrl).body
             schema != null -> schema
             else -> throw IllegalStateException("No schema defined")
         }
