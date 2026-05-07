@@ -191,7 +191,9 @@ object Verifier2VPDirectPostHandler {
         }
 
         verificationSession.expirationDate?.let { expirationDate ->
-            require(expirationDate >= Clock.System.now()) { "This verification session is expired." }
+            if (expirationDate < Clock.System.now()) {
+                Verifier2Response.Verifier2Error.EXPIRED_VERIFICATION_SESSION.throwAsError()
+            }
         }
 
         val result = handleDirectPost(
@@ -272,7 +274,13 @@ object Verifier2VPDirectPostHandler {
         // presented credential/presentation
 
 
-        PresentationVerificationEngine.executeAllVerification(vpTokenContents, session, updateSessionCallback, failSessionCallback, policyContext)
+        PresentationVerificationEngine.executeAllVerification(
+            vpTokenContents,
+            session,
+            updateSessionCallback,
+            failSessionCallback,
+            policyContext
+        )
 
 
         val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri
