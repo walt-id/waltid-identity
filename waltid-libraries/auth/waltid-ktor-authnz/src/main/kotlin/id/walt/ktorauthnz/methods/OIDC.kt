@@ -5,6 +5,7 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.accounts.identifiers.methods.OIDCIdentifier
 import id.walt.ktorauthnz.amendmends.AuthMethodFunctionAmendments
+import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.methods.config.OidcAuthConfiguration
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData
 import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticatedData.TokenValidationData
@@ -12,6 +13,7 @@ import id.walt.ktorauthnz.methods.sessiondata.OidcSessionAuthenticationStepData
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.sessions.AuthSessionNextStepRedirectData
 import id.walt.ktorauthnz.sessions.SessionManager
+import id.walt.ktorauthnz.sessions.SessionTokenCookieHandler
 import io.github.smiley4.ktoropenapi.route
 import io.klogging.logger
 import io.ktor.client.*
@@ -100,11 +102,15 @@ object OIDC : AuthenticationMethod("oidc") {
 
     /**
      * @param createdSession: Implicitly created session (containing flow method OIDC)
+     * @param redirectTo: Optional client-specified redirect URL after successful auth
      * @return Auth URL to be returned to the user
      */
-    suspend fun startOidcSession(createdSession: AuthSession): Url {
+    suspend fun startOidcSession(createdSession: AuthSession, redirectTo: String? = null): Url {
         val config = createdSession.lookupFlowMethodConfiguration<OidcAuthConfiguration>(OIDC)
         val oidcConfig = config.getOpenIdConfiguration()
+
+        // Validate client-specified redirect URL against allowlist
+        val validatedRedirectTo = config.validateRedirectUrl(redirectTo)?.toString()
 
         val state = generateSecureRandomString()
         val nonce = generateSecureRandomString()
@@ -116,7 +122,7 @@ object OIDC : AuthenticationMethod("oidc") {
             codeChallenge = generatePkceChallenge(codeVerifier)
         }
 
-        createdSession.setSessionData(OIDC, OidcSessionAuthenticationStepData(state, nonce, codeVerifier))
+        createdSession.setSessionData(OIDC, OidcSessionAuthenticationStepData(state, nonce, codeVerifier, validatedRedirectTo))
         createdSession.storeExternalIdMapping(OIDC_STATE_NAMESPACE, state)
 
         val authUrl = URLBuilder(oidcConfig.authorizationEndpoint).apply {
@@ -145,7 +151,8 @@ object OIDC : AuthenticationMethod("oidc") {
             // 1. Start of the login flow
             get("auth") {
                 val session = call.getAuthSession(authContext) // starts implicit session
-                val authUrl = startOidcSession(session)
+                val redirectTo = call.request.queryParameters["redirect_to"]
+                val authUrl = startOidcSession(session, redirectTo)
 
                 val nextStepInfo = AuthSessionNextStepRedirectData(
                     url = authUrl
@@ -212,27 +219,30 @@ object OIDC : AuthenticationMethod("oidc") {
                         ),
                         oidcIdentifier = identifier,
                         externalRoles = externalRoles,
+                        idTokenClaims = idTokenPayload,
+                        userInfoClaims = userInfo,
+                        idTokenRaw = tokenResponse.idToken,
                     )
                 )
 
-                val accountId = identifier.resolveIfExists()
-
-                /*if (accountId == null) {
-
-                    // TODO: Create account if it does not exist
-                    Account("", "")
-                    ExampleAccountStore.registerAccount()
-                }*/
+                val accountId = identifier.resolveIfExists() ?: run {
+                    // No existing account found - use addAccountIdentifierToAccount to create one
+                    // The AccountStore implementation (e.g., Enterprise) handles JIT provisioning
+                    KtorAuthnzManager.accountStore.addAccountIdentifierToAccount(subject, identifier)
+                    identifier.resolveToAccountId()
+                }
 
                 val authContext = authContext(call)
 
-                // Redirect if a URL was configured:
-                if (config.redirectAfterLogin != null) {
+                // Determine redirect URL: client-specified (from session) > config default > none
+                val redirectUrl = tempSessionData.redirectTo?.let { Url(it) } ?: config.redirectAfterLogin
+
+                if (redirectUrl != null) {
                     call.handleAuthSuccessAndRedirect(
                         session = session,
                         authContext = authContext,
                         accountId = accountId,
-                        redirectUrl = config.redirectAfterLogin
+                        redirectUrl = redirectUrl
                     )
                 } else {
                     call.handleAuthSuccess(
@@ -244,7 +254,10 @@ object OIDC : AuthenticationMethod("oidc") {
             }
 
             // --- Provider-Initiated Logout Routes ---
-
+            // NOTE: These endpoints are for OIDC provider-initiated logout interoperability.
+            // - logout/backchannel is called by the IdP with a logout_token.
+            // - logout/frontchannel is called by the IdP/browser flow with iss + sid.
+            // They should not be used as the primary user-triggered logout endpoints in client apps.
             post("logout/backchannel") {
                 log.trace { "OIDC: Backchannel-logout" }
                 val logoutTokenStr = call.receiveParameters()["logout_token"]
@@ -297,6 +310,94 @@ object OIDC : AuthenticationMethod("oidc") {
                 }
 
                 call.respond(HttpStatusCode.OK, "Session cookie cleared.")
+            }
+
+            // --- RP-Initiated Logout (User-triggered) ---
+            // Terminates local session and returns IdP's end_session_endpoint for full SSO logout.
+            // Client should redirect to end_session_url if provided.
+            get("logout") {
+                log.trace { "OIDC: RP-initiated logout" }
+
+                val postLogoutRedirect = call.request.queryParameters["post_logout_redirect_uri"]
+
+                // Get token from cookie or header
+                val token = call.request.cookies[SessionTokenCookieHandler.cookieName]
+                    ?: call.request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
+
+                var idTokenRaw: String? = null
+                var endSessionEndpoint: String? = null
+                var clientId: String? = null
+                var validatedPostLogout: String? = null
+
+                if (token != null) {
+                    try {
+                        val session = KtorAuthnzManager.tokenHandler.resolveTokenToSession(token)
+                        val oidcSessionData = session.getSessionData<OidcSessionAuthenticatedData>(this@OIDC)
+
+                        // Get id_token for logout hint
+                        idTokenRaw = oidcSessionData?.idTokenRaw
+
+                        // Resolve OIDC config to get end_session_endpoint
+                        val issuer = oidcSessionData?.tokenValidationData?.idpIss
+                        if (issuer != null) {
+                            // Construct discovery URL from issuer
+                            val discoveryUrl = Url("$issuer/.well-known/openid-configuration")
+                            val oidcConfig = resolveConfiguration(discoveryUrl)
+                            endSessionEndpoint = oidcConfig.endSessionEndpoint
+                        }
+
+                        // Get clientId from registered flows (if available in session)
+                        session.flows?.firstOrNull { it.method == id }?.config?.let { flowConfig ->
+                            try {
+                                val config = Json.decodeFromJsonElement<OidcAuthConfiguration>(flowConfig)
+                                clientId = config.clientId
+                                validatedPostLogout = postLogoutRedirect?.let { uri ->
+                                    config.allowedPostLogoutRedirectUrls.takeIf { it.isNotEmpty() }?.let {
+                                        config.validateRedirectUrl(uri)?.toString()
+                                    }
+                                } ?: config.postLogoutRedirectUri?.toString()
+                            } catch (e: Exception) {
+                                log.debug { "Could not parse OIDC config from session flow: ${e.message}" }
+                            }
+                        }
+
+                        // Terminate local session
+                        session.run {
+                            call.logoutAndDeleteCookie()
+                        }
+                        log.trace { "OIDC: Local session terminated" }
+                    } catch (e: Exception) {
+                        log.debug { "OIDC logout: Could not resolve session: ${e.message}" }
+                        // Still delete the cookie even if session resolution fails
+                        SessionTokenCookieHandler.run { call.deleteCookie() }
+                    }
+                } else {
+                    // No token - just clear cookie if present
+                    SessionTokenCookieHandler.run { call.deleteCookie() }
+                }
+
+                // Build response
+                if (endSessionEndpoint == null) {
+                    call.respond(HttpStatusCode.OK, mapOf(
+                        "status" to "logged_out",
+                        "message" to "Local session terminated. No IdP end_session_endpoint available."
+                    ))
+                    return@get
+                }
+
+                val endSessionUrl = URLBuilder(endSessionEndpoint).apply {
+                    idTokenRaw?.let { parameters.append("id_token_hint", it) }
+                    clientId?.let { parameters.append("client_id", it) }
+                    validatedPostLogout?.let { parameters.append("post_logout_redirect_uri", it) }
+                }.build()
+
+                log.trace { "OIDC: IdP end_session_endpoint: $endSessionUrl" }
+
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "status" to "logged_out",
+                    "end_session_url" to endSessionUrl.toString(),
+                    "message" to "Local session terminated. Redirect to end_session_url for full SSO logout."
+                ))
             }
         }
     }

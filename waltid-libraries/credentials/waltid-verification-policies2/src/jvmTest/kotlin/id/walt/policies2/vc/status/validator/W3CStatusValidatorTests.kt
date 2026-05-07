@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.status.validator
 
+import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.bit.BigEndianRepresentation
 import id.walt.policies2.vc.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies2.vc.policies.status.expansion.StatusListExpansionAlgorithm
@@ -28,7 +29,7 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
     fun setup() {
         coEvery { mockFetcher.fetch(uri) } returns Result.success(statusListContent)
         every { mockBitValueReaderFactory.new(strategy = ofType(BigEndianRepresentation::class)) } returns mockBitValueReader
-        every { mockStatusReader.canHandle(statusListContent) } returns true
+        every { mockStatusReader.canHandle(ofType(StatusListContent::class)) } returns true
         sut = createStatusValidator()
     }
 
@@ -52,6 +53,12 @@ class W3CStatusValidatorTests : StatusValidatorTestsBase<W3CEntry, W3CStatusPoli
 
     override fun createAttribute(scenario: TestScenario, value: UInt) = W3CStatusPolicyAttribute(
         value = value,
+        purpose = "revocation",
+        type = scenario.statusType
+    )
+
+    override fun createAttributeWithValues(scenario: TestScenario, values: List<UInt>) = W3CStatusPolicyAttribute(
+        values = values,
         purpose = "revocation",
         type = scenario.statusType
     )
