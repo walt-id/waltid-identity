@@ -1,5 +1,6 @@
 package id.walt.webdatafetching
 
+import id.walt.webdatafetching.config.RequestConfiguration
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
@@ -10,7 +11,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 
-class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null) {
+class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null): AutoCloseable {
 
     constructor(id: WebDataFetcherId, defaultConfiguration: WebDataFetchingConfiguration? = null) : this(
         id = id.name,
@@ -38,7 +39,7 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     /**
      * Fetch data from a remote URL
      */
-    suspend inline fun <reified Res : Any> fetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): WebDataFetchingResult<Res> {
+    suspend inline fun <reified Res : Any> fetch(url: Url, customRequestConfig: RequestConfiguration? = null, customRequest: HttpRequestBuilder.() -> Unit = {}): WebDataFetchingResult<Res> {
         val cacheId = url.toString()
 
         dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
@@ -50,11 +51,12 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
             return cachedValue as WebDataFetchingResult<Res>
         }
 
-        val requestConfig = dataFetcherConfiguration.request
+        val defaultRequestConfig = dataFetcherConfiguration.request
 
         val httpResponseResult = runCatching {
             httpClient.request(url) {
-                requestConfig?.applyConfiguration(this)
+                defaultRequestConfig?.applyConfiguration(this)
+                customRequestConfig?.applyConfiguration(this)
                 customRequest(this)
             }
         }
@@ -132,7 +134,7 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     /**
      * Send data to a remote URL
      */
-    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req) = fetch<Res>(url) {
+    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req, customRequestConfig: RequestConfiguration? = null) = fetch<Res>(url, customRequestConfig) {
         if (dataFetcherConfiguration.request?.method == null) {
             method = HttpMethod.Post
         }
@@ -146,8 +148,8 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     /**
      * Send data to a remote URL
      */
-    suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req) =
-        send<Req, Res>(UrlUtils.parseUrl(urlString), req)
+    suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req, customRequestConfig: RequestConfiguration? = null) =
+        send<Req, Res>(UrlUtils.parseUrl(urlString), req, customRequestConfig)
 
     suspend fun sendForm(url: String, parameters: Parameters, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
         dataFetcherConfiguration.url?.requireUrlAllowed(url)
@@ -166,6 +168,10 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
         }
 
         return httpResponse
+    }
+
+    override fun close() {
+        httpClient.close()
     }
 
 }

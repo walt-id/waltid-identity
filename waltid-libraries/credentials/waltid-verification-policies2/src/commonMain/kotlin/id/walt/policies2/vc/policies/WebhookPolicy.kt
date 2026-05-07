@@ -4,11 +4,9 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.WebhookPolicyException
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.RequestConfiguration
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 
 @Serializable
@@ -26,30 +24,30 @@ data class WebhookPolicy(
 ) : CredentialVerificationPolicy2() {
     override val id = "webhook"
 
-    @Transient
-    private val web = WebDataFetcher(
-        WebDataFetcherId.WEBHOOK_POLICY2,
-        defaultConfiguration = WebDataFetchingConfiguration(
-            request = RequestConfiguration(
-                auth = when {
-                    basicAuthUsername != null && basicAuthPassword != null -> RequestConfiguration.HttpAuthConfiguration.BasicAuth(
-                        username = basicAuthUsername,
-                        password = basicAuthPassword
-                    )
-
-                    bearerAuthToken != null -> RequestConfiguration.HttpAuthConfiguration.BearerAuth(bearerAuthToken)
-                    else -> null
-                }
-            )
-        )
-    )
+    companion object {
+        private val web = WebDataFetcher(WebDataFetcherId.WEBHOOK_POLICY2)
+    }
 
     override suspend fun verify(
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> {
         val responseResult = runCatching {
-            web.send<DigitalCredential, JsonElement>(url, credential)
+            web.send<DigitalCredential, JsonElement>(
+                urlString = url,
+                req = credential,
+                customRequestConfig = RequestConfiguration(
+                    auth = when {
+                        basicAuthUsername != null && basicAuthPassword != null -> RequestConfiguration.HttpAuthConfiguration.BasicAuth(
+                            username = basicAuthUsername,
+                            password = basicAuthPassword
+                        )
+
+                        bearerAuthToken != null -> RequestConfiguration.HttpAuthConfiguration.BearerAuth(bearerAuthToken)
+                        else -> null
+                    }
+                )
+            )
         }
 
         val response = responseResult.getOrElse { ex ->
