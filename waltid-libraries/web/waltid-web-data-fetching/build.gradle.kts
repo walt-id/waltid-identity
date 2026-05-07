@@ -21,6 +21,9 @@ kotlin {
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
 
+            // Cache hashes
+            implementation(identityLibs.kotlincrypto.hash.blake2)
+
             implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
             // For in-memory cache
             //implementation("com.mayakapps.kache:kache:2.1.1")

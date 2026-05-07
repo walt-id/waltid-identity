@@ -5,6 +5,8 @@ import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.kotlincrypto.hash.blake2.BLAKE2b
+import kotlin.io.encoding.Base64
 
 @Serializable
 data class RequestConfiguration(
@@ -18,6 +20,8 @@ data class RequestConfiguration(
 
     val expectSuccess: Boolean = true,
 ) {
+
+    fun getCacheId() = Base64.encode(BLAKE2b(128).digest("$method$headers$cookies$auth$userAgent".encodeToByteArray()))
 
     fun applyConfiguration(builder: HttpRequestBuilder) {
         if (method?.ktorHttpMethod != null) {

@@ -39,12 +39,17 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     /**
      * Fetch data from a remote URL
      */
-    suspend inline fun <reified Res : Any> fetch(url: Url, customRequestConfig: RequestConfiguration? = null, customRequest: HttpRequestBuilder.() -> Unit = {}): WebDataFetchingResult<Res> {
-        val cacheId = url.toString()
+    suspend inline fun <reified Res : Any> fetch(
+        url: Url,
+        useCache: Boolean = true,
+        customRequestConfig: RequestConfiguration? = null,
+        customRequest: HttpRequestBuilder.() -> Unit = {}
+    ): WebDataFetchingResult<Res> {
+        val cacheId = if (useCache) "${customRequestConfig?.getCacheId()}#${url}#${Res::class.simpleName}" else ""
 
-        dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
+        dataFetcherConfiguration.url?.requireUrlAllowed(url.toString())
 
-        val cachedValue = cache?.get(cacheId)
+        val cachedValue = if (useCache) cache?.get(cacheId) else null
 
         if (cachedValue != null) {
             @Suppress("UNCHECKED_CAST")
@@ -99,7 +104,9 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
             status = httpResponse.status.value
         )
 
-        cache?.put(cacheId, result.copy(cached = true))
+        if (useCache) {
+            cache?.put(cacheId, result.copy(cached = true))
+        }
 
         return result
     }
@@ -134,7 +141,7 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     /**
      * Send data to a remote URL
      */
-    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req, customRequestConfig: RequestConfiguration? = null) = fetch<Res>(url, customRequestConfig) {
+    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req, customRequestConfig: RequestConfiguration? = null) = fetch<Res>(url, useCache = false, customRequestConfig = customRequestConfig) {
         if (dataFetcherConfiguration.request?.method == null) {
             method = HttpMethod.Post
         }
