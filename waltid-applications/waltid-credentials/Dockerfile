@@ -1,4 +1,4 @@
-FROM docker.io/node:alpine AS buildstage
+FROM node:22-alpine AS buildstage
 COPY ./package.json /build/
 WORKDIR /build
 RUN npm config set fetch-retries 5 \
@@ -9,7 +9,7 @@ COPY ./ /build
 
 RUN npm run build
 # RUN
-FROM docker.io/node:alpine
+FROM node:22-alpine
 
 # Create non-root user
 RUN addgroup -g 10001 -S appgroup && \
