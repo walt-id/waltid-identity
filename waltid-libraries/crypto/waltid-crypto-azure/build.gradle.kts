@@ -25,7 +25,7 @@ dependencies {
     implementation("com.azure:azure-identity:1.19.0-beta.2")
 
     // Azure Key Vault Keys (for cryptographic operations)
-    implementation("com.azure:azure-security-keyvault-keys:4.10.5")
+    implementation("com.azure:azure-security-keyvault-keys:4.10.7")
 
     // JOSE
     implementation(identityLibs.nimbus.jose.jwt)

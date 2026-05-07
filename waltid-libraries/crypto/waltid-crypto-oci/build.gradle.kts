@@ -34,7 +34,7 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2")
 
             // OCI
-            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.81.2")
+            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.86.1")
 
             // JOSE
             implementation(identityLibs.nimbus.jose.jwt)

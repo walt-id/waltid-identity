@@ -64,9 +64,9 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(identityLibs.nimbus.jose.jwt)
-            implementation("io.kotest:kotest-runner-junit5:6.1.7") // should be replaced
-            implementation("io.kotest:kotest-assertions-core:6.1.7") // should be replaced
-            implementation("io.kotest:kotest-assertions-json:6.1.7") // should be replaced
+            implementation("io.kotest:kotest-runner-junit5:6.1.11") // should be replaced
+            implementation("io.kotest:kotest-assertions-core:6.1.11") // should be replaced
+            implementation("io.kotest:kotest-assertions-json:6.1.11") // should be replaced
             implementation(identityLibs.junit.jupiter.params)
             implementation(identityLibs.tink) // for JOSE using Ed25519
             implementation(identityLibs.bouncycastle.prov) // for secp256k1 (which was removed with Java 17)
