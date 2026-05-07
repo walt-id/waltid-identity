@@ -24,7 +24,8 @@ ping()
     done
 
     attempt=1
-    until response="$(curl -fsS "$livez_url" 2>/dev/null)" && [[ "$response" == *'"status":"Healthy"'* ]]; do
+    until response="$(curl -fsS "$livez_url" 2>/dev/null)" \
+        && printf '%s' "$response" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"Healthy"'; do
         if [[ "$attempt" -ge "$max_attempts" ]]; then
             echo "${service}-api did not become healthy in time"
             curl -sS "$livez_url" || true
