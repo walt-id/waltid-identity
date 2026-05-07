@@ -14,7 +14,7 @@ dependencies {
 
     api(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
-    api(project(":waltid-libraries:waltid-did")) // ???
+    api(project(":waltid-libraries:waltid-did"))
 
     // Ktor
     api(identityLibs.ktor.server.core)
