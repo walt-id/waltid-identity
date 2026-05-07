@@ -58,7 +58,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
-            implementation(identityLibs.ktor.client.cio)
+            implementation(identityLibs.ktor.client.java)
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             implementation(identityLibs.nimbus.jose.jwt)
         }
@@ -78,13 +78,13 @@ kotlin {
             implementation(identityLibs.ktor.server.default.headers)
             implementation(identityLibs.ktor.server.content.negotiation)
             implementation(identityLibs.ktor.client.core)
-            implementation(identityLibs.ktor.client.cio)
+            implementation(identityLibs.ktor.client.java)
             implementation(identityLibs.ktor.client.auth)
             implementation(identityLibs.ktor.client.content.negotiation)
             implementation(identityLibs.ktor.serialization.kotlinx.json)
             implementation(identityLibs.ktor.client.logging)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.2")
-            implementation(identityLibs.ktor.client.cio)
+            implementation(identityLibs.ktor.client.java)
 
             implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
             implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")

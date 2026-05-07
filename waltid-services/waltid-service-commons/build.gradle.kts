@@ -23,7 +23,7 @@ dependencies {
     api(identityLibs.ktor.server.content.negotiation)
     api(identityLibs.ktor.serialization.kotlinx.json)
     implementation(identityLibs.ktor.server.auth)
-    implementation(identityLibs.ktor.client.cio)
+    implementation(identityLibs.ktor.client.java)
 
     // Logging
     api(identityLibs.klogging) // JVM + ~JS
