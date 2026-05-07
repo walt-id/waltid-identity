@@ -186,7 +186,7 @@ class IssuerMetadataResolver(
         if (providerUrl.contains("/v2/") && providerUrl.contains("/issuer-service-api/openid4vci")) {
             val url = Url(providerUrl)
             val path = url.encodedPath
-            val newPath = path.replace("/issuer-service-api2/openid4vci", "/issuer-service-api2/openid4vc/v1")
+            val newPath = path.replace("/issuer-service-api/openid4vci", "/issuer-service-api/openid4vc/v1")
             urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$newPath$OPENID_CONFIGURATION_WELL_KNOWN_PATH")
         }
 
