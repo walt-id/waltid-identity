@@ -32,6 +32,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         selectiveDisclosure: SDMap?,
         x5Chain: List<String>?,
         display: List<DisplayProperties>?,
+        w3cVersion: String?,
     ): CredentialResponseResult {
         return try {
             val oid4vcFormat = when (configuration.format) {
