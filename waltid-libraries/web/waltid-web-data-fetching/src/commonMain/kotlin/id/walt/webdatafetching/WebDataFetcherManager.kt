@@ -10,9 +10,13 @@ object WebDataFetcherManager {
     var globalDefaultConfiguration: WebDataFetchingConfiguration = WebDataFetchingConfiguration.Default
 
     fun getConfigurationForId(id: String, instanceDefaultConfiguration: WebDataFetchingConfiguration?): WebDataFetchingConfiguration {
-        return fetcherConfigurations[id]
-            ?: instanceDefaultConfiguration
-            ?: globalDefaultConfiguration
+        // Compose layers: global default < instance default < per-ID override.
+        // Each layer only overrides fields that were explicitly set (non-null / non-default).
+        var result = globalDefaultConfiguration
+        if (instanceDefaultConfiguration != null) result = result.mergeWith(instanceDefaultConfiguration)
+        val perIdConfig = fetcherConfigurations[id]
+        if (perIdConfig != null) result = result.mergeWith(perIdConfig)
+        return result
     }
 
     fun applyConfigurations(configs: Map<String, WebDataFetchingConfiguration>) {
