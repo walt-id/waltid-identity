@@ -393,10 +393,10 @@ class Wallet2IssuerVerifier2IntegrationTest {
                     // proofs may arrive as a JSON object {"jwt": ["..."]} or as JsonNull if not provided
                     val proofsElement = body["proofs"]
                     val proofsObj = proofsElement
-                        ?.takeIf { it !is kotlinx.serialization.json.JsonNull }
+                        ?.takeIf { it !is JsonNull }
                         ?.let { it as? JsonObject }
                     val proofJwt = proofsObj?.get("jwt")?.jsonArray?.firstOrNull()?.jsonPrimitive?.content
-                        ?: body["proof"]?.takeIf { it !is kotlinx.serialization.json.JsonNull }
+                        ?: body["proof"]?.takeIf { it !is JsonNull }
                             ?.jsonObject?.get("jwt")?.jsonPrimitive?.content
 
                     val credentialRequestResult = provider.createCredentialRequest(
