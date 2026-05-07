@@ -12,7 +12,6 @@ import id.walt.commons.featureflag.AbstractFeature
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.featureflag.ServiceFeatureCatalog
 import io.ktor.client.*
-import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
@@ -45,7 +44,7 @@ class E2ETest(
         doFollowRedirects: Boolean = true,
         block: HttpClientConfig<*>.() -> Unit = {}
     ) =
-        HttpClient(OkHttp) {
+        HttpClient() {
             install(ContentNegotiation) {
                 json()
             }

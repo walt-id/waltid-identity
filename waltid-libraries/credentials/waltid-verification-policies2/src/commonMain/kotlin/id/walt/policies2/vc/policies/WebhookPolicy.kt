@@ -2,17 +2,12 @@ package id.walt.policies2.vc.policies
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.WebhookPolicyException
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.webdatafetching.config.RequestConfiguration
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 
 @Serializable
 @SerialName("webhook")
@@ -30,11 +25,7 @@ data class WebhookPolicy(
     override val id = "webhook"
 
     companion object {
-        private val http = HttpClient {
-            install(ContentNegotiation) {
-                json()
-            }
-        }
+        private val web = WebDataFetcher(WebDataFetcherId.WEBHOOK_POLICY2)
     }
 
     override suspend fun verify(
@@ -42,30 +33,29 @@ data class WebhookPolicy(
         context: PolicyExecutionContext
     ): Result<JsonElement> {
         val responseResult = runCatching {
-            http.post(url) {
-                setBody(credential)
-                header(HttpHeaders.ContentType, ContentType.Application.Json)
+            web.send<DigitalCredential, JsonElement>(
+                urlString = url,
+                req = credential,
+                customRequestConfig = RequestConfiguration(
+                    auth = when {
+                        basicAuthUsername != null && basicAuthPassword != null -> RequestConfiguration.HttpAuthConfiguration.BasicAuth(
+                            username = basicAuthUsername,
+                            password = basicAuthPassword
+                        )
 
-                if (basicAuthUsername != null && basicAuthPassword != null) {
-                    basicAuth(basicAuthUsername, basicAuthPassword)
-                }
-
-                if (bearerAuthToken != null) {
-                    bearerAuth(bearerAuthToken)
-                }
-            }
+                        bearerAuthToken != null -> RequestConfiguration.HttpAuthConfiguration.BearerAuth(bearerAuthToken)
+                        else -> null
+                    }
+                )
+            )
         }
 
         val response = responseResult.getOrElse { ex ->
             return Result.failure(IllegalArgumentException("Could not contact webhook URL: $url", ex))
         }
 
-        val responseData = if (response.contentType()?.match(ContentType.Application.Json) == true) {
-            response.body<JsonObject>()
-        } else JsonNull
-
-        return if (response.status.isSuccess()) Result.success(responseData)
-        else Result.failure(WebhookPolicyException(responseData))
+        return if (response.success) Result.success(response.body)
+        else Result.failure(WebhookPolicyException(response.body))
 
     }
 }

@@ -18,6 +18,9 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Instant
 
 /**
  * Defines all properties common to every flow.
@@ -30,6 +33,12 @@ data class GeneralFlowConfig(
     @SerialName("encrypted_response") val encryptedResponse: Boolean = false,
 
     val notifications: KtorSessionNotifications? = null,
+
+    /** Expiration duration in ISO-8601 duration format. Used to calculate expiration date. */
+    @SerialName("expiration_duration") val expirationDuration: Duration? = null,
+    /** Expiration date (takes precedence over expiration_duration if both set) */
+    @SerialName("expiration_date") val expirationDate: Instant? =
+        expirationDuration?.let { Clock.System.now().plus(it) },
 
     val policies: DefinedVerificationPolicies = DefinedVerificationPolicies(),
 

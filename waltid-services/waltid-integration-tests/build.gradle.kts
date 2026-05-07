@@ -9,7 +9,7 @@ dependencies {
     implementation(kotlin("test"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
     implementation(identityLibs.ktor.server.test.host)
-    implementation(identityLibs.ktor.client.cio)
+    implementation(identityLibs.ktor.client.java)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.client.logging)
 

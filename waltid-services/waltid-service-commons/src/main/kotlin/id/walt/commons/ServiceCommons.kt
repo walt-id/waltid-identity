@@ -82,7 +82,7 @@ object ServiceCommons {
             log.info { "Registering service feature catalog..." }
             FeatureManager.registerCatalogs(init.features)
 
-            log.info { "Loading features..." }
+            log.info { "Loading feature amendments..." }
             FeatureManager.load(init.featureAmendments)
         }.also {
             log.info { "Feature initialization completed ($it)." }

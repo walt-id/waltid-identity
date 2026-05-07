@@ -12,6 +12,8 @@ dependencies {
     // OIDC
     api(project(":waltid-libraries:protocols:waltid-openid4vc"))
 
+    api(project(":waltid-libraries:web:waltid-web-data-fetching"))
+
     api(project(":waltid-libraries:waltid-did"))
 
     // Ktor
@@ -21,7 +23,7 @@ dependencies {
     api(identityLibs.ktor.server.content.negotiation)
     api(identityLibs.ktor.serialization.kotlinx.json)
     implementation(identityLibs.ktor.server.auth)
-    implementation(identityLibs.ktor.client.okhttp)
+    implementation(identityLibs.ktor.client.java)
 
     // Logging
     api(identityLibs.klogging) // JVM + ~JS
