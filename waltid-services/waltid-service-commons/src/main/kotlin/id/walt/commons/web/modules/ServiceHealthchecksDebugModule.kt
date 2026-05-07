@@ -170,7 +170,7 @@ object ServiceHealthChecksDebugModule {
                                 put("loadAverage", ManagementFactory.getOperatingSystemMXBean().systemLoadAverage)
                                 put("processors", ManagementFactory.getOperatingSystemMXBean().availableProcessors)
                                 put("threadCount", JsonPrimitive(thread.threadCount))
-                                put("peakThreadCount", JsonPrimitive(thread.threadCount))
+                                put("peakThreadCount", JsonPrimitive(thread.peakThreadCount))
                                 put("daemonThreadCount", JsonPrimitive(thread.daemonThreadCount))
                             })
                         }
