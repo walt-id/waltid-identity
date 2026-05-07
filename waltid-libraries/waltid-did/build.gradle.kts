@@ -50,7 +50,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
+            implementation(identityLibs.ktor.client.java)
 
             // Json canonicalization
             implementation("io.github.erdtman:java-json-canonicalization:1.1")

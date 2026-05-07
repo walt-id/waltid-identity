@@ -10,6 +10,7 @@ class OptionalFeature(
     override val configs: Map<String, KClass<out WaltConfig>> = emptyMap(),
     override val dependsOn: List<AbstractFeature> = emptyList(),
     val default: Lazy<Boolean>,
+    override val onEnable: (() -> Unit)? = null
 ) : AbstractFeature(name, description, configs, dependsOn) {
 
     constructor(
@@ -17,11 +18,13 @@ class OptionalFeature(
         description: String,
         config: KClass<out WaltConfig>,
         default: Boolean,
+        onEnable: (() -> Unit)? = null
     ) : this(
         name = name,
         description = description,
         configs = mapOf(name to config),
-        default = lazy { default }
+        default = lazy { default },
+        onEnable = onEnable
     )
 
     constructor(
@@ -42,7 +45,15 @@ class OptionalFeature(
         configs: Map<String, KClass<out WaltConfig>> = emptyMap(),
         dependsOn: List<AbstractFeature> = emptyList(),
         default: Boolean,
-    ) : this(name, description, configs, dependsOn, lazy { default })
+        onEnable: (() -> Unit)? = null
+    ) : this(
+        name = name,
+        description = description,
+        configs = configs,
+        dependsOn = dependsOn,
+        default = lazy { default },
+        onEnable = onEnable
+    )
 
 }
 

@@ -1,43 +1,68 @@
 package id.walt.webdatafetching
 
+import id.walt.webdatafetching.config.RequestConfiguration
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 
-class WebDataFetcher<T : Any>(id: String) {
+class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null): AutoCloseable {
+
+    constructor(id: WebDataFetcherId, defaultConfiguration: WebDataFetchingConfiguration? = null) : this(
+        id = id.name,
+        defaultConfiguration = defaultConfiguration
+    )
 
     private val log = KotlinLogging.logger("WebDataFetcher[$id]")
+    val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration)
 
-    val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id)
-
-    val httpClient = HttpClient() {
+    val httpClient = dataFetcherConfiguration.http.engineCreator().getHttpClient {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)
+
+        install(ContentNegotiation) {
+            json()
+        }
     }
 
-    val cache = dataFetcherConfiguration.cache?.buildCache<T>()
+    val cache = dataFetcherConfiguration.cache?.buildCache<WebDataFetchingResult<*>>()
 
-    suspend inline fun <reified Res : T> fetch(url: String): T = fetch<Res>(UrlUtils.parseUrl(url))
+    /**
+     * Fetch data from a remote URL
+     */
+    suspend inline fun <reified Res : Any> fetch(urlString: String): WebDataFetchingResult<Res> = fetch<Res>(UrlUtils.parseUrl(urlString))
 
-    suspend inline fun <reified Res : T> fetch(url: Url): T {
-        val cacheId = url.toString()
+    /**
+     * Fetch data from a remote URL
+     */
+    suspend inline fun <reified Res : Any> fetch(
+        url: Url,
+        useCache: Boolean = true,
+        customRequestConfig: RequestConfiguration? = null,
+        customRequest: HttpRequestBuilder.() -> Unit = {}
+    ): WebDataFetchingResult<Res> {
+        val cacheId = if (useCache) "${customRequestConfig?.getCacheId()}#${url}#${Res::class.simpleName}" else ""
 
-        dataFetcherConfiguration.url?.requireUrlAllowed(cacheId)
+        dataFetcherConfiguration.url?.requireUrlAllowed(url.toString())
 
-        val cachedValue = cache?.get(cacheId)
+        val cachedValue = if (useCache) cache?.get(cacheId) else null
 
         if (cachedValue != null) {
-            return cachedValue
+            @Suppress("UNCHECKED_CAST")
+            return cachedValue as WebDataFetchingResult<Res>
         }
 
-        val requestConfig = dataFetcherConfiguration.request
+        val defaultRequestConfig = dataFetcherConfiguration.request
 
         val httpResponseResult = runCatching {
             httpClient.request(url) {
-                requestConfig?.applyConfiguration(this)
+                defaultRequestConfig?.applyConfiguration(this)
+                customRequestConfig?.applyConfiguration(this)
+                customRequest(this)
             }
         }
 
@@ -45,15 +70,27 @@ class WebDataFetcher<T : Any>(id: String) {
             throw DataFetchingException("Could not send request to: $url (${ex.message ?: "unknown error"})", ex)
         }
 
-        val parsedResponse: T = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
+        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+            if (!httpResponse.status.isSuccess()) {
+                // TODO: More detailed error message
+                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+            }
+        }
+
+        val parsedResponse: Res = if (httpResponse.contentType()?.match(ContentType.Text.Plain) == true) {
             val body = httpResponse.bodyAsText()
-            runCatching {
-                dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
-            }.getOrElse { ex ->
-                throw DataFetchingException(
-                    "Server answered request with non-/invalid JSON: $body (to request to $url)",
-                    cause = ex
-                )
+            if (Res::class == String::class) {
+                @Suppress("UNCHECKED_CAST")
+                body as Res
+            } else {
+                runCatching {
+                    dataFetcherConfiguration.decoding.json.decodeFromString<Res>(body)
+                }.getOrElse { ex ->
+                    throw DataFetchingException(
+                        "Server answered request with non-/invalid JSON: $body (to request to $url)",
+                        cause = ex,
+                    )
+                }
             }
         } else {
             runCatching {
@@ -61,9 +98,87 @@ class WebDataFetcher<T : Any>(id: String) {
             }.getOrElse { ex -> throw DataFetchingException("Failed to deserialize response from: $url", ex) }
         }
 
-        cache?.put(cacheId, parsedResponse)
+        val result = WebDataFetchingResult(
+            body = parsedResponse,
+            success = httpResponse.status.isSuccess(),
+            status = httpResponse.status.value
+        )
 
-        return parsedResponse
+        if (useCache) {
+            cache?.put(cacheId, result.copy(cached = true))
+        }
+
+        return result
+    }
+
+    /**
+     * Raw fetching: Does not use certain WebDataFetcher features
+     * Does not use:
+     * - Caching
+     * - Response deserialization
+     */
+    suspend inline fun rawFetch(url: Url, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
+        dataFetcherConfiguration.url?.requireUrlAllowed(url.toString())
+        val requestConfig = dataFetcherConfiguration.request
+
+        val httpResponse = httpClient.request(url) {
+            requestConfig?.applyConfiguration(this)
+            customRequest(this)
+        }
+
+        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+            if (!httpResponse.status.isSuccess()) {
+                // TODO: More detailed error message
+                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+            }
+        }
+
+        return httpResponse
+    }
+
+    suspend inline fun rawFetch(urlString: String): HttpResponse = rawFetch(UrlUtils.parseUrl(urlString))
+
+    /**
+     * Send data to a remote URL
+     */
+    suspend inline fun <reified Req : Any, reified Res : Any> send(url: Url, req: Req, customRequestConfig: RequestConfiguration? = null) = fetch<Res>(url, useCache = false, customRequestConfig = customRequestConfig) {
+        if (dataFetcherConfiguration.request?.method == null) {
+            method = HttpMethod.Post
+        }
+
+        if (req !is String) {
+            header(HttpHeaders.ContentType, ContentType.Application.Json)
+        }
+        setBody(req)
+    }
+
+    /**
+     * Send data to a remote URL
+     */
+    suspend inline fun <reified Req : Any, reified Res : Any> send(urlString: String, req: Req, customRequestConfig: RequestConfiguration? = null) =
+        send<Req, Res>(UrlUtils.parseUrl(urlString), req, customRequestConfig)
+
+    suspend fun sendForm(url: String, parameters: Parameters, customRequest: HttpRequestBuilder.() -> Unit = {}): HttpResponse {
+        dataFetcherConfiguration.url?.requireUrlAllowed(url)
+        val requestConfig = dataFetcherConfiguration.request
+
+        val httpResponse = httpClient.submitForm(url, parameters, false) {
+            requestConfig?.applyConfiguration(this)
+            customRequest(this)
+        }
+
+        if (dataFetcherConfiguration.request?.expectSuccess == true) {
+            if (!httpResponse.status.isSuccess()) {
+                // TODO: More detailed error message
+                throw DataFetchingException("Response to http request was not successful, but success was expected", null)
+            }
+        }
+
+        return httpResponse
+    }
+
+    override fun close() {
+        httpClient.close()
     }
 
 }

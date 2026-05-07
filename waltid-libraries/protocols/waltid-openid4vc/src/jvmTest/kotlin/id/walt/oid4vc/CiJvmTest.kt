@@ -241,14 +241,11 @@ class CiJvmTest {
     }
 
     private fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String) {
-        assertEquals(expected = issuerId, actual = credential["issuer"]?.jsonPrimitive?.contentOrNull)
+        val actualIssuer = credential["issuer"]?.jsonPrimitive?.contentOrNull
+        assertEquals(expected = issuerId, actual = actualIssuer)
         //credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull shouldBe subjectId // TODO <-- use this
-        assertEquals(
-            expected = subjectId,
-            actual = credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.substringBefore(
-                "#"
-            )
-        ) // FIXME <-- remove
+        val actualSubject = credential["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull?.substringBefore("#")
+        assertEquals(expected = subjectId, actual = actualSubject)
     }
 
     val issuerPortalRequest =

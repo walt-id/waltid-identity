@@ -29,6 +29,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
 
 object Verifier2VPDirectPostHandler {
 
@@ -189,6 +190,12 @@ object Verifier2VPDirectPostHandler {
             Verifier2Response.Verifier2Error.UNKNOWN_VERIFICATION_SESSION.throwAsError()
         }
 
+        verificationSession.expirationDate?.let { expirationDate ->
+            if (expirationDate < Clock.System.now()) {
+                Verifier2Response.Verifier2Error.EXPIRED_VERIFICATION_SESSION.throwAsError()
+            }
+        }
+
         val result = handleDirectPost(
             verificationSession = verificationSession,
             responseData = call.parseHttpRequestToDirectPostResponse(),
@@ -267,7 +274,13 @@ object Verifier2VPDirectPostHandler {
         // presented credential/presentation
 
 
-        PresentationVerificationEngine.executeAllVerification(vpTokenContents, session, updateSessionCallback, failSessionCallback, policyContext)
+        PresentationVerificationEngine.executeAllVerification(
+            vpTokenContents,
+            session,
+            updateSessionCallback,
+            failSessionCallback,
+            policyContext
+        )
 
 
         val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri
