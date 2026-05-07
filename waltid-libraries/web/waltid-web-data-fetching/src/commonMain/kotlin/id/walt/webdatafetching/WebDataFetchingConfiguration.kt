@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class WebDataFetchingConfiguration(
-    val http: HttpEngine = HttpEngine.CIO,
+    val http: HttpEngine = HttpEngine.Native,
     val url: UrlConfiguration? = null,
     val cache: CacheConfiguration? = null,
     val timeouts: TimeoutConfiguration? = null,
