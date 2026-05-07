@@ -43,6 +43,8 @@ data class PreAuthorizedCodeIssueRequest(
     val session: Session,
     val credentialNonce: String? = null,
     val credentialNonceExpiresAt: Instant? = null,
+    /** Optional issuance session ID for O(1) lookup on credential endpoint */
+    val issuanceSessionId: String? = null,
 )
 
 data class PreAuthorizedCodeIssueResult(
@@ -91,6 +93,7 @@ class DefaultPreAuthorizedCodeIssuer(
                 expiresAt = expiresAt,
                 credentialNonce = request.credentialNonce,
                 credentialNonceExpiresAt = request.credentialNonceExpiresAt,
+                issuanceSessionId = request.issuanceSessionId,
             )
         }
 
