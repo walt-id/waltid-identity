@@ -4,6 +4,6 @@ import io.ktor.client.HttpClient
 
 actual object Apache5Engine : WebDataFetcherHttpEngine {
     actual override fun getHttpClient(block: HttpClientConfig<*>.() -> Unit): HttpClient {
-        throw UnsupportedOperationException("Apache5 engine is not available in Linux, only Java")
+        throw UnsupportedOperationException("Apache5 engine is not available in Linux, only JVM")
     }
 }
