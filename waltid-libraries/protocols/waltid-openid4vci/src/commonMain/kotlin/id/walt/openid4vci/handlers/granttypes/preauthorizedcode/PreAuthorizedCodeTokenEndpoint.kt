@@ -115,6 +115,7 @@ class PreAuthorizedCodeTokenEndpoint(
             additional = buildMap {
                 put("client_id", clientId)
                 put("pre_authorized_code", code)
+                consumed.issuanceSessionId?.let { put("issuance_session_id", it) }
             },
         )
 
