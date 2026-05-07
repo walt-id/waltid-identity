@@ -401,7 +401,7 @@ object Verifier2OpenApiExamples {
                                 pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
                                 values = listOf("AT").map { JsonPrimitive(it) }
                             ),
-                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "travel_document_number"))
+                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number"))
                         )
                     )
                 )
