@@ -110,7 +110,7 @@ class SSIKit2WalletService(
     private val credentialService = CredentialsService()
     private val eventService = EventService()
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
-    private val openId4VpPresentationService = OpenId4VpPresentationService(http, credentialService)
+    private val openId4VpPresentationService = OpenId4VpPresentationService(credentialService)
 
     companion object {
         val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
