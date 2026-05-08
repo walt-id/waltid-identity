@@ -16,6 +16,7 @@ private var baseUrl =
 
 @Serializable
 data class CredentialTypeConfig(
+    val issuerDisplay: List<DisplayProperties>? = null,
     val supportedCredentialTypes: Map<String, JsonElement> = mapOf(
         "BankId" to vc("VerifiableCredential", "BankId"),
         "KycChecksCredential" to vc("VerifiableCredential", "VerifiableAttestation", "KycChecksCredential"),
