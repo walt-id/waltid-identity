@@ -14,6 +14,7 @@ import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
@@ -24,12 +25,11 @@ import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.client.request.accept
+import io.ktor.client.request.setBody
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.escapeHTML
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -44,11 +44,6 @@ import kotlin.time.Clock
 object WalletPresentFunctionality2 {
 
     private val log = KotlinLogging.logger { }
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-    }
 
     private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
     private val webPostToken = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_POST_TOKEN)
@@ -171,7 +166,23 @@ object WalletPresentFunctionality2 {
 
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = runCatching {
-            AuthorizationRequestResolver.resolve(presentationRequestUrl, http).authorizationRequest
+            AuthorizationRequestResolver.resolve(presentationRequestUrl) { requestUri, requestUriMethod ->
+                val response = when (requestUriMethod) {
+                    null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
+                    RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
+                        method = HttpMethod.Post
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                        setBody("")
+                    }
+                }
+
+                AuthorizationRequestResolver.RequestUriFetchResponse(
+                    status = response.status,
+                    contentType = response.contentType(),
+                    body = response.bodyAsText(),
+                )
+            }.authorizationRequest
         }.recoverCatching { error ->
             if (
                 error is AuthorizationRequestResolver.SignedAuthorizationRequestValidationException &&
