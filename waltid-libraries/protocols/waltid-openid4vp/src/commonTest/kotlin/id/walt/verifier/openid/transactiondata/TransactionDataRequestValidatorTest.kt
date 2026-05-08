@@ -94,8 +94,21 @@ class TransactionDataRequestValidatorTest {
     }
 
     @Test
-    fun `rejects missing holder binding requirement`() {
+    fun `accepts missing transaction data holder binding requirement`() {
         val encoded = TransactionDataTestFixtures.transactionDataWithoutHolderBindingRequirement()
+
+        val decoded = validateRequestTransactionData(
+            transactionData = listOf(encoded),
+            supportedTypes = setOf(supportedType),
+            credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
+        )
+
+        assertEquals(encoded, decoded.single().encoded)
+    }
+
+    @Test
+    fun `rejects explicit false transaction data holder binding requirement`() {
+        val encoded = TransactionDataTestFixtures.transactionData(requireCryptographicHolderBinding = false)
 
         assertFailsWith<IllegalArgumentException> {
             validateRequestTransactionData(
