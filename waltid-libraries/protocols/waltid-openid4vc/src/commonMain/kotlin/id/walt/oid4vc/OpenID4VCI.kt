@@ -516,7 +516,8 @@ object OpenID4VCI {
         baseUrl: String,
         credentialSupported: Map<String, CredentialSupported>? = null,
         version: OpenID4VCIVersion,
-        customParameters: Map<String, JsonElement>? = emptyMap()
+        customParameters: Map<String, JsonElement>? = emptyMap(),
+        issuerDisplay: List<DisplayProperties>? = null
     ): OpenIDProviderMetadata {
 
         return when (version) {
@@ -541,6 +542,7 @@ object OpenID4VCI {
                 idTokenSigningAlgValuesSupported = setOf("ES256"), // (EBSI) https://openid.net/specs/openid-connect-self-issued-v2-1_0.html#name-self-issued-openid-provider-
                 codeChallengeMethodsSupported = listOf("S256"),
                 credentialConfigurationsSupported = credentialSupported,
+                display = issuerDisplay,
                 customParameters = customParameters!!
             )
 
@@ -569,6 +571,7 @@ object OpenID4VCI {
                 }?.mapValues { (_, credential) ->
                     credential.copy(types = credential.credentialDefinition?.type, credentialDefinition = null)
                 },
+                display = issuerDisplay,
                 customParameters = customParameters!!
             )
 
@@ -586,6 +589,7 @@ object OpenID4VCI {
                 ),
                 codeChallengeMethodsSupported = listOf("S256"),
                 credentialConfigurationsSupported = credentialSupported,
+                display = issuerDisplay,
                 customParameters = customParameters!!,
 //                authorizationServers = setOf(baseUrl),
                 nonceEndpoint = "$baseUrl/nonce",
