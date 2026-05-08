@@ -18,6 +18,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.http.Url
 import io.ktor.http.contentType
@@ -44,13 +45,46 @@ object AuthorizationRequestResolver {
         "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}",
     )
 
+    data class RequestUriFetchResponse(
+        val status: HttpStatusCode,
+        val contentType: ContentType?,
+        val body: String,
+    )
+
     suspend fun resolve(request: String, http: HttpClient): ResolvedAuthorizationRequest =
         resolve(Url(request), http)
 
     suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
+        return resolve(requestUrl) { requestUri, requestUriMethod ->
+            val response = when (requestUriMethod) {
+                null, RequestUriHttpMethod.GET -> http.get(requestUri)
+                RequestUriHttpMethod.POST -> http.post(requestUri) {
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                    setBody("")
+                }
+            }
+
+            RequestUriFetchResponse(
+                status = response.status,
+                contentType = response.contentType(),
+                body = response.bodyAsText(),
+            )
+        }
+    }
+
+    suspend fun resolve(
+        requestUrl: Url,
+        fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
+    ): ResolvedAuthorizationRequest {
         val requestUri = requestUrl.parameters["request_uri"]
-        val requestUriMethod = requestUrl.parameters["request_uri_method"]
-        if (requestUri != null) return resolveFromRequestUri(requestUri, requestUriMethod, http)
+        if (requestUri != null) {
+            return resolveFromRequestUri(
+                requestUri = requestUri,
+                requestUriMethod = requestUrl.parameters["request_uri_method"],
+                fetchRequestUri = fetchRequestUri,
+            )
+        }
 
         val requestObject = requestUrl.parameters["request"]
         if (requestObject != null) return resolveFromRequestObject(requestObject)
@@ -78,32 +112,22 @@ object AuthorizationRequestResolver {
     private suspend fun resolveFromRequestUri(
         requestUri: String,
         requestUriMethod: String?,
-        http: HttpClient,
+        fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
         val requestUriMethod = requestUriMethod?.let(::parseRequestUriMethod)
-
         log.trace { "Fetching AuthorizationRequest from request_uri using method ${requestUriMethod?.method ?: "get"}" }
-        val response = when (requestUriMethod) {
-            null, RequestUriHttpMethod.GET -> http.get(requestUri)
-            RequestUriHttpMethod.POST -> http.post(requestUri) {
-                contentType(ContentType.Application.FormUrlEncoded)
-                accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                setBody("")
-            }
-        }
+        val response = fetchRequestUri(requestUri, requestUriMethod)
+        response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: ${response.body}" } }
 
-        val body = response.bodyAsText()
-        response.status.run { check(isSuccess()) { "AuthorizationRequest cannot be retrieved ($this) from $requestUri: $body" } }
-
-        val contentType = requireNotNull(response.contentType()) { "AuthorizationRequest response does not define a content type" }
+        val contentType = requireNotNull(response.contentType) { "AuthorizationRequest response does not define a content type" }
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
 
         return when {
-            contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(body)
+            contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(response.body)
             contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest.Plain(
-                authorizationRequest = json.decodeFromString<AuthorizationRequest>(body),
+                authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body),
             )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
