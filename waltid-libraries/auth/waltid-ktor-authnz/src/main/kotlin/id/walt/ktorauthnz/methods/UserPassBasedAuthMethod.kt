@@ -45,8 +45,8 @@ abstract class UserPassBasedAuthMethod(
                 val username = body[usernameName] as? JsonPrimitive ?: body[DEFAULT_USER_NAME] as? JsonPrimitive
                 val password = body[passwordName] as? JsonPrimitive ?: body[DEFAULT_PASSWORD_NAME] as? JsonPrimitive
 
-                check(username?.isString == true) { "Invalid or missing $usernameName in JSON request. $EXPLANATION_MESSAGE" }
-                check(password?.isString == true) { "Invalid or missing $passwordName in JSON request. $EXPLANATION_MESSAGE" }
+                require(username?.isString == true) { "Invalid or missing $usernameName in JSON request. $EXPLANATION_MESSAGE" }
+                require(password?.isString == true) { "Invalid or missing $passwordName in JSON request. $EXPLANATION_MESSAGE" }
 
                 return UserPasswordCredential(username.content, password.content)
             }
@@ -54,23 +54,24 @@ abstract class UserPassBasedAuthMethod(
             contentType.match(ContentType.Application.FormUrlEncoded) -> {
                 val form = receiveParameters()
 
-                val username = form[usernameName] ?: form[DEFAULT_USER_NAME]
-                ?: error("Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE")
+                val username = requireNotNull(form[usernameName] ?: form[DEFAULT_USER_NAME]) {
+                    "Invalid or missing $usernameName in form post request. $EXPLANATION_MESSAGE"
+                }
 
-                val password = form[passwordName] ?: form[DEFAULT_PASSWORD_NAME]
-                ?: error("Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE")
+                val password = requireNotNull(form[passwordName] ?: form[DEFAULT_PASSWORD_NAME]) {
+                    "Invalid or missing $passwordName in form post request. $EXPLANATION_MESSAGE"
+                }
 
                 return UserPasswordCredential(username, password)
             }
             // Basic auth (fallback)
             contentType.match(ContentType.Any) -> {
-                val basicAuth = request.basicAuthenticationCredentials()
-                if (basicAuth != null)
-                    return basicAuth
-                else error("No basic auth credential header found. $EXPLANATION_MESSAGE")
+                return requireNotNull(request.basicAuthenticationCredentials()) {
+                    "No basic auth credential header found. $EXPLANATION_MESSAGE"
+                }
             }
 
-            else -> error("Invalid content type: $contentType. $EXPLANATION_MESSAGE")
+            else -> throw IllegalArgumentException("Invalid content type: $contentType. $EXPLANATION_MESSAGE")
         }
     }
 

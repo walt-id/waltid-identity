@@ -37,7 +37,7 @@ object CommonsFeatureCatalog : ServiceFeatureCatalog {
     val debugEndpointsFeature = OptionalFeature(
         "debug-endpoints",
         "Enables various debug endpoints",
-        default = lazy { log.isDebugEnabled() },
+        default = false,
         config = ServiceHealthChecksDebugModule.ServiceDebugModuleConfiguration::class
     )
     val openApiFeature = OptionalFeature("openapi", "Enables openapi endpoints", default = true)

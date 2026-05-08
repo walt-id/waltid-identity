@@ -276,7 +276,7 @@ data class AuthorizationRequest(
 
                 parameters.containsKey("request_uri") -> fromRequestObjectByReference(parameters["request_uri"]!!.first())
                 parameters.containsKey("request") -> fromRequestObject(parameters["request"]!!.first())
-                else -> throw Exception("Could not find request parameters or object in given parameters")
+                else -> throw IllegalArgumentException("Could not find request parameters or object in given parameters")
             }
         }
 
