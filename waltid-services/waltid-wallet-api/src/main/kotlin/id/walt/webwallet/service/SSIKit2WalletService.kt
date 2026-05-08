@@ -67,7 +67,6 @@ import id.walt.webwallet.utils.StringUtils.couldBeJsonObject
 import id.walt.webwallet.utils.StringUtils.parseAsJsonObject
 import id.walt.webwallet.web.controllers.exchange.PresentationRequestParameter
 import id.walt.webwallet.web.parameter.CredentialRequestParameter
-import id.walt.verifier.openid.transactiondata.SUPPORTED_TRANSACTION_DATA_TYPES
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
@@ -112,6 +111,7 @@ class SSIKit2WalletService(
     private val eventService = EventService()
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
     private val openId4VpPresentationService = OpenId4VpPresentationService(credentialService)
+    private val supportedTransactionDataTypes = SUPPORTED_TRANSACTION_DATA_TYPES
 
     companion object {
         val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
