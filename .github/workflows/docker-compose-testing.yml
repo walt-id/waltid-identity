@@ -122,6 +122,7 @@ jobs:
       - name: Run stack
         run: |
           cd ./docker-compose
+          sed -i 's/^SERVICE_HOST=.*/SERVICE_HOST=host.docker.internal/' .env
           if [[ "${{ env.use-artifact }}" == "true" ]]; then
             export VERSION_TAG=${{ inputs.tag }}
             build_arg=""
