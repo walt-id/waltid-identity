@@ -11,17 +11,10 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.HttpClient
-import io.ktor.client.request.accept
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.http.Url
-import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -50,28 +43,6 @@ object AuthorizationRequestResolver {
         val contentType: ContentType?,
         val body: String,
     )
-
-    suspend fun resolve(request: String, http: HttpClient): ResolvedAuthorizationRequest =
-        resolve(Url(request), http)
-
-    suspend fun resolve(requestUrl: Url, http: HttpClient): ResolvedAuthorizationRequest {
-        return resolve(requestUrl) { requestUri, requestUriMethod ->
-            val response = when (requestUriMethod) {
-                null, RequestUriHttpMethod.GET -> http.get(requestUri)
-                RequestUriHttpMethod.POST -> http.post(requestUri) {
-                    contentType(ContentType.Application.FormUrlEncoded)
-                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                    setBody("")
-                }
-            }
-
-            RequestUriFetchResponse(
-                status = response.status,
-                contentType = response.contentType(),
-                body = response.bodyAsText(),
-            )
-        }
-    }
 
     suspend fun resolve(
         requestUrl: Url,
