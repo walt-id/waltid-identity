@@ -101,4 +101,15 @@ class KeysApi(private val e2e: E2ETest, private val client: HttpClient) {
             it.expectSuccess()
             it.body<String>()
         }
+
+    suspend fun signRaw(walletId: Uuid, keyId: String, message: JsonElement) =
+        client.post("/wallet-api/wallet/$walletId/keys/$keyId/sign") {
+            setBody(message)
+        }
+
+    suspend fun sign(walletId: Uuid, keyId: String, message: JsonElement): String =
+        signRaw(walletId, keyId, message).let {
+            it.expectSuccess()
+            it.body<String>()
+        }
 }
