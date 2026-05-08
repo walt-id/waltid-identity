@@ -10,16 +10,24 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.HttpClient
+import io.ktor.client.request.accept
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.URLBuilder
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.Url
+import io.ktor.http.contentType
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -29,18 +37,35 @@ import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 class OpenId4VpPresentationService(
-    private val http: HttpClient,
     private val credentialService: CredentialsService,
 ) {
     private val logger = KotlinLogging.logger { }
+    private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
         isLenient = true
     }
 
-    suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> =
-        runCatching { AuthorizationRequestResolver.resolve(request, http) }
+    suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
+        AuthorizationRequestResolver.resolve(Url(request)) { requestUri, requestUriMethod ->
+            val response = when (requestUriMethod) {
+                null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
+                RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
+                    method = HttpMethod.Post
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                    setBody("")
+                }
+            }
+
+            AuthorizationRequestResolver.RequestUriFetchResponse(
+                status = response.status,
+                contentType = response.contentType(),
+                body = response.bodyAsText(),
+            )
+        }
+    }
 
     fun buildWalletPresentationRequest(
         request: String,
