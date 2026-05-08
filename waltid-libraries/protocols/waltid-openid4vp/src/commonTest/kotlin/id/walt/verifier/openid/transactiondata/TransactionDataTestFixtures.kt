@@ -18,13 +18,13 @@ internal object TransactionDataTestFixtures {
         amount: String = "42.00",
         payee: String = "ACME Corp",
         hashAlgorithms: List<String>? = null,
-        requireCryptographicHolderBinding: Boolean = true,
+        requireCryptographicHolderBinding: Boolean? = null,
     ): String = buildJsonObject {
         put("type", type)
         put("credential_ids", buildJsonArray {
             credentialIds.forEach { add(JsonPrimitive(it)) }
         })
-        put("require_cryptographic_holder_binding", requireCryptographicHolderBinding)
+        requireCryptographicHolderBinding?.let { put("require_cryptographic_holder_binding", it) }
         if (hashAlgorithms != null) {
             put("transaction_data_hashes_alg", buildJsonArray {
                 hashAlgorithms.forEach { add(JsonPrimitive(it)) }
