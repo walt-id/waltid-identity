@@ -4,14 +4,17 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.stores.WalletStore
 import io.ktor.http.*
 
 /**
  * Storage-backend abstraction used by [Wallet2RouteHandler].
  *
- * The OSS service implements this with in-memory maps.
- * The Enterprise service implements it with its MongoDB resource tree,
- * mapping named store IDs to KMS / DID store / credential store references.
+ * The OSS service implements this with [id.walt.wallet2.stores.inmemory.InMemoryWalletStore]
+ * by default; deployers can swap in any [WalletStore] implementation for persistence.
+ *
+ * The Enterprise service provides its own implementation backed by the MongoDB
+ * resource tree, with wallet lifecycle delegated to WalletServiceInit.
  *
  * Named store resolution (resolveKeyStore etc.) is only needed when
  * POST /wallet supplies explicit storeIds. For the simple default case
@@ -22,13 +25,24 @@ interface WalletResolver {
     /** Public base URL of this service instance, used in response URLs. */
     val publicBaseUrl: Url
 
-    suspend fun resolveWallet(walletId: String): Wallet?
+    /**
+     * The pluggable wallet lifecycle store.
+     *
+     * All wallet CRUD operations in [Wallet2RouteHandler] delegate here,
+     * making it trivial for deployers to swap in a persistent implementation
+     * without touching any route or handler logic.
+     */
+    val walletStore: WalletStore
 
-    suspend fun storeWallet(wallet: Wallet)
-
-    suspend fun deleteWallet(walletId: String)
-
-    suspend fun listWalletIds(): List<String>
+    // Convenience delegators — route handler code calls these directly
+    suspend fun resolveWallet(walletId: String): Wallet? = walletStore.loadWallet(walletId)
+    suspend fun storeWallet(wallet: Wallet) = walletStore.saveWallet(wallet)
+    suspend fun deleteWallet(walletId: String) = walletStore.deleteWallet(walletId)
+    suspend fun listWalletIds(): List<String> = walletStore.listWalletIds()
+    suspend fun linkWalletToAccount(accountId: String, walletId: String) =
+        walletStore.linkWalletToAccount(accountId, walletId)
+    suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
+        walletStore.getWalletIdsForAccount(accountId)
 
     // ---------------------------------------------------------------------------
     // Named store management — used when POST /wallet references stores by ID,
@@ -48,17 +62,4 @@ interface WalletResolver {
     suspend fun resolveDidStore(storeId: String): WalletDidStore? = null
     suspend fun storeDidStore(storeId: String, store: WalletDidStore) {}
     suspend fun listDidStoreIds(): List<String> = emptyList()
-
-    /**
-     * Links a wallet to an account. Called after wallet creation when auth is enabled.
-     * Default is a no-op (used when auth is disabled).
-     */
-    suspend fun linkWalletToAccount(accountId: String, walletId: String) {}
-
-    /**
-     * Returns the wallet IDs owned by a given account ID.
-     * Used when auth enforcement is enabled. Returns all wallets by default
-     * (i.e., when auth is disabled, every wallet is accessible).
-     */
-    suspend fun getWalletIdsForAccount(accountId: String): List<String>? = null
 }
