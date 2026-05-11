@@ -26,6 +26,8 @@ sealed class Verifier2Response {
             val UNKNOWN_VERIFICATION_SESSION =
                 Verifier2Error(errorDescription = "Cannot find VerificationSession for received direct_post response")
 
+            val EXPIRED_VERIFICATION_SESSION = Verifier2Error(errorDescription = "This verification session is expired.")
+
             val MALFORMED_VP_TOKEN = Verifier2Error(errorDescription = "Malformed vp_token.")
 
             val REQUIRED_CREDENTIALS_NOT_PROVIDED =

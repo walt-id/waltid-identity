@@ -12,7 +12,6 @@ import io.github.optimumcode.json.schema.ValidationError
 import io.ktor.http.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -29,9 +28,8 @@ data class JsonSchemaPolicy(
         require(schema != null || schemaUrl != null) { "Schema or Schema URL has to be provided" }
     }
 
-    @Transient
-    private val schemaFetcher = schemaUrl?.let {
-        WebDataFetcher(
+    companion object {
+        private val schemaFetcher = WebDataFetcher(
             WebDataFetcherId.SCHEMA_POLICY,
             defaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.Native)
         )
@@ -39,7 +37,7 @@ data class JsonSchemaPolicy(
 
     suspend fun getCurrentSchema(): JsonObject {
         return when {
-            schemaUrl != null -> schemaFetcher!!.fetch<JsonObject>(schemaUrl).body
+            schemaUrl != null -> schemaFetcher.fetch<JsonObject>(schemaUrl).body
             schema != null -> schema
             else -> throw IllegalStateException("No schema defined")
         }

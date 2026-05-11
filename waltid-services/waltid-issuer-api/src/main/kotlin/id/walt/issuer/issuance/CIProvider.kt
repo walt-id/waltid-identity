@@ -80,26 +80,30 @@ open class CIProvider(
         get() = (OpenID4VCI.createDefaultProviderMetadata(
             baseUrl = baseUrl,
             credentialSupported = config.credentialConfigurationsSupported,
-            version = OpenID4VCIVersion.DRAFT13
+            version = OpenID4VCIVersion.DRAFT13,
+            issuerDisplay = ConfigManager.getConfig<CredentialTypeConfig>().issuerDisplay
         ) as OpenIDProviderMetadata.Draft13)
 
     val metadataDraft11
         get() = (OpenID4VCI.createDefaultProviderMetadata(
             baseUrl = baseUrlDraft11,
             credentialSupported = config.credentialConfigurationsSupported,
-            version = OpenID4VCIVersion.DRAFT11
+            version = OpenID4VCIVersion.DRAFT11,
+            issuerDisplay = ConfigManager.getConfig<CredentialTypeConfig>().issuerDisplay
         ) as OpenIDProviderMetadata.Draft11)
 
     val openIdMetadata
         get() = (OpenID4VCI.createDefaultProviderMetadata(
             baseUrl = baseUrl,
-            version = OpenID4VCIVersion.DRAFT13
+            version = OpenID4VCIVersion.DRAFT13,
+            issuerDisplay = ConfigManager.getConfig<CredentialTypeConfig>().issuerDisplay
         ) as OpenIDProviderMetadata.Draft13)
 
     val openIdMetadataDraft11
         get() = (OpenID4VCI.createDefaultProviderMetadata(
             baseUrl = baseUrlDraft11,
-            version = OpenID4VCIVersion.DRAFT11
+            version = OpenID4VCIVersion.DRAFT11,
+            issuerDisplay = ConfigManager.getConfig<CredentialTypeConfig>().issuerDisplay
         ) as OpenIDProviderMetadata.Draft11)
 
     companion object {

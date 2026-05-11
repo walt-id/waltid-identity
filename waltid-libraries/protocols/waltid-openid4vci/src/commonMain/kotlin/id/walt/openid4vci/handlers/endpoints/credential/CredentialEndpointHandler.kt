@@ -22,5 +22,6 @@ fun interface CredentialEndpointHandler {
         selectiveDisclosure: SDMap?,
         x5Chain: List<String>?,
         display: List<DisplayProperties>?,
+        w3cVersion: String?,
     ): CredentialResponseResult
 }

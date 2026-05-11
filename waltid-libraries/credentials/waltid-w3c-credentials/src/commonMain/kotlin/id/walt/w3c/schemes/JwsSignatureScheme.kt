@@ -42,13 +42,22 @@ class JwsSignatureScheme : SignatureScheme {
     data class KeyInfo(val keyId: String, val key: Key)
     data class KeysInfo(val keyId: String, val keys: Set<Key>)
 
-    fun toPayload(data: JsonObject, jwtOptions: Map<String, JsonElement> = emptyMap()) =
-        mapOf(
-            JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
-            JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
-            JwsOption.VC to data,
-            *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
-        ).toJsonObject()
+    fun toPayload(data: JsonObject, jwtOptions: Map<String, JsonElement> = emptyMap(), wrapInVc: Boolean = true) =
+        if (wrapInVc) {
+            mapOf(
+                JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
+                JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
+                JwsOption.VC to data,
+                *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
+            ).toJsonObject()
+        } else {
+            mapOf(
+                JwsOption.ISSUER to jwtOptions[JwsOption.ISSUER],
+                JwsOption.SUBJECT to jwtOptions[JwsOption.SUBJECT],
+                *(data.entries.map { it.toPair() }.toTypedArray()),
+                *(jwtOptions.entries.map { it.toPair() }.toTypedArray())
+            ).toJsonObject()
+        }
 
     @JvmBlocking
     @JvmAsync
@@ -113,9 +122,10 @@ class JwsSignatureScheme : SignatureScheme {
         jwtHeaders: Map<String, JsonElement> = emptyMap(),
         /** Set additional options in the JWT payload */
         jwtOptions: Map<String, JsonElement> = emptyMap(),
+        wrapInVc: Boolean = true
     ): String {
         val payload = Json.encodeToString(
-            toPayload(data, jwtOptions)
+            toPayload(data, jwtOptions, wrapInVc)
         ).encodeToByteArray()
 
         return key.signJws(payload, jwtHeaders)

@@ -45,7 +45,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
-            implementation(identityLibs.ktor.client.cio)
+            implementation(identityLibs.ktor.client.java)
         }
         jvmTest.dependencies {
             implementation(kotlin("test-junit5"))

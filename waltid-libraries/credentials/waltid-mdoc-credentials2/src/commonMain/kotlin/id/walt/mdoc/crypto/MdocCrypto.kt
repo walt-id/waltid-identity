@@ -35,12 +35,6 @@ object MdocCrypto {
         "SHA-512"
     )
 
-    /*val mdocDigestTable = mapOf(
-        "SHA-256" to SHA256(),
-        "SHA-384" to SHA384(),
-        "SHA-512" to SHA512()
-    )*/
-
     fun isSupportedDigest(mdocDigestAlgorithm: String) = mdocDigests.contains(mdocDigestAlgorithm)
 
     fun ByteArray.digest(digestAlgorithm: String): ByteArray {

@@ -13,7 +13,7 @@ class W3CStatusValueReader(
 ) : JwtStatusValueReaderBase<W3CStatusContent>(formatMatcher, parser) {
 
     override fun parseStatusList(payload: JsonObject): W3CStatusContent {
-        val credentialSubject = payload["vc"]!!.jsonObject["credentialSubject"]?.jsonObject!!
+        val credentialSubject = (payload["vc"]?.jsonObject ?: payload)["credentialSubject"]?.jsonObject!!
         logger.debug { "CredentialSubject: $credentialSubject" }
         return jsonModule.decodeFromJsonElement<W3CStatusContent>(credentialSubject)
     }
