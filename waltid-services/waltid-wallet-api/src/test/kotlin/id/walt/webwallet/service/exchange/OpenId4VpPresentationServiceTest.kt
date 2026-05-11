@@ -19,7 +19,6 @@ import io.mockk.unmockkObject
 import io.mockk.every
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.InputStreamReader
 import kotlinx.serialization.json.JsonPrimitive
