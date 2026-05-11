@@ -6,7 +6,6 @@ import id.walt.commons.ServiceMain
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
-import id.walt.did.dids.resolver.LocalResolver
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
 import io.ktor.http.*
@@ -28,10 +27,7 @@ suspend fun main(args: Array<String>) {
         ServiceInitialization(
             features = OSSWallet2FeatureCatalog,
             init = {
-                DidService.apply {
-                    registerResolver(LocalResolver())
-                    updateResolversForMethods()
-                }
+                DidService.minimalInit()
             },
             run = WebService(Application::wallet2Module).run()
         )
