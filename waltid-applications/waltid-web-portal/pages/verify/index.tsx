@@ -112,6 +112,7 @@ export default function Verification() {
             type: TRANSACTION_DATA_TYPE,
             credential_ids: [TRANSACTION_CREDENTIAL_ID],
             transaction_data_hashes_alg: ["sha-256"],
+            require_cryptographic_holder_binding: true,
             amount: transactionAmount,
             currency: transactionCurrency,
             payee: transactionPayee,
