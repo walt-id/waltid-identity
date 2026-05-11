@@ -10,6 +10,8 @@ import id.walt.policies2.vp.policies.TransactionDataHashCheckSdJwtVPPolicy.Valid
 import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
 import id.walt.verifier.openid.transactiondata.decodeList
+import id.walt.verifier.openid.transactiondata.normalizeHashAlgorithm
+import id.walt.verifier.openid.transactiondata.requireSupportedHashAlgorithms
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -117,15 +119,6 @@ class TransactionDataHashCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
             requireValidation(transactionDataHashesAlg != null, HASH_ALGORITHM_MISMATCH) {
                 "transaction_data_hashes_alg is required when transaction_data_hashes_alg is present in the request"
             }
-        }
-    }
-
-    private fun normalizeHashAlgorithm(algorithm: String): String = algorithm.lowercase()
-
-    private fun requireSupportedHashAlgorithms(algorithms: List<String>) {
-        require(algorithms.isNotEmpty()) { "transaction_data_hashes_alg must not be empty" }
-        require(algorithms.any { normalizeHashAlgorithm(it) == DEFAULT_HASH_ALGORITHM }) {
-            "Unsupported transaction_data_hashes_alg values: $algorithms"
         }
     }
 
