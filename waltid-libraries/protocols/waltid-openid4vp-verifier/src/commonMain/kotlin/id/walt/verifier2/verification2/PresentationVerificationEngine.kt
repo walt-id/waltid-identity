@@ -10,7 +10,9 @@ import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
+import id.walt.verifier2.data.DcqlFulfillmentFailure
 import id.walt.verifier2.data.SessionEvent
+import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
@@ -317,6 +319,18 @@ object PresentationVerificationEngine {
                 presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
             log.warn { "First error: $firstError" }
 
+            val failedPolicies = presentationValidationResult
+                .mapValues { (_, byPolicy) -> byPolicy.filterValues { it.errors.isNotEmpty() } }
+                .filterValues { it.isNotEmpty() }
+
+            session.updateSession(SessionEvent.presentation_validation_available) {
+                this.failure = SessionFailure.PresentationValidation(
+                    reason = firstError?.message?.let { "Presentation validation failed: $it" }
+                        ?: "One or more presentations in vp_token failed validation",
+                    failedPolicies = failedPolicies,
+                )
+            }
+
             session.failSession(SessionEvent.presentation_validation_failed)
 
             throw IllegalArgumentException( // TODO: custom Exception class
@@ -349,19 +363,33 @@ object PresentationVerificationEngine {
         // Check if the set of validated presentations satisfies the overall DCQL Query
         // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
         val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
-            DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
+            DcqlFulfillmentChecker.checkOverallDcqlFulfillmentDetailed(
                 dcqlQuery = dcqlQuery,
                 successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
             )
         }
         if (dcqlFulfilled?.isSuccess == false) {
-            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFulfilled.exceptionOrNull()}" }
+            val dcqlError = dcqlFulfilled.exceptionOrNull()
+            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: $dcqlError" }
+
+            val structuredFailure: DcqlFulfillmentFailure =
+                (dcqlError as? DcqlFulfillmentChecker.StructuredDcqlFulfillmentException)?.failure
+                    ?: DcqlFulfillmentFailure(
+                        successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys.toList(),
+                    )
+
+            session.updateSession(SessionEvent.validated_credentials_available) {
+                this.failure = SessionFailure.DcqlFulfillment(
+                    reason = dcqlError?.message ?: "DCQL fulfillment failed",
+                    failure = structuredFailure,
+                )
+            }
 
             session.failSession(SessionEvent.dcql_fulfillment_check_failed)
 
             throw IllegalArgumentException(
-                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.exceptionOrNull()?.message}",
-                dcqlFulfilled.exceptionOrNull()!!
+                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlError?.message}",
+                dcqlError ?: IllegalStateException("DCQL fulfillment failed without underlying cause")
             )
             //Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
         }
@@ -382,13 +410,25 @@ object PresentationVerificationEngine {
             vpPolicies = presentationValidationResult,
             vcPolicies = credentialPolicyResults.vcPolicies,
             specificVcPolicies = credentialPolicyResults.specificVcPolicies,
+            attributedVcPolicies = credentialPolicyResults.attributedVcPolicies,
+            attributedSpecificVcPolicies = credentialPolicyResults.attributedSpecificVcPolicies,
         )
+
+        val vcPolicyViolations: List<id.walt.verifier2.data.AttributedCredentialPolicyResult> =
+            credentialPolicyResults.attributedVcPolicies.filter { !it.result.success } +
+                    credentialPolicyResults.attributedSpecificVcPolicies.values.flatten().filter { !it.result.success }
 
         session.updateSession(SessionEvent.credential_policy_results_available) {
             this.policyResults = verificationSessionPolicyResults
             this.status = when {
                 verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL
                 else -> Verification2Session.VerificationSessionStatus.FAILED
+            }
+            if (!verificationSessionPolicyResults.overallSuccess && vcPolicyViolations.isNotEmpty()) {
+                this.failure = SessionFailure.VcPolicyViolations(
+                    reason = "${vcPolicyViolations.size} credential policy violation(s)",
+                    violations = vcPolicyViolations,
+                )
             }
         }
 

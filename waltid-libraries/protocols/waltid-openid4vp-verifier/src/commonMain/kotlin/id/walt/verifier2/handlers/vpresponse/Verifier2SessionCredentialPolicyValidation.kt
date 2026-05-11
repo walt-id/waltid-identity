@@ -3,6 +3,7 @@ package id.walt.verifier2.handlers.vpresponse
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.verifier2.data.AttributedCredentialPolicyResult
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,13 @@ object Verifier2SessionCredentialPolicyValidation {
         val vcPolicies: List<CredentialPolicyResult>,
 
         @SerialName("specific_vc_policies")
-        val specificVcPolicies: Map<String, List<CredentialPolicyResult>>
+        val specificVcPolicies: Map<String, List<CredentialPolicyResult>>,
+
+        @SerialName("attributed_vc_policies")
+        val attributedVcPolicies: List<AttributedCredentialPolicyResult>,
+
+        @SerialName("attributed_specific_vc_policies")
+        val attributedSpecificVcPolicies: Map<String, List<AttributedCredentialPolicyResult>>,
     )
 
     suspend fun validateCredentialPolicies(
@@ -33,18 +40,23 @@ object Verifier2SessionCredentialPolicyValidation {
 
         // --- General VC Policies ---
         val generalPolicyJobs = validatedCredentials.flatMap { (queryId, credentials) ->
-            credentials.flatMap { credential ->
+            credentials.flatMapIndexed { credentialIndex, credential ->
                 policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
-                        log.trace { "Validating '$queryId' credential with policy '${policy.id}': $credential" }
+                        log.trace { "Validating '$queryId' credential#$credentialIndex with policy '${policy.id}': $credential" }
                         val result = policy.verify(credential, context)
-                        log.trace { "'$queryId' credential '${policy.id}' result: $result" }
+                        log.trace { "'$queryId' credential#$credentialIndex '${policy.id}' result: $result" }
 
-                        CredentialPolicyResult(
+                        val policyResult = CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
                             error = result.exceptionOrNull()?.message
+                        )
+                        AttributedCredentialPolicyResult(
+                            queryId = queryId,
+                            credentialIndex = credentialIndex,
+                            result = policyResult,
                         )
                     }
                 }
@@ -55,16 +67,21 @@ object Verifier2SessionCredentialPolicyValidation {
         val specificPolicyJobs = policies.specific_vc_policies.orEmpty().flatMap { (queryId, queryPolicies) ->
             val credentials = validatedCredentials[queryId].orEmpty()
 
-            credentials.flatMap { specificCredential ->
+            credentials.flatMapIndexed { credentialIndex, specificCredential ->
                 queryPolicies.policies.map { policy ->
                     async(Dispatchers.Default) {
                         val result = policy.verify(specificCredential, context)
 
-                        queryId to CredentialPolicyResult(
+                        val policyResult = CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
                             error = result.exceptionOrNull()?.message
+                        )
+                        queryId to AttributedCredentialPolicyResult(
+                            queryId = queryId,
+                            credentialIndex = credentialIndex,
+                            result = policyResult,
                         )
                     }
                 }
@@ -72,17 +89,17 @@ object Verifier2SessionCredentialPolicyValidation {
         }
 
         // --- Await all policy runs ---
-        // Wait for all to finish
-        val vcPolicyResults = generalPolicyJobs.awaitAll()
-        val specificPolicyPairs = specificPolicyJobs.awaitAll()
+        val attributedVcResults: List<AttributedCredentialPolicyResult> = generalPolicyJobs.awaitAll()
+        val attributedSpecificPairs: List<Pair<String, AttributedCredentialPolicyResult>> = specificPolicyJobs.awaitAll()
 
-        // Group the specific results back into a Map<String, List<PolicyResult>>
-        val specificVcPolicyResults = specificPolicyPairs
-            .groupBy({ it.first }, { it.second })
+        val attributedSpecificResults: Map<String, List<AttributedCredentialPolicyResult>> =
+            attributedSpecificPairs.groupBy({ it.first }, { it.second })
 
         return@coroutineScope CredentialPolicyResults(
-            vcPolicies = ArrayList(vcPolicyResults),
-            specificVcPolicies = specificVcPolicyResults
+            vcPolicies = attributedVcResults.map { it.result },
+            specificVcPolicies = attributedSpecificResults.mapValues { (_, list) -> list.map { it.result } },
+            attributedVcPolicies = attributedVcResults,
+            attributedSpecificVcPolicies = attributedSpecificResults,
         )
     }
 }

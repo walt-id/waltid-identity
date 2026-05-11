@@ -114,6 +114,15 @@ data class Verification2Session(
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
 
     var statusReason: String? = null,
+
+    /**
+     * Structured failure detail. Populated when the session ends in [VerificationSessionStatus.FAILED]
+     * (presentation validation, DCQL fulfillment, VC policy violations, or an OID4VP §8.5 wallet
+     * error response). Null for successful sessions or sessions that have not reached a failure
+     * state. Additive — legacy consumers that only read [status]/[statusReason] keep working.
+     */
+    @SerialName("failure")
+    var failure: SessionFailure? = null,
 ) {
 
     fun deletePII() {
@@ -131,6 +140,34 @@ data class Verification2Session(
             policyResult.result?.let { resultElement ->
                 policyResult.result = redactCredentialSubject(resultElement)
             }
+        }
+
+        policyResults?.attributedVcPolicies?.forEach { attributed ->
+            attributed.result.result?.let { resultElement ->
+                attributed.result.result = redactCredentialSubject(resultElement)
+            }
+        }
+
+        policyResults?.attributedSpecificVcPolicies?.values?.forEach { list ->
+            list.forEach { attributed ->
+                attributed.result.result?.let { resultElement ->
+                    attributed.result.result = redactCredentialSubject(resultElement)
+                }
+            }
+        }
+
+        when (val f = failure) {
+            is SessionFailure.PresentationValidation -> f.failedPolicies.values.forEach { inner ->
+                inner.values.forEach { it.results = emptyMap() }
+            }
+
+            is SessionFailure.VcPolicyViolations -> f.violations.forEach { attributed ->
+                attributed.result.result?.let { resultElement ->
+                    attributed.result.result = redactCredentialSubject(resultElement)
+                }
+            }
+
+            null, is SessionFailure.DcqlFulfillment, is SessionFailure.WalletErrorResponse -> Unit
         }
     }
 
