@@ -26,6 +26,9 @@ import kotlinx.serialization.json.JsonPrimitive
 
 object Verifier2OpenApiExamples {
 
+    private const val IDENTITY_CREDENTIAL_VCT =
+        "http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential"
+
     val openid4vpHttpW3cVcDefault = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             DcqlQuery(
@@ -308,7 +311,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
@@ -326,7 +329,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
@@ -358,7 +361,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
@@ -390,7 +393,7 @@ object Verifier2OpenApiExamples {
                         id = "pid",
                         format = CredentialFormat.DC_SD_JWT,
                         meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ),
                         claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
@@ -494,7 +497,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
