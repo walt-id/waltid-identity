@@ -69,8 +69,8 @@ class OpenId4VpPresentationService(
             )
         }.also { resolvedRequest ->
             val authorizationRequest = resolvedRequest.authorizationRequest
-            if (!authorizationRequest.transactionData.isNullOrEmpty() && authorizationRequest.dcqlQuery == null) {
-                throw IllegalArgumentException("invalid_request: transaction_data requires dcql_query")
+            require(authorizationRequest.transactionData.isNullOrEmpty() || authorizationRequest.dcqlQuery != null) {
+                "invalid_request: transaction_data requires dcql_query"
             }
 
             validateRequestTransactionData(
