@@ -11,20 +11,17 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.did.dids.DidService
-import id.walt.did.dids.registrar.DidRegistrarRegistrations
-import id.walt.did.dids.resolver.LocalResolver
-import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
+import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
-import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.ProofType
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
@@ -41,9 +38,9 @@ import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
+import id.walt.policies2.vc.VCPolicyList
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.policies2.vc.VCPolicyList
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
@@ -63,15 +60,16 @@ import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
-import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.engine.*
+import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -80,6 +78,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 
 /**
  * End-to-end integration tests: OpenID4VCI 1.0 in-process issuer → Wallet2 → Verifier2 (OpenID4VP 1.0).
@@ -94,7 +93,7 @@ import kotlin.uuid.Uuid
  *
  * Out of scope: mso_mdoc — the waltid-openid4vci library has no mdoc credential handler.
  */
-@OptIn(ExperimentalUuidApi::class)
+@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 class Wallet2IssuerVerifier2IntegrationTest {
 
     // Each test gets its own pair of ports to avoid Address-already-in-use when
