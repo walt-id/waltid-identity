@@ -12,6 +12,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.ExchangeCodeRequest
 import id.walt.wallet2.handlers.FetchCredentialRequest
 import id.walt.wallet2.handlers.FetchCredentialResult
@@ -139,7 +140,7 @@ data class ImportCredentialRequest(
 @OptIn(ExperimentalUuidApi::class)
 object Wallet2RouteHandler {
 
-    private val noopOnEvent: suspend (id.walt.wallet2.data.WalletSessionEvent) -> Unit = {}
+    private val noopOnEvent: suspend (WalletSessionEvent) -> Unit = {}
 
     fun Route.registerWallet2Routes(
         resolver: WalletResolver,
@@ -162,7 +163,7 @@ object Wallet2RouteHandler {
     // Wallet CRUD
     // -------------------------------------------------------------------------
 
-    private fun Route.registerWalletManagementRoutes(
+    internal fun Route.registerWalletManagementRoutes(
         resolver: WalletResolver,
         getAccountId: (suspend RoutingCall.() -> String?)?
     ) {
@@ -637,7 +638,7 @@ object Wallet2RouteHandler {
     // Named store management routes  (POST/GET /stores/keys|credentials|dids)
     // -------------------------------------------------------------------------
 
-    private fun Route.registerNamedStoreRoutes(resolver: WalletResolver) {
+    internal fun Route.registerNamedStoreRoutes(resolver: WalletResolver) {
 
         route("/keys") {
             get("", {
