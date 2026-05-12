@@ -124,8 +124,8 @@ jobs:
 
               manager=$(echo "$metadata" | python3 -c "import sys,json; print(json.load(sys.stdin)['Manager'])")
               state=$(echo "$metadata"   | python3 -c "import sys,json; print(json.load(sys.stdin)['State'])")
-              # CreationDate is an ISO-8601 float from AWS (e.g. 1712345678.123)
-              creation_ts=$(echo "$metadata" | python3 -c "import sys,json; print(int(json.load(sys.stdin)['CreationDate']))")
+              # CreationDate is an ISO-8601 string from AWS (e.g. 2026-03-05T09:22:03.356000+00:00)
+              creation_ts=$(echo "$metadata" | python3 -c "import sys,json,datetime; d=json.load(sys.stdin)['CreationDate']; print(int(datetime.datetime.fromisoformat(d).timestamp()))")
 
               if [ "$manager" != "CUSTOMER" ]; then
                 (( skipped_aws_managed++ )) || true
