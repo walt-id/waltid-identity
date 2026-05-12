@@ -11,6 +11,7 @@ import id.walt.test.integration.tryGetData
 import id.walt.webwallet.config.RegistrationDefaultsConfig
 import io.ktor.http.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
@@ -29,6 +30,7 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
     companion object {
         val keyGenRequest = KeyGenerationRequest("jwk", KeyType.Ed25519)
         var generatedKeyId: String? = null
+        var signingKeyId: String? = null
     }
 
     @Test
@@ -111,5 +113,33 @@ class KeysWalletIntegrationTest : AbstractIntegrationTest() {
             assertEquals("RSA", it.jsonObject["kty"]?.jsonPrimitive?.content)
             assertEquals(importedKeyId, it.jsonObject["kid"]?.jsonPrimitive?.content)
         }
+    }
+
+    @Test
+    @Order(8)
+    fun walletShouldSignWithKey() = runTest {
+        signingKeyId = defaultWalletApi.generateKey(KeyGenerationRequest("jwk", KeyType.Ed25519))
+        assertFalse(signingKeyId.isNullOrEmpty(), "Key generation failed")
+        
+        val messageToSign = JsonPrimitive("Hello, World!")
+        val signature = defaultWalletApi.signWithKey(signingKeyId!!, messageToSign)
+        
+        assertNotNull(signature, "Signature should not be null")
+        assertTrue(signature.isNotEmpty(), "Signature should not be empty")
+    }
+
+    @Test
+    @Order(9)
+    fun walletShouldSignJsonObjectWithKey() = runTest {
+        assertFalse(signingKeyId.isNullOrEmpty(), "No signing key available - test order ??")
+        
+        val jsonMessage = kotlinx.serialization.json.buildJsonObject {
+            put("data", JsonPrimitive("test data"))
+            put("timestamp", JsonPrimitive(System.currentTimeMillis()))
+        }
+        val signature = defaultWalletApi.signWithKey(signingKeyId!!, jsonMessage)
+        
+        assertNotNull(signature, "Signature should not be null")
+        assertTrue(signature.isNotEmpty(), "Signature should not be empty")
     }
 }

@@ -46,7 +46,7 @@ kotlin {
             implementation(identityLibs.slf4j.simple)
 
             // Ktor client
-            implementation(identityLibs.ktor.client.okhttp)
+            implementation(identityLibs.ktor.client.java)
 
             // Test
             implementation(kotlin("test"))

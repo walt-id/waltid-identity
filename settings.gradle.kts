@@ -41,7 +41,8 @@ val modules = listOfNotNull(
         "waltid-verification-policies2-vp",
         "waltid-holder-policies",
         "waltid-vical",
-        "waltid-mdoc-credentials2"
+        "waltid-mdoc-credentials2",
+        "waltid-trust-registry"
     ),
 
     * "$libraries:protocols".group(
@@ -54,7 +55,6 @@ val modules = listOfNotNull(
         "waltid-openid4vp-clientidprefix",
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
-        "waltid-openid4vci-wallet",
     ),
 
     * "$libraries:sdjwt".group(

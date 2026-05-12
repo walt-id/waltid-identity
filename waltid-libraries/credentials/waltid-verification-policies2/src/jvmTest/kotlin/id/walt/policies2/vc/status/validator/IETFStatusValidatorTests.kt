@@ -1,5 +1,6 @@
 package id.walt.policies2.vc.status.validator
 
+import id.walt.policies2.vc.policies.status.StatusListContent
 import id.walt.policies2.vc.policies.status.bit.BitRepresentationStrategy
 import id.walt.policies2.vc.policies.status.bit.LittleEndianRepresentation
 import id.walt.policies2.vc.policies.status.expansion.StatusListExpansionAlgorithm
@@ -25,7 +26,7 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
     fun setup() {
         coEvery { mockFetcher.fetch(uri) } returns Result.success(statusListContent)
         every { mockBitValueReaderFactory.new(strategy = ofType(LittleEndianRepresentation::class)) } returns mockBitValueReader
-        every { mockStatusReader.canHandle(statusListContent) } returns true
+        every { mockStatusReader.canHandle(ofType(StatusListContent::class)) } returns true
         sut = createStatusValidator()
     }
 
@@ -47,6 +48,10 @@ class IETFStatusValidatorTests : StatusValidatorTestsBase<IETFEntry, IETFStatusP
 
     override fun createAttribute(scenario: TestScenario, value: UInt) = IETFStatusPolicyAttribute(
         value = value
+    )
+
+    override fun createAttributeWithValues(scenario: TestScenario, values: List<UInt>) = IETFStatusPolicyAttribute(
+        values = values
     )
 
     override fun createStatusContent(scenario: TestScenario, size: Int) = IETFStatusContent(

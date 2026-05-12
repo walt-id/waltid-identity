@@ -61,7 +61,7 @@ dependencies {
 
     // Ktor client
     implementation(identityLibs.ktor.client.core)
-    implementation(identityLibs.ktor.client.apache)
+    implementation(identityLibs.ktor.client.apache5)
     implementation(identityLibs.ktor.client.content.negotiation)
 
     // Ktor shared

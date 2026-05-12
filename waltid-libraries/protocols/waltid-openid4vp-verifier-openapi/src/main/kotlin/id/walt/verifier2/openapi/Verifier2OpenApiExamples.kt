@@ -77,18 +77,19 @@ object Verifier2OpenApiExamples {
         )
     )
 
-    val openid4vpHttpW3cVcCredentialStatusTokenStatusList = CrossDeviceFlowSetup(
+    val openid4vpHttpMdocCredentialStatusTokenStatusList = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
             DcqlQuery(
                 credentials = listOf(
                     CredentialQuery(
-                        id = "example_openbadge_jwt_vc",
-                        format = CredentialFormat.JWT_VC_JSON,
-                        meta = JwtVcJsonMeta(
-                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        id = "example_mdl",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(
+                            doctypeValue = "org.iso.18013.5.1.mDL"
                         ),
                         claims = listOf(
-                            ClaimsQuery(pathStrings = listOf("name"))
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name"))
                         )
                     )
                 )
@@ -99,6 +100,37 @@ object Verifier2OpenApiExamples {
                         StatusPolicy(
                             argument = IETFStatusPolicyAttribute(
                                 value = 0u
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpMdocCredentialStatusTokenStatusListMultipleValues = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_mdl",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(
+                            doctypeValue = "org.iso.18013.5.1.mDL"
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name")),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        StatusPolicy(
+                            argument = IETFStatusPolicyAttribute(
+                                values = listOf(0u, 1u)
                             )
                         )
                     )
@@ -129,6 +161,38 @@ object Verifier2OpenApiExamples {
                         StatusPolicy(
                             argument = W3CStatusPolicyAttribute(
                                 value = 0u,
+                                purpose = "Revocation",
+                                type = Values.BITSTRING_STATUS_LIST
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    val openid4vpHttpW3cVcCredentialStatusBitstringStatusListMultipleValues = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "example_openbadge_jwt_vc",
+                        format = CredentialFormat.JWT_VC_JSON,
+                        meta = JwtVcJsonMeta(
+                            typeValues = listOf(listOf("VerifiableCredential", "OpenBadgeCredential"))
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("name"))
+                        )
+                    )
+                )
+            ),
+            policies = DefinedVerificationPolicies(
+                vc_policies = VCPolicyList(
+                    listOf(
+                        StatusPolicy(
+                            argument = W3CStatusPolicyAttribute(
+                                values = listOf(0u, 1u),
                                 purpose = "Revocation",
                                 type = Values.BITSTRING_STATUS_LIST
                             )
@@ -318,6 +382,32 @@ object Verifier2OpenApiExamples {
     )
 
     // ISO Examples
+
+    val openid4vpHttpIsoPhotoIdMinimal = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            dcqlQuery = DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "my_photoid",
+                        format = CredentialFormat.MSO_MDOC,
+                        meta = MsoMdocMeta(
+                            doctypeValue = "org.iso.23220.photoid.1"
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "family_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "given_name_unicode")),
+                            ClaimsQuery(pathStrings = listOf("org.iso.18013.5.1", "issuing_authority_unicode")),
+                            ClaimsQuery(
+                                pathStrings = listOf("org.iso.18013.5.1", "issuing_country"),
+                                values = listOf("AT").map { JsonPrimitive(it) }
+                            ),
+                            ClaimsQuery(pathStrings = listOf("org.iso.23220.photoid.1", "travel_document_number"))
+                        )
+                    )
+                )
+            )
+        )
+    )
 
 
     val openid4vpHttpIsoPhotoIdVical = CrossDeviceFlowSetup(

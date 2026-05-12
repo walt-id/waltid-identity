@@ -67,12 +67,14 @@ object Issuer {
         additionalJwtOptions: Map<String, JsonElement>,
         display: JsonArray = JsonArray(emptyList()),
         completeJwtWithDefaultCredentialData: Boolean = true,
+        context: Map<String, JsonElement>? = null,
     ) = mergingToVc(
         issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
         display = display,
-        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData
+        completeJwtWithDefaultCredentialData = completeJwtWithDefaultCredentialData,
+        context = context
     ).run {
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signJws(
@@ -80,9 +82,7 @@ object Issuer {
             issuerId = issuerId,
             issuerKid = getKidHeader(issuerKey, issuerDid),
             subjectDid = subjectDid,
-            additionalJwtHeader = additionalJwtHeader.toMutableMap().apply {
-                put("typ", "JWT".toJsonElement())
-            },
+            additionalJwtHeader = additionalJwtHeader,
             additionalJwtOptions = additionalJwtOptions.toMutableMap().apply {
                 putAll(jwtOptions)
             }
@@ -106,12 +106,14 @@ object Issuer {
 
         completeJwtWithDefaultCredentialData: Boolean = true,
         disclosureMap: SDMap,
+        context: Map<String, JsonElement>? = null,
     ) = mergingToVc(
         issuerId = issuerId,
         subjectDid = subjectDid,
         mappings = mappings,
         display = display,
-        completeJwtWithDefaultCredentialData
+        completeJwtWithDefaultCredentialData,
+        context = context
     ).run {
         val issuerDid = if (DidUtils.isDidUrl(issuerId)) issuerId else null
         w3cVc.signSdJwt(
@@ -149,8 +151,9 @@ object Issuer {
         mappings: JsonObject,
         display: JsonArray? = null,
         completeJwtWithDefaultCredentialData: Boolean = true,
+        context: Map<String, JsonElement>? = null,
     ): IssuanceInformation {
-        val context = mapOf(
+        val mergedContext = mapOf(
             "issuerId" to issuerId,
             "issuerDid" to (if (DidUtils.isDidUrl(issuerId)) issuerId else null),
             "subjectDid" to subjectDid,
@@ -163,17 +166,24 @@ object Issuer {
 
                 else -> value.toString().isNotEmpty()
             }
-        }
-            .mapValues { (_, value) ->
-                when (value) {
-                    is JsonElement -> value
-                    else -> JsonPrimitive(value.toString())
-                }
+        }.mapValues { (_, value) ->
+            when (value) {
+                is JsonElement -> value
+                else -> JsonPrimitive(value.toString())
             }
+        }.toMutableMap().apply {
+            context?.let { putAll(it) }
+        }
 
-        val mapped = this.mergeWithMapping(mappings, context, dataFunctions)
+        val mapped = this.mergeWithMapping(mappings, mergedContext, dataFunctions)
 
-        val vc = mapped.vc
+        // For VCDM 2.0, rename V1.1-only date fields to their VCDM 2.0 equivalents
+        val vc = if (mapped.vc.isV2()) {
+            val m = mapped.vc.toMutableMap()
+            m.remove("issuanceDate")?.let { v -> if ("validFrom" !in m) m["validFrom"] = v }
+            m.remove("expirationDate")?.let { v -> if ("validUntil" !in m) m["validUntil"] = v }
+            W3CVC(m)
+        } else mapped.vc
         val jwtRes = mapped.results.mapKeys { it.key.removePrefix("jwt:") }.toMutableMap()
 
         fun completeJwtAttributes(attribute: String, completer: () -> JsonElement?) {
@@ -194,14 +204,12 @@ object Issuer {
                     ?: vc[VcClaims.V2.NotAfter.getValue()]?.let { Instant.parse(it.jsonPrimitive.content) }
                         ?.epochSeconds?.let { JsonPrimitive(it) }
             }
-            completeJwtAttributes("iat") {
-                vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
-                    ?.epochSeconds?.let { JsonPrimitive(it) }
-            }
-            completeJwtAttributes("nbf") {
-                vc["issuanceDate"]?.let { Instant.parse(it.jsonPrimitive.content) }
-                    ?.epochSeconds?.let { JsonPrimitive(it) }
-            }
+            // V1.1 uses issuanceDate, V2.0 uses validFrom — try both
+            val issuanceInstant =
+                (vc[VcClaims.V1.NotBefore.getValue()] ?: vc[VcClaims.V2.NotBefore.getValue()])
+                    ?.let { Instant.parse(it.jsonPrimitive.content) }
+            completeJwtAttributes("iat") { issuanceInstant?.epochSeconds?.let { JsonPrimitive(it) } }
+            completeJwtAttributes("nbf") { issuanceInstant?.epochSeconds?.let { JsonPrimitive(it) } }
         }
 
         return IssuanceInformation(vc, jwtRes)

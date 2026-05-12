@@ -9,6 +9,7 @@ import id.walt.iso18013.annexc.AnnexCResponseVerifier
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.sha256
+import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
@@ -28,6 +29,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
 
 object Verifier2VPDirectPostHandler {
 
@@ -180,6 +182,7 @@ object Verifier2VPDirectPostHandler {
         verificationSession: Verification2Session?,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
+        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
     ) {
         val call = this
 
@@ -187,11 +190,18 @@ object Verifier2VPDirectPostHandler {
             Verifier2Response.Verifier2Error.UNKNOWN_VERIFICATION_SESSION.throwAsError()
         }
 
+        verificationSession.expirationDate?.let { expirationDate ->
+            if (expirationDate < Clock.System.now()) {
+                Verifier2Response.Verifier2Error.EXPIRED_VERIFICATION_SESSION.throwAsError()
+            }
+        }
+
         val result = handleDirectPost(
             verificationSession = verificationSession,
             responseData = call.parseHttpRequestToDirectPostResponse(),
             updateSessionCallback = updateSessionCallback,
-            failSessionCallback = failSessionCallback
+            failSessionCallback = failSessionCallback,
+            policyContext = policyContext
         )
 
         call.respond(
@@ -223,6 +233,7 @@ object Verifier2VPDirectPostHandler {
         responseData: DirectPostResponse,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
+        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
     ): Map<String, String> {
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
             updateSessionCallback.invoke(this, event, block)
@@ -263,7 +274,13 @@ object Verifier2VPDirectPostHandler {
         // presented credential/presentation
 
 
-        PresentationVerificationEngine.executeAllVerification(vpTokenContents, session, updateSessionCallback, failSessionCallback)
+        PresentationVerificationEngine.executeAllVerification(
+            vpTokenContents,
+            session,
+            updateSessionCallback,
+            failSessionCallback,
+            policyContext
+        )
 
 
         val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri

@@ -49,11 +49,11 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-http][w3c vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") {
                     value = Verifier2OpenApiExamples.openid4vpHttpW3cVcBasic
                 }
-                example("[openid4vp-http][w3c vc] credential status for TokenStatusList") {
-                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusTokenStatusList
-                }
                 example("[openid4vp-http][w3c vc] credential status for BitstringStatusList") {
                     value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusBitstringStatusList
+                }
+                example("[openid4vp-http][w3c vc] credential status for BitstringStatusList (multiple allowed values)") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusBitstringStatusListMultipleValues
                 }
                 example("[openid4vp-http][w3c vc] credential status for multiple BitstringStatusList") {
                     value = Verifier2OpenApiExamples.openid4vpHttpW3cVcCredentialStatusMultipleBitstringStatusList
@@ -100,6 +100,12 @@ object VerificationSessionCreateOpenApi {
                 example("[openid4vp-http][sd-jwt pid]") { value = CrossDeviceFlowSetup.EXAMPLE_SDJWT_PID }
                 example("[openid4vp-http][iso pid]") { value = CrossDeviceFlowSetup.EXAMPLE_ISO_PID }
                 example("[openid4vp-http][iso mdl & photo-id]") { value = CrossDeviceFlowSetup.EXAMPLE_MDL_OR_PHOTOID }
+                example("[openid4vp-http][iso mdl] credential status for TokenStatusList") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpMdocCredentialStatusTokenStatusList
+                }
+                example("[openid4vp-http][iso mdl] credential status for TokenStatusList (multiple allowed values)") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpMdocCredentialStatusTokenStatusListMultipleValues
+                }
                 example("[openid4vp-http][iso photo-id] vical") { value = Verifier2OpenApiExamples.openid4vpHttpIsoPhotoIdVical }
 
                 example("[openid4vp-dc_api][iso mdl] unsigned & unencrypted") { value = DcApiAnnexDFlowSetup.EX_UNSIGNED_UNENCRYPTED_MDL }

@@ -13,6 +13,9 @@ sealed class CredentialVerificationPolicy2 {
 
     abstract val id: String
 
-    abstract suspend fun verify(credential: DigitalCredential): Result<JsonElement>
+    abstract suspend fun verify(
+        credential: DigitalCredential,
+        context: PolicyExecutionContext = PolicyExecutionContext.Empty
+    ): Result<JsonElement>
 
 }

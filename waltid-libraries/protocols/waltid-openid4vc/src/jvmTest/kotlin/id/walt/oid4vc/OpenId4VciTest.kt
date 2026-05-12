@@ -221,10 +221,18 @@ class OpenId4VciTest {
         println("// parse and verify credential")
         val credential = credentialResponse.credential.jsonPrimitive.content
         println(">>> Issued credential: $credential")
-        verifyIssuerAndSubjectId(
-            SDJwt.parse(credential).fullPayload["vc"]?.jsonObject!!,
-            ISSUER_DID, WALLET_DID
-        )
+        val fullPayload = SDJwt.parse(credential).fullPayload
+        if (fullPayload.containsKey("vc")) {
+            verifyIssuerAndSubjectId(
+                fullPayload["vc"]?.jsonObject!!,
+                ISSUER_DID, WALLET_DID
+            )
+        } else {
+            verifyIssuerAndSubjectId(
+                fullPayload,
+                ISSUER_DID, WALLET_DID
+            )
+        }
         assertTrue(actual = JwtSignaturePolicy().verify(credential, null, mapOf()).isSuccess)
 
         // test jwt-vc-issuer well-known url with URL path segments
@@ -768,6 +776,103 @@ class OpenId4VciTest {
         //Then VC Stuff
 
 
+    }
+
+    @Test
+    fun testW3CV2CredentialIssuance() = runTest {
+        println("// -------- W3C V2 CREDENTIAL ISSUANCE TEST ----------")
+        val issuerKey = ISSUER_DID_KEY
+        val issuerId = ISSUER_DID
+
+        // V1.1: subject-only data — CredentialBuilder wraps it into a full V1.1 credential
+        val credentialDataV11 = buildJsonObject {
+            put("id", JsonPrimitive("did:example:subject"))
+            put("name", JsonPrimitive("Jane Doe"))
+        }
+
+        // V2.0: full VCDM 2.0 credential — used as-is, no vc wrapper should be added
+        val credentialDataV20 = buildJsonObject {
+            put("@context", JsonArray(listOf(JsonPrimitive("https://www.w3.org/ns/credentials/v2"))))
+            put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"), JsonPrimitive("VerifiableId"))))
+            put("issuer", JsonPrimitive(issuerId))
+            put("credentialSubject", buildJsonObject {
+                put("id", JsonPrimitive("did:example:subject"))
+                put("name", JsonPrimitive("Jane Doe"))
+            })
+        }
+
+        val credentialDataV20MixedContext = buildJsonObject {
+            put("@context", JsonArray(listOf(
+                JsonPrimitive("https://www.w3.org/ns/credentials/v2"),
+                JsonPrimitive("https://www.w3.org/2018/credentials/v1"),
+                JsonPrimitive("https://purl.imsglobal.org/spec/ob/v3p0/context.json"),
+            )))
+            put("type", JsonArray(listOf(JsonPrimitive("VerifiableCredential"), JsonPrimitive("OpenBadgeCredential"))))
+            put("issuer", JsonPrimitive(issuerId))
+            put("credentialSubject", buildJsonObject {
+                put("id", JsonPrimitive("did:example:subject"))
+            })
+        }
+
+        // Mock proof of possession
+        val dummyProof = ProofOfPossession.fromJSON(buildJsonObject {
+            put("proof_type", JsonPrimitive("jwt"))
+            put("jwt", JsonPrimitive("eyJhbGciOiJFUzI1NiIsImtpZCI6ImRpZDpleGFtcGxlOmhvbGRlciNrZXkifQ.eypub25jZSI6InRlc3QifQ.dummy"))
+        })
+
+        val credentialRequest = CredentialRequest.forOfferedCredential(
+            offeredCredential = OfferedCredential(
+                format = CredentialFormat.jwt_vc_json,
+                credentialDefinition = CredentialDefinition(type = listOf("VerifiableCredential", "VerifiableId"))
+            ),
+            proof = dummyProof
+        )
+
+        // Test V1.1 (should have "vc" claim)
+        val vcV11 = OpenID4VCI.generateW3CJwtVC(
+            credentialRequest,
+            credentialData = credentialDataV11,
+            issuerKey = issuerKey,
+            issuerId = issuerId,
+            w3cVersion = CredentialBuilderType.W3CV11CredentialBuilder.name
+        )
+        println("VC V1.1: $vcV11")
+        val headerV11 = vcV11.substringBefore("~").decodeJws().header
+        val payloadV11 = SDJwt.parse(vcV11).fullPayload
+        assertTrue(payloadV11.containsKey("vc"), "V1.1 should have 'vc' claim")
+        assertEquals("JWT", headerV11["typ"]?.jsonPrimitive?.content, "V1.1 typ must be 'JWT'")
+
+        // Test V2.0 (should NOT have "vc" claim; credential claims appear directly in JWT payload)
+        val vcV20 = OpenID4VCI.generateW3CJwtVC(
+            credentialRequest,
+            credentialData = credentialDataV20,
+            issuerKey = issuerKey,
+            issuerId = issuerId,
+            w3cVersion = CredentialBuilderType.W3CV2CredentialBuilder.name
+        )
+        println("VC V2.0: $vcV20")
+        val headerV20 = vcV20.substringBefore("~").decodeJws().header
+        val payloadV20 = SDJwt.parse(vcV20).fullPayload
+        assertFalse(payloadV20.containsKey("vc"), "V2.0 should NOT have 'vc' claim")
+        assertEquals(expected = issuerId, actual = payloadV20["issuer"]?.jsonPrimitive?.content)
+        assertNotNull(payloadV20["credentialSubject"], "V2.0 should have 'credentialSubject' at top level")
+        val contextV20 = payloadV20["@context"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertTrue("https://www.w3.org/ns/credentials/v2" in contextV20, "V2.0 @context must contain v2 URI")
+        assertFalse("https://www.w3.org/2018/credentials/v1" in contextV20, "V2.0 @context must not contain v1.1 URI")
+        assertEquals("vc+jwt", headerV20["typ"]?.jsonPrimitive?.content, "V2.0 typ must be 'vc+jwt'")
+
+        val vcV20Mixed = OpenID4VCI.generateW3CJwtVC(
+            credentialRequest,
+            credentialData = credentialDataV20MixedContext,
+            issuerKey = issuerKey,
+            issuerId = issuerId,
+            w3cVersion = CredentialBuilderType.W3CV2CredentialBuilder.name
+        )
+        val payloadV20Mixed = SDJwt.parse(vcV20Mixed).fullPayload
+        val contextV20Mixed = payloadV20Mixed["@context"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertFalse("https://www.w3.org/2018/credentials/v1" in contextV20Mixed, "V2.0 @context must not contain v1.1 URI even when present in input")
+        assertTrue("https://www.w3.org/ns/credentials/v2" in contextV20Mixed, "V2.0 @context must retain v2 URI")
+        assertTrue("https://purl.imsglobal.org/spec/ob/v3p0/context.json" in contextV20Mixed, "V2.0 @context must retain other context URIs")
     }
 
     private fun verifyIssuerAndSubjectId(credential: JsonObject, issuerId: String, subjectId: String) {

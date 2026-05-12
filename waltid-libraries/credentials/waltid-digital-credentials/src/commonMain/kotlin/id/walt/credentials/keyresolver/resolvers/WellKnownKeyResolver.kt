@@ -1,17 +1,18 @@
 package id.walt.credentials.keyresolver.resolvers
 
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
+import io.ktor.http.URLBuilder
+import io.ktor.http.Url
+import io.ktor.http.encodedPath
 import kotlinx.serialization.json.*
 
 object WellKnownKeyResolver : BaseKeyResolver {
     private val log = KotlinLogging.logger { }
 
-    private val httpClient = HttpClient()
+    private val web = WebDataFetcher(WebDataFetcherId.WELL_KNOWN_KEY_RESOLVER)
 
     suspend fun resolveKeyFromWellKnown(issuerId: String, header: JsonObject?): JWKKey {
         log.debug { "Resolving issuer key via JWT VC Issuer Metadata for: $issuerId" }
@@ -23,7 +24,7 @@ object WellKnownKeyResolver : BaseKeyResolver {
             }.buildString()
 
             log.debug { "Fetching metadata from: $wellKnownUrl" }
-            val metadata = httpClient.get(wellKnownUrl).body<JsonObject>()
+            val metadata = web.fetch<JsonObject>(wellKnownUrl).body
 
             // Find the JWKS (either inline or via URI)
             val jwks = when {
@@ -31,7 +32,7 @@ object WellKnownKeyResolver : BaseKeyResolver {
                     val jwksUri = metadata["jwks_uri"]?.jsonPrimitive?.contentOrNull
                         ?: throw IllegalArgumentException("Metadata 'jwks_uri' is not a valid string.")
                     log.debug { "Fetching JWKS from: $jwksUri" }
-                    httpClient.get(jwksUri).body<JsonObject>()
+                    web.fetch<JsonObject>(jwksUri).body
                 }
 
                 "jwks" in metadata -> metadata["jwks"]?.jsonObject

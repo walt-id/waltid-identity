@@ -29,22 +29,19 @@ object MdocCrypto {
 
     private val log = KotlinLogging.logger { }
 
-    private val sha256 = SHA256()
-    private val sha384 = SHA384()
-    private val sha512 = SHA512()
-    val mdocDigestTable = mapOf(
-        "SHA-256" to sha256,
-        "SHA-384" to sha384,
-        "SHA-512" to sha512
+    val mdocDigests = listOf(
+        "SHA-256",
+        "SHA-384",
+        "SHA-512"
     )
 
-    fun isSupportedDigest(mdocDigestAlgorithm: String) = mdocDigestTable.containsKey(mdocDigestAlgorithm)
+    fun isSupportedDigest(mdocDigestAlgorithm: String) = mdocDigests.contains(mdocDigestAlgorithm)
 
     fun ByteArray.digest(digestAlgorithm: String): ByteArray {
         val digest = when (digestAlgorithm) {
-            "SHA-256" -> sha256
-            "SHA-384" -> sha384
-            "SHA-512" -> sha512
+            "SHA-256" -> SHA256()
+            "SHA-384" -> SHA384()
+            "SHA-512" -> SHA512()
             else -> throw IllegalArgumentException("Unsupported digest algorithm: $digestAlgorithm")
         }
         return digest.digest(this)
