@@ -9,6 +9,7 @@ import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier2.data.AttributedCredentialPolicyResult
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -405,7 +406,7 @@ object PresentationVerificationEngine {
             attributedSpecificVcPolicies = credentialPolicyResults.attributedSpecificVcPolicies,
         )
 
-        val vcPolicyViolations: List<id.walt.verifier2.data.AttributedCredentialPolicyResult> =
+        val vcPolicyViolations: List<AttributedCredentialPolicyResult> =
             credentialPolicyResults.attributedVcPolicies.filter { !it.result.success } +
                     credentialPolicyResults.attributedSpecificVcPolicies.values.flatten().filter { !it.result.success }
 
@@ -415,7 +416,9 @@ object PresentationVerificationEngine {
                 verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL
                 else -> Verification2Session.VerificationSessionStatus.FAILED
             }
-            if (!verificationSessionPolicyResults.overallSuccess && vcPolicyViolations.isNotEmpty()) {
+            if (!verificationSessionPolicyResults.overallSuccess) {
+                // Invariant: overallSuccess=false implies at least one attributed failure,
+                // because the flat policy lists are projections of the attributed ones.
                 this.failure = SessionFailure.VcPolicyViolations(
                     reason = "${vcPolicyViolations.size} credential policy violation(s)",
                     violations = vcPolicyViolations,

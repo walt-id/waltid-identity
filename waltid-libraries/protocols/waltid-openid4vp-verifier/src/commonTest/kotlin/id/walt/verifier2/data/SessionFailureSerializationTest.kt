@@ -16,7 +16,7 @@ class SessionFailureSerializationTest {
             reason = "Required credential_set not satisfied",
             failure = DcqlFulfillmentFailure(
                 missingQueryIds = emptyList(),
-                unsatisfiedSets = listOf(UnsatisfiedSet(options = listOf(listOf("pid"), listOf("mdl")), required = true)),
+                unsatisfiedSets = listOf(UnsatisfiedSet(options = listOf(listOf("pid"), listOf("mdl")))),
                 successfullyValidatedQueryIds = listOf("email"),
             ),
         )

@@ -59,7 +59,6 @@ data class DcqlFulfillmentFailure(
 @Serializable
 data class UnsatisfiedSet(
     val options: List<List<String>>,
-    val required: Boolean,
 )
 
 @Serializable

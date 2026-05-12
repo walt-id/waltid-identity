@@ -54,7 +54,6 @@ class DcqlFulfillmentCheckerTest {
         assertTrue(failure.details.missingQueryIds.isEmpty())
         assertEquals(1, failure.details.unsatisfiedSets.size)
         assertEquals(listOf(listOf("pid"), listOf("mdl")), failure.details.unsatisfiedSets[0].options)
-        assertTrue(failure.details.unsatisfiedSets[0].required)
         assertEquals(listOf("email"), failure.details.successfullyValidatedQueryIds)
     }
 
@@ -87,6 +86,7 @@ class DcqlFulfillmentCheckerTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun legacyApi_remainsBackwardCompatible() {
         val query = DcqlQuery(credentials = listOf(credentialQuery("pid")))
         val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(

@@ -26,11 +26,17 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
      * Checks if the set of successfully validated presentations (identified by their query IDs)
      * fulfills all the requirements of the original DCQL query.
      *
-     * @param dcqlQuery The original DCQL query sent to the Wallet.
-     * @param successfullyValidatedQueryIds A set of `id`s from `CredentialQuery` for which
-     *                                      at least one valid presentation was received.
-     * @return True if all DCQL requirements are met, false otherwise.
+     * Kept for backward compatibility with external consumers. New code should use
+     * [checkOverallDcqlFulfillmentDetailed], which returns a structured result rather than
+     * encoding failure details inside an exception message.
+     *
+     * Note: when multiple required credential_sets are unsatisfied, the exception message
+     * enumerates all of them (rather than short-circuiting on the first).
      */
+    @Deprecated(
+        message = "Use checkOverallDcqlFulfillmentDetailed to get structured failure details.",
+        replaceWith = ReplaceWith("checkOverallDcqlFulfillmentDetailed(dcqlQuery, successfullyValidatedQueryIds)")
+    )
     fun checkOverallDcqlFulfillment(
         dcqlQuery: DcqlQuery,
         successfullyValidatedQueryIds: Set<String>
@@ -89,10 +95,7 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                 }
 
                 if (!isThisRequiredSetSatisfied) {
-                    unsatisfiedRequired += UnsatisfiedSet(
-                        options = credentialSetQuery.options,
-                        required = true,
-                    )
+                    unsatisfiedRequired += UnsatisfiedSet(options = credentialSetQuery.options)
                 }
             } else {
                 val isThisOptionalSetSatisfied = credentialSetQuery.options.any { optionList ->
