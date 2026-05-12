@@ -3,7 +3,6 @@ package id.walt.verifier2.handlers.vpresponse
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.policies.PolicyExecutionContext
-import id.walt.verifier2.data.AttributedCredentialPolicyResult
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -24,12 +23,6 @@ object Verifier2SessionCredentialPolicyValidation {
 
         @SerialName("specific_vc_policies")
         val specificVcPolicies: Map<String, List<CredentialPolicyResult>>,
-
-        @SerialName("attributed_vc_policies")
-        val attributedVcPolicies: List<AttributedCredentialPolicyResult>,
-
-        @SerialName("attributed_specific_vc_policies")
-        val attributedSpecificVcPolicies: Map<String, List<AttributedCredentialPolicyResult>>,
     )
 
     suspend fun validateCredentialPolicies(
@@ -47,16 +40,13 @@ object Verifier2SessionCredentialPolicyValidation {
                         val result = policy.verify(credential, context)
                         log.trace { "'$queryId' credential#$credentialIndex '${policy.id}' result: $result" }
 
-                        val policyResult = CredentialPolicyResult(
+                        CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
-                            error = result.exceptionOrNull()?.message
-                        )
-                        AttributedCredentialPolicyResult(
+                            error = result.exceptionOrNull()?.message,
                             queryId = queryId,
                             credentialIndex = credentialIndex,
-                            result = policyResult,
                         )
                     }
                 }
@@ -72,16 +62,13 @@ object Verifier2SessionCredentialPolicyValidation {
                     async(Dispatchers.Default) {
                         val result = policy.verify(specificCredential, context)
 
-                        val policyResult = CredentialPolicyResult(
+                        queryId to CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
-                            error = result.exceptionOrNull()?.message
-                        )
-                        queryId to AttributedCredentialPolicyResult(
+                            error = result.exceptionOrNull()?.message,
                             queryId = queryId,
                             credentialIndex = credentialIndex,
-                            result = policyResult,
                         )
                     }
                 }
@@ -89,17 +76,15 @@ object Verifier2SessionCredentialPolicyValidation {
         }
 
         // --- Await all policy runs ---
-        val attributedVcResults: List<AttributedCredentialPolicyResult> = generalPolicyJobs.awaitAll()
-        val attributedSpecificPairs: List<Pair<String, AttributedCredentialPolicyResult>> = specificPolicyJobs.awaitAll()
+        val vcResults: List<CredentialPolicyResult> = generalPolicyJobs.awaitAll()
+        val specificPairs: List<Pair<String, CredentialPolicyResult>> = specificPolicyJobs.awaitAll()
 
-        val attributedSpecificResults: Map<String, List<AttributedCredentialPolicyResult>> =
-            attributedSpecificPairs.groupBy({ it.first }, { it.second })
+        val specificResults: Map<String, List<CredentialPolicyResult>> =
+            specificPairs.groupBy({ it.first }, { it.second })
 
         return@coroutineScope CredentialPolicyResults(
-            vcPolicies = attributedVcResults.map { it.result },
-            specificVcPolicies = attributedSpecificResults.mapValues { (_, list) -> list.map { it.result } },
-            attributedVcPolicies = attributedVcResults,
-            attributedSpecificVcPolicies = attributedSpecificResults,
+            vcPolicies = vcResults,
+            specificVcPolicies = specificResults,
         )
     }
 }

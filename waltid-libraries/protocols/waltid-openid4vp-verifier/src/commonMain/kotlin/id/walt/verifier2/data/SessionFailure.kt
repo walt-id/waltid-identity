@@ -32,7 +32,7 @@ sealed class SessionFailure {
     @SerialName("vc_policy_violations")
     data class VcPolicyViolations(
         override val reason: String,
-        val violations: List<AttributedCredentialPolicyResult>,
+        val violations: List<CredentialPolicyResult>,
     ) : SessionFailure()
 
     @Serializable
@@ -59,13 +59,4 @@ data class DcqlFulfillmentFailure(
 @Serializable
 data class UnsatisfiedSet(
     val options: List<List<String>>,
-)
-
-@Serializable
-data class AttributedCredentialPolicyResult(
-    @SerialName("query_id")
-    val queryId: String,
-    @SerialName("credential_index")
-    val credentialIndex: Int,
-    val result: CredentialPolicyResult,
 )

@@ -145,9 +145,8 @@ data class Verification2Session(
 
         buildList<CredentialPolicyResult> {
             policyResults?.vcPolicies?.let(::addAll)
-            policyResults?.attributedVcPolicies?.mapTo(this) { it.result }
-            policyResults?.attributedSpecificVcPolicies?.values?.flatten()?.mapTo(this) { it.result }
-            (failure as? SessionFailure.VcPolicyViolations)?.violations?.mapTo(this) { it.result }
+            policyResults?.specificVcPolicies?.values?.flatten()?.let(::addAll)
+            (failure as? SessionFailure.VcPolicyViolations)?.violations?.let(::addAll)
         }.forEach(::redactPolicyResult)
 
         when (val f = failure) {

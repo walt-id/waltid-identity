@@ -9,7 +9,6 @@ import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.walt.verifier2.data.AttributedCredentialPolicyResult
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -403,13 +402,11 @@ object PresentationVerificationEngine {
             vpPolicies = presentationValidationResult,
             vcPolicies = credentialPolicyResults.vcPolicies,
             specificVcPolicies = credentialPolicyResults.specificVcPolicies,
-            attributedVcPolicies = credentialPolicyResults.attributedVcPolicies,
-            attributedSpecificVcPolicies = credentialPolicyResults.attributedSpecificVcPolicies,
         )
 
-        val vcPolicyViolations: List<AttributedCredentialPolicyResult> =
-            credentialPolicyResults.attributedVcPolicies.filter { !it.result.success } +
-                    credentialPolicyResults.attributedSpecificVcPolicies.values.flatten().filter { !it.result.success }
+        val vcPolicyViolations =
+            credentialPolicyResults.vcPolicies.filter { !it.success } +
+                    credentialPolicyResults.specificVcPolicies.values.flatten().filter { !it.success }
 
         session.updateSession(SessionEvent.credential_policy_results_available) {
             this.policyResults = verificationSessionPolicyResults
@@ -418,8 +415,8 @@ object PresentationVerificationEngine {
                 else -> Verification2Session.VerificationSessionStatus.FAILED
             }
             if (!verificationSessionPolicyResults.overallSuccess) {
-                // Invariant: overallSuccess=false implies at least one attributed failure,
-                // because the flat policy lists are projections of the attributed ones.
+                // Invariant: overallSuccess=false implies at least one credential policy failure
+                // in the same lists used to compute the overall result.
                 this.failure = SessionFailure.VcPolicyViolations(
                     reason = "${vcPolicyViolations.size} credential policy violation(s)",
                     violations = vcPolicyViolations,
