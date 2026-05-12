@@ -1,7 +1,9 @@
 package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
+import id.walt.wallet2.auth.OSSWallet2AccountStore
 import id.walt.wallet2.OSSWallet2Service.walletStore
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
@@ -11,6 +13,7 @@ import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.http.*
+import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import java.util.concurrent.ConcurrentHashMap
 
@@ -62,17 +65,44 @@ object OSSWallet2Service {
         override suspend fun resolveDidStore(storeId: String) = namedDidStores[storeId]
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) { namedDidStores[storeId] = store }
         override suspend fun listDidStoreIds() = namedDidStores.keys.toList()
+
+        // When auth is enabled, account↔wallet mappings are owned by OSSWallet2AccountStore
+        // so that GET /auth/account/wallets and wallet ownership enforcement stay in sync.
+        override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
+            if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
+                OSSWallet2AccountStore.linkWalletToAccount(accountId, walletId)
+            } else {
+                walletStore.linkWalletToAccount(accountId, walletId)
+            }
+        }
+
+        override suspend fun getWalletIdsForAccount(accountId: String): List<String>? {
+            return if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
+                // Return the list (possibly empty) so the route handler enforces ownership.
+                // Returning null would disable ownership enforcement for accounts with no wallets.
+                OSSWallet2AccountStore.getWalletsForAccount(accountId)
+            } else {
+                walletStore.getWalletIdsForAccount(accountId)
+            }
+        }
     }
 
     fun Route.registerRoutes() {
         val authEnabled = runCatching {
-            id.walt.commons.featureflag.FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
+            FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
         }.getOrElse { false }
 
-        val getAccountId: (suspend RoutingCall.() -> String?)? = if (authEnabled) {
-            { runCatching { this.getAuthenticatedAccount() }.getOrNull() }
-        } else null
-
-        registerWallet2Routes(resolver, getAccountId)
+        if (authEnabled) {
+            // Wallet routes are protected when auth is enabled:
+            // - A valid token is required to access any wallet route
+            // - Account ownership is enforced via getAccountId
+            authenticate("ktor-authnz") {
+                val getAccountId: suspend RoutingCall.() -> String? =
+                    { runCatching { this.getAuthenticatedAccount() }.getOrNull() }
+                registerWallet2Routes(resolver, getAccountId)
+            }
+        } else {
+            registerWallet2Routes(resolver, getAccountId = null)
+        }
     }
 }
