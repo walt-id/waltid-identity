@@ -1,7 +1,6 @@
 package id.walt.wallet2.auth
 
-import id.walt.commons.config.ConfigManager
-import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.Account
@@ -16,7 +15,6 @@ import id.walt.ktorauthnz.methods.EmailPass
 import id.walt.ktorauthnz.methods.registerAuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
-import id.walt.wallet2.OSSWallet2AuthConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -78,7 +76,11 @@ object OSSWallet2AccountStore : EditableAccountStore {
     override suspend fun addAccountStoredData(accountId: String, method: String, data: AuthMethodStoredData) =
         updateAccountStoredData(accountId, method, data)
 
-    override suspend fun updateAccountIdentifierStoredData(accountIdentifier: AccountIdentifier, method: String, data: AuthMethodStoredData) {
+    override suspend fun updateAccountIdentifierStoredData(
+        accountIdentifier: AccountIdentifier,
+        method: String,
+        data: AuthMethodStoredData
+    ) {
         identifierStoredData.getOrPut(accountIdentifier) { ConcurrentHashMap() }[method] = data.transformSavable()
     }
 
@@ -97,7 +99,10 @@ object OSSWallet2AccountStore : EditableAccountStore {
     override suspend fun lookupStoredDataForAccount(accountId: String, method: AuthenticationMethod): AuthMethodStoredData? =
         accountStoredData[accountId]?.get(method.id)
 
-    override suspend fun lookupStoredDataForAccountIdentifier(identifier: AccountIdentifier, method: AuthenticationMethod): AuthMethodStoredData? =
+    override suspend fun lookupStoredDataForAccountIdentifier(
+        identifier: AccountIdentifier,
+        method: AuthenticationMethod
+    ): AuthMethodStoredData? =
         identifierStoredData[identifier]?.get(method.id)
 
     override suspend fun hasStoredDataFor(identifier: AccountIdentifier, method: AuthenticationMethod): Boolean =
@@ -117,8 +122,10 @@ object OSSWallet2AccountStore : EditableAccountStore {
 // Auth route models
 // ---------------------------------------------------------------------------
 
-@Serializable data class RegisterRequest(val email: String, val password: String)
-@Serializable data class AccountInfoResponse(
+@Serializable
+data class RegisterRequest(val email: String, val password: String)
+@Serializable
+data class AccountInfoResponse(
     val accountId: String,
     val email: String,
     val walletIds: List<String>,
@@ -129,14 +136,17 @@ object OSSWallet2AccountStore : EditableAccountStore {
 // ---------------------------------------------------------------------------
 
 /**
- * Configures [KtorAuthnzManager] and installs the Ktor authentication plugin.
+ * Configures [KtorAuthnzManager] and hooks into the shared [AuthenticationServiceModule]
+ * so that the Ktor Authentication plugin is configured once by the WebService wrapper
+ * (via [AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication])
+ * rather than installing it a second time here.
+ *
  * Called from Main.kt when the auth optional feature is enabled.
  */
 fun Application.configureWallet2Auth() {
     KtorAuthnzManager.accountStore = OSSWallet2AccountStore
-    // KtorAuthnzManager uses KtorAuthNzTokenHandler by default (in-memory opaque tokens)
 
-    install(Authentication) {
+    AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication = {
         ktorAuthnz("ktor-authnz") { }
     }
 
@@ -189,11 +199,13 @@ fun Route.registerWallet2AuthRoutes() {
             get("/account") {
                 val accountId = call.getAuthenticatedAccount()
                 val walletIds = OSSWallet2AccountStore.getWalletsForAccount(accountId)
-                call.respond(AccountInfoResponse(
-                    accountId = accountId,
-                    email = OSSWallet2AccountStore.getEmailForAccount(accountId) ?: "",
-                    walletIds = walletIds,
-                ))
+                call.respond(
+                    AccountInfoResponse(
+                        accountId = accountId,
+                        email = OSSWallet2AccountStore.getEmailForAccount(accountId) ?: "",
+                        walletIds = walletIds,
+                    )
+                )
             }
 
             get("/account/wallets") {
