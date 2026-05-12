@@ -10,7 +10,6 @@ import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
-import id.walt.verifier2.data.DcqlFulfillmentFailure
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
@@ -368,28 +367,20 @@ object PresentationVerificationEngine {
                 successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
             )
         }
-        if (dcqlFulfilled?.isSuccess == false) {
-            val dcqlError = dcqlFulfilled.exceptionOrNull()
-            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: $dcqlError" }
-
-            val structuredFailure: DcqlFulfillmentFailure =
-                (dcqlError as? DcqlFulfillmentChecker.StructuredDcqlFulfillmentException)?.failure
-                    ?: DcqlFulfillmentFailure(
-                        successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys.toList(),
-                    )
+        if (dcqlFulfilled is DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Failure) {
+            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFulfilled.reason}" }
 
             session.updateSession(SessionEvent.validated_credentials_available) {
                 this.failure = SessionFailure.DcqlFulfillment(
-                    reason = dcqlError?.message ?: "DCQL fulfillment failed",
-                    failure = structuredFailure,
+                    reason = dcqlFulfilled.reason,
+                    failure = dcqlFulfilled.details,
                 )
             }
 
             session.failSession(SessionEvent.dcql_fulfillment_check_failed)
 
             throw IllegalArgumentException(
-                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlError?.message}",
-                dcqlError ?: IllegalStateException("DCQL fulfillment failed without underlying cause")
+                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.reason}"
             )
             //Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
         }

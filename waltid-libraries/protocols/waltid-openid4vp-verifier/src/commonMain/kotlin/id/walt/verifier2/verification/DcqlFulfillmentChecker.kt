@@ -13,6 +13,15 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
     @Serializable
     class DcqlFulfillmentException(override val message: String) : IllegalArgumentException(message)
 
+    sealed class DcqlFulfillmentCheckResult {
+        data object Success : DcqlFulfillmentCheckResult()
+
+        data class Failure(
+            val reason: String,
+            val details: DcqlFulfillmentFailure,
+        ) : DcqlFulfillmentCheckResult()
+    }
+
     /**
      * Checks if the set of successfully validated presentations (identified by their query IDs)
      * fulfills all the requirements of the original DCQL query.
@@ -26,22 +35,21 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
         dcqlQuery: DcqlQuery,
         successfullyValidatedQueryIds: Set<String>
     ): Result<Unit> {
-        val detailed = checkOverallDcqlFulfillmentDetailed(dcqlQuery, successfullyValidatedQueryIds)
-        return detailed.fold(
-            onSuccess = { Result.success(Unit) },
-            onFailure = { Result.failure(it) },
-        )
+        return when (val detailed = checkOverallDcqlFulfillmentDetailed(dcqlQuery, successfullyValidatedQueryIds)) {
+            is DcqlFulfillmentCheckResult.Success -> Result.success(Unit)
+            is DcqlFulfillmentCheckResult.Failure -> Result.failure(DcqlFulfillmentException(detailed.reason))
+        }
     }
 
     /**
-     * Detailed variant of [checkOverallDcqlFulfillment] (WAL-977). On failure, returns a structured
-     * [DcqlFulfillmentFailure] that the verifier attaches to the session so webhook / /info
-     * consumers can see which required queries or credential sets were missed.
+     * Detailed variant of [checkOverallDcqlFulfillment] (WAL-977). On failure, returns structured
+     * details that the verifier attaches to the session so webhook / /info consumers can see which
+     * required queries or credential sets were missed.
      */
     fun checkOverallDcqlFulfillmentDetailed(
         dcqlQuery: DcqlQuery,
         successfullyValidatedQueryIds: Set<String>,
-    ): Result<Unit> {
+    ): DcqlFulfillmentCheckResult {
         log.debug {
             "Checking overall DCQL fulfillment. Required query IDs from DCQL: ${dcqlQuery.credentials.map { it.id }}, " +
                     "Successfully validated query IDs: $successfullyValidatedQueryIds, " +
@@ -59,19 +67,17 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                 val message = "DCQL Fulfillment Failed (no credential_sets): Missing presentations for required query IDs: $missingRequiredQueries. " +
                         "All individual queries are considered required when no credential_sets are defined."
                 log.warn { message }
-                return Result.failure(
-                    StructuredDcqlFulfillmentException(
-                        message = message,
-                        failure = DcqlFulfillmentFailure(
-                            missingQueryIds = missingRequiredQueries,
-                            unsatisfiedSets = emptyList(),
-                            successfullyValidatedQueryIds = validatedList,
-                        ),
-                    )
+                return DcqlFulfillmentCheckResult.Failure(
+                    reason = message,
+                    details = DcqlFulfillmentFailure(
+                        missingQueryIds = missingRequiredQueries,
+                        unsatisfiedSets = emptyList(),
+                        successfullyValidatedQueryIds = validatedList,
+                    ),
                 )
             }
             log.debug { "DCQL Fulfillment Succeeded (no credential_sets): All individual queries were satisfied." }
-            return Result.success(Unit)
+            return DcqlFulfillmentCheckResult.Success
         }
 
         // Case 2: credential_sets are defined
@@ -101,29 +107,17 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                     "Unsatisfied sets: ${unsatisfiedRequired.map { it.options }}, " +
                     "Successfully validated query IDs: $successfullyValidatedQueryIds"
             log.warn { message }
-            return Result.failure(
-                StructuredDcqlFulfillmentException(
-                    message = message,
-                    failure = DcqlFulfillmentFailure(
-                        missingQueryIds = emptyList(),
-                        unsatisfiedSets = unsatisfiedRequired,
-                        successfullyValidatedQueryIds = validatedList,
-                    ),
-                )
+            return DcqlFulfillmentCheckResult.Failure(
+                reason = message,
+                details = DcqlFulfillmentFailure(
+                    missingQueryIds = emptyList(),
+                    unsatisfiedSets = unsatisfiedRequired,
+                    successfullyValidatedQueryIds = validatedList,
+                ),
             )
         }
 
         log.debug { "DCQL Fulfillment Succeeded: All required credential_sets were satisfied." }
-        return Result.success(Unit)
+        return DcqlFulfillmentCheckResult.Success
     }
-
-    /**
-     * Carries the structured [DcqlFulfillmentFailure] through the existing [Result.failure] API
-     * so callers that only need a message (legacy `checkOverallDcqlFulfillment`) still work, while
-     * callers that want structure can downcast.
-     */
-    class StructuredDcqlFulfillmentException(
-        message: String,
-        val failure: DcqlFulfillmentFailure,
-    ) : IllegalArgumentException(message)
 }

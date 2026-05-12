@@ -30,12 +30,10 @@ class DcqlFulfillmentCheckerTest {
             successfullyValidatedQueryIds = setOf("pid"),
         )
 
-        assertTrue(result.isFailure, "Expected failure when a required query id is missing")
-        val exception = result.exceptionOrNull() ?: fail("Missing exception on failure")
-        val structured = assertIs<DcqlFulfillmentChecker.StructuredDcqlFulfillmentException>(exception)
-        assertEquals(listOf("address"), structured.failure.missingQueryIds)
-        assertTrue(structured.failure.unsatisfiedSets.isEmpty())
-        assertEquals(listOf("pid"), structured.failure.successfullyValidatedQueryIds)
+        val failure = assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Failure>(result)
+        assertEquals(listOf("address"), failure.details.missingQueryIds)
+        assertTrue(failure.details.unsatisfiedSets.isEmpty())
+        assertEquals(listOf("pid"), failure.details.successfullyValidatedQueryIds)
     }
 
     @Test
@@ -52,13 +50,12 @@ class DcqlFulfillmentCheckerTest {
             successfullyValidatedQueryIds = setOf("email"),
         )
 
-        assertTrue(result.isFailure, "Expected failure when a required credential_set is unsatisfied")
-        val structured = assertIs<DcqlFulfillmentChecker.StructuredDcqlFulfillmentException>(result.exceptionOrNull())
-        assertTrue(structured.failure.missingQueryIds.isEmpty())
-        assertEquals(1, structured.failure.unsatisfiedSets.size)
-        assertEquals(listOf(listOf("pid"), listOf("mdl")), structured.failure.unsatisfiedSets[0].options)
-        assertTrue(structured.failure.unsatisfiedSets[0].required)
-        assertEquals(listOf("email"), structured.failure.successfullyValidatedQueryIds)
+        val failure = assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Failure>(result)
+        assertTrue(failure.details.missingQueryIds.isEmpty())
+        assertEquals(1, failure.details.unsatisfiedSets.size)
+        assertEquals(listOf(listOf("pid"), listOf("mdl")), failure.details.unsatisfiedSets[0].options)
+        assertTrue(failure.details.unsatisfiedSets[0].required)
+        assertEquals(listOf("email"), failure.details.successfullyValidatedQueryIds)
     }
 
     @Test
@@ -76,7 +73,7 @@ class DcqlFulfillmentCheckerTest {
             successfullyValidatedQueryIds = setOf("pid"),
         )
 
-        assertTrue(result.isSuccess, "Optional unsatisfied sets must not fail DCQL fulfillment")
+        assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Success>(result)
     }
 
     @Test
@@ -86,7 +83,7 @@ class DcqlFulfillmentCheckerTest {
             dcqlQuery = query,
             successfullyValidatedQueryIds = setOf("pid"),
         )
-        assertTrue(result.isSuccess)
+        assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Success>(result)
     }
 
     @Test
