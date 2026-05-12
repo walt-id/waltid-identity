@@ -247,7 +247,8 @@ object Verifier2VPDirectPostHandler {
     /**
      * OpenID4VP 1.0 §8.5 error response. Wallet rejects the presentation request (e.g. user
      * decline → `access_denied`). Body may arrive url-encoded or as JSON and always carries at
-     * least an `error` code; `error_description` and `state` are optional.
+     * least an `error` code; `error_description` is optional. `state` is required when it was
+     * present in the Authorization Request.
      */
     data class ErrorResponseDirectPost(
         val error: String,
@@ -282,7 +283,7 @@ object Verifier2VPDirectPostHandler {
             log.info { "Wallet returned OID4VP §8.5 error for session ${session.id}: error=${responseData.error}" }
 
             val expectedState = session.authorizationRequest.state
-            if (expectedState != null && responseData.state != null && responseData.state != expectedState) {
+            if (expectedState != null && responseData.state != expectedState) {
                 Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
             }
 

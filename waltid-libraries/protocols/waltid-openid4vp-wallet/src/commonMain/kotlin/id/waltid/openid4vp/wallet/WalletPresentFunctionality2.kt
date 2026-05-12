@@ -146,6 +146,110 @@ object WalletPresentFunctionality2 {
         val redirectTo: String? = null
     )
 
+    suspend fun walletRejectHandling(
+        authorizationRequest: AuthorizationRequest,
+        error: String = "access_denied",
+        errorDescription: String? = null,
+    ): Result<WalletPresentResult> = runCatching {
+        val responseMode = authorizationRequest.responseMode ?: inferResponseMode(authorizationRequest)
+        val errorParameters = buildErrorResponseParameters(authorizationRequest, error, errorDescription)
+
+        when (responseMode) {
+            OpenID4VPResponseMode.FRAGMENT -> {
+                require(authorizationRequest.redirectUri != null) {
+                    "Invalid AuthorizationRequest: 'redirect_uri' is required for response_mode 'fragment'."
+                }
+                WalletPresentResult(
+                    getUrl = "${authorizationRequest.redirectUri}#${errorParameters.formUrlEncode()}"
+                )
+            }
+
+            OpenID4VPResponseMode.QUERY -> {
+                require(authorizationRequest.redirectUri != null) {
+                    "Invalid AuthorizationRequest: 'redirect_uri' is required for response_mode 'query'."
+                }
+                WalletPresentResult(
+                    getUrl = URLBuilder(authorizationRequest.redirectUri!!).apply {
+                        parameters.appendAll(errorParameters)
+                    }.buildString()
+                )
+            }
+
+            OpenID4VPResponseMode.FORM_POST -> {
+                require(authorizationRequest.redirectUri != null) {
+                    "Invalid AuthorizationRequest: 'redirect_uri' is required for response_mode 'form_post'."
+                }
+                WalletPresentResult(
+                    formPostHtml = buildErrorResponseFormPostHtml(authorizationRequest.redirectUri!!, errorParameters)
+                )
+            }
+
+            OpenID4VPResponseMode.DIRECT_POST -> {
+                require(authorizationRequest.responseUri != null) {
+                    "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post'."
+                }
+                val response = webPostToken.sendForm(authorizationRequest.responseUri!!, errorParameters)
+                val responseBody = response.bodyAsText()
+                val responseBodyJson = runCatching { Json.decodeFromString<JsonObject>(responseBody) }.getOrNull()
+
+                WalletPresentResult(
+                    transmissionSuccess = response.status.isSuccess(),
+                    verifierResponse = Json.parseToJsonElement(responseBody),
+                    redirectTo = responseBodyJson?.get("redirect_uri")?.jsonPrimitive?.content,
+                )
+            }
+
+            OpenID4VPResponseMode.DIRECT_POST_JWT ->
+                throw UnsupportedOperationException("OID4VP error responses for direct_post.jwt require JARM and are not supported yet.")
+
+            OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT ->
+                throw UnsupportedOperationException("OID4VP error responses are not supported for DC API response modes.")
+
+            null -> throw IllegalArgumentException("Missing response mode from AuthorizationRequest")
+        }
+    }
+
+    private fun inferResponseMode(authorizationRequest: AuthorizationRequest): OpenID4VPResponseMode? {
+        val responseType = authorizationRequest.responseType?.responseType
+        return when {
+            responseType == null -> null
+            "vp_token" in responseType && "code" !in responseType -> OpenID4VPResponseMode.FRAGMENT
+            "code" in responseType -> OpenID4VPResponseMode.QUERY
+            else -> null
+        }
+    }
+
+    private fun buildErrorResponseParameters(
+        authorizationRequest: AuthorizationRequest,
+        error: String,
+        errorDescription: String?,
+    ): Parameters = ParametersBuilder().apply {
+        append("error", error)
+        errorDescription?.let { append("error_description", it) }
+        authorizationRequest.state?.let { append("state", it) }
+    }.build()
+
+    private fun buildErrorResponseFormPostHtml(
+        redirectUri: String,
+        parameters: Parameters,
+    ): String = buildString {
+        appendLine("<!DOCTYPE html>")
+        appendLine("<html>")
+        appendLine("<head><title>Submitting Error Response...</title></head>")
+        appendLine("<body onload=\"document.forms[0].submit()\">")
+        appendLine("<noscript><p>Your browser does not support JavaScript. Please press the button below to continue.</p></noscript>")
+        appendLine("<form method=\"POST\" action=\"${redirectUri.encodeURLParameter()}\">")
+        parameters.entries().forEach { (name, values) ->
+            values.forEach { value ->
+                appendLine("<input type=\"hidden\" name=\"${name.escapeHTML()}\" value=\"${value.escapeHTML()}\"/>")
+            }
+        }
+        appendLine("<input type=\"submit\" value=\"Continue\"/>")
+        appendLine("</form>")
+        appendLine("</body>")
+        appendLine("</html>")
+    }
+
     suspend fun walletPresentHandling(
         holderKey: Key,
         holderDid: String?,
