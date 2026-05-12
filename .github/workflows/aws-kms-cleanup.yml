@@ -1,0 +1,207 @@
+name: AWS KMS Key Cleanup
+
+# Purges all AWS KMS keys not tagged with env=production that are older than min_key_age_days.
+# Keys are scheduled for deletion with the minimum 7-day pending window.
+# Run: daily at 02:00 UTC, or manually via workflow_dispatch.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run — list keys that would be deleted without acting'
+        required: false
+        default: 'true'
+        type: boolean
+      pending_window_days:
+        description: 'KMS deletion pending window in days (min 7, max 30)'
+        required: false
+        default: '7'
+        type: string
+      min_key_age_days:
+        description: 'Minimum key age in days before it is eligible for deletion'
+        required: false
+        default: '7'
+        type: string
+
+jobs:
+  purge-kms-keys:
+    name: Purge untagged KMS keys
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for OIDC auth
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_KMS_CLEANUP_ROLE_ARN }}
+          # Home region for OIDC auth and region discovery; KMS sweep covers all regions below.
+          aws-region: us-east-1
+
+      - name: Purge untagged KMS keys across all regions
+        env:
+          DRY_RUN: ${{ inputs.dry_run != '' && inputs.dry_run || 'false' }}
+          PENDING_WINDOW: ${{ inputs.pending_window_days != '' && inputs.pending_window_days || '7' }}
+          MIN_KEY_AGE_DAYS: ${{ inputs.min_key_age_days != '' && inputs.min_key_age_days || '7' }}
+          PRESERVE_TAG_KEY: 'env'
+          PRESERVE_TAG_VALUE: 'production'
+        run: |
+          set -euo pipefail
+
+          echo "=== KMS Cleanup (all regions) ==="
+          echo "Dry run:         ${DRY_RUN}"
+          echo "Pending window:  ${PENDING_WINDOW} days"
+          echo "Min key age:     ${MIN_KEY_AGE_DAYS} days"
+          echo "Preserve tag:    ${PRESERVE_TAG_KEY}=${PRESERVE_TAG_VALUE}"
+          echo ""
+
+          # Validate pending window (AWS enforces 7–30)
+          if [ "${PENDING_WINDOW}" -lt 7 ] || [ "${PENDING_WINDOW}" -gt 30 ]; then
+            echo "ERROR: pending_window_days must be between 7 and 30."
+            exit 1
+          fi
+
+          # Unix timestamp for the age cutoff (keys created after this are too new)
+          cutoff_ts=$(( $(date -u +%s) - MIN_KEY_AGE_DAYS * 86400 ))
+
+          # Global counters
+          total_scheduled=0
+          total_preserved=0
+          total_aws_managed=0
+          total_already_pending=0
+          total_disabled=0
+          total_too_new=0
+          total_errors=0
+
+          # Discover all currently-enabled regions for this account
+          regions=$(aws ec2 describe-regions \
+            --filters Name=opt-in-status,Values=opt-in-not-required,opted-in \
+            --query 'Regions[*].RegionName' \
+            --output text)
+
+          echo "Regions to scan: $(echo $regions | tr ' ' ',')"
+          echo ""
+
+          for region in $regions; do
+            echo "--- Region: ${region} ---"
+
+            scheduled=0
+            skipped_preserved=0
+            skipped_aws_managed=0
+            skipped_already_pending=0
+            skipped_disabled=0
+            skipped_too_new=0
+            errors=0
+
+            key_ids=$(aws kms list-keys \
+              --region "$region" \
+              --query 'Keys[*].KeyId' \
+              --output text 2>/dev/null) || {
+              echo "WARN: could not list keys in ${region} — skipping region"
+              (( total_errors++ )) || true
+              continue
+            }
+
+            # list-keys returns "None" (as text) when there are no keys
+            if [ -z "$key_ids" ] || [ "$key_ids" = "None" ]; then
+              echo "  (no keys)"
+              continue
+            fi
+
+            for key_id in $key_ids; do
+              metadata=$(aws kms describe-key \
+                --region "$region" \
+                --key-id "$key_id" \
+                --query 'KeyMetadata.{Manager:KeyManager,State:KeyState,CreationDate:CreationDate}' \
+                --output json 2>/dev/null) || {
+                echo "  WARN: could not describe key ${key_id} — skipping"
+                (( errors++ )) || true
+                continue
+              }
+
+              manager=$(echo "$metadata" | python3 -c "import sys,json; print(json.load(sys.stdin)['Manager'])")
+              state=$(echo "$metadata"   | python3 -c "import sys,json; print(json.load(sys.stdin)['State'])")
+              # CreationDate is an ISO-8601 float from AWS (e.g. 1712345678.123)
+              creation_ts=$(echo "$metadata" | python3 -c "import sys,json; print(int(json.load(sys.stdin)['CreationDate']))")
+
+              if [ "$manager" != "CUSTOMER" ]; then
+                (( skipped_aws_managed++ )) || true
+                continue
+              fi
+
+              if [ "$state" = "PendingDeletion" ] || [ "$state" = "PendingReplicaDeletion" ]; then
+                (( skipped_already_pending++ )) || true
+                continue
+              fi
+
+              if [ "$state" = "Disabled" ]; then
+                (( skipped_disabled++ )) || true
+                continue
+              fi
+
+              # Skip keys younger than MIN_KEY_AGE_DAYS
+              if [ "${creation_ts}" -gt "${cutoff_ts}" ]; then
+                age_days=$(( ( $(date -u +%s) - creation_ts ) / 86400 ))
+                echo "  TOO NEW   ${key_id}  (age=${age_days}d, minimum=${MIN_KEY_AGE_DAYS}d)"
+                (( skipped_too_new++ )) || true
+                continue
+              fi
+
+              tag_value=$(aws kms list-resource-tags \
+                --region "$region" \
+                --key-id "$key_id" \
+                --query "Tags[?TagKey=='${PRESERVE_TAG_KEY}'].TagValue | [0]" \
+                --output text 2>/dev/null) || tag_value="None"
+
+              if [ "$tag_value" = "${PRESERVE_TAG_VALUE}" ]; then
+                echo "  PRESERVE  ${key_id}  (tagged ${PRESERVE_TAG_KEY}=${PRESERVE_TAG_VALUE})"
+                (( skipped_preserved++ )) || true
+                continue
+              fi
+
+              echo "  PURGE     ${key_id}  (state=${state})"
+
+              if [ "${DRY_RUN}" = "true" ]; then
+                echo "            [dry-run] would schedule deletion with ${PENDING_WINDOW}-day window"
+                (( scheduled++ )) || true
+              else
+                if aws kms schedule-key-deletion \
+                    --region "$region" \
+                    --key-id "$key_id" \
+                    --pending-window-in-days "${PENDING_WINDOW}" > /dev/null; then
+                  (( scheduled++ )) || true
+                else
+                  echo "  ERROR: failed to schedule deletion for ${key_id}"
+                  (( errors++ )) || true
+                fi
+              fi
+            done
+
+            echo "  scheduled=${scheduled} preserved=${skipped_preserved} too-new=${skipped_too_new} aws-managed=${skipped_aws_managed} already-pending=${skipped_already_pending} disabled=${skipped_disabled} errors=${errors}"
+            echo ""
+
+            (( total_scheduled      += scheduled               )) || true
+            (( total_preserved      += skipped_preserved       )) || true
+            (( total_aws_managed    += skipped_aws_managed     )) || true
+            (( total_already_pending+= skipped_already_pending )) || true
+            (( total_disabled       += skipped_disabled        )) || true
+            (( total_too_new        += skipped_too_new         )) || true
+            (( total_errors         += errors                  )) || true
+          done
+
+          echo "=== Global Summary ==="
+          echo "Scheduled for deletion   : ${total_scheduled}"
+          echo "Preserved (tagged)       : ${total_preserved}"
+          echo "Skipped (too new)        : ${total_too_new}"
+          echo "Skipped (AWS-managed)    : ${total_aws_managed}"
+          echo "Skipped (already pending): ${total_already_pending}"
+          echo "Skipped (disabled)       : ${total_disabled}"
+          echo "Errors                   : ${total_errors}"
+
+          if [ "${total_errors}" -gt 0 ]; then
+            echo "Some keys could not be processed — check output above."
+            exit 1
+          fi
