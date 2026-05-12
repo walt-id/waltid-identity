@@ -81,6 +81,7 @@ dependencies {
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
     implementation(project(":waltid-services:waltid-verifier-api2"))
+    implementation(project(":waltid-services:waltid-issuer-api"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
