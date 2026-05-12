@@ -1,6 +1,7 @@
 package id.walt.verifier2.data
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -26,6 +27,13 @@ class SessionFailureSerializationTest {
 
         assertEquals("dcql_fulfillment", parsed["type"]?.jsonPrimitive?.content)
         assertEquals("Required credential_set not satisfied", parsed["reason"]?.jsonPrimitive?.content)
+        val unsatisfiedSet = parsed["failure"]
+            ?.jsonObject
+            ?.get("unsatisfied_sets")
+            ?.jsonArray
+            ?.first()
+            ?.jsonObject
+        assertEquals(2, unsatisfiedSet?.get("options")?.jsonArray?.size)
 
         val decoded = json.decodeFromString(SessionFailure.serializer(), encoded)
         assertEquals(failure, decoded)

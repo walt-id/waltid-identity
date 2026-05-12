@@ -7,9 +7,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertIs
 import kotlin.test.assertTrue
-import kotlin.test.fail
 
 class DcqlFulfillmentCheckerTest {
 
@@ -25,12 +23,12 @@ class DcqlFulfillmentCheckerTest {
             credentials = listOf(credentialQuery("pid"), credentialQuery("address")),
         )
 
-        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillmentDetailed(
+        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
             dcqlQuery = query,
             successfullyValidatedQueryIds = setOf("pid"),
         )
 
-        val failure = assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Failure>(result)
+        val failure = result.exceptionOrNull() as DcqlFulfillmentChecker.DcqlFulfillmentException
         assertEquals(listOf("address"), failure.details.missingQueryIds)
         assertTrue(failure.details.unsatisfiedSets.isEmpty())
         assertEquals(listOf("pid"), failure.details.successfullyValidatedQueryIds)
@@ -45,12 +43,12 @@ class DcqlFulfillmentCheckerTest {
             ),
         )
 
-        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillmentDetailed(
+        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
             dcqlQuery = query,
             successfullyValidatedQueryIds = setOf("email"),
         )
 
-        val failure = assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Failure>(result)
+        val failure = result.exceptionOrNull() as DcqlFulfillmentChecker.DcqlFulfillmentException
         assertTrue(failure.details.missingQueryIds.isEmpty())
         assertEquals(1, failure.details.unsatisfiedSets.size)
         assertEquals(listOf(listOf("pid"), listOf("mdl")), failure.details.unsatisfiedSets[0].options)
@@ -67,27 +65,26 @@ class DcqlFulfillmentCheckerTest {
             ),
         )
 
-        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillmentDetailed(
+        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
             dcqlQuery = query,
             successfullyValidatedQueryIds = setOf("pid"),
         )
 
-        assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Success>(result)
+        assertTrue(result.isSuccess)
     }
 
     @Test
     fun success_noCredentialSets_allIdsPresent() {
         val query = DcqlQuery(credentials = listOf(credentialQuery("pid")))
-        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillmentDetailed(
+        val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
             dcqlQuery = query,
             successfullyValidatedQueryIds = setOf("pid"),
         )
-        assertIs<DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Success>(result)
+        assertTrue(result.isSuccess)
     }
 
     @Test
-    @Suppress("DEPRECATION")
-    fun legacyApi_remainsBackwardCompatible() {
+    fun failure_remainsBackwardCompatibleWithThrowableResult() {
         val query = DcqlQuery(credentials = listOf(credentialQuery("pid")))
         val result = DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
             dcqlQuery = query,

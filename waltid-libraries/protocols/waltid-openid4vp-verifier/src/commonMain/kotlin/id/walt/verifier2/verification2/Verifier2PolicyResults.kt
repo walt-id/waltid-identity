@@ -19,7 +19,7 @@ data class Verifier2PolicyResults(
 
     /**
      * Per-credential attributed view of [vcPolicies]. Carries `queryId` + `credentialIndex` so a
-     * vc_policy failure can be pinned to the specific credential that failed (WAL-976).
+     * vc_policy failure can be pinned to the specific credential that failed.
      * Null on sessions produced before this field existed.
      */
     @SerialName("attributed_vc_policies")

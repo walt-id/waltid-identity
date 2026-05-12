@@ -363,25 +363,26 @@ object PresentationVerificationEngine {
         // Check if the set of validated presentations satisfies the overall DCQL Query
         // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
         val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
-            DcqlFulfillmentChecker.checkOverallDcqlFulfillmentDetailed(
+            DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
                 dcqlQuery = dcqlQuery,
                 successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
             )
         }
-        if (dcqlFulfilled is DcqlFulfillmentChecker.DcqlFulfillmentCheckResult.Failure) {
-            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFulfilled.reason}" }
+        val dcqlFailure = dcqlFulfilled?.exceptionOrNull() as? DcqlFulfillmentChecker.DcqlFulfillmentException
+        if (dcqlFailure != null) {
+            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFailure.message}" }
 
             session.updateSession(SessionEvent.validated_credentials_available) {
                 this.failure = SessionFailure.DcqlFulfillment(
-                    reason = dcqlFulfilled.reason,
-                    failure = dcqlFulfilled.details,
+                    reason = dcqlFailure.message,
+                    failure = dcqlFailure.details,
                 )
             }
 
             session.failSession(SessionEvent.dcql_fulfillment_check_failed)
 
             throw IllegalArgumentException(
-                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.reason}"
+                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFailure.message}"
             )
             //Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
         }

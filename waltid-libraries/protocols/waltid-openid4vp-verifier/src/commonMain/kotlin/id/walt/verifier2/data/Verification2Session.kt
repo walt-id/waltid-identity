@@ -4,6 +4,7 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.VerifiablePresentation
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
+import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
@@ -130,44 +131,32 @@ data class Verification2Session(
         presentedPresentations = null
         presentedCredentials = null
 
+        fun redactPolicyResult(policyResult: CredentialPolicyResult) {
+            policyResult.result?.let { resultElement ->
+                policyResult.result = redactCredentialSubject(resultElement)
+            }
+        }
+
         policyResults?.vpPolicies?.values?.forEach { innerMap ->
             innerMap.values.forEach { policyResult ->
                 policyResult.results = emptyMap()
             }
         }
 
-        policyResults?.vcPolicies?.forEach { policyResult ->
-            policyResult.result?.let { resultElement ->
-                policyResult.result = redactCredentialSubject(resultElement)
-            }
-        }
-
-        policyResults?.attributedVcPolicies?.forEach { attributed ->
-            attributed.result.result?.let { resultElement ->
-                attributed.result.result = redactCredentialSubject(resultElement)
-            }
-        }
-
-        policyResults?.attributedSpecificVcPolicies?.values?.forEach { list ->
-            list.forEach { attributed ->
-                attributed.result.result?.let { resultElement ->
-                    attributed.result.result = redactCredentialSubject(resultElement)
-                }
-            }
-        }
+        buildList<CredentialPolicyResult> {
+            policyResults?.vcPolicies?.let(::addAll)
+            policyResults?.attributedVcPolicies?.mapTo(this) { it.result }
+            policyResults?.attributedSpecificVcPolicies?.values?.flatten()?.mapTo(this) { it.result }
+            (failure as? SessionFailure.VcPolicyViolations)?.violations?.mapTo(this) { it.result }
+        }.forEach(::redactPolicyResult)
 
         when (val f = failure) {
             is SessionFailure.PresentationValidation -> f.failedPolicies.values.forEach { inner ->
                 inner.values.forEach { it.results = emptyMap() }
             }
 
-            is SessionFailure.VcPolicyViolations -> f.violations.forEach { attributed ->
-                attributed.result.result?.let { resultElement ->
-                    attributed.result.result = redactCredentialSubject(resultElement)
-                }
-            }
-
             null, is SessionFailure.DcqlFulfillment, is SessionFailure.WalletErrorResponse -> Unit
+            is SessionFailure.VcPolicyViolations -> Unit
         }
     }
 
