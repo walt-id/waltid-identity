@@ -49,11 +49,11 @@ sealed class SessionFailure {
 @Serializable
 data class DcqlFulfillmentFailure(
     @SerialName("missing_query_ids")
-    val missingQueryIds: List<String> = emptyList(),
+    val missingQueryIds: Set<String> = emptySet(),
     @SerialName("unsatisfied_sets")
     val unsatisfiedSets: List<UnsatisfiedSet> = emptyList(),
     @SerialName("successfully_validated_query_ids")
-    val successfullyValidatedQueryIds: List<String> = emptyList(),
+    val successfullyValidatedQueryIds: Set<String> = emptySet(),
 )
 
 @Serializable

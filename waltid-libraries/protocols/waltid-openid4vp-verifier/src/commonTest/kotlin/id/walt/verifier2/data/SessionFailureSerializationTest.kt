@@ -16,9 +16,9 @@ class SessionFailureSerializationTest {
         val failure: SessionFailure = SessionFailure.DcqlFulfillment(
             reason = "Required credential_set not satisfied",
             failure = DcqlFulfillmentFailure(
-                missingQueryIds = emptyList(),
+                missingQueryIds = emptySet(),
                 unsatisfiedSets = listOf(UnsatisfiedSet(options = listOf(listOf("pid"), listOf("mdl")))),
-                successfullyValidatedQueryIds = listOf("email"),
+                successfullyValidatedQueryIds = setOf("email"),
             ),
         )
 

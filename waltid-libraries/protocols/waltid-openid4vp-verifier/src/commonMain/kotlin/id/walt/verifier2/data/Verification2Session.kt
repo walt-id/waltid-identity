@@ -143,20 +143,15 @@ data class Verification2Session(
             }
         }
 
-        buildList<CredentialPolicyResult> {
+        buildList {
             policyResults?.vcPolicies?.let(::addAll)
             policyResults?.specificVcPolicies?.values?.flatten()?.let(::addAll)
             (failure as? SessionFailure.VcPolicyViolations)?.violations?.let(::addAll)
         }.forEach(::redactPolicyResult)
 
-        when (val f = failure) {
-            is SessionFailure.PresentationValidation -> f.failedPolicies.values.forEach { inner ->
-                inner.values.forEach { it.results = emptyMap() }
-            }
-
-            null, is SessionFailure.DcqlFulfillment, is SessionFailure.WalletErrorResponse -> Unit
-            is SessionFailure.VcPolicyViolations -> Unit
-        }
+        (failure as? SessionFailure.PresentationValidation)?.failedPolicies?.values
+            ?.flatMap { it.values }
+            ?.forEach { it.results = emptyMap() }
     }
 
     private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {

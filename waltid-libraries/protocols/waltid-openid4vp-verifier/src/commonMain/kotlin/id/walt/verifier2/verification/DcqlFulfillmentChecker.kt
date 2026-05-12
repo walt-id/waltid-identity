@@ -39,15 +39,13 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                     "Credential Sets: ${dcqlQuery.credentialSets?.size ?: 0}"
         }
 
-        val validatedList = successfullyValidatedQueryIds.toList()
-
         // Case 1: No credential_sets are defined in the DCQL query
         if (dcqlQuery.credentialSets.isNullOrEmpty()) {
             // All individual CredentialQuery entries are implicitly required.
             // We need to ensure that for every CredentialQuery in the original request,
             // we have a successfully validated presentation.
             val allOriginalQueryIds = dcqlQuery.credentials.map { it.id }.toSet()
-            val missingRequiredQueries = (allOriginalQueryIds - successfullyValidatedQueryIds).toList()
+            val missingRequiredQueries = allOriginalQueryIds - successfullyValidatedQueryIds
 
             if (missingRequiredQueries.isNotEmpty()) {
                 val message = "DCQL Fulfillment Failed (no credential_sets): Missing presentations for required query IDs: $missingRequiredQueries. " +
@@ -59,7 +57,7 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                         details = DcqlFulfillmentFailure(
                             missingQueryIds = missingRequiredQueries,
                             unsatisfiedSets = emptyList(),
-                            successfullyValidatedQueryIds = validatedList,
+                            successfullyValidatedQueryIds = successfullyValidatedQueryIds,
                         ),
                     )
                 )
@@ -113,9 +111,9 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                 DcqlFulfillmentException(
                     message = message,
                     details = DcqlFulfillmentFailure(
-                        missingQueryIds = emptyList(),
+                        missingQueryIds = emptySet(),
                         unsatisfiedSets = unsatisfiedRequired,
-                        successfullyValidatedQueryIds = validatedList,
+                        successfullyValidatedQueryIds = successfullyValidatedQueryIds,
                     ),
                 )
             )

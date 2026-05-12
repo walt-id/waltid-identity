@@ -29,9 +29,9 @@ class DcqlFulfillmentCheckerTest {
         )
 
         val failure = result.exceptionOrNull() as DcqlFulfillmentChecker.DcqlFulfillmentException
-        assertEquals(listOf("address"), failure.details.missingQueryIds)
+        assertEquals(setOf("address"), failure.details.missingQueryIds)
         assertTrue(failure.details.unsatisfiedSets.isEmpty())
-        assertEquals(listOf("pid"), failure.details.successfullyValidatedQueryIds)
+        assertEquals(setOf("pid"), failure.details.successfullyValidatedQueryIds)
     }
 
     @Test
@@ -52,7 +52,7 @@ class DcqlFulfillmentCheckerTest {
         assertTrue(failure.details.missingQueryIds.isEmpty())
         assertEquals(1, failure.details.unsatisfiedSets.size)
         assertEquals(listOf(listOf("pid"), listOf("mdl")), failure.details.unsatisfiedSets[0].options)
-        assertEquals(listOf("email"), failure.details.successfullyValidatedQueryIds)
+        assertEquals(setOf("email"), failure.details.successfullyValidatedQueryIds)
     }
 
     @Test

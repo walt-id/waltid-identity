@@ -323,7 +323,7 @@ object PresentationVerificationEngine {
                 .filterValues { it.isNotEmpty() }
 
             session.updateSession(SessionEvent.presentation_validation_available) {
-                this.failure = SessionFailure.PresentationValidation(
+                failure = SessionFailure.PresentationValidation(
                     reason = firstError?.message?.let { "Presentation validation failed: $it" }
                         ?: "One or more presentations in vp_token failed validation",
                     failedPolicies = failedPolicies,
@@ -372,7 +372,7 @@ object PresentationVerificationEngine {
             log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFailure.message}" }
 
             session.updateSession(SessionEvent.validated_credentials_available) {
-                this.failure = SessionFailure.DcqlFulfillment(
+                failure = SessionFailure.DcqlFulfillment(
                     reason = dcqlFailure.message,
                     failure = dcqlFailure.details,
                 )
@@ -417,7 +417,7 @@ object PresentationVerificationEngine {
             if (!verificationSessionPolicyResults.overallSuccess) {
                 // Invariant: overallSuccess=false implies at least one credential policy failure
                 // in the same lists used to compute the overall result.
-                this.failure = SessionFailure.VcPolicyViolations(
+                failure = SessionFailure.VcPolicyViolations(
                     reason = "${vcPolicyViolations.size} credential policy violation(s)",
                     violations = vcPolicyViolations,
                 )

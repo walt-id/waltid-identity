@@ -14,7 +14,7 @@ data class Verifier2PolicyResults(
     val vcPolicies: List<CredentialPolicyResult>,
 
     @SerialName("specific_vc_policies")
-    val specificVcPolicies: Map<String, List<CredentialPolicyResult>>,
+    val specificVcPolicies: Map<String, List<CredentialPolicyResult>>
 ) {
 
     val overallSuccess: Boolean =

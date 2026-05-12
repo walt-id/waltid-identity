@@ -22,7 +22,7 @@ object Verifier2SessionCredentialPolicyValidation {
         val vcPolicies: List<CredentialPolicyResult>,
 
         @SerialName("specific_vc_policies")
-        val specificVcPolicies: Map<String, List<CredentialPolicyResult>>,
+        val specificVcPolicies: Map<String, List<CredentialPolicyResult>>
     )
 
     suspend fun validateCredentialPolicies(
@@ -76,15 +76,17 @@ object Verifier2SessionCredentialPolicyValidation {
         }
 
         // --- Await all policy runs ---
-        val vcResults: List<CredentialPolicyResult> = generalPolicyJobs.awaitAll()
-        val specificPairs: List<Pair<String, CredentialPolicyResult>> = specificPolicyJobs.awaitAll()
+        // Wait for all to finish
+        val vcPolicyResults = generalPolicyJobs.awaitAll()
+        val specificPolicyPairs = specificPolicyJobs.awaitAll()
 
-        val specificResults: Map<String, List<CredentialPolicyResult>> =
-            specificPairs.groupBy({ it.first }, { it.second })
+        // Group the specific results back into a Map<String, List<PolicyResult>>
+        val specificVcPolicyResults = specificPolicyPairs
+            .groupBy({ it.first }, { it.second })
 
         return@coroutineScope CredentialPolicyResults(
-            vcPolicies = vcResults,
-            specificVcPolicies = specificResults,
+            vcPolicies = ArrayList(vcPolicyResults),
+            specificVcPolicies = specificVcPolicyResults
         )
     }
 }
