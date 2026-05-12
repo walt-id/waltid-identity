@@ -1,0 +1,40 @@
+# Local development compose - uses prebuilt server with custom nginx (for proper SSL cert)
+services:
+  mongodb:
+    image: ${MONGODB_IMAGE:-mongo:6.0.13}
+    volumes:
+     - ./mongo/data:/data/db
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "5"
+  nginx:
+    build:
+      context: ./nginx
+    ports:
+     - "8443:8443"
+    depends_on:
+     - server
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "5"
+  server:
+    image: registry.gitlab.com/openid/conformance-suite:${IMAGE_TAG:-latest}
+    environment:
+      BASE_URL: ${BASE_URL:-https://localhost.emobix.co.uk:8443}
+      MONGODB_HOST: mongodb
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      OIDC_GOOGLE_CLIENTID: ${OIDC_GOOGLE_CLIENTID:-google-client}
+      OIDC_GOOGLE_SECRET: ${OIDC_GOOGLE_SECRET:-google-secret}
+      OIDC_GITLAB_CLIENTID: ${OIDC_GITLAB_CLIENTID:-gitlab-client}
+      OIDC_GITLAB_SECRET: ${OIDC_GITLAB_SECRET:-gitlab-secret}
+    depends_on:
+     - mongodb
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500k"
+        max-file: "5"
