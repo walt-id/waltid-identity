@@ -38,10 +38,12 @@ object Verifier2VPDirectPostHandler {
 
     suspend fun parseResponseBody(
         responseMode: OpenID4VPResponseMode?,
-        responseData: VpTokenDirectPostResponse,
+        responseData: DirectPostResponse,
         session: Verification2Session,
         ephemeralDecryptionKey: DirectSerializedKey?
     ): Pair<String, String?> = when (responseData) {
+        is ErrorResponseDirectPost -> error("Wallet error responses must be handled before parsing vp_token data")
+
         is DcApiJsonDirectPostResponse -> {
             if (session.setup is DcApiAnnexCFlowSetup) {
                 // Annex C handling
@@ -229,28 +231,17 @@ object Verifier2VPDirectPostHandler {
     /**
      * Sealed (= limited option) interface to represent the different forms that
      * a direct post response can come in.
-     *
-     * Split into two categories:
-     * - [VpTokenDirectPostResponse]: the wallet is attempting to deliver a `vp_token`
-     *   (cleartext, encrypted, or DC API).
-     * - [ErrorResponseDirectPost]: the wallet is rejecting the request per OID4VP §8.5.
-     *
-     * Keeping the two apart lets [parseResponseBody] accept only the vp_token variants
-     * and makes the wallet-error path a separate branch in [handleDirectPost].
      */
     sealed interface DirectPostResponse
 
-    /** Wallet attempts to deliver a `vp_token` (in any of the supported forms). */
-    sealed interface VpTokenDirectPostResponse : DirectPostResponse
-
     /** Custom DC API JSON Object structure */
-    data class DcApiJsonDirectPostResponse(val jsonBody: JsonObject) : VpTokenDirectPostResponse
+    data class DcApiJsonDirectPostResponse(val jsonBody: JsonObject) : DirectPostResponse
 
     /** Encrypted response (Data is in JWT String in URL parameter 'response') */
-    data class EncryptedResponseStringDirectPostResponse(val responseParameter: String) : VpTokenDirectPostResponse
+    data class EncryptedResponseStringDirectPostResponse(val responseParameter: String) : DirectPostResponse
 
     /** Cleartext response (Data is directly passed as strings in URL parameter 'vp_token' and 'state') */
-    data class CleartextDirectPostResponse(val vpToken: String, val state: String) : VpTokenDirectPostResponse
+    data class CleartextDirectPostResponse(val vpToken: String, val state: String) : DirectPostResponse
 
     /**
      * OpenID4VP 1.0 §8.5 error response. Wallet rejects the presentation request (e.g. user
@@ -288,14 +279,13 @@ object Verifier2VPDirectPostHandler {
         val responseMode = session.authorizationRequest.responseMode
         val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
-        val vpTokenResponse: VpTokenDirectPostResponse = when (responseData) {
-            is ErrorResponseDirectPost -> return handleWalletErrorResponse(session, responseData, updateSessionCallback)
-            is VpTokenDirectPostResponse -> responseData
+        if (responseData is ErrorResponseDirectPost) {
+            return handleWalletErrorResponse(session, responseData, updateSessionCallback)
         }
 
         val (vpTokenString, receivedState) = parseResponseBody(
             responseMode = responseMode,
-            responseData = vpTokenResponse,
+            responseData = responseData,
             session = session,
             ephemeralDecryptionKey = session.ephemeralDecryptionKey
         )

@@ -22,7 +22,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
-import io.ktor.util.AttributeKey
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,7 +34,6 @@ import kotlin.test.assertNotNull
 class Verifier2VPDirectPostHandlerParseTest {
 
     private fun parse(contentType: ContentType, body: String): DirectPostResponse {
-        val captured = AttributeKey<DirectPostResponse>("captured-response")
         var parsedOut: DirectPostResponse? = null
 
         testApplication {

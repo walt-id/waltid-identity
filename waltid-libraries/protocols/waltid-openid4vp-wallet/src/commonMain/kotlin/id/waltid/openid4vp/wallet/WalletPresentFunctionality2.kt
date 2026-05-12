@@ -237,15 +237,7 @@ object WalletPresentFunctionality2 {
                 require(authorizationRequest.responseUri != null) {
                     "Invalid AuthorizationRequest: 'response_uri' is required for response_mode '$responseMode'."
                 }
-                val response = webPostToken.sendForm(authorizationRequest.responseUri!!, errorParameters)
-                val responseBody = response.bodyAsText()
-                val responseBodyJson = runCatching { Json.decodeFromString<JsonObject>(responseBody) }.getOrNull()
-
-                WalletPresentResult(
-                    transmissionSuccess = response.status.isSuccess(),
-                    verifierResponse = Json.parseToJsonElement(responseBody),
-                    redirectTo = responseBodyJson?.get("redirect_uri")?.jsonPrimitive?.content,
-                )
+                postFormResponse(authorizationRequest.responseUri!!, errorParameters)
             }
 
             OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT ->
@@ -274,6 +266,21 @@ object WalletPresentFunctionality2 {
         errorDescription?.let { append("error_description", it) }
         authorizationRequest.state?.let { append("state", it) }
     }.build()
+
+    private suspend fun postFormResponse(
+        responseUri: String,
+        parameters: Parameters,
+    ): WalletPresentResult {
+        val response = webPostToken.sendForm(responseUri, parameters)
+        val responseBody = response.bodyAsText()
+        val responseBodyJson = Json.parseToJsonElement(responseBody).jsonObject
+
+        return WalletPresentResult(
+            transmissionSuccess = response.status.isSuccess(),
+            verifierResponse = responseBodyJson,
+            redirectTo = responseBodyJson["redirect_uri"]?.jsonPrimitive?.content,
+        )
+    }
 
     /**
      * Build a self-submitting `form_post` HTML page that POSTs [fields] to [actionUrl].
@@ -577,20 +584,8 @@ object WalletPresentFunctionality2 {
                 }.build()
 
                 log.trace { "Submitting direct_post form to Verifier: ${authorizationRequest.responseUri}" }
-                val response = webPostToken.sendForm(authorizationRequest.responseUri!!, parameters)
-                log.trace { "Verifier direct_post response: $response" }
-
-                val responseBody = response.bodyAsText()
-                log.trace { "Verifier direct_post response body: $responseBody" }
-
-                val responseBodyJson = runCatching { Json.decodeFromString<JsonObject>(responseBody) }
-
                 return Result.success(
-                    WalletPresentResult(
-                        transmissionSuccess = response.status.isSuccess(),
-                        verifierResponse = Json.parseToJsonElement(responseBody),
-                        redirectTo = responseBodyJson.getOrThrow()["redirect_uri"]?.jsonPrimitive?.content
-                    )
+                    postFormResponse(authorizationRequest.responseUri!!, parameters)
                 )
             }
 
@@ -637,20 +632,8 @@ object WalletPresentFunctionality2 {
                 }.build()
 
                 log.trace { "Submitting direct_post.jwt (encrypted) to Verifier: ${authorizationRequest.responseUri}" }
-                val response = webPostToken.sendForm(authorizationRequest.responseUri!!, parameters)
-
-                log.trace { "Verifier direct_post.jwt response status: ${response.status}" }
-
-                // 7. Process Response (Same as direct_post)
-                val responseBody = response.bodyAsText()
-                val responseBodyJson = runCatching { Json.decodeFromString<JsonObject>(responseBody) }
-
                 return Result.success(
-                    WalletPresentResult(
-                        transmissionSuccess = response.status.isSuccess(),
-                        verifierResponse = Json.parseToJsonElement(responseBody),
-                        redirectTo = responseBodyJson.getOrThrow()["redirect_uri"]?.jsonPrimitive?.content
-                    )
+                    postFormResponse(authorizationRequest.responseUri!!, parameters)
                 )
 
             }
