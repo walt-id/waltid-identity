@@ -185,6 +185,20 @@ class Verifier2VPDirectPostHandlerParseTest {
         assertEquals(null, session.failure, "must not attach failure to a SUCCESSFUL session")
     }
 
+    @Test
+    fun walletErrorResponse_onTerminalSession_stillRequiresMatchingState() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession(expectedState = "expected-state").apply {
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+        }
+
+        assertFailsWith<Throwable> {
+            session.handleWalletError(state = "wrong-state")
+        }
+
+        assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
+        assertEquals(null, session.failure, "invalid replay must not attach failure to terminal session")
+    }
+
     private fun directPostSession(expectedState: String) = Verification2Session(
         setup = CrossDeviceFlowSetup.EXAMPLE_SDJWT_PID,
         status = Verification2Session.VerificationSessionStatus.ACTIVE,

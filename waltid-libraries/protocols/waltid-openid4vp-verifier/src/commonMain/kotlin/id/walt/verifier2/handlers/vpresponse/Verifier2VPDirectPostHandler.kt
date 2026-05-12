@@ -367,6 +367,11 @@ object Verifier2VPDirectPostHandler {
     ): Map<String, String> {
         log.info { "Wallet returned OID4VP §8.5 error for session ${session.id}: error=${responseData.error}" }
 
+        val expectedState = session.authorizationRequest.state
+        if (expectedState != null && responseData.state != expectedState) {
+            Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
+        }
+
         if (session.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL ||
             session.status == Verification2Session.VerificationSessionStatus.FAILED
         ) {
@@ -375,11 +380,6 @@ object Verifier2VPDirectPostHandler {
                 "status" to "acknowledged",
                 "message" to "Session already terminal; wallet error response ignored.",
             )
-        }
-
-        val expectedState = session.authorizationRequest.state
-        if (expectedState != null && responseData.state != expectedState) {
-            Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
         }
 
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {

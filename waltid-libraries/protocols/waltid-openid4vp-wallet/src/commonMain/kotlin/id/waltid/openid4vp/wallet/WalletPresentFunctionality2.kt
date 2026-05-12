@@ -174,8 +174,10 @@ object WalletPresentFunctionality2 {
      * Produce an OpenID4VP 1.0 §8.5 wallet rejection response for the given
      * [authorizationRequest]. The response is shaped according to the request's `response_mode`
      * and carries `error`, optional `error_description`, and the request's `state` (when
-     * present). For `direct_post`, the rejection is transmitted to the verifier's `response_uri`
-     * and the verifier's acknowledgement is returned.
+     * present). For `direct_post` and `direct_post.jwt`, the rejection is transmitted to the
+     * verifier's `response_uri` and the verifier's acknowledgement is returned. OpenID4VP 1.0
+     * permits an unencrypted error response for `direct_post.jwt` when the Wallet cannot generate
+     * the encrypted response.
      */
     suspend fun walletRejectHandling(
         authorizationRequest: AuthorizationRequest,
@@ -231,9 +233,9 @@ object WalletPresentFunctionality2 {
                 )
             }
 
-            OpenID4VPResponseMode.DIRECT_POST -> {
+            OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT -> {
                 require(authorizationRequest.responseUri != null) {
-                    "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post'."
+                    "Invalid AuthorizationRequest: 'response_uri' is required for response_mode '$responseMode'."
                 }
                 val response = webPostToken.sendForm(authorizationRequest.responseUri!!, errorParameters)
                 val responseBody = response.bodyAsText()
@@ -245,9 +247,6 @@ object WalletPresentFunctionality2 {
                     redirectTo = responseBodyJson?.get("redirect_uri")?.jsonPrimitive?.content,
                 )
             }
-
-            OpenID4VPResponseMode.DIRECT_POST_JWT ->
-                throw UnsupportedOperationException("OID4VP error responses for direct_post.jwt require JARM and are not supported yet.")
 
             OpenID4VPResponseMode.DC_API, OpenID4VPResponseMode.DC_API_JWT ->
                 throw UnsupportedOperationException("OID4VP error responses are not supported for DC API response modes.")
@@ -291,7 +290,7 @@ object WalletPresentFunctionality2 {
         appendLine("<head><title>${title.escapeHTML()}</title></head>")
         appendLine("<body onload=\"document.forms[0].submit()\">")
         appendLine("<noscript><p>Your browser does not support JavaScript. Please press the button below to continue.</p></noscript>")
-        appendLine("<form method=\"POST\" action=\"${actionUrl.encodeURLParameter()}\">")
+        appendLine("<form method=\"POST\" action=\"${actionUrl.escapeHTML()}\">")
         fields.forEach { (name, value) ->
             appendLine("<input type=\"hidden\" name=\"${name.escapeHTML()}\" value=\"${value.escapeHTML()}\"/>")
         }

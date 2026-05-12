@@ -100,6 +100,7 @@ class WalletRejectHandlingTest {
 
         val html = assertNotNull(result.formPostHtml)
         assertTrue("<form method=\"POST\"" in html)
+        assertTrue("action=\"https://wallet.example/callback\"" in html)
         assertTrue("name=\"error\" value=\"access_denied\"" in html)
         // error_description should be HTML-escaped
         assertTrue("name=\"error_description\" value=\"User &quot;denied&quot;\"" in html)
@@ -107,23 +108,6 @@ class WalletRejectHandlingTest {
         assertTrue("name=\"state\" value=\"state-&lt;123&gt;\"" in html)
         // auto-submit behavior present
         assertTrue("document.forms[0].submit()" in html)
-    }
-
-    // --- DIRECT_POST_JWT: explicitly unsupported ---------------------------
-
-    @Test
-    fun directPostJwt_isUnsupported() = runTest {
-        val result = WalletPresentFunctionality2.walletRejectHandling(
-            authorizationRequest = AuthorizationRequest(
-                responseUri = "https://verifier.example/response",
-                responseMode = OpenID4VPResponseMode.DIRECT_POST_JWT,
-                state = "s",
-            ),
-            error = "access_denied",
-        )
-
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is UnsupportedOperationException)
     }
 
     @Test
