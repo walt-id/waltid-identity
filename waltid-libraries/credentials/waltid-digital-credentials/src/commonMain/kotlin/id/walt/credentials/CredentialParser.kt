@@ -28,6 +28,7 @@ import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.IssuerSignedItem
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -105,6 +106,15 @@ object CredentialParser {
             val document = coseCompliantCbor.decodeFromByteArray<Document>(deviceResponseBytes)
             log.trace { "Mdoc parsed (from document)" }
             document
+        }.recoverCatching {
+            // OID4VCI §mso_mdoc: the credential response contains a bare IssuerSigned structure
+            // (not a full Document). Reconstruct the Document using the docType from the MSO
+            // embedded inside the issuerAuth COSE structure.
+            log.trace { "Mdoc could not be parsed as document, trying as IssuerSigned (OID4VCI credential response format)" }
+            val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(deviceResponseBytes)
+            val docType = issuerSigned.decodeMobileSecurityObject().docType
+            log.trace { "Mdoc parsed (from IssuerSigned), docType=$docType" }
+            Document(docType = docType, issuerSigned = issuerSigned)
         }.getOrThrow()
 
 
