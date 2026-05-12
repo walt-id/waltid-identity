@@ -16,7 +16,7 @@ gradle-shadow = "9.3.2"
 buildconfig = "6.0.9"
 
 # Plugins / Dependencies
-ktor = "3.3.3"
+ktor = "3.4.3"
 
 # ...
 
