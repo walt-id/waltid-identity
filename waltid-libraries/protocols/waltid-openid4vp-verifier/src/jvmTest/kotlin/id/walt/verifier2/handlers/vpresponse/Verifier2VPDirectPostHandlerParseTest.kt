@@ -148,6 +148,43 @@ class Verifier2VPDirectPostHandlerParseTest {
         assertEquals("expected-state", failure.state)
     }
 
+    @Test
+    fun walletErrorResponse_secondPost_doesNotOverwriteTerminalSession() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession(expectedState = "expected-state")
+
+        // First POST flips session to FAILED with access_denied
+        session.handleWalletError(state = "expected-state")
+        val failureAfterFirst = assertIs<SessionFailure.WalletErrorResponse>(assertNotNull(session.failure))
+        assertEquals("access_denied", failureAfterFirst.error)
+
+        // Second POST with a different error must not overwrite status/statusReason/failure
+        val events = session.handleWalletError(
+            state = "expected-state",
+            error = "invalid_request",
+            errorDescription = "overwrite attempt",
+        )
+
+        assertEquals(emptyList(), events, "No events should fire for a terminal session")
+        assertEquals(Verification2Session.VerificationSessionStatus.FAILED, session.status)
+        assertEquals("Wallet returned OID4VP error: access_denied", session.statusReason)
+
+        val failureAfterSecond = assertIs<SessionFailure.WalletErrorResponse>(assertNotNull(session.failure))
+        assertEquals("access_denied", failureAfterSecond.error, "original failure must be preserved")
+    }
+
+    @Test
+    fun walletErrorResponse_onSuccessfulSession_doesNotOverwrite() = kotlinx.coroutines.test.runTest {
+        val session = directPostSession(expectedState = "expected-state").apply {
+            status = Verification2Session.VerificationSessionStatus.SUCCESSFUL
+        }
+
+        val events = session.handleWalletError(state = "expected-state")
+
+        assertEquals(emptyList(), events)
+        assertEquals(Verification2Session.VerificationSessionStatus.SUCCESSFUL, session.status)
+        assertEquals(null, session.failure, "must not attach failure to a SUCCESSFUL session")
+    }
+
     private fun directPostSession(expectedState: String) = Verification2Session(
         setup = CrossDeviceFlowSetup.EXAMPLE_SDJWT_PID,
         status = Verification2Session.VerificationSessionStatus.ACTIVE,
@@ -160,13 +197,17 @@ class Verifier2VPDirectPostHandlerParseTest {
         requestMode = Verification2Session.RequestMode.REQUEST_URI,
     )
 
-    private suspend fun Verification2Session.handleWalletError(state: String?): List<SessionEvent> {
+    private suspend fun Verification2Session.handleWalletError(
+        state: String?,
+        error: String = "access_denied",
+        errorDescription: String? = "User denied",
+    ): List<SessionEvent> {
         val events = mutableListOf<SessionEvent>()
         handleDirectPost(
             verificationSession = this,
             responseData = ErrorResponseDirectPost(
-                error = "access_denied",
-                errorDescription = "User denied",
+                error = error,
+                errorDescription = errorDescription,
                 state = state,
             ),
             updateSessionCallback = { session, event, block ->

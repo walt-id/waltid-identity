@@ -146,9 +146,50 @@ object WalletPresentFunctionality2 {
         val redirectTo: String? = null
     )
 
+    /**
+     * OpenID4VP 1.0 §8.5 wallet-side error codes (with RFC 6749 §4.1.2.1 / §4.2.2.1 parents).
+     *
+     * The verifier side accepts any `error` string (permissive); this typed enum only steers
+     * wallet-side callers away from typos in the finite set that the spec enumerates. If a
+     * future spec addition is needed before this enum is updated, use
+     * [walletRejectHandling]'s String overload.
+     */
+    @Suppress("EnumEntryName")
+    enum class Oid4vpErrorCode(val code: String) {
+        access_denied("access_denied"),
+        invalid_request("invalid_request"),
+        invalid_client("invalid_client"),
+        invalid_scope("invalid_scope"),
+        unauthorized_client("unauthorized_client"),
+        unsupported_response_type("unsupported_response_type"),
+        server_error("server_error"),
+        temporarily_unavailable("temporarily_unavailable"),
+        vp_formats_not_supported("vp_formats_not_supported"),
+        invalid_request_uri_method("invalid_request_uri_method"),
+        invalid_transaction_data("invalid_transaction_data"),
+        wallet_unavailable("wallet_unavailable"),
+    }
+
+    /**
+     * Produce an OpenID4VP 1.0 §8.5 wallet rejection response for the given
+     * [authorizationRequest]. The response is shaped according to the request's `response_mode`
+     * and carries `error`, optional `error_description`, and the request's `state` (when
+     * present). For `direct_post`, the rejection is transmitted to the verifier's `response_uri`
+     * and the verifier's acknowledgement is returned.
+     */
     suspend fun walletRejectHandling(
         authorizationRequest: AuthorizationRequest,
-        error: String = "access_denied",
+        error: Oid4vpErrorCode = Oid4vpErrorCode.access_denied,
+        errorDescription: String? = null,
+    ): Result<WalletPresentResult> = walletRejectHandling(authorizationRequest, error.code, errorDescription)
+
+    /**
+     * String overload of [walletRejectHandling] for forward-compatibility with error codes
+     * not yet in [Oid4vpErrorCode]. Prefer the typed variant.
+     */
+    suspend fun walletRejectHandling(
+        authorizationRequest: AuthorizationRequest,
+        error: String,
         errorDescription: String? = null,
     ): Result<WalletPresentResult> = runCatching {
         val responseMode = authorizationRequest.responseMode ?: inferResponseMode(authorizationRequest)
@@ -180,7 +221,13 @@ object WalletPresentFunctionality2 {
                     "Invalid AuthorizationRequest: 'redirect_uri' is required for response_mode 'form_post'."
                 }
                 WalletPresentResult(
-                    formPostHtml = buildErrorResponseFormPostHtml(authorizationRequest.redirectUri!!, errorParameters)
+                    formPostHtml = buildFormPostHtml(
+                        actionUrl = authorizationRequest.redirectUri!!,
+                        title = "Submitting Error Response...",
+                        fields = errorParameters.entries().flatMap { (name, values) ->
+                            values.map { name to it }
+                        },
+                    )
                 )
             }
 
@@ -229,20 +276,24 @@ object WalletPresentFunctionality2 {
         authorizationRequest.state?.let { append("state", it) }
     }.build()
 
-    private fun buildErrorResponseFormPostHtml(
-        redirectUri: String,
-        parameters: Parameters,
+    /**
+     * Build a self-submitting `form_post` HTML page that POSTs [fields] to [actionUrl].
+     * Shared by [walletPresentHandling] (carrying `vp_token`) and [walletRejectHandling]
+     * (carrying `error` / `error_description` / `state`).
+     */
+    private fun buildFormPostHtml(
+        actionUrl: String,
+        title: String,
+        fields: List<Pair<String, String>>,
     ): String = buildString {
         appendLine("<!DOCTYPE html>")
         appendLine("<html>")
-        appendLine("<head><title>Submitting Error Response...</title></head>")
+        appendLine("<head><title>${title.escapeHTML()}</title></head>")
         appendLine("<body onload=\"document.forms[0].submit()\">")
         appendLine("<noscript><p>Your browser does not support JavaScript. Please press the button below to continue.</p></noscript>")
-        appendLine("<form method=\"POST\" action=\"${redirectUri.encodeURLParameter()}\">")
-        parameters.entries().forEach { (name, values) ->
-            values.forEach { value ->
-                appendLine("<input type=\"hidden\" name=\"${name.escapeHTML()}\" value=\"${value.escapeHTML()}\"/>")
-            }
+        appendLine("<form method=\"POST\" action=\"${actionUrl.encodeURLParameter()}\">")
+        fields.forEach { (name, value) ->
+            appendLine("<input type=\"hidden\" name=\"${name.escapeHTML()}\" value=\"${value.escapeHTML()}\"/>")
         }
         appendLine("<input type=\"submit\" value=\"Continue\"/>")
         appendLine("</form>")
@@ -495,26 +546,15 @@ object WalletPresentFunctionality2 {
                     "Invalid AuthorizationRequest: 'redirect_uri' is required for response_mode 'form_post'."
                 }
 
-                // Build an HTML page with a self-submitting form.
-                val htmlContent = buildString {
-                    appendLine("<!DOCTYPE html>")
-                    appendLine("<html>")
-                    appendLine("<head><title>Submitting Presentation...</title></head>")
-                    // The body's onload attribute triggers the form submission automatically.
-                    appendLine("<body onload=\"document.forms[0].submit()\">")
-                    appendLine("<noscript><p>Your browser does not support JavaScript. Please press the button below to continue.</p></noscript>")
-                    // The form action is the Verifier's redirect_uri.
-                    appendLine("<form method=\"POST\" action=\"${authorizationRequest.redirectUri!!.encodeURLParameter()}\">")
-                    // The vp_token and state are included as hidden input fields.
-                    appendLine("<input type=\"hidden\" name=\"vp_token\" value=\"${vpToken.escapeHTML()}\"/>")
-                    authorizationRequest.state?.let {
-                        appendLine("<input type=\"hidden\" name=\"state\" value=\"${it.escapeHTML()}\"/>")
-                    }
-                    appendLine("<input type=\"submit\" value=\"Continue\"/>")
-                    appendLine("</form>")
-                    appendLine("</body>")
-                    appendLine("</html>")
+                val fields = buildList {
+                    add("vp_token" to vpToken)
+                    authorizationRequest.state?.let { add("state" to it) }
                 }
+                val htmlContent = buildFormPostHtml(
+                    actionUrl = authorizationRequest.redirectUri!!,
+                    title = "Submitting Presentation...",
+                    fields = fields,
+                )
 
                 log.trace { "Responding with self-submitting HTML form to post to: ${authorizationRequest.redirectUri}" }
 

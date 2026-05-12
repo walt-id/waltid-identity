@@ -38,7 +38,7 @@ object Verifier2VPDirectPostHandler {
 
     suspend fun parseResponseBody(
         responseMode: OpenID4VPResponseMode?,
-        responseData: DirectPostResponse,
+        responseData: VpTokenDirectPostResponse,
         session: Verification2Session,
         ephemeralDecryptionKey: DirectSerializedKey?
     ): Pair<String, String?> = when (responseData) {
@@ -140,9 +140,6 @@ object Verifier2VPDirectPostHandler {
 
             responseData.vpToken to responseData.state
         }
-
-        is ErrorResponseDirectPost ->
-            error("parseResponseBody called with ErrorResponseDirectPost; handleDirectPost must short-circuit before this")
     }
 
     suspend fun RoutingCall.parseHttpRequestToDirectPostResponse(): DirectPostResponse {
@@ -231,24 +228,36 @@ object Verifier2VPDirectPostHandler {
 
     /**
      * Sealed (= limited option) interface to represent the different forms that
-     * a direct post response can come in
+     * a direct post response can come in.
+     *
+     * Split into two categories:
+     * - [VpTokenDirectPostResponse]: the wallet is attempting to deliver a `vp_token`
+     *   (cleartext, encrypted, or DC API).
+     * - [ErrorResponseDirectPost]: the wallet is rejecting the request per OID4VP §8.5.
+     *
+     * Keeping the two apart lets [parseResponseBody] accept only the vp_token variants
+     * and makes the wallet-error path a separate branch in [handleDirectPost].
      */
     sealed interface DirectPostResponse
 
+    /** Wallet attempts to deliver a `vp_token` (in any of the supported forms). */
+    sealed interface VpTokenDirectPostResponse : DirectPostResponse
+
     /** Custom DC API JSON Object structure */
-    data class DcApiJsonDirectPostResponse(val jsonBody: JsonObject) : DirectPostResponse
+    data class DcApiJsonDirectPostResponse(val jsonBody: JsonObject) : VpTokenDirectPostResponse
 
     /** Encrypted response (Data is in JWT String in URL parameter 'response') */
-    data class EncryptedResponseStringDirectPostResponse(val responseParameter: String) : DirectPostResponse
+    data class EncryptedResponseStringDirectPostResponse(val responseParameter: String) : VpTokenDirectPostResponse
 
     /** Cleartext response (Data is directly passed as strings in URL parameter 'vp_token' and 'state') */
-    data class CleartextDirectPostResponse(val vpToken: String, val state: String) : DirectPostResponse
+    data class CleartextDirectPostResponse(val vpToken: String, val state: String) : VpTokenDirectPostResponse
 
     /**
      * OpenID4VP 1.0 §8.5 error response. Wallet rejects the presentation request (e.g. user
      * decline → `access_denied`). Body may arrive url-encoded or as JSON and always carries at
-     * least an `error` code; `error_description` is optional. `state` is required when it was
-     * present in the Authorization Request.
+     * least an `error` code; `error_description` is optional. `state` is required whenever the
+     * Authorization Request included `state` — [handleDirectPost] rejects mismatched / absent
+     * state with `INVALID_STATE_PARAMETER` in that case.
      */
     data class ErrorResponseDirectPost(
         val error: String,
@@ -279,35 +288,14 @@ object Verifier2VPDirectPostHandler {
         val responseMode = session.authorizationRequest.responseMode
         val isAnnexC = verificationSession.setup is DcApiAnnexCFlowSetup
 
-        if (responseData is ErrorResponseDirectPost) {
-            log.info { "Wallet returned OID4VP §8.5 error for session ${session.id}: error=${responseData.error}" }
-
-            val expectedState = session.authorizationRequest.state
-            if (expectedState != null && responseData.state != expectedState) {
-                Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
-            }
-
-            session.updateSession(SessionEvent.wallet_error_response_received) {
-                attempted = true
-                status = Verification2Session.VerificationSessionStatus.FAILED
-                statusReason = "Wallet returned OID4VP error: ${responseData.error}"
-                failure = SessionFailure.WalletErrorResponse(
-                    reason = "Wallet returned OID4VP error response per §8.5",
-                    error = responseData.error,
-                    errorDescription = responseData.errorDescription,
-                    state = responseData.state,
-                )
-            }
-
-            return mapOf(
-                "status" to "acknowledged",
-                "message" to "Wallet error response recorded.",
-            )
+        val vpTokenResponse: VpTokenDirectPostResponse = when (responseData) {
+            is ErrorResponseDirectPost -> return handleWalletErrorResponse(session, responseData, updateSessionCallback)
+            is VpTokenDirectPostResponse -> responseData
         }
 
         val (vpTokenString, receivedState) = parseResponseBody(
             responseMode = responseMode,
-            responseData = responseData,
+            responseData = vpTokenResponse,
             session = session,
             ephemeralDecryptionKey = session.ephemeralDecryptionKey
         )
@@ -364,5 +352,52 @@ object Verifier2VPDirectPostHandler {
         Verifier2Response.Verifier2Error.MALFORMED_VP_TOKEN.throwAsError()
     }
 
+    /**
+     * Handles an OID4VP 1.0 §8.5 wallet error response. Validates `state` echo, marks the
+     * session as `FAILED` with a structured [SessionFailure.WalletErrorResponse], and emits
+     * [SessionEvent.wallet_error_response_received].
+     *
+     * Idempotent: if the session is already in a terminal state, the response is acknowledged
+     * without overwriting any existing outcome.
+     */
+    private suspend fun handleWalletErrorResponse(
+        session: Verification2Session,
+        responseData: ErrorResponseDirectPost,
+        updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
+    ): Map<String, String> {
+        log.info { "Wallet returned OID4VP §8.5 error for session ${session.id}: error=${responseData.error}" }
+
+        if (session.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL ||
+            session.status == Verification2Session.VerificationSessionStatus.FAILED
+        ) {
+            log.info { "Session ${session.id} is already terminal (${session.status}); ignoring wallet error response." }
+            return mapOf(
+                "status" to "acknowledged",
+                "message" to "Session already terminal; wallet error response ignored.",
+            )
+        }
+
+        val expectedState = session.authorizationRequest.state
+        if (expectedState != null && responseData.state != expectedState) {
+            Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
+        }
+
+        updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
+            attempted = true
+            status = Verification2Session.VerificationSessionStatus.FAILED
+            statusReason = "Wallet returned OID4VP error: ${responseData.error}"
+            failure = SessionFailure.WalletErrorResponse(
+                reason = "Wallet returned OID4VP error response per §8.5",
+                error = responseData.error,
+                errorDescription = responseData.errorDescription,
+                state = responseData.state,
+            )
+        }
+
+        return mapOf(
+            "status" to "acknowledged",
+            "message" to "Wallet error response recorded.",
+        )
+    }
 
 }
