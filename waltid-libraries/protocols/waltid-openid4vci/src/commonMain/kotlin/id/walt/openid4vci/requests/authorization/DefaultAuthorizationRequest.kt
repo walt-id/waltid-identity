@@ -23,6 +23,7 @@ data class DefaultAuthorizationRequest(
     override val defaultResponseMode: ResponseMode = ResponseMode.QUERY,
     override val requestForm: Map<String, List<String>> = emptyMap(),
     override val issClaim: String? = null,
+    override val authorizationDetails: List<AuthorizationDetail> = emptyList(),
 ) : AuthorizationRequest {
     override fun markResponseTypeHandled(responseType: String): AuthorizationRequest =
         copy(handledResponseTypes = handledResponseTypes + responseType)

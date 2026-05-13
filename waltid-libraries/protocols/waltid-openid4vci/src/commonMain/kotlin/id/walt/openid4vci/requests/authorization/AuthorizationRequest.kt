@@ -24,6 +24,7 @@ interface AuthorizationRequest {
     val defaultResponseMode: ResponseMode
     val requestForm: Map<String, List<String>>
     val issClaim: String?
+    val authorizationDetails: List<AuthorizationDetail>
 
     fun markResponseTypeHandled(responseType: String): AuthorizationRequest
     fun grantScopes(scopes: Collection<String>): AuthorizationRequest
