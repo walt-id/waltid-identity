@@ -21,8 +21,8 @@ ktor = "3.3.3"
 # ...
 
 # Ktor external plugins
-cohort = "2.9.4"
-smiley-openapi = "5.7.0"
+cohort = "2.8.3"
+smiley-openapi = "5.6.0"
 
 # Kotlinx
 kotlinx-serialization = "1.10.1-waltid_20260309-SNAPSHOT"
