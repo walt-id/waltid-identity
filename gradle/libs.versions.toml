@@ -21,7 +21,7 @@ ktor = "3.4.3"
 # ...
 
 # Ktor external plugins
-cohort = "2.9.4"
+cohort = "2.8.3"
 smiley-openapi = "5.7.0"
 
 # Kotlinx
