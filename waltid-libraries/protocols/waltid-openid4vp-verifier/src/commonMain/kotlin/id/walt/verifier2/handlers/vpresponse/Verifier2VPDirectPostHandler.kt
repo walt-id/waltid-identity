@@ -384,6 +384,10 @@ object Verifier2VPDirectPostHandler {
             )
         }
 
+        session.redirects?.errorRedirectUri?.let { errorRedirectUri ->
+            return mapOf("redirect_uri" to errorRedirectUri)
+        }
+
         return mapOf(
             "status" to "acknowledged",
             "message" to "Wallet error response recorded.",
