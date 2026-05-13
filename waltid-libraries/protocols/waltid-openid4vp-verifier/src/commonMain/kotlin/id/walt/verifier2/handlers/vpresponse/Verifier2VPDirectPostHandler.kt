@@ -15,6 +15,8 @@ import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.FAILED
+import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUCCESSFUL
 import id.walt.verifier2.data.Verifier2Response
 import id.walt.verifier2.utils.JsonUtils.parseAsJsonObject
 import id.walt.verifier2.verification2.PresentationVerificationEngine
@@ -230,7 +232,7 @@ object Verifier2VPDirectPostHandler {
 
     /**
      * Sealed (= limited option) interface to represent the different forms that
-     * a direct post response can come in.
+     * a direct post response can come in
      */
     sealed interface DirectPostResponse
 
@@ -357,15 +359,12 @@ object Verifier2VPDirectPostHandler {
     ): Map<String, String> {
         log.info { "Wallet returned OID4VP §8.5 error for session ${session.id}: error=${responseData.error}" }
 
-        val expectedState = session.authorizationRequest.state
-        if (expectedState != null && responseData.state != expectedState) {
-            Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
-        }
+        session.authorizationRequest.state
+            ?.takeIf { it != responseData.state }
+            ?.let { Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError() }
 
-        if (session.status == Verification2Session.VerificationSessionStatus.SUCCESSFUL ||
-            session.status == Verification2Session.VerificationSessionStatus.FAILED
-        ) {
-            log.info { "Session ${session.id} is already terminal (${session.status}); ignoring wallet error response." }
+        if (session.status == SUCCESSFUL || session.status == FAILED) {
+            log.info { "Session ${session.id} already terminal (${session.status}); ignoring wallet error." }
             return mapOf(
                 "status" to "acknowledged",
                 "message" to "Session already terminal; wallet error response ignored.",
@@ -374,7 +373,7 @@ object Verifier2VPDirectPostHandler {
 
         updateSessionCallback(session, SessionEvent.wallet_error_response_received) {
             attempted = true
-            status = Verification2Session.VerificationSessionStatus.FAILED
+            status = FAILED
             statusReason = "Wallet returned OID4VP error: ${responseData.error}"
             failure = SessionFailure.WalletErrorResponse(
                 reason = "Wallet returned OID4VP error response per §8.5",
@@ -384,14 +383,12 @@ object Verifier2VPDirectPostHandler {
             )
         }
 
-        session.redirects?.errorRedirectUri?.let { errorRedirectUri ->
-            return mapOf("redirect_uri" to errorRedirectUri)
-        }
-
-        return mapOf(
-            "status" to "acknowledged",
-            "message" to "Wallet error response recorded.",
-        )
+        return session.redirects?.errorRedirectUri
+            ?.let { mapOf("redirect_uri" to it) }
+            ?: mapOf(
+                "status" to "acknowledged",
+                "message" to "Wallet error response recorded.",
+            )
     }
 
 }
