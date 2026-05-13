@@ -1,0 +1,2276 @@
+{
+  "scraped_at": "2026-05-13T12:57:42.917973+00:00",
+  "formats": [
+    {
+      "id": "sd-jwt-vc",
+      "name": "SD-JWT-VC Test Cases",
+      "url": "https://signature-plugtests.etsi.org/testcases/tc_sd-jwt-vc",
+      "profiles": [
+        {
+          "id": "SD-JWT-VC EAA",
+          "notes": "",
+          "test_cases": [
+            {
+              "id": "SJV-EAA-1",
+              "name": "SJV-EAA-1",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; without key binding; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. given_name\n. family_name",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "given_name",
+                    "family_name"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-2",
+              "name": "SJV-EAA-2",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. sub\n. given_name\n. family_name\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-3",
+              "name": "SJV-EAA-3",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-4 (pseudonym)",
+              "name": "SJV-EAA-4 (pseudonym)",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. also_known_as\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "also_known_as",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-5 (oneTime)",
+              "name": "SJV-EAA-5 (oneTime)",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. oneTime\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "oneTime",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-6 (ShortLived)",
+              "name": "SJV-EAA-6 (ShortLived)",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. shortLived\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "shortLived",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-7",
+              "name": "SJV-EAA-7",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. iat",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "iat"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-8",
+              "name": "SJV-EAA-8",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements only, and non-recursive selective disclosures only of JSON Objects",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": []
+                },
+                {
+                  "title": "Payload",
+                  "items": []
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-9",
+              "name": "SJV-EAA-9",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements only, and non-recursive selective disclosures only of JSON Arrays elements",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": []
+                },
+                {
+                  "title": "Payload",
+                  "items": []
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-10",
+              "name": "SJV-EAA-10",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements only, and non-recursive selective disclosures of both JSON Objects and JSON Arrays elements",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": []
+                },
+                {
+                  "title": "Payload",
+                  "items": []
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-11",
+              "name": "SJV-EAA-11",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements only, and recursive selective disclosures only of JSON Objects",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": []
+                },
+                {
+                  "title": "Payload",
+                  "items": []
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-12",
+              "name": "SJV-EAA-12",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements only, and recursive selective disclosures only of JSON Array Elements",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": []
+                },
+                {
+                  "title": "Payload",
+                  "items": []
+                }
+              ]
+            },
+            {
+              "id": "SJV-EAA-13",
+              "name": "SJV-EAA-13",
+              "subtitle": "SD-JWT-VC EAA",
+              "description": "Mandatory elements only, and recursive selective disclosures  of both JSON Objects and JSON Array elements",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": []
+                },
+                {
+                  "title": "Payload",
+                  "items": []
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SD-JWT-VC QEAA",
+          "notes": "",
+          "test_cases": [
+            {
+              "id": "SJV-QEAA-1",
+              "name": "SJV-QEAA-1",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; without key binding; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. iss_reg_id (if applicable and not in Q cert)\n. given_name\n. family_name",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "given_name",
+                    "family_name"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-QEAA-2",
+              "name": "SJV-QEAA-2",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-QEAA-3",
+              "name": "SJV-QEAA-3",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-QEAA-4 (pseudonym)",
+              "name": "SJV-QEAA-4 (pseudonym)",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. also_known_as\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "also_known_as",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-QEAA-5 (oneTime)",
+              "name": "SJV-QEAA-5 (oneTime)",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. oneTime\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "oneTime",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-QEAA-6 (ShortLived)",
+              "name": "SJV-QEAA-6 (ShortLived)",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. shortLived\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "shortLived",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-QEAA-7",
+              "name": "SJV-QEAA-7",
+              "subtitle": "SD-JWT-VC QEAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. iat\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "iat",
+                    "status"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SD-JWT-VC PuB-EAA",
+          "notes": "",
+          "test_cases": [
+            {
+              "id": "SJV-PuBEAA-1",
+              "name": "SJV-PuBEAA-1",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; without key binding; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. iss_reg_id (if applicable and not in Q cert)\n. given_name\n. family_name",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "given_name",
+                    "family_name"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-PuBEAA-2",
+              "name": "SJV-PuBEAA-2",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-PuBEAA-3",
+              "name": "SJV-PuBEAA-3",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-PuBEAA-4 (pseudonym)",
+              "name": "SJV-PuBEAA-4 (pseudonym)",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. also_known_as\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "also_known_as",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-PuBEAA-5 (oneTime)",
+              "name": "SJV-PuBEAA-5 (oneTime)",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. oneTime\n. cnf with jwk component\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "oneTime",
+                    "cnf (contains a jwk element)",
+                    "status"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-PuBEAA-6 (ShortLived)",
+              "name": "SJV-PuBEAA-6 (ShortLived)",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. shortLived\n. cnf with jwk component",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "category (as byTS 119 472-1)",
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority (if NOT in the qualified certificate)",
+                    "iss_reg_id (if applicable and NOT in the qualified certificate)",
+                    "issuing_country",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "shortLived",
+                    "cnf (contains a jwk element)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SJV-PuBEAA-7",
+              "name": "SJV-PuBEAA-7",
+              "subtitle": "SD-JWT-VC PuB-EAA",
+              "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. iat\n. status",
+              "sections": [
+                {
+                  "title": "Protected Header",
+                  "items": [
+                    "x5c",
+                    "typ (=dc+sd-jwt)",
+                    "alg",
+                    "x5u",
+                    "x5t#S256"
+                  ]
+                },
+                {
+                  "title": "Payload",
+                  "items": [
+                    "vct",
+                    "vct#integrity",
+                    "nbf",
+                    "exp",
+                    "iss",
+                    "issuing_authority",
+                    "issuing_country",
+                    "iss_reg_id",
+                    "sub",
+                    "given_name",
+                    "family_name",
+                    "cnf (contains a jwk element)",
+                    "iat",
+                    "status"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mdoc",
+      "name": "ISO mdl/mdoc Test Cases",
+      "url": "https://signature-plugtests.etsi.org/testcases/iso",
+      "profiles": [
+        {
+          "id": "ISO-mdL (ISO-mdoc EAA for mdL)",
+          "notes": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc QEAA different than mdL\nISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+          "test_cases": [
+            {
+              "id": "MDL-EAA-1",
+              "name": "MDL-EAA-1",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDL-EAA-2",
+              "name": "MDL-EAA-2",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": "Addition to validityInfo of optional element\nEAA-1 +  expectedUpdate child of validityInfo\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDL-EAA-3",
+              "name": "MDL-EAA-3",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": "Test cases with  different contents of deviceKeyInfo\nEAA-1 + deviceKeyInfo.keyAuthorizations.nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo with keyAuthorizations.nameSpaces descendant",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .nameSpaces",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDL-EAA-4",
+              "name": "MDL-EAA-4",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": "Test cases with  different contents of deviceKeyInfo\nEAA-1 + deviceKeyInfo.keyAuthorizations.dataElements\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with dataElements child",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .dataElements",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDL-EAA-5",
+              "name": "MDL-EAA-5",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": "Test cases with  different contents of deviceKeyInfo\nEAA-1 + deviceKeyInfo.keyAuthorizations\n    .dataElements and \n    .nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with nameSpaces and dataElements children",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .nameSpaces\n        .dataElements",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDL-EAA-6",
+              "name": "MDL-EAA-6",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": "EAA-1 + MSO.status.identifier_list\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5\n\n.status.identifier_list",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil",
+                    "status\n   . identifier_list"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDL-EAA-7",
+              "name": "MDL-EAA-7",
+              "subtitle": "ISO-mdL (ISO-mdoc EAA for mdL)",
+              "description": "EAA-1 + Optional elements in section 7.2 of ISO 18013-5\n. Mandatory and some Optional elements as per section 7.2.1 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority",
+                    "document_number",
+                    "portrait",
+                    "driving_privileges",
+                    "distinguishing_sign",
+                    "birth_place",
+                    "age_birth_year",
+                    "resident_address",
+                    "resident_city",
+                    "resident_postal_code"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ISO-mdoc EAA (no mdL)",
+          "notes": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc EAA different than mdL\nISO-mdoc EAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+          "test_cases": [
+            {
+              "id": "MDOC-EAA-1",
+              "name": "MDOC-EAA-1",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5\n\n. Mandatory components of TS 119 472-1\n\n. Some optional components of TS 119 472-1",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-2",
+              "name": "MDOC-EAA-2",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "Additions to claims set\nMDOC-EAA-1 + iss_reg_id (TS 119 472-1 clause 6.2.4.2).\nIssuer:legal entity and registration identifier applicable\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "iss_reg_id"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-3",
+              "name": "MDOC-EAA-3",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "EAA with pseudonym\nMDOC-EAA-1 - given_name - family_name - document_number + also_knwon (TS 119 472-1 clause 6.2.5.1).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "also_known_as"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-4",
+              "name": "MDOC-EAA-4",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "Onte-time use EAA\nMDOC-EAA-1 + oneTime (TS 119 472-1 clause 6.28.2).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "oneTime"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-5",
+              "name": "MDOC-EAA-5",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "Short-Lived EAA\nMDOC-EAA-1 + shortLived (TS 119 472-1 clause 6.28.2).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "shortLived"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-6",
+              "name": "MDOC-EAA-6",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "Test cases with\nMDOC-EAA-1 + deviceKeyInfo.keyAuthorizations.nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo with keyAuthorizations.nameSpaces descendant",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-7",
+              "name": "MDOC-EAA-7",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "different contents\nMDOC-EAA-1 + deviceKeyInfo.keyAuthorizations.dataElements\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with dataElements child",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .dataElements",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-8",
+              "name": "MDOC-EAA-8",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "of deviceKeyInfo\nMDOC-EAA-1 + deviceKeyInfo.keyAuthorizations\n    .dataElements and \n    .nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with nameSpaces and dataElements children",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .nameSpaces\n        .dataElements",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-9",
+              "name": "MDOC-EAA-9",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "MDOC-EAA-1 + MSO.status.identifier_list\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5\n\n.status.identifier_list",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil",
+                    "status\n   . identifier_list"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-EAA-10",
+              "name": "MDOC-EAA-10",
+              "subtitle": "ISO-mdoc EAA (no mdL)",
+              "description": "MDOC-EAA-1 + Optional elements in section 7.2 of ISO 18013-5\n. Mandatory and some Optional elements as per section 7.2.1 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ISO-mdoc QEAA (no mdL)",
+          "notes": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc QEAA different than mdL\nISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+          "test_cases": [
+            {
+              "id": "MDOC-QEAA-1",
+              "name": "MDOC-QEAA-1",
+              "subtitle": "ISO-mdoc QEAA (no mdL)",
+              "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5\n\n. Mandatory components of TS 119 472-1\n\n. Mandatory category component identifying the QEAA as a QEAA\n\n. Some optional components of TS 119 472-1",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:qualified\")"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-QEAA-2",
+              "name": "MDOC-QEAA-2",
+              "subtitle": "ISO-mdoc QEAA (no mdL)",
+              "description": "Additions to claims set\nMDOC-QEAA-1 + iss_reg_id (TS 119 472-1 clause 6.2.4.2).\nIssuer:legal entity and registration identifier applicable\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+                    "iss_reg_id"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-QEAA-3",
+              "name": "MDOC-QEAA-3",
+              "subtitle": "ISO-mdoc QEAA (no mdL)",
+              "description": "QEAA with pseudonym\nMDOC-QEAA-1 - given_name - family_name - document_number + also_knwon (TS 119 472-1 clause 6.2.5.1).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+                    "also_known_as"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-QEAA-4",
+              "name": "MDOC-QEAA-4",
+              "subtitle": "ISO-mdoc QEAA (no mdL)",
+              "description": "Onte-time use QEAA\nMDOC-QEAA-1 + oneTime (TS 119 472-1 clause 6.28.2).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+                    "oneTime"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-QEAA-5",
+              "name": "MDOC-QEAA-5",
+              "subtitle": "ISO-mdoc QEAA (no mdL)",
+              "description": "Short-Lived QEAA\nMDOC-QEAA-1 + shortLived (TS 119 472-1 clause 6.28.2).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+                    "shortLived"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ISO-mdoc PuB-EAA (no mdL)",
+          "notes": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc PuB-EAA different than mdL\nISO-mdoc PuB-EAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+          "test_cases": [
+            {
+              "id": "MDOC-PuBEAA-1",
+              "name": "MDOC-PuBEAA-1",
+              "subtitle": "ISO-mdoc PuB-EAA (no mdL)",
+              "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5\n\n. Mandatory components of TS 119 472-1\n\n. Mandatory category component identifying the PuB-EAA as a PuB-EAA\n\n. Some optional components of TS 119 472-1",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:pub)"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-PuBEAA-2",
+              "name": "MDOC-PuBEAA-2",
+              "subtitle": "ISO-mdoc PuB-EAA (no mdL)",
+              "description": "Additions to claims set\nMDOC-PuBEAA-1 + iss_reg_id (TS 119 472-1 clause 6.2.4.2).\nIssuer:legal entity and registration identifier applicable\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:pub)",
+                    "iss_reg_id"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-PuBEAA-3",
+              "name": "MDOC-PuBEAA-3",
+              "subtitle": "ISO-mdoc PuB-EAA (no mdL)",
+              "description": "PuB-EAA with pseudonym\nMDOC-PuBEAA-1 - given_name - family_name - document_number + also_knwon (TS 119 472-1 clause 6.2.5.1).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:pub)",
+                    "also_known_as"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-PuBEAA-4",
+              "name": "MDOC-PuBEAA-4",
+              "subtitle": "ISO-mdoc PuB-EAA (no mdL)",
+              "description": "Onte-time use PuB-EAA\nMDOC-PuBEAA-1 + oneTime (TS 119 472-1 clause 6.28.2).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category (\"urn:etsi:esi:eaa:eu:pub)",
+                    "oneTime"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "MDOC-PuBEAA-5",
+              "name": "MDOC-PuBEAA-5",
+              "subtitle": "ISO-mdoc PuB-EAA (no mdL)",
+              "description": "Short-Lived PuB-EAA\nMDOC-PuBEAA-1 + shortLived (TS 119 472-1 clause 6.28.2).",
+              "sections": [
+                {
+                  "title": "Protected header",
+                  "items": [
+                    "alg (1)",
+                    "x5chain (33)"
+                  ]
+                },
+                {
+                  "title": "CWT-claims (15)",
+                  "items": [
+                    "iat (6)"
+                  ]
+                },
+                {
+                  "title": "Payload #6.24 (bstr .cbor MobileSecurityObject)",
+                  "items": [
+                    "version (\"1.0\")",
+                    "digestAltorithm",
+                    "valueDigests",
+                    "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+                    "docType (the type assigned to mdL)",
+                    "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+                  ]
+                },
+                {
+                  "title": "Signature",
+                  "items": []
+                },
+                {
+                  "title": "NameSpace",
+                  "items": [
+                    "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+                    "family_name",
+                    "given_name",
+                    "birth_date",
+                    "issue_date",
+                    "expiry_date",
+                    "issuing_country",
+                    "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+                    "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+                    "category(\"urn:etsi:esi:eaa:eu:pub)\"",
+                    "shortLived"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
