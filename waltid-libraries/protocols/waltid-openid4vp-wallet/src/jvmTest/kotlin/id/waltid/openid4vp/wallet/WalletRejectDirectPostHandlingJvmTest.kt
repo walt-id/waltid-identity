@@ -27,7 +27,7 @@ class WalletRejectDirectPostHandlingJvmTest {
                     responseMode = OpenID4VPResponseMode.DIRECT_POST,
                     state = "state-123",
                 ),
-                error = WalletPresentFunctionality2.Oid4vpErrorCode.access_denied,
+                error = WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED,
                 errorDescription = "User denied",
             ).getOrThrow()
 

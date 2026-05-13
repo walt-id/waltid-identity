@@ -40,7 +40,7 @@ class WalletRejectHandlingTest {
                 responseMode = OpenID4VPResponseMode.FRAGMENT,
                 state = "state-123",
             ),
-            error = WalletPresentFunctionality2.Oid4vpErrorCode.access_denied,
+            error = WalletPresentFunctionality2.OID4VPErrorCode.ACCESS_DENIED,
             errorDescription = "User denied",
         ).getOrThrow()
 
@@ -73,7 +73,7 @@ class WalletRejectHandlingTest {
                 responseMode = OpenID4VPResponseMode.QUERY,
                 state = "state-abc",
             ),
-            error = WalletPresentFunctionality2.Oid4vpErrorCode.invalid_request,
+            error = WalletPresentFunctionality2.OID4VPErrorCode.INVALID_REQUEST,
             errorDescription = "bad request",
         ).getOrThrow()
 

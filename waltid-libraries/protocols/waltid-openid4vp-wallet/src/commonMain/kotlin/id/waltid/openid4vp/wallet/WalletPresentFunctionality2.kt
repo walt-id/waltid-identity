@@ -154,20 +154,19 @@ object WalletPresentFunctionality2 {
      * future spec addition is needed before this enum is updated, use
      * [walletRejectHandling]'s String overload.
      */
-    @Suppress("EnumEntryName")
-    enum class Oid4vpErrorCode(val code: String) {
-        access_denied("access_denied"),
-        invalid_request("invalid_request"),
-        invalid_client("invalid_client"),
-        invalid_scope("invalid_scope"),
-        unauthorized_client("unauthorized_client"),
-        unsupported_response_type("unsupported_response_type"),
-        server_error("server_error"),
-        temporarily_unavailable("temporarily_unavailable"),
-        vp_formats_not_supported("vp_formats_not_supported"),
-        invalid_request_uri_method("invalid_request_uri_method"),
-        invalid_transaction_data("invalid_transaction_data"),
-        wallet_unavailable("wallet_unavailable"),
+    enum class OID4VPErrorCode(val code: String) {
+        ACCESS_DENIED("access_denied"),
+        INVALID_REQUEST("invalid_request"),
+        INVALID_CLIENT("invalid_client"),
+        INVALID_SCOPE("invalid_scope"),
+        UNAUTHORIZED_CLIENT("unauthorized_client"),
+        UNSUPPORTED_RESPONSE_TYPE("unsupported_response_type"),
+        SERVER_ERROR("server_error"),
+        TEMPORARILY_UNAVAILABLE("temporarily_unavailable"),
+        VP_FORMATS_NOT_SUPPORTED("vp_formats_not_supported"),
+        INVALID_REQUEST_URI_METHOD("invalid_request_uri_method"),
+        INVALID_TRANSACTION_DATA("invalid_transaction_data"),
+        WALLET_UNAVAILABLE("wallet_unavailable"),
     }
 
     /**
@@ -181,13 +180,13 @@ object WalletPresentFunctionality2 {
      */
     suspend fun walletRejectHandling(
         authorizationRequest: AuthorizationRequest,
-        error: Oid4vpErrorCode = Oid4vpErrorCode.access_denied,
+        error: OID4VPErrorCode = OID4VPErrorCode.ACCESS_DENIED,
         errorDescription: String? = null,
     ): Result<WalletPresentResult> = walletRejectHandling(authorizationRequest, error.code, errorDescription)
 
     /**
      * String overload of [walletRejectHandling] for forward-compatibility with error codes
-     * not yet in [Oid4vpErrorCode]. Prefer the typed variant.
+     * not yet in [OID4VPErrorCode]. Prefer the typed variant.
      */
     suspend fun walletRejectHandling(
         authorizationRequest: AuthorizationRequest,
