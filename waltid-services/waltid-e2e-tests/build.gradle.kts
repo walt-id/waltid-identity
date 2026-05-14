@@ -25,9 +25,9 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    testImplementation("com.nimbusds:nimbus-jose-jwt:10.9")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+    testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.10")
 
     // Multiplatform / Hashes
     testImplementation(identityLibs.kotlincrypto.hash.sha2)
