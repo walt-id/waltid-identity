@@ -178,7 +178,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
                 KeyManager.resolveSerializedKey(cliKeyFile.readText()) as JWKKey
             }
             configKeyFile != null -> {
-                val file = File(configKeyFile)
+                val file = ConfigManager.resolvePath(configKeyFile)
                 echo("Loading $name key from config file: ${file.absolutePath}")
                 KeyManager.resolveSerializedKey(file.readText()) as JWKKey
             }
@@ -204,7 +204,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
                 cliCertFile.readText()
             }
             configCertFile != null -> {
-                val file = File(configCertFile)
+                val file = ConfigManager.resolvePath(configCertFile)
                 echo("Loading certificate from config file: ${file.absolutePath}")
                 file.readText()
             }

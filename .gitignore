@@ -190,3 +190,6 @@ iOSInjectionProject/
 /waltid-services/waltid-issuer-api/k8s/cert-device-potential.pem
 /waltid-services/waltid-issuer-api/k8s/ec_device_key.pem
 /waltid-services/waltid-etsi-plugtest-cli/verification-reports/
+/waltid-services/waltid-etsi-plugtest-cli/output/
+/waltid-services/waltid-etsi-plugtest-cli/config/key.jwk
+/waltid-services/waltid-etsi-plugtest-cli/config/cert.pem

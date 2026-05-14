@@ -48,6 +48,7 @@ data class MdocConfig(
 object ConfigManager {
 
     private var loadedConfig: EtsiConfig? = null
+    private var configFileDir: File? = null
 
     @OptIn(ExperimentalHoplite::class)
     fun <T : Any> loadConfig(configFile: File?, type: KClass<T>): T {
@@ -61,6 +62,9 @@ object ConfigManager {
         }
 
         val existingConfig = configPaths.firstOrNull { it.exists() }
+        
+        // Store the config file directory for resolving relative paths
+        configFileDir = existingConfig?.parentFile
 
         val builder = ConfigLoaderBuilder.default()
             .withExplicitSealedTypes()
@@ -95,5 +99,35 @@ object ConfigManager {
 
     fun clearConfig() {
         loadedConfig = null
+        configFileDir = null
+    }
+    
+    fun resolvePath(path: String): File {
+        val file = File(path)
+        
+        // If absolute path, return as-is
+        if (file.isAbsolute) {
+            return file
+        }
+        
+        // Try relative to config file directory first
+        configFileDir?.let { configDir ->
+            val relativeToConfig = File(configDir, path)
+            if (relativeToConfig.exists()) {
+                log.debug { "Resolved path '$path' relative to config dir: ${relativeToConfig.absolutePath}" }
+                return relativeToConfig
+            }
+        }
+        
+        // Try relative to current working directory
+        val relativeToWorkDir = File(path)
+        if (relativeToWorkDir.exists()) {
+            log.debug { "Resolved path '$path' relative to working dir: ${relativeToWorkDir.absolutePath}" }
+            return relativeToWorkDir
+        }
+        
+        // Return the path as-is (will fail later if it doesn't exist)
+        log.debug { "Path '$path' not found, returning as-is" }
+        return file
     }
 }

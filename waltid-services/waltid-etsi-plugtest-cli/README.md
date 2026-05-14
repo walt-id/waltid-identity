@@ -21,6 +21,14 @@ Configuration files are searched in the following order:
 3. `etsi.conf` (relative to working directory)  
 4. `~/.config/waltid/etsi.conf`
 
+### Path Resolution
+
+Paths in the configuration file can be:
+- **Absolute paths**: Used as-is (e.g., `/home/user/keys/issuer.jwk`)
+- **Relative paths**: Resolved relative to the config file directory first, then the working directory
+
+When running via Gradle, the working directory is the module directory (`waltid-services/waltid-etsi-plugtest-cli`).
+
 ### Example Configuration
 
 See `config/etsi.conf` for a full example with all options documented.
@@ -29,11 +37,13 @@ See `config/etsi.conf` for a full example with all options documented.
 # config/etsi.conf
 
 issuer {
-    # Path to issuer JWK key file
-    keyFile = "/path/to/issuer-key.jwk"
+    # Paths relative to config file directory
+    keyFile = "key.jwk"
+    certificateFile = "cert.pem"
     
-    # Path to issuer certificate chain (PEM format)
-    certificateFile = "/path/to/issuer-cert.pem"
+    # Or use absolute paths
+    # keyFile = "/path/to/issuer-key.jwk"
+    # certificateFile = "/path/to/issuer-cert.pem"
     
     # Issuer URL for SD-JWT-VC
     url = "https://issuer.example.com"
@@ -41,7 +51,7 @@ issuer {
 
 holder {
     # Path to holder JWK key file (for key binding)
-    keyFile = "/path/to/holder-key.jwk"
+    keyFile = "holder-key.jwk"
 }
 
 output {
