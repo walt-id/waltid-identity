@@ -19,6 +19,9 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
@@ -151,6 +154,7 @@ object WalletPresentFunctionality2 {
 
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
+        supportedTransactionDataTypes: Set<String> = emptySet(),
 
         // TODO: selected credentials
 
@@ -201,6 +205,11 @@ object WalletPresentFunctionality2 {
         }.getOrThrow()
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
+        validateRequestTransactionData(
+            transactionData = authorizationRequest.transactionData,
+            supportedTypes = supportedTransactionDataTypes,
+            credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+        )
 
         require(authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN) {
             TODO("Currently only ResponseMode 'vp_token' is supported")
@@ -217,6 +226,8 @@ object WalletPresentFunctionality2 {
 
 
         if (holderPoliciesToRun != null) {
+            // transaction_data checks are intentionally not implemented as HolderPolicy checks:
+            // HolderPolicyEngine receives credentials only and has no authorization-request context.
             // TODO: ----------------- Handle disclosures from DcqlMatchResult
 
             val relevantHolderPolicies = holderPoliciesToRun
@@ -464,7 +475,8 @@ object WalletPresentFunctionality2 {
         nonce: String,
         audience: String?,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
-        holderKey: Key
+        holderKey: Key,
+        transactionData: List<String>? = null,
     ): String {
         selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
@@ -490,6 +502,14 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
+        val decodedTransactionData = validateRequestTransactionData(transactionData)
+        val transactionDataHashAlgorithm = resolveHashAlgorithm(decodedTransactionData)
+        val transactionDataHashes = transactionDataHashAlgorithm?.let {
+            calculateTransactionDataHashes(
+                transactionData = transactionData.orEmpty(),
+                algorithm = it,
+            )
+        }
 
         val jwsHeaders = buildJsonObject {
             //put("alg", JsonPrimitive(holderKey.algorithm)) // e.g., "ES256"
@@ -504,6 +524,18 @@ object WalletPresentFunctionality2 {
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
             // Add exp if needed
             put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
+            transactionDataHashes?.takeIf { it.isNotEmpty() }?.let { hashes ->
+                put(
+                    "transaction_data_hashes",
+                    buildJsonArray { hashes.forEach { add(JsonPrimitive(it)) } },
+                )
+                if (decodedTransactionData.any { !it.transactionData.transactionDataHashesAlg.isNullOrEmpty() }) {
+                    put(
+                        "transaction_data_hashes_alg",
+                        JsonPrimitive(transactionDataHashAlgorithm),
+                    )
+                }
+            }
         }
         return holderKey.signJws(plaintext = kbJwtPayload.toString().encodeToByteArray(), headers = jwsHeaders)
     }

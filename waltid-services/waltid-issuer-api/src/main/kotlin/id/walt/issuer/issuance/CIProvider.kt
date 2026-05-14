@@ -20,6 +20,8 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
@@ -62,6 +64,8 @@ import org.cose.java.OneKey
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+
+private const val MDOC_TRANSACTION_DATA_NAMESPACE = "org.waltid.openid4vp.transaction_data"
 
 
 /**
@@ -492,7 +496,8 @@ open class CIProvider(
                         holderKey.publicKey,
                         null
                     ).AsCBOR().EncodeToBytes()
-                )
+                ),
+                keyAuthorizations = buildTransactionDataKeyAuthorizations(),
             ),
             cryptoProvider = cryptoProvider,
             keyID = keyID,
@@ -512,6 +517,9 @@ open class CIProvider(
             customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
         )
     }
+
+    private fun buildTransactionDataKeyAuthorizations(): MapElement =
+        mapOf("nameSpaces" to listOf(MDOC_TRANSACTION_DATA_NAMESPACE.toDataElement()).toDataElement()).toDataElement()
 
     fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,

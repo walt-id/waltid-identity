@@ -4,12 +4,24 @@ import id.walt.credentials.presentations.formats.DcSdJwtPresentation
 import id.walt.credentials.presentations.formats.JwtVcJsonPresentation
 import id.walt.did.dids.DidService
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlin.test.assertNull
+import kotlin.test.assertEquals
 import kotlin.test.Test
 
 class PresentationTest {
 
     companion object {
         var hasInit = false
+        private val persistedPresentationJson = Json {
+            explicitNulls = false
+        }
 
         suspend fun init() {
             hasInit = true
@@ -85,6 +97,47 @@ class PresentationTest {
         println("Expecting failure. Is failure = ${result.isFailure}. Exception = ${result.exceptionOrNull()}")
 
     }
+
+    @Test
+    fun testDcSdJwtPresentationDeserializesWithoutTransactionDataFields() = runTest {
+        init()
+        val presentation = DcSdJwtPresentation.parse(sampleDcSdJwtPresentation())
+            .getOrThrow()
+        val persistedPresentation = persistedPresentationJson.encodeToString(
+            DcSdJwtPresentation.serializer(),
+            presentation,
+        )
+
+        val decoded = Json.decodeFromString<DcSdJwtPresentation>(persistedPresentation)
+
+        assertNull(decoded.transactionDataHashes)
+        assertNull(decoded.transactionDataHashesAlg)
+    }
+
+    @Test
+    fun testDcSdJwtPresentationDeserializesWithTransactionDataFields() = runTest {
+        init()
+        val presentation = DcSdJwtPresentation.parse(sampleDcSdJwtPresentation())
+            .getOrThrow()
+        val persistedPresentation = persistedPresentationJson.encodeToString(
+            DcSdJwtPresentation.serializer(),
+            presentation,
+        )
+        val persistedJson = Json.parseToJsonElement(persistedPresentation).jsonObject
+        val withTransactionDataFields = buildJsonObject {
+            persistedJson.forEach { (key, value) -> put(key, value) }
+            put("transactionDataHashes", JsonArray(listOf(JsonPrimitive("hash-1"), JsonPrimitive("hash-2"))))
+            put("transactionDataHashesAlg", "sha-256")
+        }
+
+        val decoded = Json.decodeFromString<DcSdJwtPresentation>(withTransactionDataFields.toString())
+
+        assertEquals(listOf("hash-1", "hash-2"), decoded.transactionDataHashes)
+        assertEquals("sha-256", decoded.transactionDataHashesAlg)
+    }
+
+    private fun sampleDcSdJwtPresentation(): String =
+        "eyJ4NWMiOlsiTUlJQ0NUQ0NBYkNnQXdJQkFnSVVmcXlpQXJKWm9YN002MS80NzNVQVZpMi9VcGd3Q2dZSUtvWkl6ajBFQXdJd0tERUxNQWtHQTFVRUJoTUNRVlF4R1RBWEJnTlZCQU1NRUZkaGJIUnBaQ0JVWlhOMElFbEJRMEV3SGhjTk1qVXdOakF5TURZME1URXpXaGNOTWpZd09UQXlNRFkwTVRFeldqQXpNUXN3Q1FZRFZRUUdFd0pCVkRFa01DSUdBMVVFQXd3YlYyRnNkR2xrSUZSbGMzUWdSRzlqZFcxbGJuUWdVMmxuYm1WeU1Ga3dFd1lIS29aSXpqMENBUVlJS29aSXpqMERBUWNEUWdBRVB6cDZlVlNBZFhFUnFBcDhxOE91REVobDJJTEdBYW9hUVhUSjJzRDJnNVhwM0NGUURNck1wUi9TUTBqdC9qVE9xRXhrMVBSempRNzlhS3BJc0pNMW1xT0JyRENCcVRBZkJnTlZIU01FR0RBV2dCVHhDbjJuV01yRTcwcVhiNjE0VTE0QndlWTJhekFkQmdOVkhRNEVGZ1FVeDVxa09MQzRscGwxeHBZWkdtRjlITHh0cDBnd0RnWURWUjBQQVFIL0JBUURBZ2VBTUJvR0ExVWRFZ1FUTUJHR0QyaDBkSEJ6T2k4dmQyRnNkQzVwWkRBVkJnTlZIU1VCQWY4RUN6QUpCZ2NvZ1l4ZEJRRUNNQ1FHQTFVZEh3UWRNQnN3R2FBWG9CV0dFMmgwZEhCek9pOHZkMkZzZEM1cFpDOWpjbXd3Q2dZSUtvWkl6ajBFQXdJRFJ3QXdSQUlnSFRhcDNjNnlDVU5oRFZmWldCUE1LajlkQ1daYnJNRTAza2g5TkpUYncxRUNJQXZWdnVHbGw5TzIxZVIxNlNrSkhIQUExcFBjb3ZoY1R2RjlmejljYzY2TSJdLCJ0eXAiOiJkYytzZC1qd3QiLCJhbGciOiJFUzI1NiJ9.eyJfc2QiOlsiMFlvVXQxVXNjc24xLTEzQWI3dTkzSDJCdGI1aGNiZks4OXFXMGlETTdWTSIsIkwtUHZWYlNNbWVtQngyZFY0b0UzcEEyUXhCNVg3dU0tb2dGWFU0T1hYNmciLCJPSTZmMnQzT2RuZ04tQ1IwNXJzcENfUWZqZEVJWG13TkR5LVNBUlNjTHZVIiwiUXBla1hnYmowSm92UldEc2J5Wm0ySVpPQzRnM3o1aGRISXY4aWd3NkNSRSIsImFXSGhleEtiVEdodXVWb0RoMnhrSkdYdWttTHJ0UmtNV3A1ZnJqM1BKSkEiLCJ3enJsVmNGb3RCd1hvNFdGSlhhaVNYOHd6ckpvbXRzNFRmUG9TcTdTOW1NIiwieGwzMTVTam5WcGRhZlVKbFQtRXowVkt5aHpnX0s5WTVJY2RSdzlhWnBiRSJdLCJ2Y3QiOiJ1cm46ZXVkaTpwaWQ6MSIsImlzcyI6Imh0dHBzOi8vbG9jYWxob3N0LmVtb2JpeC5jby51azo4NDQzL3Rlc3QvMlVRejBIRUxnYXFBOWhoIiwiY25mIjp7Imp3ayI6eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6ImUxaWZnNnlPUnpvbUtncEE5ZmhFY2xmTE9EX1l5aTdHWUVHRjVEc2dleXMiLCJ5IjoiWmNnWXBrbi1IVHNfZDJ0Q3dSeUE2T0lsN29STE1GTGtVOU92d2tkMmRfOCJ9fSwiZXhwIjoxNzYyMTQ3NjE0LCJpYXQiOjE3NjA5MzgwMTQsImFnZV9lcXVhbF9vcl9vdmVyIjp7Il9zZCI6WyItbHZ5MHlWQUxSUGUyMGk0UVZoaWlrUFZNdmlBUzJIMVl6VTJOMHpVcVVjIiwiN0hZR05qb2Jtd09YV01sRXBnSkZlN0loTnlPQV9jWWI3emdRdEZ3WmlsbyIsIkxaSTJnM3FRZWJTSE1Dajh2OEdxWUlyRDNERFdjWEhLcV9hazVJN0FpQU0iLCJtempqQjd1Z3FfSlJNTHZrcTFMZndlUmczZXlISURRVS1iNnFlNVZwcy04IiwieWtfN01WRGNaS2dBRE1FUloxZ2Rua2tGQmlYU29weTd3UmJKSGJnMk1pdyJdfX0.yOiR_tahOyeu8FNq_X0XMyCgtZ8JnXQ1w1_9YksCeV_ebRJGoWGd6dZxPFftO4ZUDkDfGqx_bt2IvXs7uKFqMA~WyJTQTVfTUhvZkJFclNWbWl6S245VktnIiwiZ2l2ZW5fbmFtZSIsIkplYW4iXQ~WyJHS3JLMGlWNXA5djNJWURTYnVUN21RIiwiZmFtaWx5X25hbWUiLCJEdXBvbnQiXQ~WyJSTm9pYVF0RmZGQTFaRDZPXy1sbzhnIiwiYmlydGhkYXRlIiwiMTk4MC0wNS0yMyJd~WyJRYW9zRHRreXRxazJvbHZuSFBjVFdBIiwiYWdlX2luX3llYXJzIiwiNDQiXQ~WyJsTXZ6MVBkN1lrZE5xYnFjeDJxbDV3IiwiMjEiLHRydWVd~WyI5a0Z5bGdXXzB0b01OVUZNREQ3S3ZnIiwiNjUiLGZhbHNlXQ~eyJ0eXAiOiJrYitqd3QiLCJhbGciOiJFUzI1NiJ9.eyJzZF9oYXNoIjoiZ0NMeHF5ZXdpRE0wRzhCdEVTWjJFNzk1aTA4U1pIUjFTZUotSXNDeHZ1MCIsImF1ZCI6Ing1MDlfc2FuX2Ruczp0ZXN0MTIzIiwiaWF0IjoxNzYwOTM4MDE0LCJub25jZSI6IjNjMDRjNWZjLTkzMDYtNDBmYS1iNTQ0LTBlMDA0NzRhY2UwOSJ9.W07BdEyH_TMXxhdPzYwPaitcZ9SYxapQt8Q082UwyVxb8V4u1cIcJQ0tdAfhEaYk0--ymThiGsHuUwvjAH5xiw"
 
 
 }
