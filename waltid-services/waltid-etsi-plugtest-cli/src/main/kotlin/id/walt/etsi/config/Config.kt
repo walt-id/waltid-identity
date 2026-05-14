@@ -22,7 +22,8 @@ data class IssuerConfig(
     val keyJwk: String? = null,
     val certificateFile: String? = null,
     val certificatePem: String? = null,
-    val url: String = "https://issuer.example.com"
+    val url: String = "https://issuer.example.com",
+    val x5u: String? = null  // URL where the X.509 certificate chain can be fetched
 )
 
 data class HolderConfig(

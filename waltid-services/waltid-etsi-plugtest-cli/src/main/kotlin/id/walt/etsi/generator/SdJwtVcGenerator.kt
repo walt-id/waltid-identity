@@ -6,8 +6,11 @@ import id.walt.etsi.TestCase
 import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
+import java.io.ByteArrayInputStream
+import java.security.MessageDigest
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.util.Base64
 
 private val log = KotlinLogging.logger {}
 
@@ -26,11 +29,13 @@ object SdJwtVcGenerator {
         issuerCertificatePem: String,
         holderKey: Key? = null,
         issuerUrl: String = "https://issuer.example.com",
-        vct: String = "urn:etsi:eaa:credential"
+        vct: String = "urn:etsi:eaa:credential",
+        x5u: String? = null
     ): SdJwtGenerationResult {
         log.info { "Generating SD-JWT-VC for test case: ${testCase.id}" }
 
         val x5cChain = buildX5cChain(issuerCertificatePem)
+        val x5tS256 = computeX5tS256(issuerCertificatePem)
         val payload = buildPayload(testCase, issuerUrl, vct, holderKey)
         val selectiveDisclosures = buildSelectiveDisclosures(testCase, payload)
 
@@ -42,6 +47,16 @@ object SdJwtVcGenerator {
         val additionalHeaders = mutableMapOf<String, Any>(
             "x5c" to x5cChain
         )
+        
+        // Add x5t#S256 (certificate thumbprint) if computed
+        if (x5tS256 != null) {
+            additionalHeaders["x5t#S256"] = x5tS256
+        }
+        
+        // Add x5u (certificate URL) if provided
+        if (x5u != null) {
+            additionalHeaders["x5u"] = x5u
+        }
 
         val cryptoProvider = WaltIdJWTCryptoProvider(issuerKey)
         val keyId = issuerKey.getKeyId()
@@ -58,6 +73,12 @@ object SdJwtVcGenerator {
             put("alg", "ES256")
             put("typ", "dc+sd-jwt")
             put("x5c", JsonArray(x5cChain.map { JsonPrimitive(it) }))
+            if (x5tS256 != null) {
+                put("x5t#S256", x5tS256)
+            }
+            if (x5u != null) {
+                put("x5u", x5u)
+            }
         }
 
         return SdJwtGenerationResult(
@@ -93,6 +114,35 @@ object SdJwtVcGenerator {
                 .replace("\r", "")
                 .trim()
             listOf(singleCert)
+        }
+    }
+    
+    private fun computeX5tS256(certificatePem: String): String? {
+        return try {
+            // Extract the first certificate from PEM
+            val pemContent = certificatePem
+                .replace("-----BEGIN CERTIFICATE-----", "")
+                .replace("-----END CERTIFICATE-----", "")
+                .replace("\n", "")
+                .replace("\r", "")
+                .trim()
+            
+            // Decode the base64 certificate to get DER bytes
+            val derBytes = Base64.getDecoder().decode(pemContent)
+            
+            // Parse as X509Certificate to get the encoded form
+            val certFactory = CertificateFactory.getInstance("X.509")
+            val cert = certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
+            
+            // Compute SHA-256 hash of the DER-encoded certificate
+            val digest = MessageDigest.getInstance("SHA-256")
+            val thumbprint = digest.digest(cert.encoded)
+            
+            // Return as base64url-encoded string (no padding)
+            Base64.getUrlEncoder().withoutPadding().encodeToString(thumbprint)
+        } catch (e: Exception) {
+            log.warn { "Could not compute x5t#S256 thumbprint: ${e.message}" }
+            null
         }
     }
 

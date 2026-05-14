@@ -99,6 +99,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
 
         val effectiveIssuerUrl = issuerUrl ?: config.issuer.url
         val effectiveVct = vct ?: config.sdjwt.vct
+        val effectiveX5u = config.issuer.x5u
 
         var generatedCount = 0
 
@@ -124,7 +125,8 @@ class GenerateCommand : CliktCommand(name = "generate") {
                                     issuerCertificatePem = issuerCert,
                                     holderKey = if (testCase.hasKeyBinding) holderKey else null,
                                     issuerUrl = effectiveIssuerUrl,
-                                    vct = effectiveVct
+                                    vct = effectiveVct,
+                                    x5u = effectiveX5u
                                 )
 
                                 val fileName = config.output.fileNamePattern
