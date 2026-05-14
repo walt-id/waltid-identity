@@ -10,8 +10,10 @@ import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.oid4vc.OpenID4VCI
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.oid4vc.data.CredentialFormat as Oid4vcCredentialFormat
 import id.walt.oid4vc.data.DisplayProperties
+import id.walt.oid4vc.data.LogoProperties
 import id.walt.oid4vc.data.ProofOfPossession
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.json.JsonObject
@@ -31,7 +33,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
         x5Chain: List<String>?,
-        display: List<DisplayProperties>?,
+        display: List<CredentialDisplay>?,
         w3cVersion: String?,
     ): CredentialResponseResult {
         return try {
@@ -65,7 +67,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                 selectiveDisclosure = selectiveDisclosure,
                 dataMapping = dataMapping,
                 x5Chain = x5Chain,
-                display = display,
+                display = display?.map { it.toLegacyDisplayProperties() },
                 sdJwtTypeHeader = configuration.format.value,
             )
 
@@ -80,4 +82,15 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
             CredentialResponseResult.Failure(OAuthError("invalid_request", e.message))
         }
     }
+
+    private fun CredentialDisplay.toLegacyDisplayProperties(): DisplayProperties =
+        DisplayProperties(
+            name = name,
+            locale = locale,
+            logo = logo?.let { LogoProperties(url = it.uri, altText = it.altText) },
+            description = description,
+            backgroundColor = backgroundColor,
+            backgroundImage = backgroundImage?.let { LogoProperties(url = it.uri) },
+            textColor = textColor,
+        )
 }
