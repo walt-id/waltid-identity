@@ -20,9 +20,7 @@ const queryRequest = new URL("http://example.invalid" + useRoute().fullPath)
   .search; // new URL(window.location.href).search
 console.log("queryRequest: ", queryRequest);
 
-let fixedRequest = encodeURI(
-  decodeURI(fixRequest("openid://" + window.location.search)),
-);
+const fixedRequest = fixRequest("openid://" + window.location.search);
 console.log("Fixed request: ", fixedRequest);
 
 const encodedWalletRequestUrl = encodeRequest(fixedRequest);

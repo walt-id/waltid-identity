@@ -34,9 +34,7 @@ from different blockchain ecosystems like Ethereum, Polygon, and more.
 
 # Protocol Support
 
-The wallet-api currently supports OpenID4VCI Draft 11 and Draft 13, and OpenID4VP Draft 14 and Draft 20.
-
-**NOTE**: The wallet-api does not support OpenID4VP 1.0 yet, which is used by the new verifier service [waltid-verifier-api2](../waltid-verifier-api2). You should only use this api alongside the original issuer and verifier services which match the same draft specifications.
+The wallet-api currently supports OpenID4VCI Draft 11 and Draft 13, OpenID4VP Draft 14 and Draft 20, and OpenID4VP 1.0 with routing, presentation request resolution, DCQL-based credential matching, and support for `request_uri`, unsigned `request`, and signed request-object request shapes.
 
 # How to use it
 
