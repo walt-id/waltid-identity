@@ -15,6 +15,7 @@ kotlin {
 
             // walt.id
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:waltid-did"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
