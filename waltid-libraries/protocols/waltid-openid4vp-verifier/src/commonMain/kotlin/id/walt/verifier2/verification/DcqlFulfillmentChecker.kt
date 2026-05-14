@@ -1,6 +1,8 @@
 package id.walt.verifier2.verification
 
 import id.walt.dcql.models.DcqlQuery
+import id.walt.verifier2.data.DcqlFulfillmentFailure
+import id.walt.verifier2.data.UnsatisfiedSet
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 
@@ -9,7 +11,10 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
     private val log = KotlinLogging.logger("DcqlFulfillmentChecker")
 
     @Serializable
-    class DcqlFulfillmentException(override val message: String) : IllegalArgumentException(message)
+    class DcqlFulfillmentException(
+        override val message: String,
+        val details: DcqlFulfillmentFailure = DcqlFulfillmentFailure(),
+    ) : IllegalArgumentException(message)
 
     /**
      * Checks if the set of successfully validated presentations (identified by their query IDs)
@@ -18,7 +23,11 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
      * @param dcqlQuery The original DCQL query sent to the Wallet.
      * @param successfullyValidatedQueryIds A set of `id`s from `CredentialQuery` for which
      *                                      at least one valid presentation was received.
-     * @return True if all DCQL requirements are met, false otherwise.
+     * @return Success if all DCQL requirements are met; otherwise a [DcqlFulfillmentException]
+     *         with structured failure details.
+     *
+     * Note: when multiple required credential_sets are unsatisfied, the exception details enumerate
+     * all of them rather than short-circuiting on the first.
      */
     fun checkOverallDcqlFulfillment(
         dcqlQuery: DcqlQuery,
@@ -39,15 +48,17 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
             val missingRequiredQueries = allOriginalQueryIds - successfullyValidatedQueryIds
 
             if (missingRequiredQueries.isNotEmpty()) {
-                log.warn {
-                    "DCQL Fulfillment Failed (no credential_sets): Missing presentations for required query IDs: $missingRequiredQueries. " +
-                            "All individual queries are considered required when no credential_sets are defined."
-                }
-
+                val message = "DCQL Fulfillment Failed (no credential_sets): Missing presentations for required query IDs: $missingRequiredQueries. " +
+                        "All individual queries are considered required when no credential_sets are defined."
+                log.warn { message }
                 return Result.failure(
                     DcqlFulfillmentException(
-                        "DCQL Fulfillment Failed (no credential_sets): Missing presentations for required query IDs: $missingRequiredQueries. " +
-                                "All individual queries are considered required when no credential_sets are defined."
+                        message = message,
+                        details = DcqlFulfillmentFailure(
+                            missingQueryIds = missingRequiredQueries,
+                            unsatisfiedSets = emptyList(),
+                            successfullyValidatedQueryIds = successfullyValidatedQueryIds,
+                        ),
                     )
                 )
             }
@@ -58,6 +69,7 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
         // Case 2: credential_sets are defined
         // We need to check each CredentialSetQuery.
         // All sets where 'required' is true (or omitted) MUST be satisfied.
+        val unsatisfiedRequired = ArrayList<UnsatisfiedSet>()
         for (credentialSetQuery in dcqlQuery.credentialSets) {
             if (credentialSetQuery.required) { // 'required' defaults to true if omitted
                 // This required set must have at least one of its 'options' satisfied.
@@ -76,19 +88,7 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                 }
 
                 if (!isThisRequiredSetSatisfied) {
-                    // A required set was not satisfied
-                    log.warn {
-                        "DCQL Fulfillment Failed: A required CredentialSet was not satisfied. " +
-                                "Set options: ${credentialSetQuery.options}, " +
-                                "Successfully validated query IDs: $successfullyValidatedQueryIds"
-                    }
-                    return Result.failure(
-                        DcqlFulfillmentException(
-                            "DCQL Fulfillment Failed: A required CredentialSet was not satisfied. " +
-                                    "Set options: ${credentialSetQuery.options}, " +
-                                    "Successfully validated query IDs: $successfullyValidatedQueryIds"
-                        )
-                    )
+                    unsatisfiedRequired += UnsatisfiedSet(options = credentialSetQuery.options)
                 }
             } else {
                 // For optional sets (required = false), we don't need to fail if they are not met.
@@ -100,6 +100,23 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
                 }
                 log.trace { "Optional CredentialSet satisfaction status: $isThisOptionalSetSatisfied. Options: ${credentialSetQuery.options}" }
             }
+        }
+
+        if (unsatisfiedRequired.isNotEmpty()) {
+            val message = "DCQL Fulfillment Failed: ${unsatisfiedRequired.size} required CredentialSet(s) not satisfied. " +
+                    "Unsatisfied sets: ${unsatisfiedRequired.map { it.options }}, " +
+                    "Successfully validated query IDs: $successfullyValidatedQueryIds"
+            log.warn { message }
+            return Result.failure(
+                DcqlFulfillmentException(
+                    message = message,
+                    details = DcqlFulfillmentFailure(
+                        missingQueryIds = emptySet(),
+                        unsatisfiedSets = unsatisfiedRequired,
+                        successfullyValidatedQueryIds = successfullyValidatedQueryIds,
+                    ),
+                )
+            )
         }
 
         // If we've gone through all credential sets and all *required* ones were satisfied,
@@ -116,7 +133,6 @@ object DcqlFulfillmentChecker { // Encapsulating in an object
         // it should probably be its own required set with one option.
         // For now, we assume that if credential_sets are present, they are the definitive source
         // for what combinations are required.
-
         log.debug { "DCQL Fulfillment Succeeded: All required credential_sets were satisfied." }
         return Result.success(Unit)
     }

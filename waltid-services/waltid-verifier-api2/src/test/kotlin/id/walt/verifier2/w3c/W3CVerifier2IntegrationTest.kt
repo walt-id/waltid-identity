@@ -364,6 +364,14 @@ class W3CVerifier2IntegrationTest {
                 assertNotNull(info2.policyResults)
                 assertTrue { info2.policyResults!!.overallSuccess }
                 assertEquals(2, info2.policyResults!!.vcPolicies.size)
+                assertEquals(
+                    setOf("openbadge", "universitydegree"),
+                    info2.policyResults!!.vcPolicies.map { it.queryId }.toSet()
+                )
+                assertEquals(
+                    setOf(0),
+                    info2.policyResults!!.vcPolicies.map { it.credentialIndex }.toSet()
+                )
             }
         }
     }
