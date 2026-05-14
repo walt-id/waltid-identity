@@ -391,22 +391,22 @@ class ValidateCommand : CliktCommand(name = "validate") {
             
             results.add(result)
 
-            val statusIcon = when (result.status) {
-                ValidationResult.ValidationStatus.VALID -> {
-                    validCount++
-                    "✓"
-                }
-                ValidationResult.ValidationStatus.INVALID -> {
-                    invalidCount++
-                    "✗"
-                }
-                ValidationResult.ValidationStatus.INDETERMINATE -> {
-                    indeterminateCount++
-                    "?"
-                }
+            // Count based on signature status
+            when (result.signatureStatus) {
+                ValidationResult.ValidationStatus.VALID -> validCount++
+                ValidationResult.ValidationStatus.INVALID -> invalidCount++
+                ValidationResult.ValidationStatus.INDETERMINATE -> indeterminateCount++
+            }
+            
+            // Display overall status (considers both signature and content)
+            val statusIcon = when (result.overallStatus) {
+                ValidationResult.ValidationStatus.VALID -> "✓"
+                ValidationResult.ValidationStatus.INVALID -> "✗"
+                ValidationResult.ValidationStatus.INDETERMINATE -> "?"
             }
 
-            echo("    $statusIcon ${result.status}")
+            echo("    $statusIcon ${result.overallStatus}")
+            echo("      Signature: ${result.signatureStatus}")
             if (result.errorMessage != null) {
                 echo("      Error: ${result.errorMessage}")
             }
@@ -450,14 +450,29 @@ class ValidateCommand : CliktCommand(name = "validate") {
         echo("")
         echo("Results by vendor:")
         for ((vendor, vendorResults) in byVendor) {
-            val v = vendorResults.count { it.status == ValidationResult.ValidationStatus.VALID }
-            val i = vendorResults.count { it.status == ValidationResult.ValidationStatus.INVALID }
-            val u = vendorResults.count { it.status == ValidationResult.ValidationStatus.INDETERMINATE }
-            val cv = vendorResults.count { it.contentValidation?.overallValid == true }
-            val ci = vendorResults.count { it.contentValidation?.overallValid == false }
+            val total = vendorResults.size
             
-            val contentStr = if (scrapedData != null) ", content: $cv valid/$ci invalid" else ""
-            echo("  $vendor: $v valid, $i invalid, $u indeterminate$contentStr")
+            // Overall status counts
+            val overallValid = vendorResults.count { it.overallStatus == ValidationResult.ValidationStatus.VALID }
+            val overallInvalid = vendorResults.count { it.overallStatus == ValidationResult.ValidationStatus.INVALID }
+            val overallIndet = vendorResults.count { it.overallStatus == ValidationResult.ValidationStatus.INDETERMINATE }
+            
+            // Signature status counts
+            val sigValid = vendorResults.count { it.signatureStatus == ValidationResult.ValidationStatus.VALID }
+            val sigInvalid = vendorResults.count { it.signatureStatus == ValidationResult.ValidationStatus.INVALID }
+            val sigIndet = vendorResults.count { it.signatureStatus == ValidationResult.ValidationStatus.INDETERMINATE }
+            
+            echo("")
+            echo("  $vendor ($total files):")
+            echo("    Overall:   $overallValid valid, $overallInvalid invalid, $overallIndet indeterminate")
+            echo("    Signature: $sigValid valid, $sigInvalid invalid, $sigIndet indeterminate")
+            
+            if (scrapedData != null) {
+                val contentValid = vendorResults.count { it.contentValidation?.overallValid == true }
+                val contentInvalid = vendorResults.count { it.contentValidation?.overallValid == false }
+                val contentNotChecked = vendorResults.count { it.contentValidation == null }
+                echo("    Content:   $contentValid valid, $contentInvalid invalid, $contentNotChecked not checked")
+            }
         }
     }
 }

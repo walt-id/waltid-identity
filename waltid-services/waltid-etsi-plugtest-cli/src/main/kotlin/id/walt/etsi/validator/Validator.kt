@@ -34,7 +34,7 @@ data class ValidationResult(
     val vendorId: String,
     val fileName: String,
     val testCaseId: String,
-    val status: ValidationStatus,
+    val signatureStatus: ValidationStatus,
     val verifiedAt: String,
     val hash: String,
     val details: String? = null,
@@ -46,6 +46,19 @@ data class ValidationResult(
         INVALID,
         INDETERMINATE
     }
+    
+    /**
+     * Overall status considers both signature validation AND content validation.
+     * - If signature is INVALID or INDETERMINATE, that takes precedence
+     * - If signature is VALID but content validation exists and failed, overall is INVALID
+     * - If signature is VALID and content validation passed (or wasn't performed), overall is VALID
+     */
+    val overallStatus: ValidationStatus
+        get() = when {
+            signatureStatus != ValidationStatus.VALID -> signatureStatus
+            contentValidation != null && !contentValidation.overallValid -> ValidationStatus.INVALID
+            else -> ValidationStatus.VALID
+        }
 }
 
 object ZipParser {
@@ -130,7 +143,7 @@ object CredentialValidator {
                 vendorId = vendorFile.vendorId,
                 fileName = vendorFile.fileName,
                 testCaseId = vendorFile.testCaseId,
-                status = ValidationResult.ValidationStatus.INDETERMINATE,
+                signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
                 verifiedAt = verifiedAt,
                 hash = hash,
                 errorMessage = "Validation error: ${e.message}"
@@ -161,7 +174,7 @@ object CredentialValidator {
                 vendorId = vendorFile.vendorId,
                 fileName = vendorFile.fileName,
                 testCaseId = vendorFile.testCaseId,
-                status = ValidationResult.ValidationStatus.INDETERMINATE,
+                signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
                 verifiedAt = verifiedAt,
                 hash = hash,
                 errorMessage = "Could not retrieve issuer key from credential"
@@ -174,7 +187,7 @@ object CredentialValidator {
             vendorId = vendorFile.vendorId,
             fileName = vendorFile.fileName,
             testCaseId = vendorFile.testCaseId,
-            status = if (verificationResult.isSuccess) {
+            signatureStatus = if (verificationResult.isSuccess) {
                 ValidationResult.ValidationStatus.VALID
             } else {
                 ValidationResult.ValidationStatus.INVALID
@@ -221,7 +234,7 @@ object CredentialValidator {
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
                     testCaseId = vendorFile.testCaseId,
-                    status = ValidationResult.ValidationStatus.INDETERMINATE,
+                    signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
                     verifiedAt = verifiedAt,
                     hash = hash,
                     errorMessage = "Could not retrieve issuer key from mdoc"
@@ -234,7 +247,7 @@ object CredentialValidator {
                 vendorId = vendorFile.vendorId,
                 fileName = vendorFile.fileName,
                 testCaseId = vendorFile.testCaseId,
-                status = if (verificationResult.isSuccess) {
+                signatureStatus = if (verificationResult.isSuccess) {
                     ValidationResult.ValidationStatus.VALID
                 } else {
                     ValidationResult.ValidationStatus.INVALID
@@ -266,7 +279,7 @@ object CredentialValidator {
                         vendorId = vendorFile.vendorId,
                         fileName = vendorFile.fileName,
                         testCaseId = vendorFile.testCaseId,
-                        status = ValidationResult.ValidationStatus.INDETERMINATE,
+                        signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
                         verifiedAt = verifiedAt,
                         hash = hash,
                         details = "Parsed as IssuerSigned (docType: ${mso.docType})",
@@ -281,7 +294,7 @@ object CredentialValidator {
                         vendorId = vendorFile.vendorId,
                         fileName = vendorFile.fileName,
                         testCaseId = vendorFile.testCaseId,
-                        status = ValidationResult.ValidationStatus.INDETERMINATE,
+                        signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
                         verifiedAt = verifiedAt,
                         hash = hash,
                         details = "Parsed as IssuerSigned (docType: ${mso.docType})",
@@ -296,7 +309,7 @@ object CredentialValidator {
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
                     testCaseId = vendorFile.testCaseId,
-                    status = if (signatureValid) {
+                    signatureStatus = if (signatureValid) {
                         ValidationResult.ValidationStatus.VALID
                     } else {
                         ValidationResult.ValidationStatus.INVALID
@@ -314,7 +327,7 @@ object CredentialValidator {
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
                     testCaseId = vendorFile.testCaseId,
-                    status = ValidationResult.ValidationStatus.INDETERMINATE,
+                    signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
                     verifiedAt = verifiedAt,
                     hash = hash,
                     details = "Structure: $structureInfo",
@@ -373,7 +386,14 @@ object CredentialValidator {
 object XmlReportGenerator {
 
     fun generateReport(result: ValidationResult): String {
-        val rootElement = when (result.status) {
+        // Use overallStatus (considers both signature AND content validation) for root element
+        val rootElement = when (result.overallStatus) {
+            ValidationResult.ValidationStatus.VALID -> "VALID"
+            ValidationResult.ValidationStatus.INVALID -> "INVALID"
+            ValidationResult.ValidationStatus.INDETERMINATE -> "INDETERMINATE"
+        }
+        
+        val signatureStatusText = when (result.signatureStatus) {
             ValidationResult.ValidationStatus.VALID -> "VALID"
             ValidationResult.ValidationStatus.INVALID -> "INVALID"
             ValidationResult.ValidationStatus.INDETERMINATE -> "INDETERMINATE"
@@ -387,6 +407,7 @@ object XmlReportGenerator {
             appendLine("  <VerifiedFile>${escapeXml(result.fileName)}</VerifiedFile>")
             appendLine("  <Vendor>${escapeXml(result.vendorId)}</Vendor>")
             appendLine("  <TestCaseId>${escapeXml(result.testCaseId)}</TestCaseId>")
+            appendLine("  <SignatureStatus>$signatureStatusText</SignatureStatus>")
             if (result.details != null) {
                 appendLine("  <Details>${escapeXml(result.details)}</Details>")
             }

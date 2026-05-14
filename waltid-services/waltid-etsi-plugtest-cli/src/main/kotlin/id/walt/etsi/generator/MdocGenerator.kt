@@ -1,20 +1,14 @@
 package id.walt.etsi.generator
 
 import id.walt.cose.CoseCertificate
-import id.walt.cose.CoseMac0
-import id.walt.cose.CoseHeaders
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.etsi.TestCase
-import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.issuance.MdocIssuer
-import id.walt.mdoc.objects.DeviceSigned
-import id.walt.mdoc.objects.document.DeviceAuth
-import id.walt.mdoc.objects.document.Document
-import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -31,7 +25,7 @@ object MdocGenerator {
         val testCaseId: String,
         val cborHex: String,
         val cborBytes: ByteArray,
-        val document: Document
+        val issuerSigned: IssuerSigned
     )
 
     private val defaultValueMappingFunction: (docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement) -> CborElement? =
@@ -43,6 +37,14 @@ object MdocGenerator {
             }
         }
 
+    /**
+     * Generates an mdoc in IssuerSigned format as required by ETSI plugtest.
+     * 
+     * Per the test case notes:
+     * "ISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2"
+     * 
+     * This means we output just the IssuerSigned structure, NOT the full Document wrapper.
+     */
     suspend fun generate(
         testCase: TestCase,
         issuerKey: Key,
@@ -50,7 +52,7 @@ object MdocGenerator {
         holderKey: Key,
         sampleData: Map<String, JsonObject>? = null
     ): MdocGenerationResult {
-        log.info { "Generating mdoc for test case: ${testCase.id}" }
+        log.info { "Generating mdoc (IssuerSigned format) for test case: ${testCase.id}" }
 
         val issuerCertBytes = parsePemCertificate(issuerCertificatePem)
         val issuerCertCose = listOf(CoseCertificate(issuerCertBytes))
@@ -73,23 +75,17 @@ object MdocGenerator {
             valueMappingFunction = defaultValueMappingFunction
         )
 
-        val document = Document(
-            docType = docType,
-            issuerSigned = issuerSigned,
-            deviceSigned = DeviceSigned(
-                ByteStringWrapper(DeviceNameSpaces(mapOf())),
-                DeviceAuth(deviceMac = CoseMac0(ByteArray(0), CoseHeaders(), ByteArray(0), ByteArray(0)))
-            )
-        )
-
-        val cborBytes = coseCompliantCbor.encodeToByteArray(document)
+        // ETSI plugtest expects IssuerSigned format, NOT the full Document wrapper
+        val cborBytes = coseCompliantCbor.encodeToByteArray(issuerSigned)
         val cborHex = cborBytes.toHexString()
+
+        log.debug { "Generated IssuerSigned CBOR (${cborBytes.size} bytes)" }
 
         return MdocGenerationResult(
             testCaseId = testCase.id,
             cborHex = cborHex,
             cborBytes = cborBytes,
-            document = document
+            issuerSigned = issuerSigned
         )
     }
 
