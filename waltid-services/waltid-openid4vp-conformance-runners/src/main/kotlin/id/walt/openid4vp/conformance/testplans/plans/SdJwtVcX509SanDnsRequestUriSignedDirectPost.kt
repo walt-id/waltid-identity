@@ -79,7 +79,8 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
                            "credential_format": "sd_jwt_vc",
                            "client_id_prefix": "x509_san_dns",
                            "request_method": "request_uri_signed",
-                           "response_mode": "direct_post"
+                           "vp_profile": "haip",
+                           "response_mode": "direct_post.jwt"
                          }""".trimIndent()
             )
         },

@@ -81,6 +81,7 @@ dependencies {
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
     implementation(project(":waltid-services:waltid-verifier-api2"))
+    implementation(project(":waltid-services:waltid-issuer-api"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
@@ -93,6 +94,22 @@ dependencies {
 
 application {
     mainClass.set("id.walt.openid4vp.conformance.MainKt")
+    
+    // Configure SSL truststore for conformance suite self-signed certificate
+    val truststorePath = project.file("conformance-truststore.jks").absolutePath
+    applicationDefaultJvmArgs = listOf(
+        "-Djavax.net.ssl.trustStore=$truststorePath",
+        "-Djavax.net.ssl.trustStorePassword=changeit"
+    )
+}
+
+// Configure tests to use the same truststore
+tasks.withType<Test> {
+    val truststorePath = project.file("conformance-truststore.jks").absolutePath
+    jvmArgs(
+        "-Djavax.net.ssl.trustStore=$truststorePath",
+        "-Djavax.net.ssl.trustStorePassword=changeit"
+    )
 }
 
 ktor {
