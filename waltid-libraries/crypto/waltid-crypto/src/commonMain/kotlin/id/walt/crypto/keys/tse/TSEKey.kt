@@ -305,6 +305,7 @@ class TSEKey(
             KeyType.RSA -> "rsa-2048"
             KeyType.RSA3072 -> "rsa-3072"
             KeyType.RSA4096 -> "rsa-4096"
+            KeyType.RSA6144 -> throw KeyTypeNotSupportedException(type.name) // RSA larger than 4096 is not supported
             KeyType.secp256k1 -> throw KeyTypeNotSupportedException(type.name)
         }
 

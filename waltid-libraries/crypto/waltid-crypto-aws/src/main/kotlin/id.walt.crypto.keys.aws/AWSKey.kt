@@ -64,6 +64,7 @@ class AWSKey(
             KeyType.RSA -> "RSASSA_PKCS1_V1_5_SHA_256"
             KeyType.RSA3072 -> "RSASSA_PKCS1_V1_5_SHA_384"
             KeyType.RSA4096 -> "RSASSA_PKCS1_V1_5_SHA_512"
+            KeyType.RSA6144 -> throw KeyTypeNotSupportedException(keyType.name)
             KeyType.Ed25519 -> throw KeyTypeNotSupportedException(keyType.name)
         }
     }
@@ -256,6 +257,7 @@ $encodedPk
             KeyType.RSA -> "RSA_2048"
             KeyType.RSA3072 -> "RSA_3072"
             KeyType.RSA4096 -> "RSA_4096"
+            KeyType.RSA6144 -> throw KeyTypeNotSupportedException(type.name)
             KeyType.Ed25519 -> throw KeyTypeNotSupportedException(type.name)
         }
 
