@@ -128,7 +128,7 @@ object EntraVerifierApi {
 
     val callbackMapping = HashMap<Uuid, MappedData>()
 
-    val config = ConfigManager.getConfig<EntraConfig>()
+    val config get() = ConfigManager.getConfig<EntraConfig>()
 
     private val configuredCallbackUrl = config.callbackUrl
 

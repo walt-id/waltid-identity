@@ -108,7 +108,7 @@ data class LoginResponseData(
 }
 
 object AuthKeys {
-    private val config = ConfigManager.getConfig<AuthConfig>()
+    private val config get() = ConfigManager.getConfig<AuthConfig>()
     val encryptionKey: ByteArray = config.encryptionKey.encodeToByteArray()
     val signKey: ByteArray = config.signKey.encodeToByteArray()
 

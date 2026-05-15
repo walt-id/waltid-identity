@@ -10,7 +10,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 object OSSVerifier2Manager {
 
-    private val config = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
+    private val config get() = ConfigManager.getConfig<OSSVerifier2ServiceConfig>()
 
     suspend fun createVerificationSession(
         setup: VerificationSessionSetup,
