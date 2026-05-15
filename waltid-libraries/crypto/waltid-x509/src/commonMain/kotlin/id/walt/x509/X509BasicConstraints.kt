@@ -1,5 +1,7 @@
 package id.walt.x509
 
+import kotlinx.serialization.Serializable
+
 /**
  * Platform-agnostic representation of the X.509 basicConstraints extension.
  *
@@ -7,6 +9,7 @@ package id.walt.x509
  * @param pathLengthConstraint Maximum number of additional CA certificates
  * allowed below this certificate in the chain.
  */
+@Serializable
 data class X509BasicConstraints(
     val isCA: Boolean,
     val pathLengthConstraint: Int,
