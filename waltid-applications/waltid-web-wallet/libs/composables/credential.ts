@@ -22,21 +22,33 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
     const currentWallet = useCurrentWallet()
     const jwtJson = computedAsync(async () => {
         if (credential.value) {
-            if (credential.value.parsedDocument) return credential.value.parsedDocument;
-
+            // For mDocs, use parsedDocument if available (it's already enhanced by the backend)
+            if (credential.value.format === "mso_mdoc" && credential.value.parsedDocument) {
+                return credential.value.parsedDocument;
+            }
+            
             let parsed;
             if (credential.value.format && credential.value.format === "mso_mdoc") {
-                let resp = await fetch(`/wallet-api/util/parseMDoc`, {
-                    method: "POST",
-                    body: credential.value.document,
-                });
-                parsed = await resp.json();
+                // Fallback: parse mDocs through the API if parsedDocument is not available
+                try {
+                    let resp = await fetch(`/wallet-api/util/parseMDoc`, {
+                        method: "POST",
+                        body: credential.value.document,
+                    });
+                    parsed = await resp.json();
+                    return parsed; // Return directly for mDocs
+                } catch (error) {
+                    console.error("Error parsing mDoc:", error);
+                    return null;
+                }
             }
             else {
+                // For other formats, use parsedDocument if available
+                if (credential.value.parsedDocument) return credential.value.parsedDocument;
                 parsed = parseJwt(credential.value.document);
+                
+                if (parsed.vc) return parsed.vc; else return parsed;
             }
-
-            if (parsed.vc) return parsed.vc; else return parsed;
         } else return null;
     });
 
@@ -71,8 +83,8 @@ export function useCredential(credential: Ref<WalletCredential | null>) {
             // Fallback logic if there's no `vct`
             titleTitelized.value = manifest.value?.display?.title
                 ?? jwtJson.value?.type?.at(-1)?.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-                ?? jwtJson.value?.vct?.replace("_vc+sd-jwt", "").replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-                ?? jwtJson.value?.docType;
+                ?? jwtJson.value?.vct?.replace("_vc+sd-jwt", "")?.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+                ?? jwtJson.value?.docType?.replace(/\./g, " ")?.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
         }
     });
 

@@ -2,7 +2,7 @@ import React from "react";
 import axios from "axios";
 import "@/styles/globals.css";
 import type {AppProps} from "next/app";
-import {AvailableCredential} from "@/types/credentials";
+import { AvailableCredential, MDOC_DOC_TYPE_HINT_BY_TITLE } from "@/types/credentials";
 
 export const EnvContext = React.createContext({} as { [key: string]: string });
 export const CredentialsContext = React.createContext([
@@ -35,11 +35,60 @@ export default function App({ Component, pageProps }: AppProps) {
                     {
                       id: credential,
                       title: credential,
+                      kind: 'w3c' as const,
                       offer: data.data,
                     },
                   ]);
                 });
             });
+          });
+
+        axios
+          .get(`${response.data.NEXT_PUBLIC_VC_REPO}/api/mdoc/list`)
+          .then((mdocTitles) => {
+            const titles = mdocTitles.data;
+            if (!Array.isArray(titles)) {
+              console.error(
+                '[waltid-web-portal] /api/mdoc/list returned non-array response:',
+                titles
+              );
+              return;
+            }
+            titles.forEach((title: string) => {
+              axios
+                .get(
+                  `${response.data.NEXT_PUBLIC_VC_REPO}/api/mdoc/${encodeURIComponent(
+                    title
+                  )}`
+                )
+                .then((data) => {
+                  const docTypeHint = MDOC_DOC_TYPE_HINT_BY_TITLE[title];
+                  setAvailableCredentials((prev) => [
+                    ...prev,
+                    {
+                      id: `mdoc:${title}`,
+                      title,
+                      kind: 'mdoc' as const,
+                      offer: {
+                        mdocData: data.data,
+                        ...(docTypeHint ? { docType: docTypeHint } : {}),
+                      },
+                    },
+                  ]);
+                })
+                .catch((err) => {
+                  console.error(
+                    `[waltid-web-portal] Failed to fetch mDoc "${title}" from VC repo:`,
+                    err
+                  );
+                });
+            });
+          })
+          .catch((err) => {
+            console.error(
+              '[waltid-web-portal] Failed to fetch /api/mdoc/list from VC repo:',
+              err
+            );
           });
       } else {
         throw new Error('Env variables not found');

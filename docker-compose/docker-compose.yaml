@@ -23,6 +23,7 @@ services:
   issuer-api:
     image: ${IMAGE_PREFIX}waltid/issuer-api:${VERSION_TAG:-latest}
     profiles:
+      - intermediary
       - services
       - identity
       - all
@@ -37,6 +38,7 @@ services:
   verifier-api:
     image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
+      - intermediary
       - services
       - identity
       - all
@@ -53,6 +55,7 @@ services:
   verifier-api2:
     image: ${IMAGE_PREFIX}waltid/verifier-api2:${VERSION_TAG:-latest}
     profiles:
+      - intermediary
       - services
       - identity
       - all
@@ -105,6 +108,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/portal:${VERSION_TAG:-latest}
     profiles:
       - apps
+      - intermediary
       - identity
       - all
     pull_policy: missing
@@ -125,6 +129,7 @@ services:
     image: ${IMAGE_PREFIX}waltid/vc-repository:${VERSION_VC_REPO:-latest}
     profiles:
       - services
+      - intermediary
       - identity
       - all
     pull_policy: missing
@@ -230,7 +235,6 @@ services:
     cap_add:
       - NET_ADMIN
     ports:
-
       - target: "$WALLET_BACKEND_PORT"
         published: $WALLET_BACKEND_PORT # wallet-api
         protocol: tcp

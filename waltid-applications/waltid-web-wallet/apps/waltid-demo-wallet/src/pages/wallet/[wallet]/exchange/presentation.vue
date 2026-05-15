@@ -132,8 +132,19 @@ const groupedCredentialsByType = computed(() => {
     disclosures?: string;
   }[]> = {};
   for (const credential of matchedCredentials) {
-    const parsedDocument = parseJwt(credential.document);
-    const types = (credential.parsedDocument ?? parsedDocument.vc ?? parsedDocument).type ?? parsedDocument.vct ? [parsedDocument.vct] : undefined;
+    let types;
+    // Use parsedDocument if available (includes mDocs which already have the right structure)
+    if (credential.parsedDocument) {
+      const parsed = credential.parsedDocument;
+      types = parsed.type ?? (parsed.vct ? [parsed.vct] : (parsed.docType ? [parsed.docType] : undefined));
+    } else if (credential.format === "mso_mdoc") {
+      // mDoc without parsedDocument - use docType from format or skip parsing
+      types = ["mDL"]; // Default fallback for mDocs
+    } else {
+      // For JWT-based credentials, parse the document
+      const parsedDocument = parseJwt(credential.document);
+      types = (parsedDocument.vc ?? parsedDocument).type ?? (parsedDocument.vct ? [parsedDocument.vct] : undefined);
+    }
     const typeKey = Array.isArray(types) && types.length > 0 ? types.at(-1) : "unknown";
     if (!groups[typeKey]) {
       groups[typeKey] = [];

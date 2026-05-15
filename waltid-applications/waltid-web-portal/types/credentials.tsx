@@ -1,18 +1,102 @@
+export type CredentialKind = 'w3c' | 'mdoc';
+
 export type AvailableCredential = {
   id: string;
   title: string;
+  kind?: CredentialKind;
   selectedFormat?: String;
   selectedDID?: String;
   offer: any;
 };
 
+/** Portal label for ISO mDoc issuance via `/openid4vc/mdoc/issue`. */
+export const ISO_MDOC_CREDENTIAL_FORMAT = 'ISO mDoc (18013-5)';
+
+/** VC repo titles whose JSON uses an ambiguous ISO mDL namespace but a distinct doc type (matches issuer `MDocTypes`). */
+export const MDOC_DOC_TYPE_HINT_BY_TITLE: Record<string, string> = {
+  'Google ID Card': 'com.google.wallet.idcard.1',
+};
+
 export const CredentialFormats = [
   'JWT + W3C VC',
   'SD-JWT + W3C VC',
-  'SD-JWT + IETF SD-JWT VC'
-  // 'Data Integrity/JSON-LD+ VCDM',
-  // 'mdoc / mdl (IEC/ISO 18013-5) ',
+  'SD-JWT + IETF SD-JWT VC',
+  ISO_MDOC_CREDENTIAL_FORMAT,
 ];
+
+/** Demo ES256 key + DS cert chain aligned with issuer API docs (`MdocDocs.mdlBaseIssuanceExample`). */
+export const MDOC_ISSUANCE_DEFAULTS = {
+  issuerKey: {
+    type: 'jwk',
+    jwk: {
+      kty: 'EC',
+      d: '-wSIL_tMH7-mO2NAfHn03I8ZWUHNXVzckTTb96Wsc1s',
+      crv: 'P-256',
+      kid: 'sW5yv0UmZ3S0dQuUrwlR9I3foREBHHFwXhGJGqGEVf0',
+      x: 'Pzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5U',
+      y: '6dwhUAzKzKUf0kNI7f40zqhMZNT0c40O_WiqSLCTNZo',
+    },
+  },
+  x5Chain: [
+    '-----BEGIN CERTIFICATE-----\nMIICCTCCAbCgAwIBAgIUfqyiArJZoX7M61/473UAVi2/UpgwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDY0MTEzWhcNMjYwOTAyMDY0MTEzWjAzMQswCQYDVQQGEwJBVDEkMCIGA1UEAwwbV2FsdGlkIFRlc3QgRG9jdW1lbnQgU2lnbmVyMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEPzp6eVSAdXERqAp8q8OuDEhl2ILGAaoaQXTJ2sD2g5Xp3CFQDMrMpR/SQ0jt/jTOqExk1PRzjQ79aKpIsJM1mqOBrDCBqTAfBgNVHSMEGDAWgBTxCn2nWMrE70qXb614U14BweY2azAdBgNVHQ4EFgQUx5qkOLC4lpl1xpYZGmF9HLxtp0gwDgYDVR0PAQH/BAQDAgeAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAVBgNVHSUBAf8ECzAJBgcogYxdBQECMCQGA1UdHwQdMBswGaAXoBWGE2h0dHBzOi8vd2FsdC5pZC9jcmwwCgYIKoZIzj0EAwIDRwAwRAIgHTap3c6yCUNhDVfZWBPMKj9dCWZbrME03kh9NJTbw1ECIAvVvuGll9O21eR16SkJHHAA1pPcovhcTvF9fz9cc66M\n-----END CERTIFICATE-----\n',
+  ],
+  // IACA (Issuer Authority CA) root certificate - this is the CA that signed the DS certificate above
+  iacaRootCertificate: '-----BEGIN CERTIFICATE-----\nMIIBtDCCAVmgAwIBAgIUAOXLkeu9penFRno6oDcOBgT1odYwCgYIKoZIzj0EAwIwKDELMAkGA1UEBhMCQVQxGTAXBgNVBAMMEFdhbHRpZCBUZXN0IElBQ0EwHhcNMjUwNjAyMDYzOTQ0WhcNNDAwNTI5MDYzOTQ0WjAoMQswCQYDVQQGEwJBVDEZMBcGA1UEAwwQV2FsdGlkIFRlc3QgSUFDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABAZGrRN7Oeanhn7MOaGU6HhaCt8ZMySk/nRHefLbRq8lChr+PS6JqpCJ503sEvByXzPDgPsp0urKg/y0E+F7q9+jYTBfMB0GA1UdDgQWBBTxCn2nWMrE70qXb614U14BweY2azASBgNVHRMBAf8ECDAGAQH/AgEAMBoGA1UdEgQTMBGGD2h0dHBzOi8vd2FsdC5pZDAOBgNVHQ8BAf8EBAMCAQYwCgYIKoZIzj0EAwIDSQAwRgIhAOM37BjC48KhsSlU6mdJwlTLrad9VzlXVKc1GmjoCNm1AiEAkFRJalpz62QCOby9l7Vkq0LAdWVKiFMd0DmSxjsdT2U=\n-----END CERTIFICATE-----\n',
+};
+
+export function inferDocTypeFromMdocData(mdocData: unknown): string | undefined {
+  if (
+    mdocData == null ||
+    typeof mdocData !== 'object' ||
+    Array.isArray(mdocData)
+  ) {
+    return undefined;
+  }
+  const namespaces = mdocData as Record<string, unknown>;
+  if ('eu.europa.ec.eudi.pid.1' in namespaces) return 'eu.europa.ec.eudi.pid.1';
+  if ('eu.europa.ec.av.1' in namespaces) return 'eu.europa.ec.av.1';
+  if ('at.gv.id-austria.2023' in namespaces) return 'at.gv.id-austria.2023.iso';
+  if ('org.iso.23220.1' in namespaces) return 'org.iso.23220.photoid.1';
+  if ('org.iso.18013.5.1' in namespaces) return 'org.iso.18013.5.1.mDL';
+  return undefined;
+}
+
+function metadataDocType(cfg: Record<string, unknown>): string | undefined {
+  const v = cfg.doctype ?? cfg.doc_type ?? cfg.docType;
+  return typeof v === 'string' ? v : undefined;
+}
+
+export function resolveMdocCredentialConfigurationId(
+  supported: Record<string, Record<string, unknown>>,
+  mdocData: Record<string, unknown>,
+  explicitDocType?: string
+): string | undefined {
+  const docType = explicitDocType ?? inferDocTypeFromMdocData(mdocData);
+  if (!docType) return undefined;
+  for (const [configId, cfg] of Object.entries(supported)) {
+    if (cfg.format === 'mso_mdoc' && metadataDocType(cfg) === docType) {
+      return configId;
+    }
+  }
+  return undefined;
+}
+
+export function issuanceCombinationAllowed(
+  credentialsToIssue: AvailableCredential[]
+): boolean {
+  if (credentialsToIssue.length === 0) return false;
+  const mdocCredentials = credentialsToIssue.filter((c) => c.kind === 'mdoc');
+  if (mdocCredentials.length > 0) {
+    return credentialsToIssue.length === 1 && mdocCredentials.length === 1;
+  }
+  if (credentialsToIssue.length === 1) return true;
+  const formats = credentialsToIssue.map((c) =>
+    String(c.selectedFormat ?? CredentialFormats[0])
+  );
+  const allSdJwt = formats.every((f) => f.startsWith('SD-JWT'));
+  const allJwtW3c = formats.every((f) => f === 'JWT + W3C VC');
+  return allSdJwt || allJwtW3c;
+}
 
 // Get Value
 export function mapFormat(format: string): string {
@@ -22,6 +106,8 @@ export function mapFormat(format: string): string {
       return 'jwt_vc_json';
     case 'SD-JWT + IETF SD-JWT VC':
       return 'vc+sd-jwt';
+    case ISO_MDOC_CREDENTIAL_FORMAT:
+      return 'mso_mdoc';
     default:
       throw new Error(`Unsupported format: ${format}`);
   }

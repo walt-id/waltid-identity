@@ -349,13 +349,13 @@ object VerifierService {
 
     private fun getDefaultVPPolicyRequests(presentationFormat: VCFormat): List<PolicyRequest> =
         when (presentationFormat) {
-            //VCFormat.mso_mdoc -> TODO()
+            VCFormat.mso_mdoc -> listOf() // mDocs use built-in COSE signature verification, no VP policies needed
             VCFormat.sd_jwt_vc -> listOf(PolicyRequest(SdJwtVCSignaturePolicy()))
             else -> listOf(PolicyRequest(JwtSignaturePolicy()))
         }
 
     private fun getDefaultVCPolicies(presentationFormat: VCFormat): List<PolicyRequest> = when (presentationFormat) {
-        //VCFormat.mso_mdoc -> TODO()
+        VCFormat.mso_mdoc -> listOf() // mDocs use built-in COSE signature verification, no VC policies needed
         VCFormat.sd_jwt_vc -> listOf()
         else -> listOf(PolicyRequest(JwtSignaturePolicy()))
     }

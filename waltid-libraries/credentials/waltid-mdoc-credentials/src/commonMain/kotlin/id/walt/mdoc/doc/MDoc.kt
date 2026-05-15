@@ -14,6 +14,10 @@ import id.walt.mdoc.mso.MSO
 import kotlinx.serialization.*
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.time.Clock
 
 
@@ -233,6 +237,20 @@ data class MDoc(
             selectDisclosures(mDocRequest),
             DeviceSigned(EncodedCBORElement(MapElement(mapOf())), DeviceAuth(coseMac0))
         )
+    }
+
+    fun toPresentationDefinitionMatchJson(credentialId: String): JsonObject {
+        val issuerNamespaces = issuerSigned.toUIJson()
+        return buildJsonObject {
+            put("id", credentialId)
+            put("docType", JsonPrimitive(docType.value))
+            issuerNamespaces.forEach { (namespace, elements) ->
+                put(namespace, elements)
+                if (!namespace.startsWith("dc:")) {
+                    put("dc:$namespace", elements)
+                }
+            }
+        }
     }
 
     /**

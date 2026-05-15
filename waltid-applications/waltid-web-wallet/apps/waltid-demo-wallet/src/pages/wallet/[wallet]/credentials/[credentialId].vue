@@ -44,13 +44,13 @@
         <div v-if="credential?.format === 'mso_mdoc'">
           <hr class="w-full border-gray-200 my-2" />
           <div class="text-gray-500 font-bold mt-4 mb-8">Subject Info</div>
-          <div v-for="elem in jwtJson?.issuerSigned?.nameSpaces[
-            Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
-          ]">
+          <div v-for="claim in mdocClaims" :key="claim.key">
             <div class="flex mt-3">
-              <div class="text-gray-500 w-sm">{{ elem.elementIdentifier }}</div>
+              <div class="text-gray-500 w-sm">{{ formatClaimKey(claim.key) }}</div>
               <div class="text-gray-500 font-bold w-2xl">
-                {{ elem.elementValue }}
+                <img v-if="claim.isImage" :src="claim.value" alt="Portrait" class="max-w-xs rounded" />
+                <pre v-else-if="claim.isObject" class="text-xs bg-gray-100 p-2 rounded">{{ claim.displayValue }}</pre>
+                <span v-else>{{ claim.displayValue }}</span>
               </div>
             </div>
           </div>
@@ -126,18 +126,14 @@
 
         <div v-if="credential?.format === 'mso_mdoc'">
           <div class="text-gray-600 font-bold mb-4">Credential Details</div>
-          <div v-for="(elem, index) in jwtJson?.issuerSigned?.nameSpaces[
-            Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
-          ]">
-            <div class="text-gray-500">{{ elem.elementIdentifier }}</div>
-            <div class="text-black">{{ elem.elementValue }}</div>
-            <hr v-if="
-              index !==
-              jwtJson?.issuerSigned?.nameSpaces[
-                Object.keys(jwtJson?.issuerSigned?.nameSpaces)[0]
-              ].length -
-              1
-            " class="w-full border-gray-200 my-2" />
+          <div v-for="(claim, index) in mdocClaims" :key="claim.key">
+            <div class="text-gray-500">{{ formatClaimKey(claim.key) }}</div>
+            <div class="text-black">
+              <img v-if="claim.isImage" :src="claim.value" alt="Portrait" class="max-w-xs rounded my-2" />
+              <pre v-else-if="claim.isObject" class="text-xs bg-gray-100 p-2 rounded">{{ claim.displayValue }}</pre>
+              <span v-else>{{ claim.displayValue }}</span>
+            </div>
+            <hr v-if="index !== mdocClaims.length - 1" class="w-full border-gray-200 my-2" />
           </div>
         </div>
       </div>
@@ -153,6 +149,7 @@ import {useCurrentWallet} from "@waltid-web-wallet/composables/accountWallet.ts"
 import CenterMain from "@waltid-web-wallet/components/CenterMain.vue";
 import {JSONPath} from "jsonpath-plus";
 import {ref} from "vue";
+import {useMdocClaims} from "@waltid-web-wallet/composables/mdocClaims.ts";
 
 const route = useRoute();
 const runtimeConfig = useRuntimeConfig();
@@ -179,6 +176,8 @@ const {
   issuanceDate,
   expirationDate,
 } = useCredential(credential);
+
+const { mdocClaims, formatClaimKey } = useMdocClaims(jwtJson);
 
 const credentialManifest = computedAsync(async () => {
   if (jwtJson.value) {
