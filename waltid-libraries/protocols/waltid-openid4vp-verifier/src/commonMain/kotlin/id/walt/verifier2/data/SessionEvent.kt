@@ -11,5 +11,6 @@ enum class SessionEvent {
     credential_policy_results_available,
     dcql_fulfillment_check_failed,
     presentation_validation_failed,
+    wallet_error_response_received,
     data_retention_purge
 }
