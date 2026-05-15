@@ -70,7 +70,7 @@ dependencies {
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.kotlinx.serialization.cbor)
-    testImplementation("org.bouncycastle:bcprov-lts8on:2.73.9")
+    testImplementation("org.bouncycastle:bcprov-lts8on:2.73.11")
     testImplementation(project(":waltid-services:waltid-service-commons-test"))
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
     testImplementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
