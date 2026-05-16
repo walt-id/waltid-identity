@@ -3,7 +3,7 @@
 package id.walt.mdoc.objects.elements
 
 import id.walt.mdoc.credsdata.CredentialManager
-import id.walt.mdoc.encoding.TransformingSerializerTemplate
+import id.walt.mdoc.encoding.MdocTDateInstantSerializer
 import id.walt.mdoc.objects.MdocsCborSerializer
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -77,7 +77,7 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
             is Int -> encodeIntElement(descriptor, index, it)
             is Long -> encodeLongElement(descriptor, index, it)
             is LocalDate -> encodeSerializableElement(descriptor, index, LocalDate.serializer(), it)
-            is Instant -> encodeSerializableElement(descriptor, index, InstantStringSerializer, it)
+            is Instant -> encodeSerializableElement(descriptor, index, MdocTDateInstantSerializer, it)
             is Boolean -> encodeBooleanElement(descriptor, index, it)
             is ByteArray -> encodeSerializableElement(descriptor, index, ByteArraySerializer(), it)
             else -> MdocsCborSerializer.encode(namespace, value.key, descriptor, index, this, it)
@@ -93,7 +93,7 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
         is Int -> Int.serializer()
         is Long -> Long.serializer()
         is LocalDate -> LocalDate.serializer()
-        is Instant -> InstantStringSerializer
+        is Instant -> MdocTDateInstantSerializer
         is Boolean -> Boolean.serializer()
         is ByteArray -> ByteArraySerializer()
         is Any -> MdocsCborSerializer.lookupSerializer(namespace, elementIdentifier)
@@ -147,11 +147,3 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
         throw IllegalArgumentException("Could not decode value at $index")
     }
 }
-
-
-/** De-/serializes Instant */
-internal object InstantStringSerializer : TransformingSerializerTemplate<Instant, String>(
-    parent = String.serializer(),
-    encodeAs = { it.toString() },
-    decodeAs = { Instant.parse(it) }
-)

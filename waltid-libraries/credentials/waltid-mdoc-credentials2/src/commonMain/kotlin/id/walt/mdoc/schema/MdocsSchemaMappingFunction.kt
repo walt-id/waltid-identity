@@ -3,6 +3,7 @@
 package id.walt.mdoc.schema
 
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
+import id.walt.mdoc.encoding.toMdocTDateString
 import id.walt.mdoc.schema.MdocsSchema.MdocsDatatype.*
 import id.walt.mdoc.schema.MdocsSchema.MdocsSchemaType
 import kotlinx.datetime.LocalDate
@@ -45,7 +46,7 @@ object MdocsSchemaMappingFunction {
 
             // Applying CBOR tags directly!
             DATE -> CborString(jsonPrimitive.content, 1004u)
-            DATETIME -> CborString(jsonPrimitive.content, 0u)
+            DATETIME -> CborString(jsonPrimitive.content.toMdocTDateString(), 0u)
 
             ARRAY -> CborArray(jsonArray.map { it.schemafulJsonToCborElement(schemaType.generic!!) })
             MAP -> CborMap(
@@ -113,7 +114,7 @@ object MdocsSchemaMappingFunction {
         is Boolean -> CborBoolean(this)
         is ByteArray -> CborByteString(this)
         is LocalDate -> CborString(this.toString(), 1004u)
-        is Instant -> CborString(this.toString(), 0u)
+        is Instant -> CborString(this.toMdocTDateString(), 0u)
         is List<*> -> CborArray(this.map { it.toCborElement() })
         is Map<*, *> -> CborMap(this.entries.associate { CborString(it.key as String) to it.value.toCborElement() })
         is CborElement -> this
