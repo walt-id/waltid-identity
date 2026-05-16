@@ -100,7 +100,7 @@ object Issuer {
         display: JsonArray = JsonArray(emptyList()),
 
         mappings: JsonObject,
-        type: String = "JWT",
+        type: String ,
         additionalJwtHeaders: Map<String, JsonElement>,
         additionalJwtOptions: Map<String, JsonElement>,
 

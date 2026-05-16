@@ -928,7 +928,12 @@ object OpenID4VCI {
                     additionalJwtOptions = emptyMap(),
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     disclosureMap = selectiveDisclosure,
-                    context = context
+                    context = context,
+                    type = when (builderType) {
+                        CredentialBuilderType.W3CV11CredentialBuilder -> "JWT"
+                        CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER
+                        else -> "JWT"
+                    }
                 )
             }
         }
