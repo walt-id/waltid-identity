@@ -14,7 +14,6 @@ import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
@@ -25,8 +24,6 @@ import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.request.accept
-import io.ktor.client.request.setBody
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -318,20 +315,10 @@ object WalletPresentFunctionality2 {
                 requestUrl = presentationRequestUrl,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
             ) { requestUri, requestUriMethod ->
-                val response = when (requestUriMethod) {
-                    null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
-                    RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
-                        method = HttpMethod.Post
-                        contentType(ContentType.Application.FormUrlEncoded)
-                        accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                        setBody("")
-                    }
-                }
-
-                AuthorizationRequestResolver.RequestUriFetchResponse(
-                    status = response.status,
-                    contentType = response.contentType(),
-                    body = response.bodyAsText(),
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    webResolveAuthReq = webResolveAuthReq,
+                    requestUri = requestUri,
+                    requestUriMethod = requestUriMethod,
                 )
             }.authorizationRequest
         }.recoverCatching { error ->

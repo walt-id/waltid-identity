@@ -10,12 +10,11 @@ import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
+import id.walt.webdatafetching.WebDataFetcher
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.http.ContentType
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.Parameters
-import io.ktor.http.Url
-import io.ktor.http.isSuccess
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -51,6 +50,32 @@ object AuthorizationRequestResolver {
 
     class UnsignedAuthorizationRequestNotAllowedException :
         IllegalArgumentException("Unsigned AuthorizationRequest object (alg=none) is not allowed")
+
+    /**
+     * Shared transport mapping for retrieving Authorization Requests via `request_uri`.
+     * Keeps GET/POST behavior and response conversion centralized for all wallet callers.
+     */
+    suspend fun fetchRequestUriWithWebDataFetcher(
+        webResolveAuthReq: WebDataFetcher,
+        requestUri: String,
+        requestUriMethod: RequestUriHttpMethod?,
+    ): RequestUriFetchResponse {
+        val response = when (requestUriMethod) {
+            null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
+            RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
+                method = HttpMethod.Post
+                contentType(ContentType.Application.FormUrlEncoded)
+                accept(ContentType.parse("application/oauth-authz-req+jwt"))
+                setBody("")
+            }
+        }
+
+        return RequestUriFetchResponse(
+            status = response.status,
+            contentType = response.contentType(),
+            body = response.bodyAsText(),
+        )
+    }
 
     suspend fun resolve(
         requestUrl: Url,
