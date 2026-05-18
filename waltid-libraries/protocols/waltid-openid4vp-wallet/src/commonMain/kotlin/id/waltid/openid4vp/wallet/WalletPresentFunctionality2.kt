@@ -304,7 +304,9 @@ object WalletPresentFunctionality2 {
          *  Fallback for ancient legacy tests, wrong integration tests, and various other stuff that should have long been removed
          *  Use: `OldWalletPresentFunctionality.oldWalletPresentHandling(walletService, presentationRequestUrl, request)` for this
          */
-        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
 
@@ -312,7 +314,10 @@ object WalletPresentFunctionality2 {
 
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = runCatching {
-            AuthorizationRequestResolver.resolve(presentationRequestUrl) { requestUri, requestUriMethod ->
+            AuthorizationRequestResolver.resolve(
+                requestUrl = presentationRequestUrl,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            ) { requestUri, requestUriMethod ->
                 val response = when (requestUriMethod) {
                     null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
                     RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {

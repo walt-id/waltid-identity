@@ -7,16 +7,20 @@ import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
+import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
+import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.webwallet.db.models.WalletCredential
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
-import io.ktor.client.HttpClient
 import io.ktor.http.Url
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
+import io.mockk.coEvery
 import io.mockk.every
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -27,6 +31,7 @@ import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -54,201 +59,227 @@ class OpenId4VpPresentationServiceTest {
 
     @Test
     fun `normalized request URL keeps direct OpenID4VP requests intact`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val request = AuthorizationRequest(
-                clientId = "verifier2",
-                responseMode = OpenID4VPResponseMode.DIRECT_POST,
-                responseUri = "https://verifier.example/response",
-                nonce = "nonce-123",
-                dcqlQuery = query,
-            ).toHttpUrl().toString()
+        val service = OpenId4VpPresentationService(
+            credentialService = mockk(relaxed = true),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        )
+        val request = AuthorizationRequest(
+            clientId = "verifier2",
+            responseMode = OpenID4VPResponseMode.DIRECT_POST,
+            responseUri = "https://verifier.example/response",
+            nonce = "nonce-123",
+            dcqlQuery = query,
+        ).toHttpUrl().toString()
 
-            val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
-            val resolvedUrl = Url(resolvedRequest)
+        val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
+        val resolvedUrl = Url(resolvedRequest)
 
-            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
-            assertTrue(resolvedUrl.parameters["dcql_query"]?.contains("UniversityDegreeCredential") == true)
-        }
+        assertEquals("verifier2", resolvedUrl.parameters["client_id"])
+        assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+        assertEquals(resolvedUrl.parameters["dcql_query"]?.contains("UniversityDegreeCredential"), true)
     }
 
     @Test
     fun `normalized request URL keeps raw scalar query parameters as strings`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val request = AuthorizationRequest(
-                clientId = "verifier2",
-                responseMode = OpenID4VPResponseMode.DIRECT_POST,
-                responseUri = "https://verifier.example/response",
-                nonce = "12345",
-                state = "true",
-                dcqlQuery = query,
-            ).toHttpUrl().toString()
+        val service = OpenId4VpPresentationService(
+            credentialService = mockk(relaxed = true),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        )
+        val request = AuthorizationRequest(
+            clientId = "verifier2",
+            responseMode = OpenID4VPResponseMode.DIRECT_POST,
+            responseUri = "https://verifier.example/response",
+            nonce = "12345",
+            state = "true",
+            dcqlQuery = query,
+        ).toHttpUrl().toString()
 
-            val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
-            val resolvedUrl = Url(resolvedRequest)
+        val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, request) }
+        val resolvedUrl = Url(resolvedRequest)
 
-            assertEquals("12345", resolvedUrl.parameters["nonce"])
-            assertEquals("true", resolvedUrl.parameters["state"])
-        }
+        assertEquals("12345", resolvedUrl.parameters["nonce"])
+        assertEquals("true", resolvedUrl.parameters["state"])
     }
 
     @Test
     fun `buildWalletPresentationRequest keeps scalars plain and structured values JSON encoded`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val authorizationRequest = AuthorizationRequest(
-                clientId = "verifier2",
-                responseMode = OpenID4VPResponseMode.DIRECT_POST,
-                responseUri = "https://verifier.example/response",
-                nonce = "nonce-123",
-                dcqlQuery = query,
-            )
-            val request = authorizationRequest.toHttpUrl().toString()
+        val service = OpenId4VpPresentationService(
+            credentialService = mockk(relaxed = true),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        )
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "verifier2",
+            responseMode = OpenID4VPResponseMode.DIRECT_POST,
+            responseUri = "https://verifier.example/response",
+            nonce = "nonce-123",
+            dcqlQuery = query,
+        )
+        val request = authorizationRequest.toHttpUrl().toString()
 
-            val walletRequest = service.buildWalletPresentationRequest(
-                request,
-                ResolvedAuthorizationRequest.Plain(authorizationRequest),
-            )
+        val walletRequest = service.buildWalletPresentationRequest(
+            request,
+            ResolvedAuthorizationRequest.Plain(authorizationRequest),
+        )
 
-            assertEquals("vp_token", walletRequest.parameters["response_type"])
-            assertEquals("verifier2", walletRequest.parameters["client_id"])
-            assertTrue(walletRequest.parameters["dcql_query"]?.startsWith("{") == true)
-        }
+        assertEquals("vp_token", walletRequest.parameters["response_type"])
+        assertEquals("verifier2", walletRequest.parameters["client_id"])
+        assertEquals(walletRequest.parameters["dcql_query"]?.startsWith("{"), true)
     }
 
     @Test
     fun `buildWalletPresentationRequest resolves request_uri inputs to wallet encoded parameters`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val authorizationRequest = AuthorizationRequest(
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val authorizationRequest = AuthorizationRequest(
+            clientId = "verifier2",
+            responseMode = OpenID4VPResponseMode.DIRECT_POST,
+            responseUri = "https://verifier.example/response",
+            nonce = "nonce-123",
+            dcqlQuery = query,
+        )
+
+        val walletRequest = service.buildWalletPresentationRequest(
+            request = "openid4vp://authorize?request_uri=https://verifier.example/request-object&request_uri_method=post",
+            resolvedRequest = ResolvedAuthorizationRequest.Plain(authorizationRequest),
+        )
+
+        assertEquals("verifier2", walletRequest.parameters["client_id"])
+        assertTrue(walletRequest.parameters.contains("request_uri").not())
+        assertEquals(walletRequest.parameters["dcql_query"]?.startsWith("{"), true)
+    }
+
+    @Test
+    fun `normalized request URL preserves signed request objects from request parameter`() {
+        val service = OpenId4VpPresentationService(
+            credentialService = mockk(relaxed = true),
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+        )
+        val requestObject = unsecuredJwt(
+            AuthorizationRequest(
                 clientId = "verifier2",
                 responseMode = OpenID4VPResponseMode.DIRECT_POST,
                 responseUri = "https://verifier.example/response",
                 nonce = "nonce-123",
                 dcqlQuery = query,
-            )
+            ),
+        )
 
-            val walletRequest = service.buildWalletPresentationRequest(
-                request = "openid4vp://authorize?request_uri=https://verifier.example/request-object&request_uri_method=post",
-                resolvedRequest = ResolvedAuthorizationRequest.Plain(authorizationRequest),
-            )
+        val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
+        val resolvedUrl = Url(resolvedRequest)
 
-            assertEquals("verifier2", walletRequest.parameters["client_id"])
-            assertTrue(walletRequest.parameters.contains("request_uri").not())
-            assertTrue(walletRequest.parameters["dcql_query"]?.startsWith("{") == true)
-        }
+        assertEquals(requestObject, resolvedUrl.parameters["request"])
+        assertFalse(resolvedUrl.parameters.contains("dcql_query"))
     }
 
     @Test
-    fun `normalized request URL preserves signed request objects from request parameter`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val requestObject = unsecuredJwt(
-                AuthorizationRequest(
-                    clientId = "verifier2",
-                    responseMode = OpenID4VPResponseMode.DIRECT_POST,
-                    responseUri = "https://verifier.example/response",
-                    nonce = "nonce-123",
-                    dcqlQuery = query,
-                ),
-            )
+    fun `normalized request URL rejects unsigned request objects by default`() {
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val requestObject = unsecuredJwt(
+            AuthorizationRequest(
+                clientId = "verifier2",
+                responseMode = OpenID4VPResponseMode.DIRECT_POST,
+                responseUri = "https://verifier.example/response",
+                nonce = "nonce-123",
+                dcqlQuery = query,
+            ),
+        )
 
-            val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
-            val resolvedUrl = Url(resolvedRequest)
-
-            assertEquals(requestObject, resolvedUrl.parameters["request"])
-            assertTrue(!resolvedUrl.parameters.contains("dcql_query"))
+        val error = assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
+            runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
         }
+
+        assertEquals(
+            "Unsigned AuthorizationRequest object (alg=none) is not allowed",
+            error.message,
+        )
     }
 
     @Test
     fun `normalized request URL fetches authorization requests from request_uri using GET`() {
         withAuthorizationRequestServer { serverUrl, receivedRequest ->
-            HttpClient().use { http ->
-                val service = OpenId4VpPresentationService(mockk(relaxed = true))
+            val service = OpenId4VpPresentationService(
+                credentialService = mockk(relaxed = true),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
 
-                val resolvedRequest = runBlocking {
-                    resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
-                }
-                val resolvedUrl = Url(resolvedRequest)
-
-                assertEquals("GET", receivedRequest().method)
-                assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-                assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+            val resolvedRequest = runBlocking {
+                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
             }
+            val resolvedUrl = Url(resolvedRequest)
+
+            assertEquals("GET", receivedRequest().method)
+            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
+            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
         }
     }
 
     @Test
     fun `normalized request URL fetches authorization requests from request_uri using spec compliant POST`() {
         withAuthorizationRequestServer { serverUrl, receivedRequest ->
-            HttpClient().use { http ->
-                val service = OpenId4VpPresentationService(mockk(relaxed = true))
+            val service = OpenId4VpPresentationService(
+                credentialService = mockk(relaxed = true),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
 
-                val resolvedRequest = runBlocking {
-                    resolveNormalizedRequestUrl(
-                        service,
-                        "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
-                    )
-                }
-                val resolvedUrl = Url(resolvedRequest)
-
-                val request = receivedRequest()
-                assertEquals("POST", request.method)
-                assertEquals("application/x-www-form-urlencoded", request.contentType)
-                assertTrue(request.accept?.contains("application/oauth-authz-req+jwt") == true)
-                assertEquals("", request.body)
-                assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-                assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+            val resolvedRequest = runBlocking {
+                resolveNormalizedRequestUrl(
+                    service,
+                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                )
             }
+            val resolvedUrl = Url(resolvedRequest)
+
+            val request = receivedRequest()
+            assertEquals("POST", request.method)
+            assertEquals("application/x-www-form-urlencoded", request.contentType)
+            assertEquals(request.accept?.contains("application/oauth-authz-req+jwt"), true)
+            assertEquals("", request.body)
+            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
+            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
         }
     }
 
     @Test
     fun `normalized request URL rejects unsupported request_uri_method values`() {
         withAuthorizationRequestServer { serverUrl, _ ->
-            HttpClient().use { http ->
-                val service = OpenId4VpPresentationService(mockk(relaxed = true))
+            val service = OpenId4VpPresentationService(
+                credentialService = mockk(relaxed = true),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
 
-                val error = assertFailsWith<IllegalArgumentException> {
-                    runBlocking {
-                        resolveNormalizedRequestUrl(
-                            service,
-                            "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=patch",
-                        )
-                    }
+            val error = assertFailsWith<IllegalArgumentException> {
+                runBlocking {
+                    resolveNormalizedRequestUrl(
+                        service,
+                        "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=patch",
+                    )
                 }
-
-                assertEquals(
-                    "invalid_request_uri_method: patch is neither 'get' nor 'post'",
-                    error.message,
-                )
             }
+
+            assertEquals(
+                "invalid_request_uri_method: patch is neither 'get' nor 'post'",
+                error.message,
+            )
         }
     }
 
     @Test
     fun `normalized request URL rejects request_uri_method values with incorrect casing`() {
         withAuthorizationRequestServer { serverUrl, _ ->
-            HttpClient().use { http ->
-                val service = OpenId4VpPresentationService(mockk(relaxed = true))
+            val service = OpenId4VpPresentationService(mockk(relaxed = true))
 
-                val error = assertFailsWith<IllegalArgumentException> {
-                    runBlocking {
-                        resolveNormalizedRequestUrl(
-                            service,
-                            "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=POST",
-                        )
-                    }
+            val error = assertFailsWith<IllegalArgumentException> {
+                runBlocking {
+                    resolveNormalizedRequestUrl(
+                        service,
+                        "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=POST",
+                    )
                 }
-
-                assertEquals(
-                    "invalid_request_uri_method: POST is neither 'get' nor 'post'",
-                    error.message,
-                )
             }
+
+            assertEquals(
+                "invalid_request_uri_method: POST is neither 'get' nor 'post'",
+                error.message,
+            )
         }
     }
 
@@ -268,46 +299,77 @@ class OpenId4VpPresentationServiceTest {
             responseBody = requestObject,
             responseContentType = "application/oauth-authz-req+jwt",
         ) { serverUrl, _ ->
-            HttpClient().use { http ->
-                val service = OpenId4VpPresentationService(mockk(relaxed = true))
+            val service = OpenId4VpPresentationService(
+                credentialService = mockk(relaxed = true),
+                unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+            )
 
-                val resolvedRequest = runBlocking {
-                    resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
-                }
-                val resolvedUrl = Url(resolvedRequest)
-
-                assertEquals(requestObject, resolvedUrl.parameters["request"])
-                assertTrue(!resolvedUrl.parameters.contains("request_uri"))
-                assertTrue(!resolvedUrl.parameters.contains("dcql_query"))
+            val resolvedRequest = runBlocking {
+                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
             }
+            val resolvedUrl = Url(resolvedRequest)
+
+            assertEquals(requestObject, resolvedUrl.parameters["request"])
+            assertFalse(resolvedUrl.parameters.contains("request_uri"))
+            assertFalse(resolvedUrl.parameters.contains("dcql_query"))
         }
     }
 
     @Test
     fun `normalized request URL rejects signed request objects for redirect_uri client ids`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val signedRequestObject = signedLikeJwt(
-                """
-                    {
-                      "client_id":"redirect_uri:https://verifier.example/callback",
-                      "response_type":"vp_token",
-                      "response_mode":"direct_post",
-                      "response_uri":"https://verifier.example/response",
-                      "nonce":"nonce-123",
-                      "client_metadata":{"vp_formats_supported":{}},
-                      "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
-                    }
-                    """.trimIndent(),
-            )
-
-            val error = assertFailsWith<IllegalArgumentException> {
-                runBlocking {
-                    resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject")
-                }
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val signedRequestObject = signedLikeJwt(
+            """
+            {
+              "client_id":"redirect_uri:https://verifier.example/callback",
+              "response_type":"vp_token",
+              "response_mode":"direct_post",
+              "response_uri":"https://verifier.example/response",
+              "nonce":"nonce-123",
+              "client_metadata":{"vp_formats_supported":{}},
+              "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
             }
+            """.trimIndent(),
+        )
 
-            assertTrue(error.message?.contains("Could not verify signed AuthorizationRequest") == true)
+        val error = assertFailsWith<IllegalArgumentException> {
+            runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject") }
+        }
+
+        assertEquals(error.message?.contains("Could not verify signed AuthorizationRequest"), true)
+    }
+
+    @Test
+    fun `normalized request URL accepts signed request objects by default when authentication succeeds`() {
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val signedRequestObject = signedLikeJwt(
+            """
+            {
+              "client_id":"verifier2",
+              "response_type":"vp_token",
+              "response_mode":"direct_post",
+              "response_uri":"https://verifier.example/response",
+              "nonce":"nonce-123",
+              "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
+            }
+            """.trimIndent(),
+        )
+
+        mockkObject(ClientIdPrefixAuthenticator)
+        try {
+            val clientMetadata = ClientMetadata.fromJson("""{"vp_formats_supported":{}}""").getOrThrow()
+            coEvery { ClientIdPrefixAuthenticator.authenticate(any(), any(), any()) } returns
+                    ClientValidationResult.Success(clientMetadata)
+
+            val resolvedRequest = runBlocking {
+                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject")
+            }
+            val resolvedUrl = Url(resolvedRequest)
+
+            assertEquals(signedRequestObject, resolvedUrl.parameters["request"])
+            assertFalse(resolvedUrl.parameters.contains("dcql_query"))
+        } finally {
+            unmockkObject(ClientIdPrefixAuthenticator)
         }
     }
 
@@ -342,42 +404,34 @@ class OpenId4VpPresentationServiceTest {
         assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$v1RequestObject"))
         assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?dcql_query=%7B%7D"))
         assertTrue(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request_uri=https://verifier.example/request"))
-        assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$draftRequestObject"))
-        assertTrue(!OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?transaction_data=%5B%22eyJ0eXBlIjoicGF5bWVudCJ9%22%5D"))
+        assertFalse(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?request=$draftRequestObject"))
+        assertFalse(OpenId4VpPresentationService.isOpenId4VpRequestCandidate("openid4vp://authorize?transaction_data=%5B%22eyJ0eXBlIjoicGF5bWVudCJ9%22%5D"))
     }
 
     @Test
     fun `matchCredentials returns wallet credentials satisfying a dcql query`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val matchingCredential = matchingCredential()
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val matchingCredential = matchingCredential()
 
-            val matchedCredentials = runBlocking {
-                service.matchCredentials(query, listOf(matchingCredential))
-            }
+        val matchedCredentials = runBlocking { service.matchCredentials(query, listOf(matchingCredential)) }
 
-            assertEquals(listOf("credential-1"), matchedCredentials.map { it.id })
-        }
+        assertEquals(listOf("credential-1"), matchedCredentials.map { it.id })
     }
 
     @Test
     fun `matchCredentialResults propagates matcher failures`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            mockkObject(DcqlMatcher)
-            try {
-                every { DcqlMatcher.match(any(), any()) } returns Result.failure(IllegalArgumentException("boom"))
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        mockkObject(DcqlMatcher)
+        try {
+            every { DcqlMatcher.match(any(), any()) } returns Result.failure(IllegalArgumentException("boom"))
 
-                val error = assertFailsWith<IllegalArgumentException> {
-                    runBlocking {
-                        service.matchCredentialResults(query, listOf(matchingCredential()))
-                    }
-                }
-
-                assertEquals("boom", error.message)
-            } finally {
-                unmockkObject(DcqlMatcher)
+            val error = assertFailsWith<IllegalArgumentException> {
+                runBlocking { service.matchCredentialResults(query, listOf(matchingCredential())) }
             }
+
+            assertEquals("boom", error.message)
+        } finally {
+            unmockkObject(DcqlMatcher)
         }
     }
 
@@ -386,20 +440,20 @@ class OpenId4VpPresentationServiceTest {
         id = "credential-1",
         document = jwt(
             """
-                {
-                  "iss":"did:example:issuer",
-                  "sub":"did:example:holder",
-                  "vc":{
-                    "@context":["https://www.w3.org/2018/credentials/v1"],
-                    "type":["VerifiableCredential","UniversityDegreeCredential"],
-                    "issuer":{"id":"did:example:issuer"},
-                    "credentialSubject":{
-                      "id":"did:example:holder",
-                      "degree":{"type":"BachelorDegree"}
-                    }
-                  }
+            {
+              "iss":"did:example:issuer",
+              "sub":"did:example:holder",
+              "vc":{
+                "@context":["https://www.w3.org/2018/credentials/v1"],
+                "type":["VerifiableCredential","UniversityDegreeCredential"],
+                "issuer":{"id":"did:example:issuer"},
+                "credentialSubject":{
+                  "id":"did:example:holder",
+                  "degree":{"type":"BachelorDegree"}
                 }
-                """.trimIndent(),
+              }
+            }
+            """.trimIndent(),
         ),
         disclosures = null,
         addedOn = Clock.System.now(),

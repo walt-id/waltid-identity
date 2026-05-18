@@ -44,8 +44,17 @@ object AuthorizationRequestResolver {
         val body: String,
     )
 
+    enum class UnsignedRequestObjectPolicy {
+        ALLOW_UNSIGNED,
+        REQUIRE_SIGNED,
+    }
+
+    class UnsignedAuthorizationRequestNotAllowedException :
+        IllegalArgumentException("Unsigned AuthorizationRequest object (alg=none) is not allowed")
+
     suspend fun resolve(
         requestUrl: Url,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest {
         val requestUri = requestUrl.parameters["request_uri"]
@@ -53,12 +62,13 @@ object AuthorizationRequestResolver {
             return resolveFromRequestUri(
                 requestUri = requestUri,
                 requestUriMethod = requestUrl.parameters["request_uri_method"],
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 fetchRequestUri = fetchRequestUri,
             )
         }
 
         val requestObject = requestUrl.parameters["request"]
-        if (requestObject != null) return resolveFromRequestObject(requestObject)
+        if (requestObject != null) return resolveFromRequestObject(requestObject, unsignedRequestObjectPolicy)
 
         return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
     }
@@ -83,6 +93,7 @@ object AuthorizationRequestResolver {
     private suspend fun resolveFromRequestUri(
         requestUri: String,
         requestUriMethod: String?,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
@@ -96,7 +107,10 @@ object AuthorizationRequestResolver {
         log.trace { "Resolved AuthorizationRequest response with content type $contentType" }
 
         return when {
-            contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(response.body)
+            contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
+                requestObject = response.body,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+            )
             contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest.Plain(
                 authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body),
             )
@@ -104,13 +118,20 @@ object AuthorizationRequestResolver {
         }
     }
 
-    private suspend fun resolveFromRequestObject(requestObject: String): ResolvedAuthorizationRequest {
+    private suspend fun resolveFromRequestObject(
+        requestObject: String,
+        unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+    ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via inline request object" }
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
         val authReqJws = requestObject.decodeJws()
         val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
-        if (!jwtAlg.equals("none", ignoreCase = true)) {
+        if (jwtAlg.equals("none", ignoreCase = true)) {
+            if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
+                throw UnsignedAuthorizationRequestNotAllowedException()
+            }
+        } else {
             log.trace { "Authenticating signed AuthorizationRequest object" }
             authenticateSignedRequestObject(requestObject, authReqJws.payload)
         }

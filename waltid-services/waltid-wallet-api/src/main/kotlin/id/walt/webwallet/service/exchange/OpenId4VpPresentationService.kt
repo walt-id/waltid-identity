@@ -38,6 +38,8 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
+    private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+        AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 ) {
     private val logger = KotlinLogging.logger { }
     private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
@@ -48,7 +50,10 @@ class OpenId4VpPresentationService(
     }
 
     suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
-        AuthorizationRequestResolver.resolve(Url(request)) { requestUri, requestUriMethod ->
+        AuthorizationRequestResolver.resolve(
+            requestUrl = Url(request),
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        ) { requestUri, requestUriMethod ->
             val response = when (requestUriMethod) {
                 null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
                 RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
