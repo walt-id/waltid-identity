@@ -188,45 +188,41 @@ class OpenId4VpPresentationServiceTest {
 
     @Test
     fun `normalized request URL rejects unsupported transaction data types`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val request = authorizationRequest(
-                transactionData = listOf(
-                    transactionDataItem(
-                        type = "unsupported-type",
-                        credentialIds = listOf("degree"),
-                        amount = "42.00",
-                    ),
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val request = authorizationRequest(
+            transactionData = listOf(
+                transactionDataItem(
+                    type = "unsupported-type",
+                    credentialIds = listOf("degree"),
+                    amount = "42.00",
                 ),
-            )
+            ),
+        )
 
-            assertFailsWith<IllegalArgumentException> {
-                runBlocking { resolveNormalizedRequestUrl(service, request) }
-            }
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { resolveNormalizedRequestUrl(service, request) }
         }
     }
 
     @Test
     fun `normalized request URL rejects transaction data for unsupported credential query formats`() {
-        HttpClient().use { http ->
-            val service = OpenId4VpPresentationService(mockk(relaxed = true))
-            val request = authorizationRequest(
-                transactionData = listOf(
-                    transactionDataItem(
-                        type = supportedTransactionDataType,
-                        credentialIds = listOf("degree"),
-                        requireCryptographicHolderBinding = true,
-                        amount = "42.00",
-                    ),
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val request = authorizationRequest(
+            transactionData = listOf(
+                transactionDataItem(
+                    type = supportedTransactionDataType,
+                    credentialIds = listOf("degree"),
+                    requireCryptographicHolderBinding = true,
+                    amount = "42.00",
                 ),
-            )
+            ),
+        )
 
-            val error = assertFailsWith<IllegalArgumentException> {
-                runBlocking { resolveNormalizedRequestUrl(service, request) }
-            }
-
-            assertTrue(error.message?.contains("supported transaction_data profile", ignoreCase = true) == true)
+        val error = assertFailsWith<IllegalArgumentException> {
+            runBlocking { resolveNormalizedRequestUrl(service, request) }
         }
+
+        assertTrue(error.message?.contains("supported transaction_data profile", ignoreCase = true) == true)
     }
 
     @Test
