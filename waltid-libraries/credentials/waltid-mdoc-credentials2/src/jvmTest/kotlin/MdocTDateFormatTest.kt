@@ -13,7 +13,7 @@ import kotlin.time.Instant
 class MdocTDateFormatTest {
 
     @Test
-    fun `ValidityInfo encodes MSO timestamps without fractional seconds`() {
+    fun validateMSOTimestamps() {
         val instant = Instant.fromEpochSeconds(1715786160, 123_000_000)
         val validityInfo = ValidityInfo(
             signed = instant,
@@ -30,7 +30,7 @@ class MdocTDateFormatTest {
     }
 
     @Test
-    fun `toMdocTDateString strips fractional seconds from ISO strings`() {
+    fun validateToMdocTDateStringStripsFractionalSeconds() {
         assertEquals(
             "2026-05-15T15:16:00Z",
             "2026-05-15T15:16:00.000Z".toMdocTDateString(),
