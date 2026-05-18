@@ -16,6 +16,7 @@ import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.keys.KeysService
 import id.walt.webdatafetching.WebDataFetcher
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
@@ -167,13 +168,15 @@ class OpenId4VpPresentationService(
             ?.map { DcqlDisclosure(it.name, it.value) }
 
     private suspend fun buildRuntimeRequestUriPostWalletMetadata(walletId: Uuid): String {
-        val runtimeKeyTypes = KeysService.list(walletId)
-            .mapNotNull { walletKey ->
-                runCatching { KeyManager.resolveSerializedKey(walletKey.document).keyType }
-                    .onFailure { error -> logger.warn(error) { "Skipping unresolved key ${walletKey.keyId} in wallet metadata generation" } }
-                    .getOrNull()
-            }
-            .toSet()
+        val runtimeKeyTypes = transaction {
+            KeysService.list(walletId)
+                .mapNotNull { walletKey ->
+                    runCatching { KeyManager.resolveSerializedKeyBlocking(walletKey.document).keyType }
+                        .onFailure { error -> logger.warn(error) { "Skipping unresolved key ${walletKey.keyId} in wallet metadata generation" } }
+                        .getOrNull()
+                }
+                .toSet()
+        }
 
         val runtimeCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(runtimeKeyTypes)
         val runtimeVpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(runtimeCapabilities)
