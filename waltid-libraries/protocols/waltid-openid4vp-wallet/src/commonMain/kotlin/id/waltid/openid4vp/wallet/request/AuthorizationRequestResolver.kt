@@ -1,6 +1,7 @@
 package id.waltid.openid4vp.wallet.request
 
 import id.walt.credentials.utils.JwtUtils.isJwt
+import id.walt.crypto.utils.UuidUtils
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
@@ -11,6 +12,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webdatafetching.WebDataFetcher
+import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -41,6 +43,7 @@ object AuthorizationRequestResolver {
         val status: HttpStatusCode,
         val contentType: ContentType?,
         val body: String,
+        val walletNonce: String? = null,
     )
 
     enum class UnsignedRequestObjectPolicy {
@@ -51,6 +54,17 @@ object AuthorizationRequestResolver {
     class UnsignedAuthorizationRequestNotAllowedException :
         IllegalArgumentException("Unsigned AuthorizationRequest object (alg=none) is not allowed")
 
+    private val defaultRequestUriPostWalletMetadata = buildRequestUriPostWalletMetadata(
+        vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(),
+    )
+
+    fun buildRequestUriPostWalletMetadata(vpFormatsSupported: JsonObject): String = json.encodeToString(
+        JsonObject.serializer(),
+        buildJsonObject {
+            put("vp_formats_supported", vpFormatsSupported)
+        },
+    )
+
     /**
      * Shared transport mapping for retrieving Authorization Requests via `request_uri`.
      * Keeps GET/POST behavior and response conversion centralized for all wallet callers.
@@ -59,14 +73,24 @@ object AuthorizationRequestResolver {
         webResolveAuthReq: WebDataFetcher,
         requestUri: String,
         requestUriMethod: RequestUriHttpMethod?,
+        requestUriPostWalletMetadata: String? = null,
     ): RequestUriFetchResponse {
+        val walletNonce = requestUriMethod
+            .takeIf { it == RequestUriHttpMethod.POST }
+            ?.let { UuidUtils.randomUUIDString().replace("-", "") }
+
         val response = when (requestUriMethod) {
             null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
             RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
                 method = HttpMethod.Post
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                setBody("")
+                setBody(
+                    Parameters.build {
+                        append("wallet_metadata", requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata)
+                        append("wallet_nonce", requireNotNull(walletNonce))
+                    }.formUrlEncode(),
+                )
             }
         }
 
@@ -74,6 +98,7 @@ object AuthorizationRequestResolver {
             status = response.status,
             contentType = response.contentType(),
             body = response.bodyAsText(),
+            walletNonce = walletNonce,
         )
     }
 
@@ -135,6 +160,7 @@ object AuthorizationRequestResolver {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
                 requestObject = response.body,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                expectedWalletNonce = response.walletNonce,
             )
             contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest.Plain(
                 authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body),
@@ -146,11 +172,18 @@ object AuthorizationRequestResolver {
     private suspend fun resolveFromRequestObject(
         requestObject: String,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        expectedWalletNonce: String? = null,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via inline request object" }
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
         val authReqJws = requestObject.decodeJws()
+        expectedWalletNonce?.let { nonce ->
+            val walletNonceClaim = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
+            require(walletNonceClaim == nonce) {
+                "AuthorizationRequest object wallet_nonce mismatch for request_uri_method=post"
+            }
+        }
         val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
         if (jwtAlg.equals("none", ignoreCase = true)) {
             if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
