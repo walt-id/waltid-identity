@@ -4,6 +4,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.credentials.utils.JwtUtils.isJwt
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
@@ -13,8 +14,10 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
+import id.walt.webwallet.service.keys.KeysService
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
@@ -42,7 +45,12 @@ class OpenId4VpPresentationService(
         isLenient = true
     }
 
-    suspend fun tryResolveAuthorizationRequest(request: String): Result<ResolvedAuthorizationRequest> = runCatching {
+    suspend fun tryResolveAuthorizationRequest(
+        request: String,
+        walletId: Uuid? = null,
+    ): Result<ResolvedAuthorizationRequest> = runCatching {
+        val runtimeRequestUriPostWalletMetadata = walletId?.let { buildRuntimeRequestUriPostWalletMetadata(it) }
+
         AuthorizationRequestResolver.resolve(
             requestUrl = Url(request),
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
@@ -51,6 +59,7 @@ class OpenId4VpPresentationService(
                 webResolveAuthReq = webResolveAuthReq,
                 requestUri = requestUri,
                 requestUriMethod = requestUriMethod,
+                requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
             )
         }
     }
@@ -68,7 +77,7 @@ class OpenId4VpPresentationService(
         request: String,
         selectedCredentialIds: Set<String>? = null,
     ): List<WalletCredential> =
-        tryResolveAuthorizationRequest(request)
+        tryResolveAuthorizationRequest(request, walletId)
             .getOrThrow()
             .authorizationRequest
             .dcqlQuery?.let { query ->
@@ -157,6 +166,20 @@ class OpenId4VpPresentationService(
         (this as? SelectivelyDisclosableVerifiableCredential)
             ?.disclosures
             ?.map { DcqlDisclosure(it.name, it.value) }
+
+    private suspend fun buildRuntimeRequestUriPostWalletMetadata(walletId: Uuid): String {
+        val runtimeKeyTypes = KeysService.list(walletId)
+            .mapNotNull { walletKey ->
+                runCatching { KeyManager.resolveSerializedKey(walletKey.document).keyType }
+                    .onFailure { error -> logger.warn(error) { "Skipping unresolved key ${walletKey.keyId} in wallet metadata generation" } }
+                    .getOrNull()
+            }
+            .toSet()
+
+        val runtimeCapabilities = WalletPresentationFormatRegistry.capabilitiesFromKeyTypes(runtimeKeyTypes)
+        val runtimeVpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(runtimeCapabilities)
+        return AuthorizationRequestResolver.buildRequestUriPostWalletMetadata(runtimeVpFormatsSupported)
+    }
 
     companion object {
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {

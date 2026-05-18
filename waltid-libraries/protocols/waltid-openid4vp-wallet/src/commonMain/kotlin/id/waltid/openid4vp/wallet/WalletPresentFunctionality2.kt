@@ -9,6 +9,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
+import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
@@ -24,7 +25,6 @@ import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.escapeHTML
@@ -63,8 +63,9 @@ object WalletPresentFunctionality2 {
                 for (matchResult in matchedCredsWithClaimsList) {
                     val digitalCredential = (matchResult.credential as RawDcqlCredential).originalCredential as DigitalCredential
 
-                    val presentationStringOrObject: JsonElement = when (digitalCredential.format) {
-                        "jwt_vc_json" -> W3CPresenter.presentW3C(
+                    val resolvedFormat = WalletPresentationFormatRegistry.resolve(digitalCredential.format)
+                    val presentationStringOrObject: JsonElement = when {
+                        resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.JWT_VC_JSON -> W3CPresenter.presentW3C(
                             digitalCredential = digitalCredential,
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
@@ -72,9 +73,7 @@ object WalletPresentFunctionality2 {
                             holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
                         )
 
-                        "ldp_vc" -> LDPPresenter.presentLdpTodo()
-
-                        "dc+sd-jwt" -> SdJwtVcPresenter.presentSdJwtVc(
+                        resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT -> SdJwtVcPresenter.presentSdJwtVc(
                             digitalCredential = digitalCredential,
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
@@ -82,7 +81,7 @@ object WalletPresentFunctionality2 {
                             holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
                         )
 
-                        "mso_mdoc" -> {
+                        resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> {
                             MdocPresenter.presentMdoc(
                                 digitalCredential = digitalCredential,
                                 matchResult = matchResult,
@@ -90,6 +89,9 @@ object WalletPresentFunctionality2 {
                                 holderKey = holderKey
                             )
                         }
+
+                        // Kept separate because ldp_vc presentation is not implemented yet.
+                        digitalCredential.format == CredentialFormat.LDP_VC.id.first() -> LDPPresenter.presentLdpTodo()
 
                         else ->
                             // Fallback for other formats or if it's a simple signed string
