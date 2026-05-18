@@ -10,7 +10,6 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -20,14 +19,8 @@ import id.waltid.openid4vp.wallet.request.AuthorizationRequestParameterCodec
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.request.accept
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.URLBuilder
-import io.ktor.http.ContentType
-import io.ktor.http.HttpMethod
 import io.ktor.http.Url
-import io.ktor.http.contentType
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -54,20 +47,10 @@ class OpenId4VpPresentationService(
             requestUrl = Url(request),
             unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
         ) { requestUri, requestUriMethod ->
-            val response = when (requestUriMethod) {
-                null, RequestUriHttpMethod.GET -> webResolveAuthReq.rawFetch(requestUri)
-                RequestUriHttpMethod.POST -> webResolveAuthReq.rawFetch(Url(requestUri)) {
-                    method = HttpMethod.Post
-                    contentType(ContentType.Application.FormUrlEncoded)
-                    accept(ContentType.parse("application/oauth-authz-req+jwt"))
-                    setBody("")
-                }
-            }
-
-            AuthorizationRequestResolver.RequestUriFetchResponse(
-                status = response.status,
-                contentType = response.contentType(),
-                body = response.bodyAsText(),
+            AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                webResolveAuthReq = webResolveAuthReq,
+                requestUri = requestUri,
+                requestUriMethod = requestUriMethod,
             )
         }
     }
