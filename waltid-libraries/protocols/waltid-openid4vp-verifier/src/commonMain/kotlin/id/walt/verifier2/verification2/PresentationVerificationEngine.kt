@@ -11,6 +11,7 @@ import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
+import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
@@ -317,6 +318,18 @@ object PresentationVerificationEngine {
                 presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
             log.warn { "First error: $firstError" }
 
+            val failedPolicies = presentationValidationResult
+                .mapValues { (_, byPolicy) -> byPolicy.filterValues { it.errors.isNotEmpty() } }
+                .filterValues { it.isNotEmpty() }
+
+            session.updateSession(SessionEvent.presentation_validation_available) {
+                failure = SessionFailure.PresentationValidation(
+                    reason = firstError?.message?.let { "Presentation validation failed: $it" }
+                        ?: "One or more presentations in vp_token failed validation",
+                    failedPolicies = failedPolicies,
+                )
+            }
+
             session.failSession(SessionEvent.presentation_validation_failed)
 
             throw IllegalArgumentException( // TODO: custom Exception class
@@ -354,14 +367,21 @@ object PresentationVerificationEngine {
                 successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
             )
         }
-        if (dcqlFulfilled?.isSuccess == false) {
-            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFulfilled.exceptionOrNull()}" }
+        val dcqlFailure = dcqlFulfilled?.exceptionOrNull() as? DcqlFulfillmentChecker.DcqlFulfillmentException
+        if (dcqlFailure != null) {
+            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFailure.message}" }
+
+            session.updateSession(SessionEvent.validated_credentials_available) {
+                failure = SessionFailure.DcqlFulfillment(
+                    reason = dcqlFailure.message,
+                    failure = dcqlFailure.details,
+                )
+            }
 
             session.failSession(SessionEvent.dcql_fulfillment_check_failed)
 
             throw IllegalArgumentException(
-                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.exceptionOrNull()?.message}",
-                dcqlFulfilled.exceptionOrNull()!!
+                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFailure.message}"
             )
             //Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
         }
@@ -384,11 +404,23 @@ object PresentationVerificationEngine {
             specificVcPolicies = credentialPolicyResults.specificVcPolicies,
         )
 
+        val vcPolicyViolations =
+            credentialPolicyResults.vcPolicies.filter { !it.success } +
+                    credentialPolicyResults.specificVcPolicies.values.flatten().filter { !it.success }
+
         session.updateSession(SessionEvent.credential_policy_results_available) {
             this.policyResults = verificationSessionPolicyResults
             this.status = when {
                 verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL
                 else -> Verification2Session.VerificationSessionStatus.FAILED
+            }
+            if (!verificationSessionPolicyResults.overallSuccess) {
+                // Invariant: overallSuccess=false implies at least one credential policy failure
+                // in the same lists used to compute the overall result.
+                failure = SessionFailure.VcPolicyViolations(
+                    reason = "${vcPolicyViolations.size} credential policy violation(s)",
+                    violations = vcPolicyViolations,
+                )
             }
         }
 

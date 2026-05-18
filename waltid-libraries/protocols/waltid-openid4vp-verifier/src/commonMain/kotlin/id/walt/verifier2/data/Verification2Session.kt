@@ -4,6 +4,7 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.presentations.formats.VerifiablePresentation
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.ktornotifications.core.KtorSessionNotifications
+import id.walt.policies2.vc.CredentialPolicyResult
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
@@ -114,6 +115,15 @@ data class Verification2Session(
     var presentedCredentials: Map<String, List<DigitalCredential>>? = null,
 
     var statusReason: String? = null,
+
+    /**
+     * Structured failure detail. Populated when the session ends in [VerificationSessionStatus.FAILED]
+     * (presentation validation, DCQL fulfillment, VC policy violations, or an OID4VP §8.5 wallet
+     * error response). Null for successful sessions or sessions that have not reached a failure
+     * state. Additive — legacy consumers that only read [status]/[statusReason] keep working.
+     */
+    @SerialName("failure")
+    var failure: SessionFailure? = null,
 ) {
 
     fun deletePII() {
@@ -121,17 +131,27 @@ data class Verification2Session(
         presentedPresentations = null
         presentedCredentials = null
 
+        fun redactPolicyResult(policyResult: CredentialPolicyResult) {
+            policyResult.result?.let { resultElement ->
+                policyResult.result = redactCredentialSubject(resultElement)
+            }
+        }
+
         policyResults?.vpPolicies?.values?.forEach { innerMap ->
             innerMap.values.forEach { policyResult ->
                 policyResult.results = emptyMap()
             }
         }
 
-        policyResults?.vcPolicies?.forEach { policyResult ->
-            policyResult.result?.let { resultElement ->
-                policyResult.result = redactCredentialSubject(resultElement)
-            }
-        }
+        buildList {
+            policyResults?.vcPolicies?.let(::addAll)
+            policyResults?.specificVcPolicies?.values?.flatten()?.let(::addAll)
+            (failure as? SessionFailure.VcPolicyViolations)?.violations?.let(::addAll)
+        }.forEach(::redactPolicyResult)
+
+        (failure as? SessionFailure.PresentationValidation)?.failedPolicies?.values
+            ?.flatMap { it.values }
+            ?.forEach { it.results = emptyMap() }
     }
 
     private fun redactCredentialSubject(resultElement: JsonElement): JsonElement {
