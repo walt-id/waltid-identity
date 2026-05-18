@@ -31,9 +31,11 @@ import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.util.*
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalUuidApi::class)
@@ -101,7 +103,11 @@ fun Application.exchange() = walletRoute {
             val wallet = call.getWalletService()
             val request = call.receiveText()
             runCatching {
-                wallet.matchCredentialsForPresentationRequest(request)
+                transaction {
+                    runBlocking {
+                        wallet.matchCredentialsForPresentationRequest(request)
+                    }
+                }
             }.onSuccess {
                 call.respond(HttpStatusCode.OK, it)
             }.onFailure { error ->
@@ -136,15 +142,19 @@ fun Application.exchange() = walletRoute {
 
             val disclosures = req.disclosures
 
-            val result = wallet.usePresentationRequest(
-                parameter = PresentationRequestParameter(
-                    did = did,
-                    request = presentationRequest,
-                    selectedCredentials = selectedCredentialIds,
-                    disclosures = disclosures,
-                    note = req.note,
-                )
-            ) // TODO add disclosures here
+            val result = transaction {
+                runBlocking {
+                    wallet.usePresentationRequest(
+                        parameter = PresentationRequestParameter(
+                            did = did,
+                            request = presentationRequest,
+                            selectedCredentials = selectedCredentialIds,
+                            disclosures = disclosures,
+                            note = req.note,
+                        )
+                    ) // TODO add disclosures here
+                }
+            }
 
             if (result.isSuccess) {
                 wallet.addOperationHistory(
@@ -205,7 +215,11 @@ fun Application.exchange() = walletRoute {
         post("resolvePresentationRequest", getResolvePresentationRequestDocs()) {
             val wallet = call.getWalletService()
             val request = call.receiveText()
-            val parsedRequest = wallet.resolvePresentationRequest(request)
+            val parsedRequest = transaction {
+                runBlocking {
+                    wallet.resolvePresentationRequest(request)
+                }
+            }
             call.respond(parsedRequest)
         }
 
