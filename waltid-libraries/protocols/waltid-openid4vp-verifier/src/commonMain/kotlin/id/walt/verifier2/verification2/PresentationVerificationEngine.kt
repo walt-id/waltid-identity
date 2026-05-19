@@ -329,7 +329,7 @@ object PresentationVerificationEngine {
                 presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
             log.warn { "First error: $firstError" }
 
-            val failedPolicies = presentationValidationResult
+            val failedPoliciesMap = presentationValidationResult
                 .mapValues { (_, byPolicy) -> byPolicy.filterValues { it.errors.isNotEmpty() } }
                 .filterValues { it.isNotEmpty() }
 
@@ -337,19 +337,19 @@ object PresentationVerificationEngine {
                 failure = SessionFailure.PresentationValidation(
                     reason = firstError?.message?.let { "Presentation validation failed: $it" }
                         ?: "One or more presentations in vp_token failed validation",
-                    failedPolicies = failedPolicies,
+                    failedPolicies = failedPoliciesMap,
                 )
             }
 
             session.failSession(SessionEvent.presentation_validation_failed)
 
-            /*val failedPolicies = presentationValidationResult.flatMap { (queryId, policyResults) ->
+            val failedPoliciesNames = presentationValidationResult.flatMap { (queryId, policyResults) ->
                 policyResults.filter { it.value.errors.isNotEmpty() }
                     .map { (policyId, _) -> "$queryId/$policyId" }
             }
             throw PresentationRejectionException(
-                "Presentation validation failed. Failed VP policies: ${failedPolicies.joinToString()}"
-            )*/
+                "Presentation validation failed. Failed VP policies: ${failedPoliciesNames.joinToString()}"
+            )
         }
 
 
@@ -433,7 +433,7 @@ object PresentationVerificationEngine {
             }
         }
 
-        /*if (!verificationSessionPolicyResults.overallSuccess) {
+        if (!verificationSessionPolicyResults.overallSuccess) {
             val failedVcPolicies = credentialPolicyResults.vcPolicies
                 .filter { !it.success }
                 .map { it.policy.id }
@@ -443,7 +443,7 @@ object PresentationVerificationEngine {
             throw PresentationRejectionException(
                 "Credential policy verification failed. Failed VC policies: ${allFailed.joinToString()}"
             )
-        }*/
+        }
 
     }
 }
