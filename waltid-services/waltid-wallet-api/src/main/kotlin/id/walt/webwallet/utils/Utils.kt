@@ -42,7 +42,8 @@ object BitstringUtils {
         inputStream.use { stream ->
             if (stream.markSupported()) {
                 stream.mark(Int.MAX_VALUE)
-                logger.debug { "available bytes: ${bitmap(stream.readAllBytes())}" }
+                val size = stream.readAllBytes().size
+                logger.debug { "available bytes: ${size}" }
                 inputStream.reset()
             }
             //TODO: bitSize constraints
@@ -58,7 +59,7 @@ object BitstringUtils {
         }
 
     private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
-        logger.debug { "selected byte: ${bitmap(bytes)}" }
+        logger.debug { "selected byte: ${bytes.size}" }
         val bits = bytes.toBitSequence()
         val bitStartPosition = index * bitSize % BITS_PER_BYTE_UNSIGNED
         logger.debug { "bitStartPosition within byte: $bitStartPosition" }

@@ -20,7 +20,7 @@ class BitValueReader(
     ) = getBitValue(expansionAlgorithm(bitstring), idx, bitSize)
 
     private fun getBitValue(input: ByteArray, index: ULong, bitSize: Int): List<Char> {
-        logger.debug { "available bytes: ${bitmap(input)}" }
+        logger.debug { "available bytes: ${input.size}" }
 
         // TODO: bitSize constraints
         val bitStartPosition = index * bitSize.toUInt()
