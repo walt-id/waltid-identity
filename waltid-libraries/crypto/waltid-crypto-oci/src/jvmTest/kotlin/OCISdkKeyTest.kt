@@ -1,41 +1,315 @@
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.OciKeyMeta
+import id.walt.crypto.keys.oci.OCIKey
+import id.walt.crypto.keys.oci.OCIsdkMetadata
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.TestInstance
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
+import java.util.stream.Stream
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
+/**
+ * Integration tests for [OCIKey]. Require a live OCI environment.
+ *
+ * Set environment variables to enable:
+ *   OCI_VAULT_ID, OCI_COMPARTMENT_ID, OCI_AUTH_TYPE (optional),
+ *   OCI_CONFIG_PATH (optional), OCI_CONFIG_PROFILE (optional)
+ */
+@DisplayName("OCIKey SDK Integration Tests")
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class OCISdkKeyTest {
 
-    @Test
-    fun test() = runTest {
-//        val compartmentId = "ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa"
-//        val vaultId = "ocid1.vault.oc1.eu-frankfurt-1.entbf645aabf2.abtheljshkb6dsuldqf324kitneb63vkz3dfd74dtqvkd5j2l2cxwyvmefeq"
-//
-//
-//        val config = OCIsdkMetadata(vaultId, compartmentId)
-//
-//        val testkey = OCIKey(
-//            "ocid1.key.oc1.eu-frankfurt-1.entbf645aabf2.abtheljrk2redsqsmbln4e6z543bmv4emabdmtveh3owzglt6ovo6dpnd6fa",
-//            config,
-//            _keyType = KeyType.secp256r1
-//        )
-//
-//        val plaintext = """{"abc": "xyz"}""".encodeToByteArray()
-//
-//        val signed: String = testkey.signJws(plaintext) // should already be IEEE P1363
-//        val publicKey = testkey.getPublicKey() // probably a JWKKey in the background
-//
-//        val result = publicKey.verifyJws(signed)
-//        println(result)
-//
-//        check(result.isSuccess)
-//
-//        val plaintext2 = """{"abc": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImRpZDpqd2s6ZXlKcmRIa2lPaUpGUXlJc0ltTnlkaUk2SWxBdE1qVTJJaXdpYTJsa0lqb2lVMmt3TjJwSldIRk1jMDFMU0hrd2RtZDVkbEJpWTBsMlNWQjRaSEZNTjFGek5sTlVjWEo0TVZWRE9DSXNJbmdpT2lKeExVeGFSRXN0VkZwUlUxVmplbmxmTVVzMlZFSkdaVlp1TmpCeVRYWTBTMnBaZGxSbFVIa3lWRWR6SWl3aWVTSTZJbkZVWW1sVFVrVm1WMUphZEVGTFduTlhMV3N0TUVKSVNVbFpjRUZPTUdab2JtcGhjV1ZOU1ZVMVQxa2lmUSJ9.eyJpc3MiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNklsQXRNalUySWl3aWEybGtJam9pVTJrd04ycEpXSEZNYzAxTFNIa3dkbWQ1ZGxCaVkwbDJTVkI0WkhGTU4xRnpObE5VY1hKNE1WVkRPQ0lzSW5naU9pSnhMVXhhUkVzdFZGcFJVMVZqZW5sZk1VczJWRUpHWlZadU5qQnlUWFkwUzJwWmRsUmxVSGt5VkVkeklpd2llU0k2SW5GVVltbFRVa1ZtVjFKYWRFRkxXbk5YTFdzdE1FSklTVWxaY0VGT01HWm9ibXBoY1dWTlNWVTFUMWtpZlEiLCJzdWIiOiJkaWQ6andrOmV5SnJkSGtpT2lKRlF5SXNJbU55ZGlJNklsQXRNalUySWl3aWVDSTZJbmhSVTIxUVpHeHhhMmczT0c1c1NrODJNMGRNYjFZelZrdHBlR1U1VkhKSGJtbHpTekpSZERWWmRIY2lMQ0o1SWpvaWR6WjJPRGRVUkZoRGRWOUtRVm94ZDFoa1drVjFPREYyYTBFMGNtaG1OMGhGT0ZrNU5WZ3pORlZ6U1NKOSIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwiaHR0cHM6Ly9wdXJsLmltc2dsb2JhbC5vcmcvc3BlYy9vYi92M3AwL2NvbnRleHQuanNvbiJdLCJpZCI6InVybjp1dWlkOjNjOTViNTc1LTI4NTEtNGZmOS05M2UzLTUyNzk2YmU3MDA2ZiIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiLCJPcGVuQmFkZ2VDcmVkZW50aWFsIl0sIm5hbWUiOiJKRkYgeCB2Yy1lZHUgUGx1Z0Zlc3QgMyBJbnRlcm9wZXJhYmlsaXR5IiwiaXNzdWVyIjp7InR5cGUiOlsiUHJvZmlsZSJdLCJpZCI6ImRpZDpqd2s6ZXlKcmRIa2lPaUpGUXlJc0ltTnlkaUk2SWxBdE1qVTJJaXdpYTJsa0lqb2lVMmt3TjJwSldIRk1jMDFMU0hrd2RtZDVkbEJpWTBsMlNWQjRaSEZNTjFGek5sTlVjWEo0TVZWRE9DSXNJbmdpT2lKeExVeGFSRXN0VkZwUlUxVmplbmxmTVVzMlZFSkdaVlp1TmpCeVRYWTBTMnBaZGxSbFVIa3lWRWR6SWl3aWVTSTZJbkZVWW1sVFVrVm1WMUphZEVGTFduTlhMV3N0TUVKSVNVbFpjRUZPTUdab2JtcGhjV1ZOU1ZVMVQxa2lmUSIsIm5hbWUiOiJKb2JzIGZvciB0aGUgRnV0dXJlIChKRkYpIiwidXJsIjoiaHR0cHM6Ly93d3cuamZmLm9yZy8iLCJpbWFnZSI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMS0yMDIyL2ltYWdlcy9KRkZfTG9nb0xvY2t1cC5wbmcifSwiaXNzdWFuY2VEYXRlIjoiMjAyNC0wNC0yNFQxMjoxMjozOC45NjYyNzg0OTJaIiwiZXhwaXJhdGlvbkRhdGUiOiIyMDI1LTA0LTI0VDEyOjEyOjM4Ljk2NjQ3MDU5MVoiLCJjcmVkZW50aWFsU3ViamVjdCI6eyJpZCI6ImRpZDpqd2s6ZXlKcmRIa2lPaUpGUXlJc0ltTnlkaUk2SWxBdE1qVTJJaXdpZUNJNkluaFJVMjFRWkd4eGEyZzNPRzVzU2s4Mk0wZE1iMVl6Vmt0cGVHVTVWSEpIYm1selN6SlJkRFZaZEhjaUxDSjVJam9pZHpaMk9EZFVSRmhEZFY5S1FWb3hkMWhrV2tWMU9ERjJhMEUwY21obU4waEZPRms1TlZnek5GVnpTU0o5IiwidHlwZSI6WyJBY2hpZXZlbWVudFN1YmplY3QiXSwiYWNoaWV2ZW1lbnQiOnsiaWQiOiJ1cm46dXVpZDphYzI1NGJkNS04ZmFkLTRiYjEtOWQyOS1lZmQ5Mzg1MzY5MjYiLCJ0eXBlIjpbIkFjaGlldmVtZW50Il0sIm5hbWUiOiJUSGUgbmV3IEpGRiB4IHZjLWVkdSBQbHVnRmVzdCAzIEludGVyb3BlcmFiaWxpdHkiLCJkZXNjcmlwdGlvbiI6IlRoaXMgd2FsbGV0IHN1cHBvcnRzIHRoZSB1c2Ugb2YgVzNDIFZlcmlmaWFibGUgQ3JlZGVudGlhbHMgYW5kIGhhcyBkZW1vbnN0cmF0ZWQgaW50ZXJvcGVyYWJpbGl0eSBkdXJpbmcgdGhlIHByZXNlbnRhdGlvbiByZXF1ZXN0IHdvcmtmbG93IGR1cmluZyBKRkYgeCBWQy1FRFUgUGx1Z0Zlc3QgMy4iLCJjcml0ZXJpYSI6eyJ0eXBlIjoiQ3JpdGVyaWEiLCJuYXJyYXRpdmUiOiJXYWxsZXQgc29sdXRpb25zIHByb3ZpZGVycyBlYXJuZWQgdGhpcyBiYWRnZSBieSBkZW1vbnN0cmF0aW5nIGludGVyb3BlcmFiaWxpdHkgZHVyaW5nIHRoZSBwcmVzZW50YXRpb24gcmVxdWVzdCB3b3JrZmxvdy4gVGhpcyBpbmNsdWRlcyBzdWNjZXNzZnVsbHkgcmVjZWl2aW5nIGEgcHJlc2VudGF0aW9uIHJlcXVlc3QsIGFsbG93aW5nIHRoZSBob2xkZXIgdG8gc2VsZWN0IGF0IGxlYXN0IHR3byB0eXBlcyBvZiB2ZXJpZmlhYmxlIGNyZWRlbnRpYWxzIHRvIGNyZWF0ZSBhIHZlcmlmaWFibGUgcHJlc2VudGF0aW9uLCByZXR1cm5pbmcgdGhlIHByZXNlbnRhdGlvbiB0byB0aGUgcmVxdWVzdG9yLCBhbmQgcGFzc2luZyB2ZXJpZmljYXRpb24gb2YgdGhlIHByZXNlbnRhdGlvbiBhbmQgdGhlIGluY2x1ZGVkIGNyZWRlbnRpYWxzLiJ9LCJpbWFnZSI6eyJpZCI6Imh0dHBzOi8vdzNjLWNjZy5naXRodWIuaW8vdmMtZWQvcGx1Z2Zlc3QtMy0yMDIzL2ltYWdlcy9KRkYtVkMtRURVLVBMVUdGRVNUMy1iYWRnZS1pbWFnZS5wbmciLCJ0eXBlIjoiSW1hZ2UifX19fSwianRpIjoidXJuOnV1aWQ6M2M5NWI1NzUtMjg1MS00ZmY5LTkzZTMtNTI3OTZiZTcwMDZmIiwiZXhwIjoxNzQ1NDk2NzU4LCJpYXQiOjE3MTM5NjA3NTgsIm5iZiI6MTcxMzk2MDc1OH0.SE5LZFXMu928HMoRNnad1rN8qGeO16hqNXt7GDAHly0MmhYvHJFgUBfvHaKYwikwim9SBbOZ76EJHjLfHAe97g"}""".encodeToByteArray()
-//
-//        val signed2: String = testkey.signJws(plaintext2) // should already be IEEE P1363
-//        val publicKey2 = testkey.getPublicKey() // probably a JWKKey in the background
-//
-//        val result2 = publicKey2.verifyJws(signed2)
-//        println(result2)
-//
-//        check(result2.isSuccess)
+    private val vaultId = System.getenv("OCI_VAULT_ID") ?: ""
+    private val compartmentId = System.getenv("OCI_COMPARTMENT_ID") ?: ""
+    private val authType = System.getenv("OCI_AUTH_TYPE") ?: "INSTANCE_PRINCIPAL"
+    private val configPath = System.getenv("OCI_CONFIG_PATH")
+    private val configProfile = System.getenv("OCI_CONFIG_PROFILE")
+
+    @BeforeAll
+    fun requireOciEnvironment() {
+        assumeTrue(
+            vaultId.isNotBlank() && compartmentId.isNotBlank(),
+            "Skipping: OCI_VAULT_ID and OCI_COMPARTMENT_ID must be set to run these tests"
+        )
     }
 
+    private fun config() = OCIsdkMetadata(
+        vaultId = vaultId,
+        compartmentId = compartmentId,
+        authType = authType,
+        configFilePath = configPath,
+        configProfile = configProfile,
+    )
+
+    @Nested
+    @DisplayName("Key generation")
+    inner class KeyGeneration {
+
+        @Test
+        fun `generateKey with default type produces secp256r1 key`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertEquals(KeyType.secp256r1, key.keyType)
+        }
+
+        @ParameterizedTest(name = "keyType={0}")
+        @MethodSource("OCISdkKeyTest#supportedKeyTypes")
+        fun `generateKey produces a key with the requested type`(keyType: KeyType) = runTest {
+            val key = OCIKey.generateKey(keyType, config())
+            assertEquals(keyType, key.keyType)
+        }
+
+        @Test
+        fun `generated key always reports hasPrivateKey = false`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertFalse(key.hasPrivateKey)
+        }
+
+        @Test
+        fun `generated key has a non-blank OCID id`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertTrue(key.id.startsWith("ocid1.key."), "Key ID should be an OCID: ${key.id}")
+        }
+
+        @Test
+        fun `toString contains vaultId`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertTrue(key.toString().contains(vaultId))
+        }
+    }
+
+    @Nested
+    @DisplayName("Public key retrieval")
+    inner class PublicKeyRetrieval {
+
+        @Test
+        fun `getPublicKey returns a key without a private key`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertFalse(key.getPublicKey().hasPrivateKey)
+        }
+
+        @Test
+        fun `getPublicKey is consistent across multiple calls`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertEquals(key.getPublicKey().getKeyId(), key.getPublicKey().getKeyId())
+        }
+
+        @Test
+        fun `getPublicKeyRepresentation returns non-empty byte array`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertTrue(key.getPublicKeyRepresentation().isNotEmpty())
+        }
+
+        @Test
+        fun `exportJWKObject returns a valid JWK JsonObject`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val jwkObj = key.exportJWKObject()
+            assertIs<JsonObject>(jwkObj)
+            assertTrue(jwkObj.isNotEmpty())
+            assertNotNull(jwkObj["kty"], "JWK must contain 'kty'")
+        }
+    }
+
+    @Nested
+    @DisplayName("Key identity")
+    inner class KeyIdentity {
+
+        @Test
+        fun `getKeyId returns a non-blank string`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertTrue(key.getKeyId().isNotBlank())
+        }
+
+        @Test
+        fun `getThumbprint returns a non-blank string`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertTrue(key.getThumbprint().isNotBlank())
+        }
+
+        @Test
+        fun `getMeta returns correct keyId and a non-blank keyVersion`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val meta = key.getMeta()
+            assertIs<OciKeyMeta>(meta)
+            assertEquals(key.id, meta.keyId)
+            assertTrue(meta.keyVersion.isNotBlank())
+        }
+    }
+
+    @Nested
+    @DisplayName("Raw sign + verify")
+    inner class RawSignVerify {
+
+        @ParameterizedTest(name = "keyType={0}")
+        @MethodSource("OCISdkKeyTest#supportedKeyTypes")
+        fun `signRaw and verifyRaw succeed for all supported key types`(keyType: KeyType) = runTest {
+            val key = OCIKey.generateKey(keyType, config())
+            val plaintext = "payload for $keyType".toByteArray()
+            val signed = key.signRaw(plaintext)
+            val result = key.verifyRaw(signed, plaintext)
+            assertTrue(result.isSuccess, "verifyRaw failed for $keyType: ${result.exceptionOrNull()}")
+        }
+
+        @Test
+        fun `verifyRaw returns plaintext on success`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val plaintext = "test payload".toByteArray()
+            val signed = key.signRaw(plaintext)
+            val result = key.verifyRaw(signed, plaintext)
+            assertTrue(result.isSuccess)
+            assertTrue(plaintext.contentEquals(result.getOrThrow()))
+        }
+
+        @Test
+        fun `verifyRaw fails for tampered signature`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val plaintext = "test payload".toByteArray()
+            val signed = key.signRaw(plaintext)
+            val tampered = signed.copyOf().also { it[it.size / 2] = it[it.size / 2].inc() }
+            val result = key.verifyRaw(tampered, plaintext)
+            assertTrue(result.isFailure, "Verification should fail for tampered signature")
+        }
+
+        @Test
+        fun `verifyRaw with null plaintext throws`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val signed = key.signRaw("data".toByteArray())
+            assertFailsWith<IllegalArgumentException> {
+                key.verifyRaw(signed, null)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("JWS sign + verify")
+    inner class JwsSignVerify {
+
+        @ParameterizedTest(name = "keyType={0}")
+        @MethodSource("OCISdkKeyTest#supportedKeyTypes")
+        fun `signJws and verifyJws succeed for all supported key types`(keyType: KeyType) = runTest {
+            val key = OCIKey.generateKey(keyType, config())
+            val payload = """{"sub":"test","iss":"oci-sdk-test","keyType":"$keyType"}"""
+            val signed = key.signJws(payload.encodeToByteArray())
+            val result = key.verifyJws(signed)
+            assertTrue(result.isSuccess, "verifyJws failed for $keyType: ${result.exceptionOrNull()}")
+        }
+
+        @Test
+        fun `signJws produces a 3-part dot-separated string`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val signed = key.signJws("""{"hello":"world"}""".encodeToByteArray())
+            assertEquals(3, signed.split(".").size)
+        }
+
+        @Test
+        fun `verifyJws returns the original payload as JsonElement`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val payload = """{"sub":"user123","claim":"value"}"""
+            val signed = key.signJws(payload.encodeToByteArray())
+            val result = key.verifyJws(signed)
+            assertTrue(result.isSuccess)
+            assertIs<kotlinx.serialization.json.JsonElement>(result.getOrThrow())
+        }
+
+        @Test
+        fun `signJws with custom headers includes them in JWS header`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val keyId = key.getKeyId()
+            val signed = key.signJws("""{"test":true}""".encodeToByteArray(), mapOf("kid" to JsonPrimitive(keyId)))
+            val headerJson = signed.split(".")[0]
+                .let { java.util.Base64.getUrlDecoder().decode(it).decodeToString() }
+            assertTrue(headerJson.contains(keyId), "Header should contain kid: $headerJson")
+        }
+
+        @Test
+        fun `verifyJws fails for tampered payload`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val signed = key.signJws("""{"legit":true}""".encodeToByteArray())
+            val parts = signed.split(".")
+            val tamperedPayload = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("""{"tampered":true}""".encodeToByteArray())
+            val tampered = "${parts[0]}.$tamperedPayload.${parts[2]}"
+            val result = key.verifyJws(tampered)
+            assertTrue(result.isFailure)
+        }
+
+        @Test
+        fun `verifyJws with wrong part count returns failure`() = runTest {
+            val key = OCIKey.generateKey(config())
+            val result = runCatching { key.verifyJws("only.two") }
+            assertTrue(result.isFailure)
+        }
+    }
+
+    @Nested
+    @DisplayName("Export restrictions")
+    inner class ExportRestrictions {
+
+        @Test
+        fun `exportJWK throws NotImplementedError`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertFailsWith<NotImplementedError> { key.exportJWK() }
+        }
+
+        @Test
+        fun `exportPEM throws NotImplementedError`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertFailsWith<NotImplementedError> { key.exportPEM() }
+        }
+    }
+
+    @Nested
+    @DisplayName("Key deletion")
+    inner class KeyDeletion {
+
+        @Test
+        fun `deleteKey schedules deletion and returns true`() = runTest {
+            val key = OCIKey.generateKey(config())
+            assertTrue(key.deleteKey())
+        }
+    }
+
+    @Nested
+    @DisplayName("Unsupported key types")
+    inner class UnsupportedKeyTypes {
+
+        @Test
+        fun `generateKey with Ed25519 throws IllegalArgumentException`() = runTest {
+            assertFailsWith<IllegalArgumentException> {
+                OCIKey.generateKey(KeyType.Ed25519, config())
+            }
+        }
+
+        @Test
+        fun `generateKey with secp256k1 throws IllegalArgumentException`() = runTest {
+            assertFailsWith<IllegalArgumentException> {
+                OCIKey.generateKey(KeyType.secp256k1, config())
+            }
+        }
+    }
+
+    companion object {
+        @JvmStatic
+        fun supportedKeyTypes(): Stream<Arguments> = Stream.of(
+            Arguments.of(KeyType.secp256r1),
+            Arguments.of(KeyType.secp384r1),
+            Arguments.of(KeyType.secp521r1),
+            Arguments.of(KeyType.RSA),
+            Arguments.of(KeyType.RSA3072),
+            Arguments.of(KeyType.RSA4096),
+        )
+    }
 }

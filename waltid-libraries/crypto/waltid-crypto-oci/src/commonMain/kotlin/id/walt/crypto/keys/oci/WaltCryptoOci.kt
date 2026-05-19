@@ -9,6 +9,7 @@ object WaltCryptoOci {
     fun init() {
         KeyManager.register<OCIKey>("oci") { generateRequest: KeyGenerationRequest ->
             OCIKey.generateKey(
+                generateRequest.keyType,
                 Json.decodeFromJsonElement(generateRequest.config!!)
             )
         }

@@ -36,16 +36,11 @@ expect class OCIKey(
     override suspend fun getMeta(): OciKeyMeta
 
     companion object {
-
-        // The KeyShape used for testing
         val DEFAULT_KEY_LENGTH: Int
         suspend fun generateKey(config: OCIsdkMetadata): OCIKey
-
-
+        suspend fun generateKey(type: KeyType, config: OCIsdkMetadata): OCIKey
     }
 
     val id: String
     val config: OCIsdkMetadata
-
-
 }

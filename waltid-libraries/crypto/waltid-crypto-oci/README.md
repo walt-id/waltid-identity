@@ -9,13 +9,9 @@
 <a href="https://www.linkedin.com/company/walt-id/">
 <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
 </a>
-  
-  <h2>Status</h2>
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
-    <br/>
-    <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
-  </p>
+
+<h2>Status</h2>
+<img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge" alt="Status: Active" />
 
 </div>
 
@@ -32,7 +28,6 @@ This library enables:
 - **Key Management**: Create and manage keys in OCI KMS vaults
 - **Remote Signing**: Sign data using keys stored in OCI KMS
 - **Remote Verification**: Verify signatures using OCI KMS public keys
-- **Performance**: Improved performance compared to REST API-based implementations
 
 ## Key Concepts
 
@@ -43,27 +38,32 @@ Keys are managed in OCI KMS vaults:
 - **Cloud Storage**: Keys are stored securely in OCI KMS vaults
 - **No Private Key Access**: Private keys never leave OCI KMS
 - **Remote Operations**: Signing and verification operations are performed in OCI
-- **Vault Management**: Keys are organized within OCI KMS vaults
 - **Compartment Organization**: Keys are organized within OCI compartments
 
 ### Supported Key Types
 
-The library supports key types available in OCI KMS:
+| KeyType     | OCI Algorithm | Signing Algorithm      |
+|-------------|---------------|------------------------|
+| `secp256r1` | ECDSA P-256   | `ECDSA_SHA_256`        |
+| `secp384r1` | ECDSA P-384   | `ECDSA_SHA_384`        |
+| `secp521r1` | ECDSA P-521   | `ECDSA_SHA_512`        |
+| `RSA`       | RSA-2048      | `SHA_256_RSA_PKCS_PSS` |
+| `RSA3072`   | RSA-3072      | `SHA_384_RSA_PKCS_PSS` |
+| `RSA4096`   | RSA-4096      | `SHA_512_RSA_PKCS_PSS` |
 
-- **RSA**: RSA keys with various key sizes
-- **ECDSA**: Elliptic curve keys (specific curves supported by OCI)
+> `Ed25519` and `secp256k1` are **not** supported by OCI KMS.
 
 ### OCI Authentication
 
-Uses OCI SDK's authentication mechanisms:
+Configurable via `OCIsdkMetadata.authType`:
 
-- **Instance Principals**: For OCI compute instances
-- **API Keys**: User API keys with configuration file
-- **Resource Principals**: For OCI functions and container instances
+| authType             | Description                                        |
+|----------------------|----------------------------------------------------|
+| `INSTANCE_PRINCIPAL` | Default — for OCI compute instances                |
+| `CONFIG_FILE`        | User API keys via `~/.oci/config` (or custom path) |
+| `RESOURCE_PRINCIPAL` | For OCI functions and container instances          |
 
 ### Protection Modes
-
-OCI KMS supports different protection modes:
 
 - **Software**: Keys protected by software (default)
 - **HSM**: Hardware Security Module protection (when available)
@@ -73,7 +73,7 @@ OCI KMS supports different protection modes:
 ### Platform Support
 
 - **JVM Only**: This is a JVM-only library
-- **Java 15+**: Requires Java 15 or later (for Ed25519 support)
+- **Java 15+**: Requires Java 15 or later
 - **OCI Account**: Requires an Oracle Cloud Infrastructure account with KMS access
 
 ### Dependencies
@@ -117,31 +117,46 @@ dependencies {
 ### Basic Usage
 
 ```kotlin
-import id.walt.crypto.keys.oci.OCIKey
-import id.walt.crypto.keys.oci.OCIsdkMetadata
-
-// Configure OCI connection
+// Instance Principals (default — for OCI compute instances)
 val config = OCIsdkMetadata(
-    vaultId = "ocid1.vault.oc1..example",
+    vaultId = "ocid1.vault.oc1.eu-frankfurt-1.example",
     compartmentId = "ocid1.compartment.oc1..example"
 )
 
-// Generate a new key in OCI KMS
+// Config-file auth (API key — for local dev / non-OCI environments)
+val configFileAuth = OCIsdkMetadata(
+    vaultId = "ocid1.vault.oc1.eu-frankfurt-1.example",
+    compartmentId = "ocid1.compartment.oc1..example",
+    authType = "CONFIG_FILE",
+    configFilePath = "/home/user/.oci/config",
+    configProfile = "DEFAULT"
+)
+
+// Generate a new secp256r1 key (default)
 val key = OCIKey.generateKey(config)
 
-// Use the key (implements Key interface from waltid-crypto)
-val signature = key.signRaw(data)
-val publicKey = key.getPublicKey()
-val verification = key.verifyRaw(signature, data)
+// Generate a specific key type
+val p384key = OCIKey.generateKey(KeyType.secp384r1, config)
+val rsaKey = OCIKey.generateKey(KeyType.RSA4096, config)
+
+// Sign and verify
+val plaintext = "Hello OCI".encodeToByteArray()
+val signed = key.signJws(plaintext, mapOf("kid" to JsonPrimitive(key.getKeyId())))
+val result = key.verifyJws(signed)
+
+// Schedule key deletion (minimum 7-day OCI notice period)
+key.deleteKey()
 ```
 
 ### Key Operations
 
-- **Generate**: Create new keys in OCI KMS
-- **Sign**: Sign data using OCI KMS (private key never leaves OCI)
-- **Verify**: Verify signatures using OCI KMS
-- **Get Public Key**: Retrieve public key from OCI KMS
-- **Get Metadata**: Retrieve key metadata from OCI
+- **Generate**: Create ECDSA or RSA keys in OCI KMS; key type is inferred automatically on load
+- **Sign (raw)**: SHA-256 digest sent as `messageType=DIGEST`; returns DER-encoded signature bytes
+- **Sign (JWS)**: DER signature converted to IEEE P1363 (R||S) for EC keys, standard RSA-PSS for RSA
+- **Verify (raw)**: Mirrors signing — digest + DER signature sent to OCI verify
+- **Verify (JWS)**: IEEE P1363 signature converted back to DER before OCI verification
+- **Get Public Key**: PEM retrieved from OCI and cached as a local `JWKKey`
+- **Delete Key**: Schedules deletion with a 7-day pending window (OCI minimum)
 
 ## Related Libraries
 

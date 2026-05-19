@@ -4,7 +4,10 @@ import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.JWSObject
 import com.nimbusds.jose.Payload
+import com.oracle.bmc.auth.AbstractAuthenticationDetailsProvider
+import com.oracle.bmc.auth.ConfigFileAuthenticationDetailsProvider
 import com.oracle.bmc.auth.InstancePrincipalsAuthenticationDetailsProvider
+import com.oracle.bmc.auth.ResourcePrincipalAuthenticationDetailsProvider
 import com.oracle.bmc.keymanagement.KmsCryptoClient
 import com.oracle.bmc.keymanagement.KmsManagementClient
 import com.oracle.bmc.keymanagement.KmsVaultClient
@@ -16,7 +19,6 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto.utils.JvmEccUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
@@ -25,6 +27,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 import org.kotlincrypto.hash.sha2.SHA256
 import java.time.Duration
+import java.util.Date
 import kotlin.io.encoding.Base64
 import kotlin.time.measureTime
 import kotlin.time.toJavaDuration
@@ -32,6 +35,12 @@ import kotlin.time.toKotlinDuration
 
 
 private val log = KotlinLogging.logger { }
+
+private fun OCIsdkMetadata.createAuthProvider(): AbstractAuthenticationDetailsProvider = when (authType) {
+    "CONFIG_FILE" -> ConfigFileAuthenticationDetailsProvider(configFilePath, configProfile)
+    "RESOURCE_PRINCIPAL" -> ResourcePrincipalAuthenticationDetailsProvider.builder().build()
+    else -> InstancePrincipalsAuthenticationDetailsProvider.builder().build()
+}
 
 @Serializable
 @SerialName("oci")
@@ -43,7 +52,6 @@ actual class OCIKey actual constructor(
     private var _keyType: KeyType?,
 ) : Key() {
 
-    @Transient
     actual override var keyType: KeyType
         get() = _keyType!!
         set(value) {
@@ -56,40 +64,38 @@ actual class OCIKey actual constructor(
     private suspend fun retrievePublicKey(): Key {
         val getKeyRequest = GetKeyRequest.builder().keyId(id).build()
         val response = kmsManagementClient.getKey(getKeyRequest)
-        val publicKey = getOCIPublicKey(kmsManagementClient, response.key.currentKeyVersion, id)
-        return publicKey
+        return getOCIPublicKey(kmsManagementClient, response.key.currentKeyVersion, id)
     }
 
+    // OCI clients are initialised lazily on first use so that an OCIKey constructed with a
+    // pre-loaded _publicKey can be introspected without requiring live OCI connectivity.
+    @Suppress("TRANSIENT_IS_REDUNDANT")
+    @Transient private var _mgmt: KmsManagementClient? = null
 
-    @Transient
-    private val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
+    @Suppress("TRANSIENT_IS_REDUNDANT")
+    @Transient private var _crypto: KmsCryptoClient? = null
 
+    private fun ensureConnected() {
+        if (_mgmt != null) return
+        val provider = config.createAuthProvider()
+        val vaultClient = KmsVaultClient.builder().build(provider)
+        val vault = getVault(vaultClient, config.vaultId)
+        _mgmt = KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
+        _crypto = KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
+    }
 
-    // Create KMS clients
-    @Transient
-    private var kmsVaultClient: KmsVaultClient = KmsVaultClient.builder().build(provider)
+    private val kmsManagementClient: KmsManagementClient
+        get() { ensureConnected(); return _mgmt!! }
 
-    @Transient
-    private var vault: Vault = getVault(kmsVaultClient, config.vaultId)
-
-    @Transient
-    private var kmsManagementClient: KmsManagementClient =
-        KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
-
-    @Transient
-    private var kmsCryptoClient: KmsCryptoClient =
-        KmsCryptoClient.builder().endpoint(vault.cryptoEndpoint).build(provider)
+    private val kmsCryptoClient: KmsCryptoClient
+        get() { ensureConnected(); return _crypto!! }
 
 
     actual override fun toString(): String = "[OCI ${keyType.name} key @ ${config.vaultId}]"
 
-
     actual override suspend fun getKeyId(): String = getPublicKey().getKeyId()
 
-
-    actual override suspend fun getThumbprint(): String {
-        TODO("Not yet implemented")
-    }
+    actual override suspend fun getThumbprint(): String = getPublicKey().getThumbprint()
 
     actual override suspend fun exportJWK(): String =
         throw NotImplementedError("JWK export is not available for remote keys.")
@@ -99,56 +105,60 @@ actual class OCIKey actual constructor(
     actual override suspend fun exportPEM(): String =
         throw NotImplementedError("PEM export is not available for remote keys.")
 
+    private fun keyTypeToSigningAlgorithm(): SignDataDetails.SigningAlgorithm = when (keyType) {
+        KeyType.secp256r1 -> SignDataDetails.SigningAlgorithm.EcdsaSha256
+        KeyType.secp384r1 -> SignDataDetails.SigningAlgorithm.EcdsaSha384
+        KeyType.secp521r1 -> SignDataDetails.SigningAlgorithm.EcdsaSha512
+        KeyType.RSA -> SignDataDetails.SigningAlgorithm.Sha256RsaPkcsPss
+        KeyType.RSA3072 -> SignDataDetails.SigningAlgorithm.Sha384RsaPkcsPss
+        KeyType.RSA4096 -> SignDataDetails.SigningAlgorithm.Sha512RsaPkcsPss
+        else -> throw IllegalArgumentException("Key type not supported by OCI KMS: $keyType")
+    }
+
+    private fun keyTypeToVerifyingAlgorithm(): VerifyDataDetails.SigningAlgorithm = when (keyType) {
+        KeyType.secp256r1 -> VerifyDataDetails.SigningAlgorithm.EcdsaSha256
+        KeyType.secp384r1 -> VerifyDataDetails.SigningAlgorithm.EcdsaSha384
+        KeyType.secp521r1 -> VerifyDataDetails.SigningAlgorithm.EcdsaSha512
+        KeyType.RSA -> VerifyDataDetails.SigningAlgorithm.Sha256RsaPkcsPss
+        KeyType.RSA3072 -> VerifyDataDetails.SigningAlgorithm.Sha384RsaPkcsPss
+        KeyType.RSA4096 -> VerifyDataDetails.SigningAlgorithm.Sha512RsaPkcsPss
+        else -> throw IllegalArgumentException("Key type not supported by OCI KMS: $keyType")
+    }
 
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        val encodedMessage: String = Base64.encode(SHA256().digest(plaintext))
+        // OCI KMS requires a Base64-encoded digest with messageType=DIGEST
+        val encodedDigest = Base64.encode(SHA256().digest(plaintext))
 
-        val signDataDetails =
-            SignDataDetails.builder().keyId(id).message(encodedMessage).messageType(SignDataDetails.MessageType.Digest)
-                .signingAlgorithm(SignDataDetails.SigningAlgorithm.EcdsaSha256)
-                .keyVersionId(getKeyVersion(kmsManagementClient, id)).build()
+        val signDataDetails = SignDataDetails.builder()
+            .keyId(id)
+            .message(encodedDigest)
+            .messageType(SignDataDetails.MessageType.Digest)
+            .signingAlgorithm(keyTypeToSigningAlgorithm())
+            .keyVersionId(getKeyVersion(kmsManagementClient, id))
+            .build()
 
-        val signRequest = SignRequest.builder().signDataDetails(signDataDetails).build()
-        val response = kmsCryptoClient.sign(signRequest)
-
+        val response = kmsCryptoClient.sign(SignRequest.builder().signDataDetails(signDataDetails).build())
         return response.signedData.signature.decodeFromBase64()
     }
 
-    private val _internalJwsAlgorithm by lazy {
-        JWSAlgorithm.parse(keyType.jwsAlg)
-    }
+    private val _internalJwsAlgorithm by lazy { JWSAlgorithm.parse(keyType.jwsAlg) }
 
-    @OptIn(ExperimentalStdlibApi::class)
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val jwsObject = JWSObject(
-            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(), Payload(plaintext)
+            JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),
+            Payload(plaintext)
         )
 
-        val payloadToSign = jwsObject.header.toBase64URL().toString() + '.' + jwsObject.payload.toBase64URL().toString()
+        val payloadToSign =
+            jwsObject.header.toBase64URL().toString() + '.' + jwsObject.payload.toBase64URL().toString()
         var signed = signRaw(payloadToSign.encodeToByteArray())
 
-
         if (keyType in KeyTypes.EC_KEYS) {
-            log.trace { "Converted DER to IEEE P1363 signature." }
-            val originalSigned = signed
-
-            log.trace { "ORIGINAL (DER) SIGNATURE: ${signed.toHexString()}" }
-
-            signed = EccUtils.convertDERtoIEEEP1363(originalSigned)
-            log.trace { "CONVERTED SIGNATURE 1: ${signed.toHexString()}" }
-
-            signed = JvmEccUtils.convertDERtoIEEEP1363BouncyCastle(originalSigned)
-            log.trace { "CONVERTED SIGNATURE 2: ${signed.toHexString()}" }
-        } else {
-            log.trace { "Did not convert DER to IEEE P1363 signature." }
+            // OCI returns DER; JWS requires IEEE P1363 (raw R||S) for EC
+            signed = EccUtils.convertDERtoIEEEP1363(signed)
         }
 
-        val encodedSignature = signed.encodeToBase64Url()
-
-        val customJws = "$payloadToSign.${encodedSignature}"
-
-        return customJws
-
+        return "$payloadToSign.${signed.encodeToBase64Url()}"
     }
 
     actual override suspend fun verifyRaw(
@@ -156,37 +166,55 @@ actual class OCIKey actual constructor(
         detachedPlaintext: ByteArray?,
         customSignatureAlgorithm: String?
     ): Result<ByteArray> {
+        requireNotNull(detachedPlaintext) { "detachedPlaintext is required for OCI raw verification" }
 
-        val verifyDataDetails =
-            VerifyDataDetails.builder().keyId(id).message(detachedPlaintext?.encodeToBase64Url())
-                .signature(signed.decodeToString())
-                .signingAlgorithm(VerifyDataDetails.SigningAlgorithm.EcdsaSha256).build()
-        val verifyRequest = VerifyRequest.builder().verifyDataDetails(verifyDataDetails).build()
-        val response = kmsCryptoClient.verify(verifyRequest)
-        return Result.success(response.verifiedData.isSignatureValid.toString().toByteArray())
+        val encodedDigest = Base64.encode(SHA256().digest(detachedPlaintext))
+        val encodedSignature = Base64.encode(signed)
+
+        val verifyDataDetails = VerifyDataDetails.builder()
+            .keyId(id)
+            .message(encodedDigest)
+            .messageType(VerifyDataDetails.MessageType.Digest)
+            .signature(encodedSignature)
+            .signingAlgorithm(keyTypeToVerifyingAlgorithm())
+            .build()
+
+        val response = kmsCryptoClient.verify(VerifyRequest.builder().verifyDataDetails(verifyDataDetails).build())
+
+        return if (response.verifiedData.isSignatureValid) {
+            Result.success(detachedPlaintext)
+        } else {
+            Result.failure(Exception("OCI signature verification failed"))
+        }
     }
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-
         val parts = signedJws.split(".")
         check(parts.size == 3) { "Invalid JWT part count: ${parts.size} instead of 3" }
 
         val header = parts[0]
-        val headers: Map<String, JsonElement> = Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
-        headers["alg"]?.let {
-            val algValue = it.jsonPrimitive.content
-            check(algValue == keyType.jwsAlg) { "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg}!" }
-        }
-
         val payload = parts[1]
 
-        val signature = parts[2].decodeFromBase64Url()
+        val headers: Map<String, JsonElement> =
+            Json.decodeFromString(header.decodeFromBase64Url().decodeToString())
+        headers["alg"]?.let {
+            val algValue = it.jsonPrimitive.content
+            check(algValue == keyType.jwsAlg) {
+                "Invalid key algorithm for JWS: JWS has $algValue, key is ${keyType.jwsAlg}!"
+            }
+        }
 
         val signable = "$header.$payload".encodeToByteArray()
+        // JWS uses IEEE P1363 for EC; OCI verify expects DER
+        val rawSignature = parts[2].decodeFromBase64Url()
+        val derSignature = if (keyType in KeyTypes.EC_KEYS) {
+            EccUtils.convertP1363toDER(rawSignature)
+        } else {
+            rawSignature
+        }
 
-        return verifyRaw(signature.decodeToString().toByteArray(), signable).map {
-
-            Json.decodeFromString(it.decodeToString())
+        return verifyRaw(derSignature, signable).map {
+            Json.parseToJsonElement(payload.decodeFromBase64Url().decodeToString())
         }
     }
 
@@ -194,104 +222,118 @@ actual class OCIKey actual constructor(
     private var backedKey: Key? = null
 
     actual override suspend fun getPublicKey(): Key = backedKey ?: when {
-        _publicKey != null -> _publicKey!!.let { JWKKey.importJWK(it).getOrThrow() }
+        _publicKey != null -> JWKKey.importJWK(_publicKey!!).getOrThrow()
         else -> retrievePublicKey()
-    }.also { newBackedKey -> backedKey = newBackedKey }
+    }.also { backedKey = it }
 
-
-    actual override suspend fun getPublicKeyRepresentation(): ByteArray = TODO("Not yet implemented")
+    actual override suspend fun getPublicKeyRepresentation(): ByteArray =
+        getPublicKey().getPublicKeyRepresentation()
 
     actual override suspend fun getMeta(): OciKeyMeta = OciKeyMeta(
         keyId = id,
         keyVersion = getKeyVersion(kmsManagementClient, id),
     )
 
-    override suspend fun deleteKey(): Boolean {
-        TODO("Not yet implemented")
-    }
+    // OCI requires a minimum 7-day pending window before deletion takes effect
+    override suspend fun deleteKey(): Boolean = runCatching {
+        val sevenDaysFromNow = Date(System.currentTimeMillis() + 7L * 24 * 3600 * 1000)
+        val scheduleKeyDeletionDetails = ScheduleKeyDeletionDetails.builder()
+            .timeOfDeletion(sevenDaysFromNow)
+            .build()
+        val request = ScheduleKeyDeletionRequest.builder()
+            .keyId(id)
+            .scheduleKeyDeletionDetails(scheduleKeyDeletionDetails)
+            .build()
+        kmsManagementClient.scheduleKeyDeletion(request)
+    }.isSuccess
 
 
     actual companion object {
 
         actual val DEFAULT_KEY_LENGTH: Int = 32
 
-
-        val TEST_KEY_SHAPE: KeyShape =
-            KeyShape.builder().algorithm(KeyShape.Algorithm.Ecdsa).length(DEFAULT_KEY_LENGTH)
-                .curveId(KeyShape.CurveId.NistP256).build()
-
-        private fun keyTypeToOciKeyMapping(type: KeyType) = when (type) {
-            KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> "ECDSA"
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> "RSA"
-            KeyType.secp256k1 -> throw IllegalArgumentException("Not supported: $type")
-            KeyType.Ed25519 -> throw IllegalArgumentException("Not supported: $type")
+        private fun keyTypeToOciShape(type: KeyType): KeyShape = when (type) {
+            KeyType.secp256r1 -> KeyShape.builder()
+                .algorithm(KeyShape.Algorithm.Ecdsa).length(32).curveId(KeyShape.CurveId.NistP256).build()
+            KeyType.secp384r1 -> KeyShape.builder()
+                .algorithm(KeyShape.Algorithm.Ecdsa).length(48).curveId(KeyShape.CurveId.NistP384).build()
+            KeyType.secp521r1 -> KeyShape.builder()
+                .algorithm(KeyShape.Algorithm.Ecdsa).length(66).curveId(KeyShape.CurveId.NistP521).build()
+            KeyType.RSA -> KeyShape.builder().algorithm(KeyShape.Algorithm.Rsa).length(256).build()
+            KeyType.RSA3072 -> KeyShape.builder().algorithm(KeyShape.Algorithm.Rsa).length(384).build()
+            KeyType.RSA4096 -> KeyShape.builder().algorithm(KeyShape.Algorithm.Rsa).length(512).build()
+            KeyType.secp256k1 -> throw IllegalArgumentException("secp256k1 is not supported by OCI KMS")
+            KeyType.Ed25519 -> throw IllegalArgumentException("Ed25519 is not supported by OCI KMS")
         }
 
-        private fun ociKeyToKeyTypeMapping(type: String) = when (type) {
-            "ECDSA" -> KeyType.secp256r1 // TODO: KeyType.secp384r1, KeyType.secp521r1
-            "RSA" -> KeyType.RSA
-            else -> throw IllegalArgumentException("Not supported: $type")
+        private fun ociShapeToKeyType(shape: KeyShape): KeyType = when {
+            shape.algorithm == KeyShape.Algorithm.Ecdsa -> when (shape.curveId) {
+                KeyShape.CurveId.NistP384 -> KeyType.secp384r1
+                KeyShape.CurveId.NistP521 -> KeyType.secp521r1
+                else -> KeyType.secp256r1
+            }
+            shape.algorithm == KeyShape.Algorithm.Rsa -> when (shape.length) {
+                384 -> KeyType.RSA3072
+                512 -> KeyType.RSA4096
+                else -> KeyType.RSA
+            }
+            else -> throw IllegalArgumentException("Unsupported OCI key algorithm: ${shape.algorithm}")
         }
 
+        actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey =
+            generateKey(KeyType.secp256r1, config)
 
-        actual suspend fun generateKey(config: OCIsdkMetadata): OCIKey {
+        actual suspend fun generateKey(type: KeyType, config: OCIsdkMetadata): OCIKey {
             return retry {
-                val provider = InstancePrincipalsAuthenticationDetailsProvider.builder().build()
+                val provider = config.createAuthProvider()
                 val kmsVaultClient = KmsVaultClient.builder().build(provider)
                 val vault = getVault(kmsVaultClient, config.vaultId)
                 val kmsManagementClient =
                     KmsManagementClient.builder().endpoint(vault.managementEndpoint).build(provider)
 
+                val createKeyDetails = CreateKeyDetails.builder()
+                    .keyShape(keyTypeToOciShape(type))
+                    .protectionMode(CreateKeyDetails.ProtectionMode.Software)
+                    .compartmentId(config.compartmentId)
+                    .displayName("WaltKey")
+                    .build()
 
-                val createKeyDetails =
-                    CreateKeyDetails.builder().keyShape(TEST_KEY_SHAPE)
-                        .protectionMode(CreateKeyDetails.ProtectionMode.Software)
-                        .compartmentId(config.compartmentId).displayName("WaltKey").build()
-                val createKeyRequest = CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
-                val response = kmsManagementClient.createKey(createKeyRequest)
+                val response = kmsManagementClient.createKey(
+                    CreateKeyRequest.builder().createKeyDetails(createKeyDetails).build()
+                )
 
                 val keyId = response.key.id
-
-                val keyVersionId = response.key.currentKeyVersion
-
-                val publicKey = getOCIPublicKey(kmsManagementClient, keyVersionId, keyId)
-
+                val publicKey = getOCIPublicKey(kmsManagementClient, response.key.currentKeyVersion, keyId)
 
                 OCIKey(
                     keyId,
                     config,
                     publicKey.exportJWK(),
-                    ociKeyToKeyTypeMapping(response.key.keyShape.algorithm.toString().uppercase())
+                    ociShapeToKeyType(response.key.keyShape)
                 )
             }
         }
 
-
         suspend fun getOCIPublicKey(
-            kmsManagementClient: KmsManagementClient, keyVersionId: String, keyId: String,
+            kmsManagementClient: KmsManagementClient,
+            keyVersionId: String,
+            keyId: String,
         ): Key {
-            val getKeyRequest = GetKeyVersionRequest.builder().keyVersionId(keyVersionId).keyId(keyId).build()
-            val response = kmsManagementClient.getKeyVersion(getKeyRequest)
-            val publicKeyPem = response.keyVersion.publicKey
-            return JWKKey.importPEM(publicKeyPem).getOrThrow()
+            val request = GetKeyVersionRequest.builder().keyVersionId(keyVersionId).keyId(keyId).build()
+            val response = kmsManagementClient.getKeyVersion(request)
+            return JWKKey.importPEM(response.keyVersion.publicKey).getOrThrow()
         }
 
-
         fun getKeyVersion(kmsManagementClient: KmsManagementClient, keyId: String): String {
-            val getKeyRequest = GetKeyRequest.builder().keyId(keyId).build()
-            val response = kmsManagementClient.getKey(getKeyRequest)
+            val response = kmsManagementClient.getKey(GetKeyRequest.builder().keyId(keyId).build())
             return response.key.currentKeyVersion
         }
 
         fun getVault(kmsVaultClient: KmsVaultClient, vaultId: String?): Vault {
-
-            val getVaultRequest = GetVaultRequest.builder().vaultId(vaultId).build()
-            val response = kmsVaultClient.getVault(getVaultRequest)
-
+            val response = kmsVaultClient.getVault(GetVaultRequest.builder().vaultId(vaultId).build())
             return response.vault
         }
     }
-
 }
 
 private suspend fun <T> retry(
@@ -303,21 +345,23 @@ private suspend fun <T> retry(
     var totalDuration = Duration.ZERO
 
     while (totalDuration < maxDuration) {
-        val elapsedTime = measureTime {
+        val elapsed = measureTime {
             result = runCatching { block() }
         }
 
         if (result.isSuccess) {
-            println("Success after $elapsedTime: ${result.getOrThrow()}")
+            log.debug { "OCI operation succeeded after $elapsed" }
             return result.getOrThrow()
         } else {
-            totalDuration += elapsedTime.toJavaDuration()
+            totalDuration += elapsed.toJavaDuration()
             if (totalDuration >= maxDuration) {
-                throw IllegalStateException("Failed after total duration of $totalDuration: ${result.exceptionOrNull()?.message}")
+                throw IllegalStateException(
+                    "OCI operation failed after $totalDuration: ${result.exceptionOrNull()?.message}",
+                    result.exceptionOrNull()
+                )
             }
             delay(retryInterval.toKotlinDuration())
         }
     }
-    throw IllegalStateException("Failed after total duration of $totalDuration: Retry time limit exceeded.")
+    throw IllegalStateException("OCI operation failed after $totalDuration: retry time limit exceeded")
 }
-
