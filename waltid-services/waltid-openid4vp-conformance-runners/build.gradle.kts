@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
 import io.ktor.plugin.features.*
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
@@ -80,8 +78,12 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
-    implementation(project(":waltid-services:waltid-verifier-api2"))
-    implementation(project(":waltid-services:waltid-issuer-api"))
+    implementation(project(":waltid-services:waltid-verifier-api2")) {
+        exclude(group = "id.walt.crypto", module = "waltid-crypto-azure")
+    }
+    implementation(project(":waltid-services:waltid-issuer-api")) {
+        exclude(group = "id.walt.crypto", module = "waltid-crypto-azure")
+    }
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
@@ -94,7 +96,7 @@ dependencies {
 
 application {
     mainClass.set("id.walt.openid4vp.conformance.MainKt")
-    
+
     // Configure SSL truststore for conformance suite self-signed certificate
     val truststorePath = project.file("conformance-truststore.jks").absolutePath
     applicationDefaultJvmArgs = listOf(
