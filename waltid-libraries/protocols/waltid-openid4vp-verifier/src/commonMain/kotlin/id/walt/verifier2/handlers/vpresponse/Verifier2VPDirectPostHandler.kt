@@ -196,18 +196,26 @@ object Verifier2VPDirectPostHandler {
             }
         }
 
-        val result = handleDirectPost(
-            verificationSession = verificationSession,
-            responseData = call.parseHttpRequestToDirectPostResponse(),
-            updateSessionCallback = updateSessionCallback,
-            failSessionCallback = failSessionCallback,
-            policyContext = policyContext
-        )
+        try {
+            val result = handleDirectPost(
+                verificationSession = verificationSession,
+                responseData = call.parseHttpRequestToDirectPostResponse(),
+                updateSessionCallback = updateSessionCallback,
+                failSessionCallback = failSessionCallback,
+                policyContext = policyContext
+            )
 
-        call.respond(
-            result
-        )
+            call.respond(result)
+        } catch (e: PresentationRejectionException) {
+            // OID4VP 1.0 §8.2: the verifier must signal rejection with a 4xx response so the
+            // wallet (here: the conformance suite) knows the presentation was not accepted.
+            log.debug { "Presentation rejected, responding 400: ${e.message}" }
+            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_request", "error_description" to (e.message ?: "Presentation rejected")))
+        }
     }
+
+    /** Thrown by [handleDirectPost] when the verifier rejects the presentation. */
+    class PresentationRejectionException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
     /**
      * Sealed (= limited option) interface to represent the different forms that
