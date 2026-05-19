@@ -27,7 +27,7 @@ dependencies {
 
     testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-    testImplementation("org.bouncycastle:bcpkix-lts8on:2.73.8")
+    testImplementation(identityLibs.bouncycastle.pkix)
 
     // Multiplatform / Hashes
     testImplementation(identityLibs.kotlincrypto.hash.sha2)

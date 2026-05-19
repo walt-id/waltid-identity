@@ -36,8 +36,8 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
         }
         jvmMain.dependencies {
-            implementation(identityLibs.bcprov.lts8on)
-            implementation(identityLibs.bcpkix.lts8on)
+            implementation(identityLibs.bouncycastle.prov)
+            implementation(identityLibs.bouncycastle.pkix)
             implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.kotlinx.coroutines.core)
         }
@@ -53,7 +53,7 @@ kotlin {
             implementation(identityLibs.junit.jupiter.api)
             implementation(identityLibs.junit.jupiter.engine)
 
-            implementation(identityLibs.bcprov.lts8on)
+            implementation(identityLibs.bouncycastle.prov)
             implementation(identityLibs.nimbus.jose.jwt)
         }
         jsMain.dependencies {
