@@ -8,6 +8,7 @@ import MdocIssuanceTest.Companion.verifyIssued
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
+import id.walt.mdoc.encoding.toMdocTDateString
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.schema.MdocsSchema
@@ -70,7 +71,7 @@ class MdocSchemaTest {
                     put("height", JsonPrimitive(80u)) // uint
                     put("flag", true) // bool
                     put("birth_date", LocalDate(2000, 12, 30).toString()) // full-date
-                    put("issue_date", Clock.System.now().toString()) // tdate
+                    put("issue_date", Clock.System.now().toMdocTDateString()) // tdate (second resolution)
                 },
                 "waltid.credential.nsspecial" to buildJsonObject {
                     putJsonArray("nationalities") {
@@ -137,7 +138,7 @@ class MdocSchemaTest {
                     put("height", JsonPrimitive(80u)) // uint
                     put("flag", true) // bool
                     put("birth_date", LocalDate(2000, 12, 30).toString()) // full-date
-                    put("issue_date", Clock.System.now().toString()) // tdate
+                    put("issue_date", Clock.System.now().toMdocTDateString()) // tdate (second resolution)
                 },
                 "waltid.credential.nsspecial" to buildJsonObject {
                     putJsonArray("nationalities") {
