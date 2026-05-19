@@ -79,6 +79,7 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES256"), metadata.clientAttestationSigningAlgValuesSupported)
         assertEquals(setOf("ES256"), metadata.clientAttestationPopSigningAlgValuesSupported)
         assertEquals(setOf("ES256"), metadata.dpopSigningAlgValuesSupported)
+        assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
         assertEquals(null, metadata.codeChallengeMethodsSupported)
         assertEquals(null, metadata.pushedAuthorizationRequestEndpoint)
         assertEquals(null, metadata.statusListAggregationEndpoint)
@@ -128,6 +129,7 @@ class AuthorizationServerMetadataTest {
             metadata.statusListAggregationEndpoint
         )
         assertEquals(true, metadata.requirePushedAuthorizationRequests)
+        assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
     }
 
     @Test

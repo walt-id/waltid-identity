@@ -183,7 +183,7 @@ data class AuthorizationServerMetadata(
             }
         }
 
-        // RFC 8414 §2: signing algs are required for private_key_jwt and client_secret_jwt.
+        // RFC 8414 §2: signing algorithms are required for private_key_jwt and client_secret_jwt.
         tokenEndpointAuthMethodsSupported?.let { methods ->
             val requiresSigningAlgs = methods.contains("private_key_jwt") || methods.contains("client_secret_jwt")
             require(!requiresSigningAlgs || !tokenEndpointAuthSigningAlgValuesSupported.isNullOrEmpty()) {
@@ -219,6 +219,7 @@ data class AuthorizationServerMetadata(
             requirePushedAuthorizationRequests: Boolean? = null,
             pushedAuthorizationRequestEndpointPath: String? = null,
             statusListAggregationEndpointPath: String? = null,
+            preAuthorizedGrantAnonymousAccessSupported: Boolean? = true,
         ): AuthorizationServerMetadata {
             val normalized = baseUrl.trimEnd('/')
             val parEndpoint = pushedAuthorizationRequestEndpointPath?.let { normalized + it }
@@ -239,6 +240,7 @@ data class AuthorizationServerMetadata(
                 requirePushedAuthorizationRequests = requirePushedAuthorizationRequests,
                 pushedAuthorizationRequestEndpoint = parEndpoint,
                 statusListAggregationEndpoint = statusListAggregationEndpointPath?.let { normalized + it },
+                preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
             )
         }
 

@@ -16,6 +16,7 @@ val issuerAuthenticationPluginAmendment: suspend () -> Unit = suspend {
         customAuthentication = {
             oauth("auth-oauth") {
                 client = HttpClient()
+                // Ktor 3.4.x: providerLookup is now a suspend function
                 providerLookup = {
                     OAuthServerSettings.OAuth2ServerSettings(
                         name = authenticationServiceConfig.name,
@@ -26,7 +27,8 @@ val issuerAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                         requestMethod = HttpMethod.Post,
                     )
                 }
-                urlProvider = { "${issuerServiceConfig.baseUrl}/callback" }
+                // Ktor 3.4.x: urlProvider is now a suspend function with OAuthServerSettings parameter
+                urlProvider = { _ -> "${issuerServiceConfig.baseUrl}/callback" }
             }
         }
     }
