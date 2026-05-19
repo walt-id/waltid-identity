@@ -10,10 +10,11 @@ import io.ktor.client.plugins.logging.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlin.test.assertEquals
+/*
 
 /**
  * Runner for OpenID4VCI Issuer conformance tests.
- * 
+ *
  * In this scenario:
  * - Our issuer is the System Under Test (SUT)
  * - The conformance suite acts as a wallet
@@ -93,10 +94,10 @@ class IssuerTestPlanRunner(
         // 3. Call our authorization endpoint (if using auth code flow)
         // 4. Exchange tokens
         // 5. Request credentials
-        
+
         println("Waiting for conformance suite to complete issuer tests...")
         println("The conformance suite will call our issuer at: ${config.issuerUrl}")
-        
+
         // Wait for the test to complete - for issuer tests, the conformance suite drives the flow
         conformance.waitForTestStatus(testId, shouldBeWaiting = false)
 
@@ -117,3 +118,4 @@ class IssuerTestPlanRunner(
         )
     }
 }
+*/

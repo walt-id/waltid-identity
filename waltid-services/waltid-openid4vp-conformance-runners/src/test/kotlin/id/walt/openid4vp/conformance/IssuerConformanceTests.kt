@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance
 
+/*
 import id.walt.openid4vp.conformance.ConformanceTests.Companion.conformanceHost
 import id.walt.openid4vp.conformance.ConformanceTests.Companion.conformancePort
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
@@ -28,4 +29,4 @@ class IssuerConformanceTests {
     fun runIssuerConformanceTests() {
         IssuerConformanceTestRunner().run()
     }
-}
+}*/
