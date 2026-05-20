@@ -9,10 +9,14 @@ import id.walt.openid4vci.responses.credential.IssuedCredential
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.mdoc.objects.mso.Status
 import id.walt.sdjwt.SDMap
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Instant
 
 /**
  * SD-JWT VC credential response handler using OpenID4VCI.generateSdJwtVC.
@@ -20,7 +24,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class SdJwtVcCredentialHandler : CredentialEndpointHandler {
     private companion object {
-        val supportedFormats = setOf(CredentialFormat.SD_JWT_VC, CredentialFormat.JWT_VC, CredentialFormat.JWT_VC_JSON)
+        val supportedFormats = setOf(CredentialFormat.SD_JWT_VC)
     }
 
     override suspend fun sign(
@@ -31,9 +35,13 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<String>?,
+        x5Chain: List<CertificateDer>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
     ): CredentialResponseResult {
         return try {
             if (configuration.format !in supportedFormats) {
@@ -49,6 +57,7 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
                 ?: return CredentialResponseResult.Failure(
                     OAuthError("invalid_request", "Missing vct for SD-JWT VC credential configuration"),
                 )
+
             val sdJwt = SdJwtVcCredentialSigner.generateSdJwtVC(
                 credentialRequest = request,
                 credentialData = credentialData,

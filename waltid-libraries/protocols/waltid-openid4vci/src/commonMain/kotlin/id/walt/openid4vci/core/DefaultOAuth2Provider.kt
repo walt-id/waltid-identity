@@ -22,14 +22,18 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.crypto.keys.Key
+import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.tokens.AccessTokenContext
 import id.walt.sdjwt.SDMap
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlin.time.Instant
 
 
 /**
@@ -227,11 +231,15 @@ class DefaultOAuth2Provider(
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
-        dataMapping: JsonObject? ,
+        dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<String>?,
+        x5Chain: List<CertificateDer>?,
         display: List<CredentialDisplay>?,
         w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
     ): CredentialResponseResult {
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
@@ -251,6 +259,10 @@ class DefaultOAuth2Provider(
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
+            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            credentialStatus = credentialStatus,
+            validFrom = validFrom,
+            validUntil = validUntil,
         )
     }
 

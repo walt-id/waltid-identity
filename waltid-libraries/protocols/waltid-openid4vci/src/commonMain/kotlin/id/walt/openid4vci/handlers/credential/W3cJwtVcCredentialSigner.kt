@@ -2,10 +2,12 @@ package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.sdjwt.SDMap
+import id.walt.x509.CertificateDer
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
 import id.walt.w3c.issuance.Issuer.mergingJwtIssue
@@ -32,7 +34,7 @@ object W3cJwtVcCredentialSigner {
         issuerId: String,
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
-        x5Chain: List<String>? = null,
+        x5Chain: List<CertificateDer>? = null,
         display: List<CredentialDisplay>? = null,
         credentialStatus: JsonElement? = null,
         w3cVersion: String? = null,
@@ -46,7 +48,7 @@ object W3cJwtVcCredentialSigner {
             if (!holderKid.isNullOrEmpty() && DidUtils.isDidUrl(holderKid)) holderKid.substringBefore("#") else null
 
         val additionalJwtHeaders = x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert) }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> JsonPrimitive(cert.bytes.toByteArray().encodeToBase64()) }))
         } ?: mapOf()
 
         val vcPayload = credentialStatus?.let { status ->

@@ -2,6 +2,7 @@ package id.walt.openid4vci.handlers.credential
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
@@ -28,6 +29,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.sdjwt.SDJwt.Companion.SEPARATOR_STR
 import id.walt.w3c.issuance.dataFunctions
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.jsonObject
 
 object SdJwtVcCredentialSigner {
@@ -39,7 +41,7 @@ object SdJwtVcCredentialSigner {
         vct: String,
         selectiveDisclosure: SDMap? = null,
         dataMapping: JsonObject? = null,
-        x5Chain: List<String>? = null,
+        x5Chain: List<CertificateDer>? = null,
         display: List<CredentialDisplay>? = null,
         sdJwtTypeHeader: String? = null,
         sdJwtCredentialClaims: JsonObject? = null,
@@ -121,7 +123,7 @@ object SdJwtVcCredentialSigner {
             JWT_HEADER_KID to getKidHeader(issuerKey, issuerDid),
             JWT_HEADER_TYPE to (sdJwtTypeHeader ?: SD_JWT_VC_TYPE_HEADER)
         ).plus(x5Chain?.let {
-            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> cert.toJsonElement() }))
+            mapOf(JWT_HEADER_X5C to JsonArray(it.map { cert -> cert.bytes.toByteArray().encodeToBase64().toJsonElement() }))
         } ?: mapOf())
 
         val finalSdPayload = SDPayload.createSDPayload(
