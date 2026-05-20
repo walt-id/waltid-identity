@@ -70,7 +70,8 @@ class MdlX509SanDnsRequestUriSignedDirectPost(
                            "credential_format": "iso_mdl",
                            "client_id_prefix": "x509_san_dns",
                            "request_method": "request_uri_signed",
-                           "response_mode": "direct_post"
+                           "response_mode": "direct_post",
+                           "vp_profile": "plain_vp"
                          }""".trimIndent()
             )
         },
