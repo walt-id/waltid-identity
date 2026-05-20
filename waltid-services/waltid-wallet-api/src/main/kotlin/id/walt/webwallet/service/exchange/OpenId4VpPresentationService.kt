@@ -38,7 +38,6 @@ class OpenId4VpPresentationService(
         AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 ) {
     private val logger = KotlinLogging.logger { }
-    private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
     private val json = Json {
         ignoreUnknownKeys = true
         encodeDefaults = false
@@ -182,6 +181,8 @@ class OpenId4VpPresentationService(
     }
 
     companion object {
+        private val webResolveAuthReq = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+
         fun isOpenId4VpRequestCandidate(request: String): Boolean = runCatching {
             val parameters = Url(request).parameters
             parameters.contains("dcql_query") ||
