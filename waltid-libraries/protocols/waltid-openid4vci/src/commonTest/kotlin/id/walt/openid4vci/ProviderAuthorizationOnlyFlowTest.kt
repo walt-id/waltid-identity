@@ -3,12 +3,18 @@ package id.walt.openid4vci
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
+import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
+import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.tokens.AccessTokenService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -126,6 +132,69 @@ class ProviderAuthorizationOnlyFlowTest {
         val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
         assertEquals("session-123", tokenService.lastClaims["issuance_session_id"])
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `authorization code token response includes authorization details from token response options`() = runTest {
+        val config = createTestConfig()
+        val issuerId = "test-issuer"
+        val provider = buildOAuth2Provider(
+            config = config,
+            includeAuthorizationCodeDefaultHandlers = true,
+            includePreAuthorizedCodeDefaultHandlers = false,
+        )
+
+        val authorizeRequest = (provider.createAuthorizationRequest(
+            mapOf(
+                "response_type" to listOf(ResponseType.CODE.value),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                "scope" to listOf("openid credential"),
+            ),
+        ) as AuthorizationRequestResult.Success).request.withIssuer(issuerId)
+        val authorizeResponse = provider.createAuthorizationResponse(
+            authorizeRequest,
+            DefaultSession(subject = "demo-subject"),
+        ) as AuthorizationResponseResult.Success
+
+        val accessRequest = (provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("demo-client"),
+                "code" to listOf(authorizeResponse.response.code),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+            ),
+        ) as AccessTokenRequestResult.Success).request.withIssuer(issuerId)
+
+        val accessResponse = provider.createAccessTokenResponse(
+            accessRequest,
+            TokenResponseOptions(
+                authorizationDetails = listOf(
+                    AuthorizationDetail(
+                        type = OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE,
+                        credentialConfigurationId = "identity_credential",
+                        credentialIdentifiers = listOf("credential-123"),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(accessResponse.isSuccess())
+        val tokenResponse = (accessResponse as AccessTokenResponseResult.Success).response
+        val authorizationDetail = (tokenResponse.extra["authorization_details"] as JsonArray)
+            .single()
+            .jsonObject
+        assertEquals(OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE, authorizationDetail["type"]?.jsonPrimitive?.content)
+        assertEquals("identity_credential", authorizationDetail["credential_configuration_id"]?.jsonPrimitive?.content)
+        assertEquals(
+            "credential-123",
+            authorizationDetail["credential_identifiers"]
+                ?.let { it as JsonArray }
+                ?.single()
+                ?.jsonPrimitive
+                ?.content,
+        )
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
