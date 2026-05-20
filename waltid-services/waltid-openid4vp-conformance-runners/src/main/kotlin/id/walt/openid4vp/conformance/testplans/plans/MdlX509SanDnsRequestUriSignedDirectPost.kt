@@ -22,7 +22,7 @@ class MdlX509SanDnsRequestUriSignedDirectPost(
     val verifierKey =
         Json.decodeFromString<DirectSerializedKey>("""{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}""")
     val verifierCertificateChain =
-        listOf("MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNjI0MjBaFw0yNjEwMTQwNjI0MjBaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSQAwRgIhAOu0RGM6BjVQUepeLBogw+ZD3MQ9vFppbPIGMPjtn/qdAiEAttfdfyXHfzJ2tr+Pczyckzv3NlM43461cvP96sIzOQA=")
+        listOf("MIIBwjCCAWegAwIBAgIUZaaJWLxLPQCDu87JDIaHcN+UZTowCgYIKoZIzj0EAwIwKDEmMCQGA1UEAwwdd2FsdGlkIHRlc3QgcmVxdWVzdCBvYmplY3QgQ0EwHhcNMjYwNTIwMTE0OTQxWhcNMjcwNTIwMTE0OTQxWjASMRAwDgYDVQQDDAd0ZXN0MTIzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqOBhDCBgTAJBgNVHRMEAjAAMAsGA1UdDwQEAwIHgDATBgNVHSUEDDAKBggrBgEFBQcDAjASBgNVHREECzAJggd0ZXN0MTIzMB0GA1UdDgQWBBSCJZ2bjB1VuLM8lvN8e/M4MYmLvzAfBgNVHSMEGDAWgBT5VqsOYyRZDSf3/l7pc+metuuv9zAKBggqhkjOPQQDAgNJADBGAiEA/8dLuFt2dPgyMRk+r3OEBER3lxwaDxN0aCQOcuNxTF8CIQDtuyP4EBiFf16o1bM+mJXCBEc20C1tpwX37KQDsuu50Q==")
 
     // DCQL
 

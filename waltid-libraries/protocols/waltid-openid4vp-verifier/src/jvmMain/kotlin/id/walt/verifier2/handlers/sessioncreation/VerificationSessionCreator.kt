@@ -129,7 +129,7 @@ object VerificationSessionCreator {
                     "mso_mdoc" to JsonObject(
                         if (isDcApiHaip) mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                             /*"alg_values_supported" to JsonArray(
                                 listOf(JsonPrimitive("ES256"))
                             )*/
@@ -146,7 +146,7 @@ object VerificationSessionCreator {
                     "mso_mdoc" to JsonObject(
                         mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                         )
                     )
                 )
