@@ -50,7 +50,15 @@ object PresentationVerificationEngine {
         val authorizationRequest = session.authorizationRequest
         val responseMode = session.authorizationRequest.responseMode
         val isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
-        val expectedOrigin = session.authorizationRequest.expectedOrigins?.first()
+        val expectedOrigin = if (isDcApi) {
+            session.authorizationRequest.expectedOrigins?.firstOrNull()
+                ?: throw IllegalArgumentException(
+                    "DC API session is missing expectedOrigins. " +
+                    "The verification session setup must include the exact browser page origin " +
+                    "(e.g. 'https://verifier.example.com') so the SessionTranscript can be " +
+                    "reconstructed correctly for device authentication."
+                )
+        } else null
         val expectedAudience = if (isDcApi) "origin:$expectedOrigin" else authorizationRequest.clientId
         val isEncrypted = authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
         val jwkThumbprint = session.jwkThumbprint
@@ -156,7 +164,15 @@ object PresentationVerificationEngine {
         val authorizationRequest = session.authorizationRequest
         val responseMode = session.authorizationRequest.responseMode
         val isDcApi = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
-        val expectedOrigin = session.authorizationRequest.expectedOrigins?.first()
+        val expectedOrigin = if (isDcApi) {
+            session.authorizationRequest.expectedOrigins?.firstOrNull()
+                ?: throw IllegalArgumentException(
+                    "DC API session is missing expectedOrigins. " +
+                    "The verification session setup must include the exact browser page origin " +
+                    "(e.g. 'https://verifier.example.com') so the SessionTranscript can be " +
+                    "reconstructed correctly for device authentication."
+                )
+        } else null
         val expectedAudience = if (isDcApi) "origin:$expectedOrigin" else authorizationRequest.clientId
         val isEncrypted = authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
         val jwkThumbprint = session.jwkThumbprint

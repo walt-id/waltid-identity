@@ -61,6 +61,14 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
         log.trace { "Device auth bytes (hex): ${deviceAuthBytes.toHexString()}" }
         addResult("device_auth_bytes_hex", deviceAuthBytes.toHexString())
 
+        // For DC API flows, log the origin used in SessionTranscript reconstruction to help
+        // diagnose mismatches (the wallet uses the browser-reported origin; this must match exactly)
+        if (verificationContext.isDcApi) {
+            val originUsed = verificationContext.expectedOrigins?.firstOrNull()
+            addResult("dc_api_origin_used_for_transcript", originUsed ?: "null")
+            log.debug { "DC API device auth: reconstructing SessionTranscript with origin='$originUsed'" }
+        }
+
         when {
             deviceAuth.deviceSignature != null -> {
                 log.trace { "Device auth contains device signature: ${deviceAuth.deviceSignature}" }
@@ -70,7 +78,26 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
                         deviceSignature = deviceAuth.deviceSignature!!,
                         sDevicePublicKey = devicePublicKey
                     )
-                ) { "Device authentication signature failed to verify." }
+                ) {
+                    when {
+                        verificationContext.isDcApi -> {
+                            val originUsed = verificationContext.expectedOrigins?.firstOrNull()
+                            "Device authentication signature failed to verify (Annex D - OID4VP over DC API). " +
+                            "The verifier reconstructed the OpenID4VPDCAPIHandover SessionTranscript using " +
+                            "origin='$originUsed' (from expectedOrigins[0]). " +
+                            "The wallet signs using the exact browser page origin reported by the platform - " +
+                            "these must match. Verify that expectedOrigins[0] in DcApiAnnexDFlowSetup equals " +
+                            "the origin of the page that called navigator.credentials.get()."
+                        }
+                        verificationContext.isAnnexC ->
+                            "Device authentication signature failed to verify (Annex C - ISO 18013-7 DC API). " +
+                            "The verifier reconstructed the DCAPIHandover SessionTranscript using the origin " +
+                            "from DcApiAnnexCFlowSetup. Verify that this origin matches the origin the wallet " +
+                            "received from the platform (i.e. the origin of the page that triggered the request)."
+                        else ->
+                            "Device authentication signature failed to verify."
+                    }
+                }
 
                 success()
             }
@@ -99,7 +126,13 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
     private fun VerificationSessionContext.toMdocVerificationContext() = MdocVerificationContext(
         expectedNonce = expectedNonce,
         expectedAudience = if (isDcApi) (expectedOrigins?.firstOrNull()
-            ?: throw IllegalArgumentException("Missing expected origin for DC API")) else expectedAudience,
+            ?: throw IllegalArgumentException(
+                "Missing expectedOrigins for Annex D (OID4VP over DC API) device authentication. " +
+                "DcApiAnnexDFlowSetup must include expectedOrigins with the exact origin of the " +
+                "page that called navigator.credentials.get() " +
+                "(e.g. 'https://verifier.example.com'). This value is used to reconstruct the " +
+                "OpenID4VPDCAPIHandover SessionTranscript for signature verification."
+            )) else expectedAudience,
         responseUri = responseUri,
         isEncrypted = isEncrypted,
         isDcApi = isDcApi,
