@@ -11,5 +11,7 @@ data class AuthorizationDetail(
     val type: String,
     @SerialName("credential_configuration_id")
     val credentialConfigurationId: String,
+    @SerialName("credential_identifiers")
+    val credentialIdentifiers: List<String>? = null,
     val claims: JsonElement? = null,
 )
