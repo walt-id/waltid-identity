@@ -37,7 +37,7 @@ import io.ktor.client.request.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import java.util.Base64
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -514,7 +514,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
             put("reference", JsonPrimitive("INV-2026-042"))
         }.toString()
 
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
+        return json.toByteArray().encodeToBase64Url()
     }
 
     // Utils:
