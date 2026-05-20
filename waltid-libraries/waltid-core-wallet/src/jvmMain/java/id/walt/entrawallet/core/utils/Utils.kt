@@ -41,13 +41,9 @@ object BitstringUtils {
         inputStream.use { stream ->
             //TODO: bitSize constraints
             val bitStartPosition = index * bitSize.toUInt()
-            logger.debug { "bitStartPosition: $bitStartPosition" }
             val byteStart = bitStartPosition / 8u
-            logger.debug { "skipping: $byteStart bytes" }
             stream.skip(byteStart.toLong())
-            logger.debug { "available: ${stream.available()} bytes" }
             val bytesToRead = (bitSize - 1) / 8 + 1
-            logger.debug { "readingNext: $bytesToRead bytes" }
             extractBitValue(stream.readNBytes(bytesToRead), index, bitSize.toUInt())
         }
 
