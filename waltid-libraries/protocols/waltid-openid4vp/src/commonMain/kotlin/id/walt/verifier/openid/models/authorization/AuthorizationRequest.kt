@@ -72,6 +72,12 @@ data class AuthorizationRequest(
      */
     val nonce: String? = null,
 
+    /**
+     * REQUIRED in signed Authorization Request Objects.
+     * Identifies the Wallet as the intended recipient of the request.
+     */
+    val aud: String? = null,
+
     // JAR (RFC 9101) Parameters (Section 5)
     /**
      * OPTIONAL. The Authorization Request parameters are represented as a JWT [RFC7519].

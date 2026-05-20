@@ -43,6 +43,7 @@ import kotlin.uuid.Uuid
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
+    private const val SELF_ISSUED_WALLET_AUDIENCE = "https://self-issued.me/v2"
 
     private suspend fun getKid(clientId: String?, key: Key): String {
         val prefix = "decentralized_identifier:"
@@ -206,6 +207,7 @@ object VerificationSessionCreator {
             scope = null,//OPTIONAL. OAuth 2.0 Scope value. Can be used for pre-defined DCQL queries or OpenID Connect scopes (e.g., "openid").
             state = state, // Opaque value used by the Verifier to maintain state between the request and callback.
             nonce = nonce, // String value used to mitigate replay attacks. Also used to establish holder binding.
+            aud = if (isSignedRequest) SELF_ISSUED_WALLET_AUDIENCE else null,
             responseMode = when {
                 isDcApi && isEncryptedResponse -> OpenID4VPResponseMode.DC_API_JWT // HAIP requires dc_api.jwt (encrypted)
                 isDcApi -> OpenID4VPResponseMode.DC_API
