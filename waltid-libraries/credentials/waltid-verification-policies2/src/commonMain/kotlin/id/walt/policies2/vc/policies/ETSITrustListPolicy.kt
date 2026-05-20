@@ -169,7 +169,6 @@ data class ETSITrustListPolicy(
             }
 
         } catch (e: ETSITrustListPolicyException) {
-            // Return as-is — preserve the original message rather than re-wrapping.
             return Result.failure(e)
         } catch (e: Exception) {
             log.error(e) { "ETSI Trust List policy verification failed" }
@@ -189,12 +188,12 @@ data class ETSITrustListPolicy(
         // But ONLY accept trust if we can validate the chain from leaf to trusted cert
         for ((index, certPem) in certificateChain.withIndex()) {
             log.debug { "Checking certificate at index $index via remote service" }
-            
+
             val decision = queryTrustRegistry(certPem, trustRegistryUrl!!)
-            
-            if (decision.decision == "TRUSTED" || 
+
+            if (decision.decision == "TRUSTED" ||
                 (decision.decision == "STALE_SOURCE" && allowStaleSource)) {
-                
+
                 // Security check: if the trusted certificate is not the leaf (index 0),
                 // we must verify the chain from leaf to this trusted certificate
                 if (index > 0) {
@@ -206,14 +205,14 @@ data class ETSITrustListPolicy(
                     }
                     log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
                 }
-                
+
                 log.debug { "Found trusted certificate at chain index $index" }
                 return evaluateDecision(decision)
             }
-            
+
             log.debug { "Certificate at index $index not trusted (decision: ${decision.decision})" }
         }
-        
+
         return Result.failure(ETSITrustListPolicyException(
             "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
             "was found in the ETSI trust list, or chain validation failed"
@@ -288,7 +287,7 @@ data class ETSITrustListPolicy(
 
     private suspend fun extractCertificateChain(credential: DigitalCredential): List<String> {
         val signature = credential.signature
-        
+
         return when {
             credential is MdocsCredential && signature is CoseCredentialSignature -> {
                 extractChainFromCoseSignature(signature)
@@ -324,20 +323,20 @@ data class ETSITrustListPolicy(
         if (jwtHeader == null) {
             throw ETSITrustListPolicyException("JWT credential has no header")
         }
-        
+
         val x5cElement = jwtHeader["x5c"]
             ?: throw ETSITrustListPolicyException(
                 "JWT has no x5c certificate chain in header. " +
                 "ETSI Trust List verification requires an x5c header with the issuer's certificate chain."
             )
-        
+
         val x5cArray = x5cElement.jsonArray
         if (x5cArray.isEmpty()) {
             throw ETSITrustListPolicyException("JWT x5c header is empty")
         }
-        
+
         log.debug { "Extracted ${x5cArray.size} certificate(s) from JWT x5c header" }
-        
+
         return x5cArray.map { certElement ->
             val certBase64 = certElement.jsonPrimitive.content
             val derBytes = certBase64.decodeFromBase64()
@@ -378,7 +377,7 @@ data class ETSITrustListPolicy(
 
     private fun evaluateDecision(decision: TrustDecisionResponse): Result<JsonElement> {
         log.debug { "Trust decision: ${decision.decision}, freshness: ${decision.sourceFreshness}, authenticity: ${decision.authenticity}" }
-        
+
         return when (decision.decision) {
             "TRUSTED" -> {
                 if (decision.sourceFreshness == "STALE" && !allowStaleSource) {
@@ -397,7 +396,7 @@ data class ETSITrustListPolicy(
                     Result.success(buildSuccessResult(decision))
                 }
             }
-            
+
             "STALE_SOURCE" -> {
                 if (allowStaleSource) {
                     Result.success(buildSuccessResult(decision, warning = "Trust source is stale"))
@@ -407,27 +406,27 @@ data class ETSITrustListPolicy(
                     ))
                 }
             }
-            
+
             "NOT_TRUSTED" -> {
                 val reason = decision.evidence.firstOrNull()?.value ?: "Certificate not found in trust list"
                 Result.failure(ETSITrustListPolicyException(
                     "Certificate not trusted: $reason"
                 ))
             }
-            
+
             "MULTIPLE_MATCHES" -> {
                 Result.failure(ETSITrustListPolicyException(
                     "Ambiguous trust: certificate matches multiple entities"
                 ))
             }
-            
+
             "UNSUPPORTED_SOURCE", "PROCESSING_ERROR", "UNKNOWN" -> {
                 val reason = decision.evidence.firstOrNull()?.value ?: decision.decision
                 Result.failure(ETSITrustListPolicyException(
                     "Trust registry error: $reason"
                 ))
             }
-            
+
             else -> {
                 Result.failure(ETSITrustListPolicyException(
                     "Unknown trust decision: ${decision.decision}"
@@ -607,7 +606,7 @@ expect object ETSITrustListInlineResolver {
 /**
  * Certificate chain validation - uses waltid-x509 library for PKIX path validation.
  * Validates that the leaf certificate chains up to the trusted certificate.
- * 
+ *
  * @param certificateChain List of PEM-encoded certificates
  * @param trustedIndex Index of the trusted certificate in the chain
  * @return Pair of (isValid, errorMessage)

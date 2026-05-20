@@ -20,7 +20,7 @@ private val log = KotlinLogging.logger { }
  * JVM implementation of inline trust list resolution using waltid-trust-registry library.
  */
 actual object ETSITrustListInlineResolver {
-    
+
     actual suspend fun resolve(
         certificateChain: List<String>,
         trustLists: List<String>,
@@ -33,7 +33,7 @@ actual object ETSITrustListInlineResolver {
         // Create an ephemeral trust registry for this verification request
         val trustStore = InMemoryTrustStore()
         val trustService = DefaultTrustRegistryService(trustStore)
-        
+
         // Load all trust lists, counting how many succeed
         var loadedCount = 0
         for ((index, source) in trustLists.withIndex()) {
@@ -68,33 +68,33 @@ actual object ETSITrustListInlineResolver {
             }
         }
 
-        // Fail with a distinct error if no sources could be loaded at all — this is a
-        // configuration/network problem, not a negative trust decision.
+        // Fail with a distinct error if no sources could be loaded at all (configuration/network problem,
+        // not a negative trust decision)
         if (loadedCount == 0) {
             return Result.failure(ETSITrustListPolicyException(
                 "No trust list sources could be loaded (${trustLists.size} attempted, 0 succeeded). " +
                 "Check trust list URLs and network connectivity."
             ))
         }
-        
+
         // Parse expected entity type
         val entityType = expectedEntityType?.let {
             runCatching { TrustedEntityType.valueOf(it) }.getOrNull()
         }
-        
+
         // Resolve certificate chain
         for ((index, certPem) in certificateChain.withIndex()) {
             log.debug { "Checking certificate at index $index via inline resolution" }
-            
+
             val decision = trustService.resolveByCertificate(
                 certificatePemOrDer = certPem,
                 instant = Clock.System.now(),
                 expectedEntityType = entityType,
                 expectedServiceType = expectedServiceType
             )
-            
+
             val decisionCode = decision.decision.name
-            
+
             if (decisionCode == "TRUSTED" || (decisionCode == "STALE_SOURCE" && allowStaleSource)) {
                 // Security check: if the trusted certificate is not the leaf (index 0),
                 // we must verify the chain from leaf to this trusted certificate
@@ -107,25 +107,25 @@ actual object ETSITrustListInlineResolver {
                     }
                     log.debug { "Certificate chain validated from leaf to trusted cert at index $index" }
                 }
-                
+
                 log.debug { "Found trusted certificate at chain index $index" }
                 return evaluateAndBuildResult(decision, allowStaleSource, requireAuthenticated)
             }
-            
+
             log.debug { "Certificate at index $index not trusted (decision: $decisionCode)" }
         }
-        
+
         return Result.failure(ETSITrustListPolicyException(
             "Certificate chain not trusted: no certificate in the chain (length: ${certificateChain.size}) " +
             "was found in the inline trust lists (${trustLists.size} sources loaded), or chain validation failed"
         ))
     }
-    
+
     private fun isUrl(source: String): Boolean {
         val trimmed = source.trim()
         return trimmed.startsWith("http://") || trimmed.startsWith("https://")
     }
-    
+
     private fun evaluateAndBuildResult(
         decision: TrustDecision,
         allowStaleSource: Boolean,
@@ -134,7 +134,7 @@ actual object ETSITrustListInlineResolver {
         val decisionCode = decision.decision.name
         val freshness = decision.sourceFreshness.name
         val authenticity = decision.authenticity.name
-        
+
         return when (decisionCode) {
             "TRUSTED" -> {
                 if (freshness == "STALE" && !allowStaleSource) {
@@ -153,7 +153,7 @@ actual object ETSITrustListInlineResolver {
                     Result.success(buildSuccessJson(decision))
                 }
             }
-            
+
             "STALE_SOURCE" -> {
                 if (allowStaleSource) {
                     Result.success(buildSuccessJson(decision, warning = "Trust source is stale"))
@@ -163,7 +163,7 @@ actual object ETSITrustListInlineResolver {
                     ))
                 }
             }
-            
+
             else -> {
                 Result.failure(ETSITrustListPolicyException(
                     "Certificate not trusted: $decisionCode"
@@ -171,7 +171,7 @@ actual object ETSITrustListInlineResolver {
             }
         }
     }
-    
+
     private fun buildSuccessJson(decision: TrustDecision, warning: String? = null): JsonElement {
         return buildJsonObject {
             put("trusted", JsonPrimitive(true))
@@ -222,21 +222,21 @@ actual fun validateCertificateChainToIndex(
         // The leaf certificate itself is trusted, no chain to validate
         return true to null
     }
-    
+
     if (trustedIndex >= certificateChain.size) {
         return false to "Trusted index $trustedIndex is out of bounds (chain size: ${certificateChain.size})"
     }
-    
+
     try {
         // Convert PEM strings to CertificateDer
         val certs = certificateChain.take(trustedIndex + 1).map { pem ->
             CertificateDer.fromPEMEncodedString(pem)
         }
-        
+
         val leaf = certs.first()
         val chain = certs.drop(1).dropLast(1)  // Intermediates (exclude leaf and trust anchor)
         val trustAnchor = listOf(certs.last())  // The trusted certificate is our anchor
-        
+
         // Use waltid-x509 PKIX validation
         validateCertificateChain(
             leaf = leaf,
@@ -246,7 +246,7 @@ actual fun validateCertificateChainToIndex(
             enableSystemTrustAnchors = false,
             enableRevocation = false  // TODO: Consider enabling for production
         )
-        
+
         return true to null
     } catch (e: X509ValidationException) {
         return false to "Certificate chain validation failed: ${e.message}"
