@@ -87,12 +87,12 @@ export default function Success() {
         `${env.NEXT_PUBLIC_VERIFIER ? env.NEXT_PUBLIC_VERIFIER : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER}/openid4vc/session/${router.query.sessionId}`
       )
       .then((response) => {
-        let parsedToken = parseJwt(response.data.tokenResponse.vp_token);
+        let parsedToken = parseJwt(response.data.tokenResponse?.vp_token);
         const parsedVp = asRecord(parsedToken.vp);
         let containsVP = !!parsedVp?.verifiableCredential;
         let vcs = containsVP
           ? parsedVp?.verifiableCredential
-          : [response.data.tokenResponse.vp_token];
+          : [response.data.tokenResponse?.vp_token];
 
         setCredentials(normalizePresentedCredentials(vcs));
 
