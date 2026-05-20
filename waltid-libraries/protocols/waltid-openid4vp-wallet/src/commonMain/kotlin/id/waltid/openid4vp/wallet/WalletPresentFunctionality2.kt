@@ -345,11 +345,19 @@ object WalletPresentFunctionality2 {
         }.getOrThrow()
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
-        validateRequestTransactionData(
-            transactionData = authorizationRequest.transactionData,
-            supportedTypes = supportedTransactionDataTypes,
-            credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
-        )
+        runCatching {
+            validateRequestTransactionData(
+                transactionData = authorizationRequest.transactionData,
+                supportedTypes = supportedTransactionDataTypes,
+                credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+            )
+        }.onFailure { error ->
+            return walletRejectHandling(
+                authorizationRequest,
+                OID4VPErrorCode.INVALID_TRANSACTION_DATA,
+                error.message,
+            )
+        }
 
         require(authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN) {
             TODO("Currently only ResponseMode 'vp_token' is supported")
