@@ -127,6 +127,7 @@ export default function Verification() {
                   buildTransactionCredentialQuery(
                     verifier2Format,
                     transactionVctValue,
+                    selectedCredential.offer?.credentialSubject,
                   ),
                 ],
               },
@@ -340,20 +341,24 @@ function mapSelectedFormatToVerifier2Format(selectedFormat: string): "dc+sd-jwt"
   return "dc+sd-jwt";
 }
 
-function buildTransactionCredentialQuery(format: "dc+sd-jwt", vctValue: string) {
+function buildTransactionCredentialQuery(format: "dc+sd-jwt", vctValue: string, credentialSubject?: Record<string, any>) {
+  const claims = deriveClaimsFromCredentialSubject(credentialSubject);
   return {
     id: TRANSACTION_CREDENTIAL_ID,
     format,
     meta: {
       vct_values: [vctValue],
     },
-    claims: [
-      { path: ["given_name"] },
-      { path: ["family_name"] },
-      { path: ["address", "street_address"] },
-    ],
+    ...(claims.length > 0 && { claims }),
     require_cryptographic_holder_binding: true,
   };
+}
+
+function deriveClaimsFromCredentialSubject(credentialSubject?: Record<string, any>): Array<{ path: string[] }> {
+  if (!credentialSubject) return [];
+  return Object.keys(credentialSubject)
+    .filter((key) => key !== "id")
+    .map((key) => ({ path: [key] }));
 }
 
 function encodeBase64Url(value: string) {
