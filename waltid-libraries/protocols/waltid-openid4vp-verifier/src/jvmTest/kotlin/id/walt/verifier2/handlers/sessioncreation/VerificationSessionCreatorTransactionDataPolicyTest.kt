@@ -11,7 +11,6 @@ import id.walt.policies2.vp.policies.DeviceAuthMdocVpPolicy
 import id.walt.policies2.vp.policies.TransactionDataHashCheckSdJwtVPPolicy
 import id.walt.policies2.vp.policies.TransactionDataMdocVpPolicy
 import id.walt.policies2.vp.policies.VPPolicyList
-import id.walt.verifier.openid.transactiondata.DEMO_TRANSACTION_DATA_TYPE
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.OpenId4VPConfig
@@ -24,6 +23,8 @@ import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+private const val DEMO_TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
 
 class VerificationSessionCreatorTransactionDataPolicyTest {
 

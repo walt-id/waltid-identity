@@ -10,7 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 internal object TransactionDataTestFixtures {
-    const val SUPPORTED_TRANSACTION_DATA_TYPE = DEMO_TRANSACTION_DATA_TYPE
+    const val SUPPORTED_TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
 
     fun transactionData(
         type: String = SUPPORTED_TRANSACTION_DATA_TYPE,

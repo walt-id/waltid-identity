@@ -3,9 +3,11 @@
 package id.walt.policies2.vp.policies
 
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.elements.DeviceSignedItem
+import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
-import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
+import id.walt.verifier.openid.transactiondata.DecodedTransactionData
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.parseDeviceSignedItemIndex
@@ -28,37 +30,28 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
         mso: MobileSecurityObject,
         verificationContext: VerificationSessionContext?
     ): Result<Unit> {
-        val embeddedTransactionData = extract(
-            deviceSignedItems = document.deviceSigned
-                ?.namespaces
-                ?.value
-                ?.entries
-                ?.get(MDOC_DEVICE_SIGNED_NAMESPACE)
-                ?.entries
-                ?.associate { it.key to it.value }
-                .orEmpty()
-        )
         val expectedTransactionData = verificationContext?.expectedTransactionData.orEmpty()
+        val deviceNameSpaces = document.deviceSigned?.namespaces?.value?.entries.orEmpty()
 
         addResult("expected_transaction_data_items", expectedTransactionData.size)
-        addResult("embedded_transaction_data_items", embeddedTransactionData.size)
 
-        if (verificationContext == null) {
-            require(embeddedTransactionData.isEmpty()) {
-                "mdoc transaction_data entries must be omitted when verification context is not provided"
-            }
-            return success()
-        }
-
-        if (expectedTransactionData.isEmpty()) {
-            require(embeddedTransactionData.isEmpty()) {
+        if (verificationContext == null || expectedTransactionData.isEmpty()) {
+            val anyEmbedded = hasAnyTransactionData(deviceNameSpaces)
+            require(!anyEmbedded) {
                 "mdoc transaction_data entries must be omitted when transaction_data is not requested"
             }
+            addResult("embedded_transaction_data_items", 0)
             return success()
         }
 
-        val algorithm = resolveHashAlgorithm(decodeList(expectedTransactionData)) ?: DEFAULT_HASH_ALGORITHM
-        val expectedHashes = calculateTransactionDataHashes(expectedTransactionData, algorithm)
+        val decoded = decodeList(expectedTransactionData)
+        val embeddedTransactionData = extractFromTypeNamespaces(decoded, deviceNameSpaces)
+
+        addResult("embedded_transaction_data_items", embeddedTransactionData.size)
+
+        val algorithm = resolveHashAlgorithm(decoded) ?: DEFAULT_HASH_ALGORITHM
+        val expectedInTypeOrder = decoded.groupBy { it.transactionData.type }.flatMap { (_, items) -> items.map { it.encoded } }
+        val expectedHashes = calculateTransactionDataHashes(expectedInTypeOrder, algorithm)
         val embeddedHashes = calculateTransactionDataHashes(embeddedTransactionData, algorithm)
 
         addResult("transaction_data_hash_algorithm", algorithm)
@@ -71,15 +64,24 @@ class TransactionDataMdocVpPolicy : MdocVPPolicy() {
         return success()
     }
 
-    private fun extract(deviceSignedItems: Map<String, Any>): List<String> {
-        if (deviceSignedItems.isEmpty()) return emptyList()
+    private fun hasAnyTransactionData(deviceNameSpaces: Map<String, DeviceSignedItemList>): Boolean =
+        deviceNameSpaces.values.any { itemList -> itemList.entries.any { parseDeviceSignedItemIndex(it.key) != null } }
 
-        val indexedItems = deviceSignedItems.map { (key, value) ->
-            val index = parseDeviceSignedItemIndex(key)
-                ?: throw IllegalArgumentException("Unsupported mdoc transaction_data entry: $key")
-            val encodedTransactionData = value as? String
+    private fun extractFromTypeNamespaces(
+        decoded: List<DecodedTransactionData>,
+        deviceNameSpaces: Map<String, DeviceSignedItemList>,
+    ): List<String> = decoded
+        .groupBy { it.transactionData.type }
+        .flatMap { (type, _) -> extractItems(deviceNameSpaces[type]?.entries.orEmpty()) }
+
+    private fun extractItems(items: List<DeviceSignedItem>): List<String> {
+        if (items.isEmpty()) return emptyList()
+
+        val indexedItems = items.map { item ->
+            val index = parseDeviceSignedItemIndex(item.key)
+                ?: throw IllegalArgumentException("Unsupported mdoc transaction_data entry: ${item.key}")
+            val encodedTransactionData = item.value as? String
                 ?: throw IllegalArgumentException("mdoc transaction_data entries must be strings")
-
             index to encodedTransactionData
         }.sortedBy { it.first }
 

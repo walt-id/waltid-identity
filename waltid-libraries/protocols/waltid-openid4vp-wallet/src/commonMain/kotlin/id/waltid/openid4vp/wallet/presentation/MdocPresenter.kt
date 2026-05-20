@@ -28,8 +28,9 @@ import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
+import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.deviceSignedItemKey
+import id.walt.verifier.openid.transactiondata.deviceSignedItemKeys
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -197,39 +198,34 @@ object MdocPresenter {
     private fun buildTransactionDataNamespaces(
         mdocsCredential: MdocsCredential,
         transactionData: List<String>,
-    ): DeviceNameSpaces = transactionData
-        .takeIf { it.isNotEmpty() }
-        ?.let(::buildMdocEmbeddedTransactionData)
-        ?.also { requireTransactionDataAuthorization(mdocsCredential, it) }
-        ?.let(::buildDeviceNameSpaces)
-        ?: DeviceNameSpaces(emptyMap())
+    ): DeviceNameSpaces {
+        if (transactionData.isEmpty()) return DeviceNameSpaces(emptyMap())
 
-    private fun buildMdocEmbeddedTransactionData(transactionData: List<String>): Map<String, String> =
-        transactionData
-            .mapIndexed { index, encoded -> deviceSignedItemKey(index) to encoded }
-            .toMap()
+        val byType = decodeList(transactionData).groupBy { it.transactionData.type }
+
+        val namespaceEntries = byType.map { (type, items) ->
+            requireTransactionDataAuthorization(mdocsCredential, namespace = type, itemCount = items.size)
+            type to DeviceSignedItemList(
+                items.mapIndexed { index, item -> DeviceSignedItem(deviceSignedItemKey(index), item.encoded) }
+            )
+        }.toMap()
+
+        return DeviceNameSpaces(namespaceEntries)
+    }
 
     private fun requireTransactionDataAuthorization(
         mdocsCredential: MdocsCredential,
-        embeddedTransactionData: Map<String, String>,
+        namespace: String,
+        itemCount: Int,
     ) {
         val keyAuthorizations = requireNotNull(mdocsCredential.documentMso.deviceKeyInfo.keyAuthorizations) {
             "transaction_data requires mdoc keyAuthorizations for docType ${mdocsCredential.docType}"
         }
-        val namespace = MDOC_DEVICE_SIGNED_NAMESPACE
         val isNamespaceAuthorized = keyAuthorizations.namespaces?.contains(namespace) == true
         val authorizedElements = keyAuthorizations.dataElements?.get(namespace).orEmpty().toSet()
 
-        require(isNamespaceAuthorized || authorizedElements.containsAll(embeddedTransactionData.keys)) {
-            "transaction_data type is not authorized for mdoc docType ${mdocsCredential.docType}"
+        require(isNamespaceAuthorized || authorizedElements.containsAll(deviceSignedItemKeys(itemCount))) {
+            "transaction_data type '$namespace' is not authorized for mdoc docType ${mdocsCredential.docType}"
         }
     }
-
-    private fun buildDeviceNameSpaces(embeddedTransactionData: Map<String, String>): DeviceNameSpaces = DeviceNameSpaces(
-        mapOf(
-            MDOC_DEVICE_SIGNED_NAMESPACE to DeviceSignedItemList(
-                embeddedTransactionData.map { (key, value) -> DeviceSignedItem(key, value) }
-            ),
-        )
-    )
 }

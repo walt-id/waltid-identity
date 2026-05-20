@@ -39,8 +39,6 @@ import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.verifier.openid.transactiondata.DEMO_TRANSACTION_DATA_TYPE
-import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
 import id.walt.verifier.openid.transactiondata.deviceSignedItemKeys
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
@@ -67,10 +65,8 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 
-/**
- * Integration test proving the mdoc transaction data round-trip:
- * MdocPresenter.buildTransactionDataNamespaces → DeviceSignedItem → DeviceAuth → TransactionDataMdocVpPolicy.extract
- */
+private const val DEMO_TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
+
 class MsoMdocsTransactionDataVerifier2IntegrationTest {
 
     private val issuerKey: JWKKey = runBlocking {
@@ -152,7 +148,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
             deviceKeyInfo = DeviceKeyInfo(
                 deviceKey = holderCoseKey,
                 keyAuthorizations = KeyAuthorization(
-                    dataElements = mapOf(MDOC_DEVICE_SIGNED_NAMESPACE to authorizedElements)
+                    dataElements = mapOf(DEMO_TRANSACTION_DATA_TYPE to authorizedElements)
                 ),
             ),
             validityInfo = ValidityInfo(
