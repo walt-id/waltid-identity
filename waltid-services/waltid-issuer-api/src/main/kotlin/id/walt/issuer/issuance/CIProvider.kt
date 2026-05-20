@@ -65,9 +65,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
-private const val MDOC_TRANSACTION_DATA_NAMESPACE = "org.waltid.openid4vp.transaction_data"
-
-
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
  */
@@ -497,7 +494,7 @@ open class CIProvider(
                         null
                     ).AsCBOR().EncodeToBytes()
                 ),
-                keyAuthorizations = buildTransactionDataKeyAuthorizations(),
+                keyAuthorizations = buildKeyAuthorizations(request.authorizedTransactionDataTypes),
             ),
             cryptoProvider = cryptoProvider,
             keyID = keyID,
@@ -518,8 +515,12 @@ open class CIProvider(
         )
     }
 
-    private fun buildTransactionDataKeyAuthorizations(): MapElement =
-        mapOf("nameSpaces" to listOf(MDOC_TRANSACTION_DATA_NAMESPACE.toDataElement()).toDataElement()).toDataElement()
+    private fun buildKeyAuthorizations(authorizedTransactionDataTypes: List<String>?): MapElement? =
+        authorizedTransactionDataTypes
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { types ->
+                mapOf("nameSpaces" to types.map { it.toDataElement() }.toDataElement()).toDataElement()
+            }
 
     fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,

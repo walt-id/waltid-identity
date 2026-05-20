@@ -17,8 +17,6 @@ import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.walt.verifier.openid.transactiondata.MDOC_DEVICE_SIGNED_NAMESPACE
-
 import id.walt.verifier.openid.transactiondata.deviceSignedItemKey
 import id.walt.verifier.openid.transactiondata.deviceSignedItemKeys
 import kotlinx.coroutines.test.runTest
@@ -28,6 +26,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+
+private const val DEMO_TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
 
 class TransactionDataMdocVpPolicyTest {
 
@@ -105,7 +105,7 @@ class TransactionDataMdocVpPolicyTest {
         }.toMap()
         val deviceSigned = DeviceSigned.fromDeviceSignedItems(
             namespacedItems = mapOf(
-                MDOC_DEVICE_SIGNED_NAMESPACE to embeddedTransactionData.map { (key, value) ->
+                DEMO_TRANSACTION_DATA_TYPE to embeddedTransactionData.map { (key, value) ->
                     DeviceSignedItem(key, value)
                 }
             ),
@@ -138,7 +138,7 @@ class TransactionDataMdocVpPolicyTest {
                 ),
                 keyAuthorizations = KeyAuthorization(
                     dataElements = mapOf(
-                        MDOC_DEVICE_SIGNED_NAMESPACE to authorizedElements
+                        DEMO_TRANSACTION_DATA_TYPE to authorizedElements
                     )
                 ),
             ),

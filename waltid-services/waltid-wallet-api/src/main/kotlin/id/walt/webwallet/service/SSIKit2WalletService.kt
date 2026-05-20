@@ -38,7 +38,6 @@ import id.walt.oid4vc.responses.TokenResponse
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.dcql.DcqlMatcher
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.walt.verifier.openid.transactiondata.SUPPORTED_TRANSACTION_DATA_TYPES
 import id.walt.webwallet.FeatureCatalog
 import id.walt.webwallet.config.KeyGenerationDefaultsConfig
 import id.walt.webwallet.config.RegistrationDefaultsConfig
@@ -111,7 +110,6 @@ class SSIKit2WalletService(
     private val eventService = EventService()
     private val credentialReportsService = ReportService.Credentials(credentialService, eventService)
     private val openId4VpPresentationService = OpenId4VpPresentationService(credentialService)
-    private val supportedTransactionDataTypes = SUPPORTED_TRANSACTION_DATA_TYPES
 
     companion object {
         val defaultGenerationConfig by lazy { ConfigManager.getConfig<RegistrationDefaultsConfig>() }
@@ -1171,7 +1169,7 @@ class SSIKit2WalletService(
             },
             holderPoliciesToRun = null,
             runPolicies = null,
-            supportedTransactionDataTypes = supportedTransactionDataTypes,
+            supportedTransactionDataTypes = emptySet(),
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(

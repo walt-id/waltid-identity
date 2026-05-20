@@ -2,6 +2,8 @@ package id.walt.verifier.openid.transactiondata
 
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
 
+const val DEFAULT_HASH_ALGORITHM = "sha-256"
+
 fun resolveHashAlgorithm(decodedItems: List<DecodedTransactionData>): String? {
     if (decodedItems.isEmpty()) return null
 
