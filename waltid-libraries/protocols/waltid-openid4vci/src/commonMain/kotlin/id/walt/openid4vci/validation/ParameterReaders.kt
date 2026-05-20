@@ -3,6 +3,11 @@ package id.walt.openid4vci.validation
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.Json
+
+private val authorizationDetailsJson = Json {
+    ignoreUnknownKeys = true
+}
 
 internal fun Map<String, List<String>>.requireSingle(name: String): String {
     val values = this[name].orEmpty().filter { it.isNotBlank() }
@@ -34,8 +39,7 @@ internal fun Map<String, List<String>>.rejectDuplicate(name: String) {
 internal fun Map<String, List<String>>.optionalAuthorizationDetails(): List<AuthorizationDetail> {
     val value = optionalSingle("authorization_details") ?: return emptyList()
     return try {
-        kotlinx.serialization.json.Json
-            .decodeFromString(ListSerializer(AuthorizationDetail.serializer()), value)
+        authorizationDetailsJson.decodeFromString(ListSerializer(AuthorizationDetail.serializer()), value)
     } catch (e: Exception) {
         throw SerializationException("Invalid authorization_details: ${e.message}")
     }
