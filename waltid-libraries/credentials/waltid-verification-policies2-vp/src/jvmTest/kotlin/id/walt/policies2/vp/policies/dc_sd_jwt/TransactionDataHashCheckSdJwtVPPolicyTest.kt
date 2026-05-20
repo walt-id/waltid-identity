@@ -118,6 +118,66 @@ class TransactionDataHashCheckSdJwtVPPolicyTest {
         assertTrue(result.errors.any { it.message?.contains("transaction_data_hashes", ignoreCase = true) == true })
     }
 
+    @Test
+    fun `fails without verification context when empty transaction data hashes list is present`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = emptyList(),
+            transactionDataHashesAlg = null,
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = null,
+        )
+
+        assertFalse(result.success, "empty list must not be treated as omitted")
+    }
+
+    @Test
+    fun `fails without verification context when empty transaction data hashes alg is present`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = null,
+            transactionDataHashesAlg = "",
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = null,
+        )
+
+        assertFalse(result.success, "empty string must not be treated as omitted")
+    }
+
+    @Test
+    fun `fails when empty hashes list sent but no transaction data was requested`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = emptyList(),
+            transactionDataHashesAlg = null,
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = verificationContext(expectedTransactionData = emptyList()),
+        )
+
+        assertFalse(result.success, "empty list must not be treated as omitted")
+    }
+
+    @Test
+    fun `fails when empty alg string sent but no transaction data was requested`() = runTest {
+        val presentation = samplePresentation().copy(
+            transactionDataHashes = null,
+            transactionDataHashesAlg = "",
+        )
+
+        val result = policy.runPolicy(
+            presentation = presentation,
+            verificationContext = verificationContext(expectedTransactionData = emptyList()),
+        )
+
+        assertFalse(result.success, "empty string must not be treated as omitted")
+    }
+
     private fun verificationContext(expectedTransactionData: List<String>? = null) = VerificationSessionContext(
         vpToken = "vp_token",
         expectedNonce = "3c04c5fc-9306-40fa-b544-0e00474ace09",
