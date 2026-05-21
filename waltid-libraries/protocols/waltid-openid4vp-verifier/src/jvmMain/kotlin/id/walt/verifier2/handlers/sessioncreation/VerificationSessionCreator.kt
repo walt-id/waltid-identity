@@ -6,6 +6,7 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.walt.dcql.models.CredentialFormat
 import id.walt.iso18013.annexc.AnnexC
@@ -217,7 +218,10 @@ object VerificationSessionCreator {
             nonce = null, // not required in the initial request yet
             responseType = null
         )
-        val transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null
+        val transactionDataJsonObjects = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null
+        val transactionData = transactionDataJsonObjects?.map { jsonObj ->
+            jsonObj.toString().encodeToByteArray().encodeToBase64Url()
+        }
         val credentialQueriesById = transactionData?.let {
             requireNotNull(setup.core.dcqlQuery) { "transaction_data requires a dcql_query" }
                 .credentials

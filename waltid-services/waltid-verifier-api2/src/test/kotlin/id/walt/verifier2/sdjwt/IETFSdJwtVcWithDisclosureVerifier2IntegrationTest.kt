@@ -38,7 +38,6 @@ import io.ktor.client.request.*
 import io.ktor.server.application.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -505,18 +504,14 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         }
     }
 
-    private fun transactionDataItem(credentialId: String, amount: String): String {
-        val json = buildJsonObject {
-            put("type", JsonPrimitive(PaymentAuthorizationProfile.type))
-            put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
-            put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-            put("amount", JsonPrimitive(amount))
-            put("currency", JsonPrimitive("EUR"))
-            put("payee", JsonPrimitive("ACME Corp"))
-            put("reference", JsonPrimitive("INV-2026-042"))
-        }.toString()
-
-        return json.toByteArray().encodeToBase64Url()
+    private fun transactionDataItem(credentialId: String, amount: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(PaymentAuthorizationProfile.type))
+        put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
+        put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+        put("amount", JsonPrimitive(amount))
+        put("currency", JsonPrimitive("EUR"))
+        put("payee", JsonPrimitive("ACME Corp"))
+        put("reference", JsonPrimitive("INV-2026-042"))
     }
 
     // Utils:

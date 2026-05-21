@@ -106,14 +106,6 @@ export default function Verification() {
               transactionFields[key.slice(3)] = value;
             }
           }
-          const encodedTransactionData = encodeBase64Url(JSON.stringify({
-            type: transactionType,
-            credential_ids: [TRANSACTION_CREDENTIAL_ID],
-            transaction_data_hashes_alg: ["sha-256"],
-            require_cryptographic_holder_binding: true,
-            ...transactionFields,
-          }));
-
           const response = await axios.post(`${verifier2BaseUrl}/verification-session/create`, {
             flow_type: "cross_device",
             core_flow: {
@@ -128,7 +120,13 @@ export default function Verification() {
               },
             },
             openid: {
-              transactionData: [encodedTransactionData],
+              transactionData: [{
+                type: transactionType,
+                credential_ids: [TRANSACTION_CREDENTIAL_ID],
+                transaction_data_hashes_alg: ["sha-256"],
+                require_cryptographic_holder_binding: true,
+                ...transactionFields,
+              }],
             },
           });
 
@@ -361,14 +359,6 @@ function deriveClaimsFromCredentialSubject(credentialSubject?: Record<string, an
     .map((key) => ({ path: [key] }));
 }
 
-function encodeBase64Url(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join("");
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
 
 async function waitForVerifier2Completion(verifier2BaseUrl: string, sessionId: string, isCancelled: () => boolean = () => false,): Promise<string> {
   const maxAttempts = 120;

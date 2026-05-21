@@ -18,6 +18,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -85,8 +86,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
-    // List of base64url encoded JSON strings
-    val transactionData: List<String>? = null
+    val transactionData: List<JsonObject>? = null
 )
 
 /** Allow exposing certain OpenID4VP specific options */
