@@ -225,7 +225,6 @@ object VerificationSessionCreator {
         }
         val decodedTransactionData = validateRequestTransactionData(
             transactionData = transactionData,
-            supportedTypes = null,
             credentialQueriesById = credentialQueriesById,
         )
         val transactionDataFormats = decodedTransactionData

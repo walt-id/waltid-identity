@@ -4,12 +4,19 @@ import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
 import id.walt.dcql.models.meta.MsoMdocMeta
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfile
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
+private object TestTransactionDataProfile : TransactionDataTypeProfile(
+    type = TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE,
+    displayName = "Test Profile",
+)
+
 class TransactionDataRequestValidatorTest {
-    private val supportedType = TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE
+    private val registry = TransactionDataTypeProfileRegistry(TestTransactionDataProfile)
 
     @Test
     fun `accepts supported payment data`() {
@@ -17,25 +24,37 @@ class TransactionDataRequestValidatorTest {
 
         val decoded = validateRequestTransactionData(
             transactionData = listOf(encoded),
-            supportedTypes = setOf(supportedType),
+            profileRegistry = registry,
             credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
         )
 
-        assertEquals(supportedType, decoded.single().transactionData.type)
+        assertEquals(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE, decoded.single().transactionData.type)
         assertEquals("42.00", decoded.single().details["amount"]?.toString()?.trim('"'))
     }
 
     @Test
-    fun `rejects unsupported transaction data type`() {
+    fun `rejects unknown type when registry is non-empty`() {
         val encoded = TransactionDataTestFixtures.transactionData(type = "unsupported-type")
 
         assertFailsWith<IllegalArgumentException> {
             validateRequestTransactionData(
                 transactionData = listOf(encoded),
-                supportedTypes = setOf(supportedType),
+                profileRegistry = registry,
                 credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
             )
         }
+    }
+
+    @Test
+    fun `skips profile validation when registry is empty`() {
+        val encoded = TransactionDataTestFixtures.transactionData(type = "unsupported-type")
+
+        val decoded = validateRequestTransactionData(
+            transactionData = listOf(encoded),
+            credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
+        )
+
+        assertEquals("unsupported-type", decoded.single().transactionData.type)
     }
 
     @Test
@@ -44,7 +63,7 @@ class TransactionDataRequestValidatorTest {
 
         val decoded = validateRequestTransactionData(
             transactionData = listOf(encoded),
-            supportedTypes = setOf(supportedType),
+            profileRegistry = registry,
             credentialQueriesById = mapOf(
                 "payment_credential" to CredentialQuery(
                     id = "payment_credential",
@@ -64,7 +83,7 @@ class TransactionDataRequestValidatorTest {
         assertFailsWith<IllegalArgumentException> {
             validateRequestTransactionData(
                 transactionData = listOf(encoded),
-                supportedTypes = setOf(supportedType),
+                profileRegistry = registry,
                 credentialQueriesById = mapOf(
                     "payment_credential" to CredentialQuery(
                         id = "payment_credential",
@@ -85,7 +104,7 @@ class TransactionDataRequestValidatorTest {
         assertFailsWith<IllegalArgumentException> {
             validateRequestTransactionData(
                 transactionData = listOf(encoded),
-                supportedTypes = setOf(supportedType),
+                profileRegistry = registry,
                 credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(
                     requireCryptographicHolderBinding = false,
                 ),
@@ -99,7 +118,7 @@ class TransactionDataRequestValidatorTest {
 
         val decoded = validateRequestTransactionData(
             transactionData = listOf(encoded),
-            supportedTypes = setOf(supportedType),
+            profileRegistry = registry,
             credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
         )
 
@@ -113,7 +132,7 @@ class TransactionDataRequestValidatorTest {
         assertFailsWith<IllegalArgumentException> {
             validateRequestTransactionData(
                 transactionData = listOf(encoded),
-                supportedTypes = setOf(supportedType),
+                profileRegistry = registry,
                 credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
             )
         }

@@ -8,6 +8,9 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.config.ConfigManager
+import id.walt.webwallet.service.exchange.transactiondata.DocumentSigningTransactionDataProfile
+import id.walt.webwallet.service.exchange.transactiondata.PaymentAuthorizationTransactionDataProfile
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
@@ -1169,7 +1172,10 @@ class SSIKit2WalletService(
             },
             holderPoliciesToRun = null,
             runPolicies = null,
-            supportedTransactionDataTypes = emptySet(),
+            transactionDataTypeRegistry = TransactionDataTypeProfileRegistry(
+                PaymentAuthorizationTransactionDataProfile,
+                DocumentSigningTransactionDataProfile,
+            ),
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(

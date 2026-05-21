@@ -7,6 +7,7 @@ import id.walt.cose.Cose
 import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseKey
 import id.walt.cose.CoseSign1
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.mdoc.objects.DeviceSigned
 import id.walt.mdoc.objects.document.Document
@@ -16,9 +17,8 @@ import id.walt.mdoc.objects.mso.DeviceKeyInfo
 import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
-import id.walt.verifier.openid.transactiondata.deviceSignedItemKey
-import id.walt.verifier.openid.transactiondata.deviceSignedItemKeys
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.test.Test
@@ -33,7 +33,7 @@ class TransactionDataMdocVpPolicyTest {
 
     private val policy = TransactionDataMdocVpPolicy()
     private val transactionData = listOf(
-        """{"type":"org.waltid.transaction-data.payment-authorization","credential_ids":["payment_credential"],"amount":"42.00","currency":"EUR"}"""
+        """{"type":"org.waltid.transaction-data.payment-authorization","credential_ids":["payment_credential"],"amount":"42.00","currency":"EUR","payee":"ACME Corp"}"""
         .encodeToByteArray()
         .encodeToBase64Url(),
     )
@@ -54,7 +54,7 @@ class TransactionDataMdocVpPolicyTest {
         val result = policy.runPolicy(
             document = documentWithEmbeddedTransactionData(
                 listOf(
-                    """{"type":"org.waltid.transaction-data.payment-authorization","credential_ids":["payment_credential"],"amount":"99.00","currency":"EUR"}"""
+                    """{"type":"org.waltid.transaction-data.payment-authorization","credential_ids":["payment_credential"],"amount":"99.00","currency":"EUR","payee":"ACME Corp"}"""
                     .encodeToByteArray()
                     .encodeToBase64Url(),
                 )
@@ -100,15 +100,12 @@ class TransactionDataMdocVpPolicyTest {
     }
 
     private fun documentWithEmbeddedTransactionData(transactionData: List<String>): Document {
-        val embeddedTransactionData = transactionData.mapIndexed { index, encoded ->
-            deviceSignedItemKey(index) to encoded
-        }.toMap()
+        val embeddedTransactionData = transactionData
+            .singleOrNull()
+            ?.let { encoded -> mapOf("transaction_data_hash" to calculateTransactionDataHashes(listOf(encoded)).single().decodeFromBase64Url()) }
+            .orEmpty()
         val deviceSigned = DeviceSigned.fromDeviceSignedItems(
-            namespacedItems = mapOf(
-                DEMO_TRANSACTION_DATA_TYPE to embeddedTransactionData.map { (key, value) ->
-                    DeviceSignedItem(key, value)
-                }
-            ),
+            namespacedItems = mapOf(DEMO_TRANSACTION_DATA_TYPE to embeddedTransactionData.map { (key, value) -> DeviceSignedItem(key, value) }),
             deviceAuth = dummyCoseSign1(),
         )
 
@@ -124,7 +121,6 @@ class TransactionDataMdocVpPolicyTest {
 
     private fun dummyMso(): MobileSecurityObject {
         val now = Clock.System.now()
-        val authorizedElements = deviceSignedItemKeys(transactionData.size).toList()
 
         return MobileSecurityObject(
             version = "1.0",
@@ -138,7 +134,7 @@ class TransactionDataMdocVpPolicyTest {
                 ),
                 keyAuthorizations = KeyAuthorization(
                     dataElements = mapOf(
-                        DEMO_TRANSACTION_DATA_TYPE to authorizedElements
+                        DEMO_TRANSACTION_DATA_TYPE to listOf("transaction_data_hash")
                     )
                 ),
             ),
