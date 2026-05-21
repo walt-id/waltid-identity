@@ -64,7 +64,7 @@
               class="mt-4"
             >
               <div class="text-sm font-semibold text-[#1F2933]">
-                {{ transactionDataItem.type }}
+                {{ transactionDataDisplayName(transactionDataItem.type) }}
               </div>
               <div
                 v-for="([field, value], fieldIndex) in transactionDataEntries(transactionDataItem)"
@@ -152,6 +152,7 @@ const {
   matchedCredentials,
   index,
   transactionDataItems,
+  transactionDataDisplayName,
   acceptPresentation,
   failed,
 } = await usePresentation(query);

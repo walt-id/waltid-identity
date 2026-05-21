@@ -4,13 +4,22 @@ import {AvailableCredential} from "@/types/credentials";
 import WaltIcon from "@/components/walt/logo/WaltIcon";
 import InputField from "@/components/walt/forms/Input";
 import Button from "@/components/walt/button/Button";
-import React, {useContext, useState} from "react";
-import {CredentialsContext} from "@/pages/_app";
+import React, {useContext, useEffect, useState} from "react";
+import {CredentialsContext, EnvContext} from "@/pages/_app";
 import {useRouter} from "next/router";
-import {TRANSACTION_DATA_SUPPORTED_SELECTED_FORMAT, isTransactionDataSupportedSelectedFormat} from "@/utils/transactionData";
+import nextConfig from "@/next.config";
+import {mapFormat} from "@/types/credentials";
+
+type TransactionDataProfile = {
+  type: string;
+  displayName: string;
+  requiredFields: string[];
+  applicableFormats?: string[] | null;
+};
 
 export default function VerificationSection() {
   const router = useRouter();
+  const env = useContext(EnvContext);
   const [AvailableCredentials] = useContext(CredentialsContext);
 
   const [signaturePolicy, setSignaturePolicy] = useState<boolean>(true);
@@ -19,10 +28,27 @@ export default function VerificationSection() {
   const [webhookPolicy, setWebhookPolicy] = useState<boolean>(false);
   const [webhook, setWebhook] = useState<string>('');
   const [transactionDataEnabled, setTransactionDataEnabled] = useState<boolean>(false);
-  const [transactionAmount, setTransactionAmount] = useState<string>('42.00');
-  const [transactionCurrency, setTransactionCurrency] = useState<string>('EUR');
-  const [transactionPayee, setTransactionPayee] = useState<string>('ACME Corp');
-  const [transactionReference, setTransactionReference] = useState<string>('INV-2026-042');
+
+  const [profiles, setProfiles] = useState<TransactionDataProfile[]>([]);
+  const [selectedProfileType, setSelectedProfileType] = useState<string>('');
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const verifier2BaseUrl = env.NEXT_PUBLIC_VERIFIER2
+      ? env.NEXT_PUBLIC_VERIFIER2
+      : nextConfig.publicRuntimeConfig!.NEXT_PUBLIC_VERIFIER2;
+    if (!verifier2BaseUrl) return;
+
+    fetch(`${verifier2BaseUrl}/transaction-data-profiles`)
+      .then((res) => res.json())
+      .then((data: TransactionDataProfile[]) => {
+        setProfiles(data);
+        if (data.length > 0) {
+          setSelectedProfileType(data[0].type);
+        }
+      })
+      .catch(() => {});
+  }, [env.NEXT_PUBLIC_VERIFIER2]);
 
   function handleCancel() {
     router.push('/');
@@ -39,11 +65,26 @@ export default function VerificationSection() {
     AvailableCredential[]
   >([]);
   const selectedTransactionFormat = credentialsToIssue[0]?.selectedFormat?.toString() ?? '';
+  const selectedProtocolFormat = selectedTransactionFormat ? mapFormat(selectedTransactionFormat) : '';
+  const TRANSACTION_DATA_FORMATS = ['vc+sd-jwt', 'mso_mdoc'];
+  const formatSupportsTransactionData = !selectedProtocolFormat || TRANSACTION_DATA_FORMATS.includes(selectedProtocolFormat);
   const isUnsupportedTransactionFormat =
     transactionDataEnabled &&
     credentialsToIssue.length === 1 &&
     selectedTransactionFormat.length > 0 &&
-    !isTransactionDataSupportedSelectedFormat(selectedTransactionFormat);
+    !formatSupportsTransactionData;
+
+  const selectedProfile = profiles.find((p) => p.type === selectedProfileType)
+    ?? profiles[0] ?? null;
+
+  useEffect(() => {
+    if (!selectedProfile) return;
+    const defaults: Record<string, string> = {};
+    for (const field of selectedProfile.requiredFields) {
+      defaults[field] = fieldValues[field] ?? '';
+    }
+    setFieldValues(defaults);
+  }, [selectedProfileType]);
 
   React.useEffect(() => {
     setCredentialsToIssue(
@@ -80,31 +121,31 @@ export default function VerificationSection() {
     } else if (credentialsToIssue.length !== 1) {
       alert('Transaction data verification currently requires exactly one selected credential.');
       return;
-    } else if (!isTransactionDataSupportedSelectedFormat(credentialsToIssue[0]?.selectedFormat?.toString())) {
-      alert('Transaction data verification currently supports only SD-JWT + IETF SD-JWT VC in this flow.');
+    } else if (!formatSupportsTransactionData) {
+      alert('The selected credential format does not support transaction data.');
       return;
     }
 
-    const params = new URLSearchParams();
-    params.append('ids', idsToIssue.join(','));
+    const queryParams = new URLSearchParams();
+    queryParams.append('ids', idsToIssue.join(','));
     if (vps.length) {
-      params.append('vps', vps.join(','));
+      queryParams.append('vps', vps.join(','));
     }
 
-    params.append(
+    queryParams.append(
       'format',
       (credentialsToIssue[0]?.selectedFormat ?? 'JWT + W3C VC') as string
     );
 
-    if (transactionDataEnabled) {
-      params.append('tx', '1');
-      params.append('tx_amount', transactionAmount);
-      params.append('tx_currency', transactionCurrency.toUpperCase());
-      params.append('tx_payee', transactionPayee);
-      params.append('tx_reference', transactionReference);
+    if (transactionDataEnabled && selectedProfile) {
+      queryParams.append('tx', '1');
+      queryParams.append('tx_type', selectedProfile.type);
+      for (const field of selectedProfile.requiredFields) {
+        queryParams.append(`tx_${field}`, fieldValues[field] ?? '');
+      }
     }
 
-    router.push(`/verify?${params.toString()}`);
+    router.push(`/verify?${queryParams.toString()}`);
   }
 
   if (params.ids === undefined) {
@@ -152,58 +193,42 @@ export default function VerificationSection() {
           <span className="text-gray-900">Enable transaction data</span>
         </label>
       </div>
-      {transactionDataEnabled && (
-        <p className="text-sm text-gray-500 text-left mt-3">
-          Transaction data is currently supported for format: <span className="font-medium">SD-JWT + IETF SD-JWT VC</span>.
-        </p>
-      )}
       {isUnsupportedTransactionFormat && (
         <p className="text-sm text-red-600 text-left mt-2">
-          Selected format <span className="font-medium">{selectedTransactionFormat}</span> does not support transaction data in this flow.
+          The selected format <span className="font-medium">{selectedTransactionFormat}</span> does not support transaction data.
         </p>
       )}
-      {transactionDataEnabled && (
+      {transactionDataEnabled && profiles.length > 0 && (
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Profile</label>
+          <select
+            value={selectedProfileType}
+            onChange={(e) => setSelectedProfileType(e.target.value)}
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm p-2 border"
+          >
+            {profiles.map((profile) => (
+              <option key={profile.type} value={profile.type}>
+                {profile.displayName}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      {transactionDataEnabled && selectedProfile && (
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <InputField
-            error={false}
-            label="Amount"
-            value={transactionAmount}
-            name="tx_amount"
-            type="text"
-            placeholder="42.00"
-            onChange={setTransactionAmount}
-            showLabel={true}
-          />
-          <InputField
-            error={false}
-            label="Currency"
-            value={transactionCurrency}
-            name="tx_currency"
-            type="text"
-            placeholder="EUR"
-            onChange={(value) => setTransactionCurrency(value.toUpperCase())}
-            showLabel={true}
-          />
-          <InputField
-            error={false}
-            label="Payee"
-            value={transactionPayee}
-            name="tx_payee"
-            type="text"
-            placeholder="ACME Corp"
-            onChange={setTransactionPayee}
-            showLabel={true}
-          />
-          <InputField
-            error={false}
-            label="Reference"
-            value={transactionReference}
-            name="tx_reference"
-            type="text"
-            placeholder="INV-2026-042"
-            onChange={setTransactionReference}
-            showLabel={true}
-          />
+          {selectedProfile.requiredFields.map((field) => (
+            <InputField
+              key={field}
+              error={false}
+              label={field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+              value={fieldValues[field] ?? ''}
+              name={`tx_${field}`}
+              type="text"
+              placeholder=""
+              onChange={(value) => setFieldValues((prev) => ({ ...prev, [field]: value }))}
+              showLabel={true}
+            />
+          ))}
         </div>
       )}
       <div className="mt-12"></div>

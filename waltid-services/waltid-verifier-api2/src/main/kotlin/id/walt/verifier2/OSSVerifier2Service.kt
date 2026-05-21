@@ -2,12 +2,15 @@
 
 package id.walt.verifier2
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfile
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
@@ -167,6 +170,17 @@ object Verifier2Service {
                 }
             }
         }
+        get("transaction-data-profiles", {
+            tags("Transaction Data")
+            summary = "List available transaction data type profiles"
+            response {
+                HttpStatusCode.OK to { body<List<TransactionDataTypeProfile>>() }
+            }
+        }) {
+            val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()
+            call.respond(config.transactionDataProfiles)
+        }
+
         route(VICAL) {
             route("", {
                 tags("VICAL")
