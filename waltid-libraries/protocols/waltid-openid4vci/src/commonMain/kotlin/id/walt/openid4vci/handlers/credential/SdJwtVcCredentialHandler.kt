@@ -19,8 +19,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Instant
 
 /**
- * SD-JWT VC credential response handler using OpenID4VCI.generateSdJwtVC.
- * The issuer application must provide issuer DID, signing key, and credential data (payload).
+ * SD-JWT VC credential response handler.
  */
 class SdJwtVcCredentialHandler : CredentialEndpointHandler {
     private companion object {
