@@ -1,15 +1,32 @@
 package id.walt.verifier.openid.transactiondata.profile
 
 import id.walt.verifier.openid.transactiondata.DecodedTransactionData
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.jsonPrimitive
 
-abstract class TransactionDataTypeProfile(
+@Serializable
+data class TransactionDataTypeProfile(
     val type: String,
     val displayName: String,
     val mdocResponseNamespace: String = type,
+    val applicableFormats: List<String>? = null,
+    val requiredFields: List<String> = emptyList(),
+    val mdocExtraFields: List<String> = emptyList(),
 ) {
-    open fun isApplicable(credentialFormat: String, docType: String? = null): Boolean = true
+    fun isApplicable(credentialFormat: String): Boolean =
+        applicableFormats == null || credentialFormat in applicableFormats
 
-    open fun validate(decoded: DecodedTransactionData) = Unit
+    fun validate(decoded: DecodedTransactionData) {
+        requiredFields.forEach { field ->
+            require(field in decoded.details) { "transaction_data type '$type' requires '$field'" }
+        }
+    }
 
-    open fun mdocExtraResponseItems(decoded: DecodedTransactionData): Map<String, Any> = emptyMap()
+    fun mdocExtraResponseItems(decoded: DecodedTransactionData): Map<String, Any> = buildMap {
+        mdocExtraFields.forEach { field ->
+            decoded.details[field]?.let { value ->
+                put(field, value.jsonPrimitive.content)
+            }
+        }
+    }
 }
