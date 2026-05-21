@@ -23,12 +23,12 @@ jobs:
         os: [ ubuntu-latest ]
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@29f904ce0de831e02fe64507ebe284b02e66b50e
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@6bad7de2c6de9bc3faa68333de8b00be02613f4d
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
       - name: Start tunnel and get URL
         id: tunnel
@@ -53,15 +53,15 @@ jobs:
           fi
 
           echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
-      - name: Replace URLs in Kotlin test
-        if: ${{ steps.tunnel.outputs.url != '' }}
-        run: |
-          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
-          sed -i \
-            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
-            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
-            -e "s#8443#443#g" \
-            "$FILE"
+#      - name: Replace URLs in Kotlin test
+#        if: ${{ steps.tunnel.outputs.url != '' }}
+#        run: |
+#          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
+#          sed -i \
+#            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
+#            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
+#            -e "s#8443#443#g" \
+#            "$FILE"
 
       - name: Check if Google Chrome is installed
         id: check-browser
@@ -111,7 +111,7 @@ jobs:
 
       - name: Upload test reports
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports
           path: |
@@ -121,7 +121,7 @@ jobs:
 
       - name: Build iOS Simulator Framework (ARM64)
         if: ${{ runner.os == 'macos'}}
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@d3aa55fb102dadb48032778d6e1df9a8f9155261
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
         with:
           waltid-directory: 'waltid-identity'
 

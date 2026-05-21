@@ -96,12 +96,12 @@ data class W3CVC(
         )
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).encodeToByteArray()
 
+        val typHeader = if (isV2()) "vc+sd-jwt" else "JWT"
         val signed = issuerKey.signJws(
-            signable, additionalJwtHeaders.plus(
-                mapOf(
-                    JwsHeader.KEY_ID to kid.toJsonElement()
-                )
-            )
+            signable, mapOf(
+                JwsHeader.KEY_ID to kid.toJsonElement(),
+                "typ" to typHeader.toJsonElement()
+            ).plus(additionalJwtHeaders)
         )
         return SDJwt.createFromSignedJwt(
             signedJwt = signed,

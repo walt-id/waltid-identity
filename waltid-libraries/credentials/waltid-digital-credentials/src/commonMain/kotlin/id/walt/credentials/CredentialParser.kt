@@ -530,8 +530,13 @@ object CredentialParser {
                         subject = getCredentialDataSubject(parsedJson)
                     )
 
-                    parsedJson.contains("@context") && parsedJson.contains("type") -> {
-                        val w3cModelVersion = detectW3CDataModelVersion(parsedJson)
+                    (parsedJson.contains("@context") && parsedJson.contains("type")) ||
+                    (parsedJson.contains("credentialSubject") &&
+                            parsedJson["credentialSubject"]?.jsonObject?.contains("@context") == true &&
+                            parsedJson["credentialSubject"]?.jsonObject?.contains("type") == true) -> {
+                        val vcJson = if (parsedJson.contains("@context") && parsedJson.contains("type")) parsedJson
+                        else parsedJson["credentialSubject"]!!.jsonObject
+                        val w3cModelVersion = detectW3CDataModelVersion(vcJson)
 
                         val credential = when (w3cModelVersion) {
                             W3CSubType.W3C_1_1 -> W3C11(
@@ -540,10 +545,10 @@ object CredentialParser {
                                 signature = null,
                                 signed = null,
                                 signedWithDisclosures = null,
-                                credentialData = parsedJson,
+                                credentialData = vcJson,
 
-                                issuer = getCredentialDataIssuer(parsedJson),
-                                subject = getCredentialDataSubject(parsedJson)
+                                issuer = getCredentialDataIssuer(vcJson),
+                                subject = getCredentialDataSubject(vcJson)
                             )
 
                             W3CSubType.W3C_2 -> W3C2(
@@ -552,10 +557,10 @@ object CredentialParser {
                                 signature = null,
                                 signed = null,
                                 signedWithDisclosures = null,
-                                credentialData = parsedJson,
+                                credentialData = vcJson,
 
-                                issuer = getCredentialDataIssuer(parsedJson),
-                                subject = getCredentialDataSubject(parsedJson)
+                                issuer = getCredentialDataIssuer(vcJson),
+                                subject = getCredentialDataSubject(vcJson)
                             )
                         }
 

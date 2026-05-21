@@ -1,5 +1,6 @@
 package id.walt.mdoc.objects.mso
 
+import id.walt.mdoc.encoding.MdocTDateInstantSerializer
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,18 +36,22 @@ import kotlin.time.Instant
 data class ValidityInfo(
     @SerialName("signed")
     @ValueTags(0u) // CBOR tag 0 for standard date-time string (tdate)
+    @Serializable(with = MdocTDateInstantSerializer::class)
     val signed: Instant,
 
     @SerialName("validFrom")
     @ValueTags(0u)
+    @Serializable(with = MdocTDateInstantSerializer::class)
     val validFrom: Instant,
 
     @SerialName("validUntil")
     @ValueTags(0u)
+    @Serializable(with = MdocTDateInstantSerializer::class)
     val validUntil: Instant,
 
     @SerialName("expectedUpdate")
     @ValueTags(0u)
+    @Serializable(with = MdocTDateInstantSerializer::class)
     val expectedUpdate: Instant? = null
 ) {
     fun validate() {

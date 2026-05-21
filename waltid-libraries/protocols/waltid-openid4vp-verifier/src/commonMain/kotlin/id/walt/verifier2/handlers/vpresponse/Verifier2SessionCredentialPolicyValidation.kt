@@ -33,18 +33,20 @@ object Verifier2SessionCredentialPolicyValidation {
 
         // --- General VC Policies ---
         val generalPolicyJobs = validatedCredentials.flatMap { (queryId, credentials) ->
-            credentials.flatMap { credential ->
+            credentials.flatMapIndexed { credentialIndex, credential ->
                 policies.vc_policies?.policies.orEmpty().map { policy ->
                     async(Dispatchers.Default) {
-                        log.trace { "Validating '$queryId' credential with policy '${policy.id}': $credential" }
+                        log.trace { "Validating '$queryId' credential#$credentialIndex with policy '${policy.id}': $credential" }
                         val result = policy.verify(credential, context)
-                        log.trace { "'$queryId' credential '${policy.id}' result: $result" }
+                        log.trace { "'$queryId' credential#$credentialIndex '${policy.id}' result: $result" }
 
                         CredentialPolicyResult(
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
-                            error = result.exceptionOrNull()?.message
+                            error = result.exceptionOrNull()?.message,
+                            queryId = queryId,
+                            credentialIndex = credentialIndex,
                         )
                     }
                 }
@@ -55,7 +57,7 @@ object Verifier2SessionCredentialPolicyValidation {
         val specificPolicyJobs = policies.specific_vc_policies.orEmpty().flatMap { (queryId, queryPolicies) ->
             val credentials = validatedCredentials[queryId].orEmpty()
 
-            credentials.flatMap { specificCredential ->
+            credentials.flatMapIndexed { credentialIndex, specificCredential ->
                 queryPolicies.policies.map { policy ->
                     async(Dispatchers.Default) {
                         val result = policy.verify(specificCredential, context)
@@ -64,7 +66,9 @@ object Verifier2SessionCredentialPolicyValidation {
                             policy = policy,
                             success = result.isSuccess,
                             result = result.getOrNull(),
-                            error = result.exceptionOrNull()?.message
+                            error = result.exceptionOrNull()?.message,
+                            queryId = queryId,
+                            credentialIndex = credentialIndex,
                         )
                     }
                 }
