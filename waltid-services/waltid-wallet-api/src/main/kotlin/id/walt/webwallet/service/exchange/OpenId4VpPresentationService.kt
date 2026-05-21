@@ -11,7 +11,9 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
+import id.walt.webwallet.service.exchange.transactiondata.DocumentSigningTransactionDataProfile
+import id.walt.webwallet.service.exchange.transactiondata.PaymentAuthorizationTransactionDataProfile
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
@@ -70,7 +72,10 @@ class OpenId4VpPresentationService(
 
             validateRequestTransactionData(
                 transactionData = authorizationRequest.transactionData,
-                supportedTypes = null,
+                profileRegistry = TransactionDataTypeProfileRegistry(
+                    PaymentAuthorizationTransactionDataProfile,
+                    DocumentSigningTransactionDataProfile,
+                ),
                 credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
             )
         }

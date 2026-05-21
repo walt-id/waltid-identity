@@ -30,6 +30,8 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
+import id.walt.verifier2.PaymentAuthorizationProfile
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -45,7 +47,6 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
-private const val DEMO_TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
 
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
@@ -445,7 +446,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null,
-                    supportedTransactionDataTypes = setOf(DEMO_TRANSACTION_DATA_TYPE)
+                    transactionDataTypeRegistry = TransactionDataTypeProfileRegistry(PaymentAuthorizationProfile),
                 )
             }
 
@@ -506,7 +507,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
     private fun transactionDataItem(credentialId: String, amount: String): String {
         val json = buildJsonObject {
-            put("type", JsonPrimitive(DEMO_TRANSACTION_DATA_TYPE))
+            put("type", JsonPrimitive(PaymentAuthorizationProfile.type))
             put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
             put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
             put("amount", JsonPrimitive(amount))

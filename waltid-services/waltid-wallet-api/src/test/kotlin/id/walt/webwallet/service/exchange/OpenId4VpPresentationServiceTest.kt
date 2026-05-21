@@ -7,6 +7,7 @@ import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
+import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -47,6 +48,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
@@ -69,6 +71,17 @@ class OpenId4VpPresentationServiceTest {
                 claims = listOf(
                     ClaimsQuery(pathStrings = listOf("credentialSubject", "degree", "type")),
                 ),
+            ),
+        ),
+    )
+
+    private val sdJwtQuery = DcqlQuery(
+        credentials = listOf(
+            CredentialQuery(
+                id = "degree",
+                format = DcqlCredentialFormat.DC_SD_JWT,
+                meta = SdJwtVcMeta(vctValues = listOf("https://issuer.example/payment-credential")),
+                requireCryptographicHolderBinding = true,
             ),
         ),
     )
@@ -190,6 +203,7 @@ class OpenId4VpPresentationServiceTest {
     fun `normalized request URL rejects unsupported transaction data types`() {
         val service = OpenId4VpPresentationService(mockk(relaxed = true))
         val request = authorizationRequest(
+            dcqlQuery = sdJwtQuery,
             transactionData = listOf(
                 transactionDataItem(
                     type = "unsupported-type",
@@ -222,7 +236,8 @@ class OpenId4VpPresentationServiceTest {
             runBlocking { resolveNormalizedRequestUrl(service, request) }
         }
 
-        assertTrue(error.message?.contains("supported transaction_data profile", ignoreCase = true) == true)
+        assertNotNull(error.message)
+        assertTrue(error.message!!.contains("supported format", ignoreCase = true))
     }
 
     @Test
@@ -762,6 +777,7 @@ class OpenId4VpPresentationServiceTest {
             }
 
     private fun authorizationRequest(
+        dcqlQuery: DcqlQuery = query,
         transactionData: List<String>? = null,
         includeDcqlQuery: Boolean = true,
     ): String = AuthorizationRequest(
@@ -769,7 +785,7 @@ class OpenId4VpPresentationServiceTest {
         responseMode = OpenID4VPResponseMode.DIRECT_POST,
         responseUri = "https://verifier.example/response",
         nonce = "nonce-123",
-        dcqlQuery = query.takeIf { includeDcqlQuery },
+        dcqlQuery = dcqlQuery.takeIf { includeDcqlQuery },
         transactionData = transactionData,
     ).toHttpUrl().toString()
 
@@ -787,6 +803,8 @@ class OpenId4VpPresentationServiceTest {
                 })
                 requireCryptographicHolderBinding?.let { put("require_cryptographic_holder_binding", it) }
                 put("amount", amount)
+                put("currency", "EUR")
+                put("payee", "ACME Corp")
             }.toString(),
         )
 

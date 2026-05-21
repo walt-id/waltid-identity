@@ -20,7 +20,9 @@ import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
@@ -56,7 +58,8 @@ object WalletPresentFunctionality2 {
         matchedData: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
         /** For mdocs: this is the device key */
         holderKey: Key,
-        holderDid: String?
+        holderDid: String?,
+        profileRegistry: TransactionDataTypeProfileRegistry,
     ): String {
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
 
@@ -73,7 +76,7 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
+                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation"),
                         )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.DC_SD_JWT -> SdJwtVcPresenter.presentSdJwtVc(
@@ -81,7 +84,7 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
+                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation"),
                         )
 
                         resolvedFormat == WalletPresentationFormatRegistry.SupportedFormat.MSO_MDOC -> {
@@ -89,7 +92,8 @@ object WalletPresentFunctionality2 {
                                 digitalCredential = digitalCredential,
                                 matchResult = matchResult,
                                 authorizationRequest = authorizationRequest,
-                                holderKey = holderKey
+                                holderKey = holderKey,
+                                profileRegistry = profileRegistry,
                             )
                         }
 
@@ -299,7 +303,7 @@ object WalletPresentFunctionality2 {
 
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
-        supportedTransactionDataTypes: Set<String> = emptySet(),
+        transactionDataTypeRegistry: TransactionDataTypeProfileRegistry = TransactionDataTypeProfileRegistry(),
 
         // TODO: selected credentials
 
@@ -348,7 +352,7 @@ object WalletPresentFunctionality2 {
         runCatching {
             validateRequestTransactionData(
                 transactionData = authorizationRequest.transactionData,
-                supportedTypes = supportedTransactionDataTypes,
+                profileRegistry = transactionDataTypeRegistry,
                 credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
             )
         }.onFailure { error ->
@@ -407,7 +411,7 @@ object WalletPresentFunctionality2 {
         }
 
 
-        val vpToken = generateVpTokenForRequest(authorizationRequest, credentials, holderKey, holderDid)
+        val vpToken = generateVpTokenForRequest(authorizationRequest, credentials, holderKey, holderDid, transactionDataTypeRegistry)
 
         // Send AuthorizationResponse:
         if (authorizationRequest.responseMode == null) {
@@ -610,7 +614,7 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
-        val decodedTransactionData = validateRequestTransactionData(transactionData)
+        val decodedTransactionData = decodeList(transactionData.orEmpty())
         val transactionDataHashAlgorithm = resolveHashAlgorithm(decodedTransactionData)
         val transactionDataHashes = transactionDataHashAlgorithm?.let {
             calculateTransactionDataHashes(

@@ -2,6 +2,7 @@ package id.walt.verifier.openid.transactiondata
 
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
 
 private val supportedTransactionDataFormats = setOf(
     CredentialFormat.DC_SD_JWT,
@@ -10,7 +11,7 @@ private val supportedTransactionDataFormats = setOf(
 
 fun validateRequestTransactionData(
     transactionData: List<String>?,
-    supportedTypes: Set<String>? = null,
+    profileRegistry: TransactionDataTypeProfileRegistry = TransactionDataTypeProfileRegistry(),
     credentialQueriesById: Map<String, CredentialQuery>? = null,
 ): List<DecodedTransactionData> {
     val decodedItems = decodeList(transactionData.orEmpty())
@@ -18,9 +19,7 @@ fun validateRequestTransactionData(
     decodedItems.forEach { decodedItem ->
         val item = decodedItem.transactionData
         require(item.type.isNotBlank()) { "transaction_data.type must not be blank" }
-        if (supportedTypes != null) {
-            require(item.type in supportedTypes) { "Unsupported transaction_data type: ${item.type}" }
-        }
+        profileRegistry.validateType(item.type, decodedItem)
         require(item.credentialIds.isNotEmpty()) { "transaction_data.credential_ids must not be empty" }
         require(item.requireCryptographicHolderBinding != false) {
             "transaction_data type ${item.type} requires cryptographic holder binding"
@@ -32,8 +31,8 @@ fun validateRequestTransactionData(
             }
             item.credentialIds.forEach { credentialId ->
                 val credentialQuery = credentialQueriesById.getValue(credentialId)
-                require(isTransactionDataSupportedFormat(credentialQuery.format)) {
-                    "transaction_data.credential_ids must reference credential queries with a supported transaction_data profile"
+                require(credentialQuery.format in supportedTransactionDataFormats) {
+                    "transaction_data.credential_ids must reference credential queries with a supported format (${supportedTransactionDataFormats.joinToString()})"
                 }
                 require(credentialQuery.requireCryptographicHolderBinding) {
                     "transaction_data.credential_ids must require cryptographic holder binding"
@@ -46,6 +45,3 @@ fun validateRequestTransactionData(
 
     return decodedItems
 }
-
-private fun isTransactionDataSupportedFormat(format: CredentialFormat): Boolean =
-    format in supportedTransactionDataFormats
