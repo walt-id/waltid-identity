@@ -10,7 +10,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-private object TestTransactionDataProfile : TransactionDataTypeProfile(
+private val TestTransactionDataProfile = TransactionDataTypeProfile(
     type = TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE,
     displayName = "Test Profile",
 )
