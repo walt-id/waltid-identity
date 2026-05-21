@@ -220,7 +220,7 @@ object MdocPresenter {
             }
             val item = items.single()
             val profile = profileRegistry.requireProfile(item.transactionData.type)
-            require(profile.isApplicable(mdocsCredential.format, mdocsCredential.docType)) {
+            require(profile.isApplicable(mdocsCredential.format)) {
                 "transaction_data type '${profile.type}' is not applicable to credential ${mdocsCredential.docType}"
             }
             val responseItems = buildMdocResponseItems(item, profile, hashAlgorithm)
