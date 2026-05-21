@@ -14,7 +14,6 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.ClaimsQuery
@@ -326,27 +325,21 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
         runTransactionDataTest(port = 17034, sessionSetup = sessionSetup, walletCredentials = listOf(credential))
     }
 
-    private fun paymentTransactionDataItem(credentialId: String, amount: String): String {
-        val json = buildJsonObject {
-            put("type", JsonPrimitive(PAYMENT_TYPE))
-            put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
-            put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-            put("amount", JsonPrimitive(amount))
-            put("currency", JsonPrimitive("EUR"))
-            put("payee", JsonPrimitive("ACME Corp"))
-        }.toString()
-        return json.toByteArray().encodeToBase64Url()
+    private fun paymentTransactionDataItem(credentialId: String, amount: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(PAYMENT_TYPE))
+        put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
+        put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+        put("amount", JsonPrimitive(amount))
+        put("currency", JsonPrimitive("EUR"))
+        put("payee", JsonPrimitive("ACME Corp"))
     }
 
-    private fun docSigningTransactionDataItem(credentialId: String): String {
-        val json = buildJsonObject {
-            put("type", JsonPrimitive(DOC_SIGNING_TYPE))
-            put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
-            put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-            put("document_hash", JsonPrimitive("abc123def456"))
-            put("hash_algorithm_identifier", JsonPrimitive("sha-256"))
-            put("document_reference", JsonPrimitive("contract-2024-001"))
-        }.toString()
-        return json.toByteArray().encodeToBase64Url()
+    private fun docSigningTransactionDataItem(credentialId: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(DOC_SIGNING_TYPE))
+        put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
+        put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+        put("document_hash", JsonPrimitive("abc123def456"))
+        put("hash_algorithm_identifier", JsonPrimitive("sha-256"))
+        put("document_reference", JsonPrimitive("contract-2024-001"))
     }
 }

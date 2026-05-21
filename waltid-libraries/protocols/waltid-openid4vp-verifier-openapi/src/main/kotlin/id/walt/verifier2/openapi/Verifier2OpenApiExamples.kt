@@ -23,6 +23,7 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 object Verifier2OpenApiExamples {
 
@@ -405,7 +406,16 @@ object Verifier2OpenApiExamples {
         ),
         openid = OpenId4VPConfig(
             transactionData = listOf(
-                "eyJ0eXBlIjoib3JnLndhbHRpZC50cmFuc2FjdGlvbi1kYXRhLnBheW1lbnQtYXV0aG9yaXphdGlvbiIsImNyZWRlbnRpYWxfaWRzIjpbInBpZCJdLCJyZXF1aXJlX2NyeXB0b2dyYXBoaWNfaG9sZGVyX2JpbmRpbmciOnRydWUsInRyYW5zYWN0aW9uX2RhdGFfaGFzaGVzX2FsZyI6WyJzaGEtMjU2Il0sImFtb3VudCI6IjQyLjAwIiwiY3VycmVuY3kiOiJFVVIiLCJwYXllZSI6IkFDTUUgQ29ycCIsInJlZmVyZW5jZSI6IklOVi0yMDI2LTA0MiJ9"
+                buildJsonObject {
+                    put("type", JsonPrimitive("org.waltid.transaction-data.payment-authorization"))
+                    put("credential_ids", JsonArray(listOf(JsonPrimitive("pid"))))
+                    put("require_cryptographic_holder_binding", JsonPrimitive(true))
+                    put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+                    put("amount", JsonPrimitive("42.00"))
+                    put("currency", JsonPrimitive("EUR"))
+                    put("payee", JsonPrimitive("ACME Corp"))
+                    put("reference", JsonPrimitive("INV-2026-042"))
+                }
             )
         )
     )

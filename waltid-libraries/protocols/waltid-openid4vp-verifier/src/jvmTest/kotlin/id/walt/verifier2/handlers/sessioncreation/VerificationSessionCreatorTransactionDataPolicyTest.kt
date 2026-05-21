@@ -19,7 +19,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -149,14 +148,10 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
         )
     }
 
-    private fun transactionDataItem(credentialId: String): String {
-        val json = buildJsonObject {
-            put("type", JsonPrimitive(DEMO_TRANSACTION_DATA_TYPE))
-            put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
-            put("require_cryptographic_holder_binding", JsonPrimitive(true))
-            put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-        }.toString()
-
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(json.toByteArray())
+    private fun transactionDataItem(credentialId: String) = buildJsonObject {
+        put("type", JsonPrimitive(DEMO_TRANSACTION_DATA_TYPE))
+        put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
+        put("require_cryptographic_holder_binding", JsonPrimitive(true))
+        put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
     }
 }
