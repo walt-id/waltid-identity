@@ -19,7 +19,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * W3C JWT VC credential response handler using OpenID4VCI.generateW3CJwtVC.
- * Supports JWT VC formats (jwt_vc_json, jwt_vc).
+ * Supports JWT VC formats (jwt_vc_json, jwt_vc_json-ld, jwt_vc).
  */
 class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
     override suspend fun sign(
@@ -37,6 +37,7 @@ class W3cJwtVcCredentialHandler : CredentialEndpointHandler {
         return try {
             val oid4vcFormat = when (configuration.format) {
                 CredentialFormat.JWT_VC_JSON -> Oid4vcCredentialFormat.jwt_vc_json
+                CredentialFormat.JWT_VC_JSON_LD -> Oid4vcCredentialFormat.jwt_vc_json_ld
                 CredentialFormat.JWT_VC -> Oid4vcCredentialFormat.jwt_vc
                 else -> {
                     return CredentialResponseResult.Failure(

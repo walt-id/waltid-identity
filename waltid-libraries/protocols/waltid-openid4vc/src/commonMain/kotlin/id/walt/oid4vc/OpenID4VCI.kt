@@ -871,7 +871,7 @@ object OpenID4VCI {
                     val v11ContextUri = W3CV11DataModel.defaultContext.first()
                     val base = if (vc.isV2()) vc.toMutableMap() else {
                         val existing = vcPayload["@context"]
-                            ?.let { if (it is JsonArray) it.map { e -> e.jsonPrimitive.content } else listOf(it.jsonPrimitive.content) }
+                            ?.let(::jsonLdContextUris)
                             ?: emptyList()
                         val merged = (listOf(v2ContextUri) + existing).distinct()
                         vcPayload.toMutableMap().also { map ->
@@ -879,7 +879,7 @@ object OpenID4VCI {
                         }
                     }
                     (base["@context"] as? JsonArray)?.let { arr ->
-                        val cleaned = arr.filter { it.jsonPrimitive.contentOrNull != v11ContextUri }
+                        val cleaned = arr.filter { (it as? JsonPrimitive)?.contentOrNull != v11ContextUri }
                         if (cleaned.size != arr.size) base["@context"] = JsonArray(cleaned)
                     }
                     base.remove("issuanceDate")?.let { v -> if ("validFrom" !in base) base["validFrom"] = v }
@@ -937,6 +937,13 @@ object OpenID4VCI {
                 )
             }
         }
+    }
+
+    private fun jsonLdContextUris(context: JsonElement): List<String> = when (context) {
+        is JsonPrimitive -> listOfNotNull(context.contentOrNull)
+        is JsonArray -> context.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+        is JsonObject -> emptyList()
+        JsonNull -> emptyList()
     }
 }
 

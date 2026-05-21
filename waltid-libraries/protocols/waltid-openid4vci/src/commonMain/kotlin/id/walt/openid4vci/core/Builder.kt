@@ -124,6 +124,11 @@ private fun registerDefaultCredentialHandlers(
         config.credentialEndpointHandlers.register(jwtVcJsonFormat, W3cJwtVcCredentialHandler())
     }
 
+    val jwtVcJsonLdFormat = CredentialFormat.JWT_VC_JSON_LD
+    if (config.credentialEndpointHandlers.get(jwtVcJsonLdFormat) == null) {
+        config.credentialEndpointHandlers.register(jwtVcJsonLdFormat, W3cJwtVcCredentialHandler())
+    }
+
     val jwtVcFormat = CredentialFormat.JWT_VC
     if (config.credentialEndpointHandlers.get(jwtVcFormat) == null) {
         config.credentialEndpointHandlers.register(jwtVcFormat, W3cJwtVcCredentialHandler())

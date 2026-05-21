@@ -49,7 +49,7 @@ data class W3CVC(
     fun isV2(): Boolean {
         val context = get("@context") ?: return false
         return when (context) {
-            is JsonArray -> context.any { it.jsonPrimitive.contentOrNull == "https://www.w3.org/ns/credentials/v2" }
+            is JsonArray -> context.any { (it as? JsonPrimitive)?.contentOrNull == W3CV2JsonLd.BASE_CONTEXT }
             is JsonPrimitive -> context.contentOrNull == "https://www.w3.org/ns/credentials/v2"
             else -> false
         }
