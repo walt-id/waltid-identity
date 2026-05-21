@@ -53,12 +53,35 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.TransactionDataProfilesConfig
+import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfile
 import id.walt.dcql.models.CredentialFormat as DcqlCredentialFormat
 
 @OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 class OpenId4VpPresentationServiceTest {
+    companion object {
+        private const val SUPPORTED_TX_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
+
+        init {
+            ConfigManager.preloadAndRegisterConfig(
+                "transaction-data-profiles",
+                TransactionDataProfilesConfig(
+                    transactionDataProfiles = listOf(
+                        TransactionDataTypeProfile(
+                            type = SUPPORTED_TX_DATA_TYPE,
+                            displayName = "Payment Authorization",
+                            requiredFields = listOf("amount", "currency", "payee"),
+                        )
+                    )
+                )
+            )
+            ConfigManager.loadConfigs(emptyArray())
+        }
+    }
+
     private val json = Json { encodeDefaults = false }
-    private val supportedTransactionDataType = "org.waltid.transaction-data.payment-authorization"
+    private val supportedTransactionDataType = SUPPORTED_TX_DATA_TYPE
 
     private val query = DcqlQuery(
         credentials = listOf(
