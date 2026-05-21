@@ -73,6 +73,12 @@ const TRANSACTION_DATA_KNOWN_FIELDS = [
   "require_cryptographic_holder_binding",
 ];
 
+type TransactionDataProfile = {
+  type: string;
+  displayName: string;
+  requiredFields?: string[];
+};
+
 export function transactionDataEntries(transactionDataItem: Record<string, unknown>) {
   return Object.entries(transactionDataItem).filter(
     ([field]) => !TRANSACTION_DATA_KNOWN_FIELDS.includes(field),
@@ -129,6 +135,18 @@ export async function usePresentation(query: any) {
     failed.value = true;
     failMessage.value = error instanceof Error ? error.message : "Invalid transaction data in presentation request.";
     throw error;
+  }
+
+  const transactionDataProfiles = ref<TransactionDataProfile[]>([]);
+  $fetch<TransactionDataProfile[]>(
+    `/wallet-api/transaction-data-profiles`,
+  ).then((data) => {
+    transactionDataProfiles.value = data;
+  }).catch(() => {});
+
+  function transactionDataDisplayName(type: string): string {
+    const profile = transactionDataProfiles.value.find((p) => p.type === type);
+    return profile?.displayName ?? type.split('.').pop()?.replace(/-/g, ' ') ?? type;
   }
 
   const verifierHost = new URL(
@@ -275,6 +293,7 @@ export async function usePresentation(query: any) {
     currentWallet,
     verifierHost,
     transactionDataItems,
+    transactionDataDisplayName,
     requestPayload: presentationRequestPayload,
     matchedCredentials,
     selectedCredentialIds,

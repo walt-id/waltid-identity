@@ -78,7 +78,7 @@
             :key="`${transactionDataItem.type}-${itemIndex}`"
             class="mt-4 rounded-lg bg-white p-3"
           >
-            <div class="font-medium text-gray-900">{{ transactionDataItem.type }}</div>
+            <div class="font-medium text-gray-900">{{ transactionDataDisplayName(transactionDataItem.type) }}</div>
             <div
               v-for="([field, value], fieldIndex) in transactionDataEntries(transactionDataItem)"
               :key="`${itemIndex}-${fieldIndex}`"
@@ -230,6 +230,7 @@ const {
   verifierHost,
   requestPayload,
   transactionDataItems,
+  transactionDataDisplayName,
   matchedCredentials,
   selectedCredentialIds,
   selection,

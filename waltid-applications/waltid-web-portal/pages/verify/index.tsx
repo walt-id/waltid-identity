@@ -11,11 +11,9 @@ import nextConfig from "@/next.config";
 import BackButton from "@/components/walt/button/BackButton";
 import {CredentialFormats, mapFormat} from "@/types/credentials";
 import {checkVerificationResult, getStateFromUrl} from "@/utils/checkVerificationResult";
-import {isTransactionDataSupportedSelectedFormat} from "@/utils/transactionData";
 
 const BUTTON_COPY_TEXT_DEFAULT = 'Copy offer URL';
 const BUTTON_COPY_TEXT_COPIED = 'Copied';
-const TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization";
 const TRANSACTION_CREDENTIAL_ID = "selected_credential";
 const VERIFIER2_COMPLETED_STATUSES = ["SUCCESSFUL", "FAILED", "EXPIRED", "COMPLETED", "UNSUCCESSFUL", "REJECTED"];
 
@@ -91,12 +89,9 @@ export default function Verification() {
           if (credentials.length !== 1) {
             throw new Error('Transaction data verification currently requires exactly one selected credential.');
           }
-          if (!isTransactionDataSupportedSelectedFormat(format)) {
-            throw new Error('Transaction data verification currently supports only SD-JWT + IETF SD-JWT VC in this flow.');
-          }
 
           const selectedCredential = credentials[0];
-          const verifier2Format = mapSelectedFormatToVerifier2Format(format);
+          const verifier2Format = mapSelectedFormatToVerifier2DcqlFormat(format);
           const selectedCredentialType = getCredentialType(selectedCredential.offer?.type, selectedCredential.title);
           const issuerMetadata = await axios.get(`${issuerBaseUrl}/${standardVersion}/.well-known/openid-credential-issuer`);
           const transactionVctValue = resolveSdJwtVctFromIssuerMetadata(
@@ -104,19 +99,19 @@ export default function Verification() {
             issuerMetadataConfigSelector[standardVersion],
             selectedCredentialType,
           );
-          const transactionAmount = readRequiredQueryParam(router.query.tx_amount, "tx_amount");
-          const transactionCurrency = readRequiredQueryParam(router.query.tx_currency, "tx_currency").toUpperCase();
-          const transactionPayee = readRequiredQueryParam(router.query.tx_payee, "tx_payee");
-          const transactionReference = readRequiredQueryParam(router.query.tx_reference, "tx_reference");
+          const transactionType = readRequiredQueryParam(router.query.tx_type, "tx_type");
+          const transactionFields: Record<string, string> = {};
+          for (const [key, value] of Object.entries(router.query)) {
+            if (key.startsWith('tx_') && key !== 'tx' && key !== 'tx_type' && typeof value === 'string') {
+              transactionFields[key.slice(3)] = value;
+            }
+          }
           const encodedTransactionData = encodeBase64Url(JSON.stringify({
-            type: TRANSACTION_DATA_TYPE,
+            type: transactionType,
             credential_ids: [TRANSACTION_CREDENTIAL_ID],
             transaction_data_hashes_alg: ["sha-256"],
             require_cryptographic_holder_binding: true,
-            amount: transactionAmount,
-            currency: transactionCurrency,
-            payee: transactionPayee,
-            reference: transactionReference,
+            ...transactionFields,
           }));
 
           const response = await axios.post(`${verifier2BaseUrl}/verification-session/create`, {
@@ -334,14 +329,19 @@ export default function Verification() {
   );
 }
 
-function mapSelectedFormatToVerifier2Format(selectedFormat: string): "dc+sd-jwt" {
-  if (!isTransactionDataSupportedSelectedFormat(selectedFormat)) {
-    throw new Error("Transaction data verification currently supports only SD-JWT + IETF SD-JWT VC in this flow.");
+function mapSelectedFormatToVerifier2DcqlFormat(selectedFormat: string): string {
+  const protocolFormat = mapFormat(selectedFormat);
+  switch (protocolFormat) {
+    case 'vc+sd-jwt':
+      return 'dc+sd-jwt';
+    case 'mso_mdoc':
+      return 'mso_mdoc';
+    default:
+      throw new Error(`Unsupported format for transaction data verification: ${selectedFormat}`);
   }
-  return "dc+sd-jwt";
 }
 
-function buildTransactionCredentialQuery(format: "dc+sd-jwt", vctValue: string, credentialSubject?: Record<string, any>) {
+function buildTransactionCredentialQuery(format: string, vctValue: string, credentialSubject?: Record<string, any>) {
   const claims = deriveClaimsFromCredentialSubject(credentialSubject);
   return {
     id: TRANSACTION_CREDENTIAL_ID,

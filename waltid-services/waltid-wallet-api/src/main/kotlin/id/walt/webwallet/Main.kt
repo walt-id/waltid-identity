@@ -115,4 +115,5 @@ fun Application.webWalletModule(withPlugins: Boolean = true) {
 
     // utility APIs
     utility()
+    transactionDataProfiles()
 }

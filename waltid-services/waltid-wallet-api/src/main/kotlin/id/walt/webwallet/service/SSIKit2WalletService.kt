@@ -8,7 +8,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.config.ConfigManager
-import id.walt.webwallet.config.TransactionDataProfilesConfig
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
