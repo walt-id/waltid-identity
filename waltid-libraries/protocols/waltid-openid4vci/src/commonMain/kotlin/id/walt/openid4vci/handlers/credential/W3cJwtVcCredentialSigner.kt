@@ -146,6 +146,7 @@ object W3cJwtVcCredentialSigner {
                     context = context,
                     type = when (builderType) {
                         CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER
+                        // Including CredentialBuilderType.W3CV11CredentialBuilder
                         else -> "JWT"
                     }
                 )
