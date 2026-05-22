@@ -13,8 +13,7 @@ import {mapFormat} from "@/types/credentials";
 type TransactionDataProfile = {
   type: string;
   displayName: string;
-  requiredFields: string[];
-  applicableFormats?: string[] | null;
+  fields: string[];
 };
 
 export default function VerificationSection() {
@@ -80,7 +79,7 @@ export default function VerificationSection() {
   useEffect(() => {
     if (!selectedProfile) return;
     const defaults: Record<string, string> = {};
-    for (const field of selectedProfile.requiredFields) {
+    for (const field of selectedProfile.fields) {
       defaults[field] = fieldValues[field] ?? '';
     }
     setFieldValues(defaults);
@@ -140,7 +139,7 @@ export default function VerificationSection() {
     if (transactionDataEnabled && selectedProfile) {
       queryParams.append('tx', '1');
       queryParams.append('tx_type', selectedProfile.type);
-      for (const field of selectedProfile.requiredFields) {
+      for (const field of selectedProfile.fields) {
         queryParams.append(`tx_${field}`, fieldValues[field] ?? '');
       }
     }
@@ -216,7 +215,7 @@ export default function VerificationSection() {
       )}
       {transactionDataEnabled && selectedProfile && (
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {selectedProfile.requiredFields.map((field) => (
+          {selectedProfile.fields.map((field) => (
             <InputField
               key={field}
               error={false}

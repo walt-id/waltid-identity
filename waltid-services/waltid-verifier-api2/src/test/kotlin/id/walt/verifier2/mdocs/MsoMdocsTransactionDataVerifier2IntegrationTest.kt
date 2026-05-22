@@ -38,12 +38,10 @@ import id.walt.mdoc.objects.mso.KeyAuthorization
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import id.walt.mdoc.objects.mso.ValidityInfo
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
-import id.walt.verifier2.DOC_SIGNING_TYPE
-import id.walt.verifier2.DocumentSigningProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier2.ACCOUNT_ACCESS_TYPE
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.PAYMENT_TYPE
-import id.walt.verifier2.PaymentAuthorizationProfile
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
@@ -71,10 +69,7 @@ import kotlin.time.Duration.Companion.days
 
 class MsoMdocsTransactionDataVerifier2IntegrationTest {
 
-    private val profileRegistry = TransactionDataTypeProfileRegistry(
-        PaymentAuthorizationProfile,
-        DocumentSigningProfile,
-    )
+    private val typeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE, ACCOUNT_ACCESS_TYPE)
 
     private val issuerKey: JWKKey = runBlocking {
         KeyManager.resolveSerializedKey(
@@ -264,7 +259,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
                     selectCredentialsForQuery = { query -> selectCredentialsForQuery(walletCredentials, query) },
                     holderPoliciesToRun = null,
                     runPolicies = null,
-                    transactionDataTypeRegistry = profileRegistry,
+                    transactionDataTypeRegistry = typeRegistry,
                 )
             }
 
@@ -311,15 +306,15 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
     }
 
     @Test
-    fun `document signing - hash binding with extra response items`() {
+    fun `account access - hash binding`() {
         val credential = issueMdoc(
-            authorizedTransactionDataType = DOC_SIGNING_TYPE,
-            authorizedElements = listOf("transaction_data_hash", "transaction_data_hash_alg", "document_reference"),
+            authorizedTransactionDataType = ACCOUNT_ACCESS_TYPE,
+            authorizedElements = listOf("transaction_data_hash", "transaction_data_hash_alg"),
         )
         val sessionSetup = CrossDeviceFlowSetup(
             core = GeneralFlowConfig(dcqlQuery = mdocDcqlQuery),
             openid = OpenId4VPConfig(
-                transactionData = listOf(docSigningTransactionDataItem(credentialId = "my_mdl"))
+                transactionData = listOf(accountAccessTransactionDataItem(credentialId = "my_mdl"))
             )
         )
         runTransactionDataTest(port = 17034, sessionSetup = sessionSetup, walletCredentials = listOf(credential))
@@ -334,12 +329,11 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
         put("payee", JsonPrimitive("ACME Corp"))
     }
 
-    private fun docSigningTransactionDataItem(credentialId: String): JsonObject = buildJsonObject {
-        put("type", JsonPrimitive(DOC_SIGNING_TYPE))
+    private fun accountAccessTransactionDataItem(credentialId: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(ACCOUNT_ACCESS_TYPE))
         put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
         put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
-        put("document_hash", JsonPrimitive("abc123def456"))
-        put("hash_algorithm_identifier", JsonPrimitive("sha-256"))
-        put("document_reference", JsonPrimitive("contract-2024-001"))
+        put("account_identifier", JsonPrimitive("DE89370400440532013000"))
+        put("access_scope", JsonPrimitive("balance,transactions"))
     }
 }

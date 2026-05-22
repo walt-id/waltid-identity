@@ -54,8 +54,8 @@ import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.TransactionDataProfile
 import id.walt.commons.config.list.TransactionDataProfilesConfig
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfile
 import id.walt.dcql.models.CredentialFormat as DcqlCredentialFormat
 
 @OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
@@ -68,10 +68,10 @@ class OpenId4VpPresentationServiceTest {
                 "transaction-data-profiles",
                 TransactionDataProfilesConfig(
                     transactionDataProfiles = listOf(
-                        TransactionDataTypeProfile(
+                        TransactionDataProfile(
                             type = SUPPORTED_TX_DATA_TYPE,
                             displayName = "Payment Authorization",
-                            requiredFields = listOf("amount", "currency", "payee"),
+                            fields = listOf("amount", "currency", "payee"),
                         )
                     )
                 )

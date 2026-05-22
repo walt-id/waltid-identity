@@ -71,7 +71,7 @@ class OpenId4VpPresentationService(
 
             validateRequestTransactionData(
                 transactionData = authorizationRequest.transactionData,
-                profileRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toRegistry(),
+                typeRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry(),
                 credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
             )
         }

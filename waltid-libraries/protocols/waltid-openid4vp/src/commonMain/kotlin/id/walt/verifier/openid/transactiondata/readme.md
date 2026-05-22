@@ -4,42 +4,47 @@ This package contains shared transaction-data primitives used by both wallet and
 
 ## Shared responsibilities
 
-- `TransactionDataDecoding`: decode base64url transaction_data payloads
-- `TransactionDataRequestValidator`: request-side structural and profile checks
-- `TransactionDataHashing`: hash algorithm resolution and hash calculation
-- `TransactionDataSelection`: credential-id based transaction_data selection
+- `TransactionDataDecoding`: decode base64url transaction_data items into `DecodedTransactionData` (parsed JSON + typed `TransactionDataItem`)
+- `TransactionDataRequestValidator`: structural checks (non-blank type, non-empty credential_ids, holder binding requirement, supported formats) and optional type-registry enforcement
+- `TransactionDataHashing`: hash algorithm resolution (`sha-256` only for now) and hash calculation
+- `TransactionDataSelection`: filters transaction_data items by credential_id (`filterTransactionDataForCredentialId`)
+- `TransactionDataTypeRegistry`: set of known type strings; `requireKnown` rejects unrecognized types
 
-## Type profiles (`profile/` subpackage)
+## Validation modes
 
-Each transaction data type (e.g. `org.waltid.transaction-data.payment-authorization`) is represented by a
-`TransactionDataTypeProfile` that defines:
+Two entry points in `TransactionDataRequestValidator`:
 
-- Applicability to credential formats/docTypes
-- The mdoc response namespace (convention: the type identifier itself)
-- Extra elements to include in DeviceSigned beyond the framework-level hash binding
-- Optional per-type validation
-- A human-readable display name for wallet UI
+- `validateRequestTransactionData(transactionData, typeRegistry, credentialQueriesById)` — used by the **wallet**. Enforces both structural rules and that each type is in the registry.
+- `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — used by the **verifier** when creating sessions. Runs structural checks only (no type registry).
 
-The `TransactionDataTypeProfileRegistry` holds known profiles. When non-empty, it enforces that all
-transaction data types in a request are registered (wallet use case). When empty (default), structural
-checks run but type validation is skipped (verifier use case).
-
-Concrete profiles are defined in the service layer (e.g. `waltid-wallet-api`), not in this protocol module.
-
-Files:
-- `profile/TransactionDataTypeProfile.kt`: abstract base class
-- `profile/TransactionDataTypeProfileRegistry.kt`: registry
+Both validate:
+- `type` is non-blank
+- `credential_ids` is non-empty and references valid DCQL credential query ids (when provided)
+- Referenced credential queries use a supported format (`dc+sd-jwt` or `mso_mdoc`)
+- Referenced credential queries require cryptographic holder binding
+- `require_cryptographic_holder_binding` is not explicitly `false`
+- `transaction_data_hashes_alg` values are supported (when present)
 
 ## mdoc convention
 
-Per the OID4VP spec each transaction data type maps to its own namespace in DeviceSigned.
-The wallet embeds `transaction_data_hash` (CBOR byte string) and optionally `transaction_data_hash_alg`
-(string) into the type's namespace. The verifier extracts and verifies these bindings.
+Per OID4VP (section 8.4), each transaction data type maps to its own namespace in DeviceSigned.
+The wallet embeds:
+- `transaction_data_hash` (CBOR byte string) — SHA-256 of the base64url-encoded transaction_data item
+- `transaction_data_hash_alg` (string, optional) — included when `transaction_data_hashes_alg` is present in the request
 
 One transaction data item per type per credential presentation is supported.
 
+The credential's `keyAuthorizations` must authorize either the namespace or the individual element identifiers.
+
+## Service-layer configuration
+
+Concrete type sets and UI metadata (display names, field lists for discovery endpoints) live in the service layer
+(`waltid-wallet-api`, `waltid-verifier-api2`) via `TransactionDataProfilesConfig`. This protocol module only knows type strings.
+
 ## Module-local responsibilities
 
-- Wallet-side mdoc embedding: private helpers in `openid4vp-wallet` MdocPresenter
-- Verifier policy mdoc extraction: private helpers in `waltid-verification-policies2-vp` TransactionDataMdocVpPolicy
-- SD-JWT KB-JWT hashes: handled in `openid4vp-wallet` WalletPresentFunctionality2 and verified by the SD-JWT transaction-data policy
+- Wallet-side mdoc embedding: `MdocPresenter` in `waltid-openid4vp-wallet`
+- Wallet-side SD-JWT KB-JWT hashes: `WalletPresentFunctionality2` in `waltid-openid4vp-wallet`
+- Verifier-side session creation validation: `VerificationSessionCreator` in `waltid-openid4vp-verifier`
+- Verifier policy (mdoc hash check): `TransactionDataMdocVpPolicy` in `waltid-verification-policies2-vp`
+- Verifier policy (SD-JWT hash check): SD-JWT transaction-data policy in `waltid-verification-policies2-vp`

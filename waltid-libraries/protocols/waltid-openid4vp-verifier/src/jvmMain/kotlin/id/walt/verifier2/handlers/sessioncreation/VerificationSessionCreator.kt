@@ -28,7 +28,7 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
-import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
@@ -227,7 +227,7 @@ object VerificationSessionCreator {
                 .credentials
                 .associateBy { credentialQuery -> credentialQuery.id }
         }
-        val decodedTransactionData = validateRequestTransactionData(
+        val decodedTransactionData = validateRequestTransactionDataStructure(
             transactionData = transactionData,
             credentialQueriesById = credentialQueriesById,
         )
