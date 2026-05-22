@@ -134,6 +134,50 @@ pnpm dev
 
 The application will be available at `http://localhost:3000`.
 
+### UI Tests
+
+The UI tests live under `tests/ui` and use Playwright against the portal Next app.
+Run these commands from the `waltid-web-portal` directory.
+
+Install the portal dependencies:
+
+```bash
+bun install
+```
+
+Install the Playwright browser used by the tests:
+
+```bash
+bun run test:ui:install-browsers
+```
+
+Run all UI tests:
+
+```bash
+bun run test:ui
+```
+
+Run only the offer flow:
+
+```bash
+bun run test:ui -- tests/ui/issuer-offer.spec.ts
+```
+
+Playwright starts the Next dev server automatically from `playwright.config.ts`.
+By default it uses port `3002`; override it with `PLAYWRIGHT_PORT` when needed:
+
+```bash
+PLAYWRIGHT_PORT=3102 bun run test:ui -- tests/ui/issuer-offer.spec.ts
+```
+
+The portal offer test runs from `.github/workflows/build.yml` on every push.
+The workflow installs Bun dependencies with `bun install --frozen-lockfile`,
+installs Chromium with `bun run test:ui:install-browsers`, and then runs:
+
+```bash
+bun run test:ui -- tests/ui/issuer-offer.spec.ts
+```
+
 ### Production Build
 
 Build the application for production:
