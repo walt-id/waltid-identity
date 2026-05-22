@@ -18,7 +18,7 @@ class JwtSignaturePolicy : JwtVerificationPolicy(
 ) {
     override val name = "signature"
     override val description =
-        "Checks a JWT credential by verifying its cryptographic signature using the key referenced by the DID in `iss`."
+        "Checks a JWT credential by verifying its cryptographic signature using either the key from the x5c certificate chain header or the key referenced by the DID in `iss`."
     override val supportedVCFormats = setOf(VCFormat.jwt_vc, VCFormat.jwt_vc_json, VCFormat.ldp_vc)
 
     @JvmBlocking

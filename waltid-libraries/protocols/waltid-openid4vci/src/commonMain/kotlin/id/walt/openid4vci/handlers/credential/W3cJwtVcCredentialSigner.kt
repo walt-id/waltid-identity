@@ -6,6 +6,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
+import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import id.walt.w3c.CredentialBuilder
@@ -142,7 +143,11 @@ object W3cJwtVcCredentialSigner {
                     additionalJwtOptions = emptyMap(),
                     display = Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                     disclosureMap = selectiveDisclosure,
-                    context = context
+                    context = context,
+                    type = when (builderType) {
+                        CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER
+                        else -> "JWT"
+                    }
                 )
             }
         }

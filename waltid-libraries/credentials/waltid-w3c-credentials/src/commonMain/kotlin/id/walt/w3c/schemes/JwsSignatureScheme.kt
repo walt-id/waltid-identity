@@ -3,6 +3,7 @@ package id.walt.w3c.schemes
 import id.walt.crypto.exceptions.CryptoArgumentException
 import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
@@ -11,8 +12,10 @@ import id.walt.sdjwt.JWTCryptoProvider
 import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -28,6 +31,7 @@ class JwsSignatureScheme : SignatureScheme {
 
     object JwsHeader {
         const val KEY_ID = "kid"
+        const val X5C = "x5c"
     }
 
     object JwsOption {
@@ -65,6 +69,18 @@ class JwsSignatureScheme : SignatureScheme {
     @JsExport.Ignore
     suspend fun getIssuerKeyInfo(jws: String): KeyInfo {
         val jwsParsed = jws.substringBefore("~").decodeJws()
+        
+
+        val x5cHeader = jwsParsed.header[JwsHeader.X5C]
+        if (x5cHeader != null && x5cHeader is JsonArray && x5cHeader.isNotEmpty()) {
+            log.trace { "Found x5c header with ${x5cHeader.size} certificate(s), extracting key from leaf certificate" }
+            val key = extractKeyFromX5cHeader(x5cHeader)
+            val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content 
+                ?: key.getKeyId()
+            return KeyInfo(keyId, key)
+        }
+        
+        // Fall back to DID-based key resolution
         val keyId =
             jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
         val issuerId = (jwsParsed.payload[JwsOption.ISSUER]?.jsonPrimitive?.content ?: keyId)
@@ -79,7 +95,7 @@ class JwsSignatureScheme : SignatureScheme {
                 }
                 .getOrThrow()
         } else
-            throw UnsupportedOperationException("Only DIDs are supported as issuer IDs for W3C credentials.")
+            throw UnsupportedOperationException("W3C credentials require either x5c header or DID-based issuer ID for signature verification.")
         return KeyInfo(keyId, key)
     }
 
@@ -89,6 +105,18 @@ class JwsSignatureScheme : SignatureScheme {
     @JsExport.Ignore
     suspend fun getIssuerKeysInfo(jws: String): KeysInfo {
         val jwsParsed = jws.decodeJws()
+        
+
+        val x5cHeader = jwsParsed.header[JwsHeader.X5C]
+        if (x5cHeader != null && x5cHeader is JsonArray && x5cHeader.isNotEmpty()) {
+            log.trace { "Found x5c header with ${x5cHeader.size} certificate(s), extracting key from leaf certificate" }
+            val key = extractKeyFromX5cHeader(x5cHeader)
+            val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content 
+                ?: key.getKeyId()
+            return KeysInfo(keyId, setOf(key))
+        }
+        
+        // Fall back to DID-based key resolution
         val keyId =
             jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
         val issuerId = (jwsParsed.payload[JwsOption.ISSUER]?.jsonPrimitive?.content ?: keyId)
@@ -102,8 +130,18 @@ class JwsSignatureScheme : SignatureScheme {
                 }
                 .getOrThrow()
         } else
-            TODO("Issuer IDs other than DIDs are currently not supported for W3C credentials.")
+            throw UnsupportedOperationException("W3C credentials require either x5c header or DID-based issuer ID for signature verification.")
         return KeysInfo(keyId, keys)
+    }
+    
+    /**
+     * Extracts the public key from the leaf certificate in an x5c header.
+     * Per RFC 7515 Section 4.1.6, the leaf certificate (containing the signing key) MUST be first in the array.
+     */
+    private suspend fun extractKeyFromX5cHeader(x5cHeader: JsonArray): Key {
+        if (x5cHeader.isEmpty()) throw IllegalArgumentException("Certificate chain in 'x5c' must not be empty.")
+        val leafCertBase64 = x5cHeader.first().jsonPrimitive.content
+        return JWKKey.importDERorPEM(leafCertBase64).getOrThrow()
     }
 
     /**
@@ -136,7 +174,7 @@ class JwsSignatureScheme : SignatureScheme {
     @JsPromise
     @JsExport.Ignore
     suspend fun verify(data: String): Result<JsonElement> = runCatching {
-        // Try to verify with all keys from the issuer's DID document
+        // Get keys from either x5c header or DID document
         val keysInfo = getIssuerKeysInfo(data)
         val jws = data.split("~")[0]
 
@@ -151,13 +189,13 @@ class JwsSignatureScheme : SignatureScheme {
             }
 
             if (result.isSuccess) {
-                log.trace { "Verification successful with one of the keys from the DID document" }
+                log.trace { "Verification successful with key" }
                 return result
             }
         }
 
         // If we get here, all keys failed
-        return Result.failure(lastException ?: CryptoArgumentException("Verification failed with all keys from the DID document"))
+        return Result.failure(lastException ?: CryptoArgumentException("Verification failed with all available keys"))
     }
 
     @JvmBlocking
