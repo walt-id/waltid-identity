@@ -3,6 +3,7 @@ package id.walt.openid4vci.repository.preauthorized
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 interface PreAuthorizedCodeRepository {
@@ -31,6 +32,7 @@ interface PreAuthorizedCodeRecord {
         get() = null
 }
 
+@Serializable
 data class DefaultPreAuthorizedCodeRecord(
     override val code: String,
     override val clientId: String?,
