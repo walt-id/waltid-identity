@@ -29,14 +29,12 @@ import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.verifier.openid.transactiondata.DecodedTransactionData
 import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.walt.verifier.openid.transactiondata.normalizeHashAlgorithm
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfile
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -104,7 +102,7 @@ object MdocPresenter {
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        profileRegistry: TransactionDataTypeProfileRegistry,
+        typeRegistry: TransactionDataTypeRegistry,
     ): JsonPrimitive {
         log.debug { "Handling mso_mdoc credential" }
 
@@ -125,7 +123,7 @@ object MdocPresenter {
                 transactionData = authorizationRequest.transactionData,
                 credentialId = matchResult.originalQuery.id,
             ),
-            profileRegistry = profileRegistry,
+            typeRegistry = typeRegistry,
         )
 
         val deviceAuth = buildDeviceAuth(
@@ -206,61 +204,55 @@ object MdocPresenter {
     private fun buildTransactionDataNamespaces(
         mdocsCredential: MdocsCredential,
         transactionData: List<String>,
-        profileRegistry: TransactionDataTypeProfileRegistry,
+        typeRegistry: TransactionDataTypeRegistry,
     ): DeviceNameSpaces {
         if (transactionData.isEmpty()) return DeviceNameSpaces(emptyMap())
 
         val decoded = decodeList(transactionData)
         val hashAlgorithm = resolveHashAlgorithm(decoded) ?: DEFAULT_HASH_ALGORITHM
-        val byNamespace = decoded.groupBy { profileRegistry.requireProfile(it.transactionData.type).mdocResponseNamespace }
 
-        val namespaceEntries = byNamespace.map { (namespace, items) ->
-            require(items.size == 1) {
-                "mdoc transaction_data supports one item per response namespace: $namespace"
+        val namespaces = buildMap {
+            decoded.forEach {
+                val type = it.transactionData.type
+                typeRegistry.requireKnown(type)
+                require(type !in this) { "mdoc transaction_data supports one item per response namespace: $type" }
+                put(type, buildDeviceSignedItems(it.encoded, it.transactionData.transactionDataHashesAlg, hashAlgorithm))
             }
-            val item = items.single()
-            val profile = profileRegistry.requireProfile(item.transactionData.type)
-            require(profile.isApplicable(mdocsCredential.format)) {
-                "transaction_data type '${profile.type}' is not applicable to credential ${mdocsCredential.docType}"
-            }
-            val responseItems = buildMdocResponseItems(item, profile, hashAlgorithm)
-            requireTransactionDataAuthorization(
-                mdocsCredential = mdocsCredential,
-                namespace = namespace,
-                elementKeys = responseItems.keys,
-            )
-            namespace to DeviceSignedItemList(responseItems.map { (key, value) -> DeviceSignedItem(key, value) })
-        }.toMap()
+        }
 
-        return DeviceNameSpaces(namespaceEntries)
+        requireTransactionDataAuthorization(mdocsCredential, namespaces)
+        return DeviceNameSpaces(namespaces)
     }
 
-    private fun buildMdocResponseItems(
-        decoded: DecodedTransactionData,
-        profile: TransactionDataTypeProfile,
+    private fun buildDeviceSignedItems(
+        encoded: String,
+        transactionDataHashesAlg: List<String>?,
         hashAlgorithm: String,
-    ): Map<String, Any> = buildMap {
-        val hash = calculateTransactionDataHashes(listOf(decoded.encoded), hashAlgorithm).single()
-        put("transaction_data_hash", hash.decodeFromBase64Url())
-        if (!decoded.transactionData.transactionDataHashesAlg.isNullOrEmpty()) {
-            put("transaction_data_hash_alg", normalizeHashAlgorithm(hashAlgorithm))
+    ): DeviceSignedItemList {
+        val hash = calculateTransactionDataHashes(listOf(encoded), hashAlgorithm).single()
+        val items = buildList {
+            add(DeviceSignedItem("transaction_data_hash", hash.decodeFromBase64Url()))
+            if (!transactionDataHashesAlg.isNullOrEmpty()) {
+                add(DeviceSignedItem("transaction_data_hash_alg", normalizeHashAlgorithm(hashAlgorithm)))
+            }
         }
-        putAll(profile.mdocExtraResponseItems(decoded))
+        return DeviceSignedItemList(items)
     }
 
     private fun requireTransactionDataAuthorization(
         mdocsCredential: MdocsCredential,
-        namespace: String,
-        elementKeys: Set<String>,
+        namespaces: Map<String, DeviceSignedItemList>,
     ) {
         val keyAuthorizations = requireNotNull(mdocsCredential.documentMso.deviceKeyInfo.keyAuthorizations) {
             "transaction_data requires mdoc keyAuthorizations for docType ${mdocsCredential.docType}"
         }
-        val isNamespaceAuthorized = keyAuthorizations.namespaces?.contains(namespace) == true
-        val authorizedElements = keyAuthorizations.dataElements?.get(namespace).orEmpty().toSet()
-
-        require(isNamespaceAuthorized || authorizedElements.containsAll(elementKeys)) {
-            "transaction_data type '$namespace' is not authorized for mdoc docType ${mdocsCredential.docType}"
+        namespaces.forEach { (namespace, items) ->
+            val elementKeys = items.entries.map { it.key }.toSet()
+            val isNamespaceAuthorized = keyAuthorizations.namespaces?.contains(namespace) == true
+            val authorizedElements = keyAuthorizations.dataElements?.get(namespace).orEmpty().toSet()
+            require(isNamespaceAuthorized || authorizedElements.containsAll(elementKeys)) {
+                "transaction_data type '$namespace' is not authorized for mdoc docType ${mdocsCredential.docType}"
+            }
         }
     }
 }

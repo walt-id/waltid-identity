@@ -9,7 +9,7 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfile
+import id.walt.commons.config.list.TransactionDataProfile
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
@@ -174,7 +174,7 @@ object Verifier2Service {
             tags("Transaction Data")
             summary = "List available transaction data type profiles"
             response {
-                HttpStatusCode.OK to { body<List<TransactionDataTypeProfile>>() }
+                HttpStatusCode.OK to { body<List<TransactionDataProfile>>() }
             }
         }) {
             val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()

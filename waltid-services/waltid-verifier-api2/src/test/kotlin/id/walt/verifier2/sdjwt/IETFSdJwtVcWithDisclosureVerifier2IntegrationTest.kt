@@ -30,8 +30,8 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
-import id.walt.verifier2.PaymentAuthorizationProfile
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier2.PAYMENT_TYPE
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -445,7 +445,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null,
-                    transactionDataTypeRegistry = TransactionDataTypeProfileRegistry(PaymentAuthorizationProfile),
+                    transactionDataTypeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE),
                 )
             }
 
@@ -505,7 +505,7 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
     }
 
     private fun transactionDataItem(credentialId: String, amount: String): JsonObject = buildJsonObject {
-        put("type", JsonPrimitive(PaymentAuthorizationProfile.type))
+        put("type", JsonPrimitive(PAYMENT_TYPE))
         put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
         put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
         put("amount", JsonPrimitive(amount))

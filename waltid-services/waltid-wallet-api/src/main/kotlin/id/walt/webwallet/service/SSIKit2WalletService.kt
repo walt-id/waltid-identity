@@ -1170,7 +1170,7 @@ class SSIKit2WalletService(
             },
             holderPoliciesToRun = null,
             runPolicies = null,
-            transactionDataTypeRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toRegistry(),
+            transactionDataTypeRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry(),
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(

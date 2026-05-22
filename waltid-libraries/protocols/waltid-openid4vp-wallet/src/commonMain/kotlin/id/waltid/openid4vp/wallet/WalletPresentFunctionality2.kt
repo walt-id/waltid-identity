@@ -22,7 +22,7 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
 import id.walt.verifier.openid.transactiondata.decodeList
 import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
-import id.walt.verifier.openid.transactiondata.profile.TransactionDataTypeProfileRegistry
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
@@ -59,7 +59,7 @@ object WalletPresentFunctionality2 {
         /** For mdocs: this is the device key */
         holderKey: Key,
         holderDid: String?,
-        profileRegistry: TransactionDataTypeProfileRegistry,
+        typeRegistry: TransactionDataTypeRegistry,
     ): String {
         val vpTokenMapContents = mutableMapOf<String, JsonArray>()
 
@@ -93,7 +93,7 @@ object WalletPresentFunctionality2 {
                                 matchResult = matchResult,
                                 authorizationRequest = authorizationRequest,
                                 holderKey = holderKey,
-                                profileRegistry = profileRegistry,
+                                typeRegistry = typeRegistry,
                             )
                         }
 
@@ -303,7 +303,7 @@ object WalletPresentFunctionality2 {
 
         holderPoliciesToRun: Flow<HolderPolicy>?,
         runPolicies: Boolean?,
-        transactionDataTypeRegistry: TransactionDataTypeProfileRegistry = TransactionDataTypeProfileRegistry(),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
 
         // TODO: selected credentials
 
@@ -352,7 +352,7 @@ object WalletPresentFunctionality2 {
         runCatching {
             validateRequestTransactionData(
                 transactionData = authorizationRequest.transactionData,
-                profileRegistry = transactionDataTypeRegistry,
+                typeRegistry = transactionDataTypeRegistry,
                 credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
             )
         }.onFailure { error ->
