@@ -21,7 +21,7 @@ object SdJwtVcPresenter {
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String,
+        holderDid: String
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -45,6 +45,7 @@ object SdJwtVcPresenter {
 
         val disclosed = sdJwtCredential.disclose(digitalCredential, disclosuresToPresent)
 
+        // Construct the Key Binding JWT
         val kbJwtString = createKeyBindingJwt(
             disclosed = disclosed,
             nonce = authorizationRequest.nonce!!,
@@ -57,6 +58,7 @@ object SdJwtVcPresenter {
             ),
         )
 
+        // Use the disclose method from the interface, then append the KB-JWT
         val finalPresentationString = "$disclosed${if (!disclosed.endsWith("~")) "~" else ""}$kbJwtString"
         log.trace { "Final presentation string for dc+sd-jwt is: $finalPresentationString" }
 
