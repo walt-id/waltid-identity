@@ -75,10 +75,12 @@ class TokenRequestBuilder(
 
     /**
      * Exchanges a pre-authorized code for an access token
-     * 
+     *
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param preAuthorizedCode The pre-authorized code from credential offer
      * @param txCode Optional transaction code (PIN) if required by the issuer
+     * @param includeClientId Whether to include client_id in the request. Set to false for anonymous
+     *        pre-authorized code flow per OID4VCI spec when the issuer supports anonymous client authentication.
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -87,6 +89,7 @@ class TokenRequestBuilder(
         preAuthorizedCode: String,
         txCode: String? = null,
         additionalParameters: Map<String, String> = emptyMap(),
+        includeClientId: Boolean = true,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -95,11 +98,14 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Transaction code (PIN) present: ${txCode != null}" }
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
+        log.trace { "Include client_id: $includeClientId" }
 
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
             append("pre-authorized_code", preAuthorizedCode)
-            append("client_id", clientConfig.clientId)
+            if (includeClientId) {
+                append("client_id", clientConfig.clientId)
+            }
             txCode?.let {
                 append("tx_code", it)
                 log.trace { "Including transaction code in token request" }
