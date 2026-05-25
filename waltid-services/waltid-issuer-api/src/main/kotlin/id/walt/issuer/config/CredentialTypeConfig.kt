@@ -209,7 +209,16 @@ data class CredentialTypeConfig(
                 is JsonArray -> {
                     val type = element.jsonArray.map { it.jsonPrimitive.content }
 
-                    CredentialFormat.entries.minus(CredentialFormat.mso_mdoc).associate { format ->
+                    // Only advertise formats that are actually issuable.
+                    // jwt_vc_json-ld and ldp_vc are not implemented (fall to JWT path silently),
+                    // and VP formats (jwt_vp_json, ldp_vp, etc.) do not belong in credentials_supported.
+                    val issuableFormats = listOf(
+                        CredentialFormat.jwt_vc_json,
+                        CredentialFormat.sd_jwt_vc,
+                        CredentialFormat.jwt_vc,
+                    )
+
+                    issuableFormats.associate { format ->
                         "${entry.key}_${format.value}" to CredentialSupported(
                             format = format,
                             cryptographicBindingMethodsSupported = if (format == CredentialFormat.sd_jwt_vc) setOf("jwk") else setOf(
