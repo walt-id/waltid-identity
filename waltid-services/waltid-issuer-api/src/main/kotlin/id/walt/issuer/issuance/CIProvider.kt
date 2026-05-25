@@ -346,6 +346,7 @@ open class CIProvider(
                         },
                         x5Chain = x5c,
                         sdJwtCredentialClaims = request.sdJwtCredentialClaims,
+                        sdJwtTypeHeader = id.walt.sdjwt.SDJwtVC.SD_JWT_VC_TYPE_HEADER,
                     ).also {
                         if (!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(
