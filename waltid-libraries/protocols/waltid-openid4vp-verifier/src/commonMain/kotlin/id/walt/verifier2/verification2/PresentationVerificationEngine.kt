@@ -355,7 +355,14 @@ object PresentationVerificationEngine {
 
         val allSuccessfullyValidatedAndProcessedData = parsedPresentations.map {
             it.key.second.id to when (val presentation = it.value) {
-                is JwtVcJsonPresentation -> presentation.credentials ?: emptyList()
+                is JwtVcJsonPresentation -> {
+                    if (presentation.vp == null) {
+                        throw PresentationRejectionException(
+                            "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
+                        )
+                    }
+                    presentation.credentials ?: emptyList()
+                }
                 is DcSdJwtPresentation -> listOf(presentation.credential)
                 is MsoMdocPresentation -> listOf(presentation.mdoc)
                 is LdpVcPresentation -> throw NotImplementedError()
