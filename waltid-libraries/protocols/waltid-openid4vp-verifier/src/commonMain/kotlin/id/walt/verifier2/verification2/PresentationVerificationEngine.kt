@@ -31,16 +31,24 @@ object PresentationVerificationEngine {
 
     suspend fun parsePresentation(presentationString: String, format: CredentialFormat): VerifiablePresentation = when (format) {
         CredentialFormat.JWT_VC_JSON -> {
-            // W3C SD-JWT (jwt_vc_json credential wrapped in SD-JWT with ~disclosures~kb-jwt)
-            // is not a supported presentation format. jwt_vc_json expects a plain JWT VP envelope.
-            // The wallet should use dc+sd-jwt format for SD-JWT-based credentials.
             if (presentationString.contains("~")) {
-                throw UnsupportedOperationException(
-                    "Presentation format 'jwt_vc_json' does not support SD-JWT structure (~). " +
-                        "For SD-JWT Verifiable Credentials, use the 'dc+sd-jwt' format."
-                )
+                // The presentation string has SD-JWT structure (~) under a jwt_vc_json query.
+                // Per OID4VP §jwt_vc_json, this format expects a plain JWT VP envelope; SD-JWT
+                // structure is not defined for jwt_vc_json. The correct format identifier for
+                // W3C VCDM secured with SD-JWT is dc+sd-jwt (SD-JWT VCLD, OID4VP §sd-jwt_vcld).
+                //
+                // As a pragmatic fallback for wallets that present W3C+SD-JWT under jwt_vc_json,
+                // we attempt to parse it as dc+sd-jwt. This allows interoperability during the
+                // migration to the correct dc+sd-jwt format identifier.
+                log.warn {
+                    "Received SD-JWT structure (~) under jwt_vc_json format — " +
+                        "attempting dc+sd-jwt parsing as a fallback. " +
+                        "The wallet should use the 'dc+sd-jwt' DCQL format identifier for SD-JWT credentials."
+                }
+                DcSdJwtPresentation.parse(presentationString).getOrThrow()
+            } else {
+                JwtVcJsonPresentation.parse(presentationString).getOrThrow()
             }
-            JwtVcJsonPresentation.parse(presentationString).getOrThrow()
         }
         CredentialFormat.DC_SD_JWT -> DcSdJwtPresentation.parse(presentationString).getOrThrow()
         CredentialFormat.MSO_MDOC -> MsoMdocPresentation.parse(presentationString).getOrThrow()
