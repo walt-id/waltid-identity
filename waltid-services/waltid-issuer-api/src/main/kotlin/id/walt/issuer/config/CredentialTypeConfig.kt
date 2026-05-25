@@ -134,7 +134,7 @@ data class CredentialTypeConfig(
         ),
         "urn:eu.eur1opa.ec.eudi:pid:1" to vc(
             CredentialSupported(
-                format = CredentialFormat.sd_jwt_vc,
+                format = CredentialFormat.sd_jwt_dc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = baseUrl.plus("/urn:eu.europa.ec.eudi:pid:1")
@@ -142,7 +142,7 @@ data class CredentialTypeConfig(
         ),
         "identity_credential_vc+sd-jwt" to vc(
             CredentialSupported(
-                format = CredentialFormat.sd_jwt_vc,
+                format = CredentialFormat.sd_jwt_dc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = baseUrl.plus("/identity_credential"),
@@ -167,7 +167,7 @@ data class CredentialTypeConfig(
         ),
         "my_custom_vct_vc+sd-jwt" to vc(
             CredentialSupported(
-                format = CredentialFormat.sd_jwt_vc,
+                format = CredentialFormat.sd_jwt_dc,
                 cryptographicBindingMethodsSupported = setOf("did", "jwk"),
                 credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = "https://example.com/my_custom_vct",
@@ -182,7 +182,7 @@ data class CredentialTypeConfig(
         ),
         "photoID_credential_vc+sd-jwt" to vc(
             CredentialSupported(
-                format = CredentialFormat.sd_jwt_vc,
+                format = CredentialFormat.sd_jwt_dc,
                 cryptographicBindingMethodsSupported = setOf("jwk"),
                 credentialSigningAlgValuesSupported = setOf(CredSignAlgValues.Named("ES256")),
                 vct = baseUrl + "/PhotoIDCredential",
