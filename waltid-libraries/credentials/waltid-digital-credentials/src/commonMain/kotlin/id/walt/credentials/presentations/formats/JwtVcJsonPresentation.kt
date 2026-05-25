@@ -78,7 +78,14 @@ data class JwtVcJsonPresentation(
 
             val issuer = parsedJws.payload.getString("iss") ?: parsedJws.payload["issuer"].getString("id")
 
-            val aud = payload["aud"]?.jsonPrimitive?.contentOrNull
+            // RFC 7519 §4.1.3 allows aud to be either a single string or an array of strings.
+            val aud = payload["aud"]?.let { audElement ->
+                when (audElement) {
+                    is JsonPrimitive -> audElement.contentOrNull
+                    is JsonArray -> audElement.firstOrNull()?.jsonPrimitive?.contentOrNull
+                    else -> null
+                }
+            }
             val nonce = payload["nonce"]?.jsonPrimitive?.contentOrNull
             val vpClaim = payload["vp"]?.jsonObject
 
