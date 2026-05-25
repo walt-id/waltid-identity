@@ -32,7 +32,7 @@ class MsoVerificationMdocVpPolicy : MdocVPPolicy() {
         val timestamps = mso.validityInfo
         addResult("signed", timestamps.signed.toString())
         addResult("valid_from", timestamps.validFrom.toString())
-        addResult("valid_from", timestamps.validUntil.toString())
+        addResult("valid_until", timestamps.validUntil.toString())
         timestamps.validate()
 
         require(MdocCrypto.isSupportedDigest(mso.digestAlgorithm)) {
