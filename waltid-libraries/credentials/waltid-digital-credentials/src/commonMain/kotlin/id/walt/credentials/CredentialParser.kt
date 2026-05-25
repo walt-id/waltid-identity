@@ -51,7 +51,13 @@ object CredentialParser {
     )
 
     fun detectW3CDataModelVersion(data: JsonObject): W3CSubType {
-        val contextField = data["@context"]?.jsonArray?.map { it.jsonPrimitive.content } ?: error("Missing context from W3C: $data")
+        // @context may be a JSON array (standard) or a single string (non-conformant but seen in practice)
+        val rawContext = data["@context"] ?: error("Missing context from W3C: $data")
+        val contextField = when (rawContext) {
+            is JsonArray -> rawContext.map { it.jsonPrimitive.content }
+            is JsonPrimitive -> listOf(rawContext.content)
+            else -> error("Unexpected @context type in W3C credential: $data")
+        }
 
         return when {
             DM_2_0_CONTEXT_INDICATORS.any { contextField.contains(it) } -> W3CSubType.W3C_2
@@ -587,9 +593,7 @@ object CredentialParser {
                         val unsignedCredential = payload["vc"]?.toString() ?: payload.toString()
                         val unsignedCredentialDetection = detectAndParse(unsignedCredential)
 
-                        val parsedCred = unsignedCredentialDetection.second
-
-                        val signedCredential = when (parsedCred) {
+                        val signedCredential = when (val parsedCred = unsignedCredentialDetection.second) {
                             is W3C2 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature(signature, header))
                             is W3C11 -> parsedCred.copy(signed = credential, signature = JwtCredentialSignature(signature, header))
                             is SdJwtCredential -> parsedCred.copy(
