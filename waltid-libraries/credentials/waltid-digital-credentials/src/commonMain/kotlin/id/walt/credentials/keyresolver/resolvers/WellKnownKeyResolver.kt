@@ -41,12 +41,17 @@ object WellKnownKeyResolver : BaseKeyResolver {
                 else -> throw IllegalArgumentException("Issuer metadata must contain 'jwks' or 'jwks_uri'.")
             }
 
-            // Find the specific key using the 'kid' from the JWS header
+            // Find the specific key using the 'kid' from the JWS header if present,
+            // otherwise fall back to the first key in the JWKS.
             val kid = header?.get("kid")?.jsonPrimitive?.contentOrNull
-                ?: throw IllegalArgumentException("JWS header must have a 'kid' to find the key in the JWKS.")
-
-            val keyJwk = jwks["keys"]?.jsonArray?.firstOrNull { it.jsonObject["kid"]?.jsonPrimitive?.contentOrNull == kid }
-                ?: throw IllegalArgumentException("Key with kid '$kid' not found in JWKS for issuer $issuerId.")
+            val keyJwk = if (kid != null) {
+                jwks["keys"]?.jsonArray?.firstOrNull { it.jsonObject["kid"]?.jsonPrimitive?.contentOrNull == kid }
+                    ?: throw IllegalArgumentException("Key with kid '$kid' not found in JWKS for issuer $issuerId.")
+            } else {
+                log.debug { "No 'kid' in JWS header for $issuerId — using first key from JWKS" }
+                jwks["keys"]?.jsonArray?.firstOrNull()
+                    ?: throw IllegalArgumentException("JWKS for issuer $issuerId contains no keys.")
+            }
 
             return JWKKey.importJWK(keyJwk.jsonObject.toString()).getOrThrow()
         } catch (e: Exception) {
