@@ -333,7 +333,12 @@ object WalletPresentFunctionality2 {
                     log.trace { "JWT AuthorizationRequest algorithm: $jwtAlg" }
 
                     if (jwtAlg.equals("none", true)) {
-                        Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                        // alg=none means no signature — reject. A request delivered as
+                        // application/oauth-authz-req+jwt via request_uri MUST be signed
+                        // (JAR, RFC 9101).
+                        throw IllegalArgumentException(
+                            "Authorization request JWT uses alg=none — unsigned requests are not accepted for request_uri signed flows."
+                        )
                     } else {
                         val authReqBody = authReqJws.payload
 
