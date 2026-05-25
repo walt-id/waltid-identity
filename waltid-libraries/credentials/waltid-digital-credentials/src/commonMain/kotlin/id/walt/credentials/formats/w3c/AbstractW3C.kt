@@ -5,8 +5,10 @@ import id.walt.cose.toCoseVerifier
 import id.walt.credentials.signatures.*
 import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.jsonObject
 
 @Serializable
 sealed class AbstractW3C(
@@ -20,6 +22,16 @@ sealed class AbstractW3C(
             is CoseCredentialSignature -> (signature as CoseCredentialSignature).signerKey.key
             else -> throw NotImplementedError("Not yet implemented: Retrieve issuer key from SdJwtCredential with ${signature!!::class.simpleName} signature")
         }
+
+    /**
+     * Resolve holder's public key from the `cnf.jwk` claim, if present.
+     * Used for W3C+SD-JWT credentials (vc-jose-cose) that embed a holder key.
+     */
+    override suspend fun getHolderKey(): Key? {
+        val cnf = credentialData["cnf"]?.jsonObject ?: return null
+        val jwk = cnf["jwk"]?.jsonObject ?: return null
+        return JWKKey.importJWK(jwk.toString()).getOrNull()
+    }
 
     init {
         selfCheck()
