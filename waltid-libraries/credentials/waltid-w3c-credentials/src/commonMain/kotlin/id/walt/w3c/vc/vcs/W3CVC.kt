@@ -96,7 +96,9 @@ data class W3CVC(
         )
         val signable = Json.encodeToString(sdPayload.undisclosedPayload).encodeToByteArray()
 
-        val typHeader = if (isV2()) "vc+sd-jwt" else "JWT"
+        // Per vc-jose-cose §securing-vcs-with-sd-jwt, the typ header for W3C VCDM secured
+        // with SD-JWT should be "vc+sd-jwt" regardless of VCDM version.
+        val typHeader = "vc+sd-jwt"
         val signed = issuerKey.signJws(
             signable, mapOf(
                 JwsHeader.KEY_ID to kid.toJsonElement(),
