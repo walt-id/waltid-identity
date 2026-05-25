@@ -28,8 +28,8 @@ sealed class AbstractW3C(
                 publicKey.verifyJws(signed!!)
             }
 
-            is CoseCredentialSignature -> TODO("Not implemented yet: verify W3C with COSE")
-            is DataIntegrityProofCredentialSignature -> TODO("Not implemented yet: verify W3C with DIP")
+            is CoseCredentialSignature -> throw UnsupportedOperationException("COSE signature verification for W3C credentials is not yet implemented")
+            is DataIntegrityProofCredentialSignature -> throw UnsupportedOperationException("Data Integrity Proof (LDP) signature verification for W3C credentials is not yet implemented")
             null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")
         }
 }
