@@ -29,13 +29,17 @@ object DcqlMatcher {
      *
      * @param query The parsed DCQL query.
      * @param availableCredentials The list of credentials held by the wallet.
+     * @param trustedAuthoritiesChecker Optional callback invoked when a credential query has
+     *   `trusted_authorities` constraints. Receives the credential and the list of authority
+     *   queries; should return `true` if the credential satisfies at least one authority.
+     *   When null (default), trusted_authorities constraints are not enforced.
      * @return A Result containing a map where keys are CredentialQuery IDs and
      *         values are lists of matching Credentials, or a failure with an exception.
      */
     fun match(
-        // Or not suspend if availableCredentials is a List
         query: DcqlQuery,
         availableCredentials: List<DcqlCredential>,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ): Result<Map<String, List<DcqlMatchResult>>> {
         log.debug { "Starting DCQL match. Query: $query, Available Credentials Count: ${availableCredentials.size}" }
 
@@ -56,7 +60,7 @@ object DcqlMatcher {
                     continue
                 }
 
-                val authoritiesCheck = matchesTrustedAuthorities(credential, credentialQuery.trustedAuthorities)
+                val authoritiesCheck = matchesTrustedAuthorities(credential, credentialQuery.trustedAuthorities, trustedAuthoritiesChecker)
                 if (!authoritiesCheck) {
                     log.trace { "Credential ${credential.id} failed trusted authorities check for query ${credentialQuery.id}" }
                     continue
@@ -118,8 +122,9 @@ object DcqlMatcher {
      */
     fun matchWithoutClaims(
         query: DcqlQuery,
-        availableCredentials: List<DcqlCredential>, // TODO: Have this be a flow
-    ): Result<Map<String, List<DcqlCredential>>> { // TODO: Have the result be a flow
+        availableCredentials: List<DcqlCredential>,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
+    ): Result<Map<String, List<DcqlCredential>>> {
         log.debug { "Starting DCQL match. Query: $query, Available Credentials: ${availableCredentials.map { it.id }}" }
         val individualMatches = mutableMapOf<String, List<DcqlCredential>>()
 
@@ -132,7 +137,7 @@ object DcqlMatcher {
             val finalMatchesForQuery = potentialMatches.filter { credential ->
                 // Apply further filtering based on query constraints
                 matchesMeta(credential, credQuery.meta, credQuery.format) &&
-                        matchesTrustedAuthorities(credential, credQuery.trustedAuthorities) &&
+                        matchesTrustedAuthorities(credential, credQuery.trustedAuthorities, trustedAuthoritiesChecker) &&
                         matchesClaims(credential, credQuery.claims, credQuery.claimSets)
                 // Note: requireCryptographicHolderBinding check would happen during
                 // presentation generation, not typically during matching.
@@ -431,16 +436,18 @@ object DcqlMatcher {
         }
     }
 
-    /** Placeholder: Check issuer constraints. */
+    /** Check issuer trust constraints. Delegates to [trustedAuthoritiesChecker] when provided. */
     private fun matchesTrustedAuthorities(
         credential: DcqlCredential,
         authoritiesQuery: List<TrustedAuthoritiesQuery>?,
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)?,
     ): Boolean {
         if (authoritiesQuery.isNullOrEmpty()) return true
-        log.trace { "Checking trusted authorities for credential ${credential.id} (simplified: returning true)" }
-        // Actual implementation requires checking credential.issuer against
-        // the types and values in authoritiesQuery. May involve trust list lookups.
-        return true // TODO
+        if (trustedAuthoritiesChecker == null) {
+            log.trace { "trusted_authorities query present for credential ${credential.id} but no checker provided — skipping (not enforced)" }
+            return true
+        }
+        return trustedAuthoritiesChecker(credential, authoritiesQuery)
     }
 
     /** Check if a credential satisfies the claims constraints. */

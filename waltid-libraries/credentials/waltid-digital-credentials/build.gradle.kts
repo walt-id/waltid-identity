@@ -49,8 +49,8 @@ kotlin {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
         }
         jvmMain.dependencies {
-            // Ktor client
-            // implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+            // X.509 certificate extensions (AKI etc.) for trusted_authorities DCQL matching
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
         jvmTest.dependencies {
             implementation("org.slf4j:slf4j-simple:2.0.17")
