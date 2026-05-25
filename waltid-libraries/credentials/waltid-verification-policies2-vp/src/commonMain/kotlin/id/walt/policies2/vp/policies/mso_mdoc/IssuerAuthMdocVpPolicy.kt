@@ -50,6 +50,15 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
             throw IllegalArgumentException("IssuerAuth COSE_Sign1 signature is invalid.")
         }
 
+        // Verify the certificate chain when more than one cert is present.
+        // Platform-specific chain validation (requires JVM BouncyCastle).
+        if (x5c.size > 1) {
+            val chainBytes = x5c.map { it.rawBytes }
+            X5CChainValidator.verifyChain(chainBytes)
+            addResult("chain_length", x5c.size.toString())
+            addResult("chain_verified", true.toString())
+        }
+
         success()
     }
 }
