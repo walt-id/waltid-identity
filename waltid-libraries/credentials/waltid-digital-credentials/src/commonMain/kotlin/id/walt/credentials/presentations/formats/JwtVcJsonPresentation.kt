@@ -3,13 +3,13 @@ package id.walt.credentials.presentations.formats
 import id.walt.credentials.CredentialParser
 import id.walt.credentials.CredentialParser.getString
 import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.keyresolver.JwtKeyResolver
 import id.walt.credentials.presentations.PresentationFormat
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequire
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireNotNull
 import id.walt.credentials.presentations.PresentationValidationExceptionFunctions.presentationRequireSuccess
 import id.walt.credentials.presentations.W3CPresentationValidationError
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.did.dids.DidService
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -45,9 +45,13 @@ data class JwtVcJsonPresentation(
     ) {
         presentationRequireNotNull(issuer, W3CPresentationValidationError.ISSUER_NOT_FOUND)
 
-        // Verify its signature using the Holder's public key (obtained from vpJwt.payload.iss DID or other mechanism).
-        val holderKey = DidService.resolveToKey(issuer).getOrThrow() // TODO: handle multi key
-        val vpJwtStringVerification = holderKey.verifyJws(jwt)
+        // Resolve the holder key using DID, x5c header, or HTTPS well-known, in that priority order.
+        val jwtHeader = jwt.decodeJws().header
+        val holderKey = JwtKeyResolver.resolveFromJwt(jwtHeader, payload)
+        presentationRequireNotNull(holderKey, W3CPresentationValidationError.ISSUER_NOT_FOUND) {
+            "Could not resolve VP signer key for issuer '$issuer'"
+        }
+        val vpJwtStringVerification = holderKey!!.verifyJws(jwt)
 
         presentationRequireSuccess(
             vpJwtStringVerification,
