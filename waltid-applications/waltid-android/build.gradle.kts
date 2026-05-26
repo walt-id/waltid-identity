@@ -6,6 +6,12 @@ plugins {
     id("com.github.ben-manes.versions")
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+    }
+}
+
 android {
     namespace = "id.walt.androidSample"
     compileSdk = 35
@@ -38,9 +44,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-    }
-    kotlinOptions {
-        jvmTarget = "1.8"
     }
     buildFeatures {
         compose = true
