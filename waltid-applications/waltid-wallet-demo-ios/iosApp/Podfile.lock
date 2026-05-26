@@ -1,0 +1,23 @@
+PODS:
+  - JOSESwift (3.0.0)
+  - shared (1.0)
+
+DEPENDENCIES:
+  - JOSESwift (= 3.0.0)
+  - shared (from `../shared`)
+
+SPEC REPOS:
+  trunk:
+    - JOSESwift
+
+EXTERNAL SOURCES:
+  shared:
+    :path: "../shared"
+
+SPEC CHECKSUMS:
+  JOSESwift: 7784b1b844194d0f534eb6ac4fba5af683bccc79
+  shared: 2556bbfced23e3184f0ea675505a8964e58ba586
+
+PODFILE CHECKSUM: ba3e6c1e536bd0ea38ece9c170dd97bc03c4febb
+
+COCOAPODS: 1.16.2
