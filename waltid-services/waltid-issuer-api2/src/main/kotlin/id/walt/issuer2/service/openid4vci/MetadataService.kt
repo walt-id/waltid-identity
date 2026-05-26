@@ -72,7 +72,8 @@ class MetadataService(
         val expectedVct = selfHostedVct(credentialType)
         credentialConfigurations.entries.firstOrNull { (_, configuration) ->
             configuration.vct == expectedVct
-        } ?: throw IllegalArgumentException("Invalid type value: $credentialType. The $credentialType type is not supported")
+        }
+            ?: throw IllegalArgumentException("Invalid type value: $credentialType. The $credentialType type is not supported")
 
         return SdJwtVcTypeMetadataDraft04(
             vct = expectedVct,
