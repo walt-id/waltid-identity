@@ -35,7 +35,7 @@ class Issuer2Module(
     )
 
     private val credentialProfileService = CredentialProfileService(
-        profileConfigProvider = profileConfigProvider,
+        profilesConfig = profilesConfig,
         metadataConfig = metadataConfig,
     )
     private val issuanceSessionService = IssuanceSessionService(
@@ -44,6 +44,7 @@ class Issuer2Module(
     private val metadataService = MetadataService(
         serviceConfig = serviceConfig,
         metadataConfig = metadataConfig,
+        profileService = credentialProfileService,
         issuerKeyResolver = issuerKeyResolver,
     )
     )
@@ -56,6 +57,7 @@ class Issuer2Module(
     private val protocolService = OpenId4VciProtocolService(
         oauth2Provider = openId4VciModule.oauth2Provider,
         sessionService = issuanceSessionService,
+        profileService = credentialProfileService,
         metadataService = metadataService,
     )
 

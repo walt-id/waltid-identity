@@ -8,27 +8,53 @@ import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
 
 object Issuer2ManagementRoutesDocs {
-    fun listProfiles(): RouteConfig.() -> Unit = {
+    fun listProfiles(profileExamples: List<CredentialProfile>): RouteConfig.() -> Unit = {
         summary = "List credential profiles"
-        description = "List credential profiles loaded from issuer2-profiles.conf."
+        description = """
+            List credential profiles loaded from issuer2-profiles.conf.
+
+            Profiles are deployment templates used by credential-offer creation. Use the
+            returned profileId in POST /issuer2/credential-offers. Runtime overrides may
+            provide credential data, mappings, selective disclosure, mDOC namespace data
+            mappings, ID token claim mappings, x5 chains, and webhook URLs for a single
+            issuance session.
+        """.trimIndent()
         response {
             HttpStatusCode.OK to {
                 description = "Configured credential profiles"
-                body<List<CredentialProfile>>()
+                body<List<CredentialProfile>> {
+                    example("Configured W3C, SD-JWT VC, and mDOC profiles") {
+                        value = profileExamples
+                    }
+                }
             }
         }
     }
 
-    fun getProfile(): RouteConfig.() -> Unit = {
+    fun getProfile(profileExamples: List<CredentialProfile>): RouteConfig.() -> Unit = {
         summary = "Get credential profile"
-        description = "Get one credential profile by profile ID."
+        description = """
+            Get one credential profile by profile ID.
+
+            The response is the exact profile loaded from issuer2-profiles.conf, including
+            issuer key material for this first OSS issuer2 version.
+        """.trimIndent()
         request {
-            pathParameter<String>("profileId")
+            pathParameter<String>("profileId") {
+                description = "Credential profile ID from GET /issuer2/profiles"
+                profileExamples.firstOrNull()?.let { example("Profile ID") { value = it.profileId } }
+            }
         }
         response {
             HttpStatusCode.OK to {
                 description = "Credential profile"
-                body<CredentialProfile>()
+                body<CredentialProfile> {
+                    profileExamples.forEach { profile ->
+                        example("${profile.profileId} profile") {
+                            value = profile
+                        }
+                    }
+                }
             }
         }
     }
@@ -92,4 +118,19 @@ object Issuer2ManagementRoutesDocs {
             pathParameter<String>("sessionId")
         }
     }
+
+    internal fun selectProfileExamples(profiles: List<CredentialProfile>): List<CredentialProfile> {
+        val byId = profiles.associateBy { it.profileId }
+        val preferred = preferredProfileExampleIds.mapNotNull(byId::get)
+        return (preferred + profiles.filterNot { it.profileId in preferredProfileExampleIds })
+            .distinctBy { it.profileId }
+            .take(MAX_PROFILE_EXAMPLES)
+    }
+
+    private val preferredProfileExampleIds = listOf(
+        "universityDegree",
+        "identityCredentialSdJwt",
+        "isoPhotoId",
+    )
+    private const val MAX_PROFILE_EXAMPLES = 3
 }

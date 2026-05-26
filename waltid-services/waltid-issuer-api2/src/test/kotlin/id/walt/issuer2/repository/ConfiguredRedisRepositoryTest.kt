@@ -85,7 +85,6 @@ class ConfiguredRedisRepositoryTest {
     private fun testSession(suffix: String) = IssuanceSession(
         sessionId = "redis-session-$suffix",
         profileId = "profile-id",
-        profileVersion = 1,
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialConfigurationId = "identity_credential",
         credentialData = buildJsonObject {

@@ -36,7 +36,6 @@ class ConfiguredIssuanceSessionRepositoryTest {
     private fun testSession() = IssuanceSession(
         sessionId = "session-${Clock.System.now().toEpochMilliseconds()}",
         profileId = "profile-id",
-        profileVersion = 1,
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialConfigurationId = "identity_credential",
         credentialData = buildJsonObject {

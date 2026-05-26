@@ -1,6 +1,8 @@
 package id.walt.issuer2.controller
 
 import id.walt.issuer2.controller.dto.CreateCredentialOfferRequest
+import id.walt.issuer2.controller.dto.toCommand
+import id.walt.issuer2.controller.dto.toDto
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
@@ -20,11 +22,13 @@ class Issuer2ManagementController(
     private val offerService: CredentialOfferService,
 ) {
     fun register(route: Route) = route.route("issuer2", { tags = listOf("Issuer2 Management") }) {
-        get("profiles", Issuer2ManagementRoutesDocs.listProfiles()) {
+        val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
+
+        get("profiles", Issuer2ManagementRoutesDocs.listProfiles(profileExamples)) {
             call.respond(profileService.listProfiles())
         }
 
-        get("profiles/{profileId}", Issuer2ManagementRoutesDocs.getProfile()) {
+        get("profiles/{profileId}", Issuer2ManagementRoutesDocs.getProfile(profileExamples)) {
             val profileId = requireNotNull(call.parameters["profileId"]) { "Missing profileId" }
             call.respond(profileService.getProfile(profileId))
         }
