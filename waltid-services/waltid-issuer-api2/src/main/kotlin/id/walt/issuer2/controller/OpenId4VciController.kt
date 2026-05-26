@@ -21,6 +21,7 @@ import io.ktor.util.toMap
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class OpenId4VciController(
     private val metadataService: MetadataService,
@@ -28,7 +29,7 @@ class OpenId4VciController(
     private val offerService: CredentialOfferService,
 ) {
     fun register(route: Route) {
-        route.get(".well-known/openid-credential-issuer", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
+        route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
             call.respond(
                 Json.encodeToJsonElement(
                     CredentialIssuerMetadata.serializer(),
@@ -37,7 +38,7 @@ class OpenId4VciController(
             )
         }
 
-        route.get(".well-known/oauth-authorization-server", OpenId4VciRoutesDocs.authorizationServerMetadata()) {
+        route.get(".well-known/oauth-authorization-server/openid4vci", OpenId4VciRoutesDocs.authorizationServerMetadata()) {
             call.respond(
                 Json.encodeToJsonElement(
                     AuthorizationServerMetadata.serializer(),
@@ -46,13 +47,13 @@ class OpenId4VciController(
             )
         }
 
-        route.get(".well-known/openid-configuration", OpenId4VciRoutesDocs.openIdProviderMetadata()) {
-            call.respond(
-                Json.encodeToJsonElement(
-                    OpenIDProviderMetadata.serializer(),
-                    metadataService.getOpenIdProviderMetadata(),
-                )
-            )
+        route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata()) {
+            call.respond(metadataService.getJwtVcIssuerMetadata())
+        }
+
+        route.get(".well-known/vct/{type}", OpenId4VciRoutesDocs.vctTypeMetadata()) {
+            val credentialType = requireNotNull(call.parameters["type"]) { "Missing VCT type" }
+            call.respond(metadataService.getVctTypeMetadata(credentialType))
         }
 
         route.route("openid4vci", { tags = listOf("OpenID4VCI") }) {

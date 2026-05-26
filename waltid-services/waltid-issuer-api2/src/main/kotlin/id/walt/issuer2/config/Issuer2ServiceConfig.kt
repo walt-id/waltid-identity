@@ -9,4 +9,5 @@ import kotlinx.coroutines.runBlocking
 data class Issuer2ServiceConfig(
     val baseUrl: String,
     val ciTokenKey: String = runBlocking { KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1)) },
+    val issuerKeys: Map<String, String> = emptyMap(),
 ) : WaltConfig()

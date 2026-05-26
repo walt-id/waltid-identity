@@ -13,6 +13,7 @@ import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeReposito
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.issuer2.service.IssuerKeyResolver
 import id.walt.issuer2.service.openid4vci.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
@@ -23,6 +24,7 @@ class Issuer2Module(
     profilesConfig: Issuer2ProfilesConfig,
 ) {
     private val profileConfigProvider = CredentialProfileConfigProvider(profilesConfig)
+    private val issuerKeyResolver = IssuerKeyResolver(serviceConfig)
     private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
     private val preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
@@ -42,6 +44,8 @@ class Issuer2Module(
     private val metadataService = MetadataService(
         serviceConfig = serviceConfig,
         metadataConfig = metadataConfig,
+        issuerKeyResolver = issuerKeyResolver,
+    )
     )
     private val credentialOfferService = CredentialOfferService(
         profileService = credentialProfileService,

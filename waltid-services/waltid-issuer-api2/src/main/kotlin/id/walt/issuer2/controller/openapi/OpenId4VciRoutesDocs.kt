@@ -25,11 +25,25 @@ object OpenId4VciRoutesDocs {
         }
     }
 
-    fun openIdProviderMetadata(): RouteConfig.() -> Unit = {
-        summary = "Get OpenID Provider metadata"
+    fun jwtVcIssuerMetadata(): RouteConfig.() -> Unit = {
+        summary = "Get SD-JWT VC issuer metadata"
         response {
             HttpStatusCode.OK to {
-                description = "OpenID Provider metadata"
+                description = "SD-JWT VC issuer metadata"
+                body<JsonObject>()
+            }
+        }
+    }
+
+    fun vctTypeMetadata(): RouteConfig.() -> Unit = {
+        summary = "Get SD-JWT VC type metadata"
+        description = "Resolve self-hosted SD-JWT VC type metadata from a VCT URL path."
+        request {
+            pathParameter<String>("type")
+        }
+        response {
+            HttpStatusCode.OK to {
+                description = "SD-JWT VC type metadata"
                 body<JsonObject>()
             }
         }
