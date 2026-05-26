@@ -1,5 +1,6 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
+import id.walt.credentials.trustedauthorities.X5CChainValidatorHelper
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -33,13 +34,18 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
 
             val leafCertDer = x5cHeader.first().jsonPrimitive.content.decodeFromBase64()
 
-            // 1. Verify JWS signature.
+            // 1. Verify the certificate chain signatures when more than one cert is present.
+            if (x5cHeader.size > 1) {
+                X5CChainValidatorHelper.verifyChain(x5cHeader.map { it.jsonPrimitive.content.decodeFromBase64() })
+            }
+
+            // 2. Verify JWS signature with the leaf certificate's public key.
             JWKKey.importFromDerCertificate(leafCertDer).getOrThrow().verifyJws(jws).getOrThrow()
 
-            // 2. Calculate the certificate hash using the isolated JCA utility function.
+            // 3. Calculate the certificate hash using the isolated JCA utility function.
             val calculatedHash = SHA256().digest(leafCertDer).encodeToBase64Url()
 
-            // 3. Compare with the hash from the client_id.
+            // 4. Compare with the hash from the client_id.
             if (clientId.hash != calculatedHash) {
                 throw IllegalArgumentException("Provided hash does not match certificate hash.")
             }
@@ -54,3 +60,4 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         )
     }
 }
+
