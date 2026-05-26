@@ -79,7 +79,8 @@ object PresentationVerificationEngine {
             isEncrypted = isEncrypted,
             jwkThumbprint = jwkThumbprint,
             isAnnexC = session.setup is DcApiAnnexCFlowSetup,
-            customData = session.data as? JsonObject
+            customData = session.data as? JsonObject,
+            transactionData = authorizationRequest.transactionData
         )
 
         return VPPolicyRunner.verifyPresentation(
