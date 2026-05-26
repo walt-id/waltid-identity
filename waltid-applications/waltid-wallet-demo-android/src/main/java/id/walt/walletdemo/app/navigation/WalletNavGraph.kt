@@ -47,13 +47,10 @@ fun WalletNavGraph(
             deepLinks = listOf(
                 navDeepLink { uriPattern = "openid-credential-offer://{path}" },
             ),
-        ) { backStackEntry ->
-            val deepLinkUrl = backStackEntry.arguments?.getString("path")?.let {
-                "openid-credential-offer://$it"
-            } ?: initialOfferUrl
+        ) {
             ReceiveScreen(
                 viewModel = viewModel,
-                initialOfferUrl = deepLinkUrl,
+                initialOfferUrl = initialOfferUrl,
                 onBack = { navController.popBackStack() },
             )
         }
@@ -62,13 +59,10 @@ fun WalletNavGraph(
             deepLinks = listOf(
                 navDeepLink { uriPattern = "openid4vp://{path}" },
             ),
-        ) { backStackEntry ->
-            val deepLinkUrl = backStackEntry.arguments?.getString("path")?.let {
-                "openid4vp://$it"
-            } ?: initialVpRequestUrl
+        ) {
             PresentScreen(
                 viewModel = viewModel,
-                initialRequestUrl = deepLinkUrl,
+                initialRequestUrl = initialVpRequestUrl,
                 onBack = { navController.popBackStack() },
             )
         }
