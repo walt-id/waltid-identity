@@ -10,6 +10,7 @@ object VPVerificationPolicyManager {
         KbJwtIatCheckSdJwtVPPolicy(),
         ExpCheckSdJwtVPPolicy(),
         NbfCheckSdJwtVPPolicy(),
+        TransactionDataHashesVPPolicy(),
     )
     val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
 
