@@ -400,10 +400,16 @@ open class CIProvider(
             else -> {
                 return proof.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get(JWTClaims.Header.jwk)?.jsonObject?.let {
                     JWKKey.importJWK(it.toString()).getOrNull()?.let { key ->
+                        val ecKey = ECKey.parse(key.exportJWK())
+                        val algID = when (ecKey.curve.stdName) {
+                            "P-384" -> AlgorithmID.ECDSA_384
+                            "P-521" -> AlgorithmID.ECDSA_512
+                            else -> AlgorithmID.ECDSA_256
+                        }
                         COSECryptoProviderKeyInfo(
                             keyID = key.getKeyId(),
-                            algorithmID = AlgorithmID.ECDSA_256,
-                            publicKey = ECKey.parse(key.exportJWK()).toECPublicKey(),
+                            algorithmID = algID,
+                            publicKey = ecKey.toECPublicKey(),
                             privateKey = null
                         )
                     }
@@ -450,11 +456,18 @@ open class CIProvider(
 
         val keyID = resolvedIssuerKey.getKeyId()
 
+        // Select COSE algorithm based on the key curve (ISO 18013-5 requires EC keys; P-256, P-384, P-521 are supported)
+        val coseAlgorithmID = when (issuerKey.curve.stdName) {
+            "P-384" -> AlgorithmID.ECDSA_384
+            "P-521" -> AlgorithmID.ECDSA_512
+            else -> AlgorithmID.ECDSA_256 // P-256 default
+        }
+
         val cryptoProvider = SimpleCOSECryptoProvider(
             listOf(
                 COSECryptoProviderKeyInfo(
                     keyID = keyID,
-                    algorithmID = AlgorithmID.ECDSA_256,
+                    algorithmID = coseAlgorithmID,
                     publicKey = issuerKey.toECPublicKey(),
                     privateKey = issuerKey.toECPrivateKey(),
                     x5Chain = request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
@@ -482,11 +495,11 @@ open class CIProvider(
                     )
                 }
             }
-        }.sign( // TODO: expiration date!
+        }.sign( // Validity period configurable via IssuanceRequest.mdocValidityDays (default: 365 days)
             validityInfo = ValidityInfo(
                 signed = Clock.System.now(),
                 validFrom = Clock.System.now(),
-                validUntil = Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
+                validUntil = Clock.System.now().plus((request.mdocValidityDays ?: 365) * 24, DateTimeUnit.HOUR)
             ),
             deviceKeyInfo = DeviceKeyInfo(
                 deviceKey = DataElement.fromCBOR(
