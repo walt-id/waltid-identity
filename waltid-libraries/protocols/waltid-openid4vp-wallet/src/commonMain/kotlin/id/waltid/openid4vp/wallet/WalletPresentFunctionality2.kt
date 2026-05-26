@@ -669,14 +669,42 @@ object WalletPresentFunctionality2 {
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
             put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
 
-            // Per OID4VP 1.0 §5.5.1: if transaction_data is present in the authorization request,
-            // include transaction_data_hashes (SHA-256 of each base64url-encoded item).
+            // Per OID4VP 1.0 §A.3.2: if transaction_data is present in the authorization request,
+            // include transaction_data_hashes (SHA-256 of each raw base64url-encoded item string,
+            // without base64url decoding first) and transaction_data_hashes_alg if the request
+            // specified a preferred algorithm.
             if (!transactionData.isNullOrEmpty()) {
+                // Determine the hash algorithm: check each item's transaction_data_hashes_alg field.
+                // All items must agree on the algorithm; sha-256 is the default and always supported.
+                val requestedAlgs = transactionData.mapNotNull { itemB64 ->
+                    runCatching {
+                        val itemJson = Json.parseToJsonElement(
+                            itemB64.decodeBase64String()
+                        ).jsonObject
+                        itemJson["transaction_data_hashes_alg"]?.jsonArray
+                            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    }.getOrNull()
+                }.flatten().distinct()
+
+                // Use sha-256 unless the request specifies otherwise (sha-256 is always supported).
+                val algToUse = if (requestedAlgs.isEmpty() || "sha-256" in requestedAlgs) {
+                    "sha-256"
+                } else {
+                    requestedAlgs.firstOrNull() ?: "sha-256"
+                }
+
                 val hashes = transactionData.map { item ->
+                    // Hash is computed over the raw base64url string as received (no decoding first).
                     JsonPrimitive(calculateSha256Base64Url(item))
                 }
                 put("transaction_data_hashes", JsonArray(hashes))
-                // SHA-256 is the default; only include alg claim if a different algorithm is used.
+
+                // transaction_data_hashes_alg is REQUIRED when transaction_data_hashes_alg was
+                // present in the request; include it always when transaction_data is present
+                // so the verifier knows which algorithm was used.
+                if (requestedAlgs.isNotEmpty()) {
+                    put("transaction_data_hashes_alg", JsonPrimitive(algToUse))
+                }
             }
         }
         return holderKey.signJws(plaintext = kbJwtPayload.toString().encodeToByteArray(), headers = jwsHeaders)
