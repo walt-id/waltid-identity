@@ -38,7 +38,8 @@ class SdJwtVcCredentialHandler : CredentialEndpointHandler {
             val oid4vcFormat = when (configuration.format) {
                 CredentialFormat.JWT_VC_JSON -> Oid4vcCredentialFormat.jwt_vc_json
                 CredentialFormat.JWT_VC -> Oid4vcCredentialFormat.jwt_vc
-                CredentialFormat.SD_JWT_VC -> Oid4vcCredentialFormat.sd_jwt_vc
+                // SD_JWT_VC (wire: "dc+sd-jwt") maps to sd_jwt_dc (wire: "dc+sd-jwt") — same format, aligned names
+                CredentialFormat.SD_JWT_VC -> Oid4vcCredentialFormat.sd_jwt_dc
                 CredentialFormat.MSO_MDOC -> Oid4vcCredentialFormat.mso_mdoc
                 CredentialFormat.JWT_VC_JSON_LD -> Oid4vcCredentialFormat.jwt_vc_json_ld
                 CredentialFormat.LDP_VC -> Oid4vcCredentialFormat.ldp_vc
