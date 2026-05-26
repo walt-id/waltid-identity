@@ -13,20 +13,20 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-private const val policyId = "jwt_vc_json/exp-check"
+private const val policyId = "jwt_vc_json/nbf-check"
 
 /**
- * Checks the `exp` claim on the jwt_vc_json VP JWT envelope.
+ * Checks the `nbf` claim on the jwt_vc_json VP JWT envelope.
  *
- * Per RFC 7519 §4.1.4: the JWT MUST NOT be accepted on or after the expiration time.
- * If the `exp` claim is absent this policy passes without error.
+ * Per RFC 7519 §4.1.5: the JWT MUST NOT be accepted before the not-before time.
+ * If the `nbf` claim is absent this policy passes without error.
  */
 @Serializable
 @SerialName(policyId)
-class ExpCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
+class NbfCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
 
     override val id = policyId
-    override val description = "Check the VP JWT 'exp' claim — reject presentations that have expired"
+    override val description = "Check the VP JWT 'nbf' claim — reject presentations that are not yet valid"
 
     companion object {
         private val log = KotlinLogging.logger { }
@@ -36,19 +36,19 @@ class ExpCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
         presentation: JwtVcJsonPresentation,
         verificationContext: VerificationSessionContext?
     ): Result<Unit> {
-        val expSeconds = presentation.payload["exp"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
-            ?: return success() // absent exp claim is allowed
+        val nbfSeconds = presentation.payload["nbf"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
+            ?: return success() // absent nbf claim is allowed
 
         val now = Clock.System.now()
-        val exp = Instant.fromEpochSeconds(expSeconds)
+        val nbf = Instant.fromEpochSeconds(nbfSeconds)
 
-        addResult("exp", expSeconds.toString())
+        addResult("nbf", nbfSeconds.toString())
         addResult("now_epoch_seconds", now.epochSeconds.toString())
 
-        presentationRequire(now <= exp, W3CPresentationValidationError.PRESENTATION_EXPIRED) {
-            "VP JWT is expired: exp=$expSeconds, now=${now.epochSeconds}"
+        presentationRequire(now >= nbf, W3CPresentationValidationError.PRESENTATION_NOT_YET_VALID) {
+            "VP JWT is not yet valid: nbf=$nbfSeconds, now=${now.epochSeconds}"
         }
-        log.trace { "VP JWT exp=$expSeconds is valid (now=${now.epochSeconds})" }
+        log.trace { "VP JWT nbf=$nbfSeconds is valid (now=${now.epochSeconds})" }
         return success()
     }
 }

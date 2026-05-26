@@ -9,6 +9,7 @@ object VPVerificationPolicyManager {
         SdHashCheckSdJwtVPPolicy(),
         KbJwtIatCheckSdJwtVPPolicy(),
         ExpCheckSdJwtVPPolicy(),
+        NbfCheckSdJwtVPPolicy(),
     )
     val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
 
@@ -17,6 +18,7 @@ object VPVerificationPolicyManager {
         NonceCheckJwtVcJsonVPPolicy(),
         SignatureJwtVcJsonVPPolicy(),
         ExpCheckJwtVcJsonVPPolicy(),
+        NbfCheckJwtVcJsonVPPolicy(),
     )
     val defaultJwtVcJsonPolicies = simpleJwtVcJsonPolicies.toList()
 
