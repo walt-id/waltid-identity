@@ -20,6 +20,7 @@ import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus.SUC
 import id.walt.verifier2.data.Verifier2Response
 import id.walt.verifier2.utils.JsonUtils.parseAsJsonObject
 import id.walt.verifier2.verification2.PresentationVerificationEngine
+import id.walt.verifier2.verification2.SelfIssuedIdTokenValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -146,6 +147,28 @@ object Verifier2VPDirectPostHandler {
         }
     }
 
+    /**
+     * Extracts the `id_token` from a [DirectPostResponse] for `vp_token id_token` flows.
+     * Returns null if no `id_token` is present (e.g., plain `vp_token` flow).
+     */
+    suspend fun extractIdToken(
+        responseData: DirectPostResponse,
+        session: Verification2Session,
+        ephemeralDecryptionKey: DirectSerializedKey?
+    ): String? = when (responseData) {
+        is CleartextDirectPostResponse -> responseData.idToken
+        is EncryptedResponseStringDirectPostResponse -> {
+            // id_token may also appear in the encrypted JWE payload
+            runCatching {
+                requireNotNull(ephemeralDecryptionKey)
+                val decryptedPayloadString = (ephemeralDecryptionKey.key as JWKKey)
+                    .decryptJwe(responseData.responseParameter).decodeToString()
+                Json.parseToJsonElement(decryptedPayloadString).jsonObject["id_token"]?.jsonPrimitive?.content
+            }.getOrNull()
+        }
+        else -> null
+    }
+
     suspend fun RoutingCall.parseHttpRequestToDirectPostResponse(): DirectPostResponse {
 
         val providedContentType = this.request.contentType()
@@ -172,10 +195,11 @@ object Verifier2VPDirectPostHandler {
                 val urlParameters = this.receiveParameters()
                 val responseString = urlParameters["response"]
                 val vpTokenString = urlParameters["vp_token"]
+                val idTokenString = urlParameters["id_token"]
                 val receivedState = urlParameters["state"]
                 val errorCode = urlParameters["error"]
 
-                log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString, response = $responseString, error = $errorCode" }
+                log.trace { "Verification session data: state = $receivedState, vp_token = $vpTokenString, id_token = ${idTokenString?.take(20)}, response = $responseString, error = $errorCode" }
 
                 when {
                     errorCode != null -> ErrorResponseDirectPost(
@@ -190,7 +214,8 @@ object Verifier2VPDirectPostHandler {
 
                     vpTokenString != null -> CleartextDirectPostResponse(
                         vpToken = vpTokenString,
-                        state = receivedState ?: Verifier2Response.Verifier2Error.MISSING_STATE_PARAMETER.throwAsError()
+                        state = receivedState ?: Verifier2Response.Verifier2Error.MISSING_STATE_PARAMETER.throwAsError(),
+                        idToken = idTokenString,
                     )
 
                     else -> throw IllegalArgumentException("No presentation data was included in request")
@@ -258,7 +283,12 @@ object Verifier2VPDirectPostHandler {
     data class EncryptedResponseStringDirectPostResponse(val responseParameter: String) : DirectPostResponse
 
     /** Cleartext response (Data is directly passed as strings in URL parameter 'vp_token' and 'state') */
-    data class CleartextDirectPostResponse(val vpToken: String, val state: String) : DirectPostResponse
+    data class CleartextDirectPostResponse(
+        val vpToken: String,
+        val state: String,
+        /** Present when response_type=vp_token id_token (SIOPv2 combined flow) */
+        val idToken: String? = null,
+    ) : DirectPostResponse
 
     /**
      * OpenID4VP 1.0 §8.5 error response. Wallet rejects the presentation request (e.g. user
@@ -309,6 +339,19 @@ object Verifier2VPDirectPostHandler {
 
         if (receivedState != session.authorizationRequest.state) {
             Verifier2Response.Verifier2Error.INVALID_STATE_PARAMETER.throwAsError()
+        }
+
+        // For vp_token id_token (SIOPv2 combined flow): validate the Self-Issued ID Token.
+        // Per SIOPv2 §7 and OID4VP §"Combining this specification with SIOPv2".
+        if (session.authorizationRequest.responseType == id.walt.verifier.openid.models.openid.OpenID4VPResponseType.VP_TOKEN_ID_TOKEN) {
+            val idToken = extractIdToken(responseData, session, session.ephemeralDecryptionKey)
+                ?: throw PresentationRejectionException("id_token is required for response_type=vp_token id_token but was absent")
+            SelfIssuedIdTokenValidator.validate(
+                idToken = idToken,
+                expectedNonce = session.authorizationRequest.nonce!!,
+                expectedAudience = session.authorizationRequest.clientId!!,
+            )
+            log.debug { "Self-Issued ID Token validated successfully for session ${session.id}" }
         }
 
         // Parse vp_token
