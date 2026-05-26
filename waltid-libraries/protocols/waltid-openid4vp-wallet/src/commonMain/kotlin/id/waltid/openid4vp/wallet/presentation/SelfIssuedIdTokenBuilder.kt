@@ -46,15 +46,11 @@ object SelfIssuedIdTokenBuilder {
         // - JWK Thumbprint: `sub` = "urn:ietf:params:oauth:jwk-thumbprint:sha-256:<thumbprint>",
         //                   `sub_jwk` = public key JWK
         val useDidSubject = !holderDid.isNullOrEmpty() && holderDid.startsWith("did:")
-        val sub: String
-        val subJwk = if (!useDidSubject) publicKey.exportJWKObject() else null
-
-        sub = if (useDidSubject) {
-            holderDid!!
-        } else {
-            // JWK Thumbprint Subject Syntax Type URI per RFC 7638 + SIOPv2 §4.1
-            "urn:ietf:params:oauth:jwk-thumbprint:sha-256:${publicKey.getThumbprint()}"
+        val sub: String = when {
+            useDidSubject -> holderDid
+            else -> "urn:ietf:params:oauth:jwk-thumbprint:sha-256:${publicKey.getThumbprint()}" // JWK Thumbprint Subject Syntax Type URI per RFC 7638 + SIOPv2 §4.1
         }
+        val subJwk = if (!useDidSubject) publicKey.exportJWKObject() else null
 
         val now = Clock.System.now()
         val exp = now + 5.minutes
