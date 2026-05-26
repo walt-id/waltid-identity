@@ -49,10 +49,6 @@ kotlin {
             implementation(identityLibs.ktor.client.cio)
         }
         jvmMain.dependencies {
-            // Json canonicalization
-            implementation("io.github.erdtman:java-json-canonicalization:1.1")
-            // X.509 certificate chain validation (AKI, SKI, signature chain)
-            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
