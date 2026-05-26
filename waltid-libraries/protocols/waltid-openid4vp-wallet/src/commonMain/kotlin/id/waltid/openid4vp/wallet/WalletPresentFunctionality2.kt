@@ -637,35 +637,25 @@ object WalletPresentFunctionality2 {
     ): String {
         selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
-        // The spec for _sd_hash in KB-JWT sometimes implies hashing the concatenated disclosures
-        // as they would appear in the final presentation string (with ~).
-        // Let's assume for now Verifier will re-calculate based on the presented disclosures.
-        // A common interpretation for `sd_hash` in KB-JWT is a hash of the digests from the `_sd` array
-        // that correspond to the selectedDisclosures. This requires linking disclosures back to their original digests.
-
-        // Simpler approach (hashing concatenated presented disclosures):
-        // This binds the KB-JWT to the exact set and order of presented disclosures.
+        // Per RFC 9901 §4.3.1, sd_hash is computed over:
+        // <Issuer-signed JWT>~<Disclosure 1>~...~<Disclosure N>~
+        // The trailing ~ is always required, even when there are no disclosures.
+        // disclose() returns "issuer_jwt~disc1~disc2" (no trailing ~) for non-empty disclosures,
+        // and "issuer_jwt~" (trailing ~) for zero disclosures — so we only append ~ when needed.
         val stringToHash = if (selectedDisclosures.isNotEmpty()) {
-            "$disclosed~" //selectedDisclosures.joinToString(separator = "~") { it.asEncoded() }
+            "$disclosed~"
         } else {
-            disclosed // If there are no disclosures, what should sd_hash be?
-            // Typically, a KB-JWT implies there are disclosures.
-            // If it's possible to have a KB-JWT without disclosures (e.g. just binding to the core SD-JWT),
-            // then the sd_hash might be calculated differently or be absent.
-            // For now, let's assume selectedDisclosures is non-empty if we are creating a KB-JWT.
-            // If selectedDisclosures can be empty, define how sd_hash is computed then?
-            // Often, an empty string is hashed, or the field is omitted if allowed by profile.
+            disclosed // disclose() already produces "issuer_jwt~" for zero disclosures
         }
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
 
         val jwsHeaders = buildJsonObject {
-            //put("alg", JsonPrimitive(holderKey.algorithm)) // e.g., "ES256"
+            // alg is REQUIRED in the KB-JWT JOSE header per RFC 9901 §4.3
+            put("alg", JsonPrimitive(holderKey.keyType.jwsAlg))
             put("typ", JsonPrimitive("kb+jwt"))
-            // Add "kid" if holderKey has a key ID and it's useful for the verifier
-            // holderKey.kid?.let { put("kid", JsonPrimitive(it)) }
-        } // The header also needs to be base64url encoded as part of JWS construction
+        }
 
         val kbJwtPayload = buildJsonObject {
             put("aud", JsonPrimitive(audience))
