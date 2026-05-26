@@ -24,6 +24,7 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
+import id.waltid.openid4vp.wallet.presentation.SelfIssuedIdTokenBuilder
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
@@ -411,10 +412,16 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 
-        require(authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN) {
-            TODO("Currently only ResponseMode 'vp_token' is supported")
-            // should also support "vp_token id_token"
+        require(
+            authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN ||
+            authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
+        ) {
+            // Other response types (e.g. "code") are not supported in this wallet implementation.
+            "Unsupported response_type '${authorizationRequest.responseType}': " +
+                "only 'vp_token' and 'vp_token id_token' are supported."
         }
+
+        val isSiopv2 = authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
 
         // Build VP Token response
         val credentials = selectCredentialsForQuery(
@@ -459,6 +466,13 @@ object WalletPresentFunctionality2 {
 
         val vpToken = generateVpTokenForRequest(authorizationRequest, credentials, holderKey, holderDid)
 
+        // For vp_token id_token (SIOPv2 combined flow per OID4VP §"Combining with SIOPv2"),
+        // generate a Self-Issued ID Token alongside the VP Token.
+        val idToken: String? = if (isSiopv2) {
+            log.trace { "Generating Self-Issued ID Token for vp_token id_token response type" }
+            SelfIssuedIdTokenBuilder.build(authorizationRequest, holderKey, holderDid)
+        } else null
+
         // Send AuthorizationResponse:
         if (authorizationRequest.responseMode == null) {
             require(authorizationRequest.responseType != null) { "Missing response_type" }
@@ -483,6 +497,7 @@ object WalletPresentFunctionality2 {
                 // Build the parameters that will go into the URL fragment.
                 val fragmentParameters = ParametersBuilder().apply {
                     append("vp_token", vpToken)
+                    idToken?.let { append("id_token", it) }
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
 
@@ -509,6 +524,7 @@ object WalletPresentFunctionality2 {
                 // Build the parameters that will go into the URL query string.
                 val queryParameters = ParametersBuilder().apply {
                     append("vp_token", vpToken)
+                    idToken?.let { append("id_token", it) }
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
 
@@ -538,6 +554,7 @@ object WalletPresentFunctionality2 {
 
                 val fields = buildList {
                     add("vp_token" to vpToken)
+                    idToken?.let { add("id_token" to it) }
                     authorizationRequest.state?.let { add("state" to it) }
                 }
                 val htmlContent = buildFormPostHtml(
@@ -562,7 +579,7 @@ object WalletPresentFunctionality2 {
                 requireNotNull(responseUri) { "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post'." }
                 val parameters = ParametersBuilder().apply {
                     append("vp_token", vpToken)
-
+                    idToken?.let { append("id_token", it) }
                     if (authorizationRequest.state != null) {
                         append("state", authorizationRequest.state!!)
                     }
@@ -600,6 +617,7 @@ object WalletPresentFunctionality2 {
 
                 val payloadJson = buildJsonObject {
                     put("vp_token", vpTokenElement)
+                    idToken?.let { put("id_token", it) }
                     authorizationRequest.state?.let { put("state", it) }
                 }
 
