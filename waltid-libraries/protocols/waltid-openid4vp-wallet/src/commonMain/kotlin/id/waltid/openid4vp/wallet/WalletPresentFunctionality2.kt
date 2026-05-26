@@ -9,7 +9,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
@@ -41,6 +41,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 
 object WalletPresentFunctionality2 {
@@ -242,11 +243,9 @@ object WalletPresentFunctionality2 {
 
     /**
      * Generates a fresh wallet_nonce per OID4VP 1.0 §5.6.
-     * Must be a base64url-encoded, cryptographically random value with sufficient entropy (≥128 bits).
      */
-    private fun generateWalletNonce(): String {
-        return kotlin.random.Random.Default.nextBytes(16).encodeToBase64Url()
-    }
+    @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+    private fun generateWalletNonce(): String = Uuid.random().toHexString()
 
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,
@@ -742,7 +741,7 @@ object WalletPresentFunctionality2 {
                 val requestedAlgs = transactionData.mapNotNull { itemB64 ->
                     runCatching {
                         val itemJson = Json.parseToJsonElement(
-                            itemB64.decodeBase64String()
+                            itemB64.decodeFromBase64Url().decodeToString()
                         ).jsonObject
                         itemJson["transaction_data_hashes_alg"]?.jsonArray
                             ?.mapNotNull { it.jsonPrimitive.contentOrNull }
