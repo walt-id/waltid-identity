@@ -627,13 +627,19 @@ object WalletPresentFunctionality2 {
 
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.
+     *
+     * Per OID4VP 1.0 §5.5.1, when the authorization request includes `transaction_data`,
+     * the wallet MUST include `transaction_data_hashes` in the KB-JWT. Each entry is the
+     * base64url-encoded SHA-256 hash of the corresponding base64url-encoded transaction data
+     * item as it appeared in the request. The algorithm is SHA-256 by default.
      */
     internal suspend fun createKeyBindingJwt(
         disclosed: String,
         nonce: String,
         audience: String?,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
-        holderKey: Key
+        holderKey: Key,
+        transactionData: List<String>? = null
     ): String {
         selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
@@ -661,8 +667,17 @@ object WalletPresentFunctionality2 {
             put("aud", JsonPrimitive(audience))
             put("nonce", JsonPrimitive(nonce))
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
-            // Add exp if needed
             put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
+
+            // Per OID4VP 1.0 §5.5.1: if transaction_data is present in the authorization request,
+            // include transaction_data_hashes (SHA-256 of each base64url-encoded item).
+            if (!transactionData.isNullOrEmpty()) {
+                val hashes = transactionData.map { item ->
+                    JsonPrimitive(calculateSha256Base64Url(item))
+                }
+                put("transaction_data_hashes", JsonArray(hashes))
+                // SHA-256 is the default; only include alg claim if a different algorithm is used.
+            }
         }
         return holderKey.signJws(plaintext = kbJwtPayload.toString().encodeToByteArray(), headers = jwsHeaders)
     }
