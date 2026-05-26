@@ -6,7 +6,14 @@ plugins {
 
 kotlin {
     iosArm64()
-    iosSimulatorArm64()
+    iosSimulatorArm64() {
+        binaries.all {
+            val frameworkDir = "${project.rootDir}/waltid-libraries/crypto/waltid-target-ios/build/cocoapods/synthetic/ios/build/Debug-iphonesimulator/JOSESwift"
+            if (file(frameworkDir).exists()) {
+                linkerOpts("-F$frameworkDir", "-framework", "JOSESwift", "-rpath", frameworkDir)
+            }
+        }
+    }
 
     cocoapods {
         summary = "Shared WAL-1033 wallet demo client module"
@@ -54,7 +61,8 @@ kotlin {
             implementation(identityLibs.ktor.serialization.kotlinx.json)
         }
         commonTest.dependencies {
-
+            implementation(kotlin("test"))
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
 
         val iosArm64Main by getting
