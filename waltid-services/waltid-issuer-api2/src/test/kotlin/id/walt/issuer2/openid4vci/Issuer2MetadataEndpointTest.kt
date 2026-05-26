@@ -56,7 +56,7 @@ class Issuer2MetadataEndpointTest {
     @Test
     fun shouldHaveValidMetadataEndpointsFromConfigFiles() = testApplication {
         installIssuer2WithConfigFiles()
-        val client = walletClient()
+        val client = apiClient()
 
         val credentialIssuerMetadataRaw = client.get("/.well-known/openid-credential-issuer/openid4vci")
         assertEquals(HttpStatusCode.OK, credentialIssuerMetadataRaw.status)
@@ -215,7 +215,7 @@ class Issuer2MetadataEndpointTest {
         }
     }
 
-    private fun ApplicationTestBuilder.walletClient() = createClient {
+    private fun ApplicationTestBuilder.apiClient() = createClient {
         followRedirects = false
         install(ClientContentNegotiation) {
             json(json)
