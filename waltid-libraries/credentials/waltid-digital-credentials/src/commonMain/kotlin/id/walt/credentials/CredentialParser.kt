@@ -77,7 +77,9 @@ object CredentialParser {
         else -> throw UnsupportedOperationException("Unsupported JSON type: $this")
     }
 
-    fun getCredentialDataIssuer(data: JsonObject) = data["issuer"].getItAsStringOrId() ?: data["vc"]?.jsonObject?.get("issuer")?.getItAsStringOrId()
+    fun getCredentialDataIssuer(data: JsonObject) =
+        data["issuer"].getItAsStringOrId() ?: data["vc"]?.jsonObject?.get("issuer")?.getItAsStringOrId()
+
     fun getJwtHeaderOrDataIssuer(data: JsonObject) = data.getString("iss") ?: getCredentialDataIssuer(data)
 
     fun getCredentialDataSubject(data: JsonObject) =
@@ -239,6 +241,9 @@ object CredentialParser {
             }
 
             fun findForHash(hash: String) =
+                /* asHashed() is the spec-compliant SHA-256(base64url(json_array)) method per RFC 9901.
+                 asHashed2() is an alternative base64 encoding fallback for some non-standard issuers.
+                 asHashed3() (double-base64url) is a non-standard malformed disclosure */
                 availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
 
             // Helper to recursively scan a JSON element for more SD-JWT hashes
@@ -313,7 +318,8 @@ object CredentialParser {
 
         val fullCredentialData =
             if (availableDisclosures?.isNotEmpty() == true ||
-                header.getValue("typ").jsonPrimitive.content.let { it == "vc+sd-jwt" || it == "dc+sd-jwt" }) {
+                header.getValue("typ").jsonPrimitive.content.let { it == "vc+sd-jwt" || it == "dc+sd-jwt" }
+            ) {
                 SDJwt.parse(credential).fullPayload
             } else payload
 
@@ -337,7 +343,9 @@ object CredentialParser {
                         )
             }
 
-            payload.contains("@context") || payload.contains("type") || (payload.containsKey("vc") && (payload["vc"]?.jsonObject?.contains("@context") == true || payload["vc"]?.jsonObject?.contains("type") == true)) -> {
+            payload.contains("@context") || payload.contains("type") || (payload.containsKey("vc") && (payload["vc"]?.jsonObject?.contains("@context") == true || payload["vc"]?.jsonObject?.contains(
+                "type"
+            ) == true)) -> {
                 val w3cPayload = if (payload.containsKey("vc")) payload["vc"]!!.jsonObject else payload
                 val w3cModelVersion = detectW3CDataModelVersion(w3cPayload)
                 val credential = when (w3cModelVersion) {
@@ -415,6 +423,7 @@ object CredentialParser {
                                 issuer = getCredentialDataIssuer(payload),
                                 subject = getCredentialDataSubject(payload)
                             )
+
                             W3CSubType.W3C_2 -> W3C2(
                                 disclosables = containedDisclosablesSaveable,
                                 disclosures = availableDisclosures,
@@ -487,6 +496,7 @@ object CredentialParser {
                                         issuer = getCredentialDataIssuer(parsedJson),
                                         subject = getCredentialDataSubject(parsedJson)
                                     )
+
                                     W3CSubType.W3C_1_1 -> W3C11(
                                         disclosables = containedDisclosablesSaveable,
                                         disclosures = null,
@@ -538,9 +548,9 @@ object CredentialParser {
                     )
 
                     (parsedJson.contains("@context") && parsedJson.contains("type")) ||
-                    (parsedJson.contains("credentialSubject") &&
-                            parsedJson["credentialSubject"]?.jsonObject?.contains("@context") == true &&
-                            parsedJson["credentialSubject"]?.jsonObject?.contains("type") == true) -> {
+                            (parsedJson.contains("credentialSubject") &&
+                                    parsedJson["credentialSubject"]?.jsonObject?.contains("@context") == true &&
+                                    parsedJson["credentialSubject"]?.jsonObject?.contains("type") == true) -> {
                         val vcJson = if (parsedJson.contains("@context") && parsedJson.contains("type")) parsedJson
                         else parsedJson["credentialSubject"]!!.jsonObject
                         val w3cModelVersion = detectW3CDataModelVersion(vcJson)
