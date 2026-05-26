@@ -21,6 +21,7 @@ import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.verifier2.data.*
@@ -177,12 +178,9 @@ object VerificationSessionCreator {
             // TODO: url building (handle host alias)
             requestUri = "$urlPrefix/$sessionId/request",
 
-            /*
-             * OPTIONAL. A string determining the HTTP method to be used when 'request_uri' is present.
-             * Valid values: "get", "post". Defaults to "get" if not present.
-             * MUST NOT be present if 'request_uri' is not present.
-             */
-            //requestUriMethod = RequestUriHttpMethod.GET,
+            // Per OID4VP 1.0 §5.1: when the verifier uses signed requests, advertise
+            // request_uri_method=post so wallets can send wallet_nonce to prevent replay.
+            requestUriMethod = if (isSignedRequest) RequestUriHttpMethod.POST else null,
 
             clientId = clientId,
 
