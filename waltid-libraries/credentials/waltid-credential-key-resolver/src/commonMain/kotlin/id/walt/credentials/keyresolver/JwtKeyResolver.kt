@@ -1,13 +1,14 @@
 package id.walt.credentials.keyresolver
 
-import id.walt.credentials.CredentialParser.getItAsStringOrId
 import id.walt.credentials.keyresolver.resolvers.DidKeyResolver
 import id.walt.credentials.keyresolver.resolvers.WellKnownKeyResolver
 import id.walt.credentials.keyresolver.resolvers.X5CKeyResolver
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -26,7 +27,7 @@ object JwtKeyResolver {
     private val log = KotlinLogging.logger { }
 
     suspend fun resolveFromJwt(jwtHeader: JsonObject?, jwtPayload: JsonObject): Key? {
-        val signerIdentifier = (jwtPayload["iss"] ?: jwtPayload["issuer"]).getItAsStringOrId()
+        val signerIdentifier = extractSignerIdentifier(jwtPayload)
         log.trace { "Attempting to resolve JWT signer key for: $signerIdentifier" }
 
         return runCatching {
@@ -55,6 +56,20 @@ object JwtKeyResolver {
             null
         }
     }
+
+    /**
+     * Extracts the signer identifier from `iss` or `issuer` claim.
+     * Handles plain strings and objects with an `id` field (W3C VCDM issuer object).
+     */
+    private fun extractSignerIdentifier(payload: JsonObject): String? =
+        (payload["iss"] ?: payload["issuer"])?.let { element ->
+            when (element) {
+                is JsonNull -> null
+                is JsonPrimitive -> element.contentOrNull
+                is JsonObject -> element["id"]?.jsonPrimitive?.contentOrNull
+                else -> null
+            }
+        }
 
 }
 
