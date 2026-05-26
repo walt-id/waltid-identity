@@ -15,6 +15,8 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.IssuerKeyResolver
 import id.walt.issuer2.service.openid4vci.CredentialOfferService
+import id.walt.issuer2.service.openid4vci.ExternalOAuthProviderClient
+import id.walt.issuer2.service.openid4vci.JwksService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
@@ -38,14 +40,17 @@ class Issuer2Module(
         profilesConfig = profilesConfig,
         metadataConfig = metadataConfig,
     )
+    private val jwksService = JwksService(
+        serviceConfig = serviceConfig,
+        profileService = credentialProfileService,
+    )
     private val issuanceSessionService = IssuanceSessionService(
         repository = issuanceSessionRepository,
     )
     private val metadataService = MetadataService(
         serviceConfig = serviceConfig,
         metadataConfig = metadataConfig,
-        profileService = credentialProfileService,
-        issuerKeyResolver = issuerKeyResolver,
+        jwksService = jwksService,
     )
     )
     private val credentialOfferService = CredentialOfferService(

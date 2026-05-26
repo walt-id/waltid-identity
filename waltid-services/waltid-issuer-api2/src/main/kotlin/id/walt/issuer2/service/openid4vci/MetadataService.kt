@@ -2,7 +2,6 @@ package id.walt.issuer2.service.openid4vci
 
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
-import id.walt.issuer2.service.IssuerKeyResolver
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
@@ -15,7 +14,7 @@ import kotlinx.serialization.json.JsonObject
 class MetadataService(
     serviceConfig: Issuer2ServiceConfig,
     metadataConfig: Issuer2MetadataConfig,
-    private val issuerKeyResolver: IssuerKeyResolver,
+    private val jwksService: JwksService,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -75,7 +74,7 @@ class MetadataService(
 
     fun issuerBaseUrl(): String = baseUrl
 
-    suspend fun listJwks(): JsonObject = issuerKeyResolver.listPublicJwks()
+    suspend fun listJwks(): JsonObject = jwksService.listJwks()
 
     private fun CredentialConfiguration.withResolvedVct(credentialType: String): CredentialConfiguration =
         if (vct == INTERNAL_VCT_BASE_URL) copy(vct = selfHostedVct(credentialType)) else this
