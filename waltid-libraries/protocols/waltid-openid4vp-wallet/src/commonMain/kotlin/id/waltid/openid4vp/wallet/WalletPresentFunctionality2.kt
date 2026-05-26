@@ -9,6 +9,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
@@ -28,6 +29,7 @@ import id.waltid.openid4vp.wallet.presentation.SelfIssuedIdTokenBuilder
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
+import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -238,6 +240,14 @@ object WalletPresentFunctionality2 {
         }
     }
 
+    /**
+     * Generates a fresh wallet_nonce per OID4VP 1.0 §5.6.
+     * Must be a base64url-encoded, cryptographically random value with sufficient entropy (≥128 bits).
+     */
+    private fun generateWalletNonce(): String {
+        return kotlin.random.Random.Default.nextBytes(16).encodeToBase64Url()
+    }
+
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,
         error: String,
@@ -313,8 +323,28 @@ object WalletPresentFunctionality2 {
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = if (presentationRequestUrl.parameters.contains("request_uri")) {
             val requestUri = presentationRequestUrl.parameters["request_uri"]!!
-            log.trace { "Resolving AuthorizationRequest from URI: $requestUri" }
-            val httpResponse = webResolveAuthReq.rawFetch(requestUri)
+            val requestUriMethod = presentationRequestUrl.parameters["request_uri_method"]
+
+            log.trace { "Resolving AuthorizationRequest from URI: $requestUri (method=${requestUriMethod ?: "get"})" }
+
+            // Per OID4VP 1.0 §5.1: if request_uri_method=post, send a POST with wallet_nonce
+            // to bind this request and prevent replay attacks.
+            val walletNonce: String? = if (requestUriMethod?.lowercase() == "post") {
+                // Generate a fresh, cryptographically random wallet_nonce (base64url, 128 bits)
+                generateWalletNonce()
+            } else null
+
+            val httpResponse = if (walletNonce != null) {
+                log.trace { "Sending POST to request URI with wallet_nonce (request_uri_method=post)" }
+                webResolveAuthReq.rawFetch(io.ktor.http.Url(requestUri)) {
+                    method = HttpMethod.Post
+                    headers.append(HttpHeaders.ContentType, ContentType.Application.FormUrlEncoded.toString())
+                    headers.append(HttpHeaders.Accept, "application/oauth-authz-req+jwt")
+                    setBody("wallet_nonce=${walletNonce.encodeURLQueryComponent()}")
+                }
+            } else {
+                webResolveAuthReq.rawFetch(requestUri)
+            }
 
             check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}" }
 
@@ -384,7 +414,22 @@ object WalletPresentFunctionality2 {
                                 throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")
                             }
 
-                            is ClientValidationResult.Success -> Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                            is ClientValidationResult.Success -> {
+                                val decodedRequest = Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+
+                                // Per OID4VP 1.0 §5.6: if wallet sent wallet_nonce, the request object
+                                // MUST contain the same value in a wallet_nonce claim.
+                                if (walletNonce != null) {
+                                    val receivedWalletNonce = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
+                                    require(receivedWalletNonce == walletNonce) {
+                                        "wallet_nonce mismatch: sent '$walletNonce' but request object contains '$receivedWalletNonce'. " +
+                                            "Possible replay attack — terminating request processing."
+                                    }
+                                    log.trace { "wallet_nonce validated successfully" }
+                                }
+
+                                decodedRequest
+                            }
                         }
                     }
 

@@ -1,7 +1,6 @@
 package id.walt.verifier2.handlers.authrequest
 
-import id.walt.crypto.keys.DirectSerializedKey
-import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -9,7 +8,10 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 
 /**
@@ -67,16 +69,9 @@ object Verifier2RequestUriPostHandler {
         }
 
         // Re-sign the request object including wallet_nonce per OID4VP 1.0 §5.6
-        val setup = verificationSession.setup
-        val coreSetup = setup as? GeneralFlowConfig
-            ?: (setup as? id.walt.verifier2.data.CrossDeviceFlowSetup)?.core
-            ?: run {
-                log.warn { "Cannot re-sign for session type ${setup::class.simpleName}, falling back to pre-built JWT" }
-                call.respondText(existingJwt, ContentType.parse("application/oauth-authz-req+jwt"))
-                return
-            }
+        val coreSetup = verificationSession.setup.core
 
-        val signingKey = (coreSetup.key as? DirectSerializedKey)?.key
+        val signingKey = coreSetup.key?.key
             ?: run {
                 log.warn { "No signing key available for re-sign, returning pre-built JWT (no wallet_nonce)" }
                 call.respondText(existingJwt, ContentType.parse("application/oauth-authz-req+jwt"))
@@ -87,8 +82,8 @@ object Verifier2RequestUriPostHandler {
         val parts = existingJwt.split(".")
         require(parts.size == 3) { "Existing signed request JWT is malformed" }
 
-        val existingHeaderBytes = io.ktor.util.decodeBase64Bytes(parts[0])
-        val existingPayloadBytes = io.ktor.util.decodeBase64Bytes(parts[1])
+        val existingHeaderBytes = parts[0].decodeFromBase64Url()
+        val existingPayloadBytes = parts[1].decodeFromBase64Url()
 
         val existingHeaders = Json.parseToJsonElement(existingHeaderBytes.decodeToString()).jsonObject
         val existingPayload = Json.parseToJsonElement(existingPayloadBytes.decodeToString()).jsonObject
