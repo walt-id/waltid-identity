@@ -91,7 +91,6 @@ class ConfiguredRedisRepositoryTest {
             put("given_name", "Jane")
             put("family_name", "Doe")
         },
-        issuerKeyId = "issuer-key",
         issuerDid = "did:web:issuer.example",
         expiresAt = Clock.System.now().plus(5.minutes),
     )
