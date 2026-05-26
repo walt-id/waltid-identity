@@ -55,16 +55,32 @@ jobs:
       oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
       enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@8fcefa7d4f599104fbcffc982133848eef3035ac
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
-  enterprise-tag:
-    uses: walt-id/waltid-identity/.github/workflows/enterprise-tag.yml@8fcefa7d4f599104fbcffc982133848eef3035ac
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
     secrets: inherit
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}
+  enterprise-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    secrets: inherit
+    needs: [ version, deploy ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-identity-enterprise
+  docs-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    secrets: inherit
+    needs: [ version, deploy ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-docs
+  quickstart-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    secrets: inherit
+    needs: [ version, deploy ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-enterprise-quickstart
   release:
     uses: walt-id/waltid-identity/.github/workflows/changelog.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
     secrets: inherit
