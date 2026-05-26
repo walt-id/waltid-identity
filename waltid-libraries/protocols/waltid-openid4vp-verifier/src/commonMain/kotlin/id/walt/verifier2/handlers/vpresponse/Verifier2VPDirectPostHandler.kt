@@ -34,6 +34,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 object Verifier2VPDirectPostHandler {
 
@@ -261,7 +262,7 @@ object Verifier2VPDirectPostHandler {
             val errorBody = buildMap {
                 put("error", "invalid_request")
                 put("error_description", e.message ?: "Presentation rejected")
-                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it) }
+                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it.toString()) }
             }
             call.respond(HttpStatusCode.BadRequest, errorBody)
         }
@@ -380,12 +381,26 @@ object Verifier2VPDirectPostHandler {
 
 
         val optionalSuccessRedirectUrl = session.redirects?.successRedirectUri
-        val willRedirect = optionalSuccessRedirectUrl != null
 
-        return if (willRedirect) {
-            // Per OID4VP 1.0 §1298, the response body MUST contain redirect_uri when present so
-            // the wallet redirects the user back to the verifier's success page.
-            mapOf("redirect_uri" to optionalSuccessRedirectUrl)
+        return if (optionalSuccessRedirectUrl != null) {
+            // Per OID4VP 1.0 §1758 (session fixation prevention): append a fresh cryptographic
+            // random response_code to the redirect URI. The wallet redirects the user browser to
+            // this URI. The frontend then presents response_code + transaction-id to the Response
+            // Endpoint to fetch the VP Token — only the browser that received the redirect can do this.
+            val responseCode = generateResponseCode()
+
+            // Store response_code on session so the frontend can validate it
+            updateSessionCallback(session, SessionEvent.credential_policy_results_available) {
+                this.responseCode = responseCode
+            }
+
+            val redirectUriWithCode = URLBuilder(optionalSuccessRedirectUrl)
+                .apply { parameters.append("response_code", responseCode) }
+                .buildString()
+
+            log.trace { "Success redirect with response_code for session ${session.id}" }
+            // Per OID4VP 1.0 §1298, the response body MUST contain redirect_uri when present.
+            mapOf("redirect_uri" to redirectUriWithCode)
         } else {
             mapOf(
                 "status" to "received",
@@ -393,6 +408,13 @@ object Verifier2VPDirectPostHandler {
             )
         }
     }
+
+    /**
+     * Generates a fresh response_code per OID4VP 1.0 §1758.
+     * Uses multiplatform UUID (backed by SecureRandom on JVM) for cryptographic randomness.
+     */
+    @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+    private fun generateResponseCode(): String = Uuid.random().toHexString()
 
     fun parseVpToken(vpTokenString: String): ParsedVpToken = try {
         Json.Default.decodeFromString(vpTokenString)
@@ -441,7 +463,7 @@ object Verifier2VPDirectPostHandler {
         }
 
         return session.redirects?.errorRedirectUri
-            ?.let { mapOf("redirect_uri" to it) }
+            ?.let { mapOf("redirect_uri" to it.toString()) }
             ?: mapOf(
                 "status" to "acknowledged",
                 "message" to "Wallet error response recorded.",

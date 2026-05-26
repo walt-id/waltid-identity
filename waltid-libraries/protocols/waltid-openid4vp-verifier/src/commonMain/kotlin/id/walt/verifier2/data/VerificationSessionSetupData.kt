@@ -14,6 +14,7 @@ import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.utils.UrlUtils
+import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -116,7 +117,7 @@ data class CrossDeviceFlowSetup(
                 dcqlQuery = DcqlQuery(listOf(CredentialQuery("stub", CredentialFormat.AC_VP, meta = NoMeta)))
             ), urlConfig = UrlConfig(
             ), redirects = Verification2Session.VerificationSessionRedirects(
-                successRedirectUri = "https://example.com/success", errorRedirectUri = "https://example.com/not-successful"
+                successRedirectUri = Url("https://example.com/success"), errorRedirectUri = io.ktor.http.Url("https://example.com/not-successful")
             )
         )
 

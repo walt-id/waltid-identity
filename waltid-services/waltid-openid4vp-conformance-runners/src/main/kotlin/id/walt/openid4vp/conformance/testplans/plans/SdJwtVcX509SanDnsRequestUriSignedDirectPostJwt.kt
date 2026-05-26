@@ -10,6 +10,7 @@ import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.UrlConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.VerificationSessionRedirects
+import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -144,7 +145,7 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt(
                 //urlHost, // <-- set by TestPlanRunner
             ),
             redirects = VerificationSessionRedirects(
-                successRedirectUri = "https://example.org/verifcation-success"
+                successRedirectUri = Url("https://example.org/verifcation-success")
             )
         )
     )

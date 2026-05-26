@@ -222,9 +222,9 @@ data class Verification2Session(
     @Serializable
     data class VerificationSessionRedirects(
         @SerialName("success_redirect_uri")
-        var successRedirectUri: String? = null,
+        var successRedirectUri: Url? = null,
         @SerialName("error_redirect_uri")
-        val errorRedirectUri: String? = null,
+        val errorRedirectUri: Url? = null,
     )
 
 
