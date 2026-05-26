@@ -228,10 +228,17 @@ object Verifier2VPDirectPostHandler {
 
             call.respond(result)
         } catch (e: PresentationRejectionException) {
-            // OID4VP 1.0 §8.2: the verifier must signal rejection with a 4xx response so the
-            // wallet (here: the conformance suite) knows the presentation was not accepted.
+            // OID4VP 1.0 §8.2 / §response_mode_post: the verifier signals rejection with a 4xx
+            // response so the wallet knows the presentation was not accepted.
+            // Per §1298, the response body MAY also include a redirect_uri for the error page
+            // so the wallet can redirect the user to an appropriate error page on the verifier's site.
             log.debug { "Presentation rejected, responding 400: ${e.message}" }
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to "invalid_request", "error_description" to (e.message ?: "Presentation rejected")))
+            val errorBody = buildMap {
+                put("error", "invalid_request")
+                put("error_description", e.message ?: "Presentation rejected")
+                verificationSession.redirects?.errorRedirectUri?.let { put("redirect_uri", it) }
+            }
+            call.respond(HttpStatusCode.BadRequest, errorBody)
         }
     }
 
@@ -333,10 +340,9 @@ object Verifier2VPDirectPostHandler {
         val willRedirect = optionalSuccessRedirectUrl != null
 
         return if (willRedirect) {
+            // Per OID4VP 1.0 §1298, the response body MUST contain redirect_uri when present so
+            // the wallet redirects the user back to the verifier's success page.
             mapOf("redirect_uri" to optionalSuccessRedirectUrl)
-
-            // TODO: error redirect url !!!
-
         } else {
             mapOf(
                 "status" to "received",
