@@ -37,7 +37,7 @@ class CredentialProfileService(
         }
         require(metadataConfig.credentialConfigurations.containsKey(profile.credentialConfigurationId)) {
             "Credential profile ${profile.profileId} references unsupported credential configuration " +
-                profile.credentialConfigurationId
+                    profile.credentialConfigurationId
         }
         return profile
     }
