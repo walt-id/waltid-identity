@@ -24,6 +24,13 @@ data class VerificationSessionContext(
     val jwkThumbprint: String?,
     val customData: JsonObject? = null,
     val isAnnexC: Boolean,
+
+    /**
+     * Base64url-encoded transaction data items from the authorization request's `transaction_data`
+     * parameter (OID4VP 1.0 §5.5.1). When non-null, the KB-JWT MUST contain `transaction_data_hashes`
+     * and the verifier MUST validate them against these values.
+     */
+    val transactionData: List<String>? = null,
 ) {
     val isDcApi
         get() = responseMode in OpenID4VPResponseMode.DC_API_RESPONSES
