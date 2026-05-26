@@ -63,6 +63,14 @@ kotlin {
             implementation(identityLibs.ktor.server.netty)
             implementation("io.mockk:mockk:1.14.9")
         }
+
+        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+            iosMain.get().dependsOn(commonMain.get())
+            iosArm64Main.dependsOn(iosMain.get())
+            iosSimulatorArm64Main.dependsOn(iosMain.get())
+        }
     }
 }
 

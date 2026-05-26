@@ -61,6 +61,18 @@ kotlin {
             implementation(kotlin("test-js"))
         }
 
+        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+            val iosMain by creating {
+                dependsOn(commonMain.get())
+            }
+            val iosArm64Main by getting {
+                dependsOn(iosMain)
+            }
+            val iosSimulatorArm64Main by getting {
+                dependsOn(iosMain)
+            }
+        }
+
     }
 }
 
