@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private const val policyId = "dc+sd-jwt/exp-check"
@@ -22,10 +23,15 @@ private const val policyId = "dc+sd-jwt/exp-check"
  * Per draft-ietf-oauth-sd-jwt-vc §2.2.2 and RFC 7519 §4.1.4:
  * the credential MUST NOT be accepted on or after the expiration time.
  * If the `exp` claim is absent this policy passes without error.
+ *
+ * [clockSkewSeconds] allows a small tolerance for clock differences between issuer and verifier
+ * machines (default: 2 seconds).
  */
 @Serializable
 @SerialName(policyId)
-class ExpCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
+class ExpCheckSdJwtVPPolicy(
+    val clockSkewSeconds: Long = 2L
+) : DcSdJwtVPPolicy() {
 
     override val id = policyId
     override val description = "Check the SD-JWT core 'exp' claim — reject expired credentials"
@@ -46,11 +52,13 @@ class ExpCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
 
         addResult("exp", expSeconds.toString())
         addResult("now_epoch_seconds", now.epochSeconds.toString())
+        addResult("clock_skew_seconds", clockSkewSeconds.toString())
 
-        presentationRequire(now <= exp, DcSdJwtPresentationValidationError.SD_JWT_EXPIRED) {
-            "SD-JWT credential is expired: exp=$expSeconds, now=${now.epochSeconds}"
+        // Allow clock_skew_seconds tolerance: credential is valid if now <= exp + skew
+        presentationRequire(now <= exp + clockSkewSeconds.seconds, DcSdJwtPresentationValidationError.SD_JWT_EXPIRED) {
+            "SD-JWT credential is expired: exp=$expSeconds, now=${now.epochSeconds}, skew=${clockSkewSeconds}s"
         }
-        log.trace { "SD-JWT exp=$expSeconds is valid (now=${now.epochSeconds})" }
+        log.trace { "SD-JWT exp=$expSeconds is valid (now=${now.epochSeconds}, skew=${clockSkewSeconds}s)" }
         return success()
     }
 }

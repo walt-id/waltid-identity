@@ -11,6 +11,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private const val policyId = "jwt_vc_json/exp-check"
@@ -20,10 +21,15 @@ private const val policyId = "jwt_vc_json/exp-check"
  *
  * Per RFC 7519 §4.1.4: the JWT MUST NOT be accepted on or after the expiration time.
  * If the `exp` claim is absent this policy passes without error.
+ *
+ * [clockSkewSeconds] allows a small tolerance for clock differences between issuer and verifier
+ * machines (default: 2 seconds).
  */
 @Serializable
 @SerialName(policyId)
-class ExpCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
+class ExpCheckJwtVcJsonVPPolicy(
+    val clockSkewSeconds: Long = 2L
+) : JwtVcJsonVPPolicy() {
 
     override val id = policyId
     override val description = "Check the VP JWT 'exp' claim — reject presentations that have expired"
@@ -44,11 +50,13 @@ class ExpCheckJwtVcJsonVPPolicy : JwtVcJsonVPPolicy() {
 
         addResult("exp", expSeconds.toString())
         addResult("now_epoch_seconds", now.epochSeconds.toString())
+        addResult("clock_skew_seconds", clockSkewSeconds.toString())
 
-        presentationRequire(now <= exp, W3CPresentationValidationError.PRESENTATION_EXPIRED) {
-            "VP JWT is expired: exp=$expSeconds, now=${now.epochSeconds}"
+        // Allow clock_skew_seconds tolerance: presentation is valid if now <= exp + skew
+        presentationRequire(now <= exp + clockSkewSeconds.seconds, W3CPresentationValidationError.PRESENTATION_EXPIRED) {
+            "VP JWT is expired: exp=$expSeconds, now=${now.epochSeconds}, skew=${clockSkewSeconds}s"
         }
-        log.trace { "VP JWT exp=$expSeconds is valid (now=${now.epochSeconds})" }
+        log.trace { "VP JWT exp=$expSeconds is valid (now=${now.epochSeconds}, skew=${clockSkewSeconds}s)" }
         return success()
     }
 }
