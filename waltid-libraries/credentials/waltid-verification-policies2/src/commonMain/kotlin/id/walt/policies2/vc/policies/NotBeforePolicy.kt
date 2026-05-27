@@ -18,7 +18,13 @@ import kotlin.time.Instant
 
 @Serializable
 @SerialName("not-before")
-class NotBeforePolicy : CredentialVerificationPolicy2() {
+class NotBeforePolicy(
+    /**
+     * If true, the policy fails when the nbf claim is absent entirely.
+     * Default false for general use; set true for strict profiles (e.g. ETSI TS 119 472-1 EAA-5.2.7.1-01).
+     */
+    val requireField: Boolean = false
+) : CredentialVerificationPolicy2() {
     override val id = "not-before"
 
     companion object {
@@ -49,10 +55,7 @@ class NotBeforePolicy : CredentialVerificationPolicy2() {
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> {
-        return PolicyClaimChecker.checkClaim(
-            credential,
-            claims
-        ) { claim ->
+        return PolicyClaimChecker.checkClaim(credential, claims, requireField) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
             val rawLong = this.longOrNull
@@ -80,7 +83,6 @@ class NotBeforePolicy : CredentialVerificationPolicy2() {
                 )
             } else {
                 val availableSince = now - storedDate
-
                 Result.success(
                     NotBeforePolicyClaimCheckResult(
                         date = storedDate,

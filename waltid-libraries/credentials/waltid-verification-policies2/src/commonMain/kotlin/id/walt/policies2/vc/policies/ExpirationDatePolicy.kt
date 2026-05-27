@@ -8,17 +8,20 @@ import id.walt.w3c.JwtClaims
 import id.walt.w3c.VcClaims
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.long
-import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
 
 @Serializable
 @SerialName("expiration")
-class ExpirationDatePolicy : CredentialVerificationPolicy2() {
+class ExpirationDatePolicy(
+    /**
+     * If true, the policy fails when the exp claim is absent entirely.
+     * Default false for general use; set true for strict profiles (e.g. ETSI TS 119 472-1 EAA-5.2.7.1-03).
+     */
+    val requireField: Boolean = false
+) : CredentialVerificationPolicy2() {
     override val id = "expiration"
 
     companion object {
@@ -48,7 +51,7 @@ class ExpirationDatePolicy : CredentialVerificationPolicy2() {
         credential: DigitalCredential,
         context: PolicyExecutionContext
     ): Result<JsonElement> {
-        return PolicyClaimChecker.checkClaim(credential, claims) { claim ->
+        return PolicyClaimChecker.checkClaim(credential, claims, requireField) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
             val rawLong = this.longOrNull
@@ -76,7 +79,6 @@ class ExpirationDatePolicy : CredentialVerificationPolicy2() {
                 )
             } else {
                 val expiresIn = storedDate - now
-
                 Result.success(
                     ExpirationDateClaimCheckResult(
                         date = storedDate,
