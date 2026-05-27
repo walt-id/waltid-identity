@@ -55,7 +55,14 @@ class NotBeforePolicy : CredentialVerificationPolicy2() {
         ) { claim ->
             require(this is JsonPrimitive) { "Claim at $claim is not a JSON primitive" }
 
-            val storedDate = this.longOrNull?.let { Instant.fromEpochSeconds(this.long) } ?: Instant.parse(this.content)
+            val rawLong = this.longOrNull
+            // RFC 7519 §4.1.5: NumericDate is seconds since epoch.
+            // Values >= 1e12 (year ~33658) indicate milliseconds were used instead — non-conformant.
+            require(rawLong == null || rawLong < 1_000_000_000_000L) {
+                "Claim $claim value $rawLong appears to be in milliseconds, not seconds as required by RFC 7519 §4.1.5 (NumericDate)"
+            }
+
+            val storedDate = rawLong?.let { Instant.fromEpochSeconds(it) } ?: Instant.parse(this.content)
             val now = Clock.System.now()
 
             val isTooEarly = storedDate > now
