@@ -1,35 +1,33 @@
 package id.walt.wallet2.stores
 
-import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletDescriptor
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Pluggable wallet lifecycle store.
  *
- * Handles creation, retrieval, deletion and listing of [Wallet] instances.
- * Item-level stores (keys, credentials, DIDs) remain independent — this
- * interface only manages the wallet shell and account-to-wallet mappings.
+ * Stores and retrieves [WalletDescriptor] — the serializable configuration of
+ * a wallet (store IDs, static key/DID). The live [Wallet] object with runtime
+ * store instances is assembled by [id.walt.wallet2.server.WalletResolver] after
+ * loading the descriptor.
+ *
+ * Also extends [WalletAccountMapping] for optional account-ownership tracking
+ * when auth is enabled. Default implementations are no-ops.
  *
  * Implementations:
- * - [id.walt.wallet2.stores.inmemory.InMemoryWalletStore] — default, ships in
- *   the base library, no setup required, lost on restart
- * - OSS persistent — bring your own (e.g. Exposed + SQLite/Postgres); plug in
- *   via [id.walt.wallet2.server.WalletResolver.walletStore]
- * - Enterprise — MongoDB-backed implementation in waltid-enterprise-api,
- *   delegates wallet creation to WalletServiceInit
+ * - [inmemory.InMemoryWalletStore] — default, no setup, lost on restart
+ * - Exposed/SQL — pluggable persistent implementation (waltid-openid4vc-wallet-persistence)
+ * - Enterprise — MongoDB-backed via WalletServiceInit (in waltid-enterprise-api)
  */
-interface WalletStore {
+interface WalletStore : WalletAccountMapping {
 
-    /** Retrieve a wallet by its ID. Returns null if not found. */
-    suspend fun loadWallet(walletId: String): Wallet?
+    /** Retrieve a wallet descriptor by its ID. Returns null if not found. */
+    suspend fun loadDescriptor(walletId: String): WalletDescriptor?
 
     /**
-     * Persist a wallet.
-     *
-     * For in-memory implementations this is a simple map put.
-     * For persistent implementations this should be idempotent (upsert).
-     * For Enterprise this provisions a new WalletServiceReference node.
+     * Persist a wallet descriptor. Should be idempotent (upsert semantics).
      */
-    suspend fun saveWallet(wallet: Wallet)
+    suspend fun saveDescriptor(descriptor: WalletDescriptor)
 
     /** Remove a wallet by ID. No-op if not found. */
     suspend fun deleteWallet(walletId: String)
@@ -37,16 +35,7 @@ interface WalletStore {
     /** Stream all wallet IDs known to this store. */
     fun listWalletIds(): Flow<String>
 
-    /**
-     * Associate [walletId] with [accountId].
-     * Called automatically after wallet creation when auth is enabled.
-     */
-    suspend fun linkWalletToAccount(accountId: String, walletId: String) {}
-
-    /**
-     * Return all wallet IDs owned by [accountId], or null if the concept of
-     * account ownership is not applicable (e.g. Enterprise uses its own
-     * permission system and returns null to skip OSS-style enforcement).
-     */
-    suspend fun getWalletIdsForAccount(accountId: String): List<String>? = null
+    /** Convenience: collect all wallet IDs as a list. */
+    suspend fun listWalletIdsAsList(): Flow<String> = listWalletIds()
 }
+

@@ -1,5 +1,7 @@
 package id.walt.wallet2.stores
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Optional account-to-wallet ownership mapping.
  *
@@ -30,5 +32,5 @@ interface WalletAccountMapping {
      *
      * Default: returns null (no enforcement).
      */
-    suspend fun getWalletIdsForAccount(accountId: String): List<String>? = null
+    suspend fun getWalletIdsForAccount(accountId: String): Flow<String>? = null
 }
