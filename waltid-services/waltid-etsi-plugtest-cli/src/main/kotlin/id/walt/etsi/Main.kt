@@ -100,6 +100,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
 
         val effectiveIssuerUrl = issuerUrl ?: config.issuer.url
         val effectiveVct = vct ?: config.sdjwt.vct
+        // x5u: explicit CLI/config override takes priority; generator auto-derives for QEAA/PuBEAA if absent
         val effectiveX5u = config.issuer.x5u
 
         var generatedCount = 0
@@ -130,8 +131,11 @@ class GenerateCommand : CliktCommand(name = "generate") {
                                     x5u = effectiveX5u
                                 )
 
+                                // Use only the canonical test case ID part (before any parenthetical)
+                                // e.g. "SJV-EAA-4 (pseudonym)" -> "SJV-EAA-4"
+                                val canonicalId = testCase.id.substringBefore(" ").trim()
                                 val fileName = config.output.fileNamePattern
-                                    .replace("{testCaseId}", testCase.id)
+                                    .replace("{testCaseId}", canonicalId)
                                 val outputFile = File(effectiveOutputDir, "$fileName.json")
                                 outputFile.writeText(result.sdJwtVc)
                                 echo("    Generated: ${outputFile.name}")
@@ -146,8 +150,9 @@ class GenerateCommand : CliktCommand(name = "generate") {
                                     holderKey = holderKey
                                 )
 
+                                val canonicalId = testCase.id.substringBefore(" ").trim()
                                 val fileName = config.output.fileNamePattern
-                                    .replace("{testCaseId}", testCase.id)
+                                    .replace("{testCaseId}", canonicalId)
                                 val outputFile = File(effectiveOutputDir, "$fileName.cbor")
                                 outputFile.writeBytes(result.cborBytes)
                                 echo("    Generated: ${outputFile.name}")
