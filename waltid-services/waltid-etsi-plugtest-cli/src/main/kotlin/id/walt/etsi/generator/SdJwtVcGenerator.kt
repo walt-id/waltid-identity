@@ -241,7 +241,12 @@ object SdJwtVcGenerator {
                             }
                         }
                         !cleanItem.startsWith("vct") && cleanItem != "nbf" && cleanItem != "exp" && cleanItem != "iss" -> {
-                            put(cleanItem, "test_value_$cleanItem")
+                            // EAA-5.2.8.2-05 / EAA-5.2.12-02: oneTime and shortLived SHALL be null
+                            if (cleanItem == "oneTime" || cleanItem == "shortLived") {
+                                put(cleanItem, JsonNull)
+                            } else {
+                                put(cleanItem, "test_value_$cleanItem")
+                            }
                         }
                     }
                 }
@@ -252,11 +257,13 @@ object SdJwtVcGenerator {
             }
 
             if (testCase.isOneTime) {
-                put("one_time_use", true)
+                // EAA-5.2.8.2-05: oneTime SHALL have the null JSON primitive type
+                put("oneTime", JsonNull)
             }
 
             if (testCase.isShortLived) {
-                put("exp", now + (24 * 60 * 60))
+                // EAA-5.2.12-02: shortLived SHALL have the null JSON primitive type
+                put("shortLived", JsonNull)
             }
         }
     }
