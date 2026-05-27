@@ -1,8 +1,11 @@
 package id.walt.verifier2.verification2
 
 import id.walt.credentials.presentations.formats.*
+import id.walt.dcql.DcqlCredential
+import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
@@ -169,7 +172,17 @@ object PresentationVerificationEngine {
         vpTokenContents: ParsedVpToken, session: Verification2Session,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
-        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty
+        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
+        /**
+         * Optional callback for checking `trusted_authorities` constraints declared in a DCQL
+         * `CredentialQuery`. Receives the credential (wrapped as [DcqlCredential]) and the list of
+         * authority constraints; returns true if the credential satisfies at least one entry.
+         *
+         * When null (default), `trusted_authorities` constraints are not enforced.
+         * Pass [id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker.checker]
+         * from JVM callers to enable AKI-based authority verification.
+         */
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ) {
         // syntax sugar:
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
@@ -252,6 +265,41 @@ object PresentationVerificationEngine {
 
         session.updateSession(SessionEvent.validated_credentials_available) {
             presentedCredentials = allSuccessfullyValidatedAndProcessedData
+        }
+
+        // --- trusted_authorities check ---
+        // Per OID4VP §6.1.1: if a CredentialQuery specifies trusted_authorities, every credential
+        // presented for that query MUST satisfy at least one authority entry.
+        if (trustedAuthoritiesChecker != null) {
+            val dcqlQuery = session.authorizationRequest.dcqlQuery
+            if (dcqlQuery != null) {
+                for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
+                    val credentialQuery = dcqlQuery.credentials.find { it.id == queryId }
+                    val authorities = credentialQuery?.trustedAuthorities
+                    if (!authorities.isNullOrEmpty()) {
+                        for (credential in credentials) {
+                            val dcqlCredential = RawDcqlCredential(
+                                id = queryId,
+                                format = credentialQuery.format.name,
+                                data = credential.credentialData,
+                                originalCredential = credential
+                            )
+                            if (!trustedAuthoritiesChecker(dcqlCredential, authorities)) {
+                                val msg = "Credential for query '$queryId' does not satisfy trusted_authorities constraint"
+                                log.warn { msg }
+                                session.updateSession(SessionEvent.presentation_validation_available) {
+                                    failure = SessionFailure.PresentationValidation(
+                                        reason = msg,
+                                        failedPolicies = emptyMap()
+                                    )
+                                }
+                                session.failSession(SessionEvent.presentation_validation_failed)
+                                throw PresentationRejectionException(msg)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // --- DCQL validation ---
