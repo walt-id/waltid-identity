@@ -10,6 +10,7 @@ import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.policies2.vc.ExpirationDatePolicyException
 import id.walt.policies2.vc.NotBeforePolicyException
+import id.walt.policies2.vc.SerializableRuntimeException
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
 import id.walt.policies2.vc.policies.ExpirationDatePolicy
 import id.walt.policies2.vc.policies.NotBeforePolicy
@@ -22,6 +23,7 @@ import id.walt.policies2.vp.policies.MsoVerificationMdocVpPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.io.File
@@ -169,7 +171,8 @@ object CredentialValidator {
 
     // mdoc VP policies — used directly on MdocsCredential.document + documentMso
     private val issuerAuthPolicy = IssuerAuthMdocVpPolicy()
-    private val msoPolicy = MsoVerificationMdocVpPolicy()
+    // strictEtsiPrecision=true: enforce EAA-6.2.7.1-04/05 (ETSI TS 119 472-1) — no fractional seconds in validFrom/validUntil
+    private val msoPolicy = MsoVerificationMdocVpPolicy(strictEtsiPrecision = true)
     private val integrityPolicy = IssuerSignedDataMdocVpPolicy()
 
     /** Convert a VP PolicyRunResult to a plugtest PolicyCheckResult, preserving all detail fields. */
@@ -187,12 +190,28 @@ object CredentialValidator {
         policyId: String,
         result: Result<JsonElement>,
         status: ValidationResult.ValidationStatus
-    ) = PolicyCheckResult(
-        policyId = policyId,
-        status = status,
-        errorMessage = result.exceptionOrNull()?.message,
-        results = (result.getOrNull() as? JsonObject)?.toMap() ?: emptyMap()
-    )
+    ): PolicyCheckResult {
+        val ex = result.exceptionOrNull()
+        // Typed policy exceptions carry their data as fields — serialize them to get rich results.
+        // Plain exceptions fall back to message + empty results.
+        val results: Map<String, JsonElement> = when {
+            ex is SerializableRuntimeException ->
+                runCatching {
+                    @Suppress("UNCHECKED_CAST")
+                    val serializer = kotlinx.serialization.serializer(ex::class, emptyList(), false)
+                        as kotlinx.serialization.KSerializer<Any>
+                    (Json.encodeToJsonElement(serializer, ex) as? JsonObject)?.toMap().orEmpty()
+                }.getOrElse { emptyMap() }
+            else ->
+                (result.getOrNull() as? JsonObject)?.toMap().orEmpty()
+        }
+        return PolicyCheckResult(
+            policyId = policyId,
+            status = status,
+            errorMessage = ex?.message,
+            results = results
+        )
+    }
 
     suspend fun validate(vendorFile: VendorFile): ValidationResult {
         val verifiedAt = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
