@@ -19,6 +19,7 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     implementation(project(":waltid-libraries:credentials:waltid-verification-policies2"))
+    implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
 
     // Kotlinx

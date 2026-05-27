@@ -8,7 +8,6 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
-import id.walt.mdoc.verification.MdocVerifier
 import id.walt.policies2.vc.ExpirationDatePolicyException
 import id.walt.policies2.vc.NotBeforePolicyException
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
@@ -17,9 +16,14 @@ import id.walt.policies2.vc.policies.NotBeforePolicy
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vc.policies.VctIntegrityException
 import id.walt.policies2.vc.policies.VctIntegrityPolicy
+import id.walt.policies2.vp.policies.IssuerAuthMdocVpPolicy
+import id.walt.policies2.vp.policies.IssuerSignedDataMdocVpPolicy
+import id.walt.policies2.vp.policies.MsoVerificationMdocVpPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.security.MessageDigest
 import java.time.Instant
@@ -48,7 +52,9 @@ data class VendorFile(
 data class PolicyCheckResult(
     val policyId: String,
     val status: ValidationResult.ValidationStatus,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    /** Rich detail fields produced by the policy (e.g. signer key, digest info, timestamps). */
+    val results: Map<String, JsonElement> = emptyMap()
 )
 
 data class ValidationResult(
@@ -161,6 +167,33 @@ object CredentialValidator {
     /** Offline plugtest: skip value verification (requires fetching Type Metadata from network). */
     private val vctIntegrityPolicy = VctIntegrityPolicy(skipValueVerification = true)
 
+    // mdoc VP policies — used directly on MdocsCredential.document + documentMso
+    private val issuerAuthPolicy = IssuerAuthMdocVpPolicy()
+    private val msoPolicy = MsoVerificationMdocVpPolicy()
+    private val integrityPolicy = IssuerSignedDataMdocVpPolicy()
+
+    /** Convert a VP PolicyRunResult to a plugtest PolicyCheckResult, preserving all detail fields. */
+    private fun id.walt.policies2.vp.policies.VPPolicy2.PolicyRunResult.toCheckResult() =
+        PolicyCheckResult(
+            policyId = policyExecuted.id,
+            status = if (success) ValidationResult.ValidationStatus.VALID
+                     else ValidationResult.ValidationStatus.INVALID,
+            errorMessage = errors.firstOrNull()?.message,
+            results = results
+        )
+
+    /** Convert a CredentialVerificationPolicy2 Result<JsonElement> to a PolicyCheckResult. */
+    private fun policyResult(
+        policyId: String,
+        result: Result<JsonElement>,
+        status: ValidationResult.ValidationStatus
+    ) = PolicyCheckResult(
+        policyId = policyId,
+        status = status,
+        errorMessage = result.exceptionOrNull()?.message,
+        results = (result.getOrNull() as? JsonObject)?.toMap() ?: emptyMap()
+    )
+
     suspend fun validate(vendorFile: VendorFile): ValidationResult {
         val verifiedAt = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
         val hash = computeSha1Hash(vendorFile.content)
@@ -214,54 +247,42 @@ object CredentialValidator {
         // Checks presence (EAA-5.2.1.2-03 SHALL) and format.
         // Value correctness (requires fetching Type Metadata from vct URL) is CRIT-13 / out of scope offline.
         val vctResult = runCatching { vctIntegrityPolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
-        policyResults += PolicyCheckResult(
-            policyId = vctIntegrityPolicy.id,
-            status = when {
-                vctResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-                vctResult.exceptionOrNull() is VctIntegrityException &&
-                (vctResult.exceptionOrNull() as VctIntegrityException).reason.let {
-                    it == VctIntegrityException.Reason.MISSING || it == VctIntegrityException.Reason.MALFORMED ||
-                    it == VctIntegrityException.Reason.VALUE_MISMATCH
-                } -> ValidationResult.ValidationStatus.INVALID
-                else -> ValidationResult.ValidationStatus.INDETERMINATE
-            },
-            errorMessage = vctResult.exceptionOrNull()?.message
-        )
+        val vctStatus = when {
+            vctResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+            vctResult.exceptionOrNull() is VctIntegrityException &&
+            (vctResult.exceptionOrNull() as VctIntegrityException).reason.let {
+                it == VctIntegrityException.Reason.MISSING || it == VctIntegrityException.Reason.MALFORMED ||
+                it == VctIntegrityException.Reason.VALUE_MISMATCH
+            } -> ValidationResult.ValidationStatus.INVALID
+            else -> ValidationResult.ValidationStatus.INDETERMINATE
+        }
+        policyResults += policyResult(vctIntegrityPolicy.id, vctResult, vctStatus)
 
         // --- Signature policy (via CredentialSignaturePolicy) ---
         val sigResult = signaturePolicy.verify(credential, context)
-        policyResults += PolicyCheckResult(
-            policyId = "signature",
-            status = if (sigResult.isSuccess) ValidationResult.ValidationStatus.VALID
-                     else ValidationResult.ValidationStatus.INVALID,
-            errorMessage = sigResult.exceptionOrNull()?.message
-        )
+        val sigStatus = if (sigResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                        else ValidationResult.ValidationStatus.INVALID
+        policyResults += policyResult(signaturePolicy.id, sigResult, sigStatus)
 
         // --- Expiration policy ---
         // ExpirationDatePolicyException = credential is expired → INVALID (MUST reject per RFC 9901 §7.1 step 6)
         val expResult = runCatching { expirationPolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
-        policyResults += PolicyCheckResult(
-            policyId = "expiration",
-            status = when {
-                expResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-                expResult.exceptionOrNull() is ExpirationDatePolicyException -> ValidationResult.ValidationStatus.INVALID
-                else -> ValidationResult.ValidationStatus.INDETERMINATE
-            },
-            errorMessage = expResult.exceptionOrNull()?.message
-        )
+        val expStatus = when {
+            expResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+            expResult.exceptionOrNull() is ExpirationDatePolicyException -> ValidationResult.ValidationStatus.INVALID
+            else -> ValidationResult.ValidationStatus.INDETERMINATE
+        }
+        policyResults += policyResult(expirationPolicy.id, expResult, expStatus)
 
         // --- Not-before policy ---
         // NotBeforePolicyException = credential not yet valid → INVALID
         val nbfResult = runCatching { notBeforePolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
-        policyResults += PolicyCheckResult(
-            policyId = "not-before",
-            status = when {
-                nbfResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-                nbfResult.exceptionOrNull() is NotBeforePolicyException -> ValidationResult.ValidationStatus.INVALID
-                else -> ValidationResult.ValidationStatus.INDETERMINATE
-            },
-            errorMessage = nbfResult.exceptionOrNull()?.message
-        )
+        val nbfStatus = when {
+            nbfResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+            nbfResult.exceptionOrNull() is NotBeforePolicyException -> ValidationResult.ValidationStatus.INVALID
+            else -> ValidationResult.ValidationStatus.INDETERMINATE
+        }
+        policyResults += policyResult(notBeforePolicy.id, nbfResult, nbfStatus)
 
         // Overall signatureStatus: INVALID if any mandatory policy fails, VALID only if all pass.
         // Expiration and not-before are mandatory validity checks — a failed credential MUST be rejected.
@@ -340,39 +361,23 @@ object CredentialValidator {
             val sigStatus = if (verificationResult.isSuccess) ValidationResult.ValidationStatus.VALID
                             else ValidationResult.ValidationStatus.INVALID
 
-            // If parsed as MdocsCredential, also run MdocVerifier sub-steps for richer policy results
+            // If parsed as MdocsCredential, run the actual mdoc VP policies for rich per-policy results
             val policyResults = if (credential is id.walt.credentials.formats.MdocsCredential) {
-                val policyResults = mutableListOf<PolicyCheckResult>()
                 val document = credential.document
                 val mso = credential.documentMso
 
-                policyResults += PolicyCheckResult(
-                    policyId = "issuer_auth",
-                    status = sigStatus,
-                    errorMessage = verificationResult.exceptionOrNull()?.message
+                listOf(
+                    // issuer_auth: signature + x5chain (from the CredentialSignaturePolicy path above)
+                    PolicyCheckResult(
+                        policyId = issuerAuthPolicy.id,
+                        status = sigStatus,
+                        errorMessage = verificationResult.exceptionOrNull()?.message
+                    ),
+                    // mso_validity: validity timestamps + digest algorithm
+                    msoPolicy.runPolicy(document, mso, null).toCheckResult(),
+                    // issuer_signed_integrity: each data element digest matches MSO
+                    integrityPolicy.runPolicy(document, mso, null).toCheckResult(),
                 )
-
-                val msoResult = runCatching { MdocVerifier.verifyMso(mso) }
-                policyResults += PolicyCheckResult(
-                    policyId = "mso_validity",
-                    status = when {
-                        msoResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-                        msoResult.exceptionOrNull()?.message?.contains("valid", ignoreCase = true) == true ->
-                            ValidationResult.ValidationStatus.INVALID
-                        else -> ValidationResult.ValidationStatus.INDETERMINATE
-                    },
-                    errorMessage = msoResult.exceptionOrNull()?.message
-                )
-
-                val integrityResult = runCatching { MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso) }
-                policyResults += PolicyCheckResult(
-                    policyId = "issuer_signed_integrity",
-                    status = if (integrityResult.isSuccess) ValidationResult.ValidationStatus.VALID
-                             else ValidationResult.ValidationStatus.INVALID,
-                    errorMessage = integrityResult.exceptionOrNull()?.message
-                )
-
-                policyResults
             } else emptyList()
 
             val overallStatus = (policyResults.map { it.status } + sigStatus)
@@ -405,45 +410,20 @@ object CredentialValidator {
                 val mso = issuerSigned.decodeMobileSecurityObject()
                 log.debug { "MSO docType: ${mso.docType}" }
 
-                // Build a stub Document so we can reuse MdocVerifier sub-steps
+                // Build a stub Document so we can run the actual mdoc VP policy objects
                 val document = Document(docType = mso.docType, issuerSigned = issuerSigned)
 
-                val policyResults = mutableListOf<PolicyCheckResult>()
-
-                // --- issuer_auth: COSE_Sign1 signature + x5chain (via getParsedIssuerAuth for protected header fallback) ---
-                val issuerAuthResult = runCatching { MdocVerifier.verifyIssuerAuthentication(document) }
-                policyResults += PolicyCheckResult(
-                    policyId = "issuer_auth",
-                    status = if (issuerAuthResult.isSuccess) ValidationResult.ValidationStatus.VALID
-                             else ValidationResult.ValidationStatus.INVALID,
-                    errorMessage = issuerAuthResult.exceptionOrNull()?.message
+                val policyResults = listOf(
+                    // issuer_auth: COSE_Sign1 + x5chain (protected header fallback via getParsedIssuerAuth)
+                    issuerAuthPolicy.runPolicy(document, mso, null).toCheckResult(),
+                    // mso_validity: validity timestamps + supported digest algorithm
+                    msoPolicy.runPolicy(document, mso, null).toCheckResult(),
+                    // issuer_signed_integrity: each IssuerSignedItem digest matches MSO
+                    integrityPolicy.runPolicy(document, mso, null).toCheckResult(),
                 )
 
-                // --- mso: validity timestamps + digest algorithm ---
-                val msoResult = runCatching { MdocVerifier.verifyMso(mso) }
-                policyResults += PolicyCheckResult(
-                    policyId = "mso_validity",
-                    status = when {
-                        msoResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-                        msoResult.exceptionOrNull()?.message?.contains("expired", ignoreCase = true) == true ||
-                        msoResult.exceptionOrNull()?.message?.contains("valid", ignoreCase = true) == true ->
-                            ValidationResult.ValidationStatus.INVALID
-                        else -> ValidationResult.ValidationStatus.INDETERMINATE
-                    },
-                    errorMessage = msoResult.exceptionOrNull()?.message
-                )
-
-                // --- issuer_signed_integrity: each IssuerSignedItem digest matches MSO ---
-                val integrityResult = runCatching { MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso) }
-                policyResults += PolicyCheckResult(
-                    policyId = "issuer_signed_integrity",
-                    status = if (integrityResult.isSuccess) ValidationResult.ValidationStatus.VALID
-                             else ValidationResult.ValidationStatus.INVALID,
-                    errorMessage = integrityResult.exceptionOrNull()?.message
-                )
-
-                // Signature status is driven by issuer_auth; other failures are also recorded
-                val sigStatus = policyResults.first { it.policyId == "issuer_auth" }.status
+                // Signature status is driven by issuer_auth
+                val sigStatus = policyResults.first { it.policyId == issuerAuthPolicy.id }.status
                 val firstError = policyResults.firstOrNull { it.status != ValidationResult.ValidationStatus.VALID }
 
                 ValidationResult(
@@ -539,13 +519,22 @@ object XmlReportGenerator {
                 appendLine("  <ErrorMessage>${escapeXml(result.errorMessage)}</ErrorMessage>")
             }
 
-            // Per-policy results (SD-JWT-VC only)
+            // Per-policy results with full detail fields
             if (result.policyResults.isNotEmpty()) {
                 appendLine("  <PolicyResults>")
                 for (pr in result.policyResults) {
-                    if (pr.errorMessage != null) {
+                    val hasContent = pr.errorMessage != null || pr.results.isNotEmpty()
+                    if (hasContent) {
                         appendLine("    <PolicyResult policy=\"${escapeXml(pr.policyId)}\" status=\"${pr.status.name}\">")
-                        appendLine("      <ErrorMessage>${escapeXml(pr.errorMessage)}</ErrorMessage>")
+                        if (pr.errorMessage != null) {
+                            appendLine("      <ErrorMessage>${escapeXml(pr.errorMessage)}</ErrorMessage>")
+                        }
+                        for ((key, value) in pr.results) {
+                            // Render each result entry as a <Result key="..." value="..."/> element.
+                            // Trim to keep large values (e.g. PEM certs) readable but present.
+                            val rendered = value.toString().trim('"').take(512)
+                            appendLine("      <Result key=\"${escapeXml(key)}\">${escapeXml(rendered)}</Result>")
+                        }
                         appendLine("    </PolicyResult>")
                     } else {
                         appendLine("    <PolicyResult policy=\"${escapeXml(pr.policyId)}\" status=\"${pr.status.name}\"/>")
