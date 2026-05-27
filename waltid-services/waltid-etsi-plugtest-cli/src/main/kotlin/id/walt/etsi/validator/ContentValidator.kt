@@ -454,10 +454,9 @@ object ContentValidator {
     }
 
     private fun normalizeFieldName(field: String): String {
-        // Remove annotations like "(=dc+sd-jwt)" or "(contains a jwk element)"
+        // Remove annotations like "(=dc+sd-jwt)" or "(contains a jwk element)" but preserve # in field names like x5t#S256
         return field
-            .replace(Regex("\\s*\\(.*\\)"), "")
-            .replace(Regex("#.*"), "")
+            .replace(Regex("\\s*\\([^)]*\\)"), "")  // remove parenthetical notes
             .trim()
             .lowercase()
     }
