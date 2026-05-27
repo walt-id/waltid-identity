@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import id.walt.wallet2.client.NativeWalletClient
 import id.walt.wallet2.client.NativeWalletCredential
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.HttpEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +30,8 @@ class WalletViewModel : ViewModel() {
     val state: StateFlow<WalletUiState> = _state.asStateFlow()
 
     init {
+        WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.CIO)
+
         viewModelScope.launch {
             runCatching { client.bootstrap() }
                 .onSuccess { result ->
