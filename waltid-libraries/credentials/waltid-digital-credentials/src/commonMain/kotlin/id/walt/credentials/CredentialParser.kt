@@ -36,6 +36,9 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.*
 
+/** Thrown when an SD-JWT contains disclosures that cannot be reached from any payload digest hash (RFC 9901 §7.1 step 5) */
+class UnreachableDisclosuresException(message: String) : IllegalArgumentException(message)
+
 object CredentialParser {
 
     private val log = KotlinLogging.logger { }
@@ -325,7 +328,16 @@ object CredentialParser {
                 mappedDisclosures.mapIndexed { idx, it -> "$idx: ${it.name} -> $it" }.joinToString("\n")
             }
 
-            check(availableDisclosures.size == mappedDisclosures.size) { "Invalid disclosures: Different size after mapping disclosures (${availableDisclosures.size}) to mappable disclosable (${mappedDisclosures.size}), for credential: $credential" }
+            // Per RFC 9901 §7.1 step 5: "If any Disclosure was not referenced by digest value
+            // in the Issuer-signed JWT (directly or recursively via other Disclosures), the
+            // SD-JWT MUST be rejected." Throw a distinct exception so callers can return INVALID.
+            if (availableDisclosures.size != mappedDisclosures.size) {
+                throw UnreachableDisclosuresException(
+                    "Invalid disclosures: ${availableDisclosures.size} disclosures provided but " +
+                    "only ${mappedDisclosures.size} are reachable from the payload hashes. " +
+                    "Per RFC 9901 §7.1 step 5 this SD-JWT MUST be rejected."
+                )
+            }
             availableDisclosures = mappedDisclosures.toList()
         }
 
