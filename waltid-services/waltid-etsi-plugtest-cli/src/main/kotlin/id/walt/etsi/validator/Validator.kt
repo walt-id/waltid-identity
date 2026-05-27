@@ -8,15 +8,8 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
-import id.walt.policies2.vc.ExpirationDatePolicyException
-import id.walt.policies2.vc.NotBeforePolicyException
 import id.walt.policies2.vc.SerializableRuntimeException
-import id.walt.policies2.vc.policies.CredentialSignaturePolicy
-import id.walt.policies2.vc.policies.ExpirationDatePolicy
-import id.walt.policies2.vc.policies.NotBeforePolicy
-import id.walt.policies2.vc.policies.PolicyExecutionContext
-import id.walt.policies2.vc.policies.VctIntegrityException
-import id.walt.policies2.vc.policies.VctIntegrityPolicy
+import id.walt.policies2.vc.policies.*
 import id.walt.policies2.vp.policies.IssuerAuthMdocVpPolicy
 import id.walt.policies2.vp.policies.IssuerSignedDataMdocVpPolicy
 import id.walt.policies2.vp.policies.MsoVerificationMdocVpPolicy
@@ -164,10 +157,13 @@ object ZipParser {
 object CredentialValidator {
 
     private val signaturePolicy = CredentialSignaturePolicy()
-    private val expirationPolicy = ExpirationDatePolicy()
-    private val notBeforePolicy = NotBeforePolicy()
+    // requireField=true: ETSI TS 119 472-1 EAA-5.2.7.1-01/03 mandates both nbf and exp
+    private val expirationPolicy = ExpirationDatePolicy(requireField = true)
+    private val notBeforePolicy = NotBeforePolicy(requireField = true)
     /** Offline plugtest: skip value verification (requires fetching Type Metadata from network). */
     private val vctIntegrityPolicy = VctIntegrityPolicy(skipValueVerification = true)
+    /** ETSI-specific SD-JWT VC checks (QC cert + forbidden claims + status structure). */
+    private val etsiSdJwtVcPolicy = EtsiSdJwtVcPolicy()
 
     // mdoc VP policies — used directly on MdocsCredential.document + documentMso
     private val issuerAuthPolicy = IssuerAuthMdocVpPolicy()
@@ -317,6 +313,12 @@ object CredentialValidator {
             else -> ValidationResult.ValidationStatus.INVALID
         }
         policyResults += policyResult(notBeforePolicy.id, nbfResult, nbfStatus)
+
+        // --- ETSI TS 119 472-1 specific checks (QC cert + forbidden claims + status structure) ---
+        val etsiResult = runCatching { etsiSdJwtVcPolicy.verify(credential) }.getOrElse { Result.failure(it) }
+        val etsiStatus = if (etsiResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                         else ValidationResult.ValidationStatus.INVALID
+        policyResults += policyResult(etsiSdJwtVcPolicy.id, etsiResult, etsiStatus)
 
         // Overall signatureStatus: INVALID if any mandatory policy fails, VALID only if all pass.
         // Expiration and not-before are mandatory validity checks — a failed credential MUST be rejected.
