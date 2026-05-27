@@ -208,7 +208,10 @@ object CredentialValidator {
         return PolicyCheckResult(
             policyId = policyId,
             status = status,
-            errorMessage = ex?.message,
+            // Simplify JsonPath toString in error messages the same way we do for result values
+            errorMessage = ex?.message?.replace(
+                Regex("JsonPath\\(tokens=\\[.*?AccessorToken\\(key=(\\w+)\\).*?\\)"), "\\\$.$1"
+            ),
             results = results
         )
     }
@@ -235,12 +238,24 @@ object CredentialValidator {
                 errorMessage = e.message
             )
         } catch (e: Throwable) {
-            log.error(e) { "Error validating ${vendorFile.fileName}" }
+            // Network/IO failures genuinely prevent determination → INDETERMINATE.
+            // Everything else (parse failure, malformed content, spec violation) → INVALID.
+            val isNetworkError = e is java.net.UnknownHostException
+                || e is java.net.ConnectException
+                || e is java.net.SocketTimeoutException
+                || e is java.io.IOException && (e.message?.contains("connect", ignoreCase = true) == true
+                    || e.message?.contains("resolve", ignoreCase = true) == true)
+            val status = if (isNetworkError)
+                ValidationResult.ValidationStatus.INDETERMINATE
+            else
+                ValidationResult.ValidationStatus.INVALID
+            if (isNetworkError) log.warn { "INDETERMINATE (network error) ${vendorFile.fileName}: ${e.message}" }
+            else log.error(e) { "INVALID (unhandled error) ${vendorFile.fileName}" }
             ValidationResult(
                 vendorId = vendorFile.vendorId,
                 fileName = vendorFile.fileName,
                 testCaseId = vendorFile.testCaseId,
-                signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
+                signatureStatus = status,
                 verifiedAt = verifiedAt,
                 hash = hash,
                 errorMessage = "Validation error: ${e.message}"
@@ -288,8 +303,8 @@ object CredentialValidator {
         val expResult = runCatching { expirationPolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
         val expStatus = when {
             expResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-            expResult.exceptionOrNull() is ExpirationDatePolicyException -> ValidationResult.ValidationStatus.INVALID
-            else -> ValidationResult.ValidationStatus.INDETERMINATE
+            // Any failure evaluating expiry → INVALID (expired, malformed claim, or unexpected error)
+            else -> ValidationResult.ValidationStatus.INVALID
         }
         policyResults += policyResult(expirationPolicy.id, expResult, expStatus)
 
@@ -298,8 +313,8 @@ object CredentialValidator {
         val nbfResult = runCatching { notBeforePolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
         val nbfStatus = when {
             nbfResult.isSuccess -> ValidationResult.ValidationStatus.VALID
-            nbfResult.exceptionOrNull() is NotBeforePolicyException -> ValidationResult.ValidationStatus.INVALID
-            else -> ValidationResult.ValidationStatus.INDETERMINATE
+            // Any failure evaluating not-before → INVALID (not yet valid, malformed claim, or unexpected error)
+            else -> ValidationResult.ValidationStatus.INVALID
         }
         policyResults += policyResult(notBeforePolicy.id, nbfResult, nbfStatus)
 
@@ -365,14 +380,25 @@ object CredentialValidator {
             }
 
             if (signerKey == null) {
+                // If the credential doesn't carry key material (no x5c, unresolvable DID, etc.)
+                // we can't distinguish network failure from a spec violation without the original exception.
+                // Re-attempt to capture the cause for accurate status determination.
+                val keyError = runCatching { credential.getSignerKey() }.exceptionOrNull()
+                val isNetworkKeyError = keyError is java.net.UnknownHostException
+                    || keyError is java.net.ConnectException
+                    || keyError is java.net.SocketTimeoutException
+                val keyStatus = if (isNetworkKeyError)
+                    ValidationResult.ValidationStatus.INDETERMINATE
+                else
+                    ValidationResult.ValidationStatus.INVALID
                 return ValidationResult(
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
                     testCaseId = vendorFile.testCaseId,
-                    signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
+                    signatureStatus = keyStatus,
                     verifiedAt = verifiedAt,
                     hash = hash,
-                    errorMessage = "Could not retrieve issuer key from mdoc"
+                    errorMessage = "Could not retrieve issuer key from mdoc: ${keyError?.message ?: "unknown error"}"
                 )
             }
 
@@ -465,11 +491,13 @@ object CredentialValidator {
             } catch (issuerSignedError: Exception) {
                 log.error(issuerSignedError) { "IssuerSigned parsing also failed" }
 
+                // A conformant mdoc MUST be parseable as Document, DeviceResponse, or IssuerSigned.
+                // Parse failure means non-conformant structure → INVALID (not INDETERMINATE).
                 ValidationResult(
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
                     testCaseId = vendorFile.testCaseId,
-                    signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
+                    signatureStatus = ValidationResult.ValidationStatus.INVALID,
                     verifiedAt = verifiedAt,
                     hash = hash,
                     details = "Structure: $structureInfo",
