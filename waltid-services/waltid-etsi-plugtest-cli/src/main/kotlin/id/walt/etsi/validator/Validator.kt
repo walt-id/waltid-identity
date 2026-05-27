@@ -583,10 +583,11 @@ object XmlReportGenerator {
                                 .trim('"')
                                 // Simplify JsonPath toString: JsonPath(tokens=[ObjectAccessorToken(key=exp)]) -> $.exp
                                 .replace(Regex("JsonPath\\(tokens=\\[.*?AccessorToken\\(key=(\\w+)\\).*?\\)"), "\\\$.$1")
-                            // Use CDATA only when the value contains XML-special characters;
-                            // use plain text for simple values (booleans, numbers, plain strings)
-                            val needsCdata = raw.any { it == '<' || it == '>' || it == '&' || it == '"' || it == '\'' }
-                            val rendered = if (needsCdata) "<![CDATA[$raw]]>" else escapeXml(raw)
+                            // Use CDATA only when the value contains XML-special characters that
+                            // break element content: '<', '>', '&'.
+                            // Quotes/apostrophes are only problematic in XML attributes, not element text.
+                            val needsCdata = raw.any { it == '<' || it == '>' || it == '&' }
+                            val rendered = if (needsCdata) "<![CDATA[\n$raw\n]]>" else escapeXml(raw)
                             appendLine("      <Result key=\"${escapeXml(key)}\">$rendered</Result>")
                         }
                         appendLine("    </PolicyResult>")
