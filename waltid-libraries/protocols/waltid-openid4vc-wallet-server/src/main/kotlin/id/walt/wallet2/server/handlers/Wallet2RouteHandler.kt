@@ -51,7 +51,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -374,7 +376,12 @@ object Wallet2RouteHandler {
                     val key = (req.keyId?.let { wallet.findKey(it) } ?: wallet.defaultKey())
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "No key available for DID creation")
                     val did = DidService.registerByKey(req.method, key)
-                    val entry = WalletDidEntry(did = did.did, document = did.didDocument.toString())
+                    val entry = WalletDidEntry(
+                        did = did.did,
+                        document = runCatching {
+                            Json.parseToJsonElement(did.didDocument.toString()).jsonObject
+                        }.getOrElse { JsonObject(emptyMap()) }
+                    )
                     didStore.addDid(entry)
                     call.respond(HttpStatusCode.Created, entry)
                 }
@@ -388,7 +395,12 @@ object Wallet2RouteHandler {
                     val req = call.receive<ImportDidRequest>()
                     val didStore = wallet.didStore
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "Wallet has no DID store")
-                    val entry = WalletDidEntry(did = req.did, document = req.document)
+                    val entry = WalletDidEntry(
+                        did = req.did,
+                        document = runCatching {
+                            Json.parseToJsonElement(req.document).jsonObject
+                        }.getOrElse { JsonObject(emptyMap()) }
+                    )
                     didStore.addDid(entry)
                     call.respond(HttpStatusCode.Created, entry)
                 }
