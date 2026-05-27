@@ -56,6 +56,8 @@ val modules = listOfNotNull(
         "waltid-openid4vp-clientidprefix",
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
+        "waltid-openid4vc-wallet",
+        "waltid-openid4vc-wallet-server",
     ),
 
     * "$libraries:sdjwt".group(
@@ -90,6 +92,7 @@ val modules = listOfNotNull(
     "$services:waltid-verifier-api",
     "$services:waltid-verifier-api2",
     "$services:waltid-wallet-api",
+    "$services:waltid-wallet-api2",
 
     // Service tests
     "$services:waltid-e2e-tests",

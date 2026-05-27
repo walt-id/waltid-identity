@@ -6,6 +6,7 @@ import id.walt.crypto.utils.Base64Utils.matchesBase64Url
 import id.walt.crypto.utils.HexUtils.matchesHex
 import id.walt.mdoc.objects.deviceretrieval.DeviceResponse
 import id.walt.mdoc.objects.document.Document
+import id.walt.mdoc.objects.document.IssuerSigned
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -31,8 +32,16 @@ object MdocParser {
             log.trace { "Parsed mdoc as DeviceResponse" }
             deviceResponse.documents?.firstOrNull() ?: throw IllegalArgumentException("Mdoc document not found in DeviceResponse")
         }.recoverCatching {
-            log.trace { "Parsing mdoc as Document (not DeviceRespons)" }
+            log.trace { "Parsing mdoc as Document (not DeviceResponse)" }
             coseCompliantCbor.decodeFromByteArray<Document>(signedBytes)
+        }.recoverCatching {
+            // OID4VCI §mso_mdoc: the credential response contains a bare IssuerSigned structure.
+            // Reconstruct the Document using the docType from the MSO in the issuerAuth COSE structure.
+            log.trace { "Parsing mdoc as IssuerSigned (OID4VCI credential response format)" }
+            val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(signedBytes)
+            val docType = issuerSigned.decodeMobileSecurityObject().docType
+            log.trace { "Parsed mdoc as IssuerSigned, docType=$docType" }
+            Document(docType = docType, issuerSigned = issuerSigned)
         }.getOrElse { ex ->
             throw IllegalArgumentException("Was unable to parse mdoc document: ${ex.message}", ex)
         }
