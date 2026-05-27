@@ -59,4 +59,6 @@ tasks.withType<Jar> {
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
+    // Exclude JAR signing artifacts to prevent SecurityException on signed dependency JARs
+    exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA", "META-INF/*.EC")
 }
