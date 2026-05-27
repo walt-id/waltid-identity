@@ -6,7 +6,10 @@ import kotlinx.serialization.json.JsonObject
 
 object JwtUtils {
 
-    fun String.isJwt() = startsWith("ey") && count { it == '.' } == 2
+    // Per RFC 9901 §4 ABNF: SD-JWT-KB = SD-JWT KB-JWT, where SD-JWT = JWT "~" *(DISCLOSURE "~").
+    // The full SD-JWT+KB string contains the KB-JWT after the last "~", which adds more dots.
+    // We must only check the issuer-signed JWT part (before the first "~") for the 3-part JWT structure.
+    fun String.isJwt() = substringBefore("~").let { it.startsWith("ey") && it.count { c -> c == '.' } == 2 }
 
     fun parseJwt(jwt: String): Triple<JsonObject, JsonObject, String> = jwt.split(".").let {
         check(it.size == 3)
