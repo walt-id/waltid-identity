@@ -34,13 +34,8 @@ interface WalletStore {
     /** Remove a wallet by ID. No-op if not found. */
     suspend fun deleteWallet(walletId: String)
 
-    /** List all wallet IDs known to this store. */
-    suspend fun listWalletIds(): List<String>
-
-    // ---------------------------------------------------------------------------
-    // Account ↔ wallet mapping — used when auth is enabled.
-    // Default implementations are no-ops (auth-disabled deployments).
-    // ---------------------------------------------------------------------------
+    /** Stream all wallet IDs known to this store. */
+    fun listWalletIds(): Flow<String>
 
     /**
      * Associate [walletId] with [accountId].

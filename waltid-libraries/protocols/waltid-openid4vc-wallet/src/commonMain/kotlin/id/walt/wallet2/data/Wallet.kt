@@ -3,6 +3,7 @@ package id.walt.wallet2.data
 import id.walt.crypto.keys.Key
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.toList
 
 /**
  * Represents a wallet instance composed of its storage backends.
@@ -68,7 +69,7 @@ data class Wallet(
 
     /** Lists all keys across all key stores, in store order. */
     suspend fun listAllKeys(): List<WalletKeyInfo> =
-        keyStores.flatMap { it.listKeys() }
+        keyStores.flatMap { it.listKeys().toList() }
 
     /** Streams all credentials across all credential stores, in store order. */
     fun streamAllCredentials(): Flow<StoredCredential> = flow {

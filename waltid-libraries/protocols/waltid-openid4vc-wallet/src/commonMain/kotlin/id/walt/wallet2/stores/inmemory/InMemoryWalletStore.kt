@@ -2,6 +2,8 @@ package id.walt.wallet2.stores.inmemory
 
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.stores.WalletStore
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 
 /**
  * In-memory [WalletStore] implementation.
@@ -27,7 +29,7 @@ class InMemoryWalletStore : WalletStore {
         wallets.remove(walletId)
     }
 
-    override suspend fun listWalletIds(): List<String> = wallets.keys.toList()
+    override fun listWalletIds(): Flow<String> = wallets.keys.toList().asFlow()
 
     override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
         accountWallets.getOrPut(accountId) { mutableListOf() }.add(walletId)
