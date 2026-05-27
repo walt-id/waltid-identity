@@ -243,11 +243,10 @@ object ContentValidator {
         for ((index, required) in normalizedRequired.withIndex()) {
             val originalName = requiredItems[index]
 
-            // Check if field is present (with various matching strategies)
+            // Exact match only after normalization, substring matching causes false positives
+            // e.g. "iss_reg_id".contains("iss") would wrongly match the iss claim
             val isPresent = normalizedActual.any { actual ->
-                actual == required ||
-                actual.contains(required) ||
-                required.contains(actual)
+                actual == required
             } || checkSpecialField(originalName, actualObject)
 
             if (isPresent) {
