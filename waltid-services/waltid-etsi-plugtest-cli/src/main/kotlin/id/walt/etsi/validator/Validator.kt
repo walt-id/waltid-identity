@@ -337,17 +337,61 @@ object CredentialValidator {
             }
 
             val verificationResult = credential.verify(signerKey)
+            val sigStatus = if (verificationResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                            else ValidationResult.ValidationStatus.INVALID
+
+            // If parsed as MdocsCredential, also run MdocVerifier sub-steps for richer policy results
+            val policyResults = if (credential is id.walt.credentials.formats.MdocsCredential) {
+                val policyResults = mutableListOf<PolicyCheckResult>()
+                val document = credential.document
+                val mso = credential.documentMso
+
+                policyResults += PolicyCheckResult(
+                    policyId = "issuer_auth",
+                    status = sigStatus,
+                    errorMessage = verificationResult.exceptionOrNull()?.message
+                )
+
+                val msoResult = runCatching { MdocVerifier.verifyMso(mso) }
+                policyResults += PolicyCheckResult(
+                    policyId = "mso_validity",
+                    status = when {
+                        msoResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+                        msoResult.exceptionOrNull()?.message?.contains("valid", ignoreCase = true) == true ->
+                            ValidationResult.ValidationStatus.INVALID
+                        else -> ValidationResult.ValidationStatus.INDETERMINATE
+                    },
+                    errorMessage = msoResult.exceptionOrNull()?.message
+                )
+
+                val integrityResult = runCatching { MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso) }
+                policyResults += PolicyCheckResult(
+                    policyId = "issuer_signed_integrity",
+                    status = if (integrityResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                             else ValidationResult.ValidationStatus.INVALID,
+                    errorMessage = integrityResult.exceptionOrNull()?.message
+                )
+
+                policyResults
+            } else emptyList()
+
+            val overallStatus = (policyResults.map { it.status } + sigStatus)
+                .firstOrNull { it == ValidationResult.ValidationStatus.INVALID }
+                ?: (policyResults.map { it.status } + sigStatus)
+                    .firstOrNull { it == ValidationResult.ValidationStatus.INDETERMINATE }
+                ?: ValidationResult.ValidationStatus.VALID
 
             ValidationResult(
                 vendorId = vendorFile.vendorId,
                 fileName = vendorFile.fileName,
                 testCaseId = vendorFile.testCaseId,
-                signatureStatus = if (verificationResult.isSuccess) ValidationResult.ValidationStatus.VALID
-                                  else ValidationResult.ValidationStatus.INVALID,
+                signatureStatus = overallStatus,
                 verifiedAt = verifiedAt,
                 hash = hash,
                 details = "Detection: ${detectionResult.credentialPrimaryType}/${detectionResult.credentialSubType}",
-                errorMessage = verificationResult.exceptionOrNull()?.message
+                errorMessage = (policyResults.firstOrNull { it.status != ValidationResult.ValidationStatus.VALID }
+                    ?.errorMessage) ?: verificationResult.exceptionOrNull()?.message,
+                policyResults = policyResults
             )
         } catch (e: Exception) {
             log.debug { "CredentialParser failed, trying IssuerSigned format (ETSI plugtest format): ${e.message}" }
