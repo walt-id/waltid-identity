@@ -1,5 +1,6 @@
 package id.walt.wallet2
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
@@ -8,6 +9,9 @@ import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
+import id.walt.wallet2.persistence.ExposedWalletStore
+import id.walt.wallet2.persistence.Wallet2PersistenceConfig
+import id.walt.wallet2.persistence.initWallet2Database
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -28,6 +32,12 @@ suspend fun main(args: Array<String>) {
             features = OSSWallet2FeatureCatalog,
             init = {
                 DidService.minimalInit()
+                // If persistence is enabled, swap in the Exposed-backed wallet store
+                if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.persistenceFeature)) {
+                    val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
+                    val db = initWallet2Database(config)
+                    OSSWallet2Service.walletStore = ExposedWalletStore(db)
+                }
             },
             run = WebService(Application::wallet2Module).run()
         )
