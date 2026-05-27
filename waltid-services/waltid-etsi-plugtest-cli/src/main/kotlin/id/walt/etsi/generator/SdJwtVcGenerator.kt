@@ -39,6 +39,16 @@ object SdJwtVcGenerator {
         val payload = buildPayload(testCase, issuerUrl, vct, holderKey)
         val selectiveDisclosures = buildSelectiveDisclosures(testCase, payload)
 
+        // QEAA-5.6.2-02 / PuB-EAA-5.6.3-02 (ETSI TS 119 472-1): x5u SHALL be present
+        // for QEAA and PuBEAA. If not supplied explicitly, derive from issuerUrl.
+        val effectiveX5u: String? = when {
+            x5u != null -> x5u
+            testCase.id.contains("QEAA", ignoreCase = true) ||
+            testCase.id.contains("PuBEAA", ignoreCase = true) ->
+                "$issuerUrl/cert.pem"
+            else -> null
+        }
+
         val sdPayload = SDPayload.createSDPayload(
             fullPayload = payload,
             disclosureMap = selectiveDisclosures
@@ -47,15 +57,15 @@ object SdJwtVcGenerator {
         val additionalHeaders = mutableMapOf<String, Any>(
             "x5c" to x5cChain
         )
-        
+
         // Add x5t#S256 (certificate thumbprint) if computed
         if (x5tS256 != null) {
             additionalHeaders["x5t#S256"] = x5tS256
         }
-        
-        // Add x5u (certificate URL) if provided
-        if (x5u != null) {
-            additionalHeaders["x5u"] = x5u
+
+        // Add x5u (certificate URL) if applicable
+        if (effectiveX5u != null) {
+            additionalHeaders["x5u"] = effectiveX5u
         }
 
         val cryptoProvider = WaltIdJWTCryptoProvider(issuerKey)
@@ -76,8 +86,8 @@ object SdJwtVcGenerator {
             if (x5tS256 != null) {
                 put("x5t#S256", x5tS256)
             }
-            if (x5u != null) {
-                put("x5u", x5u)
+            if (effectiveX5u != null) {
+                put("x5u", effectiveX5u)
             }
         }
 
@@ -183,6 +193,19 @@ object SdJwtVcGenerator {
             put("iat", now)
             existingKeys.add("iat")
 
+            // ETSI TS 119 472-1: category claim is required for QEAA and PuBEAA SD-JWT VCs
+            val testCaseUpper = testCase.id.uppercase()
+            when {
+                testCaseUpper.contains("QEAA") -> {
+                    put("category", "urn:etsi:esi:eaa:eu:qualified")
+                    existingKeys.add("category")
+                }
+                testCaseUpper.contains("PUBEAA") -> {
+                    put("category", "urn:etsi:esi:eaa:eu:pub")
+                    existingKeys.add("category")
+                }
+                // plain EAA: no category claim per ETSI TS 119 472-1 §5.2.2.1
+            }
             put("issuing_authority", "ETSI Test Authority")
             existingKeys.add("issuing_authority")
             put("given_name", "Max")
