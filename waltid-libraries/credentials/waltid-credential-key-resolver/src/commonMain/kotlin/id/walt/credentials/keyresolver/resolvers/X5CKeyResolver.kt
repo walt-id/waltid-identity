@@ -2,7 +2,7 @@ package id.walt.credentials.keyresolver.resolvers
 
 import id.walt.credentials.trustedauthorities.X5CChainValidatorHelper
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -17,11 +17,9 @@ object X5CKeyResolver : BaseKeyResolver {
         val certificateChainStrings = x5c.map { it.jsonPrimitive.content }
         val issuerCertificate = certificateChainStrings.first()
 
-        // (check signatures, expiration, and if trusting the root CA)
-
-        // Validate the certificate chain when more than one cert is present.
+        // Per RFC 7515 §4.1.6, x5c values are base64-encoded (standard), not base64url.
         if (certificateChainStrings.size > 1) {
-            X5CChainValidatorHelper.verifyChain(certificateChainStrings.map { it.decodeFromBase64Url() })
+            X5CChainValidatorHelper.verifyChain(certificateChainStrings.map { it.decodeFromBase64() })
         }
 
         return JWKKey.importDERorPEM(issuerCertificate).getOrThrow()
