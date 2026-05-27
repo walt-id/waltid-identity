@@ -29,6 +29,7 @@ class NotBeforePolicy : CredentialVerificationPolicy2() {
     }
 
     @Serializable
+    @SerialName("NotBeforePolicyClaimCheckResult")
     data class NotBeforePolicyClaimCheckResult(
         val date: Instant,
 

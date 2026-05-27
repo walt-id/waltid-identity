@@ -20,6 +20,7 @@ data class RegexPolicy(
     override val id = "regex"
 
     @Serializable
+    @SerialName("CredentialDataMatcherResult")
     data class CredentialDataMatcherResult(
         val value: String?,
         val groups: List<String>? = null

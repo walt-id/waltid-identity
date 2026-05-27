@@ -26,6 +26,7 @@ object PolicyClaimChecker {
     }
 
     @Serializable
+    @SerialName("ClaimNotFoundClaimCheckResult")
     class ClaimNotFoundClaimCheckResult(
 
     ) : ClaimCheckResult() {

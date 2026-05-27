@@ -29,6 +29,7 @@ data class AllowedIssuerPolicy(
     }
 
     @Serializable
+    @SerialName("AllowedIssuerPolicyClaimCheckResult")
     data class AllowedIssuerPolicyClaimCheckResult(
         val issuer: String,
 

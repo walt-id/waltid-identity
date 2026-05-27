@@ -28,6 +28,7 @@ class ExpirationDatePolicy : CredentialVerificationPolicy2() {
     }
 
     @Serializable
+    @SerialName("ExpirationDateClaimCheckResult")
     data class ExpirationDateClaimCheckResult(
         val date: Instant,
 
