@@ -16,6 +16,7 @@ import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.flow.asFlow
 
 /**
  * OSS [WalletResolver] and route registration.
@@ -56,15 +57,15 @@ object OSSWallet2Service {
 
         override suspend fun resolveKeyStore(storeId: String) = namedKeyStores[storeId]
         override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) { namedKeyStores[storeId] = store }
-        override suspend fun listKeyStoreIds() = namedKeyStores.keys.toList()
+        override fun listKeyStoreIds() = namedKeyStores.keys.asFlow()
 
         override suspend fun resolveCredentialStore(storeId: String) = namedCredentialStores[storeId]
         override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) { namedCredentialStores[storeId] = store }
-        override suspend fun listCredentialStoreIds() = namedCredentialStores.keys.toList()
+        override fun listCredentialStoreIds() = namedCredentialStores.keys.asFlow()
 
         override suspend fun resolveDidStore(storeId: String) = namedDidStores[storeId]
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) { namedDidStores[storeId] = store }
-        override suspend fun listDidStoreIds() = namedDidStores.keys.toList()
+        override fun listDidStoreIds() = namedDidStores.keys.asFlow()
 
         // When auth is enabled, account↔wallet mappings are owned by OSSWallet2AccountStore
         // so that GET /auth/account/wallets and wallet ownership enforcement stay in sync.
