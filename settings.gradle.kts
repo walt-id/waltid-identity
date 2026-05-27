@@ -101,6 +101,9 @@ val modules = listOfNotNull(
     "$services:waltid-integration-tests",
     "$services:waltid-openid4vp-conformance-runners",
 
+    // ETSI Plugtest CLI
+    "$services:waltid-etsi-plugtest-cli",
+
     // CLI
     "$applications:waltid-cli",
 
