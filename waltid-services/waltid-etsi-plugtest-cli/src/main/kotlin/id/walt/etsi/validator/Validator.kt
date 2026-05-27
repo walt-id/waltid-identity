@@ -1,5 +1,6 @@
 package id.walt.etsi.validator
 
+import id.walt.cose.CoseHeaders
 import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialParser
@@ -272,7 +273,12 @@ object CredentialValidator {
                 
                 // Verify the issuer signature
                 val issuerAuth = issuerSigned.issuerAuth
+                // Per ISO 18013-5 §9.1.2.4: x5chain SHALL be in the unprotected header,
+                // but readers SHOULD also support x5chain in the protected header.
                 val x5c = issuerAuth.unprotected.x5chain
+                    ?: runCatching {
+                        coseCompliantCbor.decodeFromByteArray<CoseHeaders>(issuerAuth.protected).x5chain
+                    }.getOrNull()
                 
                 if (x5c.isNullOrEmpty()) {
                     return ValidationResult(
