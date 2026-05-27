@@ -23,7 +23,7 @@ class WalletBaseLibraryTest {
     @Test
     fun testInMemoryKeyStore() = runTest {
         val store = InMemoryKeyStore()
-        assertTrue(store.listKeys().isEmpty())
+        assertTrue(store.listKeys().toList().isEmpty())
         assertNull(store.getDefaultKey())
     }
 
@@ -33,7 +33,7 @@ class WalletBaseLibraryTest {
         assertTrue(store.listDids().toList().isEmpty())
         assertNull(store.getDefaultDid())
 
-        val entry = WalletDidEntry(did = "did:key:test", document = "{}")
+        val entry = WalletDidEntry(did = "did:key:test", document = JsonObject(emptyMap()))
         store.addDid(entry)
 
         val dids = store.listDids().toList()
