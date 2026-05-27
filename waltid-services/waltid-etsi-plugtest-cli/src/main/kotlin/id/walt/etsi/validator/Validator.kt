@@ -137,7 +137,7 @@ object CredentialValidator {
                 VendorFile.FileFormat.SD_JWT_VC -> validateSdJwtVc(vendorFile, verifiedAt, hash)
                 VendorFile.FileFormat.MDOC -> validateMdoc(vendorFile, verifiedAt, hash)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             log.error(e) { "Error validating ${vendorFile.fileName}" }
             ValidationResult(
                 vendorId = vendorFile.vendorId,

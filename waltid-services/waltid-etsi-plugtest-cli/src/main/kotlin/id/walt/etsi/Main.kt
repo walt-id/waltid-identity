@@ -83,14 +83,14 @@ class GenerateCommand : CliktCommand(name = "generate") {
             configKeyJwk = config.issuer.keyJwk,
             name = "issuer"
         )
-        
+
         val holderKey = loadKey(
             cliKeyFile = holderKeyFile,
             configKeyFile = config.holder.keyFile,
             configKeyJwk = config.holder.keyJwk,
             name = "holder"
         )
-        
+
         val issuerCert = loadCertificate(
             cliCertFile = issuerCertFile,
             configCertFile = config.issuer.certificateFile,
@@ -179,15 +179,18 @@ class GenerateCommand : CliktCommand(name = "generate") {
                 echo("Loading $name key from CLI option: ${cliKeyFile.absolutePath}")
                 KeyManager.resolveSerializedKey(cliKeyFile.readText()) as JWKKey
             }
+
             configKeyFile != null -> {
                 val file = ConfigManager.resolvePath(configKeyFile)
                 echo("Loading $name key from config file: ${file.absolutePath}")
                 KeyManager.resolveSerializedKey(file.readText()) as JWKKey
             }
+
             configKeyJwk != null -> {
                 echo("Loading $name key from inline JWK in config")
                 KeyManager.resolveSerializedKey(configKeyJwk) as JWKKey
             }
+
             else -> {
                 echo("Generating new $name key (P-256)")
                 JWKKey.generate(KeyType.secp256r1)
@@ -205,15 +208,18 @@ class GenerateCommand : CliktCommand(name = "generate") {
                 echo("Loading certificate from CLI option: ${cliCertFile.absolutePath}")
                 cliCertFile.readText()
             }
+
             configCertFile != null -> {
                 val file = ConfigManager.resolvePath(configCertFile)
                 echo("Loading certificate from config file: ${file.absolutePath}")
                 file.readText()
             }
+
             configCertPem != null -> {
                 echo("Using inline certificate from config")
                 configCertPem
             }
+
             else -> {
                 log.warn { "No certificate provided, using placeholder. For production, provide a proper certificate chain." }
                 DEFAULT_CERTIFICATE
@@ -258,7 +264,7 @@ class ListCommand : CliktCommand(name = "list") {
             if (format != null && formatData.id != format) continue
 
             echo("\n${formatData.name} (${formatData.id})")
-            echo("=" .repeat(50))
+            echo("=".repeat(50))
 
             for (profileData in formatData.profiles) {
                 if (profile != null && !profileData.id.contains(profile!!, ignoreCase = true)) continue
@@ -310,28 +316,28 @@ class ValidateCommand : CliktCommand(name = "validate") {
 
     override fun run() = runBlocking {
         echo("Parsing zip file: ${zipFile.absolutePath}")
-        
+
         // Load test cases if provided
         val scrapedData = testCasesFile?.let { file ->
             echo("Loading test cases from: ${file.absolutePath}")
             Json.decodeFromString<ScrapedData>(file.readText())
         }
-        
+
         if (scrapedData != null) {
             echo("Content validation enabled - will check credentials against test case requirements")
         }
-        
+
         val vendorFiles = ZipParser.parseZipFile(zipFile)
         echo("Found ${vendorFiles.size} files from ${vendorFiles.map { it.vendorId }.distinct().size} vendors")
 
         val filteredFiles = vendorFiles.filter { file ->
             (vendorFilter == null || file.vendorId.contains(vendorFilter!!, ignoreCase = true)) &&
-            (testCaseFilter == null || file.testCaseId.contains(testCaseFilter!!, ignoreCase = true)) &&
-            (formatFilter == null || when (formatFilter) {
-                "sd-jwt-vc" -> file.format == id.walt.etsi.validator.VendorFile.FileFormat.SD_JWT_VC
-                "mdoc" -> file.format == id.walt.etsi.validator.VendorFile.FileFormat.MDOC
-                else -> true
-            })
+                    (testCaseFilter == null || file.testCaseId.contains(testCaseFilter!!, ignoreCase = true)) &&
+                    (formatFilter == null || when (formatFilter) {
+                        "sd-jwt-vc" -> file.format == id.walt.etsi.validator.VendorFile.FileFormat.SD_JWT_VC
+                        "mdoc" -> file.format == id.walt.etsi.validator.VendorFile.FileFormat.MDOC
+                        else -> true
+                    })
         }
 
         if (filteredFiles.isEmpty()) {
@@ -355,94 +361,101 @@ class ValidateCommand : CliktCommand(name = "validate") {
 
         for (file in filteredFiles) {
             echo("  Validating: ${file.vendorId}/${file.fileName}")
-            
-            // Signature validation
-            var result = CredentialValidator.validate(file)
-            
-            // Content validation if test cases are provided
-            if (scrapedData != null) {
-                val testCase = ContentValidator.findTestCase(scrapedData, file.testCaseId)
-                if (testCase != null) {
-                    val contentValidation = when (file.format) {
-                        VendorFile.FileFormat.SD_JWT_VC -> {
-                            ContentValidator.validateSdJwtVcContent(
-                                file.content.decodeToString().trim(),
-                                testCase
-                            )
+
+            try {
+                // Signature validation
+                var result = CredentialValidator.validate(file)
+
+                // Content validation if test cases are provided
+                if (scrapedData != null) {
+                    val testCase = ContentValidator.findTestCase(scrapedData, file.testCaseId)
+                    if (testCase != null) {
+                        val contentValidation = when (file.format) {
+                            VendorFile.FileFormat.SD_JWT_VC -> {
+                                ContentValidator.validateSdJwtVcContent(
+                                    file.content.decodeToString().trim(),
+                                    testCase
+                                )
+                            }
+
+                            VendorFile.FileFormat.MDOC -> {
+                                ContentValidator.validateMdocContent(
+                                    file.content,
+                                    testCase
+                                )
+                            }
                         }
-                        VendorFile.FileFormat.MDOC -> {
-                            ContentValidator.validateMdocContent(
-                                file.content,
-                                testCase
-                            )
+
+                        // Update result with content validation
+                        result = result.copy(contentValidation = contentValidation)
+
+                        if (contentValidation.overallValid) {
+                            contentValidCount++
+                        } else {
+                            contentInvalidCount++
                         }
-                    }
-                    
-                    // Update result with content validation
-                    result = result.copy(contentValidation = contentValidation)
-                    
-                    if (contentValidation.overallValid) {
-                        contentValidCount++
                     } else {
-                        contentInvalidCount++
+                        echo("    Warning: Test case ${file.testCaseId} not found in test-cases.json")
                     }
-                } else {
-                    echo("    Warning: Test case ${file.testCaseId} not found in test-cases.json")
                 }
-            }
-            
-            results.add(result)
 
-            // Count based on signature status
-            when (result.signatureStatus) {
-                ValidationResult.ValidationStatus.VALID -> validCount++
-                ValidationResult.ValidationStatus.INVALID -> invalidCount++
-                ValidationResult.ValidationStatus.INDETERMINATE -> indeterminateCount++
-            }
-            
-            // Display overall status (considers both signature and content)
-            val statusIcon = when (result.overallStatus) {
-                ValidationResult.ValidationStatus.VALID -> "✓"
-                ValidationResult.ValidationStatus.INVALID -> "✗"
-                ValidationResult.ValidationStatus.INDETERMINATE -> "?"
-            }
+                results.add(result)
 
-            echo("    $statusIcon ${result.overallStatus}")
-            echo("      Signature: ${result.signatureStatus}")
-            if (result.errorMessage != null) {
-                echo("      Error: ${result.errorMessage}")
-            }
-            
-            // Show content validation result
-            result.contentValidation?.let { cv ->
-                val cvIcon = if (cv.overallValid) "✓" else "✗"
-                echo("    $cvIcon Content: ${cv.summary}")
-            }
+                // Count based on signature status
+                when (result.signatureStatus) {
+                    ValidationResult.ValidationStatus.VALID -> validCount++
+                    ValidationResult.ValidationStatus.INVALID -> invalidCount++
+                    ValidationResult.ValidationStatus.INDETERMINATE -> indeterminateCount++
+                }
 
-            if (!summary) {
-                val reportXml = XmlReportGenerator.generateReport(result)
-                val reportFileName = XmlReportGenerator.generateReportFileName(result)
-                val reportFile = File(outputDir, reportFileName)
-                reportFile.writeText(reportXml)
-                echo("    Report: ${reportFile.name}")
+                // Display overall status (considers both signature and content)
+                val statusIcon = when (result.overallStatus) {
+                    ValidationResult.ValidationStatus.VALID -> "✓"
+                    ValidationResult.ValidationStatus.INVALID -> "✗"
+                    ValidationResult.ValidationStatus.INDETERMINATE -> "?"
+                }
+
+                echo("    $statusIcon ${result.overallStatus}")
+                echo("      Signature: ${result.signatureStatus}")
+                if (result.errorMessage != null) {
+                    echo("      Error: ${result.errorMessage}")
+                }
+
+                // Show content validation result
+                result.contentValidation?.let { cv ->
+                    val cvIcon = if (cv.overallValid) "✓" else "✗"
+                    echo("    $cvIcon Content: ${cv.summary}")
+                }
+
+                if (!summary) {
+                    val reportXml = XmlReportGenerator.generateReport(result)
+                    val reportFileName = XmlReportGenerator.generateReportFileName(result)
+                    val reportFile = File(outputDir, reportFileName)
+                    reportFile.writeText(reportXml)
+                    echo("    Report: ${reportFile.name}")
+                }
+            } catch (e: Throwable) {
+                echo("    ERROR: ${e.message?.take(120)}")
+                log.error(e) { "Unexpected error validating ${file.vendorId}/${file.fileName}" }
+                indeterminateCount++
             }
         }
 
         echo("")
-        echo("=" .repeat(50))
+        echo("=".repeat(50))
         echo("Validation Summary:")
         echo("  Total files:       ${results.size}")
         echo("  Signature Valid:   $validCount")
         echo("  Signature Invalid: $invalidCount")
         echo("  Indeterminate:     $indeterminateCount")
-        
+
         if (scrapedData != null) {
             echo("")
             echo("Content Validation:")
             echo("  Content Valid:     $contentValidCount")
             echo("  Content Invalid:   $contentInvalidCount")
         }
-        
+
         if (!summary) {
             echo("")
             echo("Reports written to: ${outputDir.absolutePath}")
@@ -453,22 +466,22 @@ class ValidateCommand : CliktCommand(name = "validate") {
         echo("Results by vendor:")
         for ((vendor, vendorResults) in byVendor) {
             val total = vendorResults.size
-            
+
             // Overall status counts
             val overallValid = vendorResults.count { it.overallStatus == ValidationResult.ValidationStatus.VALID }
             val overallInvalid = vendorResults.count { it.overallStatus == ValidationResult.ValidationStatus.INVALID }
             val overallIndet = vendorResults.count { it.overallStatus == ValidationResult.ValidationStatus.INDETERMINATE }
-            
+
             // Signature status counts
             val sigValid = vendorResults.count { it.signatureStatus == ValidationResult.ValidationStatus.VALID }
             val sigInvalid = vendorResults.count { it.signatureStatus == ValidationResult.ValidationStatus.INVALID }
             val sigIndet = vendorResults.count { it.signatureStatus == ValidationResult.ValidationStatus.INDETERMINATE }
-            
+
             echo("")
             echo("  $vendor ($total files):")
             echo("    Overall:   $overallValid valid, $overallInvalid invalid, $overallIndet indeterminate")
             echo("    Signature: $sigValid valid, $sigInvalid invalid, $sigIndet indeterminate")
-            
+
             if (scrapedData != null) {
                 val contentValid = vendorResults.count { it.contentValidation?.overallValid == true }
                 val contentInvalid = vendorResults.count { it.contentValidation?.overallValid == false }
