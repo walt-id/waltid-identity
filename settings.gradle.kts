@@ -58,6 +58,7 @@ val modules = listOfNotNull(
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
         "waltid-openid4vc-wallet-server",
+        "waltid-openid4vc-wallet-persistence",
     ),
 
     * "$libraries:sdjwt".group(
