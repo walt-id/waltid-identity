@@ -35,8 +35,8 @@ object ContentValidator {
     fun findTestCase(scrapedData: ScrapedData, testCaseId: String): TestCase? {
         for (format in scrapedData.formats) {
             for (profile in format.profiles) {
-                val testCase = profile.testCases.find { 
-                    it.id.equals(testCaseId, ignoreCase = true) 
+                val testCase = profile.testCases.find {
+                    it.id.equals(testCaseId, ignoreCase = true)
                 }
                 if (testCase != null) return testCase
             }
@@ -49,12 +49,12 @@ object ContentValidator {
         testCase: TestCase
     ): ContentValidationResult {
         log.debug { "Validating SD-JWT-VC content against test case: ${testCase.id}" }
-        
+
         return try {
             val sdJwt = SDJwt.parse(sdJwtString)
             val header = sdJwt.header
             val payload = sdJwt.fullPayload
-            
+
             val headerValidation = testCase.getProtectedHeader()?.let { section ->
                 validateFields(
                     sectionName = "Protected Header",
@@ -63,7 +63,7 @@ object ContentValidator {
                     actualObject = header
                 )
             }
-            
+
             val payloadValidation = testCase.getPayload()?.let { section ->
                 validateFields(
                     sectionName = "Payload",
@@ -72,9 +72,9 @@ object ContentValidator {
                     actualObject = payload
                 )
             }
-            
+
             val allValid = (headerValidation?.valid ?: true) && (payloadValidation?.valid ?: true)
-            
+
             val summary = buildString {
                 append("Test case ${testCase.id}: ")
                 if (allValid) {
@@ -86,7 +86,7 @@ object ContentValidator {
                     append("Missing fields: ${missing.joinToString(", ")}")
                 }
             }
-            
+
             ContentValidationResult(
                 testCaseId = testCase.id,
                 testCaseFound = true,
@@ -116,11 +116,11 @@ object ContentValidator {
         testCase: TestCase
     ): ContentValidationResult {
         log.debug { "Validating mdoc content against test case: ${testCase.id}" }
-        
+
         return try {
             val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(cborBytes)
             val mso = issuerSigned.decodeMobileSecurityObject()
-            
+
             // Extract namespace data elements
             val namespaceFields = mutableListOf<String>()
             issuerSigned.namespaces?.forEach { (namespace, items) ->
@@ -129,16 +129,16 @@ object ContentValidator {
                     namespaceFields.add(item.value.elementIdentifier)
                 }
             }
-            
+
             // Get header fields - check both protected and unprotected
             val headerFields = mutableListOf<String>()
-            
+
             // Add unprotected header fields
             issuerSigned.issuerAuth.unprotected.let { unprotected ->
                 if (unprotected.algorithm != null) headerFields.add("alg")
                 if (unprotected.x5chain != null) headerFields.add("x5chain")
             }
-            
+
             // Try to decode protected header for alg
             try {
                 val protectedBytes = issuerSigned.issuerAuth.protected
@@ -152,7 +152,7 @@ object ContentValidator {
             } catch (e: Exception) {
                 log.debug { "Could not decode protected headers: ${e.message}" }
             }
-            
+
             val headerValidation = testCase.getProtectedHeader()?.let { section ->
                 validateMdocHeaderFields(
                     sectionName = "Protected Header",
@@ -160,7 +160,7 @@ object ContentValidator {
                     actualFields = headerFields
                 )
             }
-            
+
             val namespaceValidation = testCase.getNamespace()?.let { section ->
                 validateMdocNamespaceFields(
                     sectionName = "NameSpace",
@@ -168,24 +168,30 @@ object ContentValidator {
                     actualFields = namespaceFields
                 )
             }
-            
-            // Check MSO payload - use actual MSO fields
+
+            // Check MSO payload - derive actual fields from the decoded MSO
             val msoValidation = testCase.getMsoPayload()?.let { section ->
-                val actualMsoFields = listOf(
-                    "version", "digestAlgorithm", "docType", "valueDigests", 
+                val actualMsoFields = mutableListOf(
+                    "version", "digestAlgorithm", "docType", "valueDigests",
                     "deviceKeyInfo", "validityInfo"
                 )
+                // Add status sub-fields if present
+                mso.status?.let { status ->
+                    actualMsoFields.add("status")
+                    if (status.identifierList != null) actualMsoFields.add("identifier_list")
+                    if (status.statusList != null) actualMsoFields.add("status_list")
+                }
                 validateMdocMsoFields(
                     sectionName = section.title,
                     requiredItems = section.items,
                     actualFields = actualMsoFields
                 )
             }
-            
-            val allValid = (headerValidation?.valid ?: true) && 
+
+            val allValid = (headerValidation?.valid ?: true) &&
                           (namespaceValidation?.valid ?: true) &&
                           (msoValidation?.valid ?: true)
-            
+
             val summary = buildString {
                 append("Test case ${testCase.id} (docType: ${mso.docType}): ")
                 if (allValid) {
@@ -198,7 +204,7 @@ object ContentValidator {
                     append("Missing fields: ${missing.joinToString(", ")}")
                 }
             }
-            
+
             ContentValidationResult(
                 testCaseId = testCase.id,
                 testCaseFound = true,
@@ -230,27 +236,27 @@ object ContentValidator {
     ): FieldValidation {
         val normalizedRequired = requiredItems.map { normalizeFieldName(it) }
         val normalizedActual = actualFields.map { it.lowercase() }
-        
+
         val presentFields = mutableListOf<String>()
         val missingFields = mutableListOf<String>()
-        
+
         for ((index, required) in normalizedRequired.withIndex()) {
             val originalName = requiredItems[index]
-            
+
             // Check if field is present (with various matching strategies)
             val isPresent = normalizedActual.any { actual ->
                 actual == required ||
                 actual.contains(required) ||
                 required.contains(actual)
             } || checkSpecialField(originalName, actualObject)
-            
+
             if (isPresent) {
                 presentFields.add(originalName)
             } else {
                 missingFields.add(originalName)
             }
         }
-        
+
         return FieldValidation(
             sectionName = sectionName,
             requiredFields = requiredItems,
@@ -267,10 +273,10 @@ object ContentValidator {
     ): FieldValidation {
         val presentFields = mutableListOf<String>()
         val missingFields = mutableListOf<String>()
-        
+
         for (required in requiredItems) {
             val normalizedRequired = normalizeMdocFieldName(required)
-            
+
             val isPresent = actualFields.any { actual ->
                 val normalizedActual = actual.lowercase()
                 normalizedActual == normalizedRequired ||
@@ -278,14 +284,14 @@ object ContentValidator {
                 normalizedRequired.contains(normalizedActual) ||
                 matchesCoseLabel(required, actual)
             }
-            
+
             if (isPresent) {
                 presentFields.add(required)
             } else {
                 missingFields.add(required)
             }
         }
-        
+
         return FieldValidation(
             sectionName = sectionName,
             requiredFields = requiredItems,
@@ -302,22 +308,22 @@ object ContentValidator {
     ): FieldValidation {
         val presentFields = mutableListOf<String>()
         val missingFields = mutableListOf<String>()
-        
+
         for (required in requiredItems) {
             // Extract the field name from items like "alg (1)" or "x5chain (33)"
             val fieldName = extractCoseFieldName(required)
-            
+
             val isPresent = actualFields.any { actual ->
                 actual.equals(fieldName, ignoreCase = true)
             }
-            
+
             if (isPresent) {
                 presentFields.add(required)
             } else {
                 missingFields.add(required)
             }
         }
-        
+
         return FieldValidation(
             sectionName = sectionName,
             requiredFields = requiredItems,
@@ -334,30 +340,30 @@ object ContentValidator {
     ): FieldValidation {
         val presentFields = mutableListOf<String>()
         val missingFields = mutableListOf<String>()
-        
+
         for (required in requiredItems) {
             // Skip descriptive text that isn't an actual field name
             if (isDescriptiveText(required)) {
                 presentFields.add(required) // Treat as present (it's not a real field requirement)
                 continue
             }
-            
+
             val fieldNames = extractFieldNames(required)
-            
+
             val allPresent = fieldNames.all { fieldName ->
                 actualFields.any { actual ->
                     actual.equals(fieldName, ignoreCase = true) ||
                     actual.endsWith(":$fieldName", ignoreCase = true)
                 }
             }
-            
+
             if (allPresent || fieldNames.isEmpty()) {
                 presentFields.add(required)
             } else {
                 missingFields.add(required)
             }
         }
-        
+
         return FieldValidation(
             sectionName = sectionName,
             requiredFields = requiredItems,
@@ -374,29 +380,29 @@ object ContentValidator {
     ): FieldValidation {
         val presentFields = mutableListOf<String>()
         val missingFields = mutableListOf<String>()
-        
+
         for (required in requiredItems) {
             // Skip descriptive text
             if (isDescriptiveText(required)) {
                 presentFields.add(required)
                 continue
             }
-            
+
             val fieldName = extractMsoFieldName(required)
-            
+
             // Handle typos in test data (digestAltorithm vs digestAlgorithm)
             val isPresent = actualFields.any { actual ->
                 actual.equals(fieldName, ignoreCase = true) ||
                 (fieldName.contains("digest", ignoreCase = true) && actual.contains("digest", ignoreCase = true))
             }
-            
+
             if (isPresent || fieldName.isEmpty()) {
                 presentFields.add(required)
             } else {
                 missingFields.add(required)
             }
         }
-        
+
         return FieldValidation(
             sectionName = sectionName,
             requiredFields = requiredItems,
@@ -427,12 +433,13 @@ object ContentValidator {
     private fun extractFieldNames(item: String): List<String> {
         // Extract actual field names from complex items
         // e.g., "family_name, given_name, birth_date" -> ["family_name", "given_name", "birth_date"]
+        // e.g., 'category("urn:etsi:esi:eaa:eu:pub)"' -> ["category"]
         val cleanItem = item
-            .replace(Regex("\\(.*?\\)"), "") // Remove parenthetical notes
-            .replace(Regex("\\n.*"), "") // Remove everything after newline
-        
+            .replace(Regex("\\(.*?\\)"), "") // Remove parenthetical notes (non-greedy)
+            .replace(Regex("\\n.*"), "")     // Remove everything after newline
+
         return cleanItem.split(",")
-            .map { it.trim() }
+            .map { it.trim().trimEnd('"', '\'') } // strip stray quotes left by regex
             .filter { it.isNotEmpty() && !it.contains(" ") && it.length < 50 }
     }
 
@@ -477,7 +484,7 @@ object ContentValidator {
 
     private fun checkSpecialField(fieldName: String, obj: JsonObject): Boolean {
         val normalized = normalizeFieldName(fieldName)
-        
+
         // Handle special cases
         return when {
             normalized == "cnf" && obj.containsKey("cnf") -> true
