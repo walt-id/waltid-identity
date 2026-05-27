@@ -52,9 +52,6 @@ kotlin {
          */
 
 
-        iosMain.dependencies {
-            implementation(identityLibs.ktor.client.darwin)
-        }
         macosMain.dependencies {
             implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.darwin)
@@ -72,6 +69,19 @@ kotlin {
 
         jsMain.dependencies {
             implementation(identityLibs.ktor.client.js)
+        }
+
+        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+            val iosMain = maybeCreate("iosMain").apply {
+                dependencies {
+                    implementation(identityLibs.ktor.client.darwin)
+                }
+            }
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+            iosMain.dependsOn(commonMain.get())
+            iosArm64Main.dependsOn(iosMain)
+            iosSimulatorArm64Main.dependsOn(iosMain)
         }
     }
 }

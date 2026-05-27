@@ -2,6 +2,7 @@
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableAndroidBuild = getSetting("enableAndroidBuild")
+val enableWalletDemoAndroidBuild = getSetting("enableWalletDemoAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
@@ -57,6 +58,7 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
+        "waltid-openid4vc-wallet-client",
         "waltid-openid4vc-wallet-server",
         "waltid-openid4vc-wallet-persistence",
     ),
@@ -110,15 +112,28 @@ val modules = listOfNotNull(
     "$applications:waltid-cli",
 
     ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-android" whenEnabled enableWalletDemoAndroidBuild,
 
     "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
-    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild
+    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild,
+    "$applications:waltid-wallet-demo-ios" whenEnabled enableIosBuild,
+    "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )
 
 include(*modules.toTypedArray())
 
 pluginManagement {
     includeBuild("build-logic")
+
+    plugins {
+        id("com.android.application") version "8.12.3"
+        id("org.jetbrains.kotlin.android") version "2.3.20"
+        id("org.jetbrains.kotlin.multiplatform") version "2.3.20"
+        id("org.jetbrains.kotlin.native.cocoapods") version "2.3.20"
+        id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
+        id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20"
+        id("com.github.ben-manes.versions") version "0.53.0"
+    }
 
     repositories {
         google()
