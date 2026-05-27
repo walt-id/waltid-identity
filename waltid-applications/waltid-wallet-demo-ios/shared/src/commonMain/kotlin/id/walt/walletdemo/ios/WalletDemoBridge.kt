@@ -24,35 +24,48 @@ class WalletDemoBridgeController {
             return BridgeOperationResult(success = true, message = did)
         }
 
-        val result = client.bootstrap()
-        did = result.did
-        return BridgeOperationResult(success = true, message = result.did)
+        return try {
+            val result = client.bootstrap()
+            did = result.did
+            BridgeOperationResult(success = true, message = result.did)
+        } catch (e: Throwable) {
+            BridgeOperationResult(success = false, message = "Bootstrap failed: ${e.message ?: e::class.simpleName}")
+        }
     }
 
     suspend fun receiveCredential(offerUrl: String): BridgeOperationResult {
-        val ids = client.receive(offerUrl = offerUrl)
-        return BridgeOperationResult(
-            success = true,
-            message = "Received ${ids.size} credential(s)",
-        )
+        return try {
+            val ids = client.receive(offerUrl = offerUrl)
+            BridgeOperationResult(success = true, message = "Received ${ids.size} credential(s)")
+        } catch (e: Throwable) {
+            BridgeOperationResult(success = false, message = "Receive failed: ${e.message ?: e::class.simpleName}")
+        }
     }
 
     suspend fun listCredentials(): List<BridgeCredential> =
-        client.credentials().map { credential ->
-            BridgeCredential(
-                id = credential.id,
-                format = credential.format,
-                issuer = credential.issuer ?: "Unknown",
-                label = credential.label ?: credential.format,
-                addedAt = credential.addedAt ?: "",
-            )
+        try {
+            client.credentials().map { credential ->
+                BridgeCredential(
+                    id = credential.id,
+                    format = credential.format,
+                    issuer = credential.issuer ?: "Unknown",
+                    label = credential.label ?: credential.format,
+                    addedAt = credential.addedAt ?: "",
+                )
+            }
+        } catch (e: Throwable) {
+            emptyList()
         }
 
     suspend fun presentCredential(requestUrl: String): BridgeOperationResult {
-        val result = client.present(requestUrl = requestUrl)
-        return BridgeOperationResult(
-            success = result.success,
-            message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",
-        )
+        return try {
+            val result = client.present(requestUrl = requestUrl)
+            BridgeOperationResult(
+                success = result.success,
+                message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",
+            )
+        } catch (e: Throwable) {
+            BridgeOperationResult(success = false, message = "Present failed: ${e.message ?: e::class.simpleName}")
+        }
     }
 }

@@ -7,13 +7,25 @@ import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.target.ios.keys.Ed25519
 import id.walt.target.ios.keys.P256
 import id.walt.target.ios.keys.RSA
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.usePinned
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import platform.Foundation.CFBridgingRelease
+import platform.Foundation.CFBridgingRetain
+import platform.Foundation.NSData
+import platform.Foundation.create
+import platform.Security.SecCertificateCopyKey
+import platform.Security.SecCertificateCreateWithData
+import platform.Security.SecKeyCopyExternalRepresentation
 
 actual class JWKKey actual constructor(private val jwk: String?, private val _keyId: String?) : Key() {
 
@@ -65,13 +77,23 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
      * @return signed (JWS)
      */
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        error("Not implemented")
+        val kid = getKeyId()
+        return when (keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid, inSecureEnclave = false).signRaw(plaintext)
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).signRaw(plaintext)
+            else -> error("signRaw not implemented for $keyType on iOS")
+        }
     }
 
     actual override suspend fun signJws(
         plaintext: ByteArray, headers: Map<String, JsonElement>
     ): String {
-        error("Not implemented")
+        val kid = getKeyId()
+        return when (keyType) {
+            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid, inSecureEnclave = false).signJws(plaintext, headers)
+            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).signJws(plaintext, headers)
+            else -> error("signJws not implemented for $keyType on iOS")
+        }
     }
 
     /**
@@ -143,8 +165,50 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
             return Result.success(JWKKey(jwk))
         }
 
-        actual override suspend fun importPEM(pem: String): Result<JWKKey> {
-            TODO("Not yet implemented")
+        @OptIn(ExperimentalEncodingApi::class, ExperimentalForeignApi::class)
+        actual override suspend fun importPEM(pem: String): Result<JWKKey> = runCatching {
+            val derBytes = pem.lines()
+                .filter { !it.startsWith("-----") }
+                .joinToString("")
+                .let { Base64.decode(it) }
+
+            val nsData = derBytes.usePinned { pinned ->
+                NSData.create(bytes = pinned.addressOf(0), length = derBytes.size.toULong())
+            }
+
+            @Suppress("UNCHECKED_CAST")
+            val cfData = CFBridgingRetain(nsData) as platform.CoreFoundation.CFDataRef
+
+            val certificate = SecCertificateCreateWithData(null, cfData)
+                ?: error("Failed to create SecCertificate from PEM data")
+
+            val publicKey = SecCertificateCopyKey(certificate)
+                ?: error("Failed to extract public key from certificate")
+
+            val keyData = SecKeyCopyExternalRepresentation(publicKey, null)
+                ?: error("Failed to get external representation of public key")
+
+            val keyNsData = CFBridgingRelease(keyData) as NSData
+            val keyBytes = ByteArray(keyNsData.length.toInt()).also { bytes ->
+                bytes.usePinned { pinned ->
+                    platform.posix.memcpy(pinned.addressOf(0), keyNsData.bytes, keyNsData.length)
+                }
+            }
+
+            val jwkJson = when {
+                keyBytes.size == 65 && keyBytes[0] == 0x04.toByte() -> {
+                    val x = Base64.UrlSafe.encode(keyBytes.sliceArray(1..32)).trimEnd('=')
+                    val y = Base64.UrlSafe.encode(keyBytes.sliceArray(33..64)).trimEnd('=')
+                    """{"kty":"EC","crv":"P-256","x":"$x","y":"$y"}"""
+                }
+                keyBytes.size > 65 -> {
+                    val b64 = Base64.UrlSafe.encode(keyBytes).trimEnd('=')
+                    """{"kty":"RSA","n":"$b64","e":"AQAB"}"""
+                }
+                else -> error("Unsupported key format from certificate (${keyBytes.size} bytes)")
+            }
+
+            JWKKey(jwkJson)
         }
 
     }
