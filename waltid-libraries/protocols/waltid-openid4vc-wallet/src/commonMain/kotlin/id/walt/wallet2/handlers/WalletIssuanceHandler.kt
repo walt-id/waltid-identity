@@ -93,7 +93,14 @@ data class ReceiveCredentialRequest(
 @Serializable
 data class ReceiveCredentialResult(
     /** All credentials that were successfully issued and stored. */
-    val credentialIds: List<String>
+    val credentialIds: List<String>,
+    /**
+     * Transaction IDs for credentials deferred by the issuer.
+     * Each entry maps a credential configuration ID to the transaction ID
+     * that should be used with [WalletIssuanceHandler.pollDeferredFlow] to
+     * retrieve the credential once it becomes available.
+     */
+    val deferredTransactionIds: Map<String, String> = emptyMap()
 )
 
 // Isolated step types
@@ -251,7 +258,13 @@ object WalletIssuanceHandler {
         wallet: Wallet,
         request: ReceiveCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
-        httpClient: HttpClient = defaultHttpClient()
+        httpClient: HttpClient = defaultHttpClient(),
+        /**
+         * Called whenever the issuer defers a credential.
+         * [credentialConfigurationId] identifies which credential was deferred;
+         * [transactionId] should be stored and passed to [pollDeferredFlow] later.
+         */
+        onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
     ): Flow<StoredCredential> = channelFlow {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -357,7 +370,9 @@ object WalletIssuanceHandler {
                 // The transactionId can be used to poll the deferred credential endpoint.
                 val transactionId = credentialResponse.transactionId
                 log.info { "Deferred issuance: credential for '${offeredCredential.credentialConfigurationId}' will be available later. transactionId=$transactionId" }
-                // TODO: store the transactionId for later polling via a dedicated deferred-issuance endpoint
+                if (transactionId != null) {
+                    onDeferredTransactionId(offeredCredential.credentialConfigurationId, transactionId)
+                }
                 onEvent(WalletSessionEvent.issuance_deferred)
                 continue
             }
@@ -384,6 +399,7 @@ object WalletIssuanceHandler {
 
     /**
      * Convenience wrapper that collects [receiveCredentialFlow] into a result.
+     * Deferred credential transaction IDs are included in [ReceiveCredentialResult.deferredTransactionIds].
      */
     suspend fun receiveCredential(
         wallet: Wallet,
@@ -392,8 +408,12 @@ object WalletIssuanceHandler {
         httpClient: HttpClient = defaultHttpClient()
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
-        receiveCredentialFlow(wallet, request, onEvent, httpClient).collect { ids += it.id }
-        return ReceiveCredentialResult(credentialIds = ids)
+        val deferredIds = mutableMapOf<String, String>()
+        receiveCredentialFlow(
+            wallet, request, onEvent, httpClient,
+            onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId }
+        ).collect { ids += it.id }
+        return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
     }
 
     // ---------------------------------------------------------------------------
