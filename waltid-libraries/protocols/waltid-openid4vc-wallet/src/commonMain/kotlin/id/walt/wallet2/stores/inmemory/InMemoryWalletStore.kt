@@ -5,7 +5,6 @@ import id.walt.wallet2.data.WalletDescriptor
 import id.walt.wallet2.stores.WalletStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
-
 /**
  * In-memory [WalletStore] implementation.
  *
