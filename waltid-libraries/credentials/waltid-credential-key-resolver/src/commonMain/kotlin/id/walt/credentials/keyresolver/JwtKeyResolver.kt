@@ -34,9 +34,20 @@ object JwtKeyResolver {
             val kid = jwtHeader?.get("kid")?.jsonPrimitive?.contentOrNull
 
             when {
-                // 1. DID Resolution — pass kid for multi-key DID documents
-                signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier)
-                    -> DidKeyResolver.resolveKeyFromDid(signerIdentifier, kid)
+                // 1. DID Resolution — pass kid for multi-key DID documents.
+                // If DID resolution fails but x5c is also present, fall through to x5c below.
+                signerIdentifier != null && DidUtils.isDidUrl(signerIdentifier) -> {
+                    val didKey = runCatching { DidKeyResolver.resolveKeyFromDid(signerIdentifier, kid) }
+                        .getOrNull()
+                    didKey
+                        ?: if (jwtHeader?.contains("x5c") == true) {
+                            log.debug { "DID resolution failed for $signerIdentifier, falling back to x5c header" }
+                            X5CKeyResolver.resolveKeyFromX5c(jwtHeader["x5c"]!!.jsonArray)
+                        } else {
+                            log.warn { "DID resolution failed for $signerIdentifier and no x5c fallback available" }
+                            null
+                        }
+                }
 
                 // 2. Inline X.509 Certificate Chain
                 jwtHeader?.contains("x5c") == true
