@@ -500,7 +500,7 @@ class ValidateCommand : CliktCommand(name = "validate") {
 
 fun main(args: Array<String>) {
     // Initialise DID resolvers (including did:web) so credentials with did:web issuers can be verified
-    runBlocking { DidService.init() }
+    runBlocking { DidService.minimalInit() }
     EtsiCli()
         .subcommands(GenerateCommand(), ListCommand(), ValidateCommand())
         .main(args)
