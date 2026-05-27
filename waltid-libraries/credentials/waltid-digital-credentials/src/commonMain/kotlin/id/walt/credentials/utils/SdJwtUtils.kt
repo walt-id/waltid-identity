@@ -105,6 +105,12 @@ object SdJwtUtils {
             disclosures.split("~").mapNotNull {
                 log.trace { "Parsing disclosure part: $it" }
                 if (it.isNotBlank()) {
+                    // Per RFC 9901 §4: disclosures are base64url-encoded JSON arrays and never
+                    // contain '.'. A part containing '.' is a KB-JWT (or similar) and must be skipped.
+                    if (it.contains('.')) {
+                        log.trace { "Skipping non-disclosure tilde-part (contains '.'): ${it.take(20)}..." }
+                        return@mapNotNull null
+                    }
                     val jsonArrayString = it.base64UrlDecode().decodeToString()
                     val jsonArray = Json.decodeFromString<JsonArray>(jsonArrayString)
 

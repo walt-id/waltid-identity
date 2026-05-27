@@ -232,9 +232,12 @@ object CredentialParser {
         val signedCredentialWithoutDisclosures = credential.substringBefore("~")
         val plainSignature = signedCredentialWithoutDisclosures.substringAfterLast(".")
 
-        val disclosuresPart = signature.substringAfter("~", "")
+        // Disclosures follow the first "~" in the full credential string.
+        // `signature` is the bare JWT signature bytes (no tilde); disclosures must be
+        // extracted from `credential` itself per RFC 9901 §4 compact serialisation format.
+        val disclosuresPart = credential.substringAfter("~", "")
         log.trace { "Parsing disclosures: $disclosuresPart" }
-        var availableDisclosures = parseDisclosureString(signature.substringAfter("~", ""))
+        var availableDisclosures = parseDisclosureString(disclosuresPart)
 
         if (availableDisclosures?.isNotEmpty() == true) {
             log.trace { "=== MAPPING ===" }
@@ -602,7 +605,11 @@ object CredentialParser {
 
             credential.isJwt() -> {
                 // TODO: also check if `typ` matches, and pass through `alg`
-                val (header, payload, signature) = JwtUtils.parseJwt(credential)
+                // Per RFC 9901 §4 ABNF: SD-JWT-KB = SD-JWT KB-JWT where SD-JWT = JWT "~" *(DISCLOSURE "~").
+                // The issuer-signed JWT is always the part before the first "~". We must parse only that
+                // part as a JWT — the full string may contain extra dots from a KB-JWT appended after "~".
+                val issuerJwt = credential.substringBefore("~")
+                val (header, payload, signature) = JwtUtils.parseJwt(issuerJwt)
 
                 when {
                     // SD-JWT disclosures
