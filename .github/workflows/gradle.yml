@@ -53,15 +53,15 @@ jobs:
           fi
 
           echo "url=$TUNNEL_URL" >> $GITHUB_OUTPUT
-      - name: Replace URLs in Kotlin test
-        if: ${{ steps.tunnel.outputs.url != '' }}
-        run: |
-          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
-          sed -i \
-            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
-            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
-            -e "s#8443#443#g" \
-            "$FILE"
+#      - name: Replace URLs in Kotlin test
+#        if: ${{ steps.tunnel.outputs.url != '' }}
+#        run: |
+#          FILE="./waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/src/test/kotlin/id/walt/openid4vp/conformance/ConformanceTests.kt"
+#          sed -i \
+#            -e "s#https://verifier2.localhost/verification-session#${{ steps.tunnel.outputs.url }}/verification-session#g" \
+#            -e "s#localhost.emobix.co.uk#conformance.waltid.cloud#g" \
+#            -e "s#8443#443#g" \
+#            "$FILE"
 
       - name: Check if Google Chrome is installed
         id: check-browser
