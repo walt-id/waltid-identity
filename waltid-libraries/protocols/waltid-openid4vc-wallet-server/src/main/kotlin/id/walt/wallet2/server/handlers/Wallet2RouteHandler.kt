@@ -19,6 +19,7 @@ import id.walt.wallet2.handlers.FetchCredentialResult
 import id.walt.wallet2.handlers.GenerateAuthorizationUrlRequest
 import id.walt.wallet2.handlers.GenerateAuthorizationUrlResult
 import id.walt.wallet2.handlers.PollDeferredRequest
+import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
 import id.walt.wallet2.handlers.MatchCredentialsRequest
 import id.walt.wallet2.handlers.MatchCredentialsResult
 import id.walt.wallet2.handlers.PresentCredentialIsolatedRequest
@@ -623,11 +624,26 @@ object Wallet2RouteHandler {
 
                     post("/match-credentials", {
                         summary = "Isolated: DCQL-match supplied credentials against a query"
+                        description = "Stateless — caller provides credentials inline. " +
+                            "Use /match-credentials-from-store to match against the wallet's own credential stores."
                         request { pathParameter<String>("walletId"); body<MatchCredentialsRequest>() }
                         response { HttpStatusCode.OK to { body<MatchCredentialsResult>() } }
                     }) {
                         val req = call.receive<MatchCredentialsRequest>()
                         call.respond(WalletPresentationHandler.matchCredentials(req))
+                    }
+
+                    post("/match-credentials-from-store", {
+                        summary = "DCQL-match wallet's stored credentials against a query"
+                        description = "Loads credentials from the wallet's credential stores and runs DCQL " +
+                            "matching — no credentials need to be supplied inline. " +
+                            "Use this for consent-preview UIs: show the user what will be shared before calling /present."
+                        request { pathParameter<String>("walletId"); body<MatchCredentialsFromStoreRequest>() }
+                        response { HttpStatusCode.OK to { body<MatchCredentialsResult>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<MatchCredentialsFromStoreRequest>()
+                        call.respond(WalletPresentationHandler.matchCredentialsFromStore(wallet, req))
                     }
                 }
             }

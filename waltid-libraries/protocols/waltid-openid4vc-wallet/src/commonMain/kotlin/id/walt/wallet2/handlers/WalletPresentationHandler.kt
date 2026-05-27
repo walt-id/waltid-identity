@@ -119,6 +119,15 @@ data class MatchCredentialsRequest(
     val credentials: List<StoredCredential>
 )
 
+/**
+ * Request for matching a DCQL query against the wallet's own credential stores.
+ * No credentials need to be supplied inline — they are loaded from the wallet.
+ */
+@Serializable
+data class MatchCredentialsFromStoreRequest(
+    val dcqlQuery: DcqlQuery
+)
+
 @Serializable
 data class MatchCredentialsResult(
     /** DCQL query IDs for which at least one credential matched. */
@@ -324,11 +333,34 @@ object WalletPresentationHandler {
     }
 
     /**
+     * DCQL-matches the wallet's own stored credentials against [query] without
+     * presenting anything. Used to preview what credentials and fields would be
+     * shared before asking the user for consent.
+     *
+     * Unlike [matchCredentials], the caller does not need to supply credentials
+     * inline — they are streamed from [Wallet.credentialStores].
+     */
+    suspend fun matchCredentialsFromStore(
+        wallet: Wallet,
+        request: MatchCredentialsFromStoreRequest
+    ): MatchCredentialsResult {
+        val matched = selectFromStores(wallet, request.dcqlQuery)
+        val matchedCredentialIds = matched.mapValues { (_, results) ->
+            results.map { result -> result.credential.id }
+        }
+        return MatchCredentialsResult(
+            matchedQueryIds = matched.keys.toList(),
+            matchCount = matched.values.sumOf { it.size },
+            matchedCredentialIds = matchedCredentialIds
+        )
+    }
+
+    /**
      * Streams all credentials from all wallet credential stores, converts each
      * to a [RawDcqlCredential], then runs DCQL matching — mirrors the Enterprise
      * WalletPresentFunctionality.selectCredentialsForQuery exactly.
      */
-    private suspend fun selectFromStores(
+    internal suspend fun selectFromStores(
         wallet: Wallet,
         query: DcqlQuery
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
