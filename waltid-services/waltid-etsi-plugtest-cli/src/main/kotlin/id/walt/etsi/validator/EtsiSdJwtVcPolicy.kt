@@ -3,6 +3,7 @@ package id.walt.etsi.validator
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.JwtBasedSignature
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -19,10 +20,13 @@ import java.util.Base64
  * so they live here in the plugtest CLI rather than in the shared policy library.
  *
  * Checks performed:
+ * - SD-JWT VC §3.2.1.1: typ MUST be "dc+sd-jwt"
  * - EAA-5.2.4.1-03: issuing_authority SHALL NOT be present with a qualified certificate
  * - EAA-5.2.4.1-07: issuing_country SHALL NOT be present with a qualified certificate
  * - EAA-5.2.4.1-11: iss_reg_id SHALL NOT be present with a qualified certificate
+ * - EAA-5.2.8.2-05: oneTime claim SHALL have null JSON primitive type
  * - EAA-5.2.10.1-04..11: status object (if present) MUST have type, purpose, index, uri members
+ * - EAA-5.2.12-02: shortLived claim SHALL have null JSON primitive type
  */
 class EtsiSdJwtVcPolicy {
     val id = "etsi/sd-jwt-vc"
@@ -80,6 +84,17 @@ class EtsiSdJwtVcPolicy {
                 if (!statusObj.containsKey(member)) {
                     violations += "'status' missing required member '$member' ($reqId)"
                 }
+            }
+        }
+
+        // --- oneTime and shortLived SHALL be null (EAA-5.2.8.2-05, EAA-5.2.12-02) ---
+        for ((claim, reqId) in listOf(
+            "oneTime"    to "EAA-5.2.8.2-05",
+            "shortLived" to "EAA-5.2.12-02"
+        )) {
+            val value = payload[claim]
+            if (value != null && value !is JsonNull) {
+                violations += "'$claim' SHALL have null JSON primitive type, got ${value::class.simpleName} ($reqId)"
             }
         }
 
