@@ -532,10 +532,15 @@ object XmlReportGenerator {
                             appendLine("      <ErrorMessage>${escapeXml(pr.errorMessage)}</ErrorMessage>")
                         }
                         for ((key, value) in pr.results) {
-                            // Use CDATA so raw JSON values (including quotes, angle brackets, etc.)
-                            // are preserved exactly without escaping.
-                            val raw = value.toString().trim('"')
-                            appendLine("      <Result key=\"${escapeXml(key)}\"><![CDATA[$raw]]></Result>")
+                            val raw = value.toString()
+                                .trim('"')
+                                // Simplify JsonPath toString: JsonPath(tokens=[ObjectAccessorToken(key=exp)]) -> $.exp
+                                .replace(Regex("JsonPath\\(tokens=\\[.*?AccessorToken\\(key=(\\w+)\\).*?\\)"), "\\\$.$1")
+                            // Use CDATA only when the value contains XML-special characters;
+                            // use plain text for simple values (booleans, numbers, plain strings)
+                            val needsCdata = raw.any { it == '<' || it == '>' || it == '&' || it == '"' || it == '\'' }
+                            val rendered = if (needsCdata) "<![CDATA[$raw]]>" else escapeXml(raw)
+                            appendLine("      <Result key=\"${escapeXml(key)}\">$rendered</Result>")
                         }
                         appendLine("    </PolicyResult>")
                     } else {
