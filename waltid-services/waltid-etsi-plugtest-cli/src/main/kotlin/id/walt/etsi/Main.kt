@@ -12,6 +12,7 @@ import com.github.ajalt.clikt.parameters.types.file
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.did.dids.DidService
 import id.walt.etsi.config.ConfigManager
 import id.walt.etsi.generator.MdocGenerator
 import id.walt.etsi.generator.SdJwtVcGenerator
@@ -492,6 +493,10 @@ class ValidateCommand : CliktCommand(name = "validate") {
     }
 }
 
-fun main(args: Array<String>) = EtsiCli()
-    .subcommands(GenerateCommand(), ListCommand(), ValidateCommand())
-    .main(args)
+fun main(args: Array<String>) {
+    // Initialise DID resolvers (including did:web) so credentials with did:web issuers can be verified
+    runBlocking { DidService.init() }
+    EtsiCli()
+        .subcommands(GenerateCommand(), ListCommand(), ValidateCommand())
+        .main(args)
+}
