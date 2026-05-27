@@ -3,6 +3,8 @@
 package id.walt.verifier2.handlers.vpresponse
 
 import id.walt.cose.coseCompliantCbor
+import id.walt.dcql.DcqlCredential
+import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.iso18013.annexc.AnnexCResponseVerifier
@@ -39,6 +41,14 @@ import kotlin.uuid.Uuid
 object Verifier2VPDirectPostHandler {
 
     private val log = KotlinLogging.logger {}
+
+    /**
+     * Optional callback for `trusted_authorities` verification per OID4VP §6.1.1.
+     * Set this from JVM code to enable AKI-based trust chain checking, e.g.:
+     *   `Verifier2VPDirectPostHandler.trustedAuthoritiesChecker = DcqlTrustedAuthoritiesChecker.checker`
+     * Defaults to null — trusted_authorities constraints are not enforced unless set.
+     */
+    var trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null
 
     suspend fun parseResponseBody(
         responseMode: OpenID4VPResponseMode?,
@@ -376,7 +386,8 @@ object Verifier2VPDirectPostHandler {
             session,
             updateSessionCallback,
             failSessionCallback,
-            policyContext
+            policyContext,
+            trustedAuthoritiesChecker
         )
 
 
