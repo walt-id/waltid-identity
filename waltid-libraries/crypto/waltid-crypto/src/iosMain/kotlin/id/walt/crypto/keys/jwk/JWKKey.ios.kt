@@ -150,7 +150,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         TODO("Not yet implemented")
     }
 
-    actual suspend fun encryptJwe(plaintext: ByteArray): String {
+    actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
         TODO("Not yet implemented")
     }
 
