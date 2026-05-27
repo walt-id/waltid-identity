@@ -32,8 +32,9 @@ data class CoseHeaders(
     //@CborLabel(2) @SerialName("crit") val criticalHeaders: String? = null,
     /** 3: Content type of the payload */
     @CborLabel(3) @SerialName("content type") val contentType: CoseContentType? = null,
-    /** 4: Key identifier */
-    @CborLabel(4) @SerialName("kid") @ByteString val kid: ByteArray? = null,
+    /** 4: Key identifier — per RFC 8152 §3.1, kid is application-defined; in practice it may
+     *  be a byte string (canonical) or a text string (e.g. a UUID). Both are supported here. */
+    @CborLabel(4) @SerialName("kid") @Serializable(CoseKidSerializer::class) val kid: ByteArray? = null,
     /** 5: Full Initialization Vector */
     @CborLabel(5) @SerialName("IV") @ByteString val iv: ByteArray? = null,
     /** 6: Partial Initialization Vector */
@@ -165,6 +166,32 @@ object CoseCertificateSerializer : KSerializer<List<CoseCertificate>> {
 
             is CborByteString -> listOf(CoseCertificate(element.value))
             else -> throw IllegalArgumentException("Expected array or bytestring for x5chain, got ${element::class.simpleName}")
+        }
+    }
+}
+
+/**
+ * Serializer for the COSE `kid` header parameter (label 4).
+ * Per RFC 8152 §3.1, `kid` is application-defined and may be a byte string or a text string.
+ * Both representations are handled: byte strings are returned as-is; text strings are
+ * UTF-8 encoded to ByteArray so callers receive a consistent type.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+object CoseKidSerializer : KSerializer<ByteArray?> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CoseKid", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: ByteArray?) {
+        if (value == null) encoder.encodeNull()
+        else encoder.encodeSerializableValue(CborElement.serializer(), CborByteString(value))
+    }
+
+    override fun deserialize(decoder: Decoder): ByteArray? {
+        val element = decoder.decodeSerializableValue(CborElement.serializer())
+        return when (element) {
+            is CborByteString -> element.value
+            is CborString -> element.value.encodeToByteArray()
+            else -> null
         }
     }
 }
