@@ -462,7 +462,7 @@ object XmlReportGenerator {
         }
     }
 
-    fun generateReportFileName(result: ValidationResult, verifierName: String = "WALTID"): String {
+    fun generateReportFileName(result: ValidationResult): String {
         return "Verification_of_${result.vendorId}_${result.testCaseId}.xml"
     }
 
