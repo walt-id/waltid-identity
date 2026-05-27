@@ -157,12 +157,24 @@ object SdJwtVcGenerator {
 
         val existingKeys = mutableSetOf<String>()
 
+        // Compute vct#integrity as SHA-256 of the VCT URI bytes (base64url, no padding)
+        val vctIntegrity = run {
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hash = digest.digest(vct.toByteArray(Charsets.UTF_8))
+            "sha256-" + Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
+        }
+
+        // Export holder JWK outside buildJsonObject to avoid runBlocking inside coroutine
+        val holderJwkString: String? = holderKey?.let {
+            runCatching { kotlinx.coroutines.runBlocking { it.exportJWK() } }.getOrNull()
+        }
+
         return buildJsonObject {
             put("iss", issuerUrl)
             existingKeys.add("iss")
             put("vct", vct)
             existingKeys.add("vct")
-            put("vct#integrity", "sha256-${vct.hashCode().toString(16)}")
+            put("vct#integrity", vctIntegrity)
             existingKeys.add("vct#integrity")
             put("nbf", now)
             existingKeys.add("nbf")
@@ -191,18 +203,17 @@ object SdJwtVcGenerator {
                         cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
                         cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                         cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
-                        cleanItem == "cnf" && holderKey != null -> {
+                        cleanItem == "cnf" -> {
                             putJsonObject("cnf") {
-                                put("jwk", Json.parseToJsonElement(kotlinx.coroutines.runBlocking { holderKey.exportJWK() }))
-                            }
-                        }
-                        cleanItem == "cnf" && holderKey == null -> {
-                            putJsonObject("cnf") {
-                                putJsonObject("jwk") {
-                                    put("kty", "EC")
-                                    put("crv", "P-256")
-                                    put("x", "example_x_coordinate")
-                                    put("y", "example_y_coordinate")
+                                if (holderJwkString != null) {
+                                    put("jwk", Json.parseToJsonElement(holderJwkString))
+                                } else {
+                                    putJsonObject("jwk") {
+                                        put("kty", "EC")
+                                        put("crv", "P-256")
+                                        put("x", "example_x_coordinate")
+                                        put("y", "example_y_coordinate")
+                                    }
                                 }
                             }
                         }
