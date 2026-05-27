@@ -54,7 +54,7 @@ class WalletDemoBridgeController {
                 )
             }
         } catch (e: Throwable) {
-            emptyList()
+            emptyList() // TODO: log error for debugging
         }
 
     suspend fun presentCredential(requestUrl: String): BridgeOperationResult {

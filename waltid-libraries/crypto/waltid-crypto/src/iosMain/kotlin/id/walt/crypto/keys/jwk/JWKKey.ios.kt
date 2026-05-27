@@ -81,7 +81,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid, inSecureEnclave = false).signRaw(plaintext)
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).signRaw(plaintext)
-            else -> error("signRaw not implemented for $keyType on iOS")
+            else -> error("signRaw not implemented for $keyType on iOS") // TODO: RSA signing via RSA.PrivateKey.loadFromKeychain
         }
     }
 
@@ -92,7 +92,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         return when (keyType) {
             KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid, inSecureEnclave = false).signJws(plaintext, headers)
             KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).signJws(plaintext, headers)
-            else -> error("signJws not implemented for $keyType on iOS")
+            else -> error("signJws not implemented for $keyType on iOS") // TODO: RSA signing via RSA.PrivateKey.loadFromKeychain
         }
     }
 
@@ -108,7 +108,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
         KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
         else -> error("Not implemented for $keyType")
-    }.verifyRaw(signed, detachedPlaintext!!)
+    }.verifyRaw(signed, detachedPlaintext!!) // TODO: handle null detachedPlaintext (crashes if called without it)
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (keyType) {
         KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
@@ -176,6 +176,8 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
                 NSData.create(bytes = pinned.addressOf(0), length = derBytes.size.toULong())
             }
 
+            // TODO: cfData, certificate, and publicKey are CF objects following the Create/Copy Rule
+            // and should be released with CFRelease to avoid memory leaks in long-running processes.
             @Suppress("UNCHECKED_CAST")
             val cfData = CFBridgingRetain(nsData) as platform.CoreFoundation.CFDataRef
 
@@ -201,7 +203,9 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
                     val y = Base64.UrlSafe.encode(keyBytes.sliceArray(33..64)).trimEnd('=')
                     """{"kty":"EC","crv":"P-256","x":"$x","y":"$y"}"""
                 }
-                keyBytes.size > 65 -> {
+                // TODO: RSA parsing is incorrect — SecKeyCopyExternalRepresentation returns PKCS#1 DER
+            // (SEQUENCE { INTEGER n, INTEGER e }), not raw n bytes. Needs ASN.1 parsing.
+            keyBytes.size > 65 -> {
                     val b64 = Base64.UrlSafe.encode(keyBytes).trimEnd('=')
                     """{"kty":"RSA","n":"$b64","e":"AQAB"}"""
                 }
