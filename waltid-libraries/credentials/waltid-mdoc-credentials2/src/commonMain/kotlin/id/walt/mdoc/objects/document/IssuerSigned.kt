@@ -1,8 +1,12 @@
 package id.walt.mdoc.objects.document
 
+import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
 import id.walt.crypto.utils.JsonUtils.toSerializedJsonElement
 import id.walt.mdoc.objects.MdocsCborSerializer
 import id.walt.mdoc.objects.elements.IssuerSignedItem
@@ -96,8 +100,15 @@ data class IssuerSigned private constructor(
         val signerKey: Key,
     )
 
+    @OptIn(ExperimentalSerializationApi::class)
     suspend fun getParsedIssuerAuth(): ParsedIssuerAuth {
+        // Per ISO 18013-5 §9.1.2.4: x5chain SHALL be in the unprotected header.
+        // Readers SHOULD also support x5chain in the protected header (for backwards compat / future).
         val containedX5c = issuerAuth.unprotected.x5chain
+            ?: runCatching {
+                // Fall back to protected header if unprotected has no x5chain
+                coseCompliantCbor.decodeFromByteArray<CoseHeaders>(issuerAuth.protected).x5chain
+            }.getOrNull()
         requireNotNull(containedX5c) { "Missing x5c X509 certificate chain in Mdocs credential" }
 
         val convertedX5c = containedX5c.map { Base64.encode(it.rawBytes) }
