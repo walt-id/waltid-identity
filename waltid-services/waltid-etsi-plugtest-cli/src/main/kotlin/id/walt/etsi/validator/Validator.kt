@@ -2,11 +2,21 @@ package id.walt.etsi.validator
 
 import id.walt.cose.CoseHeaders
 import id.walt.cose.coseCompliantCbor
-import id.walt.cose.toCoseVerifier
 import id.walt.credentials.CredentialParser
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.credentials.UnreachableDisclosuresException
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.matchesBase64Url
+import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.verification.MdocVerifier
+import id.walt.policies2.vc.ExpirationDatePolicyException
+import id.walt.policies2.vc.NotBeforePolicyException
+import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vc.policies.ExpirationDatePolicy
+import id.walt.policies2.vc.policies.NotBeforePolicy
+import id.walt.policies2.vc.policies.PolicyExecutionContext
+import id.walt.policies2.vc.policies.VctIntegrityException
+import id.walt.policies2.vc.policies.VctIntegrityPolicy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
@@ -31,6 +41,16 @@ data class VendorFile(
     }
 }
 
+/**
+ * Result of a single named policy check.
+ * Used to populate the <PolicyResults> block in the XML report.
+ */
+data class PolicyCheckResult(
+    val policyId: String,
+    val status: ValidationResult.ValidationStatus,
+    val errorMessage: String? = null
+)
+
 data class ValidationResult(
     val vendorId: String,
     val fileName: String,
@@ -40,14 +60,16 @@ data class ValidationResult(
     val hash: String,
     val details: String? = null,
     val errorMessage: String? = null,
-    val contentValidation: ContentValidationResult? = null
+    val contentValidation: ContentValidationResult? = null,
+    /** Per-policy check results, populated for SD-JWT-VC credentials. */
+    val policyResults: List<PolicyCheckResult> = emptyList()
 ) {
     enum class ValidationStatus {
         VALID,
         INVALID,
         INDETERMINATE
     }
-    
+
     /**
      * Overall status considers both signature validation AND content validation.
      * - If signature is INVALID or INDETERMINATE, that takes precedence
@@ -66,27 +88,27 @@ object ZipParser {
 
     fun parseZipFile(zipFile: File): List<VendorFile> {
         log.info { "Parsing zip file: ${zipFile.absolutePath}" }
-        
+
         val vendorFiles = mutableListOf<VendorFile>()
-        
+
         ZipFile(zipFile).use { zip ->
             zip.entries().asSequence().forEach { entry ->
                 if (entry.isDirectory) return@forEach
-                
+
                 val pathParts = entry.name.split("/").filter { it.isNotBlank() }
                 if (pathParts.size < 2) {
                     log.debug { "Skipping file not in vendor folder: ${entry.name}" }
                     return@forEach
                 }
-                
+
                 val vendorId = pathParts[0]
                 val fileName = pathParts.last()
-                
+
                 if (fileName.startsWith("Verification_of_")) {
                     log.debug { "Skipping existing verification report: $fileName" }
                     return@forEach
                 }
-                
+
                 val format = when {
                     fileName.endsWith(".json", ignoreCase = true) -> VendorFile.FileFormat.SD_JWT_VC
                     fileName.endsWith(".cbor", ignoreCase = true) -> VendorFile.FileFormat.MDOC
@@ -95,49 +117,71 @@ object ZipParser {
                         return@forEach
                     }
                 }
-                
+
                 val testCaseId = extractTestCaseId(fileName)
                 if (testCaseId == null) {
                     log.warn { "Could not extract test case ID from: $fileName" }
                     return@forEach
                 }
-                
+
                 val content = zip.getInputStream(entry).readBytes()
-                
-                vendorFiles.add(VendorFile(
-                    vendorId = vendorId,
-                    fileName = fileName,
-                    testCaseId = testCaseId,
-                    format = format,
-                    content = content
-                ))
-                
+
+                vendorFiles.add(
+                    VendorFile(
+                        vendorId = vendorId,
+                        fileName = fileName,
+                        testCaseId = testCaseId,
+                        format = format,
+                        content = content
+                    )
+                )
+
                 log.debug { "Found file: $vendorId/$fileName (format: $format, testCase: $testCaseId)" }
             }
         }
-        
+
         log.info { "Parsed ${vendorFiles.size} files from ${vendorFiles.map { it.vendorId }.distinct().size} vendors" }
         return vendorFiles
     }
 
     private fun extractTestCaseId(fileName: String): String? {
         val nameWithoutExtension = fileName.substringBeforeLast(".")
-        val pattern = Regex("(SJV|MDL|MDOC)-(QEAA|PuBEAA|EAA)-\\d+.*", RegexOption.IGNORE_CASE)
+        // Matches both positive test cases (EAA, QEAA, PuBEAA) and
+        // ETSI negative test cases (EAAN, QEAAN, PuBEAAN — the N suffix marks negative/invalid)
+        val pattern = Regex("(SJV|MDL|MDOC)-(QEAA|PuBEAA|EAA)N?-\\d+.*", RegexOption.IGNORE_CASE)
         return if (pattern.matches(nameWithoutExtension)) nameWithoutExtension else null
     }
 }
 
 object CredentialValidator {
 
+    private val signaturePolicy = CredentialSignaturePolicy()
+    private val expirationPolicy = ExpirationDatePolicy()
+    private val notBeforePolicy = NotBeforePolicy()
+    /** Offline plugtest: skip value verification (requires fetching Type Metadata from network). */
+    private val vctIntegrityPolicy = VctIntegrityPolicy(skipValueVerification = true)
+
     suspend fun validate(vendorFile: VendorFile): ValidationResult {
         val verifiedAt = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
         val hash = computeSha1Hash(vendorFile.content)
-        
+
         return try {
             when (vendorFile.format) {
                 VendorFile.FileFormat.SD_JWT_VC -> validateSdJwtVc(vendorFile, verifiedAt, hash)
                 VendorFile.FileFormat.MDOC -> validateMdoc(vendorFile, verifiedAt, hash)
             }
+        } catch (e: UnreachableDisclosuresException) {
+            // Per RFC 9901 §7.1 step 5: disclosures not reachable from payload hashes → MUST reject (INVALID)
+            log.warn { "INVALID (unreachable disclosures): ${vendorFile.fileName}: ${e.message}" }
+            ValidationResult(
+                vendorId = vendorFile.vendorId,
+                fileName = vendorFile.fileName,
+                testCaseId = vendorFile.testCaseId,
+                signatureStatus = ValidationResult.ValidationStatus.INVALID,
+                verifiedAt = verifiedAt,
+                hash = hash,
+                errorMessage = e.message
+            )
         } catch (e: Throwable) {
             log.error(e) { "Error validating ${vendorFile.fileName}" }
             ValidationResult(
@@ -158,45 +202,87 @@ object CredentialValidator {
         hash: String
     ): ValidationResult {
         val sdJwtString = vendorFile.content.decodeToString().trim()
-        
+
         log.debug { "Validating SD-JWT-VC: ${vendorFile.fileName}" }
-        
+
         val (detectionResult, credential) = CredentialParser.detectAndParse(sdJwtString)
-        
-        val signerKey: Key? = try {
-            credential.getSignerKey()
-        } catch (e: Exception) {
-            log.warn { "Could not retrieve signer key: ${e.message}" }
-            null
-        }
-        
-        if (signerKey == null) {
-            return ValidationResult(
-                vendorId = vendorFile.vendorId,
-                fileName = vendorFile.fileName,
-                testCaseId = vendorFile.testCaseId,
-                signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
-                verifiedAt = verifiedAt,
-                hash = hash,
-                errorMessage = "Could not retrieve issuer key from credential"
-            )
-        }
-        
-        val verificationResult = credential.verify(signerKey)
-        
+
+        val policyResults = mutableListOf<PolicyCheckResult>()
+        val context = PolicyExecutionContext.Empty
+
+        // --- vct#integrity policy ---
+        // Checks presence (EAA-5.2.1.2-03 SHALL) and format.
+        // Value correctness (requires fetching Type Metadata from vct URL) is CRIT-13 / out of scope offline.
+        val vctResult = runCatching { vctIntegrityPolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
+        policyResults += PolicyCheckResult(
+            policyId = vctIntegrityPolicy.id,
+            status = when {
+                vctResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+                vctResult.exceptionOrNull() is VctIntegrityException &&
+                (vctResult.exceptionOrNull() as VctIntegrityException).reason.let {
+                    it == VctIntegrityException.Reason.MISSING || it == VctIntegrityException.Reason.MALFORMED ||
+                    it == VctIntegrityException.Reason.VALUE_MISMATCH
+                } -> ValidationResult.ValidationStatus.INVALID
+                else -> ValidationResult.ValidationStatus.INDETERMINATE
+            },
+            errorMessage = vctResult.exceptionOrNull()?.message
+        )
+
+        // --- Signature policy (via CredentialSignaturePolicy) ---
+        val sigResult = signaturePolicy.verify(credential, context)
+        policyResults += PolicyCheckResult(
+            policyId = "signature",
+            status = if (sigResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                     else ValidationResult.ValidationStatus.INVALID,
+            errorMessage = sigResult.exceptionOrNull()?.message
+        )
+
+        // --- Expiration policy ---
+        // ExpirationDatePolicyException = credential is expired → INVALID (MUST reject per RFC 9901 §7.1 step 6)
+        val expResult = runCatching { expirationPolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
+        policyResults += PolicyCheckResult(
+            policyId = "expiration",
+            status = when {
+                expResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+                expResult.exceptionOrNull() is ExpirationDatePolicyException -> ValidationResult.ValidationStatus.INVALID
+                else -> ValidationResult.ValidationStatus.INDETERMINATE
+            },
+            errorMessage = expResult.exceptionOrNull()?.message
+        )
+
+        // --- Not-before policy ---
+        // NotBeforePolicyException = credential not yet valid → INVALID
+        val nbfResult = runCatching { notBeforePolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
+        policyResults += PolicyCheckResult(
+            policyId = "not-before",
+            status = when {
+                nbfResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+                nbfResult.exceptionOrNull() is NotBeforePolicyException -> ValidationResult.ValidationStatus.INVALID
+                else -> ValidationResult.ValidationStatus.INDETERMINATE
+            },
+            errorMessage = nbfResult.exceptionOrNull()?.message
+        )
+
+        // Overall signatureStatus: INVALID if any mandatory policy fails, VALID only if all pass.
+        // Expiration and not-before are mandatory validity checks — a failed credential MUST be rejected.
+        val overallSigStatus = policyResults
+            .map { it.status }
+            .firstOrNull { it == ValidationResult.ValidationStatus.INVALID }
+            ?: policyResults.map { it.status }.firstOrNull { it == ValidationResult.ValidationStatus.INDETERMINATE }
+            ?: ValidationResult.ValidationStatus.VALID
+
+        val firstError = policyResults.firstOrNull { it.status != ValidationResult.ValidationStatus.VALID }
+
         return ValidationResult(
             vendorId = vendorFile.vendorId,
             fileName = vendorFile.fileName,
             testCaseId = vendorFile.testCaseId,
-            signatureStatus = if (verificationResult.isSuccess) {
-                ValidationResult.ValidationStatus.VALID
-            } else {
-                ValidationResult.ValidationStatus.INVALID
-            },
+            signatureStatus = overallSigStatus,
             verifiedAt = verifiedAt,
             hash = hash,
             details = "Detection: ${detectionResult.credentialPrimaryType}/${detectionResult.credentialSubType}",
-            errorMessage = verificationResult.exceptionOrNull()?.message
+            errorMessage = firstError?.errorMessage,
+            policyResults = policyResults
         )
     }
 
@@ -207,10 +293,18 @@ object CredentialValidator {
         hash: String
     ): ValidationResult {
         log.debug { "Validating mdoc: ${vendorFile.fileName}" }
-        
-        val cborBytes = vendorFile.content
+
+        val cborBytes = vendorFile.content.let { raw ->
+            // Some participants (e.g. SITA) submit their .cbor files as base64url-encoded text
+            // rather than raw binary CBOR. Detect and decode transparently.
+            val asText = raw.decodeToString().trim()
+            if (asText.matchesBase64Url()) {
+                log.debug { "Detected base64url-encoded CBOR in ${vendorFile.fileName}, decoding" }
+                asText.decodeFromBase64Url()
+            } else raw
+        }
         val hexString = cborBytes.toHexString()
-        
+
         // First, try to understand the CBOR structure
         val structureInfo = try {
             analyzeCborStructure(cborBytes)
@@ -218,18 +312,18 @@ object CredentialValidator {
             "Unknown structure: ${e.message}"
         }
         log.debug { "CBOR structure analysis: $structureInfo" }
-        
+
         // Try parsing with CredentialParser (handles DeviceResponse and Document)
         return try {
             val (detectionResult, credential) = CredentialParser.detectAndParse(hexString)
-            
-            val signerKey: Key? = try {
+
+            val signerKey = try {
                 credential.getSignerKey()
             } catch (e: Exception) {
                 log.warn { "Could not retrieve signer key: ${e.message}" }
                 null
             }
-            
+
             if (signerKey == null) {
                 return ValidationResult(
                     vendorId = vendorFile.vendorId,
@@ -241,18 +335,15 @@ object CredentialValidator {
                     errorMessage = "Could not retrieve issuer key from mdoc"
                 )
             }
-            
+
             val verificationResult = credential.verify(signerKey)
-            
+
             ValidationResult(
                 vendorId = vendorFile.vendorId,
                 fileName = vendorFile.fileName,
                 testCaseId = vendorFile.testCaseId,
-                signatureStatus = if (verificationResult.isSuccess) {
-                    ValidationResult.ValidationStatus.VALID
-                } else {
-                    ValidationResult.ValidationStatus.INVALID
-                },
+                signatureStatus = if (verificationResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                                  else ValidationResult.ValidationStatus.INVALID,
                 verifiedAt = verifiedAt,
                 hash = hash,
                 details = "Detection: ${detectionResult.credentialPrimaryType}/${detectionResult.credentialSubType}",
@@ -260,75 +351,75 @@ object CredentialValidator {
             )
         } catch (e: Exception) {
             log.debug { "CredentialParser failed, trying IssuerSigned format (ETSI plugtest format): ${e.message}" }
-            
-            // ETSI plugtest mdocs are in IssuerSigned format per the test case notes:
+
+            // ETSI plugtest mdocs are in IssuerSigned format:
             // "ISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5"
             try {
                 val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(cborBytes)
                 log.debug { "Successfully parsed as IssuerSigned" }
-                
-                // Get the MSO to extract docType
+
                 val mso = issuerSigned.decodeMobileSecurityObject()
                 log.debug { "MSO docType: ${mso.docType}" }
-                
-                // Verify the issuer signature
-                val issuerAuth = issuerSigned.issuerAuth
-                // Per ISO 18013-5 §9.1.2.4: x5chain SHALL be in the unprotected header,
-                // but readers SHOULD also support x5chain in the protected header.
-                val x5c = issuerAuth.unprotected.x5chain
-                    ?: runCatching {
-                        coseCompliantCbor.decodeFromByteArray<CoseHeaders>(issuerAuth.protected).x5chain
-                    }.getOrNull()
-                
-                if (x5c.isNullOrEmpty()) {
-                    return ValidationResult(
-                        vendorId = vendorFile.vendorId,
-                        fileName = vendorFile.fileName,
-                        testCaseId = vendorFile.testCaseId,
-                        signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
-                        verifiedAt = verifiedAt,
-                        hash = hash,
-                        details = "Parsed as IssuerSigned (docType: ${mso.docType})",
-                        errorMessage = "Missing x5chain certificate in issuerAuth"
-                    )
-                }
-                
-                val signerCertificateBytes = x5c.first().rawBytes
-                
-                val issuerKey = JWKKey.importFromDerCertificate(signerCertificateBytes).getOrElse { certError ->
-                    return ValidationResult(
-                        vendorId = vendorFile.vendorId,
-                        fileName = vendorFile.fileName,
-                        testCaseId = vendorFile.testCaseId,
-                        signatureStatus = ValidationResult.ValidationStatus.INDETERMINATE,
-                        verifiedAt = verifiedAt,
-                        hash = hash,
-                        details = "Parsed as IssuerSigned (docType: ${mso.docType})",
-                        errorMessage = "Failed to import issuer key from certificate: ${certError.message}"
-                    )
-                }
-                
-                log.debug { "Verifying issuerAuth signature..." }
-                val signatureValid = issuerAuth.verify(issuerKey.toCoseVerifier())
-                
+
+                // Build a stub Document so we can reuse MdocVerifier sub-steps
+                val document = Document(docType = mso.docType, issuerSigned = issuerSigned)
+
+                val policyResults = mutableListOf<PolicyCheckResult>()
+
+                // --- issuer_auth: COSE_Sign1 signature + x5chain (via getParsedIssuerAuth for protected header fallback) ---
+                val issuerAuthResult = runCatching { MdocVerifier.verifyIssuerAuthentication(document) }
+                policyResults += PolicyCheckResult(
+                    policyId = "issuer_auth",
+                    status = if (issuerAuthResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                             else ValidationResult.ValidationStatus.INVALID,
+                    errorMessage = issuerAuthResult.exceptionOrNull()?.message
+                )
+
+                // --- mso: validity timestamps + digest algorithm ---
+                val msoResult = runCatching { MdocVerifier.verifyMso(mso) }
+                policyResults += PolicyCheckResult(
+                    policyId = "mso_validity",
+                    status = when {
+                        msoResult.isSuccess -> ValidationResult.ValidationStatus.VALID
+                        msoResult.exceptionOrNull()?.message?.contains("expired", ignoreCase = true) == true ||
+                        msoResult.exceptionOrNull()?.message?.contains("valid", ignoreCase = true) == true ->
+                            ValidationResult.ValidationStatus.INVALID
+                        else -> ValidationResult.ValidationStatus.INDETERMINATE
+                    },
+                    errorMessage = msoResult.exceptionOrNull()?.message
+                )
+
+                // --- issuer_signed_integrity: each IssuerSignedItem digest matches MSO ---
+                val integrityResult = runCatching { MdocVerifier.verifyIssuerSignedDataIntegrity(document, mso) }
+                policyResults += PolicyCheckResult(
+                    policyId = "issuer_signed_integrity",
+                    status = if (integrityResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                             else ValidationResult.ValidationStatus.INVALID,
+                    errorMessage = integrityResult.exceptionOrNull()?.message
+                )
+
+                // Signature status is driven by issuer_auth; other failures are also recorded
+                val sigStatus = policyResults.first { it.policyId == "issuer_auth" }.status
+                val firstError = policyResults.firstOrNull { it.status != ValidationResult.ValidationStatus.VALID }
+
                 ValidationResult(
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
                     testCaseId = vendorFile.testCaseId,
-                    signatureStatus = if (signatureValid) {
-                        ValidationResult.ValidationStatus.VALID
-                    } else {
-                        ValidationResult.ValidationStatus.INVALID
-                    },
+                    signatureStatus = sigStatus,
                     verifiedAt = verifiedAt,
                     hash = hash,
-                    details = "IssuerSigned format (docType: ${mso.docType}, x5c certs: ${x5c.size})",
-                    errorMessage = if (!signatureValid) "IssuerAuth COSE_Sign1 signature verification failed" else null
+                    details = "IssuerSigned format (docType: ${mso.docType}, x5c certs: ${
+                        issuerSigned.issuerAuth.unprotected.x5chain?.size
+                            ?: runCatching { coseCompliantCbor.decodeFromByteArray<CoseHeaders>(issuerSigned.issuerAuth.protected).x5chain?.size }.getOrNull()
+                            ?: 0
+                    })",
+                    errorMessage = firstError?.errorMessage,
+                    policyResults = policyResults
                 )
             } catch (issuerSignedError: Exception) {
                 log.error(issuerSignedError) { "IssuerSigned parsing also failed" }
-                
-                // Return detailed error with structure analysis
+
                 ValidationResult(
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
@@ -346,25 +437,14 @@ object CredentialValidator {
     @OptIn(ExperimentalSerializationApi::class)
     private fun analyzeCborStructure(cborBytes: ByteArray): String {
         return try {
-            // Try to decode as a generic CBOR map to see the top-level keys
             val firstByte = cborBytes.firstOrNull()?.toInt()?.and(0xFF) ?: return "Empty data"
-            
             val majorType = (firstByte shr 5) and 0x07
             val additionalInfo = firstByte and 0x1F
-            
             val typeDescription = when (majorType) {
-                0 -> "Unsigned integer"
-                1 -> "Negative integer"
-                2 -> "Byte string"
-                3 -> "Text string"
-                4 -> "Array"
-                5 -> "Map"
-                6 -> "Tagged value (tag: $additionalInfo)"
-                7 -> "Simple/float"
-                else -> "Unknown"
+                0 -> "Unsigned integer"; 1 -> "Negative integer"; 2 -> "Byte string"
+                3 -> "Text string"; 4 -> "Array"; 5 -> "Map"
+                6 -> "Tagged value (tag: $additionalInfo)"; 7 -> "Simple/float"; else -> "Unknown"
             }
-            
-            // For maps, try to extract key names
             if (majorType == 5) {
                 val mapSize = when {
                     additionalInfo < 24 -> additionalInfo
@@ -382,8 +462,7 @@ object CredentialValidator {
 
     private fun computeSha1Hash(data: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-1")
-        val hashBytes = digest.digest(data)
-        return hashBytes.joinToString(":") { "%02X".format(it) }
+        return digest.digest(data).joinToString(":") { "%02X".format(it) }
     }
 
     private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
@@ -392,19 +471,14 @@ object CredentialValidator {
 object XmlReportGenerator {
 
     fun generateReport(result: ValidationResult): String {
-        // Use overallStatus (considers both signature AND content validation) for root element
         val rootElement = when (result.overallStatus) {
             ValidationResult.ValidationStatus.VALID -> "VALID"
             ValidationResult.ValidationStatus.INVALID -> "INVALID"
             ValidationResult.ValidationStatus.INDETERMINATE -> "INDETERMINATE"
         }
-        
-        val signatureStatusText = when (result.signatureStatus) {
-            ValidationResult.ValidationStatus.VALID -> "VALID"
-            ValidationResult.ValidationStatus.INVALID -> "INVALID"
-            ValidationResult.ValidationStatus.INDETERMINATE -> "INDETERMINATE"
-        }
-        
+
+        val signatureStatusText = result.signatureStatus.name
+
         return buildString {
             appendLine("""<?xml version="1.0" encoding="UTF-8"?>""")
             appendLine("<$rootElement>")
@@ -420,64 +494,70 @@ object XmlReportGenerator {
             if (result.errorMessage != null) {
                 appendLine("  <ErrorMessage>${escapeXml(result.errorMessage)}</ErrorMessage>")
             }
-            
-            // Add content validation results if present
+
+            // Per-policy results (SD-JWT-VC only)
+            if (result.policyResults.isNotEmpty()) {
+                appendLine("  <PolicyResults>")
+                for (pr in result.policyResults) {
+                    if (pr.errorMessage != null) {
+                        appendLine("    <PolicyResult policy=\"${escapeXml(pr.policyId)}\" status=\"${pr.status.name}\">")
+                        appendLine("      <ErrorMessage>${escapeXml(pr.errorMessage)}</ErrorMessage>")
+                        appendLine("    </PolicyResult>")
+                    } else {
+                        appendLine("    <PolicyResult policy=\"${escapeXml(pr.policyId)}\" status=\"${pr.status.name}\"/>")
+                    }
+                }
+                appendLine("  </PolicyResults>")
+            }
+
+            // Content validation results
             result.contentValidation?.let { cv ->
                 appendLine("  <ContentValidation>")
                 appendLine("    <TestCaseFound>${cv.testCaseFound}</TestCaseFound>")
                 appendLine("    <OverallValid>${cv.overallValid}</OverallValid>")
                 appendLine("    <Summary>${escapeXml(cv.summary)}</Summary>")
-                
+
                 cv.headerValidation?.let { hv ->
                     appendLine("    <HeaderValidation valid=\"${hv.valid}\">")
-                    if (hv.missingFields.isNotEmpty()) {
+                    if (hv.missingFields.isNotEmpty())
                         appendLine("      <MissingFields>${escapeXml(hv.missingFields.joinToString(", "))}</MissingFields>")
-                    }
-                    if (hv.presentFields.isNotEmpty()) {
+                    if (hv.presentFields.isNotEmpty())
                         appendLine("      <PresentFields>${escapeXml(hv.presentFields.joinToString(", "))}</PresentFields>")
-                    }
                     appendLine("    </HeaderValidation>")
                 }
-                
+
                 cv.payloadValidation?.let { pv ->
                     appendLine("    <PayloadValidation valid=\"${pv.valid}\">")
-                    if (pv.missingFields.isNotEmpty()) {
+                    if (pv.missingFields.isNotEmpty())
                         appendLine("      <MissingFields>${escapeXml(pv.missingFields.joinToString(", "))}</MissingFields>")
-                    }
-                    if (pv.presentFields.isNotEmpty()) {
+                    if (pv.presentFields.isNotEmpty())
                         appendLine("      <PresentFields>${escapeXml(pv.presentFields.joinToString(", "))}</PresentFields>")
-                    }
                     appendLine("    </PayloadValidation>")
                 }
-                
+
                 cv.namespaceValidation?.let { nv ->
                     appendLine("    <NamespaceValidation valid=\"${nv.valid}\">")
-                    if (nv.missingFields.isNotEmpty()) {
+                    if (nv.missingFields.isNotEmpty())
                         appendLine("      <MissingFields>${escapeXml(nv.missingFields.joinToString(", "))}</MissingFields>")
-                    }
-                    if (nv.presentFields.isNotEmpty()) {
+                    if (nv.presentFields.isNotEmpty())
                         appendLine("      <PresentFields>${escapeXml(nv.presentFields.joinToString(", "))}</PresentFields>")
-                    }
                     appendLine("    </NamespaceValidation>")
                 }
-                
+
                 appendLine("  </ContentValidation>")
             }
-            
+
             appendLine("</$rootElement>")
         }
     }
 
-    fun generateReportFileName(result: ValidationResult): String {
-        return "Verification_of_${result.vendorId}_${result.testCaseId}.xml"
-    }
+    fun generateReportFileName(result: ValidationResult): String =
+        "Verification_of_${result.vendorId}_${result.testCaseId}.xml"
 
-    private fun escapeXml(text: String): String {
-        return text
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("'", "&apos;")
-    }
+    private fun escapeXml(text: String): String = text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&apos;")
 }
