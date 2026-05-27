@@ -9,6 +9,8 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.etsi.TestCase
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.mdoc.objects.mso.Status
+import id.walt.mdoc.objects.mso.UniformResourceIdentifier
 import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -66,13 +68,29 @@ object MdocGenerator {
 
         val data = MdocIssuer.MdocUniversalIssuanceData(namespaces = namespaces)
 
+        // ISO 18013-5 §9.1.2.6: some test cases require MSO.status.identifier_list
+        // (MDL-EAA-6, MDOC-EAA-9). The uri points to the identifier list revocation token.
+        // We host a minimal (empty, no revocations) identifier list at the static files repo.
+        val msoStatus: Status? = when {
+            testCase.id.contains("-6") && testCase.id.startsWith("MDL-EAA") ||
+            testCase.id.contains("-9") && testCase.id.startsWith("MDOC-EAA") ->
+                Status(identifierList = Status.IdentifierListInfo(
+                    id = testCase.id,
+                    uri = UniformResourceIdentifier(
+                        "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
+                    )
+                ))
+            else -> null
+        }
+
         val issuerSigned = MdocIssuer.issueUniversal(
             issuerKey = issuerKey,
             issuerCertificate = issuerCertCose,
             holderKey = holderCoseKey,
             docType = docType,
             data = data,
-            valueMappingFunction = defaultValueMappingFunction
+            valueMappingFunction = defaultValueMappingFunction,
+            status = msoStatus
         )
 
         // ETSI plugtest expects IssuerSigned format, NOT the full Document wrapper
