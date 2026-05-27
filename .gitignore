@@ -194,3 +194,6 @@ iOSInjectionProject/
 /waltid-services/waltid-etsi-plugtest-cli/output/
 /waltid-services/waltid-etsi-plugtest-cli/config/key.jwk
 /waltid-services/waltid-etsi-plugtest-cli/config/cert.pem
+
+# E2E test local config
+scripts/e2e/e2e.env
