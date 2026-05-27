@@ -107,52 +107,95 @@ object MdocGenerator {
     private fun buildNamespacesFromTestCase(testCase: TestCase): Map<String, JsonObject> {
         val docType = determineDocType(testCase)
 
-        val namespace = when {
-            docType == "org.iso.18013.5.1.mDL" -> "org.iso.18013.5.1"
-            docType.contains("23220") -> "org.iso.23220.1"
-            else -> "org.etsi.01947201.010101"
-        }
+        return when {
+            // mDL uses a single ISO 18013-5 namespace
+            docType == "org.iso.18013.5.1.mDL" -> {
+                val ns = buildJsonObject {
+                    put("family_name", "Mustermann")
+                    put("given_name", "Max")
+                    put("birth_date", "1990-01-15")
+                    put("issue_date", "2024-01-01")
+                    put("expiry_date", "2034-01-01")
+                    put("issuing_country", "DE")
+                    put("issuing_authority", "Test Authority")
+                    put("document_number", "DOC123456789")
+                    put("portrait", "")
+                    put("driving_privileges", "")
+                    put("distinguishing_sign", "DE")
 
-        val namespaceSection = testCase.getNamespace()
-        
-        val attributes = buildJsonObject {
-            put("family_name", "Mustermann")
-            put("given_name", "Max")
-            put("birth_date", "1990-01-15")
-            put("issue_date", "2024-01-01")
-            put("expiry_date", "2034-01-01")
-            put("issuing_country", "DE")
-            put("issuing_authority", "Test Authority")
-            put("document_number", "DOC123456789")
-
-            if (testCase.id.contains("QEAA")) {
-                put("category", "urn:etsi:esi:eaa:eu:qualified")
-            }
-
-            if (testCase.isOneTime) {
-                put("oneTime", true)
-            }
-
-            if (testCase.isShortLived) {
-                put("shortLived", true)
-            }
-
-            namespaceSection?.items?.forEach { item ->
-                val cleanItem = item.trim().split(" ").first().split("(").first()
-                if (!this@buildJsonObject.toString().contains("\"$cleanItem\"") && !cleanItem.contains("namespace", ignoreCase = true)) {
-                    when {
-                        cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
-                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
-                        cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
-                        cleanItem.contains("number", ignoreCase = true) -> put(cleanItem, "123456789")
-                        cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
-                        else -> put(cleanItem, "test_value")
+                    // Extra optional elements from the test case description
+                    val namespaceSection = testCase.getNamespace()
+                    namespaceSection?.items?.forEach { item ->
+                        val cleanItem = item.trim().split(" ").first().split("(").first()
+                        if (cleanItem.isNotBlank() && !cleanItem.contains("namespace", ignoreCase = true) &&
+                            !cleanItem.contains("namespaces", ignoreCase = true) &&
+                            !this@buildJsonObject.toString().contains("\"$cleanItem\"")) {
+                            when {
+                                cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
+                                cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
+                                cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
+                                cleanItem.contains("number", ignoreCase = true) -> put(cleanItem, "123456789")
+                                cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
+                                else -> put(cleanItem, "test_value")
+                            }
+                        }
                     }
                 }
+                mapOf("org.iso.18013.5.1" to ns)
+            }
+
+            // MDOC-EAA/QEAA/PuBEAA: two namespaces per ETSI TS 119 472-1
+            else -> {
+                // ISO 23220-1 namespace: base personal attributes
+                val isoNs = buildJsonObject {
+                    put("family_name", "Mustermann")
+                    put("given_name", "Max")
+                    put("birth_date", "1990-01-15")
+                    put("issue_date", "2024-01-01")
+                    put("expiry_date", "2034-01-01")
+                    put("issuing_country", "DE")
+                    // ISO 23220-2 requires the unicode variant for issuing_authority
+                    put("issuing_authority_unicode", "Test Authority")
+                    put("document_number", "DOC123456789")
+                }
+
+                // ETSI namespace: category and ETSI-specific extensions
+                val etsiNs = buildJsonObject {
+                    // category is mandatory for QEAA and PuBEAA; absent for plain EAA
+                    when {
+                        testCase.id.contains("QEAA", ignoreCase = true) ->
+                            put("category", "urn:etsi:esi:eaa:eu:qualified")
+                        testCase.id.contains("PuBEAA", ignoreCase = true) ->
+                            put("category", "urn:etsi:esi:eaa:eu:pub")
+                        // plain EAA: no category claim
+                    }
+
+                    if (testCase.isOneTime) put("oneTime", true)
+                    if (testCase.isShortLived) put("shortLived", true)
+                    if (testCase.isPseudonym) put("also_known_as", "pseudonym:user123")
+
+                    // Add any remaining ETSI-specific fields from the test case
+                    val namespaceSection = testCase.getNamespace()
+                    namespaceSection?.items?.forEach { item ->
+                        val cleanItem = item.trim().split(" ").first().split("(").first()
+                        // Only add items that look like ETSI-specific field names
+                        val etsiFields = setOf("iss_reg_id", "status_service", "also_known_as", "oneTime", "shortLived", "category")
+                        if (cleanItem in etsiFields && !this@buildJsonObject.toString().contains("\"$cleanItem\"")) {
+                            when (cleanItem) {
+                                "iss_reg_id" -> put("iss_reg_id", "DE-REG-123456")
+                                "status_service" -> put("status_service", "https://status.example.com")
+                                else -> {} // already handled above
+                            }
+                        }
+                    }
+                }
+
+                mapOf(
+                    "org.iso.23220.1" to isoNs,
+                    "org.etsi.01947201.010101" to etsiNs
+                )
             }
         }
-
-        return mapOf(namespace to attributes)
     }
 
     private fun parsePemCertificate(pem: String): ByteArray {
