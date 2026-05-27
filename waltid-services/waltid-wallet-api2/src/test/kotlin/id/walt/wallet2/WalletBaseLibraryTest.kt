@@ -7,6 +7,7 @@ import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
