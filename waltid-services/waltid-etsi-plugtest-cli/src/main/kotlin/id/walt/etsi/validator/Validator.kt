@@ -366,13 +366,15 @@ object CredentialValidator {
                 val document = credential.document
                 val mso = credential.documentMso
 
+                // Run issuer_auth policy to get certificate_chain, signer_jwk, signer_pem etc.
+                // The signature was already verified above via credential.verify(); use that status
+                // but take the rich results from the policy run.
+                val issuerAuthRun = issuerAuthPolicy.runPolicy(document, mso, null).toCheckResult()
+                val issuerAuthResult = issuerAuthRun.copy(status = sigStatus,
+                    errorMessage = issuerAuthRun.errorMessage ?: verificationResult.exceptionOrNull()?.message)
+
                 listOf(
-                    // issuer_auth: signature + x5chain (from the CredentialSignaturePolicy path above)
-                    PolicyCheckResult(
-                        policyId = issuerAuthPolicy.id,
-                        status = sigStatus,
-                        errorMessage = verificationResult.exceptionOrNull()?.message
-                    ),
+                    issuerAuthResult,
                     // mso_validity: validity timestamps + digest algorithm
                     msoPolicy.runPolicy(document, mso, null).toCheckResult(),
                     // issuer_signed_integrity: each data element digest matches MSO
@@ -530,10 +532,10 @@ object XmlReportGenerator {
                             appendLine("      <ErrorMessage>${escapeXml(pr.errorMessage)}</ErrorMessage>")
                         }
                         for ((key, value) in pr.results) {
-                            // Render each result entry as a <Result key="..." value="..."/> element.
-                            // Trim to keep large values (e.g. PEM certs) readable but present.
-                            val rendered = value.toString().trim('"').take(512)
-                            appendLine("      <Result key=\"${escapeXml(key)}\">${escapeXml(rendered)}</Result>")
+                            // Use CDATA so raw JSON values (including quotes, angle brackets, etc.)
+                            // are preserved exactly without escaping.
+                            val raw = value.toString().trim('"')
+                            appendLine("      <Result key=\"${escapeXml(key)}\"><![CDATA[$raw]]></Result>")
                         }
                         appendLine("    </PolicyResult>")
                     } else {
