@@ -65,6 +65,8 @@ data class MobileSecurityObject(
  * A container for credential status information, typically referencing an external Status List.
  * This allows a verifier to check if the mdoc has been revoked by the issuer.
  *
+ * Per ISO/IEC 18013-5 §9.1.2.6, both `identifier_list` and `status_list` are optional.
+ *
  * @see ISO/IEC 18013-5:xxxx(E), 9.1.2.6 (MSO revocation)
  * @see IETF Draft: draft-ietf-oauth-status-list
  *
@@ -73,7 +75,7 @@ data class MobileSecurityObject(
 @Serializable
 data class Status(
     @SerialName("status_list")
-    val statusList: StatusListInfo
+    val statusList: StatusListInfo? = null
 ) {
     /**
      * Specifies the location of a Status List Token and the specific index within that list
