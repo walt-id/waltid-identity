@@ -18,6 +18,8 @@ class WalletViewModel: ObservableObject {
         bootstrap()
     }
 
+    // TODO: if a deep link arrives before bootstrap completes, the URL is stored but the action
+    // is never triggered. Consider checking for pending URLs after bootstrap sets isReady = true.
     func handleDeepLink(_ url: URL) {
         switch url.scheme {
         case "openid-credential-offer":
