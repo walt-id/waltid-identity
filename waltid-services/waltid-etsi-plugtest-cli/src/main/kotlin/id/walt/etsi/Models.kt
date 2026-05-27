@@ -41,7 +41,10 @@ data class TestCase(
     fun getPayload(): TestCaseSection? = getSection("Payload")
     fun getNamespace(): TestCaseSection? = getSection("NameSpace")
     fun getCwtClaims(): TestCaseSection? = sections.find { it.title.contains("CWT", ignoreCase = true) }
-    fun getMsoPayload(): TestCaseSection? = sections.find { it.title.contains("Payload", ignoreCase = true) && it.title.contains("MSO", ignoreCase = true) || it.title.contains("MobileSecurityObject", ignoreCase = true) }
+    fun getMsoPayload(): TestCaseSection? = sections.find {
+        it.title.contains("Payload", ignoreCase = true) &&
+            (it.title.contains("MSO", ignoreCase = true) || it.title.contains("MobileSecurityObject", ignoreCase = true))
+    }
 
     val hasKeyBinding: Boolean
         get() = description.contains("cnf", ignoreCase = true) || 
