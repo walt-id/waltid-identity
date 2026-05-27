@@ -30,15 +30,24 @@ data class SDisclosure internal constructor(
          */
         fun parse(disclosure: String) =
             Json.parseToJsonElement(disclosure.decodeFromBase64Url().decodeToString()).jsonArray.let {
-                if (it.size != 3) {
-                    throw Exception("Invalid selective disclosure")
+                // Per RFC 9901 §4.2.1: object property disclosures are [salt, name, value] (size 3).
+                // Per RFC 9901 §4.2.2: array element disclosures are [salt, value] (size 2).
+                // Both are valid; only other sizes are malformed.
+                when (it.size) {
+                    3 -> SDisclosure(
+                        disclosure = disclosure,
+                        salt = it[0].jsonPrimitive.content,
+                        key = it[1].jsonPrimitive.content,
+                        value = it[2]
+                    )
+                    2 -> SDisclosure(
+                        disclosure = disclosure,
+                        salt = it[0].jsonPrimitive.content,
+                        key = "",
+                        value = it[1]
+                    )
+                    else -> throw Exception("Invalid selective disclosure")
                 }
-                SDisclosure(
-                    disclosure = disclosure,
-                    salt = it[0].jsonPrimitive.content,
-                    key = it[1].jsonPrimitive.content,
-                    value = it[2]
-                )
             }
     }
 }
