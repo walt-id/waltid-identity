@@ -54,6 +54,10 @@ android {
 dependencies {
     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-client"))
 
+    implementation(identityLibs.ktor.client.android)
+    implementation(identityLibs.ktor.client.content.negotiation)
+    implementation(identityLibs.ktor.serialization.kotlinx.json)
+
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")

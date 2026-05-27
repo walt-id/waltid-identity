@@ -7,6 +7,8 @@ import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.target.ios.keys.Ed25519
 import id.walt.target.ios.keys.P256
 import id.walt.target.ios.keys.RSA
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -117,10 +119,18 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         get() = _jwkObj.toMap().any { it.key in privateParameters }
 
     actual companion object : JWKKeyCreator() {
+        @OptIn(ExperimentalUuidApi::class)
         actual override suspend fun generate(
             type: KeyType, metadata: JwkKeyMeta?
         ): JWKKey {
-            TODO("Not yet implemented")
+            val kid = Uuid.random().toString()
+            val jwkJson = when (type) {
+                KeyType.secp256r1 -> P256.PrivateKey.createInKeychain(kid, inSecureEnclave = false).jwk()
+                KeyType.Ed25519 -> Ed25519.PrivateKey.createInKeychain(kid).jwk()
+                KeyType.RSA -> RSA.PrivateKey.createInKeychain(kid, size = 2048u).jwk()
+                else -> error("Key generation not supported for $type on iOS")
+            }
+            return JWKKey(jwkJson.toString(), kid)
         }
 
         actual override suspend fun importRawPublicKey(
