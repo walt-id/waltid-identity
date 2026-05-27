@@ -4,14 +4,18 @@ import id.walt.crypto.keys.Key
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandler
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.IssuedCredential
-import id.walt.oid4vc.data.DisplayProperties
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
+import id.walt.mdoc.objects.mso.Status
 import id.walt.sdjwt.SDMap
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.time.Instant
 
 
 /**
@@ -25,22 +29,6 @@ import kotlinx.serialization.json.JsonPrimitive
  * each top-level key is a namespace string and its value is a [JsonObject] of
  * data element identifier → value pairs. The [CredentialConfiguration.doctype]
  * provides the document type.
- *
- * Example:
- * ```kotlin
- * class MyMdocHandler(private val issuerKey: Key, private val x5c: List<String>) :
- *     MsoMdocCredentialHandler() {
- *
- *     override suspend fun issueMdoc(
- *         docType: String,
- *         namespaceData: Map<String, JsonObject>,
- *         holderKey: Key,
- *         issuerKey: Key,
- *         x5Chain: List<String>?,
- *         validityDays: Int,
- *     ): String = /* CBOR issuance logic here, returns base64url-encoded IssuerSigned */
- * }
- * ```
  */
 abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
 
@@ -52,9 +40,13 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         credentialData: JsonObject,
         dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<String>?,
-        display: List<DisplayProperties>?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
         w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
     ): CredentialResponseResult {
         return try {
             val docType = configuration.doctype
@@ -62,7 +54,6 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                     OAuthError("invalid_request", "Missing doctype in credential configuration for mso_mdoc")
                 )
 
-            // credentialData is interpreted as namespace → { elementId: value, ... }
             val namespaceData = credentialData.entries
                 .mapNotNull { (namespace, value) ->
                     (value as? JsonObject)?.let { namespace to it }
@@ -75,7 +66,6 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
                 )
             }
 
-            // Extract the holder key from the proof
             val holderKey = extractHolderKey(request)
                 ?: return CredentialResponseResult.Failure(
                     OAuthError("invalid_or_missing_proof", "Could not extract holder key from proof")
@@ -102,8 +92,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
 
     /**
      * Extracts the holder's public key from the credential request proof.
-     * The default implementation returns null — override to extract the key
-     * from the proof JWT header `jwk` claim or CWT.
+     * Override to extract the key from the proof JWT header `jwk` claim or CWT.
      */
     protected open suspend fun extractHolderKey(request: CredentialRequest): Key? = null
 
@@ -123,7 +112,7 @@ abstract class MsoMdocCredentialHandler : CredentialEndpointHandler {
         namespaceData: Map<String, JsonObject>,
         holderKey: Key,
         issuerKey: Key,
-        x5Chain: List<String>?,
+        x5Chain: List<CertificateDer>?,
         validityDays: Int,
     ): String
 }
