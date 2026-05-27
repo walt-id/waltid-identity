@@ -73,9 +73,7 @@ data class Wallet(
 
     /** Streams all credentials across all credential stores, in store order. */
     suspend fun streamAllCredentials(): Flow<StoredCredential> =
-        credentialStores.map { store ->
-            store.listCredentials()
-        }.merge()
+        credentialStores.map { it.listCredentials() }.merge()
 
     /** Finds a credential by wallet-assigned ID across all credential stores. */
     suspend fun findCredential(id: String): StoredCredential? =
