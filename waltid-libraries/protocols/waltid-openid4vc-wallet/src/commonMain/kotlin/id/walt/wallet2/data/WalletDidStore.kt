@@ -11,7 +11,7 @@ interface WalletDidStore {
 
     suspend fun getDid(did: String): WalletDidEntry?
 
-    fun listDids(): Flow<WalletDidEntry>
+    suspend fun listDids(): Flow<WalletDidEntry>
 
     suspend fun addDid(entry: WalletDidEntry)
 

@@ -15,7 +15,7 @@ class InMemoryCredentialStore : WalletCredentialStore {
     override suspend fun getCredential(id: String): StoredCredential? =
         credentials[id]
 
-    override fun listCredentials(): Flow<StoredCredential> =
+    override suspend fun listCredentials(): Flow<StoredCredential> =
         credentials.values.toList().asFlow()
 
     override suspend fun addCredential(entry: StoredCredential) {

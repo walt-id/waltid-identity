@@ -45,12 +45,12 @@ class InMemoryWalletStore : WalletStore {
         descriptors.remove(walletId)
     }
 
-    override fun listWalletIds(): Flow<String> = wallets.keys.toList().asFlow()
+    override suspend fun listWalletIds(): Flow<String> = wallets.keys.toList().asFlow()
 
     override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
         accountWallets.getOrPut(accountId) { mutableListOf() }.add(walletId)
     }
 
-    override suspend fun getWalletIdsForAccount(accountId: String): Flow<String>? =
-        accountWallets[accountId]?.toList()?.asFlow()
+    override suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
+        accountWallets[accountId]?.toList()
 }

@@ -9,9 +9,9 @@ dependencies {
     // The base wallet library — store interfaces and data models
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
 
-    // Exposed — SQL framework
-    implementation("org.jetbrains.exposed:exposed-core:1.3.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:1.3.0")
+    // Exposed — SQL framework (api so Database is visible to consumers)
+    api("org.jetbrains.exposed:exposed-core:1.3.0")
+    api("org.jetbrains.exposed:exposed-jdbc:1.3.0")
     implementation("org.jetbrains.exposed:exposed-java-time:1.3.0")
     implementation("org.jetbrains.exposed:exposed-json:1.3.0")
 

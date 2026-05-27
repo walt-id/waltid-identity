@@ -2,7 +2,7 @@ package id.walt.wallet2.data
 
 import id.walt.crypto.keys.Key
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
 
 /**
@@ -72,11 +72,10 @@ data class Wallet(
         keyStores.flatMap { it.listKeys().toList() }
 
     /** Streams all credentials across all credential stores, in store order. */
-    fun streamAllCredentials(): Flow<StoredCredential> = flow {
-        credentialStores.forEach { store ->
-            store.listCredentials().collect { emit(it) }
-        }
-    }
+    suspend fun streamAllCredentials(): Flow<StoredCredential> =
+        credentialStores.map { store ->
+            store.listCredentials()
+        }.merge()
 
     /** Finds a credential by wallet-assigned ID across all credential stores. */
     suspend fun findCredential(id: String): StoredCredential? =

@@ -3,13 +3,10 @@ package id.walt.wallet2.persistence
 import id.walt.wallet2.data.WalletDescriptor
 import id.walt.wallet2.stores.WalletStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowimport org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.jdbc.Database
-import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.insert
-import org.jetbrains.exposed.v1.jdbc.selectAll
-import org.jetbrains.exposed.v1.jdbc.upsert
-import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
+import kotlinx.coroutines.flow.asFlow
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 
 /**
  * Exposed-backed [WalletStore].
@@ -20,10 +17,10 @@ import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTrans
 class ExposedWalletStore(private val db: Database) : WalletStore {
 
     override suspend fun loadDescriptor(walletId: String): WalletDescriptor? =
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             val walletRow = Wallet2Tables.Wallets.selectAll()
                 .where { Wallet2Tables.Wallets.id eq walletId }
-                .firstOrNull() ?: return@newSuspendedTransaction null
+                .firstOrNull() ?: return@suspendTransaction null
 
             val keyStoreIds = Wallet2Tables.WalletKeyStores.selectAll()
                 .where { Wallet2Tables.WalletKeyStores.walletId eq walletId }
@@ -51,7 +48,7 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
         }
 
     override suspend fun saveDescriptor(descriptor: WalletDescriptor) {
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             // Upsert wallet row
             Wallet2Tables.Wallets.upsert {
                 it[Wallet2Tables.Wallets.id] = descriptor.id
@@ -100,7 +97,7 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
     }
 
     override suspend fun deleteWallet(walletId: String) {
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.WalletKeyStores.deleteWhere { Wallet2Tables.WalletKeyStores.walletId eq walletId }
             Wallet2Tables.WalletCredentialStores.deleteWhere { Wallet2Tables.WalletCredentialStores.walletId eq walletId }
             Wallet2Tables.WalletDidStores.deleteWhere { Wallet2Tables.WalletDidStores.walletId eq walletId }
@@ -109,15 +106,13 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
         }
     }
 
-    override fun listWalletIds(): Flow<String> = flow {
-        val ids = newSuspendedTransaction(db = db) {
+    override suspend fun listWalletIds(): Flow<String> =
+        suspendTransaction(db) {
             Wallet2Tables.Wallets.selectAll().map { it[Wallet2Tables.Wallets.id] }
-        }
-        ids.forEach { emit(it) }
-    }
+        }.asFlow()
 
     override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.AccountWallets.upsert {
                 it[Wallet2Tables.AccountWallets.accountId] = accountId
                 it[Wallet2Tables.AccountWallets.walletId] = walletId
@@ -125,12 +120,10 @@ class ExposedWalletStore(private val db: Database) : WalletStore {
         }
     }
 
-    override suspend fun getWalletIdsForAccount(accountId: String): Flow<String> = flow {
-        val ids = newSuspendedTransaction(db = db) {
+    override suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
+        suspendTransaction(db) {
             Wallet2Tables.AccountWallets.selectAll()
                 .where { Wallet2Tables.AccountWallets.accountId eq accountId }
                 .map { it[Wallet2Tables.AccountWallets.walletId] }
         }
-        ids.forEach { emit(it) }
-    }
 }

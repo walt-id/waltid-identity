@@ -11,7 +11,7 @@ interface WalletCredentialStore {
 
     suspend fun getCredential(id: String): StoredCredential?
 
-    fun listCredentials(): Flow<StoredCredential>
+    suspend fun listCredentials(): Flow<StoredCredential>
 
     suspend fun addCredential(entry: StoredCredential)
 

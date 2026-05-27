@@ -75,10 +75,10 @@ interface WalletResolver {
     }
 
     suspend fun deleteWallet(walletId: String) = walletStore.deleteWallet(walletId)
-    fun listWalletIds(): Flow<String> = walletStore.listWalletIds()
+    suspend fun listWalletIds(): Flow<String> = walletStore.listWalletIds()
     suspend fun linkWalletToAccount(accountId: String, walletId: String) =
         walletStore.linkWalletToAccount(accountId, walletId)
-    suspend fun getWalletIdsForAccount(accountId: String): Flow<String>? =
+    suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
         walletStore.getWalletIdsForAccount(accountId)
 
     // ---------------------------------------------------------------------------

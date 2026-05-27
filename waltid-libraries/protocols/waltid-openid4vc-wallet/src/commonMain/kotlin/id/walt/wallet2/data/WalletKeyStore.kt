@@ -13,7 +13,7 @@ interface WalletKeyStore {
     suspend fun getKey(keyId: String): Key?
 
     /** Streams all key metadata entries. Uses Flow for consistency with credential/DID stores. */
-    fun listKeys(): Flow<WalletKeyInfo>
+    suspend fun listKeys(): Flow<WalletKeyInfo>
 
     /**
      * Persists a key and returns its assigned ID.

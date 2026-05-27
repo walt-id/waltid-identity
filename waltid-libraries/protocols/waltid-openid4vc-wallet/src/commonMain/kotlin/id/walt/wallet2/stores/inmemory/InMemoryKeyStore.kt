@@ -18,7 +18,7 @@ class InMemoryKeyStore : WalletKeyStore {
 
     override suspend fun getKey(keyId: String): Key? = keys[keyId]
 
-    override fun listKeys(): Flow<WalletKeyInfo> =
+    override suspend fun listKeys(): Flow<WalletKeyInfo> =
         keys.entries.map { (id, key) ->
             WalletKeyInfo(keyId = id, keyType = key.keyType.name)
         }.asFlow()

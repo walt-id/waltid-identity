@@ -33,7 +33,7 @@ interface WalletStore : WalletAccountMapping {
     suspend fun deleteWallet(walletId: String)
 
     /** Stream all wallet IDs known to this store. */
-    fun listWalletIds(): Flow<String>
+    suspend fun listWalletIds(): Flow<String>
 
     /** Convenience: collect all wallet IDs as a list. */
     suspend fun listWalletIdsAsList(): Flow<String> = listWalletIds()

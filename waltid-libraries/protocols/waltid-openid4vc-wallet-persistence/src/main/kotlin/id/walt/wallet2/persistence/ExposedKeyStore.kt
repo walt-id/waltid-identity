@@ -6,14 +6,14 @@ import id.walt.crypto.keys.KeySerialization
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.asFlow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.upsert
-import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
 
 /**
  * Exposed-backed [WalletKeyStore].
@@ -27,7 +27,7 @@ class ExposedKeyStore(
 ) : WalletKeyStore {
 
     override suspend fun getKey(keyId: String): Key? =
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.Keys.selectAll()
                 .where { (Wallet2Tables.Keys.storeId eq storeId) and (Wallet2Tables.Keys.keyId eq keyId) }
                 .firstOrNull()
@@ -38,18 +38,15 @@ class ExposedKeyStore(
                 }
         }
 
-    override fun listKeys(): Flow<WalletKeyInfo> = flow {
-        val rows = newSuspendedTransaction(db = db) {
-            Wallet2Tables.Keys.selectAll()
-                .where { Wallet2Tables.Keys.storeId eq storeId }
-                .map { WalletKeyInfo(keyId = it[Wallet2Tables.Keys.keyId], keyType = it[Wallet2Tables.Keys.keyType]) }
-        }
-        rows.forEach { emit(it) }
-    }
+    override suspend fun listKeys(): Flow<WalletKeyInfo> = suspendTransaction(db) {
+        Wallet2Tables.Keys.selectAll()
+            .where { Wallet2Tables.Keys.storeId eq storeId }
+            .map { WalletKeyInfo(keyId = it[Wallet2Tables.Keys.keyId], keyType = it[Wallet2Tables.Keys.keyType]) }
+    }.asFlow()
 
     override suspend fun addKey(key: Key): String {
         val keyId = key.getKeyId()
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.Keys.upsert {
                 it[Wallet2Tables.Keys.storeId] = this@ExposedKeyStore.storeId
                 it[Wallet2Tables.Keys.keyId] = keyId
@@ -61,7 +58,7 @@ class ExposedKeyStore(
     }
 
     override suspend fun removeKey(keyId: String): Boolean =
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.Keys.deleteWhere {
                 (Wallet2Tables.Keys.storeId eq storeId) and (Wallet2Tables.Keys.keyId eq keyId)
             } > 0

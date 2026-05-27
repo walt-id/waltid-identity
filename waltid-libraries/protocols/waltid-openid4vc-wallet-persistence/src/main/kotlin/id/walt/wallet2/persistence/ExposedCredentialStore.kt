@@ -4,7 +4,7 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
@@ -12,8 +12,8 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import org.jetbrains.exposed.v1.jdbc.upsert
-import org.jetbrains.exposed.v1.jdbc.transactions.experimental.newSuspendedTransaction
 import java.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
@@ -32,24 +32,22 @@ class ExposedCredentialStore(
 ) : WalletCredentialStore {
 
     override suspend fun getCredential(id: String): StoredCredential? =
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.Credentials.selectAll()
                 .where { (Wallet2Tables.Credentials.storeId eq storeId) and (Wallet2Tables.Credentials.id eq id) }
                 .firstOrNull()
                 ?.let { rowToStoredCredential(it) }
         }
 
-    override fun listCredentials(): Flow<StoredCredential> = flow {
-        val rows = newSuspendedTransaction(db = db) {
+    override suspend fun listCredentials(): Flow<StoredCredential> =
+        suspendTransaction(db) {
             Wallet2Tables.Credentials.selectAll()
                 .where { Wallet2Tables.Credentials.storeId eq storeId }
                 .mapNotNull { rowToStoredCredential(it) }
-        }
-        rows.forEach { emit(it) }
-    }
+        }.asFlow()
 
     override suspend fun addCredential(entry: StoredCredential) {
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.Credentials.upsert {
                 it[Wallet2Tables.Credentials.storeId] = this@ExposedCredentialStore.storeId
                 it[Wallet2Tables.Credentials.id] = entry.id
@@ -63,7 +61,7 @@ class ExposedCredentialStore(
     }
 
     override suspend fun removeCredential(id: String): Boolean =
-        newSuspendedTransaction(db = db) {
+        suspendTransaction(db) {
             Wallet2Tables.Credentials.deleteWhere {
                 (Wallet2Tables.Credentials.storeId eq storeId) and (Wallet2Tables.Credentials.id eq id)
             } > 0

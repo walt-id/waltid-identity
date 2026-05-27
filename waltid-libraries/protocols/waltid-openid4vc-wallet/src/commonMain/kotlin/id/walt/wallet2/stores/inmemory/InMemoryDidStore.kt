@@ -14,7 +14,7 @@ class InMemoryDidStore : WalletDidStore {
 
     override suspend fun getDid(did: String): WalletDidEntry? = dids[did]
 
-    override fun listDids(): Flow<WalletDidEntry> =
+    override suspend fun listDids(): Flow<WalletDidEntry> =
         dids.values.toList().asFlow()
 
     override suspend fun addDid(entry: WalletDidEntry) {
