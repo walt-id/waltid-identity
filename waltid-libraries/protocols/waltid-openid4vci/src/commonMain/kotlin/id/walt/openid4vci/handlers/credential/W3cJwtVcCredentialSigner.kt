@@ -110,6 +110,7 @@ object W3cJwtVcCredentialSigner {
             val context = mapOf(
                 "subjectDid" to holderDid,
                 "issuerDid" to issuerId,
+                "issuerId" to issuerId,
                 "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
             ).filterValues {
                 when (it) {
