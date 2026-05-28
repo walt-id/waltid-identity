@@ -13,6 +13,8 @@ import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.toList
 import kotlin.uuid.ExperimentalUuidApi
@@ -37,14 +39,33 @@ data class NativeWalletPresentationResult(
     val redirectTo: String?,
 )
 
+data class WalletAttestationConfig(
+    val enterpriseBaseUrl: String,
+    val attesterPath: String,
+    val bearerToken: String = "",
+    val enterpriseHostHeader: String = "",
+)
+
 @OptIn(ExperimentalUuidApi::class)
 class NativeWalletClient(
     walletId: String = Uuid.random().toString(),
+    private val attestationConfig: WalletAttestationConfig? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
 ) {
     private val keyStore = InMemoryKeyStore()
     private val didStore = InMemoryDidStore()
     private val credentialStore = InMemoryCredentialStore()
+
+    private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
+        ClientAttestationAssembler(
+            HttpWalletAttestationProvider(
+                enterpriseBaseUrl = config.enterpriseBaseUrl,
+                attesterPath = config.attesterPath,
+                bearerToken = config.bearerToken,
+                enterpriseHostHeader = config.enterpriseHostHeader,
+            )
+        )
+    }
 
     private val wallet = Wallet(
         id = walletId,
@@ -87,6 +108,7 @@ class NativeWalletClient(
                 txCode = txCode?.ifBlank { null },
                 clientId = clientId,
             ),
+            attestationAssembler = attestationAssembler,
             onEvent = onEvent,
         ).credentialIds
 

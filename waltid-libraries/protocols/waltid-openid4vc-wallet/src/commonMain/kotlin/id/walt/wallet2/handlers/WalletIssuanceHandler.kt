@@ -15,6 +15,7 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
@@ -288,6 +289,7 @@ object WalletIssuanceHandler {
     fun receiveCredentialFlow(
         wallet: Wallet,
         request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient(),
         /**
@@ -336,26 +338,23 @@ object WalletIssuanceHandler {
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
-        // TODO (missing in openid4vci lib):
-        //   TokenRequestBuilder.exchangePreAuthorizedCode currently only accepts `additionalParameters`
-        //   (form params, for the legacy client_assertion style). To support header-based attestation-
-        //   based client authentication (OpenID4VCI 1.0 Token Endpoint; OAuth-Client-Attestation /
-        //   OAuth-Client-Attestation-PoP headers per ietf-oauth-attestation-based-client-auth),
-        //   it requires something like `additionalHeaders: Map<String,String>` parameter to exchangePreAuthorizedCode /
-        //   exchangeAuthorizationCode / executeTokenRequest and set them on the HTTP request.
-        //   Once available, forward `request.tokenRequestHeaders` here:
-        //       tokenBuilder.exchangePreAuthorizedCode(..., additionalHeaders = request.tokenRequestHeaders)
-        if (request.tokenRequestHeaders.isNotEmpty()) {
-            log.warn {
-                "tokenRequestHeaders were supplied (${request.tokenRequestHeaders.keys}) but TokenRequestBuilder " +
-                        "does not yet support per-request headers; attestation-based client auth headers will NOT be sent. " +
-                        "See TODO(WAL-864 follow-up)."
-            }
-        }
+
+        val attestationHeaders = if (attestationAssembler != null &&
+            asMetadata.tokenEndpointAuthMethodsSupported?.contains("attest_jwt_client_auth") == true
+        ) {
+            log.debug { "Issuer requires attestation-based client auth, building attestation headers" }
+            val asIssuer = asMetadata.issuer ?: tokenEndpoint
+            val headers = attestationAssembler.buildAttestationHeaders(key, request.clientId, asIssuer)
+            onEvent(WalletSessionEvent.issuance_attestation_obtained)
+            headers
+        } else null
+
+
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
-            txCode = request.txCode
+            txCode = request.txCode,
+            attestationHeaders = attestationHeaders,
         )
         log.trace { "Token obtained, c_nonce=${tokenResponse.c_nonce}" }
         onEvent(WalletSessionEvent.issuance_token_obtained)
@@ -398,7 +397,7 @@ object WalletIssuanceHandler {
             }
             log.trace { "Posting to credential endpoint: ${credentialRequestJson.toString().take(200)}" }
 
-            val credentialResponse = httpClient.post(credentialEndpoint) {
+            val credentialResponse = postFollowingRedirects(httpClient, credentialEndpoint) {
                 header(HttpHeaders.Authorization, "Bearer ${tokenResponse.access_token}")
                 contentType(ContentType.Application.Json)
                 setBody(credentialRequestJson.toString())
@@ -451,13 +450,14 @@ object WalletIssuanceHandler {
     suspend fun receiveCredential(
         wallet: Wallet,
         request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient()
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
         receiveCredentialFlow(
-            wallet, request, onEvent, httpClient,
+            wallet, request, attestationAssembler, onEvent, httpClient,
             onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId }
         ).collect { ids += it.id }
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
@@ -529,7 +529,7 @@ object WalletIssuanceHandler {
                 }
             }
         }
-        val response = httpClient.post(request.credentialEndpoint.toString()) {
+        val response = postFollowingRedirects(httpClient, request.credentialEndpoint.toString()) {
             header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
             contentType(ContentType.Application.Json)
             setBody(credentialRequestJson.toString())
@@ -555,9 +555,25 @@ object WalletIssuanceHandler {
         else -> wallet.defaultKey()
     }
 
+    private suspend fun postFollowingRedirects(
+        httpClient: HttpClient,
+        url: String,
+        block: HttpRequestBuilder.() -> Unit
+    ): HttpResponse {
+        var response = httpClient.post(url, block)
+        if (response.status.value in listOf(301, 302, 303, 307, 308)) {
+            val location = response.headers[HttpHeaders.Location]
+            if (location != null) {
+                log.debug { "Following redirect to: $location" }
+                response = httpClient.post(location, block)
+            }
+        }
+        return response
+    }
+
     private suspend fun fetchCNonce(httpClient: HttpClient, nonceEndpoint: String): String? =
         runCatching {
-            val response = httpClient.post(nonceEndpoint) {
+            val response = postFollowingRedirects(httpClient, nonceEndpoint) {
                 contentType(ContentType.Application.Json)
             }
             if (response.status.isSuccess()) {

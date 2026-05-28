@@ -12,9 +12,20 @@ class WalletViewModel: ObservableObject {
     @Published var offerUrl = ""
     @Published var presentationRequestUrl = ""
 
-    private let controller = WalletDemoBridgeController()
+    private let controller: WalletDemoBridgeController
 
-    init() {
+    init(
+        attestationBaseUrl: String? = nil,
+        attestationAttesterPath: String? = nil,
+        attestationBearerToken: String? = nil,
+        attestationHostHeader: String? = nil
+    ) {
+        controller = WalletDemoBridgeController(
+            attestationBaseUrl: attestationBaseUrl,
+            attestationAttesterPath: attestationAttesterPath,
+            attestationBearerToken: attestationBearerToken,
+            attestationHostHeader: attestationHostHeader
+        )
         bootstrap()
     }
 

@@ -1,6 +1,7 @@
 package id.walt.walletdemo.ios
 
 import id.walt.wallet2.client.NativeWalletClient
+import id.walt.wallet2.client.WalletAttestationConfig
 
 data class BridgeCredential(
     val id: String,
@@ -15,8 +16,22 @@ data class BridgeOperationResult(
     val message: String,
 )
 
-class WalletDemoBridgeController {
-    private val client = NativeWalletClient()
+class WalletDemoBridgeController(
+    attestationBaseUrl: String? = null,
+    attestationAttesterPath: String? = null,
+    attestationBearerToken: String? = null,
+    attestationHostHeader: String? = null,
+) {
+    private val client = NativeWalletClient(
+        attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
+            WalletAttestationConfig(
+                enterpriseBaseUrl = it,
+                attesterPath = attestationAttesterPath ?: "",
+                bearerToken = attestationBearerToken ?: "",
+                enterpriseHostHeader = attestationHostHeader ?: "",
+            )
+        }
+    )
     private var did = ""
 
     suspend fun bootstrap(): BridgeOperationResult {

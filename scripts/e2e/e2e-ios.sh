@@ -31,6 +31,7 @@ TENANT_PATH="${ORG}.${TENANT:-waltid-tenant01}"
 ISSUER_PROFILE="${ISSUER_PROFILE:-issuer2.mdl-profile}"
 VERIFIER="${VERIFIER:-verifier2}"
 BUNDLE_ID="${IOS_BUNDLE_ID:-waltid.iosApp}"
+ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 
 # Auto-detect booted simulator if not specified
 if [ -z "${IOS_SIMULATOR_ID:-}" ]; then
@@ -130,6 +131,15 @@ for scheme in openid-credential-offer openid4vp; do
     /usr/libexec/PlistBuddy -c "Add :com.apple.CoreSimulator.CoreSimulatorBridge-->$scheme string $BUNDLE_ID" "$PLIST" 2>/dev/null || true
   fi
 done
+
+# --- Inject attestation config via UserDefaults ---
+log "ATTEST" "Getting auth token for attestation config..."
+ATTEST_TOKEN=$(get_token)
+log "ATTEST" "Injecting attestation UserDefaults..."
+xcrun simctl spawn "$SIMULATOR_ID" defaults write "$BUNDLE_ID" ATTESTATION_BASE_URL "http://localhost:${PORT:-7500}"
+xcrun simctl spawn "$SIMULATOR_ID" defaults write "$BUNDLE_ID" ATTESTATION_ATTESTER_PATH "$ATTESTER_PATH"
+xcrun simctl spawn "$SIMULATOR_ID" defaults write "$BUNDLE_ID" ATTESTATION_BEARER_TOKEN "$ATTEST_TOKEN"
+xcrun simctl spawn "$SIMULATOR_ID" defaults write "$BUNDLE_ID" ATTESTATION_HOST_HEADER "${ORG}.enterprise.localhost"
 
 # --- Launch app ---
 log "APP" "Launching $BUNDLE_ID..."
