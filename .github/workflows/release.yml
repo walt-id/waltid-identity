@@ -87,3 +87,39 @@ jobs:
     needs: [ tag ]
     with:
       tag: ${{ needs.tag.outputs.tag }}
+  enterprise-release:
+    name: Create Enterprise Release
+    runs-on: ubuntu-latest
+    needs: [ enterprise-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-identity-enterprise
+          tag_name: ${{ needs.enterprise-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.enterprise-tag.outputs.tag, 'PRE-RELEASE') }}
+  docs-release:
+    name: Create Docs Release
+    runs-on: ubuntu-latest
+    needs: [ docs-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-docs
+          tag_name: ${{ needs.docs-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.docs-tag.outputs.tag, 'PRE-RELEASE') }}
+  quickstart-release:
+    name: Create Quickstart Release
+    runs-on: ubuntu-latest
+    needs: [ quickstart-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-enterprise-quickstart
+          tag_name: ${{ needs.quickstart-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.quickstart-tag.outputs.tag, 'PRE-RELEASE') }}
