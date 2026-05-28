@@ -33,6 +33,7 @@ ISSUER_PROFILE="${ISSUER_PROFILE:-issuer2.mdl-profile}"
 VERIFIER="${VERIFIER:-verifier2}"
 PACKAGE="${ANDROID_PACKAGE:-id.walt.walletdemo}"
 UI_POLL_TIMEOUT="${UI_POLL_TIMEOUT:-45}"
+ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 
 # --- Parse args ---
 DO_BUILD=false
@@ -87,17 +88,33 @@ find_button() {
 import sys, re
 xml = sys.stdin.read()
 text = '$button_text'
-matches = list(re.finditer(r'text=\"' + re.escape(text) + r'\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"', xml))
-if len(matches) >= 2:
-    m = matches[1]
-else:
-    m = matches[0] if matches else None
-if m:
-    x = (int(m.group(1)) + int(m.group(3))) // 2
-    y = (int(m.group(2)) + int(m.group(4))) // 2
-    print(f'{x} {y}')
+# Find all text nodes matching the button text
+text_matches = list(re.finditer(r'text=\"' + re.escape(text) + r'\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"', xml))
+# Find all clickable views
+clickable = list(re.finditer(r'clickable=\"true\"[^>]*bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"', xml))
+# Also check reversed order (bounds before clickable)
+clickable += list(re.finditer(r'bounds=\"\[(\d+),(\d+)\]\[(\d+),(\d+)\]\"[^>]*clickable=\"true\"', xml))
+# For each text match, find the clickable parent that contains it
+for tm in text_matches:
+    tx1, ty1, tx2, ty2 = int(tm.group(1)), int(tm.group(2)), int(tm.group(3)), int(tm.group(4))
+    for cm in clickable:
+        cx1, cy1, cx2, cy2 = int(cm.group(1)), int(cm.group(2)), int(cm.group(3)), int(cm.group(4))
+        if cx1 <= tx1 and cy1 <= ty1 and cx2 >= tx2 and cy2 >= ty2:
+            x = (cx1 + cx2) // 2
+            y = (cy1 + cy2) // 2
+            print(f'{x} {y}')
+            sys.exit(0)
+# Fallback: use second text match if no clickable parent found
+if len(text_matches) >= 2:
+    m = text_matches[1]
+elif text_matches:
+    m = text_matches[0]
 else:
     print('')
+    sys.exit(0)
+x = (int(m.group(1)) + int(m.group(3))) // 2
+y = (int(m.group(2)) + int(m.group(4))) // 2
+print(f'{x} {y}')
 " 2>/dev/null || echo ""
 }
 
@@ -114,11 +131,17 @@ wait_for_ui_result() {
       echo "  UI status: $status"
       last_status="$status"
     fi
-    if ! echo "$status" | grep -qi "$busy_pattern"; then
-      echo "$status"
-      return 0
+    # Keep polling if status matches the busy pattern, is UNKNOWN, or is Wallet ready
+    if echo "$status" | grep -qi "$busy_pattern"; then
+      sleep 2
+      continue
     fi
-    sleep 2
+    if [ "$status" = "UNKNOWN" ] || [ "$status" = "Wallet ready" ] || [ "$status" = "DUMP_FAILED" ]; then
+      sleep 2
+      continue
+    fi
+    echo "$status"
+    return 0
   done
   echo "TIMEOUT"
   return 1
@@ -139,10 +162,17 @@ if [ "$DO_BUILD" = true ]; then
   [ -n "$IDENTITY_DIR" ] || err "IDENTITY_DIR not set and could not be auto-detected. Set it to the waltid-identity repo root."
   [ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
 
+  log "BUILD" "Getting auth token for attestation config..."
+  BUILD_TOKEN=$(get_token)
+
   log "BUILD" "Building Android APK..."
   "$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" \
     :waltid-applications:waltid-wallet-demo-android:assembleDebug \
-    --no-configuration-cache -q
+    --no-configuration-cache -q \
+    -Pattestation.baseUrl="http://10.0.2.2:${PORT:-7500}" \
+    -Pattestation.attesterPath="$ATTESTER_PATH" \
+    -Pattestation.bearerToken="$BUILD_TOKEN" \
+    -Pattestation.hostHeader="${ORG}.enterprise.localhost"
 
   APK_PATH="$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/build/outputs/apk/debug/waltid-wallet-demo-android-debug.apk"
   [ -f "$APK_PATH" ] || err "APK not found at $APK_PATH"

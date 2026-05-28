@@ -246,11 +246,9 @@ class IssuerMetadataResolver(
         
         // Try authorization_servers if present
         val authorizationServers = credentialIssuerMetadata.authorizationServers
-        println("the authorizationServers are: $authorizationServers")
         if (!authorizationServers.isNullOrEmpty()) {
             val authServerUrl = authorizationServers.first()
             log.info { "Attempting to use authorization server from issuer metadata: ${authServerUrl}" }
-            println("Attempting to use authorization server from issuer metadata: ${authServerUrl} - this is a test message, please ignore it.")
             return try {
                 resolveAuthorizationServerMetadata(authServerUrl)
             } catch (e: Exception) {

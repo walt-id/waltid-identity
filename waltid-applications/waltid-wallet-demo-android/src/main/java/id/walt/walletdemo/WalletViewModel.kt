@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import id.walt.wallet2.client.NativeWalletClient
 import id.walt.wallet2.client.NativeWalletCredential
+import id.walt.wallet2.client.WalletAttestationConfig
 import id.walt.webdatafetching.WebDataFetcherManager
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
@@ -25,7 +26,16 @@ data class WalletUiState(
 )
 
 class WalletViewModel : ViewModel() {
-    private val client = NativeWalletClient()
+    private val client = NativeWalletClient(
+        attestationConfig = BuildConfig.ATTESTATION_BASE_URL.takeIf { it.isNotBlank() }?.let {
+            WalletAttestationConfig(
+                enterpriseBaseUrl = it,
+                attesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
+                bearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
+                enterpriseHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
+            )
+        }
+    )
     private val _state = MutableStateFlow(WalletUiState())
     val state: StateFlow<WalletUiState> = _state.asStateFlow()
 
