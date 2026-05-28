@@ -65,7 +65,7 @@ class NativeWalletClient(
         didStore.addDid(
             WalletDidEntry(
                 did = didResult.did,
-                document = didResult.didDocument.toString(),
+                document = didResult.didDocument.toJsonObject(),
             )
         )
 
