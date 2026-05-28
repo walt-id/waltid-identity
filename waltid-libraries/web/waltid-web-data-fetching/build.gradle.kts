@@ -13,8 +13,7 @@ kotlin {
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
-            implementation(identityLibs.ktor.client.cio)
-
+            
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
 
@@ -38,6 +37,7 @@ kotlin {
         }
 
         jvmMain.dependencies {
+            implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.java)
             implementation(identityLibs.ktor.client.apache5)
             implementation(identityLibs.ktor.client.okhttp)
