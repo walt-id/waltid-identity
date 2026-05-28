@@ -10,6 +10,15 @@ End-to-end tests for the Android and iOS wallet demo apps against the local ente
   docker compose up -d
   cd cli && npm install && npx tsx walt.ts --recreate
   ```
+- **After `--recreate`**: comment out `basePort` in `config/enterprise.conf` and restart the API:
+  ```bash
+  # In config/enterprise.conf, change:
+  #   basePort = 7500
+  # to:
+  #   # basePort = 7500
+  docker compose restart waltid-enterprise
+  ```
+  This makes the API generate URLs without `:7500`, so they route through ngrok correctly. The `--recreate` step requires `basePort = 7500` for internal wallet-service calls, but E2E needs it off so offer/metadata URLs don't include an unreachable port on the ngrok domain.
 - ngrok tunnel active, pointing to port 7500:
   ```bash
   ngrok http 7500 --domain=<your-ngrok-domain>
@@ -28,6 +37,7 @@ cp e2e.env.example e2e.env
 
 **Android:**
 - Emulator running (or physical device connected via USB with ADB)
+- `adb reverse tcp:7500 tcp:7500` — the verifier2 service hardcodes `:7500` in its `response_uri`; this forwards the emulator's localhost:7500 to the host where the enterprise API runs
 - App installed (or use `--build` flag)
 - Ngrok workarounds patch applied (see below)
 
@@ -134,7 +144,10 @@ git apply -R scripts/e2e/patches/ngrok-workarounds.patch
 | `Enterprise API not reachable` | Stack not running | Start via quickstart repo |
 | `ngrok tunnel not reachable` | Tunnel not active | `ngrok http 7500 --domain=...` |
 | `Failed to get credential offer` | Issuer not configured | `npx tsx walt.ts --recreate` in quickstart CLI |
+| Android receive hangs/timeout | `basePort=7500` still set | Comment out `basePort` in enterprise.conf and restart |
 | Android receive hangs/fails | Ngrok patch not applied | `git apply scripts/e2e/patches/ngrok-workarounds.patch` |
+| Android present: Connection refused | `adb reverse` not set or stale | `adb reverse tcp:7500 tcp:7500` (restart emulator if stale) |
 | iOS app crashes on deep link | Wrong waltid-identity branch | Check out `feature/wal-1033-initial-wallet-sdk-setup-clean` |
 | `No booted iOS simulator` | Simulator not started | `xcrun simctl boot <device-id>` |
 | Verifier status PENDING | Presentation still in flight | Increase sleep or check logs |
+| Verifier status UNUSED | Wallet couldn't reach response_uri | Check `adb reverse` (Android) or ATS settings (iOS) |
