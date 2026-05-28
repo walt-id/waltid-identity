@@ -81,6 +81,13 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-enterprise-quickstart
+  unified-build-tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    secrets: inherit
+    needs: [ version, deploy ]
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-unified-build
   release:
     uses: walt-id/waltid-identity/.github/workflows/changelog.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
     secrets: inherit
@@ -123,3 +130,15 @@ jobs:
           repository: walt-id/waltid-enterprise-quickstart
           tag_name: ${{ needs.quickstart-tag.outputs.tag }}
           prerelease: ${{ contains(needs.quickstart-tag.outputs.tag, 'PRE-RELEASE') }}
+  unified-build-release:
+    name: Create Unified Build Release
+    runs-on: ubuntu-latest
+    needs: [ unified-build-tag ]
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          repository: walt-id/waltid-unified-build
+          tag_name: ${{ needs.unified-build-tag.outputs.tag }}
+          prerelease: ${{ contains(needs.unified-build-tag.outputs.tag, 'PRE-RELEASE') }}
