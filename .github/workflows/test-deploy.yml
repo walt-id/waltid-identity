@@ -12,7 +12,7 @@ jobs:
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@3953e60730aeeb1d918bdf24318a1fcf9d180830
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@354260aebde1a117cb35e4dffaecaa67a0182eae
     secrets: inherit
     needs: version
     with:
@@ -48,7 +48,7 @@ jobs:
     with:
       version: ${{ needs.version.outputs.release_version }}
   tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@8fcefa7d4f599104fbcffc982133848eef3035ac
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
     needs: [ version, deploy ]
     with:
       version: ${{ needs.version.outputs.release_version }}

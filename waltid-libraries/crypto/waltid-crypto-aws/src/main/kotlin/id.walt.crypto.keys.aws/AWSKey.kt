@@ -194,6 +194,7 @@ class AWSKey(
                 keySpec = KeySpec.fromValue(keyTypeToAwsKeyMapping(keyType))
                 keyUsage = KeyUsageType.SignVerify
                 tags = awsTags
+                multiRegion = config.multiRegion
             }
 
             val response = KmsClient { region = config.auth.region }.use { kms ->
