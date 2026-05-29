@@ -1,6 +1,7 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
+import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
 import id.walt.openid4vci.responses.credential.CredentialResponse
@@ -328,10 +329,13 @@ object WalletIssuanceHandler {
             headers
         } else null
 
+        val effectiveTxCode = request.txCode
+            ?: preAuthGrant.txCode?.value?.content
+
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
-            txCode = request.txCode,
+            txCode = effectiveTxCode,
             attestationHeaders = attestationHeaders,
         )
         log.trace { "Token obtained, c_nonce=${tokenResponse.c_nonce}" }
@@ -353,7 +357,8 @@ object WalletIssuanceHandler {
             val proofs = if (offeredCredential.configuration.proofTypesSupported?.isNotEmpty() == true) {
                 val nonce = cNonce ?: tokenResponse.access_token
                 log.trace { "Building proof JWT, did=$did, nonce=$nonce" }
-                if (did != null) {
+                val preferJwkBinding = shouldPreferJwkBinding(offeredCredential.configuration.cryptographicBindingMethodsSupported)
+                if (did != null && !preferJwkBinding) {
                     proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, keyId = did)
                 } else {
                     proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, includeJwk = true)
@@ -558,6 +563,15 @@ object WalletIssuanceHandler {
                     ?.let { (it as? JsonPrimitive)?.content }
             } else null
         }.getOrNull()
+
+    private fun shouldPreferJwkBinding(
+        methods: Set<CryptographicBindingMethod>?
+    ): Boolean {
+        if (methods.isNullOrEmpty()) return false
+        val supportsJwk = methods.any { it is CryptographicBindingMethod.Jwk }
+        val supportsDid = methods.any { it is CryptographicBindingMethod.Did }
+        return supportsJwk && !supportsDid
+    }
 
     // ---------------------------------------------------------------------------
     // Authorization-code grant isolated steps

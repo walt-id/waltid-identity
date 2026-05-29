@@ -30,7 +30,7 @@ class WalletDemoBridgeController(
                 bearerToken = attestationBearerToken ?: "",
                 enterpriseHostHeader = attestationHostHeader ?: "",
             )
-        }
+        },
     )
     private var did = ""
 
