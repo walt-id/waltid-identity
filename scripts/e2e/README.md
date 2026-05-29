@@ -50,26 +50,6 @@ adb reverse tcp:7500 tcp:7500
 
 This is required because verifier callback URLs still reference `localhost:7500` for emulator routing.
 
-## Cleartext Workaround Patch (Local Stack)
-
-Local enterprise metadata still resolves to `http://...enterprise.localhost...` in this setup.
-
-Apply once in `waltid-identity` root:
-
-```bash
-git apply scripts/e2e/patches/local-cleartext-workarounds.patch
-```
-
-Revert:
-
-```bash
-git apply -R scripts/e2e/patches/local-cleartext-workarounds.patch
-```
-
-Patch touches:
-- Android app manifest (`android:usesCleartextTraffic="true"`)
-- iOS `Info.plist` (ATS exception for `enterprise.localhost`)
-
 ## Public EUDI Notes
 
 - Android public EUDI flow is fully native in `EudiPublicBackendReceiveInstrumentedTest.kt` (offer generation + verifier polling inside test).

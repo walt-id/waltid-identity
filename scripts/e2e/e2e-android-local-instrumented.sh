@@ -78,10 +78,9 @@ curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS
   || err "ngrok domain not reachable: https://$HOST_ALIAS_DOMAIN"
 
 if [ "$IS_EMULATOR" = true ]; then
-  # Local enterprise currently returns http:// metadata URLs, so cleartext workaround is required.
   grep -q 'android:usesCleartextTraffic=\"true\"' \
     "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" \
-    || err "Missing local cleartext workaround. Apply: git apply scripts/e2e/patches/local-cleartext-workarounds.patch"
+    || err "Missing android:usesCleartextTraffic in AndroidManifest.xml (needed for emulator local-enterprise E2E)"
 fi
 
 # Verifier response_uri resolves to localhost:7500 for the emulator path.

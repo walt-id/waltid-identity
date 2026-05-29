@@ -64,7 +64,7 @@ curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS
 
 PLIST="$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Info.plist"
 grep -q "NSAppTransportSecurity" "$PLIST" \
-  || err "Missing iOS cleartext workaround. Apply: git apply scripts/e2e/patches/local-cleartext-workarounds.patch"
+  || err "Missing NSAppTransportSecurity in Info.plist (needed for local-enterprise E2E over HTTP)"
 
 if [ "$ATTESTED" = false ] && [ "$ISSUER_PROFILE" = "issuer2-noattest.mdl-profile" ]; then
   log "SETUP" "Ensuring non-attested issuer exists (issuer2-noattest)"

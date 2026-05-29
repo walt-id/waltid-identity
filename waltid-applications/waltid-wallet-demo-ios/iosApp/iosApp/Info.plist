@@ -14,6 +14,8 @@
 			</array>
 		</dict>
 	</array>
+	<!-- TODO: remove NSAppTransportSecurity once enterprise API returns https:// metadata URLs.
+	     Without this, iOS blocks HTTP loads to *.enterprise.localhost during local E2E. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>
