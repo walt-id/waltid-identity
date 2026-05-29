@@ -88,8 +88,10 @@ class WalletViewModel: ObservableObject {
         Task {
             do {
                 let result = try await controller.bootstrap()
+                let list = try await controller.listCredentials()
                 await MainActor.run {
                     self.did = result.message
+                    self.credentials = list
                     self.isReady = true
                     self.setSuccess("Wallet ready")
                 }

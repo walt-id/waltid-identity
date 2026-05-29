@@ -60,6 +60,76 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status was \(verifierStatus)")
     }
 
+    func testCredentialsPersistAcrossAppRestart() async throws {
+        let config = LocalEnterpriseConfig.fromEnvironment()
+        let attested = (ProcessInfo.processInfo.environment["E2E_ATTESTED"] ?? "false").lowercased() == "true"
+        guard attested else {
+            XCTFail("Persistence test requires attested mode (issuer requires attestation)")
+            return
+        }
+
+        let token = try await getAdminToken(config: config)
+        let offerURL = try await createOffer(config: config, token: token)
+
+        let app = XCUIApplication()
+        let ui = await WalletE2EUI(app: app)
+
+        let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+        await ui.launch(attestation: [
+            "ATTESTATION_BASE_URL": attestationBaseURL,
+            "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
+            "ATTESTATION_BEARER_TOKEN": token,
+            "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
+        ])
+
+        // Phase 1: Bootstrap + receive
+        let readyStatus = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 120)
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet not ready: \(readyStatus ?? "nil")")
+
+        let offerInput = app.textFields["wallet.offerInput"]
+        await ui.replaceText(in: offerInput, value: offerURL)
+        app.buttons["wallet.receiveButton"].tap()
+
+        let receiveStatus = await ui.waitForStatus(
+            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
+            timeout: 220
+        )
+        XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed: \(receiveStatus ?? "nil")")
+        XCTAssertFalse(app.staticTexts["No credentials"].exists)
+
+        // Phase 2: Terminate the app
+        app.terminate()
+        try await Task.sleep(nanoseconds: 2_000_000_000)
+
+        // Phase 3: Relaunch and verify credentials survived
+        await ui.launch(attestation: [
+            "ATTESTATION_BASE_URL": attestationBaseURL,
+            "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
+            "ATTESTATION_BEARER_TOKEN": token,
+            "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
+        ])
+
+        let readyAfterRestart = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 120)
+        XCTAssertEqual(readyAfterRestart, "Wallet ready", "Wallet not ready after restart: \(readyAfterRestart ?? "nil")")
+        XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials not persisted — 'No credentials' shown after restart")
+
+        // Phase 4: Present from persisted credential
+        let verifier = try await createVerifierSession(config: config, token: token)
+        let presentInput = app.textFields["wallet.presentationInput"]
+        await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
+        app.buttons["wallet.presentButton"].tap()
+
+        let presentStatus = await ui.waitForStatus(
+            prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
+            timeout: 220
+        )
+        XCTAssertNotNil(presentStatus)
+        XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed after restart: \(presentStatus!)")
+
+        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: 220)
+        XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status after restart: \(verifierStatus)")
+    }
+
     private func getAdminToken(config: LocalEnterpriseConfig) async throws -> String {
         let body = try jsonString([
             "email": config.adminEmail,

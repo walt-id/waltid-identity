@@ -79,6 +79,16 @@ class NativeWalletClient(
         didMethod: String = "key",
     ): NativeWalletBootstrapResult {
         DidService.minimalInit()
+
+        val existingDids = didStore.listDids().toList()
+        if (existingDids.isNotEmpty()) {
+            val existingKeys = keyStore.listKeys().toList()
+            return NativeWalletBootstrapResult(
+                keyId = existingKeys.firstOrNull()?.keyId ?: "",
+                did = existingDids.first().did,
+            )
+        }
+
         val key = keyGenerator(keyType)
         val keyId = keyStore.addKey(key)
         val didResult = DidService.registerByKey(didMethod, key)
