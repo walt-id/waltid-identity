@@ -83,6 +83,7 @@ private fun WalletScreen(viewModel: WalletViewModel) {
             label = { Text("Credential offer URL") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
+            maxLines = 3,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
@@ -102,6 +103,7 @@ private fun WalletScreen(viewModel: WalletViewModel) {
             label = { Text("OpenID4VP request URL") },
             modifier = Modifier.fillMaxWidth(),
             minLines = 3,
+            maxLines = 3,
         )
         Button(
             enabled = state.isReady && state.presentationRequestUrl.isNotBlank() && state.credentials.isNotEmpty() && !state.isBusy,

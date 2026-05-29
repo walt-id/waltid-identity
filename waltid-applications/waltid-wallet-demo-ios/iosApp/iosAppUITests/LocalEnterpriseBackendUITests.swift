@@ -39,23 +39,7 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
             timeout: 220
         )
-        if !attested {
-            if receiveStatus?.starts(with: "Received") == true {
-                // non-attested mode can pass if issuer profile does not enforce attestation
-            } else {
-                guard let status = receiveStatus else {
-                    XCTFail("Non-attested receive had no terminal status")
-                    return
-                }
-                XCTAssertTrue(
-                    status.contains("invalid_client") || status.contains("attestation") || status.starts(with: "Receive failed"),
-                    "Unexpected non-attested failure status: \(status)"
-                )
-                return
-            }
-        } else {
-            XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
-        }
+        XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
 

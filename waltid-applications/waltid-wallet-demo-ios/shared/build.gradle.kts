@@ -17,6 +17,7 @@ kotlin {
             baseName = "shared"
             isStatic = true
         }
+        extraSpecAttributes["libraries"] = "'c++', 'sqlite3'"
     }
 
     sourceSets {

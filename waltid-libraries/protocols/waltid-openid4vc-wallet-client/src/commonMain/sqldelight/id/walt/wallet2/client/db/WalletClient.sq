@@ -1,0 +1,62 @@
+CREATE TABLE key_references (
+    key_id TEXT NOT NULL PRIMARY KEY,
+    key_type TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    is_hardware_backed INTEGER NOT NULL DEFAULT 1
+);
+
+selectAll:
+SELECT * FROM key_references;
+
+selectByKeyId:
+SELECT * FROM key_references WHERE key_id = ?;
+
+insert:
+INSERT OR REPLACE INTO key_references (key_id, key_type, created_at, is_hardware_backed)
+VALUES (?, ?, ?, ?);
+
+deleteByKeyId:
+DELETE FROM key_references WHERE key_id = ?;
+
+-- Credentials
+
+CREATE TABLE credentials (
+    id TEXT NOT NULL PRIMARY KEY,
+    serialized_credential TEXT NOT NULL,
+    format TEXT NOT NULL DEFAULT '',
+    label TEXT,
+    added_at INTEGER NOT NULL
+);
+
+selectAllCredentials:
+SELECT * FROM credentials;
+
+selectCredentialById:
+SELECT * FROM credentials WHERE id = ?;
+
+insertCredential:
+INSERT OR REPLACE INTO credentials (id, serialized_credential, format, label, added_at)
+VALUES (?, ?, ?, ?, ?);
+
+deleteCredentialById:
+DELETE FROM credentials WHERE id = ?;
+
+-- DIDs
+
+CREATE TABLE dids (
+    did TEXT NOT NULL PRIMARY KEY,
+    document TEXT NOT NULL
+);
+
+selectAllDids:
+SELECT * FROM dids;
+
+selectDidByDid:
+SELECT * FROM dids WHERE did = ?;
+
+insertDid:
+INSERT OR REPLACE INTO dids (did, document)
+VALUES (?, ?);
+
+deleteDidByDid:
+DELETE FROM dids WHERE did = ?;

@@ -58,7 +58,7 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
-        "waltid-openid4vc-wallet-client",
+        "waltid-openid4vc-wallet-client" whenEnabled enableWalletDemoAndroidBuild,
         "waltid-openid4vc-wallet-server",
         "waltid-openid4vc-wallet-persistence",
     ),
@@ -133,6 +133,7 @@ pluginManagement {
         id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
         id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20"
         id("com.github.ben-manes.versions") version "0.53.0"
+        id("app.cash.sqldelight") version "2.0.2"
     }
 
     repositories {
