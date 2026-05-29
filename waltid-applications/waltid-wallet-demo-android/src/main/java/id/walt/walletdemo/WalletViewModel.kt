@@ -30,6 +30,7 @@ data class WalletUiState(
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
     private val client = MobileWalletClientFactory(application).create(
         MobileWalletConfig(
+            walletId = "default",
             attestationConfig = BuildConfig.ATTESTATION_BASE_URL.takeIf { it.isNotBlank() }?.let {
                 WalletAttestationConfig(
                     enterpriseBaseUrl = it,
@@ -49,12 +50,14 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             runCatching { client.bootstrap() }
                 .onSuccess { result ->
+                    val credentials = client.credentials()
                     _state.update {
                         it.copy(
                             isReady = true,
                             isError = false,
                             status = "Wallet ready",
                             did = result.did,
+                            credentials = credentials,
                         )
                     }
                 }

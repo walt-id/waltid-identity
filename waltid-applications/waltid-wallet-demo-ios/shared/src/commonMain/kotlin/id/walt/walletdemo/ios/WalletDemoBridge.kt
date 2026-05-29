@@ -25,6 +25,7 @@ class WalletDemoBridgeController(
 ) {
     private val client = MobileWalletClientFactory().create(
         MobileWalletConfig(
+            walletId = "default",
             attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
                 WalletAttestationConfig(
                     enterpriseBaseUrl = it,

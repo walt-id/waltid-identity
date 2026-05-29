@@ -155,6 +155,115 @@ class LocalEnterpriseBackendInstrumentedTest {
         )
     }
 
+    @Test
+    fun credentialsPersistAcrossAppRestart() {
+        val args = InstrumentationRegistry.getArguments()
+        val ngrokDomain = args.getString("e2e_host_alias_domain")
+            ?: error("Missing required instrumentation arg: e2e_host_alias_domain")
+
+        val config = BackendConfig(
+            apiBaseUrl = args.getString("e2e_api_base_url") ?: "https://$ngrokDomain",
+            ngrokBaseUrl = "https://$ngrokDomain",
+            apiHostHeader = args.getString("e2e_api_host_header"),
+            adminEmail = args.getString("e2e_admin_email") ?: DEFAULT_ADMIN_EMAIL,
+            adminPassword = args.getString("e2e_admin_password") ?: DEFAULT_ADMIN_PASSWORD,
+            org = args.getString("e2e_org") ?: DEFAULT_ORG,
+            tenant = args.getString("e2e_tenant") ?: DEFAULT_TENANT,
+            issuerProfile = args.getString("e2e_issuer_profile") ?: DEFAULT_ISSUER_PROFILE,
+            verifier = args.getString("e2e_verifier") ?: DEFAULT_VERIFIER,
+        )
+
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val device = UiDevice.getInstance(instrumentation)
+
+        val token = getAdminToken(config)
+        val offerUrl = createPreAuthorizedOffer(config, token)
+
+        // --- Phase 1: Launch, bootstrap, receive credential ---
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?: error("Cannot resolve launch intent for ${context.packageName}")
+        context.startActivity(launchIntent)
+
+        assertTrue(
+            "Wallet did not become ready",
+            waitForStatus(device, 120_000, { it == "Wallet ready" }, listOf("Bootstrap failed"))
+        )
+
+        val offerIntent = Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl)).apply {
+            `package` = context.packageName
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(offerIntent)
+        assertTrue("Offer URL did not appear", waitForOfferUrlInUi(device, 30_000))
+
+        val receiveButton = waitForClickableButton(device, "Receive", timeoutMs = 30_000)
+        assertNotNull("Receive button not found", receiveButton)
+        receiveButton!!.visibleBounds.let { device.click(it.centerX(), it.centerY()) }
+
+        assertTrue(
+            "Receive did not complete. Status: ${latestStatus(device)}",
+            waitForStatus(device, 220_000, { it.startsWith("Received") }, listOf("Receive failed", "Bootstrap failed"))
+        )
+
+        // --- Phase 2: Kill app process (send to background first, then use am kill) ---
+        device.pressHome()
+        Thread.sleep(1_000)
+        device.executeShellCommand("am kill ${context.packageName}")
+        Thread.sleep(2_000)
+
+        // --- Phase 3: Relaunch and verify credentials survived ---
+        val relaunchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?: error("Cannot resolve launch intent for ${context.packageName}")
+        context.startActivity(relaunchIntent)
+
+        assertTrue(
+            "Wallet did not become ready after restart",
+            waitForStatus(device, 120_000, { it == "Wallet ready" }, listOf("Bootstrap failed"))
+        )
+
+        assertTrue(
+            "Credentials not displayed after restart — persistence failed",
+            device.findObject(By.text("No credentials")) == null
+        )
+
+        // --- Phase 4: Present from persisted credential ---
+        val verifierSession = createVerifierSession(config, token)
+        val presentIntent = Intent(Intent.ACTION_VIEW, Uri.parse(verifierSession.bootstrapAuthorizationRequestUrl)).apply {
+            `package` = context.packageName
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(presentIntent)
+
+        val startedWithoutTap = waitForStatus(
+            device, 5_000,
+            { it.startsWith("Presenting credential") || it.startsWith("Presentation sent") || it.startsWith("Presentation finished") },
+            listOf("Present failed", "Receive failed", "Bootstrap failed")
+        )
+        if (!startedWithoutTap) {
+            val presentButton = waitForClickableButton(device, "Present", timeoutMs = 30_000)
+            assertNotNull("Present button not found after restart", presentButton)
+            presentButton!!.visibleBounds.let { device.click(it.centerX(), it.centerY()) }
+        }
+
+        Thread.sleep(8_000)
+        val statusAfterPresent = latestStatus(device)
+        assertTrue(
+            "Presentation failed after restart. Status: $statusAfterPresent",
+            !statusAfterPresent.startsWith("Present failed") &&
+                !statusAfterPresent.startsWith("Receive failed") &&
+                !statusAfterPresent.startsWith("Bootstrap failed")
+        )
+
+        val verifierStatus = waitForVerifierSuccess(config, verifierSession.sessionId, timeoutMs = 220_000)
+        assertTrue(
+            "Verifier session was not SUCCESSFUL after restart. Status: $verifierStatus",
+            verifierStatus == "SUCCESSFUL"
+        )
+    }
+
     private fun getAdminToken(config: BackendConfig): String {
         val body = JSONObject()
             .put("email", config.adminEmail)

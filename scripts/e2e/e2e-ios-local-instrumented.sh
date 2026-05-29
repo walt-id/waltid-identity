@@ -81,6 +81,6 @@ env \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     test \
-    -only-testing:iosAppUITests/LocalEnterpriseBackendUITests/testReceiveAndPresentAgainstLocalEnterpriseBackend
+    -only-testing:iosAppUITests/LocalEnterpriseBackendUITests
 
 log "DONE" "iOS local instrumented E2E completed (attested=$ATTESTED)"
