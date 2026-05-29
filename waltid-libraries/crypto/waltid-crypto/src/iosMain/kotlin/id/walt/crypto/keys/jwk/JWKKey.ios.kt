@@ -7,6 +7,7 @@ import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.target.ios.keys.Ed25519
 import id.walt.target.ios.keys.P256
 import id.walt.target.ios.keys.RSA
+import id.walt.target.ios.keys.toNSData
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.uuid.ExperimentalUuidApi
@@ -228,8 +229,23 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         TODO("Not yet implemented")
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
-        TODO("Not yet implemented")
+        val recipientJwk = _jwkObj.toString()
+        val kid = _jwkObj["kid"]?.jsonPrimitive?.content
+
+        val result = id.walt.platform.utils.ios.JWE_Operations.encryptWithPlaintext(
+            plaintext.toNSData(),
+            recipientJwk,
+            encAlg,
+            kid
+        )
+
+        check(result.success()) {
+            result.errorMessage() ?: "JWE encryption failed"
+        }
+
+        return result.data() ?: error("JWE encryption returned no data")
     }
 
     override fun equals(other: Any?): Boolean {

@@ -74,24 +74,15 @@ struct EudiPublicConfig {
             return decoded
         }
 
-        let fileCandidates = [
-            env["E2E_OFFER_URL_FILE"],
-            "/tmp/waltid-e2e-offer-url.txt",
-            "/tmp/waltid-e2e-offer-url.b64",
-        ].compactMap { $0 }
-
-        for path in fileCandidates {
-            guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-                  var text = String(data: data, encoding: .utf8)?
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-                  !text.isEmpty else {
-                continue
-            }
-
+        // File-based injection only when explicitly configured via E2E_OFFER_URL_FILE
+        if let path = env["E2E_OFFER_URL_FILE"],
+           let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+           var text = String(data: data, encoding: .utf8)?
+             .trimmingCharacters(in: .whitespacesAndNewlines),
+           !text.isEmpty {
             if path.hasSuffix(".b64"), let decoded = Data(base64Encoded: text), let decodedText = String(data: decoded, encoding: .utf8) {
                 text = decodedText
             }
-
             if text.starts(with: "openid-credential-offer://") {
                 return text
             }
@@ -108,7 +99,6 @@ final class WalletE2EClient {
         let config = URLSessionConfiguration.ephemeral
         config.httpShouldSetCookies = true
         config.httpCookieAcceptPolicy = .always
-        config.httpCookieStorage = HTTPCookieStorage()
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         session = URLSession(configuration: config)

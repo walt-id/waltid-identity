@@ -74,15 +74,17 @@ All 4 scenarios pass:
 | # | Command | Result |
 |---|---------|--------|
 | 5 | `./e2e-android-public-eudi-instrumented.sh` | PASS |
-| 6 | `./e2e-ios-public-eudi-instrumented.sh` | FAIL |
+| 6 | `./e2e-ios-public-eudi-instrumented.sh` | PASS |
 
-iOS public EUDI failure: `Failed to parse inline credential offer` in wallet receive path.
+## Resolved Issues (2026-05-29)
 
-## Current Gaps
+The iOS public EUDI path previously failed with multiple issues, now all fixed:
 
-1. iOS public EUDI path is not reliable.
-- Primary blocker is inline credential offer parsing failure in wallet receive path.
-- Next debugging target: parity between Android and iOS offer encoding/parsing assumptions for generated inline `credential_offer` URLs.
+1. **Stale offer URL injection**: `resolveOfferURL()` read from hardcoded `/tmp/waltid-e2e-offer-url.txt` which could contain stale data. Fixed: file-based injection now requires explicit `E2E_OFFER_URL_FILE` env var.
+2. **Broken cross-domain cookies**: `URLSessionConfiguration.ephemeral` with an explicit `HTTPCookieStorage()` prevented cookie sharing between `issuer.eudiw.dev` and `backend.issuer.eudiw.dev`. Fixed: removed the explicit cookie storage (ephemeral config shares cookies by default).
+3. **tx_code type mismatch**: EUDI backend returns `tx_code` as integer, not string. Fixed: added `NSNumber` fallback in offer generation.
+4. **iOS `getCosePublicKey()` not implemented**: `JWKKeyCoseTransform.ios.kt` was a `TODO()` stub. Fixed: implemented using JWK JSON extraction (needed for mdoc presentations).
+5. **iOS `encryptJwe()` not implemented**: EUDI verifier uses `direct_post.jwt` response mode requiring ECDH-ES JWE encryption. Fixed: implemented via JOSESwift library in Swift, bridged to Kotlin/Native.
 
 ## Quick Command Recap
 

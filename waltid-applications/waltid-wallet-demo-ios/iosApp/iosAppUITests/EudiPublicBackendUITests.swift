@@ -7,10 +7,8 @@ final class EudiPublicBackendUITests: XCTestCase {
         let config = EudiPublicConfig.fromEnvironment()
         let offerURL: String
         if let configuredOffer = config.offerURL, !configuredOffer.isEmpty {
-            print("WalletE2E: using injected offer URL")
             offerURL = configuredOffer
         } else {
-            print("WalletE2E: generating offer via in-test flow")
             offerURL = try await generatePreAuthorizedOffer(credentialID: config.credentialID)
         }
 
@@ -20,7 +18,7 @@ final class EudiPublicBackendUITests: XCTestCase {
 
         let readyStatus = await ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: 120
+            timeout: 60
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
@@ -30,7 +28,7 @@ final class EudiPublicBackendUITests: XCTestCase {
 
         let receiveStatus = await ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
-            timeout: 220
+            timeout: 90
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
@@ -41,7 +39,7 @@ final class EudiPublicBackendUITests: XCTestCase {
 
         let presentStatus = await ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: 220
+            timeout: 90
         )
         XCTAssertNotNil(presentStatus)
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed: \(presentStatus!)")
@@ -50,7 +48,7 @@ final class EudiPublicBackendUITests: XCTestCase {
             "Presentation finished without verifier confirmation: \(presentStatus!)"
         )
 
-        let verifierEvent = try await waitForVerifierResult(transactionID: verifier.transactionID, timeoutSeconds: 220)
+        let verifierEvent = try await waitForVerifierResult(transactionID: verifier.transactionID, timeoutSeconds: 90)
         XCTAssertNotNil(verifierEvent, "Verifier did not confirm wallet response")
     }
 
@@ -197,9 +195,12 @@ private final class EudiOfferFlow {
             throw NSError(domain: "WalletE2E", code: 210, userInfo: [NSLocalizedDescriptionKey: "Invalid final payload"])
         }
 
-        guard let txCodeValue = payloadJSON["tx_code"] as? String,
-              let urlData = payloadJSON["url_data"] as? String,
-              let offerURI = URL(string: urlData),
+        let txCodeRaw = payloadJSON["tx_code"]
+        guard let txCodeValue = txCodeRaw as? String ?? (txCodeRaw as? NSNumber)?.stringValue,
+              let urlData = payloadJSON["url_data"] as? String else {
+            throw NSError(domain: "WalletE2E", code: 211, userInfo: [NSLocalizedDescriptionKey: "Missing tx_code or url_data in final payload"])
+        }
+        guard let offerURI = URL(string: urlData),
               let components = URLComponents(url: offerURI, resolvingAgainstBaseURL: false),
               let credentialOfferRaw = components.queryItems?.first(where: { $0.name == "credential_offer" })?.value,
               let credentialData = credentialOfferRaw.data(using: .utf8),
