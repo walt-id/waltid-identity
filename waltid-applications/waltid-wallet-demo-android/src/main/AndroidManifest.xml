@@ -3,8 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- TODO: remove usesCleartextTraffic once enterprise API returns https:// metadata URLs.
-         Without this, emulator E2E fails: "Cleartext HTTP traffic to 10.0.2.2 not permitted" -->
+    <!-- TODO: remove usesCleartextTraffic — only needed for local E2E testing against enterprise on localhost -->
     <application
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
