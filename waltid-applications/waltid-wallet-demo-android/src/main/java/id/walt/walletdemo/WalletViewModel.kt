@@ -1,8 +1,10 @@
 package id.walt.walletdemo
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import id.walt.wallet2.client.NativeWalletClient
+import id.walt.wallet2.client.MobileWalletClientFactory
+import id.walt.wallet2.client.MobileWalletConfig
 import id.walt.wallet2.client.NativeWalletCredential
 import id.walt.wallet2.client.WalletAttestationConfig
 import id.walt.webdatafetching.WebDataFetcherManager
@@ -25,16 +27,18 @@ data class WalletUiState(
     val credentials: List<NativeWalletCredential> = emptyList(),
 )
 
-class WalletViewModel : ViewModel() {
-    private val client = NativeWalletClient(
-        attestationConfig = BuildConfig.ATTESTATION_BASE_URL.takeIf { it.isNotBlank() }?.let {
-            WalletAttestationConfig(
-                enterpriseBaseUrl = it,
-                attesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
-                bearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
-                enterpriseHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
-            )
-        }
+class WalletViewModel(application: Application) : AndroidViewModel(application) {
+    private val client = MobileWalletClientFactory(application).create(
+        MobileWalletConfig(
+            attestationConfig = BuildConfig.ATTESTATION_BASE_URL.takeIf { it.isNotBlank() }?.let {
+                WalletAttestationConfig(
+                    enterpriseBaseUrl = it,
+                    attesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
+                    bearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,
+                    enterpriseHostHeader = BuildConfig.ATTESTATION_HOST_HEADER,
+                )
+            }
+        )
     )
     private val _state = MutableStateFlow(WalletUiState())
     val state: StateFlow<WalletUiState> = _state.asStateFlow()

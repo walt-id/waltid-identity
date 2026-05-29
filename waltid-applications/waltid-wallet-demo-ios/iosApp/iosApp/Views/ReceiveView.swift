@@ -12,7 +12,7 @@ struct ReceiveView: View {
                 .textFieldStyle(.roundedBorder)
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
-                .lineLimit(3...6)
+                .lineLimit(3)
                 .accessibilityIdentifier("wallet.offerInput")
 
             Button("Receive") {

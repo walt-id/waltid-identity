@@ -39,14 +39,28 @@ get_token() {
 }
 
 [ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e/e2e.env or env"
-[ -n "$ANDROID_API_URL" ] || ANDROID_API_URL="https://$HOST_ALIAS_DOMAIN"
+
+# Detect emulator vs physical device
+if adb devices -l | grep -q "emulator-"; then
+  IS_EMULATOR=true
+else
+  IS_EMULATOR=false
+fi
+
+if [ -z "$ANDROID_API_URL" ]; then
+  if [ "$IS_EMULATOR" = true ]; then
+    ANDROID_API_URL="http://10.0.2.2:$PORT"
+  else
+    ANDROID_API_URL="https://$HOST_ALIAS_DOMAIN"
+  fi
+fi
 if [ -z "$ANDROID_API_HOST_HEADER" ] && echo "$ANDROID_API_URL" | grep -Eq '10\.0\.2\.2|localhost'; then
   ANDROID_API_HOST_HEADER="${ORG}.enterprise.localhost"
 fi
 [ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
 [ -f "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" ] || err "AndroidManifest.xml not found"
 
-log "CHECK" "Verifying Android + backend prerequisites"
+log "CHECK" "Verifying Android + backend prerequisites (emulator=$IS_EMULATOR)"
 adb devices | grep -q "device$" || err "No Android emulator/device connected"
 curl -sf "$API_URL/auth/account/emailpass" -X POST -H "Content-Type: application/json" \
   -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" > /dev/null \
@@ -55,10 +69,12 @@ curl -sf -o /dev/null "$API_URL/health" 2>/dev/null || true
 curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS_DOMAIN" \
   || err "ngrok domain not reachable: https://$HOST_ALIAS_DOMAIN"
 
-# Local enterprise currently returns http:// metadata URLs, so cleartext workaround is required.
-grep -q 'android:usesCleartextTraffic=\"true\"' \
-  "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" \
-  || err "Missing local cleartext workaround. Apply: git apply scripts/e2e/patches/local-cleartext-workarounds.patch"
+if [ "$IS_EMULATOR" = true ]; then
+  # Local enterprise currently returns http:// metadata URLs, so cleartext workaround is required.
+  grep -q 'android:usesCleartextTraffic=\"true\"' \
+    "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" \
+    || err "Missing local cleartext workaround. Apply: git apply scripts/e2e/patches/local-cleartext-workarounds.patch"
+fi
 
 # Verifier response_uri resolves to localhost:7500 for the emulator path.
 adb reverse --list | grep -q 'tcp:7500 tcp:7500' \
@@ -82,11 +98,18 @@ GRADLE_ARGS=(
 if [ "$ATTESTED" = true ]; then
   log "BUILD" "Attested mode enabled: injecting client-attester build config"
   TOKEN="$(get_token)"
+  if [ "$IS_EMULATOR" = true ]; then
+    ATTESTATION_BASE_URL="http://10.0.2.2:$PORT"
+    ATTESTATION_HOST_HEADER="${ORG}.enterprise.localhost"
+  else
+    ATTESTATION_BASE_URL="https://$HOST_ALIAS_DOMAIN"
+    ATTESTATION_HOST_HEADER=""
+  fi
   GRADLE_ARGS+=(
-    -Pattestation.baseUrl="http://10.0.2.2:$PORT"
+    -Pattestation.baseUrl="$ATTESTATION_BASE_URL"
     -Pattestation.attesterPath="$ATTESTER_PATH"
     -Pattestation.bearerToken="$TOKEN"
-    -Pattestation.hostHeader="${ORG}.enterprise.localhost"
+    -Pattestation.hostHeader="$ATTESTATION_HOST_HEADER"
   )
 else
   log "BUILD" "Non-attested mode: forcing empty attestation config"

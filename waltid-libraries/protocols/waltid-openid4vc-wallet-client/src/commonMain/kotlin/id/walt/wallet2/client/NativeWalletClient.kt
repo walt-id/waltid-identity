@@ -1,18 +1,18 @@
 package id.walt.wallet2.client
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.wallet2.data.Wallet
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.WalletDidStore
+import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
-import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import io.ktor.http.Url
@@ -48,14 +48,14 @@ data class WalletAttestationConfig(
 
 @OptIn(ExperimentalUuidApi::class)
 class NativeWalletClient(
-    walletId: String = Uuid.random().toString(),
+    walletId: String,
+    private val keyStore: WalletKeyStore,
+    private val didStore: WalletDidStore,
+    private val credentialStore: WalletCredentialStore,
+    private val keyGenerator: suspend (KeyType) -> Key,
     private val attestationConfig: WalletAttestationConfig? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
 ) {
-    private val keyStore = InMemoryKeyStore()
-    private val didStore = InMemoryDidStore()
-    private val credentialStore = InMemoryCredentialStore()
-
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
         ClientAttestationAssembler(
             HttpWalletAttestationProvider(
@@ -79,7 +79,7 @@ class NativeWalletClient(
         didMethod: String = "key",
     ): NativeWalletBootstrapResult {
         DidService.minimalInit()
-        val key = JWKKey.generate(keyType)
+        val key = keyGenerator(keyType)
         val keyId = keyStore.addKey(key)
         val didResult = DidService.registerByKey(didMethod, key)
 

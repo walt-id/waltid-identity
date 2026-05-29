@@ -1,6 +1,7 @@
 package id.walt.walletdemo.ios
 
-import id.walt.wallet2.client.NativeWalletClient
+import id.walt.wallet2.client.MobileWalletClientFactory
+import id.walt.wallet2.client.MobileWalletConfig
 import id.walt.wallet2.client.WalletAttestationConfig
 
 data class BridgeCredential(
@@ -22,15 +23,17 @@ class WalletDemoBridgeController(
     attestationBearerToken: String? = null,
     attestationHostHeader: String? = null,
 ) {
-    private val client = NativeWalletClient(
-        attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
-            WalletAttestationConfig(
-                enterpriseBaseUrl = it,
-                attesterPath = attestationAttesterPath ?: "",
-                bearerToken = attestationBearerToken ?: "",
-                enterpriseHostHeader = attestationHostHeader ?: "",
-            )
-        },
+    private val client = MobileWalletClientFactory().create(
+        MobileWalletConfig(
+            attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
+                WalletAttestationConfig(
+                    enterpriseBaseUrl = it,
+                    attesterPath = attestationAttesterPath ?: "",
+                    bearerToken = attestationBearerToken ?: "",
+                    enterpriseHostHeader = attestationHostHeader ?: "",
+                )
+            },
+        )
     )
     private var did = ""
 

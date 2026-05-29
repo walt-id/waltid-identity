@@ -7,7 +7,6 @@ Pod::Spec.new do |spec|
     spec.license                  = ''
     spec.summary                  = 'Shared WAL-1033 native wallet demo bridge'
     spec.vendored_frameworks      = 'build/cocoapods/framework/shared.framework'
-    spec.libraries                = 'c++'
     spec.ios.deployment_target    = '15.4'
     if !Dir.exist?('build/cocoapods/framework/shared.framework') || Dir.empty?('build/cocoapods/framework/shared.framework')
         raise "
@@ -42,4 +41,5 @@ Pod::Spec.new do |spec|
             SCRIPT
         }
     ]
+    spec.libraries = 'c++', 'sqlite3'
 end
