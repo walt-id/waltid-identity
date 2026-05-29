@@ -13,6 +13,7 @@ struct PresentView: View {
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
                 .lineLimit(3...6)
+                .accessibilityIdentifier("wallet.presentationInput")
 
             Button("Present") {
                 viewModel.presentCredential()
@@ -20,6 +21,7 @@ struct PresentView: View {
             .buttonStyle(.borderedProminent)
             .tint(.waltBlue)
             .disabled(!viewModel.isReady || viewModel.presentationRequestUrl.isEmpty || viewModel.credentials.isEmpty || viewModel.isLoading)
+            .accessibilityIdentifier("wallet.presentButton")
         }
     }
 }

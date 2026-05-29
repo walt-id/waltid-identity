@@ -32,6 +32,7 @@ class WalletViewModel: ObservableObject {
     // TODO: if a deep link arrives before bootstrap completes, the URL is stored but the action
     // is never triggered. Consider checking for pending URLs after bootstrap sets isReady = true.
     func handleDeepLink(_ url: URL) {
+        logE2E("Deep link received: \(url.scheme ?? "unknown")")
         switch url.scheme {
         case "openid-credential-offer":
             offerUrl = url.absoluteString
@@ -104,17 +105,24 @@ class WalletViewModel: ObservableObject {
         isLoading = true
         isError = false
         statusMessage = message
+        logE2E("STATUS \(message)")
     }
 
     private func setSuccess(_ message: String) {
         isLoading = false
         isError = false
         statusMessage = message
+        logE2E("STATUS \(message)")
     }
 
     private func setError(_ message: String) {
         isLoading = false
         isError = true
         statusMessage = message
+        logE2E("STATUS \(message)")
+    }
+
+    private func logE2E(_ message: String) {
+        NSLog("[WalletE2E] \(message)")
     }
 }

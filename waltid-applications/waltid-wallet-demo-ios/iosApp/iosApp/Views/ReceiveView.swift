@@ -13,6 +13,7 @@ struct ReceiveView: View {
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
                 .lineLimit(3...6)
+                .accessibilityIdentifier("wallet.offerInput")
 
             Button("Receive") {
                 viewModel.receiveCredential()
@@ -20,6 +21,7 @@ struct ReceiveView: View {
             .buttonStyle(.borderedProminent)
             .tint(.waltBlue)
             .disabled(!viewModel.isReady || viewModel.offerUrl.isEmpty || viewModel.isLoading)
+            .accessibilityIdentifier("wallet.receiveButton")
         }
     }
 }

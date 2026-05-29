@@ -1,168 +1,131 @@
 # E2E Testing: Mobile Wallet Demos
 
-End-to-end tests for the Android and iOS wallet demo apps against the local enterprise stack exposed via ngrok.
+This folder contains the native E2E paths for wallet demo apps.
 
-## Prerequisites
+Primary goal: keep orchestration thin and move receive/present logic into native tests.
 
-- Enterprise stack running — see [waltid-enterprise-quickstart](https://github.com/walt-id/waltid-enterprise-quickstart)
-  ```bash
-  cd /path/to/waltid-enterprise-quickstart
-  docker compose up -d
-  cd cli && npm install && npx tsx walt.ts --recreate
-  ```
-- **After `--recreate`**: comment out `basePort` in `config/enterprise.conf` and restart the API:
-  ```bash
-  # In config/enterprise.conf, change:
-  #   basePort = 7500
-  # to:
-  #   # basePort = 7500
-  docker compose restart waltid-enterprise
-  ```
-  This makes the API generate URLs without `:7500`, so they route through ngrok correctly. The `--recreate` step requires `basePort = 7500` for internal wallet-service calls, but E2E needs it off so offer/metadata URLs don't include an unreachable port on the ngrok domain.
-- ngrok tunnel active, pointing to port 7500:
-  ```bash
-  ngrok http 7500 --domain=<your-ngrok-domain>
-  ```
-- Host alias created for the organization — done automatically by `--recreate` if `HOST_ALIAS_DOMAIN` is set in the quickstart's `cli/walt.env`
+## Kept Test Entrypoints
 
-### Setup
+Local enterprise backend (requires local stack + ngrok):
+- `./e2e-android-local-instrumented.sh`
+- `./e2e-android-local-instrumented-attested.sh`
+- `./e2e-ios-local-instrumented.sh`
+- `./e2e-ios-local-instrumented-attested.sh`
+
+Public EUDI backend (no local enterprise required):
+- `./e2e-android-public-eudi-instrumented.sh`
+- `./e2e-ios-public-eudi-instrumented.sh`
+
+Legacy non-instrumented scripts (`e2e-android.sh`, `e2e-ios.sh`) are still present but are no longer the recommended path for this WAL-1033 effort.
+
+## Environment Setup
+
+From `scripts/e2e`:
 
 ```bash
-cd scripts/e2e
 cp e2e.env.example e2e.env
-# Edit e2e.env: set HOST_ALIAS_DOMAIN to your ngrok domain
+# set HOST_ALIAS_DOMAIN=<your ngrok domain>
 ```
 
-### Platform-specific
+### Local Enterprise Stack Constraints
 
-**Android:**
-- Emulator running (or physical device connected via USB with ADB)
-- `adb reverse tcp:7500 tcp:7500` — the verifier2 service hardcodes `:7500` in its `response_uri`; this forwards the emulator's localhost:7500 to the host where the enterprise API runs
-- App installed (or use `--build` flag)
-- Cleartext workaround patch applied (see below)
-
-**iOS:**
-- Simulator booted
-- App installed (or use `--build` flag)
-- macOS with Xcode command-line tools
-- Cleartext workaround patch applied (see below)
-
-## Wallet Attestation
-
-Both E2E scripts automatically configure wallet attestation (OAuth 2.0 Attestation-Based Client Authentication). The scripts:
-
-1. Obtain a fresh admin token from the enterprise stack
-2. Inject attestation config into the app:
-   - **Android**: Passes `-Pattestation.*` Gradle properties at build time → `BuildConfig` fields
-   - **iOS**: Writes attestation config to simulator UserDefaults before app launch
-3. The apps use the enterprise `client-attester-api` to obtain attestation JWTs at runtime
-
-The attester path defaults to `$TENANT_PATH.client-attester` (e.g., `waltid.waltid-tenant01.client-attester`). Override via `ATTESTER_PATH` in `e2e.env`.
-
-## Running
+1. Start enterprise quickstart (`docker compose up -d`, then recreate).
+2. After recreate, comment out `basePort = 7500` in quickstart `enterprise.conf`, then restart enterprise API.
+3. Keep ngrok forwarding `7500`.
+4. For Android local flow, set emulator reverse port:
 
 ```bash
-cd scripts/e2e
-
-# Android
-./e2e-android.sh              # receive + present
-./e2e-android.sh --build      # rebuild APK first
-./e2e-android.sh --receive    # only receive
-./e2e-android.sh --present    # only present (credential must be in memory)
-
-# iOS
-./e2e-ios.sh                  # receive + present
-./e2e-ios.sh --build          # rebuild framework + app first
-./e2e-ios.sh --receive        # only receive
-./e2e-ios.sh --present        # only present (credential must be in memory)
+adb reverse tcp:7500 tcp:7500
 ```
 
-## Configuration
+This is required because verifier callback URLs still reference `localhost:7500` for emulator routing.
 
-All configuration is sourced from `e2e.env` and can be overridden via environment variables:
+## Cleartext Workaround Patch (Local Stack)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST_ALIAS_DOMAIN` | *(required)* | Your ngrok domain |
-| `PORT` | `7500` | Enterprise API port |
-| `ADMIN_EMAIL` | `admin@walt.id` | Admin credentials |
-| `ADMIN_PASSWORD` | `admin123456` | Admin credentials |
-| `ORGANIZATION` | `waltid` | Organization slug |
-| `TENANT` | `waltid-tenant01` | Tenant slug |
-| `ATTESTER_PATH` | `$TENANT_PATH.client-attester` | Enterprise client-attester path |
-| `IDENTITY_DIR` | *(auto: repo root)* | Path to `waltid-identity` repo root |
-| `IOS_SIMULATOR_ID` | *(auto: first booted sim)* | Booted simulator UUID |
-| `IOS_BUNDLE_ID` | `waltid.iosApp` | iOS app bundle ID |
-| `ANDROID_PACKAGE` | `id.walt.walletdemo` | Android app package |
-| `UI_POLL_TIMEOUT` | `45` | Seconds to wait for UI state changes (Android) |
+Local enterprise metadata still resolves to `http://...enterprise.localhost...` in this setup.
 
-## Cleartext Workaround Patch
-
-The enterprise API returns `http://` URLs in its OpenID metadata when accessed locally (it doesn't see ngrok's HTTPS layer). Both mobile platforms block cleartext HTTP by default:
-
-- **Android**: blocks non-HTTPS traffic (Android 9+)
-- **iOS**: App Transport Security blocks HTTP to non-localhost domains
-
-A patch is included at `patches/local-cleartext-workarounds.patch`:
+Apply once in `waltid-identity` root:
 
 ```bash
-# Apply (from the waltid-identity repo root)
 git apply scripts/e2e/patches/local-cleartext-workarounds.patch
+```
 
-# Revert
+Revert:
+
+```bash
 git apply -R scripts/e2e/patches/local-cleartext-workarounds.patch
 ```
 
-**These workarounds become unnecessary** once the enterprise API installs Ktor's `ForwardedHeaders` plugin (so it generates `https://` URLs when behind a reverse proxy).
+Patch touches:
+- Android app manifest (`android:usesCleartextTraffic="true"`)
+- iOS `Info.plist` (ATS exception for `enterprise.localhost`)
 
-### What the patch changes
+## Public EUDI Notes
 
-| File | Change |
-|------|--------|
-| `AndroidManifest.xml` | `android:usesCleartextTraffic="true"` |
-| `Info.plist` | ATS exception for `*.enterprise.localhost` and local networking |
+- Android public EUDI flow is fully native in `EudiPublicBackendReceiveInstrumentedTest.kt` (offer generation + verifier polling inside test).
+- iOS public EUDI flow is fully native in `EudiPublicBackendUITests.swift` (offer generation + verifier polling inside test).
+- No helper Python scripts are required anymore for public EUDI instrumented paths.
 
-## How It Works
+## Actual Run Matrix (2026-05-29)
 
-### Android
-1. Builds APK with attestation config baked in via Gradle properties (if `--build`)
-2. Creates a credential offer via the ngrok-exposed API
-3. Delivers the `openid-credential-offer://` URL as a deep link via `adb`
-4. Finds and taps the Receive button using UI Automator (finds clickable parent containing target text)
-5. Polls UI state until receive completes
-6. Creates a verification session
-7. Delivers the `openid4vp://` deep link (without restarting — credentials are in-memory)
-8. Taps Present button
-9. Confirms verifier session status is `SUCCESSFUL` via API
+### Local Enterprise
 
-### iOS
-1. Injects attestation config via UserDefaults into the simulator
-2. Pre-approves URL schemes in the simulator's plist (no confirmation dialog)
-3. Launches app and waits for bootstrap
-4. Creates a credential offer and delivers it as a deep link — app auto-triggers receive
-5. Creates a verification session and delivers the deep link — app auto-triggers present
-6. Confirms verifier session status is `SUCCESSFUL` via API
+1. Android non-attested
+- Command: `./e2e-android-local-instrumented.sh`
+- Result: FAIL
+- Reason: issuer profile enforces attestation; receive fails with `401 invalid_client` and `Client attestation headers are required by this issuer configuration`.
 
-## Important Notes
+2. Android attested
+- Command: `./e2e-android-local-instrumented-attested.sh`
+- Result: PASS
 
-- **In-memory credentials**: Both apps use in-memory storage. Don't restart the app between receive and present.
-- **Offers expire** in ~5 minutes. The scripts create fresh ones each run.
-- **iOS has no UI automator**: The iOS app auto-triggers receive/present on deep link arrival.
-- **Android needs the cleartext patch**: Without it, HTTP connections to the local enterprise are blocked.
-- **iOS needs the cleartext patch**: Without ATS exceptions, HTTP to `*.enterprise.localhost` is blocked.
-- **Redirect handling is built-in**: The SDK now follows HTTP 307 redirects on POST requests (token, credential, nonce endpoints). This handles ngrok HTTP→HTTPS upgrades transparently.
+3. iOS non-attested
+- Command: `./e2e-ios-local-instrumented.sh`
+- Result: PASS (test-level pass)
+- Important: in non-attested mode the test allows expected attestation rejection and can return early. This is not equivalent to a full receive+present success unless issuer profile does not enforce attestation.
 
-## Troubleshooting
+4. iOS attested
+- Command: `./e2e-ios-local-instrumented-attested.sh`
+- Result: PASS
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| `Enterprise API not reachable` | Stack not running | Start via quickstart repo |
-| `ngrok tunnel not reachable` | Tunnel not active | `ngrok http 7500 --domain=...` |
-| `Failed to get credential offer` | Issuer not configured | `npx tsx walt.ts --recreate` in quickstart CLI |
-| Android receive hangs/timeout | `basePort=7500` still set | Comment out `basePort` in enterprise.conf and restart |
-| Android present: Connection refused | `adb reverse` not set or stale | `adb reverse tcp:7500 tcp:7500` (restart emulator if stale) |
-| iOS ATS error (code -1022) | Cleartext patch not applied | `git apply scripts/e2e/patches/local-cleartext-workarounds.patch` |
-| `No booted iOS simulator` | Simulator not started | `xcrun simctl boot <device-id>` |
-| Verifier status PENDING | Presentation still in flight | Increase sleep or check logs |
-| Verifier status UNUSED | Wallet couldn't reach response_uri | Check `adb reverse` (Android) or ATS settings (iOS) |
-| Attestation 401 | Token expired or attester not configured | Scripts auto-refresh; check enterprise has `client-attester` configured |
+### Public EUDI
+
+5. Android public EUDI instrumented
+- Command: `./e2e-android-public-eudi-instrumented.sh`
+- Result: PASS
+
+6. iOS public EUDI instrumented (run twice)
+- Command: `./e2e-ios-public-eudi-instrumented.sh`
+- Result: FAIL (2/2)
+- Failure evidence from xcresult:
+  - `XCTAssertTrue failed - Receive failed, status: Receive failed: Failed to parse inline credential offer`
+  - Follow-on: `XCTAssertNotNil failed - Verifier did not confirm wallet response`
+
+xcresult paths from failing runs:
+- `/Users/szipe/Library/Developer/Xcode/DerivedData/iosApp-ezcrcwlijmetamgtukwvrcoaesho/Logs/Test/Test-iosApp-2026.05.29_10-29-39-+0200.xcresult`
+- `/Users/szipe/Library/Developer/Xcode/DerivedData/iosApp-ezcrcwlijmetamgtukwvrcoaesho/Logs/Test/Test-iosApp-2026.05.29_10-34-31-+0200.xcresult`
+
+## Current Gaps / Handover Focus
+
+1. Android non-attested local script currently fails hard under attestation-enforcing profile.
+- To test full non-attested success, point to an issuer profile that does not require attestation.
+
+2. iOS public EUDI path is currently not reliable.
+- Primary blocker is inline credential offer parsing failure in wallet receive path.
+- Next debugging target: parity between Android and iOS offer encoding/parsing assumptions for generated inline `credential_offer` URLs.
+
+## Quick Command Recap
+
+```bash
+cd scripts/e2e
+
+# Local enterprise
+./e2e-android-local-instrumented-attested.sh
+./e2e-android-local-instrumented.sh
+./e2e-ios-local-instrumented-attested.sh
+./e2e-ios-local-instrumented.sh
+
+# Public EUDI
+./e2e-android-public-eudi-instrumented.sh
+./e2e-ios-public-eudi-instrumented.sh
+```
