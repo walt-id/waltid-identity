@@ -7,16 +7,26 @@ Primary goal: keep orchestration thin and move receive/present logic into native
 ## Kept Test Entrypoints
 
 Local enterprise backend (requires local stack + ngrok):
-- `./e2e-android-local-instrumented.sh`
+- `./e2e-android-local-instrumented.sh` — non-attested (default)
+- `./e2e-android-local-instrumented.sh --attested` — with client attestation
+- `./e2e-ios-local-instrumented.sh` — non-attested (default)
+- `./e2e-ios-local-instrumented.sh --attested` — with client attestation
+
+Convenience wrappers (call the above with `--attested`):
 - `./e2e-android-local-instrumented-attested.sh`
-- `./e2e-ios-local-instrumented.sh`
 - `./e2e-ios-local-instrumented-attested.sh`
 
 Public EUDI backend (no local enterprise required):
 - `./e2e-android-public-eudi-instrumented.sh`
 - `./e2e-ios-public-eudi-instrumented.sh`
 
-Legacy non-instrumented scripts (`e2e-android.sh`, `e2e-ios.sh`) are still present but are no longer the recommended path for this WAL-1033 effort.
+### Attested vs Non-Attested
+
+The `--attested` flag controls which issuer profile is used:
+- **Non-attested** (default): uses `issuer2-noattest.mdl-profile` — no client attestation required. The script auto-provisions `issuer2-noattest` via API if it doesn't exist.
+- **Attested** (`--attested`): uses `issuer2.mdl-profile` — requires wallet to present client attestation headers.
+
+Legacy non-instrumented scripts (`e2e-android.sh`, `e2e-ios.sh`) are still present but are no longer the recommended path.
 
 ## Environment Setup
 
@@ -70,47 +80,27 @@ Patch touches:
 
 ### Local Enterprise
 
-1. Android non-attested
-- Command: `./e2e-android-local-instrumented.sh`
-- Result: FAIL
-- Reason: issuer profile enforces attestation; receive fails with `401 invalid_client` and `Client attestation headers are required by this issuer configuration`.
+All 4 scenarios pass:
 
-2. Android attested
-- Command: `./e2e-android-local-instrumented-attested.sh`
-- Result: PASS
-
-3. iOS non-attested
-- Command: `./e2e-ios-local-instrumented.sh`
-- Result: PASS (test-level pass)
-- Important: in non-attested mode the test allows expected attestation rejection and can return early. This is not equivalent to a full receive+present success unless issuer profile does not enforce attestation.
-
-4. iOS attested
-- Command: `./e2e-ios-local-instrumented-attested.sh`
-- Result: PASS
+| # | Command | Result |
+|---|---------|--------|
+| 1 | `./e2e-android-local-instrumented.sh` | PASS |
+| 2 | `./e2e-android-local-instrumented.sh --attested` | PASS |
+| 3 | `./e2e-ios-local-instrumented.sh` | PASS |
+| 4 | `./e2e-ios-local-instrumented.sh --attested` | PASS |
 
 ### Public EUDI
 
-5. Android public EUDI instrumented
-- Command: `./e2e-android-public-eudi-instrumented.sh`
-- Result: PASS
+| # | Command | Result |
+|---|---------|--------|
+| 5 | `./e2e-android-public-eudi-instrumented.sh` | PASS |
+| 6 | `./e2e-ios-public-eudi-instrumented.sh` | FAIL |
 
-6. iOS public EUDI instrumented (run twice)
-- Command: `./e2e-ios-public-eudi-instrumented.sh`
-- Result: FAIL (2/2)
-- Failure evidence from xcresult:
-  - `XCTAssertTrue failed - Receive failed, status: Receive failed: Failed to parse inline credential offer`
-  - Follow-on: `XCTAssertNotNil failed - Verifier did not confirm wallet response`
+iOS public EUDI failure: `Failed to parse inline credential offer` in wallet receive path.
 
-xcresult paths from failing runs:
-- `/Users/szipe/Library/Developer/Xcode/DerivedData/iosApp-ezcrcwlijmetamgtukwvrcoaesho/Logs/Test/Test-iosApp-2026.05.29_10-29-39-+0200.xcresult`
-- `/Users/szipe/Library/Developer/Xcode/DerivedData/iosApp-ezcrcwlijmetamgtukwvrcoaesho/Logs/Test/Test-iosApp-2026.05.29_10-34-31-+0200.xcresult`
+## Current Gaps
 
-## Current Gaps / Handover Focus
-
-1. Android non-attested local script currently fails hard under attestation-enforcing profile.
-- To test full non-attested success, point to an issuer profile that does not require attestation.
-
-2. iOS public EUDI path is currently not reliable.
+1. iOS public EUDI path is not reliable.
 - Primary blocker is inline credential offer parsing failure in wallet receive path.
 - Next debugging target: parity between Android and iOS offer encoding/parsing assumptions for generated inline `credential_offer` URLs.
 
