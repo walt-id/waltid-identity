@@ -56,11 +56,9 @@ This is required because verifier callback URLs still reference `localhost:7500`
 - iOS public EUDI flow is fully native in `EudiPublicBackendUITests.swift` (offer generation + verifier polling inside test).
 - No helper Python scripts are required anymore for public EUDI instrumented paths.
 
-## Actual Run Matrix (2026-05-29)
+## Run Matrix
 
 ### Local Enterprise
-
-All 4 scenarios pass:
 
 | # | Command | Result |
 |---|---------|--------|
@@ -75,16 +73,6 @@ All 4 scenarios pass:
 |---|---------|--------|
 | 5 | `./e2e-android-public-eudi-instrumented.sh` | PASS |
 | 6 | `./e2e-ios-public-eudi-instrumented.sh` | PASS |
-
-## Resolved Issues (2026-05-29)
-
-The iOS public EUDI path previously failed with multiple issues, now all fixed:
-
-1. **Stale offer URL injection**: `resolveOfferURL()` read from hardcoded `/tmp/waltid-e2e-offer-url.txt` which could contain stale data. Fixed: file-based injection now requires explicit `E2E_OFFER_URL_FILE` env var.
-2. **Broken cross-domain cookies**: `URLSessionConfiguration.ephemeral` with an explicit `HTTPCookieStorage()` prevented cookie sharing between `issuer.eudiw.dev` and `backend.issuer.eudiw.dev`. Fixed: removed the explicit cookie storage (ephemeral config shares cookies by default).
-3. **tx_code type mismatch**: EUDI backend returns `tx_code` as integer, not string. Fixed: added `NSNumber` fallback in offer generation.
-4. **iOS `getCosePublicKey()` not implemented**: `JWKKeyCoseTransform.ios.kt` was a `TODO()` stub. Fixed: implemented using JWK JSON extraction (needed for mdoc presentations).
-5. **iOS `encryptJwe()` not implemented**: EUDI verifier uses `direct_post.jwt` response mode requiring ECDH-ES JWE encryption. Fixed: implemented via JOSESwift library in Swift, bridged to Kotlin/Native.
 
 ## Quick Command Recap
 
