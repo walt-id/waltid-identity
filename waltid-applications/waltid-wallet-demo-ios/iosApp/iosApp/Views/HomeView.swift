@@ -12,14 +12,6 @@ struct HomeView: View {
                     isError: viewModel.isError
                 )
 
-                if !viewModel.did.isEmpty {
-                    Text("DID: \(viewModel.did)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-
                 ReceiveView(viewModel: viewModel)
                 Divider()
                 PresentView(viewModel: viewModel)
