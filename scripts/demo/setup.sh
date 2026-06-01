@@ -22,13 +22,11 @@ ok "enterprise.conf patched"
 # ─── 2. Start enterprise stack (using latest local images) ───────────────────
 
 log "STACK" "Starting enterprise stack from $QUICKSTART_DIR (image tag: latest)"
+docker rm -f waltid-enterprise-ui 2>/dev/null || true
 docker compose -f "$QUICKSTART_DIR/docker-compose.yml" up -d
 
 # Replace UI container with correct network alias so Caddy can resolve it
-UI_ID=$(docker compose -f "$QUICKSTART_DIR/docker-compose.yml" ps -q waltid-enterprise-ui 2>/dev/null)
-if [ -n "$UI_ID" ]; then
-  docker rm -f "$UI_ID" >/dev/null 2>&1
-fi
+docker compose -f "$QUICKSTART_DIR/docker-compose.yml" rm -sf waltid-enterprise-ui 2>/dev/null || true
 docker rm -f waltid-enterprise-ui 2>/dev/null || true
 docker run -d \
   --name waltid-enterprise-ui \
@@ -36,7 +34,7 @@ docker run -d \
   --network-alias waltid-enterprise-ui \
   -p 7501:3000 \
   -e "NUXT_PUBLIC_BASE_DOMAIN=enterprise.localhost" \
-  waltid/waltid-enterprise-ui:latest >/dev/null 2>&1
+  waltid/waltid-enterprise-ui:latest >/dev/null 2>&1 || true
 ok "Docker containers started"
 
 # ─── 3. Wait for API health ──────────────────────────────────────────────────
@@ -45,13 +43,13 @@ log "HEALTH" "Waiting for enterprise API on port $PORT..."
 for i in $(seq 1 90); do
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT/auth/account/emailpass" \
     -X POST -H "Content-Type: application/json" \
-    -d '{"email":"probe@test","password":"x"}' 2>/dev/null)
+    -d '{"email":"probe@test","password":"x"}' 2>/dev/null || true)
   if [ "$HTTP_CODE" = "404" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "200" ]; then
-    ok "Enterprise API is healthy (HTTP $HTTP_CODE, took ${i}s)"
+    ok "Enterprise API is healthy (took $((i*2))s)"
     break
   fi
   if [ "$i" -eq 90 ]; then
-    err "Enterprise API not responding after 90s (last HTTP: $HTTP_CODE)"
+    err "Enterprise API not responding after 180s (last HTTP: $HTTP_CODE)"
   fi
   sleep 2
 done
