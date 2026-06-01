@@ -1,49 +1,73 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
+import com.android.build.api.dsl.androidLibrary
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
-    id("waltid.jvm.library")
-    id("waltid.publish.maven")
+    kotlin("multiplatform")
+    kotlin("plugin.serialization")
+    id("com.android.kotlin.multiplatform.library")
+    id("app.cash.sqldelight") version "2.0.2"
 }
 
 group = "id.walt.protocols"
 
-dependencies {
-    // The base wallet library — store interfaces and data models
-    api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
+val catalogs = extensions.getByType<VersionCatalogsExtension>()
+val identityLibs = catalogs.named("identityLibs")
 
-    // Exposed — SQL framework (api so Database is visible to consumers)
-    api("org.jetbrains.exposed:exposed-core:1.3.0")
-    api("org.jetbrains.exposed:exposed-jdbc:1.3.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:1.3.0")
-    implementation("org.jetbrains.exposed:exposed-json:1.3.0")
+kotlin {
+    applyDefaultHierarchyTemplate()
 
-    // JDBC drivers — SQLite (default) and Postgres (optional)
-    implementation("org.xerial:sqlite-jdbc:3.47.0.0")
-    compileOnly("org.postgresql:postgresql:42.7.3")
+    androidLibrary {
+        namespace = "id.walt.wallet2.persistence"
+        compileSdk = 35
+        minSdk = 28
 
-    // Connection pooling
-    implementation("com.zaxxer:HikariCP:5.1.0")
+        compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    jvmTarget.set(JvmTarget.JVM_17)
+                }
+            }
+        }
+    }
 
-    // Serialization
-    implementation(identityLibs.kotlinx.serialization.json)
+    iosArm64()
+    iosSimulatorArm64()
 
-    // Logging
-    implementation(identityLibs.oshai.kotlinlogging)
+    sourceSets {
+        commonMain.dependencies {
+            api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
+            api(project(":waltid-libraries:crypto:waltid-crypto"))
+            api(project(":waltid-libraries:waltid-did"))
+            implementation("app.cash.sqldelight:runtime:2.0.2")
+            implementation("app.cash.sqldelight:coroutines-extensions:2.0.2")
+            implementation(identityLibs.findLibrary("kotlinx-coroutines-core").get())
+            implementation(identityLibs.findLibrary("kotlinx-serialization-json").get())
+            implementation(identityLibs.findLibrary("kotlinx-datetime").get())
+        }
 
-    // Coroutines
-    implementation(identityLibs.kotlinx.coroutines.core)
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(identityLibs.findLibrary("kotlinx-coroutines-test").get())
+        }
 
-    // Tests
-    testImplementation(kotlin("test"))
-    testImplementation(identityLibs.kotlinx.coroutines.test)
-    testImplementation("org.xerial:sqlite-jdbc:3.47.0.0")
+        androidMain.dependencies {
+            implementation("app.cash.sqldelight:android-driver:2.0.2")
+        }
+
+        iosMain.dependencies {
+            api(project(":waltid-libraries:crypto:waltid-crypto-ios"))
+            implementation("app.cash.sqldelight:native-driver:2.0.2")
+        }
+    }
 }
 
-mavenPublishing {
-    pom {
-        name.set("walt.id Wallet SDK - Persistence (Exposed/SQL)")
-        description.set(
-            "Exposed/SQL-backed implementations of WalletStore, WalletCredentialStore, " +
-                "WalletKeyStore, and WalletDidStore for the walt.id Wallet2. " +
-                "Supports SQLite (default) and PostgreSQL."
-        )
+sqldelight {
+    databases {
+        create("WalletPersistenceDatabase") {
+            packageName.set("id.walt.wallet2.persistence.db")
+        }
     }
 }
