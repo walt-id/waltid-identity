@@ -1,18 +1,18 @@
 package id.walt.wallet2.client
 
 import android.content.Context
-import id.walt.wallet2.client.db.WalletClientDatabase
-import id.walt.wallet2.client.keys.AndroidPlatformKeyProvider
-import id.walt.wallet2.client.stores.DriverFactory
-import id.walt.wallet2.client.stores.HardwareKeyStore
-import id.walt.wallet2.client.stores.SqlDelightCredentialStore
-import id.walt.wallet2.client.stores.SqlDelightDidStore
+import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
+import id.walt.wallet2.persistence.stores.DriverFactory
+import id.walt.wallet2.persistence.stores.HardwareKeyStore
+import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
 actual class MobileWalletClientFactory(private val context: Context) {
     actual fun create(config: MobileWalletConfig): NativeWalletClient {
         val driver = DriverFactory(context).createDriver("wallet_${config.walletId}")
-        val db = WalletClientDatabase(driver)
-        val queries = db.walletClientQueries
+        val db = WalletPersistenceDatabase(driver)
+        val queries = db.walletPersistenceQueries
 
         val keyProvider = AndroidPlatformKeyProvider()
         val keyStore = HardwareKeyStore(keyProvider, queries)
