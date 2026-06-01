@@ -36,14 +36,8 @@ class WalletViewModel: ObservableObject {
         switch url.scheme {
         case "openid-credential-offer":
             offerUrl = url.absoluteString
-            if isReady && !isLoading {
-                receiveCredential()
-            }
         case "openid4vp":
             presentationRequestUrl = url.absoluteString
-            if isReady && !isLoading && !credentials.isEmpty {
-                presentCredential()
-            }
         default:
             break
         }
