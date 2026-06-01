@@ -70,10 +70,6 @@ private fun WalletScreen(viewModel: WalletViewModel) {
         Text("walt.id Wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         Text(state.status, color = if (state.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
 
-        if (state.did.isNotBlank()) {
-            Text("DID: ${state.did}", style = MaterialTheme.typography.bodySmall)
-        }
-
         HorizontalDivider()
 
         Text("Receive", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
