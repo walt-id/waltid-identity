@@ -22,7 +22,7 @@ kotlin {
     androidLibrary {
         namespace = "id.walt.wallet2.persistence"
         compileSdk = 35
-        minSdk = 28
+        minSdk = 30
 
         compilations.all {
             compileTaskProvider.configure {
@@ -55,6 +55,7 @@ kotlin {
 
         androidMain.dependencies {
             implementation("app.cash.sqldelight:android-driver:2.0.2")
+            api(project(":waltid-libraries:crypto:waltid-crypto-android"))
         }
 
         iosMain.dependencies {

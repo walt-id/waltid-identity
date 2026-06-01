@@ -111,7 +111,7 @@ val modules = listOfNotNull(
     // CLI
     "$applications:waltid-cli",
 
-    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
+    // ":waltid-applications:waltid-android" — legacy demo, deprecated build syntax
     "$applications:waltid-wallet-demo-android" whenEnabled enableWalletDemoAndroidBuild,
 
     "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,

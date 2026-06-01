@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("waltid.multiplatform.library")
+    id("com.android.kotlin.multiplatform.library")
 }
 
 // Access the version catalog
