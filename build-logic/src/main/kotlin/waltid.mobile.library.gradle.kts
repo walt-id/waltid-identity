@@ -11,30 +11,26 @@ plugins {
     id("com.android.kotlin.multiplatform.library")
 }
 
-val catalogs = extensions.getByType<VersionCatalogsExtension>()
-val identityLibs = catalogs.named("identityLibs")
-val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion.toInt()
-
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
     applyDefaultHierarchyTemplate()
-    jvmToolchain(javaVersion)
+    jvmToolchain(project.javaLibraryVersion)
 
     androidLibrary {
-        compileSdk = 37
-        minSdk = 30
+        compileSdk = WaltidBuildConstants.COMPILE_SDK
+        minSdk = WaltidBuildConstants.MIN_SDK
         compilations.all {
             compileTaskProvider.configure {
                 compilerOptions {
-                    jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
+                    jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
                 }
             }
         }
         packaging {
             resources {
-                excludes += "/META-INF/{AL2.0,LGPL2.1}"
+                excludes += WaltidBuildConstants.META_INF_EXCLUDES
             }
         }
     }
@@ -58,9 +54,5 @@ if (enableIosBuild) {
 
 powerAssert {
     includedSourceSets = listOf("commonTest")
-    functions = listOf(
-        "kotlin.assert", "kotlin.test.assertEquals", "kotlin.test.assertNull",
-        "kotlin.test.assertTrue", "kotlin.test.assertFalse", "kotlin.test.assertContentEquals",
-        "kotlin.require", "kotlin.check"
-    )
+    functions = WaltidBuildConstants.POWER_ASSERT_FUNCTIONS
 }
