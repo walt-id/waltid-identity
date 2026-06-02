@@ -51,8 +51,9 @@ data class TestCase(
                 getPayload()?.items?.any { it.contains("cnf", ignoreCase = true) } == true
 
     val hasSelectiveDisclosure: Boolean
-        get() = description.contains("selective disclosure", ignoreCase = true) ||
-                description.contains("_sd", ignoreCase = true)
+        get() = (description.contains("selective disclosure", ignoreCase = true) ||
+                 description.contains("_sd", ignoreCase = true)) &&
+                !description.contains("without selective disclosure", ignoreCase = true)
 
     val isPseudonym: Boolean
         get() = id.contains("pseudonym", ignoreCase = true) || description.contains("pseudonym", ignoreCase = true)
