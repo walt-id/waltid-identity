@@ -72,7 +72,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
 
         echo("Loading test cases from: ${testCasesFile.absolutePath}")
 
-        val scrapedData = Json.decodeFromString<ScrapedData>(testCasesFile.readText())
+        val scrapedData = loadScrapedData(testCasesFile)
         echo("Loaded ${scrapedData.formats.size} formats")
 
         val effectiveOutputDir = outputDir ?: File(config.output.directory)
@@ -326,7 +326,7 @@ class ValidateCommand : CliktCommand(name = "validate") {
         // Load test cases if provided
         val scrapedData = testCasesFile?.let { file ->
             echo("Loading test cases from: ${file.absolutePath}")
-            Json.decodeFromString<ScrapedData>(file.readText())
+            loadScrapedData(file)
         }
 
         if (scrapedData != null) {
@@ -505,3 +505,12 @@ fun main(args: Array<String>) {
         .subcommands(GenerateCommand(), ListCommand(), ValidateCommand())
         .main(args)
 }
+
+/**
+ * Load ScrapedData from either:
+ * - a directory containing sd-jwt-vc.json, negative.json, iso-mdoc.json (scraped files), or
+ * - a single test-cases.json file (legacy format).
+ */
+fun loadScrapedData(file: java.io.File): ScrapedData =
+    if (file.isDirectory) ScrapedData.loadFromDirectory(file)
+    else Json.decodeFromString<ScrapedData>(file.readText())
