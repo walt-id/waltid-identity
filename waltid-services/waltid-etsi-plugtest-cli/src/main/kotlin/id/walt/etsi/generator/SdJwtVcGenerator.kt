@@ -1,7 +1,6 @@
 package id.walt.etsi.generator
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.etsi.TestCase
 import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -127,7 +126,7 @@ object SdJwtVcGenerator {
             listOf(singleCert)
         }
     }
-    
+
     private fun computeX5tS256(certificatePem: String): String? {
         return try {
             // Extract the first certificate from PEM
@@ -137,18 +136,18 @@ object SdJwtVcGenerator {
                 .replace("\n", "")
                 .replace("\r", "")
                 .trim()
-            
+
             // Decode the base64 certificate to get DER bytes
             val derBytes = Base64.getDecoder().decode(pemContent)
-            
+
             // Parse as X509Certificate to get the encoded form
             val certFactory = CertificateFactory.getInstance("X.509")
             val cert = certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
-            
+
             // Compute SHA-256 hash of the DER-encoded certificate
             val digest = MessageDigest.getInstance("SHA-256")
             val thumbprint = digest.digest(cert.encoded)
-            
+
             // Return as base64url-encoded string (no padding)
             Base64.getUrlEncoder().withoutPadding().encodeToString(thumbprint)
         } catch (e: Exception) {
