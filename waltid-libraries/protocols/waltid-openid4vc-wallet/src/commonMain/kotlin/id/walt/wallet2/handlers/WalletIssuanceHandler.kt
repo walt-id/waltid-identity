@@ -146,7 +146,7 @@ data class RequestTokenRequest(
 data class RequestTokenResult(
     val accessToken: String,
     val cNonce: String?,
-    val expiresIn: Int?
+    val expiresIn: Long?
 )
 
 @Serializable
