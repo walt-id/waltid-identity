@@ -1,7 +1,6 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("org.jetbrains.kotlin.android")
     id("com.android.application")
     kotlin("plugin.compose")
 }
@@ -20,7 +19,6 @@ android {
             excludes += WaltidBuildConstants.META_INF_EXCLUDES
         }
     }
-
     kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))

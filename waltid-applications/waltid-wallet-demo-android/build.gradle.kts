@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     kotlin("plugin.compose")
 }
 
@@ -49,11 +48,11 @@ android {
             excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
-}
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
+        }
     }
 }
 

@@ -1,5 +1,3 @@
-import com.android.build.api.dsl.androidLibrary
-
 plugins {
     id("waltid.android.library")
     id("waltid.publish.maven")
@@ -10,8 +8,6 @@ group = "id.walt.crypto"
 kotlin {
     androidLibrary {
         namespace = group.toString()
-        compileSdk = 34
-        minSdk = 30
 
         withJava()
 
@@ -29,7 +25,7 @@ kotlin {
     sourceSets {
         androidMain.dependencies {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.android)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.oshai.kotlinlogging)
         }
@@ -47,7 +43,6 @@ kotlin {
         }
     }
 }
-
 
 mavenPublishing {
     pom {
