@@ -15,7 +15,7 @@ val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion
 android {
     namespace = project.group.toString()
 
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig { minSdk = 30 }
     compileOptions {
         sourceCompatibility = JavaVersion.toVersion(javaVersion)

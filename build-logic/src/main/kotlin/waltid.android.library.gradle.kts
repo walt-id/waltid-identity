@@ -13,7 +13,7 @@ val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion
 kotlin {
     androidLibrary {
         namespace = project.group.toString()
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 30
 
         withJava()
