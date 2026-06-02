@@ -11,7 +11,6 @@ fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
-    applyDefaultHierarchyTemplate()
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()

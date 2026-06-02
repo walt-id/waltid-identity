@@ -6,30 +6,24 @@ plugins {
     kotlin("plugin.compose")
 }
 
-// Access the version catalog
-val catalogs = extensions.getByType<VersionCatalogsExtension>()
-val identityLibs = catalogs.named("identityLibs")
-val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion.toInt()
-
-// 2. Configure the Android Extension
 android {
     namespace = project.group.toString()
 
-    compileSdk = 37
-    defaultConfig { minSdk = 30 }
+    compileSdk = WaltidBuildConstants.COMPILE_SDK
+    defaultConfig { minSdk = WaltidBuildConstants.MIN_SDK }
     compileOptions {
-        sourceCompatibility = JavaVersion.toVersion(javaVersion)
-        targetCompatibility = JavaVersion.toVersion(javaVersion)
+        sourceCompatibility = JavaVersion.toVersion(project.javaLibraryVersion)
+        targetCompatibility = JavaVersion.toVersion(project.javaLibraryVersion)
     }
     packaging {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += WaltidBuildConstants.META_INF_EXCLUDES
         }
     }
 
     kotlin {
         compilerOptions {
-            jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
+            jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
         }
     }
 }

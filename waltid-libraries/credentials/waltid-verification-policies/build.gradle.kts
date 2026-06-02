@@ -15,7 +15,6 @@ kotlin {
         outputModuleName = "verification-policies"
     }
 
-    applyDefaultHierarchyTemplate()
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()

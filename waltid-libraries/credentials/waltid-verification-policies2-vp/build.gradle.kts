@@ -8,7 +8,6 @@ group = "id.walt.credentials"
 
 
 kotlin {
-    applyDefaultHierarchyTemplate()
 
     sourceSets {
         commonMain.dependencies {

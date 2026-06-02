@@ -39,7 +39,6 @@ kotlin {
         }
     }
 
-    applyDefaultHierarchyTemplate()
 }
 
 tasks.named("jsBrowserTest") {

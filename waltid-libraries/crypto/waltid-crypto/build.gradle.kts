@@ -13,7 +13,6 @@ kotlin {
         outputModuleName = "crypto"
     }
 
-    applyDefaultHierarchyTemplate()
     if(enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()

@@ -1,34 +1,30 @@
 import com.android.build.api.dsl.androidLibrary
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// For new mobile-only modules, prefer waltid.mobile.library instead.
 plugins {
     id("waltid.android.base")
 }
 
-// Access the version catalog
-val catalogs = extensions.getByType<VersionCatalogsExtension>()
-val identityLibs = catalogs.named("identityLibs")
-val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion.toInt()
-
 kotlin {
     androidLibrary {
         namespace = project.group.toString()
-        compileSdk = 37
-        minSdk = 30
+        compileSdk = WaltidBuildConstants.COMPILE_SDK
+        minSdk = WaltidBuildConstants.MIN_SDK
 
         withJava()
 
         compilations.all {
             compileTaskProvider.configure {
                 compilerOptions {
-                    jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
+                    jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
                 }
             }
         }
 
         packaging {
             resources {
-                excludes += "/META-INF/{AL2.0,LGPL2.1}"
+                excludes += WaltidBuildConstants.META_INF_EXCLUDES
             }
         }
     }

@@ -7,7 +7,6 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    applyDefaultHierarchyTemplate()
 
     sourceSets {
         commonMain.dependencies {

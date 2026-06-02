@@ -5,10 +5,8 @@ plugins {
     id("com.github.gmazzo.buildconfig")
 }
 
-val catalogs = extensions.getByType<VersionCatalogsExtension>()
-val identityLibs = catalogs.named("identityLibs")
-val ktorVersion = identityLibs.findVersion("ktor").get().requiredVersion
-val kotlinLoggingVersion = identityLibs.findVersion("kotlinlogging").get().requiredVersion
+val ktorVersion = project.identityCatalog.findVersion("ktor").get().requiredVersion
+val kotlinLoggingVersion = project.identityCatalog.findVersion("kotlinlogging").get().requiredVersion
 
 // Common Ktor Dependencies (if all services use these)
 dependencies {

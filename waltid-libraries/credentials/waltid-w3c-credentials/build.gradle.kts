@@ -9,7 +9,6 @@ fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableIosBuild = getSetting("enableIosBuild")
 
 kotlin {
-    applyDefaultHierarchyTemplate()
     js(IR) {
         outputModuleName.set("w3c-credentials")
     }
