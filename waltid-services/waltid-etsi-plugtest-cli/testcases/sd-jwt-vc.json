@@ -1,0 +1,606 @@
+{
+  "scraped_at": "2026-06-02T03:26:32.909445+00:00",
+  "source": "https://signature-plugtests.etsi.org/testcases/tc_sd-jwt-vc",
+  "sheets": [
+    {
+      "sheetName": "SD-JWT-VC EAA",
+      "testcases": [
+        {
+          "key": "SD-JWT-VC EAA-2",
+          "name": "SJV-EAA-1",
+          "description": "Mandatory elements, without selective disclosures; without key binding; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. given_name\n. family_name",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "given_name",
+            "family_name"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-3",
+          "name": "SJV-EAA-2",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. sub\n. given_name\n. family_name\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-4",
+          "name": "SJV-EAA-3",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-5",
+          "name": "SJV-EAA-4  (pseudonym)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. also_known_as\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "also_known_as",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-6",
+          "name": "SJV-EAA-5  (oneTime)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. oneTime\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "sub",
+            "given_name",
+            "family_name",
+            "oneTime",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-7",
+          "name": "SJV-EAA-6  (ShortLived)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. shortLived\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "sub",
+            "given_name",
+            "family_name",
+            "shortLived",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-8",
+          "name": "SJV-EAA-7",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. iat",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "iat"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC EAA-9",
+          "name": "SJV-EAA-8",
+          "description": "Mandatory elements only, and non-recursive selective disclosures only of JSON Objects",
+          "protectedHeader": [],
+          "payload": []
+        },
+        {
+          "key": "SD-JWT-VC EAA-10",
+          "name": "SJV-EAA-9",
+          "description": "Mandatory elements only, and non-recursive selective disclosures only of JSON Arrays elements",
+          "protectedHeader": [],
+          "payload": []
+        },
+        {
+          "key": "SD-JWT-VC EAA-11",
+          "name": "SJV-EAA-10",
+          "description": "Mandatory elements only, and non-recursive selective disclosures of both JSON Objects and JSON Arrays elements",
+          "protectedHeader": [],
+          "payload": []
+        },
+        {
+          "key": "SD-JWT-VC EAA-12",
+          "name": "SJV-EAA-11",
+          "description": "Mandatory elements only, and recursive selective disclosures only of JSON Objects",
+          "protectedHeader": [],
+          "payload": []
+        },
+        {
+          "key": "SD-JWT-VC EAA-13",
+          "name": "SJV-EAA-12",
+          "description": "Mandatory elements only, and recursive selective disclosures only of JSON Array Elements",
+          "protectedHeader": [],
+          "payload": []
+        },
+        {
+          "key": "SD-JWT-VC EAA-14",
+          "name": "SJV-EAA-13",
+          "description": "Mandatory elements only, and recursive selective disclosures  of both JSON Objects and JSON Array elements",
+          "protectedHeader": [],
+          "payload": []
+        }
+      ]
+    },
+    {
+      "sheetName": "SD-JWT-VC QEAA",
+      "testcases": [
+        {
+          "key": "SD-JWT-VC QEAA-2",
+          "name": "SJV-QEAA-1",
+          "description": "Mandatory elements, without selective disclosures; without key binding; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. iss_reg_id (if applicable and not in Q cert)\n. given_name\n. family_name",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "given_name",
+            "family_name"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC QEAA-3",
+          "name": "SJV-QEAA-2",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC QEAA-4",
+          "name": "SJV-QEAA-3",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC QEAA-5",
+          "name": "SJV-QEAA-4  (pseudonym)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. also_known_as\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "also_known_as",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC QEAA-6",
+          "name": "SJV-QEAA-5  (oneTime)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. oneTime\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "sub",
+            "given_name",
+            "family_name",
+            "oneTime",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC QEAA-7",
+          "name": "SJV-QEAA-6 (ShortLived)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. shortLived\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "sub",
+            "given_name",
+            "family_name",
+            "shortLived",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC QEAA-8",
+          "name": "SJV-QEAA-7",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. iat\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "iat",
+            "status"
+          ]
+        }
+      ]
+    },
+    {
+      "sheetName": "SD-JWT-VC PuB-EAA",
+      "testcases": [
+        {
+          "key": "SD-JWT-VC PuB-EAA-2",
+          "name": "SJV-PuBEAA-1",
+          "description": "Mandatory elements, without selective disclosures; without key binding; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. iss_reg_id (if applicable and not in Q cert)\n. given_name\n. family_name",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "given_name",
+            "family_name"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAA-3",
+          "name": "SJV-PuBEAA-2",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAA-4",
+          "name": "SJV-PuBEAA-3",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAA-5",
+          "name": "SJV-PuBEAA-4  (pseudonym)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. also_known_as\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "also_known_as",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAA-6",
+          "name": "SJV-PuBEAA-5  (oneTime)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. oneTime\n. cnf with jwk component\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "sub",
+            "given_name",
+            "family_name",
+            "oneTime",
+            "cnf (contains a jwk element)",
+            "status"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAA-7",
+          "name": "SJV-PuBEAA-6  (ShortLived)",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. shortLived\n. cnf with jwk component",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "category (as byTS 119 472-1)",
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority (if NOT in the qualified certificate)",
+            "iss_reg_id (if applicable and NOT in the qualified certificate)",
+            "issuing_country",
+            "sub",
+            "given_name",
+            "family_name",
+            "shortLived",
+            "cnf (contains a jwk element)"
+          ]
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAA-8",
+          "name": "SJV-PuBEAA-7",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\n. signing certificate in x5c.\n. iss\n. issuing_authority\n. issuing_country\n. iss_reg_id (if applicable and not in Q cert)\n. sub\n. given_name\n. family_name\n. cnf with jwk component\n. iat\n. status",
+          "protectedHeader": [
+            "x5c",
+            "typ (=dc+sd-jwt)",
+            "alg",
+            "x5u",
+            "x5t#S256"
+          ],
+          "payload": [
+            "vct",
+            "vct#integrity",
+            "nbf",
+            "exp",
+            "iss",
+            "issuing_authority",
+            "issuing_country",
+            "iss_reg_id",
+            "sub",
+            "given_name",
+            "family_name",
+            "cnf (contains a jwk element)",
+            "iat",
+            "status"
+          ]
+        }
+      ]
+    }
+  ]
+}
