@@ -495,6 +495,16 @@ object CredentialValidator {
 
                 // A conformant mdoc MUST be parseable as Document, DeviceResponse, or IssuerSigned.
                 // Parse failure means non-conformant structure → INVALID (not INDETERMINATE).
+                val errorMsg = issuerSignedError.message ?: ""
+                val friendlyError = when {
+                    // digestID > 2^31 violates ISO 18013-5 §9.1.2.4 "The value shall be smaller than 2^31"
+                    errorMsg.contains("not within the range for type Int") -> {
+                        val numMatch = Regex("Decoded number (\\d+)").find(errorMsg)
+                        val num = numMatch?.groupValues?.get(1) ?: "unknown"
+                        "digestID value $num exceeds maximum allowed value 2^31-1 (ISO 18013-5 §9.1.2.4: digestID SHALL be smaller than 2^31)"
+                    }
+                    else -> "Failed to parse mdoc. Tried Document, DeviceResponse, and IssuerSigned formats. IssuerSigned error: $errorMsg"
+                }
                 ValidationResult(
                     vendorId = vendorFile.vendorId,
                     fileName = vendorFile.fileName,
@@ -503,7 +513,7 @@ object CredentialValidator {
                     verifiedAt = verifiedAt,
                     hash = hash,
                     details = "Structure: $structureInfo",
-                    errorMessage = "Failed to parse mdoc. Tried Document, DeviceResponse, and IssuerSigned formats. IssuerSigned error: ${issuerSignedError.message}"
+                    errorMessage = friendlyError
                 )
             }
         }
