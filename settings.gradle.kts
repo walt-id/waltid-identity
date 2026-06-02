@@ -126,8 +126,7 @@ pluginManagement {
     includeBuild("build-logic")
 
     plugins {
-        id("com.android.application") version "8.12.3"
-        id("org.jetbrains.kotlin.android") version "2.3.20"
+        id("com.android.application") version "9.2.1"
         id("org.jetbrains.kotlin.multiplatform") version "2.3.20"
         id("org.jetbrains.kotlin.native.cocoapods") version "2.3.20"
         id("org.jetbrains.kotlin.plugin.compose") version "2.3.20"
