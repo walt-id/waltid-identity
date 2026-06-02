@@ -93,7 +93,8 @@ object SdJwtVcGenerator {
 
         return SdJwtGenerationResult(
             testCaseId = testCase.id,
-            sdJwtVc = sdJwt.toString(),
+            // RFC 9901 §4: SD-JWT serialization always ends with ~ (trailing tilde required)
+            sdJwtVc = sdJwt.toString(formatForPresentation = true),
             payload = payload,
             header = headerJson
         )
