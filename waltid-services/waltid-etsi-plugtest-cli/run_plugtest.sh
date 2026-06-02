@@ -91,7 +91,7 @@ mkdir -p "$CREDS_DIR" "$REPORTS_DIR"
 # ── Step 1: Clean ─────────────────────────────────────────────────────────────
 echo ""
 echo "==> Step 1: Cleaning old credentials..."
-rm -f "$CREDS_DIR"/*
+find "$CREDS_DIR" -maxdepth 1 -type f -delete
 echo "    Cleaned $CREDS_DIR"
 
 # ── Step 2: Issue credentials ─────────────────────────────────────────────────
@@ -126,8 +126,8 @@ mkdir -p "$SELF_REPORTS_DIR"
     --output     "$SELF_REPORTS_DIR"
 rm -f "$SELF_ZIP"
 
-SELF_VALID=$(grep -rl '<VALID>'   "$SELF_REPORTS_DIR" | wc -l)
-SELF_INVALID=$(grep -rl '<INVALID>' "$SELF_REPORTS_DIR" | wc -l)
+SELF_VALID=$(grep -rl '<VALID>'   "$SELF_REPORTS_DIR" 2>/dev/null | wc -l || true)
+SELF_INVALID=$(grep -rl '<INVALID>' "$SELF_REPORTS_DIR" 2>/dev/null | wc -l || true)
 echo "    Self-verify: $SELF_VALID VALID, $SELF_INVALID INVALID"
 if [[ "$SELF_INVALID" -gt 0 ]]; then
     echo "    WARNING: $SELF_INVALID of our own credentials failed self-verification!" >&2
@@ -146,9 +146,9 @@ mkdir -p "$VENDOR_REPORTS_DIR"
     --output     "$VENDOR_REPORTS_DIR"
 
 TOTAL=$(ls "$VENDOR_REPORTS_DIR" | wc -l)
-VALID=$(grep -rl '<VALID>'         "$VENDOR_REPORTS_DIR" | wc -l)
-INVALID=$(grep -rl '<INVALID>'     "$VENDOR_REPORTS_DIR" | wc -l)
-INDET=$(grep -rl '<INDETERMINATE>' "$VENDOR_REPORTS_DIR" | wc -l)
+VALID=$(grep -rl '<VALID>'         "$VENDOR_REPORTS_DIR" 2>/dev/null | wc -l || true)
+INVALID=$(grep -rl '<INVALID>'     "$VENDOR_REPORTS_DIR" 2>/dev/null | wc -l || true)
+INDET=$(grep -rl '<INDETERMINATE>' "$VENDOR_REPORTS_DIR" 2>/dev/null | wc -l || true)
 echo "    $TOTAL reports: $VALID VALID, $INVALID INVALID, $INDET INDETERMINATE"
 
 # ── Step 5: Build upload zip ──────────────────────────────────────────────────
