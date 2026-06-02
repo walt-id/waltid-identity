@@ -49,6 +49,9 @@ kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
 tink = "1.21.0"
 
+# Persistence
+sqldelight = "2.0.2"
+
 # Testing
 junit-jupiter = "6.0.3"
 mokkery = "3.3.0"
@@ -187,6 +190,13 @@ clikt-markdown = { module = "com.github.ajalt.clikt:clikt-markdown", version.ref
 optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.4" }
 jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "3.0.2" }
 
+## Persistence
+sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
+sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", version.ref = "sqldelight" }
+
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
 
@@ -224,3 +234,4 @@ ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
 versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
 license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
