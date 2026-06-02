@@ -10,6 +10,7 @@ import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.dataUsingEncoding
 import id.walt.sdjwt.HMACJWTCryptoProvider
+import id.walt.sdjwt.ObjectPropertyDisclosure
 import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDMapBuilder
@@ -57,7 +58,7 @@ class SDJwtTestIOS {
         assertEquals(expected = 1, actual = sdJwt.disclosures.size)
         assertEquals(
             expected = "sub",
-            actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key
+            actual = (sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!! as ObjectPropertyDisclosure).key
         )
         assertEquals(expected = originalClaimsSet, actual = Json.parseToJsonElement(sdJwt.fullPayload.toString()).jsonObject)
 

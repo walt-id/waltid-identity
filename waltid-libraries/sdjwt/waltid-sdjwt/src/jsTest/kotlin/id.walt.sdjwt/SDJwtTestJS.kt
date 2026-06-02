@@ -43,7 +43,7 @@ class SDJwtTestJS {
         assertEquals(expected = 1, actual = sdJwt.disclosures.size)
         assertEquals(
             expected = "sub",
-            actual = sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!!.key
+            actual = (sdJwt.digestedDisclosures[sdJwt.undisclosedPayload[SDJwt.DIGESTS_KEY]!!.jsonArray[0].jsonPrimitive.content]!! as ObjectPropertyDisclosure).key
         )
         println("BLA")
         assertEquals(expected = Json.parseToJsonElement(JSON.stringify(originalClaimsSet)).jsonObject, actual = sdJwt.fullPayload)

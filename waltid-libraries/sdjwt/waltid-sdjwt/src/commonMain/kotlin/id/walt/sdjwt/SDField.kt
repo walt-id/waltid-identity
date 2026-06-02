@@ -12,7 +12,11 @@ private val log = KotlinLogging.logger { }
  * Selective disclosure information for a given payload field
  * @param sd          **Issuance:** field is made selectively disclosable if *true*, **Presentation:** field should be _disclosed_ if *true*, or _undisclosed_ if *false*
  * @param children    Not null, if field is an object. Contains SDMap for the properties of the object
+ * @param arrayChildren  Not null, if field is an array whose elements are selectively disclosable.
+ *                       Contains [SDArray] describing the per-index settings.
+ *                       Mutually exclusive with [children].
  * @see SDMap
+ * @see SDArray
  */
 @Suppress("NON_EXPORTABLE_TYPE")
 @OptIn(ExperimentalJsExport::class)
@@ -21,7 +25,13 @@ private val log = KotlinLogging.logger { }
 data class SDField(
     val sd: Boolean,
     val children: SDMap? = null,
+    val arrayChildren: SDArray? = null,
 ) {
+    init {
+        require(children == null || arrayChildren == null) {
+            "SDField cannot have both children (object) and arrayChildren (array) set"
+        }
+    }
 
     @JsExport.Ignore
     fun toJSON(): JsonObject {
@@ -29,6 +39,9 @@ data class SDField(
             put("sd", sd)
             children?.also {
                 put("children", it.toJSON())
+            }
+            arrayChildren?.also {
+                put("arrayChildren", it.toJSON())
             }
         }
     }
@@ -47,7 +60,14 @@ data class SDField(
                         is JsonNull -> null
                         else -> error("Error parsing SDField.children from JSON element")
                     }
-                }
+                },
+                arrayChildren = json.jsonObject["arrayChildren"]?.let { arrayChildren ->
+                    when (arrayChildren) {
+                        is JsonObject -> SDArray.fromJSON(arrayChildren)
+                        is JsonNull -> null
+                        else -> error("Error parsing SDField.arrayChildren from JSON element")
+                    }
+                },
             )
         }
     }
