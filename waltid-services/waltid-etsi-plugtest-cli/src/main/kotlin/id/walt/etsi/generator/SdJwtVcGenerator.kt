@@ -201,12 +201,14 @@ object SdJwtVcGenerator {
 
             // ETSI TS 119 472-1: category claim is required for QEAA and PuBEAA SD-JWT VCs
             val testCaseUpper = testCase.id.uppercase()
+            val isQeaa   = testCaseUpper.contains("QEAA")
+            val isPubEaa = testCaseUpper.contains("PUBEAA")
             when {
-                testCaseUpper.contains("QEAA") -> {
+                isQeaa -> {
                     put("category", "urn:etsi:esi:eaa:eu:qualified")
                     existingKeys.add("category")
                 }
-                testCaseUpper.contains("PUBEAA") -> {
+                isPubEaa -> {
                     put("category", "urn:etsi:esi:eaa:eu:pub")
                     existingKeys.add("category")
                 }
@@ -270,6 +272,18 @@ object SdJwtVcGenerator {
             if (testCase.isShortLived) {
                 // EAA-5.2.12-02: shortLived SHALL have the null JSON primitive type
                 put("shortLived", JsonNull)
+            }
+
+            // QEAA-5.2.10.2-01 / PuB-EAA-5.2.10.3-01: QEAA/PuBEAA SHALL include status when shortLived is absent.
+            // Add a minimal valid status object if neither status nor shortLived is present.
+            if ((isQeaa || isPubEaa) && !existingKeys.contains("status") && !existingKeys.contains("shortLived") && !testCase.isShortLived) {
+                putJsonObject("status") {
+                    put("type", "TokenStatusList")
+                    put("purpose", "revocation")
+                    put("index", 0)
+                    put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt")
+                }
+                existingKeys.add("status")
             }
         }
     }
