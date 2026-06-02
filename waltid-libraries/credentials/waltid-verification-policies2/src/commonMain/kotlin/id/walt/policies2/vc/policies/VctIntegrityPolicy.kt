@@ -1,11 +1,10 @@
 package id.walt.policies2.vc.policies
 
 import id.walt.credentials.formats.DigitalCredential
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.ShaUtils
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -47,7 +46,9 @@ class VctIntegrityPolicy(
 
     companion object {
         private val log = KotlinLogging.logger {}
-        private val SUPPORTED_PREFIXES = listOf("sha256-", "sha384-", "sha512-")    }
+        private val SUPPORTED_PREFIXES = listOf("sha256-", "sha384-", "sha512-")
+        private val fetcher = WebDataFetcher(WebDataFetcherId.VCT_INTEGRITY_POLICY)
+    }
 
     override suspend fun verify(
         credential: DigitalCredential,
@@ -143,14 +144,8 @@ class VctIntegrityPolicy(
     }
 
     /** Fetches the Type Metadata JSON document from the given vct URL. */
-    private suspend fun fetchTypeMetadata(vct: String): ByteArray {
-        val client = HttpClient()
-        return try {
-            client.get(vct).readRawBytes()
-        } finally {
-            client.close()
-        }
-    }
+    private suspend fun fetchTypeMetadata(vct: String): ByteArray =
+        fetcher.rawFetch(vct).readRawBytes()
 
     private fun computeHash(prefix: String, bytes: ByteArray): String = when (prefix) {
         // encodeToBase64Url is from id.walt.crypto.utils.Base64Utils (multiplatform, already imported)
