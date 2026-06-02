@@ -146,6 +146,14 @@ else
 fi
 
 log "TEST" "Running $TEST_CLASS"
+# Android 16+ (targetSdk 37) requires ACCESS_LOCAL_NETWORK for emulator 10.0.2.2 connections.
+# Pre-install the APK so we can grant the runtime permission before connectedAndroidTest runs.
+"$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" :waltid-applications:waltid-wallet-demo-android:installDebug --no-configuration-cache \
+  -Pattestation.baseUrl="${ATTESTATION_BASE_URL:-}" \
+  -Pattestation.attesterPath="${ATTESTER_PATH:-}" \
+  -Pattestation.bearerToken="${TOKEN:-}" \
+  -Pattestation.hostHeader="${ATTESTATION_HOST_HEADER:-}"
+adb shell pm grant id.walt.walletdemo android.permission.ACCESS_LOCAL_NETWORK 2>/dev/null || true
 "$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" "${GRADLE_ARGS[@]}"
 
 log "DONE" "Local enterprise instrumented E2E completed (attested=$ATTESTED)"
