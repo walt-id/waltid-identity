@@ -3,14 +3,11 @@ package id.walt.did.dids.resolver
 import id.walt.crypto.keys.Key
 import id.walt.did.utils.KeyMaterial
 import id.walt.did.utils.VerificationMaterial
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.TimeoutConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -19,6 +16,7 @@ import love.forte.plugin.suspendtrans.annotation.JvmAsync
 import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
+import kotlin.time.Duration.Companion.seconds
 
 private val log = KotlinLogging.logger { }
 
@@ -41,14 +39,12 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
     @JsExport.Ignore
     override suspend fun getSupportedMethods() = runCatching { lazyOf(getMethods()).value }
 
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 30 * 1000
-        }
-    }
+    private val fetcher = WebDataFetcher(
+        id = "did-uniresolver",
+        defaultConfiguration = WebDataFetchingConfiguration(
+            timeouts = TimeoutConfiguration(requestTimeout = 30.seconds)
+        )
+    )
 
     @JvmBlocking
     @JvmAsync
@@ -56,14 +52,7 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
     @JsExport.Ignore
     override suspend fun resolve(did: String): Result<JsonObject> =
         runCatching {
-            http.get("$resolverUrl/identifiers/$did")
-        }.map { response ->
-            runCatching { response.body<JsonObject>() }.getOrElse {
-                throw RuntimeException(
-                    "HTTP response (status ${response.status}) for resolving did $did is not JSON, body: ${response.bodyAsText()}",
-                    it
-                )
-            }
+            fetcher.fetch<JsonObject>("$resolverUrl/identifiers/$did").body
         }
 
     @JvmBlocking
@@ -98,13 +87,12 @@ class UniresolverResolver(var resolverUrl: String = DEFAULT_RESOLVER_URL) : DidR
     )
 
     private suspend fun getMethods(): Set<String> =
-        http.get("$resolverUrl/methods") { }
-            .body<JsonArray>()
+        fetcher.fetch<JsonArray>("$resolverUrl/methods").body
             .map { it.jsonPrimitive.content }
             .toSet()
 
     private suspend fun scrapeMethods(): List<String> =
-        http.get("https://raw.githubusercontent.com/decentralized-identity/universal-resolver/main/README.md")
+        fetcher.rawFetch("https://raw.githubusercontent.com/decentralized-identity/universal-resolver/main/README.md")
             .bodyAsText().lines()
             .filter { it.trim().startsWith("| [") }
             .map { it.removePrefix("| [").substringBefore("]").removePrefix("did-") }

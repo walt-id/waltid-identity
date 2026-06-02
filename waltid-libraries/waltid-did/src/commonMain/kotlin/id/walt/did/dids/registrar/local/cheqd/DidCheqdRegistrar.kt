@@ -14,15 +14,14 @@ import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobDeactivateRe
 import id.walt.did.dids.registrar.local.cheqd.models.job.request.JobSignRequest
 import id.walt.did.dids.registrar.local.cheqd.models.job.response.JobActionResponse
 import id.walt.did.dids.registrar.local.cheqd.models.job.response.didresponse.DidGetResponse
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.LoggingConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.encodeToJsonElement
@@ -57,15 +56,14 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         explicitNulls = false
     }
 
-    //TODO: inject
-    private val client = HttpClient {
-        install(ContentNegotiation) {
-            json(json)
-        }
-        install(Logging) {
-            level = LogLevel.BODY
-        }
-    }
+    // Responses are decoded manually with the custom [json] (sealed DidState module), so the
+    // fetcher is used only as the transport layer (raw fetch). The engine is selected per-platform.
+    private val fetcher = WebDataFetcher(
+        id = "did-cheqd-registrar",
+        defaultConfiguration = WebDataFetchingConfiguration(
+            logging = LoggingConfiguration(enable = true, level = LogLevel.BODY)
+        )
+    )
 
     @JvmBlocking
     @JvmAsync
@@ -89,7 +87,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         // step#0. get public key hex
         val pubKeyHex = key.getPublicKeyRepresentation().toHexString()
         // step#1. fetch the did document from cheqd registrar
-        val response = client.get(
+        val response = fetcher.rawFetch(
             "$registrarUrl/$registrarApiVersion/did-document" +
                     "?verificationMethod=$verificationMethod" +
                     "&methodSpecificIdAlgo=$methodSpecificIdAlgo" +
@@ -131,7 +129,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
     }
 
     private suspend fun initiateDidJob(url: String, body: JsonElement): JobActionResponse =
-        client.post(url) {
+        fetcher.rawFetch(url) {
             contentType(ContentType.Application.Json)
             setBody(body)
         }.bodyAsText().let {
@@ -140,7 +138,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         }
 
     private suspend fun finalizeDidJob(url: String, jobId: String, verificationMethodId: String, signatures: List<String>) = let {
-        client.post(url) {
+        fetcher.rawFetch(url) {
             contentType(ContentType.Application.Json)
             setBody(
                 JobSignRequest(
@@ -152,7 +150,7 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
                     })
                 )
             )
-        }.body<JobActionResponse>()
+        }.bodyAsText().let { json.decodeFromString<JobActionResponse>(it) }
     }
 
     private suspend fun signPayload(key: Key, job: JobActionResponse): List<String> = let {

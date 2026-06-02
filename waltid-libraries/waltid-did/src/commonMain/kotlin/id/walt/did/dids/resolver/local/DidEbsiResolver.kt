@@ -4,7 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.document.DidEbsiDocument
-import io.ktor.client.*
+import id.walt.webdatafetching.WebDataFetcher
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -21,7 +21,7 @@ import kotlin.js.JsExport
 @OptIn(ExperimentalJsExport::class)
 @JsExport
 class DidEbsiResolver(
-    private val client: HttpClient,
+    private val fetcher: WebDataFetcher,
 ) : LocalResolverMethod("ebsi") {
 
     private val didConformanceRegistryUrlBaseURL = "https://api-conformance.ebsi.eu/did-registry/v5/identifiers/"
@@ -36,7 +36,7 @@ class DidEbsiResolver(
     }
 
     private suspend fun resolveDid(did: String): DidDocument {
-        val responseConformance = client.get(didConformanceRegistryUrlBaseURL + did) {
+        val responseConformance = fetcher.rawFetch(didConformanceRegistryUrlBaseURL + did) {
             headers {
                 append(ContentType, "application/did+json")
                 append(HttpHeaders.Accept, "application/did+json")
@@ -47,7 +47,7 @@ class DidEbsiResolver(
             return docConformance
         }
 
-        val responsePilot = client.get(didPilotRegistryUrlBaseURL + did) {
+        val responsePilot = fetcher.rawFetch(didPilotRegistryUrlBaseURL + did) {
             headers {
                 append(ContentType, "application/did+json")
                 append(HttpHeaders.Accept, "application/did+json")
