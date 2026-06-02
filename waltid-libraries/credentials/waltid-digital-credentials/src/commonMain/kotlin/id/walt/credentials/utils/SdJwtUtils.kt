@@ -38,6 +38,39 @@ object SdJwtUtils {
     fun Map<String, Set<String>>.dropDollarPrefix() =
         mapKeys { it.key.removePrefix("$.") }
 
+    /**
+     * Normalises a disclosure location path into a clean relative dot-path.
+     *
+     * Removes the JSONPath root prefix (`$.` / `$`), a trailing `_sd` segment, and any
+     * leading/trailing/duplicate `.` separators. For example:
+     *   - `$._sd`                              -> ``        (root)
+     *   - `$.credentialSubject.degree._sd`     -> `credentialSubject.degree`
+     *   - `$.vc.`                              -> `vc`
+     */
+    fun normalizeDisclosureLocation(path: String): String =
+        path.removePrefix("$")
+            .removePrefix(".")
+            .removeSuffix("_sd")
+            .trim('.')
+            .split('.')
+            .filter { it.isNotEmpty() }
+            .joinToString(".")
+
+    /**
+     * Joins a parent location with a child segment (a claim name or an array index token like
+     * `[0]`), producing a clean dot-path without leading/duplicate dots. Array index tokens are
+     * appended without a separating dot.
+     */
+    fun joinDisclosureLocation(parent: String, child: String): String {
+        val normalizedParent = normalizeDisclosureLocation(parent)
+        return when {
+            child.startsWith("[") -> normalizedParent + child
+            normalizedParent.isEmpty() -> child
+            else -> "$normalizedParent.$child"
+        }
+    }
+
+
     // Recursive helper function
     private fun findSdArraysRecursive(
         element: JsonElement,

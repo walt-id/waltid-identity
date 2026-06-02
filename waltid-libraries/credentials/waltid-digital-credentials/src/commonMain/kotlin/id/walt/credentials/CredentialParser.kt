@@ -20,6 +20,8 @@ import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
+import id.walt.credentials.utils.SdJwtUtils.joinDisclosureLocation
+import id.walt.credentials.utils.SdJwtUtils.normalizeDisclosureLocation
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -252,7 +254,7 @@ object CredentialParser {
 
             // 1. Initial population from the main payload
             containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
-                val loc = sdLocation.removeSuffix("_sd")
+                val loc = normalizeDisclosureLocation(sdLocation)
                 disclosureHashes.forEach { hash -> hashesToVerify.add(loc to hash) }
             }
 
@@ -274,7 +276,7 @@ object CredentialParser {
                         }
                         // Recurse into properties
                         element.forEach { (key, value) ->
-                            if (key != "_sd") scanForHashes(value, "$currentPath.$key")
+                            if (key != "_sd") scanForHashes(value, joinDisclosureLocation(currentPath, key))
                         }
                     }
 
@@ -284,11 +286,11 @@ object CredentialParser {
                             if (item is JsonObject && item.size == 1 && item.containsKey("...")) {
                                 val hash = item["..."]?.jsonPrimitive?.content
                                 if (hash != null) {
-                                    hashesToVerify.add("$currentPath[$index]" to hash)
+                                    hashesToVerify.add(joinDisclosureLocation(currentPath, "[$index]") to hash)
                                 }
                             } else {
                                 // Recurse
-                                scanForHashes(item, "$currentPath[$index]")
+                                scanForHashes(item, joinDisclosureLocation(currentPath, "[$index]"))
                             }
                         }
                     }
@@ -305,7 +307,9 @@ object CredentialParser {
                 val matchingDisclosure = findForHash(hash)
                 if (matchingDisclosure != null) {
                     // Construct the location for the *content* of this disclosure first
-                    val newLoc = if (matchingDisclosure.name != null) "$loc.${matchingDisclosure.name}" else loc
+                    val newLoc = if (matchingDisclosure.name != null)
+                        joinDisclosureLocation(loc, matchingDisclosure.name)
+                    else normalizeDisclosureLocation(loc)
 
                     // Create a copy of the disclosure with the populated location
                     val updatedDisclosure = matchingDisclosure.copy(location = newLoc)
