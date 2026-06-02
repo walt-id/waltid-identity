@@ -16,6 +16,9 @@ kotlin {
             // No Ktor server dependency; this library has no concept of HTTP routes.
             implementation(identityLibs.bundles.waltid.ktor.client)
 
+            // Centralised HTTP client creation / configuration (engine, TLS, redirects, logging)
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
+
             // Serialization
             implementation(identityLibs.kotlinx.serialization.json)
 

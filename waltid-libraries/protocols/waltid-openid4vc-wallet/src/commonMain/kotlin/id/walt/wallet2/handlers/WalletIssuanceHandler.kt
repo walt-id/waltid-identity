@@ -14,6 +14,8 @@ import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -244,9 +246,17 @@ object WalletIssuanceHandler {
 
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
 
-    private fun defaultHttpClient() = HttpClient {
-        install(ContentNegotiation) { json(lenientJson) }
-    }
+    /**
+     * Creates the [HttpClient] used for the issuance flow.
+     *
+     * The client is created and configured by [WebDataFetcher] (default Native engine — Java on
+     * JVM, with TLS 1.3 — plus centrally-managed request/logging configuration, including lenient
+     * JSON content negotiation) rather than constructed directly with the platform default engine.
+     * The collaborators ([IssuerMetadataResolver], [CredentialOfferResolver], [TokenRequestBuilder])
+     * and the direct credential/nonce/deferred POST calls continue to consume the raw [HttpClient].
+     */
+    private fun defaultHttpClient(): HttpClient =
+        WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
 
     /**
      * Full pre-authorized-code issuance flow, emitting each stored credential
