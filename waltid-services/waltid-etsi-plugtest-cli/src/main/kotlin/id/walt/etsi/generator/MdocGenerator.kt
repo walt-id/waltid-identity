@@ -32,11 +32,7 @@ object MdocGenerator {
 
     private val defaultValueMappingFunction: (docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement) -> CborElement? =
         { _, _, _, elementValueJson ->
-            if (elementValueJson is JsonPrimitive || elementValueJson is JsonNull) {
-                elementValueJson.jsonToCborElement()
-            } else {
-                elementValueJson.jsonToCborElement()
-            }
+            elementValueJson.jsonToCborElement()
         }
 
     /**
