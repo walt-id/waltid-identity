@@ -2,6 +2,7 @@ package id.walt.etsi.validator
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.JwtBasedSignature
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -11,7 +12,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Base64
 
 /**
  * ETSI TS 119 472-1 specific checks for SD-JWT VC EAAs.
@@ -56,7 +56,7 @@ class EtsiSdJwtVcPolicy {
             val x5cArray = jwtHeader?.get("x5c") as? JsonArray
             val x5cList = x5cArray?.mapNotNull { (it as? JsonPrimitive)?.content }
             if (!x5cList.isNullOrEmpty()) {
-                val certDer = Base64.getDecoder().decode(x5cList[0])
+                val certDer = x5cList[0].decodeFromBase64()
                 val cert = CertificateFactory.getInstance("X.509")
                     .generateCertificate(certDer.inputStream()) as X509Certificate
                 cert.criticalExtensionOIDs.contains(QC_STATEMENTS_OID) ||
@@ -113,7 +113,7 @@ class EtsiSdJwtVcPolicy {
                     val x5cArray = jwtHeader?.get("x5c") as? JsonArray
                     val x5cList = x5cArray?.mapNotNull { (it as? JsonPrimitive)?.content }
                     if (!x5cList.isNullOrEmpty()) {
-                        val certDer = Base64.getDecoder().decode(x5cList[0])
+                        val certDer = x5cList[0].decodeFromBase64()
                         val cert = CertificateFactory.getInstance("X.509")
                             .generateCertificate(certDer.inputStream()) as X509Certificate
                         cert.subjectX500Principal.name.contains("C=")

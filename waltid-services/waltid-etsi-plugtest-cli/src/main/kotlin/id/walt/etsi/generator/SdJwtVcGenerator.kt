@@ -1,15 +1,15 @@
 package id.walt.etsi.generator
 
 import id.walt.crypto.keys.Key
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.ShaUtils
 import id.walt.etsi.TestCase
 import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.*
 import java.io.ByteArrayInputStream
-import java.security.MessageDigest
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
-import java.util.Base64
 
 private val log = KotlinLogging.logger {}
 
@@ -138,18 +138,14 @@ object SdJwtVcGenerator {
                 .trim()
 
             // Decode the base64 certificate to get DER bytes
-            val derBytes = Base64.getDecoder().decode(pemContent)
+            val derBytes = pemContent.decodeFromBase64()
 
             // Parse as X509Certificate to get the encoded form
             val certFactory = CertificateFactory.getInstance("X.509")
             val cert = certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
 
-            // Compute SHA-256 hash of the DER-encoded certificate
-            val digest = MessageDigest.getInstance("SHA-256")
-            val thumbprint = digest.digest(cert.encoded)
-
-            // Return as base64url-encoded string (no padding)
-            Base64.getUrlEncoder().withoutPadding().encodeToString(thumbprint)
+            // Compute SHA-256 hash of the DER-encoded certificate (base64url, no padding)
+            ShaUtils.sha256Base64Url(cert.encoded)
         } catch (e: Exception) {
             log.warn { "Could not compute x5t#S256 thumbprint: ${e.message}" }
             null
@@ -168,11 +164,7 @@ object SdJwtVcGenerator {
         val existingKeys = mutableSetOf<String>()
 
         // Compute vct#integrity as SHA-256 of the VCT URI bytes (base64url, no padding)
-        val vctIntegrity = run {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val hash = digest.digest(vct.toByteArray(Charsets.UTF_8))
-            "sha256-" + Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
-        }
+        val vctIntegrity = "sha256-" + ShaUtils.sha256Base64Url(vct.toByteArray(Charsets.UTF_8))
 
         // Export holder JWK outside buildJsonObject to avoid runBlocking inside coroutine
         val holderJwkString: String? = holderKey?.let {

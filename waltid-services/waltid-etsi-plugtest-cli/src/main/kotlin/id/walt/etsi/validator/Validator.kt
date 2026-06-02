@@ -6,6 +6,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.credentials.UnreachableDisclosuresException
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.matchesBase64Url
+import id.walt.crypto.utils.ShaUtils
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.policies2.vc.SerializableRuntimeException
@@ -20,7 +21,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import java.io.File
-import java.security.MessageDigest
 import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
@@ -545,10 +545,7 @@ object CredentialValidator {
         }
     }
 
-    private fun computeSha1Hash(data: ByteArray): String {
-        val digest = MessageDigest.getInstance("SHA-1")
-        return digest.digest(data).joinToString(":") { "%02X".format(it) }
-    }
+    private fun computeSha1Hash(data: ByteArray): String = ShaUtils.sha1HexColon(data)
 
     private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
 }
