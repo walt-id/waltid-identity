@@ -193,6 +193,12 @@ object SdJwtVcGenerator {
             put("iat", now)
             existingKeys.add("iat")
 
+            // _sd_alg is required when selective disclosure is used (EAA-5.4.1.5-02)
+            if (testCase.hasSelectiveDisclosure) {
+                put("_sd_alg", "sha-256")
+                existingKeys.add("_sd_alg")
+            }
+
             // ETSI TS 119 472-1: category claim is required for QEAA and PuBEAA SD-JWT VCs
             val testCaseUpper = testCase.id.uppercase()
             when {
