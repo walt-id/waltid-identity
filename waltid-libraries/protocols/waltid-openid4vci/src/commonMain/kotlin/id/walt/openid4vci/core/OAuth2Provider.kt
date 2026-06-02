@@ -3,6 +3,7 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequest
@@ -20,10 +21,13 @@ import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.crypto.keys.Key
+import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.tokens.AccessTokenContext
-import id.walt.oid4vc.data.DisplayProperties
+import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.sdjwt.SDMap
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Instant
 
 /**
  * Minimal OAuth2 provider contract scoped to the authorization-code/pre-authorized code grants.
@@ -87,9 +91,13 @@ interface OAuth2Provider {
         credentialData: JsonObject,
         dataMapping: JsonObject? = null,
         selectiveDisclosure: SDMap? = null,
-        x5Chain: List<String>? = null,
-        display: List<DisplayProperties>? = null,
+        x5Chain: List<CertificateDer>? = null,
+        display: List<CredentialDisplay>? = null,
         w3cVersion: String? = null,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>? = null,
+        credentialStatus: Status? = null,
+        validFrom: Instant? = null,
+        validUntil: Instant? = null,
     ): CredentialResponseResult
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
