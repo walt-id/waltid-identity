@@ -29,7 +29,7 @@ set -euo pipefail
 
 MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI="$MODULE_DIR/build/install/waltid-etsi-plugtest-cli/bin/waltid-etsi-plugtest-cli"
-TEST_CASES="$MODULE_DIR/test-cases.json"
+TEST_CASES="$MODULE_DIR/testcases"
 
 # ── Argument parsing ──────────────────────────────────────────────────────────
 DATA_DIR=""
@@ -74,9 +74,11 @@ if [[ -z "$VENDOR_ZIP" ]]; then
 fi
 
 # ── Sanity checks ─────────────────────────────────────────────────────────────
-for f in "$CLI" "$ISSUER_KEY" "$ISSUER_CERT" "$TEST_CASES" "$VENDOR_ZIP"; do
+for f in "$CLI" "$ISSUER_KEY" "$ISSUER_CERT" "$VENDOR_ZIP"; do
     [[ -f "$f" ]] || { echo "ERROR: Required file not found: $f" >&2; exit 1; }
 done
+# TEST_CASES can be a file (test-cases.json) or a directory (testcases/)
+[[ -f "$TEST_CASES" || -d "$TEST_CASES" ]] || { echo "ERROR: Test cases not found: $TEST_CASES" >&2; exit 1; }
 
 echo "Data dir   : $DATA_DIR"
 echo "Output dir : $OUTPUT_DIR"
