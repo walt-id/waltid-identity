@@ -49,6 +49,13 @@ kotlin {
     }
 }
 
+// iOS test binaries cannot link without CocoaPods framework paths (JOSESwift from waltid-target-ios).
+if (enableIosBuild) {
+    tasks.matching { it.name.startsWith("linkDebugTestIos") || it.name.startsWith("linkReleaseTestIos") }.configureEach {
+        enabled = false
+    }
+}
+
 powerAssert {
     includedSourceSets = listOf("commonTest")
     functions = listOf(

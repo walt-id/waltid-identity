@@ -5,6 +5,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.target.ios.keys.Ed25519
+import id.walt.target.ios.keys.JweEncryption
 import id.walt.target.ios.keys.P256
 import id.walt.target.ios.keys.RSA
 import id.walt.target.ios.keys.toNSData
@@ -234,18 +235,18 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         val recipientJwk = _jwkObj.toString()
         val kid = _jwkObj["kid"]?.jsonPrimitive?.content
 
-        val result = id.walt.platform.utils.ios.JWE_Operations.encryptWithPlaintext(
+        val result = JweEncryption.encrypt(
             plaintext.toNSData(),
             recipientJwk,
             encAlg,
             kid
         )
 
-        check(result.success()) {
-            result.errorMessage() ?: "JWE encryption failed"
+        check(result.isSuccess()) {
+            result.error ?: "JWE encryption failed"
         }
 
-        return result.data() ?: error("JWE encryption returned no data")
+        return result.data ?: error("JWE encryption returned no data")
     }
 
     override fun equals(other: Any?): Boolean {
