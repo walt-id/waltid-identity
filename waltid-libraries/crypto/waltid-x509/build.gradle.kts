@@ -11,6 +11,8 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
+    applyDefaultHierarchyTemplate()
+
     js(IR) {
         outputModuleName = "x509"
         nodejs {
