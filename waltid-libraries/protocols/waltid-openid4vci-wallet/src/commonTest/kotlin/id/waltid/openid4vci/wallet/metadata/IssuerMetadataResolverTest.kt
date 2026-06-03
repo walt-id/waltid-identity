@@ -65,7 +65,42 @@ class IssuerMetadataResolverTest {
         assertEquals(issuerUrl, metadata.credentialIssuer)
         assertEquals(1, metadata.credentialConfigurationsSupported?.size)
     }
+    @Test
+    fun testResolveCredentialIssuerMetadataWithIssuerPath() = runTest {
+        val issuerUrl = "https://example.com/openid4vci"
+        val mockResponse = """
+            {
+                "credential_issuer": "$issuerUrl",
+                "credential_endpoint": "$issuerUrl/credential",
+                "credential_configurations_supported": {
+                    "test_id": {
+                        "format": "jwt_vc_json",
+                        "credential_definition": {
+                            "type": ["VerifiableCredential", "TestCredential"]
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
 
+        val client = createMockClient { request ->
+            if (request.url.toString() == "https://example.com/.well-known/openid-credential-issuer/openid4vci") {
+                respond(
+                    content = mockResponse,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val resolver = IssuerMetadataResolver(client)
+        val metadata = resolver.resolveCredentialIssuerMetadata(issuerUrl)
+
+        assertEquals(issuerUrl, metadata.credentialIssuer)
+        assertEquals("$issuerUrl/credential", metadata.credentialEndpoint)
+    }
     @Test
     fun testResolveCredentialIssuerMetadataNotFound() = runTest {
         val client = createMockClient { _ ->
