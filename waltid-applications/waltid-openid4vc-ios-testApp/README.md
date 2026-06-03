@@ -10,9 +10,9 @@
     </a>
     <h2>Status</h2>
     <p align="center">
-        <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
+        <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
         <br/>
-        <em>This project is not actively maintained. Certain features may be outdated or not working as expected.<br />We encourage users to contribute to the project to help keep it up to date.</em>
+        <em>This project is planned for deprecation. Please use <code>waltid-wallet-demo-ios</code> instead.</em>
     </p>
 
 </div>

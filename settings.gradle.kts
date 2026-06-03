@@ -2,7 +2,6 @@
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableAndroidBuild = getSetting("enableAndroidBuild")
-val enableWalletDemoAndroidBuild = getSetting("enableWalletDemoAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
@@ -58,8 +57,8 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
-        "waltid-openid4vc-wallet-persistence" whenEnabled enableWalletDemoAndroidBuild,
-        "waltid-openid4vc-wallet-client" whenEnabled enableWalletDemoAndroidBuild,
+        "waltid-openid4vc-wallet-persistence",
+        "waltid-openid4vc-wallet-client",
         "waltid-openid4vc-wallet-server",
     ),
 
@@ -111,8 +110,8 @@ val modules = listOfNotNull(
     // CLI
     "$applications:waltid-cli",
 
-    // ":waltid-applications:waltid-android" — legacy demo, deprecated build syntax
-    "$applications:waltid-wallet-demo-android" whenEnabled enableWalletDemoAndroidBuild,
+    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-android" whenEnabled enableAndroidBuild,
 
     "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
     "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild,
