@@ -113,6 +113,10 @@ okio = "3.17.0"
 # Misc
 clikt = "5.1.0"
 
+# a-sit-plus signum (mobile crypto)
+signum = "3.23.0"
+supreme = "0.13.0"
+
 [libraries]
 
 # Plugins
@@ -319,6 +323,11 @@ mina-core = { module = "org.apache.mina:mina-core", version.ref = "mina-core" }
 commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
 onetime = { module = "com.atlassian:onetime", version.ref = "onetime" }
 kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
+
+## a-sit-plus signum (mobile crypto)
+signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
+signum-indispensable-josef = { module = "at.asitplus.signum:indispensable-josef", version.ref = "signum" }
+signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "supreme" }
 
 [bundles]
 waltid-ktor-client = [

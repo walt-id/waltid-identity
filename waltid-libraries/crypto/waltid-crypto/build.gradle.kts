@@ -86,9 +86,17 @@ kotlin {
 
         if (enableIosBuild) {
             iosMain.dependencies {
-                implementation(project(":waltid-libraries:crypto:waltid-target-ios"))
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.indispensable.josef)
+                implementation(identityLibs.signum.supreme)
             }
-            iosTest.dependencies {}
+            iosTest.dependencies {
+                implementation(kotlin("test"))
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.indispensable.josef)
+                implementation(identityLibs.signum.supreme)
+                implementation(identityLibs.kotlinx.coroutines.test)
+            }
         }
     }
 }

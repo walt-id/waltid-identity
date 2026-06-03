@@ -31,11 +31,8 @@ kotlin {
                 api(project(":waltid-libraries:crypto:waltid-crypto-android"))
             }
         }
-        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
-            iosMain.dependencies {
-                api(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation(identityLibs.sqldelight.native.driver)
-            }
+        iosMain.dependencies {
+            implementation(identityLibs.sqldelight.native.driver)
         }
     }
 }
