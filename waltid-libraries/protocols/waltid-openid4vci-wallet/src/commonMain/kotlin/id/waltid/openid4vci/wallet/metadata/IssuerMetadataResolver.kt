@@ -130,8 +130,9 @@ class IssuerMetadataResolver(
                     continue
                 }
             } else {
+                val errorBody = response.bodyAsText()
                 log.debug { "Failed to fetch authorization server metadata from $metadataUrl. Status: ${response.status}" }
-                log.trace { "Error body: $response" }
+                log.trace { "Error body: $errorBody" }
             }
         }
 
@@ -173,8 +174,9 @@ class IssuerMetadataResolver(
                     continue
                 }
             } else {
+                val errorBody = response.bodyAsText()
                 log.debug { "Failed to fetch OpenID provider metadata from $metadataUrl. Status: ${response.status}" }
-                log.trace { "Error body: $response" }
+                log.trace { "Error body: $errorBody" }
             }
         }
 
