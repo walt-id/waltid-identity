@@ -78,9 +78,9 @@ curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS
   || err "ngrok domain not reachable: https://$HOST_ALIAS_DOMAIN"
 
 if [ "$IS_EMULATOR" = true ]; then
-  grep -q 'android:usesCleartextTraffic=\"true\"' \
-    "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" \
-    || err "Missing android:usesCleartextTraffic in AndroidManifest.xml (needed for emulator local-enterprise E2E)"
+  grep -q 'cleartextTrafficPermitted=\"true\"' \
+    "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/debug/res/xml/network_security_config.xml" \
+    || err "Missing cleartext permission in debug network_security_config.xml (needed for emulator local-enterprise E2E)"
 fi
 
 # Verifier response_uri resolves to localhost:7500 for the emulator path.
