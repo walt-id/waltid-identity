@@ -7,6 +7,5 @@ target 'iosApp' do
 
   # Pods for iosApp
   pod 'shared', :path => '../shared'
-  pod 'JOSESwift', '3.0.0'
 
 end

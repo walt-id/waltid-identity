@@ -62,6 +62,10 @@ okio = "3.17.0"
 # Misc
 clikt = "5.1.0"
 
+# a-sit-plus signum (mobile crypto)
+signum = "3.23.0"
+supreme = "0.13.0"
+
 [libraries]
 
 # Plugins
@@ -200,6 +204,11 @@ sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", versi
 
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
+
+## a-sit-plus signum (mobile crypto)
+signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
+signum-indispensable-josef = { module = "at.asitplus.signum:indispensable-josef", version.ref = "signum" }
+signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "supreme" }
 
 [bundles]
 waltid-ktor-client = [

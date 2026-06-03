@@ -32,14 +32,6 @@ kotlin {
     }
 }
 
-// iOS test binaries cannot link without CocoaPods framework paths (JOSESwift from waltid-target-ios).
-// iOS source compilation still runs, verifying correctness; only test linking/execution is disabled.
-if (enableIosBuild) {
-    tasks.matching { it.name.startsWith("linkDebugTestIos") || it.name.startsWith("linkReleaseTestIos") }.configureEach {
-        enabled = false
-    }
-}
-
 suspendTransformPlugin {
     enabled = true
     includeRuntime = true
