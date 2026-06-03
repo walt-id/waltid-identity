@@ -3,12 +3,16 @@ package id.walt.issuer2.service
 import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.sdjwt.SDField
+import id.walt.sdjwt.SDMap
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -25,17 +29,15 @@ class CredentialProfileServiceTest {
                     mapping = buildJsonObject {
                         put("id", "<uuid>")
                     },
-                    selectiveDisclosure = buildJsonObject {
-                        put("credentialSubject", true)
-                    },
+                    selectiveDisclosure = SDMap(
+                        mapOf("credentialSubject" to SDField(sd = true))
+                    ),
                     idTokenClaimsMapping = mapOf(
                         "sub" to "$.credentialSubject.id",
                         "given_name" to "$.credentialSubject.givenName",
                     ),
-                    mdocNamespacesDataMapping = mapOf(
-                        "org.iso.18013.5.1" to buildJsonObject {
-                            put("entriesConfigMap", JsonObject(emptyMap()))
-                        },
+                    mDocNameSpacesDataMappingConfig = mapOf(
+                        "org.iso.18013.5.1" to JsonObjectToCborMappingConfig(emptyMap()),
                     ),
                     x5Chain = listOf("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"),
                     webhookUrl = "https://issuer.example/webhook",
@@ -55,7 +57,7 @@ class CredentialProfileServiceTest {
         assertNotNull(profile.mapping)
         assertNotNull(profile.selectiveDisclosure)
         assertEquals("$.credentialSubject.id", profile.idTokenClaimsMapping?.get("sub"))
-        assertEquals(setOf("org.iso.18013.5.1"), profile.mdocNamespacesDataMapping?.keys)
+        assertEquals(setOf("org.iso.18013.5.1"), profile.mDocNameSpacesDataMappingConfig?.keys)
         assertEquals(listOf("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"), profile.x5Chain)
         assertEquals("https://issuer.example/webhook", profile.webhookUrl)
     }
@@ -126,11 +128,15 @@ class CredentialProfileServiceTest {
         issuerDid: String? = null,
         credentialData: JsonObject = buildJsonObject {
             put("type", "UniversityDegreeCredential")
+            putJsonObject("credentialSubject") {
+                put("id", "did:example:subject")
+                put("givenName", "Jane")
+            }
         },
         mapping: JsonObject? = null,
-        selectiveDisclosure: JsonObject? = null,
+        selectiveDisclosure: SDMap? = null,
         idTokenClaimsMapping: Map<String, String>? = null,
-        mdocNamespacesDataMapping: Map<String, JsonObject>? = null,
+        mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
         x5Chain: List<String>? = null,
         webhookUrl: String? = null,
     ): CredentialProfileConfig =
@@ -143,7 +149,7 @@ class CredentialProfileServiceTest {
             mapping = mapping,
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
-            mdocNamespacesDataMapping = mdocNamespacesDataMapping,
+            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             x5Chain = x5Chain,
             webhookUrl = webhookUrl,
         )
