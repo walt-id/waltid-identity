@@ -67,7 +67,6 @@ object Issuer2RequestExamples {
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
         runtimeOverrides = CredentialOfferRuntimeOverrides(
-            subjectId = "did:key:z6MkiY...",
             credentialData = buildJsonObject {
                 putJsonObject("credentialSubject") {
                     put("givenName", "Jane")

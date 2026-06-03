@@ -12,7 +12,6 @@ import kotlin.time.Duration.Companion.minutes
 
 @Serializable
 data class CredentialOfferRuntimeOverrides(
-    val subjectId: String? = null,
     val issuerDid: String? = null,
     val credentialData: JsonObject? = null,
     val mapping: JsonObject? = null,

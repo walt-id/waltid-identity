@@ -211,7 +211,6 @@ class Issuer2CredentialOfferEndpointTest {
                 profileId = profile.profileId,
                 authMethod = AuthenticationMethod.AUTHORIZED,
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
-                    subjectId = "did:example:subject",
                     issuerDid = "did:example:issuer-override",
                     credentialData = buildJsonObject {
                         put("given_name", "Jane")
@@ -235,7 +234,6 @@ class Issuer2CredentialOfferEndpointTest {
         // Runtime overrides are offer-scoped; they must be copied into the stored session
         // without changing the configured profile.
         val session = client.getSession(response.offerId)
-        assertEquals("did:example:subject", session.subjectId)
         assertEquals("did:example:issuer-override", session.issuerDid)
         assertEquals("Jane", session.credentialData["given_name"]?.jsonPrimitive?.content)
         assertEquals("<timestamp>", session.mapping?.get("iat")?.jsonPrimitive?.content)

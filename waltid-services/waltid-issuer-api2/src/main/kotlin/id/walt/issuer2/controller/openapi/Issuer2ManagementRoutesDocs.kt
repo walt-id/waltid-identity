@@ -66,7 +66,7 @@ object Issuer2ManagementRoutesDocs {
 
             Supports pre-authorized and authorization-code issuance flows. The offer can be returned
             by reference or by value. Runtime overrides can be applied for one offer only. Supported
-            override fields are: subjectId, issuerDid, credentialData, mapping, selectiveDisclosure,
+            override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and webhookUrl.
             Offer/session expiry is configured with expiresInSeconds. The default is 5 minutes.
             Use -1 for no expiry.

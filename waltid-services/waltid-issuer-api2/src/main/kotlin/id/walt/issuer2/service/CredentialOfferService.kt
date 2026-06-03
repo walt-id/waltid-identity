@@ -43,7 +43,7 @@ class CredentialOfferService(
         var resolvedTxCodeValue: String? = null
         val credentialOffer = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
-                val oauthSession = DefaultSession(subject = overrides?.subjectId ?: sessionId)
+                val oauthSession = DefaultSession(subject = sessionId)
                     .withExpiresAt(TokenType.ACCESS_TOKEN, expiresAt)
                 val preAuthorizedCode = preAuthorizedCodeIssuer.issue(
                     PreAuthorizedCodeIssueRequest(
@@ -52,7 +52,6 @@ class CredentialOfferService(
                         session = oauthSession,
                         scopes = emptySet(),
                         audience = emptySet(),
-                        issuanceSessionId = sessionId,
                     )
                 )
                 resolvedTxCodeValue = preAuthorizedCode.txCodeValue
@@ -84,7 +83,6 @@ class CredentialOfferService(
             profileId = profile.profileId,
             authenticationMethod = request.authMethod,
             credentialConfigurationId = profile.credentialConfigurationId,
-            subjectId = overrides?.subjectId,
             credentialData = credentialData,
             mapping = overrides?.mapping ?: profile.mapping,
             selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,
