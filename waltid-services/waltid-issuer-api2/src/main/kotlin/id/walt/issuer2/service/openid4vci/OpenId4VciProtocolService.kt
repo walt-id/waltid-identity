@@ -21,6 +21,7 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.tokens.AccessTokenContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
@@ -135,8 +136,8 @@ class OpenId4VciProtocolService(
             is CredentialRequestResult.Failure -> return CredentialResponseHttp(
                 status = 400,
                 payload = buildMap {
-                    put("error", result.error.error)
-                    result.error.description?.let { put("error_description", it) }
+                    put("error", JsonPrimitive(result.error.error))
+                    result.error.description?.let { put("error_description", JsonPrimitive(it)) }
                 },
             )
         }
@@ -234,7 +235,7 @@ class OpenId4VciProtocolService(
 
     private fun JsonObject.toParametersMap(): Map<String, List<String>> =
         entries.associate { (key, value) ->
-            key to listOf(if (value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
+            key to listOf(if (value is JsonPrimitive && value.isString) {
                 value.content
             } else {
                 value.toString()
@@ -252,8 +253,8 @@ class OpenId4VciProtocolService(
         CredentialResponseHttp(
             status = 400,
             payload = mapOf(
-                "error" to "invalid_request",
-                "error_description" to description,
+                "error" to JsonPrimitive("invalid_request"),
+                "error_description" to JsonPrimitive(description),
             ),
         )
 }

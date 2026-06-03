@@ -80,7 +80,7 @@ class OpenId4VciController(
                     ?: throw IllegalArgumentException("No bearer access token found")
                 val request = call.receive<JsonObject>()
                 val response = protocolService.processCredentialRequest(accessToken, request)
-                call.respond(HttpStatusCode.fromValue(response.status), response.payload.toJsonElement())
+                call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
         }
     }

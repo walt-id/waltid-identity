@@ -23,7 +23,7 @@ data class IssuedCredential(
 
 data class CredentialResponseHttp(
     val status: Int,
-    val payload: Map<String, Any?>,
+    val payload: Map<String, JsonElement>,
     val headers: Map<String, String> = emptyMap(),
 )
 
