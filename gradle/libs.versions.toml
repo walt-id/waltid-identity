@@ -50,7 +50,7 @@ kotlincrypto-rand = "0.6.0"
 tink = "1.21.0"
 
 # Persistence
-sqldelight = "2.0.2"
+sqldelight = "2.3.2"
 
 # Testing
 junit-jupiter = "6.0.3"
