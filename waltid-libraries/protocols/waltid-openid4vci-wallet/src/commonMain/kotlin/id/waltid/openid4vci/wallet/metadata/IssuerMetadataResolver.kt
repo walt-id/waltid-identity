@@ -46,13 +46,13 @@ class IssuerMetadataResolver(
         if (credentialIssuerUrl.contains("/v2/") && credentialIssuerUrl.contains("/issuer-service-api/openid4vci")) {
             val url = Url(credentialIssuerUrl)
             val path = url.encodedPath
-            urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$CREDENTIAL_ISSUER_WELL_KNOWN_PATH$path")
+            urlsToTry.add("${url.protocol.name}://${url.hostWithPortIfSpecified}$CREDENTIAL_ISSUER_WELL_KNOWN_PATH$path")
         }
 
         if (credentialIssuerUrl.contains(CREDENTIAL_ISSUER_WELL_KNOWN_PATH)) {
             urlsToTry.add(credentialIssuerUrl)
         } else {
-            urlsToTry.add(buildMetadataUrl(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
+            urlsToTry.addAll(buildMetadataUrls(credentialIssuerUrl, CREDENTIAL_ISSUER_WELL_KNOWN_PATH))
         }
         
         if (!credentialIssuerUrl.contains("/openid4vci/")) {
@@ -127,13 +127,13 @@ class IssuerMetadataResolver(
         if (authorizationServerUrl.contains("/v2/") && authorizationServerUrl.contains("/issuer-service-api/openid4vci")) {
             val url = Url(authorizationServerUrl)
             val path = url.encodedPath
-            urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH$path")
+            urlsToTry.add("${url.protocol.name}://${url.hostWithPortIfSpecified}$OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH$path")
         }
 
         if (authorizationServerUrl.contains(OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH)) {
             urlsToTry.add(authorizationServerUrl)
         } else {
-            urlsToTry.add(buildMetadataUrl(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))
+            urlsToTry.addAll(buildMetadataUrls(authorizationServerUrl, OAUTH_AUTHORIZATION_SERVER_WELL_KNOWN_PATH))
         }
 
         if (!authorizationServerUrl.contains("/openid4vc/")) {
@@ -187,13 +187,13 @@ class IssuerMetadataResolver(
             val url = Url(providerUrl)
             val path = url.encodedPath
             val newPath = path.replace("/issuer-service-api/openid4vci", "/issuer-service-api/openid4vc/v1")
-            urlsToTry.add("${url.protocol.name}://${url.hostWithPort}$newPath$OPENID_CONFIGURATION_WELL_KNOWN_PATH")
+            urlsToTry.add("${url.protocol.name}://${url.hostWithPortIfSpecified}$newPath$OPENID_CONFIGURATION_WELL_KNOWN_PATH")
         }
 
         if (providerUrl.contains(OPENID_CONFIGURATION_WELL_KNOWN_PATH)) {
             urlsToTry.add(providerUrl)
         } else {
-            urlsToTry.add(buildMetadataUrl(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH))
+            urlsToTry.addAll(buildMetadataUrls(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH))
         }
 
         if (!providerUrl.contains("/openid4vc/")) {
@@ -246,17 +246,15 @@ class IssuerMetadataResolver(
         
         // Try authorization_servers if present
         val authorizationServers = credentialIssuerMetadata.authorizationServers
-        println("the authorizationServers are: $authorizationServers")
         if (!authorizationServers.isNullOrEmpty()) {
             val authServerUrl = authorizationServers.first()
             log.info { "Attempting to use authorization server from issuer metadata: ${authServerUrl}" }
-            println("Attempting to use authorization server from issuer metadata: ${authServerUrl} - this is a test message, please ignore it.")
-            return try {
+            val resolved = runCatching {
                 resolveAuthorizationServerMetadata(authServerUrl)
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 log.warn(e) { "Failed to resolve authorization server from issuer metadata, trying fallback strategies" }
-                // Continue to fallback
-            } as AuthorizationServerMetadata
+            }.getOrNull()
+            if (resolved != null) return resolved
         }
 
         // Fallback: use credential issuer URL as authorization server
@@ -307,10 +305,23 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Builds a full metadata URL from a base URL and well-known path
+     * Builds metadata URLs from an issuer identifier.
+     *
+     * RFC 8414 and OpenID discovery place the issuer path after the well-known path, e.g.
+     * https://issuer.example/openid4vci -> https://issuer.example/.well-known/oauth-authorization-server/openid4vci.
+     * The suffix form is kept as a fallback for older deployments and tests.
      */
-    private fun buildMetadataUrl(baseUrl: String, wellKnownPath: String): String {
+    private fun buildMetadataUrls(baseUrl: String, wellKnownPath: String): List<String> {
+        val url = Url(baseUrl)
+        val issuerPath = url.encodedPath.trimEnd('/')
+        val specUrl = if (issuerPath.isBlank() || issuerPath == "/") {
+            "${url.protocol.name}://${url.hostWithPortIfSpecified}$wellKnownPath"
+        } else {
+            "${url.protocol.name}://${url.hostWithPortIfSpecified}$wellKnownPath$issuerPath"
+        }
+
         val normalizedBase = baseUrl.trimEnd('/')
-        return "$normalizedBase$wellKnownPath"
+        val suffixUrl = "$normalizedBase$wellKnownPath"
+        return listOf(specUrl, suffixUrl).distinct()
     }
 }
