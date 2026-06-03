@@ -20,7 +20,7 @@ jobs:
       matrix:
         # macos-latest disabled until all multiplatform modules set up properly
         # currently configured on workflow dispatch as a separate workflow (gradle-macos)
-        os: [ ubuntu-latest ]
+        os: [ ubuntu-22.04 ]
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
