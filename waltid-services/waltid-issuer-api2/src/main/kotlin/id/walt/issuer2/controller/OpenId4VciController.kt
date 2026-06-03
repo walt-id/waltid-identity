@@ -1,12 +1,9 @@
 package id.walt.issuer2.controller
 
 import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
-import id.walt.issuer2.service.openid4vci.CredentialOfferService
+import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
-import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
-import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
-import id.walt.openid4vci.metadata.oidc.OpenIDProviderMetadata
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -18,7 +15,6 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.util.toMap
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -69,8 +65,13 @@ class OpenId4VciController(
 
             post("token", OpenId4VciRoutesDocs.token()) {
                 val response = protocolService.processTokenRequest(call.receiveParameters().toMap())
-                response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
+            }
+
+            post("nonce", OpenId4VciRoutesDocs.nonce()) {
+                call.respond(buildJsonObject {
+                    protocolService.createNonceResponse().forEach { (key, value) -> put(key, value) }
+                })
             }
 
             post("credential", OpenId4VciRoutesDocs.credential()) {
@@ -78,13 +79,8 @@ class OpenId4VciController(
                     ?.substringAfter("Bearer ")
                     ?: throw IllegalArgumentException("No bearer access token found")
                 val request = call.receive<JsonObject>()
-                call.respond(protocolService.processCredentialRequest(accessToken, request))
-            }
-
-            post("nonce", OpenId4VciRoutesDocs.nonce()) {
-                call.respond(buildJsonObject {
-                    protocolService.createNonceResponse().forEach { (key, value) -> put(key, value) }
-                })
+                val response = protocolService.processCredentialRequest(accessToken, request)
+                call.respond(HttpStatusCode.fromValue(response.status), response.payload.toJsonElement())
             }
         }
     }

@@ -39,6 +39,7 @@ data class OpenId4VciModule(
             }
             val preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository)
 
+            val accessTokenVerifier = JwtAccessTokenVerifier(verificationKeyResolver)
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
                     authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
@@ -48,7 +49,7 @@ data class OpenId4VciModule(
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     accessTokenService = JwtAccessTokenIssuer(signingKeyResolver),
-                    accessTokenVerifier = JwtAccessTokenVerifier(verificationKeyResolver),
+                    accessTokenVerifier = accessTokenVerifier,
 
                     preAuthorizedCodeRepository = preAuthorizedCodeRepository,
                     preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,

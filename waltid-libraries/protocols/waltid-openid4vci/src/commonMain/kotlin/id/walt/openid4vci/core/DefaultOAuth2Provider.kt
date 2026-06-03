@@ -161,7 +161,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp =
+    override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 400,
             payload = buildMap {
@@ -169,6 +169,9 @@ class DefaultOAuth2Provider(
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
         )
+
+    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp =
+        writeAccessTokenError(error)
 
     override fun writeAccessTokenResponse(
         request: AccessTokenRequest,

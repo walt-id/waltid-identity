@@ -68,6 +68,8 @@ interface OAuth2Provider {
 
     suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult
 
+    fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp
+
     fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp
 
     fun writeAccessTokenResponse(request: AccessTokenRequest, response: AccessTokenResponse): AccessTokenResponseHttp
