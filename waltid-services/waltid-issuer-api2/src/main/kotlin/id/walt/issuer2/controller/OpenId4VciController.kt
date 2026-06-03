@@ -30,21 +30,11 @@ class OpenId4VciController(
 ) {
     fun register(route: Route) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
-            call.respond(
-                Json.encodeToJsonElement(
-                    CredentialIssuerMetadata.serializer(),
-                    metadataService.getCredentialIssuerMetadata(),
-                )
-            )
+            call.respond(metadataService.getCredentialIssuerMetadata())
         }
 
         route.get(".well-known/oauth-authorization-server/openid4vci", OpenId4VciRoutesDocs.authorizationServerMetadata()) {
-            call.respond(
-                Json.encodeToJsonElement(
-                    AuthorizationServerMetadata.serializer(),
-                    metadataService.getAuthorizationServerMetadata(),
-                )
-            )
+            call.respond(metadataService.getAuthorizationServerMetadata())
         }
 
         route.get(".well-known/jwt-vc-issuer/openid4vci", OpenId4VciRoutesDocs.jwtVcIssuerMetadata()) {
