@@ -52,6 +52,7 @@ dependencies {
     api(project(":waltid-libraries:crypto:waltid-crypto"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-aws"))
     implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
+    implementation(project(":waltid-libraries:crypto:waltid-x509"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     api(project(":waltid-libraries:waltid-did"))
