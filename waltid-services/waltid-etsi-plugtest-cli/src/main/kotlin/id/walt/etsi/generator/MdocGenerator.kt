@@ -1,11 +1,13 @@
 package id.walt.etsi.generator
 
 import id.walt.cose.CoseCertificate
+import id.walt.cose.CoseCertHash
 import id.walt.cose.JWKKeyCoseTransform.getCosePublicKey
 import id.walt.cose.coseCompliantCbor
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.ShaUtils
 import id.walt.etsi.TestCase
 import id.walt.mdoc.issuance.MdocIssuer
 import id.walt.mdoc.objects.document.IssuerSigned
@@ -48,7 +50,12 @@ object MdocGenerator {
         issuerKey: Key,
         issuerCertificatePem: String,
         holderKey: Key,
-        sampleData: Map<String, JsonObject>? = null
+        sampleData: Map<String, JsonObject>? = null,
+        /**
+         * URL where the issuer (signing) certificate can be retrieved. Used to populate the COSE
+         * `x5u` protected-header parameter for QEAA/PuB-EAA (QEAA-6.6.2-02 / PuB-EAA-6.6.3-02).
+         */
+        x5u: String = "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/cert.pem"
     ): MdocGenerationResult {
         log.info { "Generating mdoc (IssuerSigned format) for test case: ${testCase.id}" }
 
@@ -66,17 +73,37 @@ object MdocGenerator {
 
         // ISO 18013-5 §9.1.2.6: some test cases require MSO.status.identifier_list
         // (MDL-EAA-6, MDOC-EAA-9). The uri points to the identifier list revocation token.
+        // Additionally, per QEAA-6.2.10.2-01 / PuB-EAA-6.2.10.3-01 a QEAA/PuBEAA SHALL include the
+        // status component when it does not contain the short-lived component.
         // We host a minimal (empty, no revocations) identifier list at the static files repo.
-        val msoStatus: Status? = when {
-            testCase.id.contains("-6") && testCase.id.startsWith("MDL-EAA") ||
-            testCase.id.contains("-9") && testCase.id.startsWith("MDOC-EAA") ->
-                Status(identifierList = Status.IdentifierListInfo(
-                    id = testCase.id,
-                    uri = UniformResourceIdentifier(
-                        "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
-                    )
-                ))
-            else -> null
+        val isQeaaOrPubEaa = testCase.id.contains("QEAA", ignoreCase = true) ||
+                testCase.id.contains("PuBEAA", ignoreCase = true)
+        val requiresStatus =
+            (testCase.id.contains("-6") && testCase.id.startsWith("MDL-EAA")) ||
+            (testCase.id.contains("-9") && testCase.id.startsWith("MDOC-EAA")) ||
+            (isQeaaOrPubEaa && !testCase.isShortLived)
+        val msoStatus: Status? = if (requiresStatus) {
+            Status(identifierList = Status.IdentifierListInfo(
+                id = testCase.id,
+                uri = UniformResourceIdentifier(
+                    "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
+                )
+            ))
+        } else null
+
+        // QEAA-6.6.2-02 / PuB-EAA-6.6.3-02: the CB-AdES protected header of an ISO-mdoc QEAA/PuB-EAA
+        // SHALL contain x5u and x5t (RFC 9360); the x5t digest SHALL be SHA-256 (QEAA-6.6.2-03).
+        val protectedX5u: String?
+        val protectedX5t: CoseCertHash?
+        if (isQeaaOrPubEaa) {
+            protectedX5u = x5u
+            protectedX5t = CoseCertHash(
+                hashAlgorithm = CoseCertHash.SHA_256,
+                hashValue = ShaUtils.sha256(issuerCertBytes)
+            )
+        } else {
+            protectedX5u = null
+            protectedX5t = null
         }
 
         val issuerSigned = MdocIssuer.issueUniversal(
@@ -86,7 +113,9 @@ object MdocGenerator {
             docType = docType,
             data = data,
             valueMappingFunction = defaultValueMappingFunction,
-            status = msoStatus
+            status = msoStatus,
+            protectedHeaderX5u = protectedX5u,
+            protectedHeaderX5t = protectedX5t
         )
 
         // ETSI plugtest expects IssuerSigned format, NOT the full Document wrapper
@@ -196,7 +225,9 @@ object MdocGenerator {
                         val etsiFields = setOf("iss_reg_id", "status_service", "also_known_as", "oneTime", "shortLived", "category")
                         if (cleanItem in etsiFields && !this@buildJsonObject.toString().contains("\"$cleanItem\"")) {
                             when (cleanItem) {
-                                "iss_reg_id" -> put("iss_reg_id", "DE-REG-123456")
+                                // ETSI EN 319 412-1 §5.1.4 registration identifier format:
+                                // <3-letter scheme><2-letter ISO 3166-1 country>-<reference>.
+                                "iss_reg_id" -> put("iss_reg_id", "VATAT-U12345678")
                                 "status_service" -> put("status_service", "https://status.example.com")
                                 else -> {} // already handled above
                             }

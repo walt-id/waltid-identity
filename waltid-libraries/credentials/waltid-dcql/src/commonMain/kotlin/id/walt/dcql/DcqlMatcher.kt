@@ -298,13 +298,13 @@ object DcqlMatcher {
 
         // If the credential has disclosures and is JWT-based (where SD mechanism applies)
         if (isCredentialPotentiallySD && credential.disclosures != null) {
-            // More robust path matching for SD-JWTs is needed here.
-            // This simplistic approach assumes path.last() is the claim name.
+            // Match on the claim name (path.last()). The disclosure's full Claim Path is available
+            // via it.location (SD-JWT VC §4.6.1) for stricter matching if needed in the future.
             val targetClaimName = claimQuery.path.lastOrNull {
                 it is JsonPrimitive && it.isString
             }?.jsonPrimitive?.content
             val matchingDisclosure =
-                credential.disclosures?.find { it.name == targetClaimName /* && it.location matches claimQuery.path more precisely */ }
+                credential.disclosures?.find { it.name == targetClaimName }
 
             if (matchingDisclosure != null) {
                 if (!claimQuery.values.isNullOrEmpty()) {

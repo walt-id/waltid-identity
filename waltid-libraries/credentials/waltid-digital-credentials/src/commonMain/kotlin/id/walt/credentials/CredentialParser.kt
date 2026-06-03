@@ -20,8 +20,9 @@ import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
-import id.walt.credentials.utils.SdJwtUtils.joinDisclosureLocation
-import id.walt.credentials.utils.SdJwtUtils.normalizeDisclosureLocation
+import id.walt.credentials.utils.SdJwtUtils.appendArrayIndex
+import id.walt.credentials.utils.SdJwtUtils.appendClaimName
+import id.walt.credentials.utils.SdJwtUtils.parseSdLocationToClaimPath
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -249,13 +250,14 @@ object CredentialParser {
             // Use a Mutable Set to track what we have successfully mapped
             val mappedDisclosures = HashSet<SdJwtSelectiveDisclosure>()
 
-            // A queue of hashes we expect to find, paired with their parent location
-            val hashesToVerify = ArrayDeque<Pair<String, String>>()
+            // A queue of hashes we expect to find, paired with the Claim Path of their containing
+            // object (per SD-JWT VC §4.6.1; relative to the credential root).
+            val hashesToVerify = ArrayDeque<Pair<List<JsonElement>, String>>()
 
             // 1. Initial population from the main payload
             containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
-                val loc = normalizeDisclosureLocation(sdLocation)
-                disclosureHashes.forEach { hash -> hashesToVerify.add(loc to hash) }
+                val basePath = parseSdLocationToClaimPath(sdLocation)
+                disclosureHashes.forEach { hash -> hashesToVerify.add(basePath to hash) }
             }
 
             fun findForHash(hash: String) =
@@ -264,8 +266,9 @@ object CredentialParser {
                  asHashed3() (double-base64url) is a non-standard malformed disclosure */
                 availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
 
-            // Helper to recursively scan a JSON element for more SD-JWT hashes
-            fun scanForHashes(element: JsonElement, currentPath: String) {
+            // Helper to recursively scan a JSON element for more SD-JWT hashes.
+            // currentPath is the Claim Path (§4.6.1) of [element] relative to the credential root.
+            fun scanForHashes(element: JsonElement, currentPath: List<JsonElement>) {
                 when (element) {
                     is JsonObject -> {
                         // Check for _sd array in this object
@@ -276,7 +279,7 @@ object CredentialParser {
                         }
                         // Recurse into properties
                         element.forEach { (key, value) ->
-                            if (key != "_sd") scanForHashes(value, joinDisclosureLocation(currentPath, key))
+                            if (key != "_sd") scanForHashes(value, currentPath.appendClaimName(key))
                         }
                     }
 
@@ -286,11 +289,11 @@ object CredentialParser {
                             if (item is JsonObject && item.size == 1 && item.containsKey("...")) {
                                 val hash = item["..."]?.jsonPrimitive?.content
                                 if (hash != null) {
-                                    hashesToVerify.add(joinDisclosureLocation(currentPath, "[$index]") to hash)
+                                    hashesToVerify.add(currentPath.appendArrayIndex(index) to hash)
                                 }
                             } else {
                                 // Recurse
-                                scanForHashes(item, joinDisclosureLocation(currentPath, "[$index]"))
+                                scanForHashes(item, currentPath.appendArrayIndex(index))
                             }
                         }
                     }
@@ -301,18 +304,20 @@ object CredentialParser {
 
             // 2. Process the queue until all nested hashes are resolved
             while (hashesToVerify.isNotEmpty()) {
-                val (loc, hash) = hashesToVerify.removeFirst()
-                log.trace { "Processing hash: $hash at $loc" }
+                val (basePath, hash) = hashesToVerify.removeFirst()
+                log.trace { "Processing hash: $hash at $basePath" }
 
                 val matchingDisclosure = findForHash(hash)
                 if (matchingDisclosure != null) {
-                    // Construct the location for the *content* of this disclosure first
-                    val newLoc = if (matchingDisclosure.name != null)
-                        joinDisclosureLocation(loc, matchingDisclosure.name)
-                    else normalizeDisclosureLocation(loc)
+                    // Construct the Claim Path for the *content* of this disclosure.
+                    // Object-property disclosures append their claim name; array-element
+                    // disclosures ([salt, value], name == null) keep the containing path.
+                    val newPath = if (matchingDisclosure.name != null)
+                        basePath.appendClaimName(matchingDisclosure.name)
+                    else basePath
 
                     // Create a copy of the disclosure with the populated location
-                    val updatedDisclosure = matchingDisclosure.copy(location = newLoc)
+                    val updatedDisclosure = matchingDisclosure.copy(location = newPath)
 
                     // Only process if we haven't mapped this specific disclosure instance yet
                     // (SD-JWT spec says digest MUST NOT appear more than once, but safety check)
@@ -321,7 +326,7 @@ object CredentialParser {
                         log.trace { "Found hash for ${updatedDisclosure.name ?: "array_element"}" }
 
                         // 3. Recursive Step: Scan the *value* of the disclosure for new hashes
-                        scanForHashes(updatedDisclosure.value, newLoc)
+                        scanForHashes(updatedDisclosure.value, newPath)
                     }
                 } else {
                     log.trace { "Hash $hash not found in available disclosures (might be a decoy)" }

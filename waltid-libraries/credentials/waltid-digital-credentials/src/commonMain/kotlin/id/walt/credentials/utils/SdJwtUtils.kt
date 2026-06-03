@@ -39,36 +39,41 @@ object SdJwtUtils {
         mapKeys { it.key.removePrefix("$.") }
 
     /**
-     * Normalises a disclosure location path into a clean relative dot-path.
+     * Parses a `_sd` array location key produced by [getSdArrays] (e.g. `$.credentialSubject.degree._sd`
+     * or `$.vc._sd`) into a Claim Path prefix as a list of [JsonElement] string components, per
+     * SD-JWT VC §4.6.1.
      *
-     * Removes the JSONPath root prefix (`$.` / `$`), a trailing `_sd` segment, and any
-     * leading/trailing/duplicate `.` separators. For example:
-     *   - `$._sd`                              -> ``        (root)
-     *   - `$.credentialSubject.degree._sd`     -> `credentialSubject.degree`
-     *   - `$.vc.`                              -> `vc`
+     * The JSONPath root (`$`), the trailing `_sd` segment, and (for W3C credentials) a leading `vc`
+     * wrapper segment are removed so the resulting path is relative to the credential root. For
+     * example:
+     *   - `$._sd`                           -> `[]`                              (root object)
+     *   - `$.credentialSubject.degree._sd`  -> `["credentialSubject","degree"]`
+     *   - `$.vc._sd`                         -> `[]`                              (vc wrapper dropped)
+     *   - `$.vc.credentialSubject._sd`      -> `["credentialSubject"]`
      */
-    fun normalizeDisclosureLocation(path: String): String =
-        path.removePrefix("$")
+    fun parseSdLocationToClaimPath(sdLocation: String): List<JsonElement> =
+        sdLocation
+            .removePrefix("$")
             .removePrefix(".")
             .removeSuffix("_sd")
             .trim('.')
             .split('.')
             .filter { it.isNotEmpty() }
-            .joinToString(".")
+            .dropVcWrapper()
+            .map { JsonPrimitive(it) }
 
     /**
-     * Joins a parent location with a child segment (a claim name or an array index token like
-     * `[0]`), producing a clean dot-path without leading/duplicate dots. Array index tokens are
-     * appended without a separating dot.
+     * Drops a leading `vc` segment used by W3C JWT-VCs that embed the credential under a `vc` claim.
+     * Claim Paths are resolved relative to the credential root (the `vc` content), not the JWT payload.
      */
-    fun joinDisclosureLocation(parent: String, child: String): String {
-        val normalizedParent = normalizeDisclosureLocation(parent)
-        return when {
-            child.startsWith("[") -> normalizedParent + child
-            normalizedParent.isEmpty() -> child
-            else -> "$normalizedParent.$child"
-        }
-    }
+    private fun List<String>.dropVcWrapper(): List<String> =
+        if (firstOrNull() == "vc") drop(1) else this
+
+    /** Appends a claim name (object key) component to a Claim Path. */
+    fun List<JsonElement>.appendClaimName(name: String): List<JsonElement> = this + JsonPrimitive(name)
+
+    /** Appends an array index component to a Claim Path. */
+    fun List<JsonElement>.appendArrayIndex(index: Int): List<JsonElement> = this + JsonPrimitive(index)
 
 
     // Recursive helper function

@@ -35,7 +35,8 @@ object SdJwtVcGenerator {
 
         val x5cChain = buildX5cChain(issuerCertificatePem)
         val x5tS256 = computeX5tS256(issuerCertificatePem)
-        val payload = buildPayload(testCase, issuerUrl, vct, holderKey)
+        val certRegistrationId = extractCertRegistrationId(issuerCertificatePem)
+        val payload = buildPayload(testCase, issuerUrl, vct, holderKey, certRegistrationId)
         val selectiveDisclosures = buildSelectiveDisclosures(testCase, payload)
 
         // QEAA-5.6.2-02 / PuB-EAA-5.6.3-02 (ETSI TS 119 472-1): x5u SHALL be present
@@ -127,24 +128,86 @@ object SdJwtVcGenerator {
         }
     }
 
-    private fun computeX5tS256(certificatePem: String): String? {
+    private fun parseCertificate(certificatePem: String): X509Certificate? = try {
+        val pemContent = certificatePem
+            .replace("-----BEGIN CERTIFICATE-----", "")
+            .replace("-----END CERTIFICATE-----", "")
+            .replace("\n", "")
+            .replace("\r", "")
+            .trim()
+        val derBytes = pemContent.decodeFromBase64()
+        CertificateFactory.getInstance("X.509")
+            .generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
+    } catch (e: Exception) {
+        log.warn { "Could not parse issuer certificate: ${e.message}" }
+        null
+    }
+
+    /**
+     * Returns the issuer registration identifier carried in the certificate subject DN, if present.
+     *
+     * Per ETSI EN 319 412-1 §5.1.4 the organizationIdentifier attribute (OID 2.5.4.97) holds the
+     * registration identifier (e.g. `VATAT-U12345678`, `NTR:SE-5591332720`). Some Plugtest PKI
+     * certificates instead carry it in the subject serialNumber (OID 2.5.4.5). When the certificate
+     * already carries a valid registration identifier, the `iss_reg_id` payload claim should be
+     * omitted (QEAA-4.2.4.2-05 / PuB-EAA-4.2.4.3-05: "if applicable and NOT in the qualified certificate").
+     */
+    private fun extractCertRegistrationId(certificatePem: String): String? {
+        val cert = parseCertificate(certificatePem) ?: return null
+        // Subject DN in RFC 2253 form. Java renders attributes outside its short-name set
+        // (CN, L, ST, O, OU, C, STREET, DC, UID) using the numeric OID and a DER-hex value, e.g.
+        // "2.5.4.5=#130f56415441542d553132333435363738". We decode those hex values.
+        val dn = cert.subjectX500Principal.getName("RFC2253")
+        // organizationIdentifier (2.5.4.97) is the canonical place per EN 319 412-1 §5.1.4,
+        // with subject serialNumber (2.5.4.5) as a common fallback. Match by numeric OID
+        // (with optional OID. prefix) or by readable attribute name, then decode any DER-hex value.
+        val patterns = listOf(
+            """(?:OID\.)?2\.5\.4\.97=([^,]+)""",
+            """organizationIdentifier=([^,]+)""",
+            """(?:OID\.)?2\.5\.4\.5=([^,]+)""",
+            """serialNumber=([^,]+)"""
+        )
+        for (pattern in patterns) {
+            val raw = Regex(pattern, RegexOption.IGNORE_CASE).find(dn)?.groupValues?.getOrNull(1)?.trim()
+                ?: continue
+            val value = decodeDnAttributeValue(raw)
+            if (value.isNotBlank() && isValidRegistrationId(value)) return value
+        }
+        return null
+    }
+
+    /**
+     * Decodes an RFC 2253 attribute value. Values rendered as `#<hex>` are DER-encoded
+     * (ASN.1 tag + length + content); we strip the 2-byte tag/length prefix and decode the
+     * remaining bytes as UTF-8. Plain string values are returned unescaped.
+     */
+    private fun decodeDnAttributeValue(raw: String): String {
+        if (!raw.startsWith("#")) return raw.replace("\\", "")
+        val hex = raw.removePrefix("#")
+        if (hex.length < 4 || hex.length % 2 != 0) return raw
         return try {
-            // Extract the first certificate from PEM
-            val pemContent = certificatePem
-                .replace("-----BEGIN CERTIFICATE-----", "")
-                .replace("-----END CERTIFICATE-----", "")
-                .replace("\n", "")
-                .replace("\r", "")
-                .trim()
+            val bytes = hex.chunked(2).map { it.toInt(16).toByte() }
+            // bytes[0] = ASN.1 tag, bytes[1] = length; content follows.
+            val content = bytes.drop(2).toByteArray()
+            content.decodeToString()
+        } catch (e: Exception) {
+            raw
+        }
+    }
 
-            // Decode the base64 certificate to get DER bytes
-            val derBytes = pemContent.decodeFromBase64()
 
-            // Parse as X509Certificate to get the encoded form
-            val certFactory = CertificateFactory.getInstance("X.509")
-            val cert = certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
+    /**
+     * Validates a registration identifier against ETSI EN 319 412-1 §5.1.4:
+     * `<3-character scheme><2-character ISO 3166-1 country>-<reference>` (e.g. `VATAT-U12345678`),
+     * also accepting the `<scheme>:<country>-<reference>` variant (e.g. `NTR:SE-5591332720`).
+     */
+    private fun isValidRegistrationId(value: String): Boolean =
+        Regex("""^[A-Z]{3}:?[A-Z]{2}-.+$""").matches(value)
 
-            // Compute SHA-256 hash of the DER-encoded certificate (base64url, no padding)
+    private fun computeX5tS256(certificatePem: String): String? {
+        val cert = parseCertificate(certificatePem) ?: return null
+        return try {
+            // SHA-256 of the DER-encoded certificate (base64url, no padding)
             ShaUtils.sha256Base64Url(cert.encoded)
         } catch (e: Exception) {
             log.warn { "Could not compute x5t#S256 thumbprint: ${e.message}" }
@@ -156,7 +219,8 @@ object SdJwtVcGenerator {
         testCase: TestCase,
         issuerUrl: String,
         vct: String,
-        holderKey: Key?
+        holderKey: Key?,
+        certRegistrationId: String?
     ): JsonObject {
         val now = System.currentTimeMillis() / 1000
         val expiry = now + (365 * 24 * 60 * 60)
@@ -221,11 +285,31 @@ object SdJwtVcGenerator {
                     when {
                         cleanItem == "sub" -> put("sub", "did:example:holder123")
                         cleanItem == "issuing_country" -> put("issuing_country", "DE")
-                        cleanItem == "iss_reg_id" -> put("iss_reg_id", "DE-REG-123456")
+                        // EAA-4.2.4.1-07 / QEAA-4.2.4.2-05 / PuB-EAA-4.2.4.3-05: the registration
+                        // identifier SHALL be built per ETSI EN 319 412-1 §5.1.4, i.e.
+                        // <3-letter scheme><2-letter ISO 3166-1 country>-<reference>, e.g. VATAT-U12345678.
+                        // Emit it in the payload only when the qualified certificate does not already
+                        // carry one ("if applicable and NOT in the qualified certificate").
+                        cleanItem == "iss_reg_id" -> {
+                            if (certRegistrationId == null) {
+                                put("iss_reg_id", "VATAT-U12345678")
+                            } else {
+                                existingKeys.remove("iss_reg_id")
+                                log.debug { "Omitting iss_reg_id from payload; present in certificate as '$certRegistrationId'" }
+                            }
+                        }
                         cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
                         cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
                         cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                         cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
+                        // EAA-5.2.10.1: status SHALL be a JSON object (ETSI flat shape
+                        // { type, purpose, index, uri }), never a bare string.
+                        cleanItem == "status" -> putJsonObject("status") {
+                            put("type", "TokenStatusList")
+                            put("purpose", "revocation")
+                            put("index", 0)
+                            put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt")
+                        }
                         cleanItem == "cnf" -> {
                             putJsonObject("cnf") {
                                 if (holderJwkString != null) {

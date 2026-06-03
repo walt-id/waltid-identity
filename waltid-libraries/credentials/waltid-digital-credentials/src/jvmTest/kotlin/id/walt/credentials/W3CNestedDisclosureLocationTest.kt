@@ -83,14 +83,16 @@ class W3CNestedDisclosureLocationTest {
             )
         }
 
-        // 6. Assert the locations are clean (no `$.` prefix, no double dots) and end with the claim name
+        // 6. Assert the locations are spec-compliant Claim Paths (SD-JWT VC §4.6.1):
+        //    arrays of string components, relative to the credential root (vc wrapper dropped).
         val byName = disclosures.associateBy { it.name }
         val issuanceLoc = assertNotNull(byName["issuanceDate"]?.location)
         val nameLoc = assertNotNull(byName["name"]?.location)
-        assertTrue(!issuanceLoc.contains(".."), "location must not contain double dots: $issuanceLoc")
-        assertTrue(!issuanceLoc.startsWith("$"), "location must not start with JSONPath root: $issuanceLoc")
-        assertTrue(issuanceLoc.endsWith("issuanceDate"), "unexpected issuanceDate location: $issuanceLoc")
-        assertTrue(!nameLoc.contains(".."), "location must not contain double dots: $nameLoc")
-        assertTrue(nameLoc.endsWith("degree.name"), "unexpected degree.name location: $nameLoc")
+
+        assertEquals(listOf(JsonPrimitive("issuanceDate")), issuanceLoc)
+        assertEquals(
+            listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("degree"), JsonPrimitive("name")),
+            nameLoc
+        )
     }
 }
