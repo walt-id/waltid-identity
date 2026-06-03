@@ -5,11 +5,11 @@ import id.walt.commons.featureflag.CommonsFeatureCatalog
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.commons.persistence.PersistenceNode
-import id.walt.issuer2.domain.AuthenticationMethod
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord

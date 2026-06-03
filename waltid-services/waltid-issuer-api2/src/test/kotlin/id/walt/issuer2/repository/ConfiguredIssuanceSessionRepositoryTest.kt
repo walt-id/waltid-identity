@@ -1,7 +1,7 @@
 package id.walt.issuer2.repository
 
-import id.walt.issuer2.domain.AuthenticationMethod
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.openid4vci.offers.AuthenticationMethod
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
