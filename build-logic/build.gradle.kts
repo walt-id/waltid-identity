@@ -48,4 +48,11 @@ dependencies {
 
     // Tests
     implementation(identityLibs.mokkery.gradle.plugin)
+
+    // Force kotlin-stdlib to project version (SQLDelight transitively pulls 1.9.x with CVE-2020-29582)
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
+            version { require(identityLibs.versions.kotlin.get()) }
+        }
+    }
 }
