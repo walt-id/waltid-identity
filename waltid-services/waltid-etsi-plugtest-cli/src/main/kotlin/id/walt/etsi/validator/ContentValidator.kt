@@ -251,6 +251,10 @@ object ContentValidator {
 
             if (isPresent) {
                 presentFields.add(originalName)
+            } else if (isOptionalField(originalName)) {
+                // Conditionally-required field (e.g. "iss_reg_id (if applicable and NOT in the
+                // qualified certificate)"): absence is acceptable, so do not flag it as missing.
+                // Not added to presentFields either, since it is genuinely absent.
             } else {
                 missingFields.add(originalName)
             }
@@ -459,6 +463,18 @@ object ContentValidator {
             .replace(Regex("\\s*\\([^)]*\\)"), "")  // remove parenthetical notes
             .trim()
             .lowercase()
+    }
+
+    /**
+     * A test-case field item is conditionally required when its parenthetical annotation expresses
+     * a condition, e.g. "iss_reg_id (if applicable and NOT in the qualified certificate)" or
+     * "issuing_authority (if NOT in the qualified certificate)". Such fields may legitimately be
+     * absent (the data lives in the certificate), so they must not be reported as missing.
+     */
+    private fun isOptionalField(field: String): Boolean {
+        val annotation = Regex("\\(([^)]*)\\)").find(field)?.groupValues?.getOrNull(1)?.lowercase()
+            ?: return false
+        return listOf("if ", "if applicable", "not in", "optional", "where", "when ").any { annotation.contains(it) }
     }
 
     private fun normalizeMdocFieldName(field: String): String {

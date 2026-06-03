@@ -15,6 +15,9 @@ private val log = KotlinLogging.logger {}
 
 object SdJwtVcGenerator {
 
+    /** qcStatements extension OID (RFC 3739 / ETSI EN 319 412-5) marking a qualified certificate. */
+    private const val QC_STATEMENTS_OID = "1.3.6.1.5.5.7.1.3"
+
     data class SdJwtGenerationResult(
         val testCaseId: String,
         val sdJwtVc: String,
@@ -35,8 +38,12 @@ object SdJwtVcGenerator {
 
         val x5cChain = buildX5cChain(issuerCertificatePem)
         val x5tS256 = computeX5tS256(issuerCertificatePem)
-        val certRegistrationId = extractCertRegistrationId(issuerCertificatePem)
-        val payload = buildPayload(testCase, issuerUrl, vct, holderKey, certRegistrationId)
+        // The conditional omission of issuing_authority / issuing_country / iss_reg_id
+        // (EAA-5.2.4.1-03/-07/-11) applies ONLY when the credential incorporates a *qualified*
+        // certificate. With a non-qualified certificate, QEAA-5.2.4.2-01/-02 (and PuB-EAA
+        // equivalents) require these claims to be present in the payload.
+        val issuerCertQualified = certIsQualified(issuerCertificatePem)
+        val payload = buildPayload(testCase, issuerUrl, vct, holderKey, issuerCertQualified)
         val selectiveDisclosures = buildSelectiveDisclosures(testCase, payload)
 
         // QEAA-5.6.2-02 / PuB-EAA-5.6.3-02 (ETSI TS 119 472-1): x5u SHALL be present
@@ -144,65 +151,20 @@ object SdJwtVcGenerator {
     }
 
     /**
-     * Returns the issuer registration identifier carried in the certificate subject DN, if present.
+     * Whether the certificate is an EU *qualified* certificate, detected by the presence of the
+     * qcStatements extension (OID 1.3.6.1.5.5.7.1.3, RFC 3739 / ETSI EN 319 412-5).
      *
-     * Per ETSI EN 319 412-1 §5.1.4 the organizationIdentifier attribute (OID 2.5.4.97) holds the
-     * registration identifier (e.g. `VATAT-U12345678`, `NTR:SE-5591332720`). Some Plugtest PKI
-     * certificates instead carry it in the subject serialNumber (OID 2.5.4.5). When the certificate
-     * already carries a valid registration identifier, the `iss_reg_id` payload claim should be
-     * omitted (QEAA-4.2.4.2-05 / PuB-EAA-4.2.4.3-05: "if applicable and NOT in the qualified certificate").
+     * The conditional omission of issuing_authority / issuing_country / iss_reg_id
+     * (EAA-5.2.4.1-03/-07/-11) applies only when the credential incorporates a *qualified*
+     * certificate. If the embedded certificate is not qualified, QEAA-5.2.4.2-01/-02 (and the
+     * PuB-EAA equivalents) require these values to be present in the payload instead.
      */
-    private fun extractCertRegistrationId(certificatePem: String): String? {
-        val cert = parseCertificate(certificatePem) ?: return null
-        // Subject DN in RFC 2253 form. Java renders attributes outside its short-name set
-        // (CN, L, ST, O, OU, C, STREET, DC, UID) using the numeric OID and a DER-hex value, e.g.
-        // "2.5.4.5=#130f56415441542d553132333435363738". We decode those hex values.
-        val dn = cert.subjectX500Principal.getName("RFC2253")
-        // organizationIdentifier (2.5.4.97) is the canonical place per EN 319 412-1 §5.1.4,
-        // with subject serialNumber (2.5.4.5) as a common fallback. Match by numeric OID
-        // (with optional OID. prefix) or by readable attribute name, then decode any DER-hex value.
-        val patterns = listOf(
-            """(?:OID\.)?2\.5\.4\.97=([^,]+)""",
-            """organizationIdentifier=([^,]+)""",
-            """(?:OID\.)?2\.5\.4\.5=([^,]+)""",
-            """serialNumber=([^,]+)"""
-        )
-        for (pattern in patterns) {
-            val raw = Regex(pattern, RegexOption.IGNORE_CASE).find(dn)?.groupValues?.getOrNull(1)?.trim()
-                ?: continue
-            val value = decodeDnAttributeValue(raw)
-            if (value.isNotBlank() && isValidRegistrationId(value)) return value
-        }
-        return null
+    private fun certIsQualified(certificatePem: String): Boolean {
+        val cert = parseCertificate(certificatePem) ?: return false
+        return cert.criticalExtensionOIDs?.contains(QC_STATEMENTS_OID) == true ||
+                cert.nonCriticalExtensionOIDs?.contains(QC_STATEMENTS_OID) == true
     }
 
-    /**
-     * Decodes an RFC 2253 attribute value. Values rendered as `#<hex>` are DER-encoded
-     * (ASN.1 tag + length + content); we strip the 2-byte tag/length prefix and decode the
-     * remaining bytes as UTF-8. Plain string values are returned unescaped.
-     */
-    private fun decodeDnAttributeValue(raw: String): String {
-        if (!raw.startsWith("#")) return raw.replace("\\", "")
-        val hex = raw.removePrefix("#")
-        if (hex.length < 4 || hex.length % 2 != 0) return raw
-        return try {
-            val bytes = hex.chunked(2).map { it.toInt(16).toByte() }
-            // bytes[0] = ASN.1 tag, bytes[1] = length; content follows.
-            val content = bytes.drop(2).toByteArray()
-            content.decodeToString()
-        } catch (e: Exception) {
-            raw
-        }
-    }
-
-
-    /**
-     * Validates a registration identifier against ETSI EN 319 412-1 §5.1.4:
-     * `<3-character scheme><2-character ISO 3166-1 country>-<reference>` (e.g. `VATAT-U12345678`),
-     * also accepting the `<scheme>:<country>-<reference>` variant (e.g. `NTR:SE-5591332720`).
-     */
-    private fun isValidRegistrationId(value: String): Boolean =
-        Regex("""^[A-Z]{3}:?[A-Z]{2}-.+$""").matches(value)
 
     private fun computeX5tS256(certificatePem: String): String? {
         val cert = parseCertificate(certificatePem) ?: return null
@@ -220,7 +182,7 @@ object SdJwtVcGenerator {
         issuerUrl: String,
         vct: String,
         holderKey: Key?,
-        certRegistrationId: String?
+        issuerCertQualified: Boolean
     ): JsonObject {
         val now = System.currentTimeMillis() / 1000
         val expiry = now + (365 * 24 * 60 * 60)
@@ -270,8 +232,6 @@ object SdJwtVcGenerator {
                 }
                 // plain EAA: no category claim per ETSI TS 119 472-1 §5.2.2.1
             }
-            put("issuing_authority", "ETSI Test Authority")
-            existingKeys.add("issuing_authority")
             put("given_name", "Max")
             existingKeys.add("given_name")
             put("family_name", "Mustermann")
@@ -284,18 +244,44 @@ object SdJwtVcGenerator {
                     existingKeys.add(cleanItem)
                     when {
                         cleanItem == "sub" -> put("sub", "did:example:holder123")
-                        cleanItem == "issuing_country" -> put("issuing_country", "DE")
-                        // EAA-4.2.4.1-07 / QEAA-4.2.4.2-05 / PuB-EAA-4.2.4.3-05: the registration
-                        // identifier SHALL be built per ETSI EN 319 412-1 §5.1.4, i.e.
-                        // <3-letter scheme><2-letter ISO 3166-1 country>-<reference>, e.g. VATAT-U12345678.
-                        // Emit it in the payload only when the qualified certificate does not already
-                        // carry one ("if applicable and NOT in the qualified certificate").
-                        cleanItem == "iss_reg_id" -> {
-                            if (certRegistrationId == null) {
-                                put("iss_reg_id", "VATAT-U12345678")
+                        // EAA-5.2.4.1-03: the issuing_authority claim SHALL NOT be present when the
+                        // credential incorporates a *qualified* certificate (which carries the issuer
+                        // name per ETSI TS 119 412-6). Omit only when the test case marks it conditional
+                        // on the certificate AND the embedded certificate is actually qualified.
+                        // Otherwise (non-qualified cert) QEAA-5.2.4.2-01 requires it in the payload.
+                        cleanItem == "issuing_authority" -> {
+                            val conditionalOnCert = item.contains("not in", ignoreCase = true) &&
+                                    item.contains("cert", ignoreCase = true)
+                            if (conditionalOnCert && issuerCertQualified) {
+                                existingKeys.remove("issuing_authority")
+                                log.debug { "Omitting issuing_authority; qualified certificate carries it (EAA-5.2.4.1-03)" }
                             } else {
+                                put("issuing_authority", "ETSI Test Authority")
+                            }
+                        }
+                        // EAA-5.2.4.1-07: issuing_country SHALL NOT be present with a qualified certificate.
+                        cleanItem == "issuing_country" -> {
+                            val conditionalOnCert = item.contains("not in", ignoreCase = true) &&
+                                    item.contains("cert", ignoreCase = true)
+                            if (conditionalOnCert && issuerCertQualified) {
+                                existingKeys.remove("issuing_country")
+                                log.debug { "Omitting issuing_country; qualified certificate carries it (EAA-5.2.4.1-07)" }
+                            } else {
+                                put("issuing_country", "DE")
+                            }
+                        }
+                        // EAA-5.2.4.1-11 / QEAA-5.2.4.2-03 / PuB-EAA-5.2.4.3-03: the registration
+                        // identifier (built per ETSI EN 319 412-1 §5.1.4, e.g. VATAT-U12345678) SHALL
+                        // NOT be present when the credential incorporates a *qualified* certificate.
+                        // With a non-qualified certificate it must be present in the payload.
+                        cleanItem == "iss_reg_id" -> {
+                            val conditionalOnCert = item.contains("not in", ignoreCase = true) &&
+                                    item.contains("cert", ignoreCase = true)
+                            if (conditionalOnCert && issuerCertQualified) {
                                 existingKeys.remove("iss_reg_id")
-                                log.debug { "Omitting iss_reg_id from payload; present in certificate as '$certRegistrationId'" }
+                                log.debug { "Omitting iss_reg_id; qualified certificate carries it (EAA-5.2.4.1-11)" }
+                            } else {
+                                put("iss_reg_id", "VATAT-U12345678")
                             }
                         }
                         cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
