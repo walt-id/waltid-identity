@@ -9,6 +9,7 @@ import id.walt.crypto.keys.aws.WaltCryptoAws
 import id.walt.crypto.keys.azure.WaltCryptoAzure
 import id.walt.did.dids.DidService
 import id.walt.issuer2.application.Issuer2Module
+import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.web.plugins.configureHTTP
 import id.walt.issuer2.web.plugins.configureMonitoring
 import id.walt.issuer2.web.plugins.configureRouting
@@ -17,6 +18,8 @@ import io.ktor.server.application.Application
 import io.ktor.server.routing.routing
 
 suspend fun main(args: Array<String>) {
+    registerIssuer2ConfigDecoders()
+
     ServiceMain(
         ServiceConfiguration("issuer2", version = BuildConfig.VERSION),
         ServiceInitialization(

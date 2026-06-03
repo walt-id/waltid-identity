@@ -8,6 +8,7 @@ import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.issuer2Module
@@ -26,6 +27,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -164,9 +166,9 @@ class Issuer2ProfileEndpointTest {
             assertEquals(HttpStatusCode.OK, configuredProfileRaw.status)
             val configuredProfileBody = configuredProfileRaw.bodyAsText()
             assertIssuerKeyIsExposed(configuredProfileBody)
-            assertEquals(
-                listedProfile,
-                json.decodeFromString<CredentialProfile>(configuredProfileBody),
+            assertProfileJsonEquals(
+                expected = listedProfile,
+                actualBody = configuredProfileBody,
                 "Expected configured profile ${listedProfile.profileId} to be retrievable by id",
             )
         }
@@ -181,10 +183,7 @@ class Issuer2ProfileEndpointTest {
         assertEquals(HttpStatusCode.OK, profileRaw.status)
         val profileResponseBody = profileRaw.bodyAsText()
         assertIssuerKeyIsExposed(profileResponseBody)
-        assertEquals(
-            universityDegreeProfile,
-            json.decodeFromString<CredentialProfile>(profileResponseBody),
-        )
+        assertProfileJsonEquals(universityDegreeProfile, profileResponseBody)
 
         val mdocPhotoIdProfile = assertNotNull(
             profiles.firstOrNull { it.profileId == ISO_PHOTO_ID_PROFILE_ID },
@@ -228,7 +227,7 @@ class Issuer2ProfileEndpointTest {
                     mapping = profile.mapping,
                     selectiveDisclosure = profile.selectiveDisclosure,
                     idTokenClaimsMapping = profile.idTokenClaimsMapping,
-                    mdocNamespacesDataMapping = profile.mdocNamespacesDataMapping,
+                    mDocNameSpacesDataMappingConfig = profile.mDocNameSpacesDataMappingConfig,
                     x5Chain = profile.x5Chain,
                     webhookUrl = profile.webhookUrl,
                 )
@@ -295,11 +294,11 @@ class Issuer2ProfileEndpointTest {
             "$.['$ISO_PHOTO_ID_CONFIGURATION_ID'].family_name_unicode",
             profile.idTokenClaimsMapping?.get("$.family_name"),
         )
-        val entriesConfig = assertNotNull(profile.mdocNamespacesDataMapping
-            ?.get(ISO_PHOTO_ID_CONFIGURATION_ID)
-            ?.jsonObject
-            ?.get("entriesConfigMap")
-            ?.jsonObject)
+        val entriesConfig = assertNotNull(
+            profile.mDocNameSpacesDataMappingConfig
+                ?.get(ISO_PHOTO_ID_CONFIGURATION_ID)
+                ?.entriesConfigMap,
+        )
         assertNotNull(entriesConfig["portrait"], "Expected portrait byte-string mapping")
     }
 
@@ -315,11 +314,11 @@ class Issuer2ProfileEndpointTest {
         assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
         assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].resident_address", profile.idTokenClaimsMapping?.get("$.address"))
 
-        val entriesConfig = assertNotNull(profile.mdocNamespacesDataMapping
-            ?.get(ISO_MDL_NAMESPACE_ID)
-            ?.jsonObject
-            ?.get("entriesConfigMap")
-            ?.jsonObject)
+        val entriesConfig = assertNotNull(
+            profile.mDocNameSpacesDataMappingConfig
+                ?.get(ISO_MDL_NAMESPACE_ID)
+                ?.entriesConfigMap,
+        )
         assertNotNull(entriesConfig["portrait"], "Expected mDL portrait byte-string mapping")
         assertNotNull(entriesConfig["driving_privileges"], "Expected mDL nested driving privilege mapping")
     }
@@ -330,7 +329,7 @@ class Issuer2ProfileEndpointTest {
         assertEquals(ISSUER_DID, profile.issuerDid)
         assertEquals("Jane", profile.credentialData["given_name"]?.jsonPrimitive?.content)
         assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
-        assertNotNull(profile.selectiveDisclosure?.get("fields")?.jsonObject)
+        assertNotNull(profile.selectiveDisclosure?.fields)
         assertEquals("$.given_name", profile.idTokenClaimsMapping?.get("given_name"))
         assertNull(profile.x5Chain, "Expected identity SD-JWT VC profile to be DID/JWK based")
     }
@@ -366,10 +365,15 @@ class Issuer2ProfileEndpointTest {
         assertNoUnresolvedSubstitution("$profileId.issuerKey", profile.issuerKey)
         assertNoUnresolvedSubstitution("$profileId.credentialData", profile.credentialData)
         profile.mapping?.let { assertNoUnresolvedSubstitution("$profileId.mapping", it) }
-        profile.selectiveDisclosure?.let { assertNoUnresolvedSubstitution("$profileId.selectiveDisclosure", it) }
-        profile.mdocNamespacesDataMapping?.forEach { (namespace, mapping) ->
-            assertNoUnresolvedString("$profileId.mdocNamespacesDataMapping.key", namespace)
-            assertNoUnresolvedSubstitution("$profileId.mdocNamespacesDataMapping.$namespace", mapping)
+        profile.selectiveDisclosure?.let {
+            assertNoUnresolvedSubstitution("$profileId.selectiveDisclosure", json.encodeToJsonElement(it))
+        }
+        profile.mDocNameSpacesDataMappingConfig?.forEach { (namespace, mapping) ->
+            assertNoUnresolvedString("$profileId.mDocNameSpacesDataMappingConfig.key", namespace)
+            assertNoUnresolvedSubstitution(
+                "$profileId.mDocNameSpacesDataMappingConfig.$namespace",
+                json.encodeToJsonElement(mapping),
+            )
         }
         profile.idTokenClaimsMapping?.forEach { (claim, path) ->
             assertNoUnresolvedString("$profileId.idTokenClaimsMapping.key", claim)
@@ -398,6 +402,18 @@ class Issuer2ProfileEndpointTest {
         assertFalse(value.contains("\${"), "Expected $context to have resolved HOCON substitutions, got: $value")
     }
 
+    private fun assertProfileJsonEquals(
+        expected: CredentialProfile,
+        actualBody: String,
+        message: String? = null,
+    ) {
+        assertEquals(
+            json.encodeToJsonElement(expected),
+            json.parseToJsonElement(actualBody),
+            message,
+        )
+    }
+
     private fun ApplicationTestBuilder.installIssuer2WithConfigFiles() {
         loadIssuer2ConfigFiles()
         application {
@@ -417,6 +433,7 @@ class Issuer2ProfileEndpointTest {
     private fun loadIssuer2ConfigFiles() {
         ConfigManager.preclear()
         FeatureManager.preclear()
+        registerIssuer2ConfigDecoders()
         configFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
 
         val configDir = issuer2ConfigDir()

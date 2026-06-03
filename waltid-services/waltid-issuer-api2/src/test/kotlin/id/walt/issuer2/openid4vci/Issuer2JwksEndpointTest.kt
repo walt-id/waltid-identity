@@ -8,6 +8,7 @@ import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.issuer2Module
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
@@ -119,6 +120,7 @@ class Issuer2JwksEndpointTest {
     private fun loadIssuer2ConfigFiles() {
         ConfigManager.preclear()
         FeatureManager.preclear()
+        registerIssuer2ConfigDecoders()
         configFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
 
         val configDir = issuer2ConfigDir()
