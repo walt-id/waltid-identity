@@ -1,7 +1,7 @@
 package id.walt.issuer2.controller.openapi
 
-import id.walt.issuer2.controller.dto.CreateCredentialOfferRequest
-import id.walt.issuer2.controller.dto.CreateCredentialOfferResponse
+import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
+import id.walt.issuer2.controller.dto.CredentialOfferCreateResponse
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -61,25 +61,77 @@ object Issuer2ManagementRoutesDocs {
 
     fun createCredentialOffer(): RouteConfig.() -> Unit = {
         summary = "Create credential offer"
-        description =
-            "Create an issuance session and return an OpenID4VCI credential offer URI. " +
-                "Supports pre-authorized and authorization-code issuance flows."
+        description = """
+            Create a profile-derived OpenID4VCI credential offer URL and the backing issuance session.
+
+            Supports pre-authorized and authorization-code issuance flows. The offer can be returned
+            by reference or by value. Runtime overrides can be applied for one offer only. Supported
+            override fields are: subjectId, issuerDid, credentialData, mapping, selectiveDisclosure,
+            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and webhookUrl.
+            Offer/session expiry is configured with expiresInSeconds. The default is 5 minutes.
+            Use -1 for no expiry.
+        """.trimIndent()
         request {
-            body<CreateCredentialOfferRequest> {
-                example("Pre-authorized credential offer") {
-                    value = Issuer2RequestExamples.PRE_AUTHORIZED_CREDENTIAL_OFFER
+            body<CredentialOfferCreateRequest> {
+                example("[authorized][by-reference]") {
+                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE
                 }
-                example("Authorization-code credential offer") {
-                    value = Issuer2RequestExamples.AUTHORIZATION_CODE_CREDENTIAL_OFFER
+                example("[authorized][by-value]") {
+                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE
+                }
+                example("[authorized][by-value][issuer_state included]") {
+                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE_AND_ISSUER_STATE
+                }
+                example("[pre-authorized][by-reference]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE
+                }
+                example("[pre-authorized][by-value]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_VALUE
+                }
+                example("[pre-authorized][by-reference][provided tx_code]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_PROVIDED_TX_CODE
+                }
+                example("[pre-authorized][by-reference][generated tx_code]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_GENERATED_TX_CODE
+                }
+                example("[pre-authorized][by-reference][expires in 2 minutes]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_2_MIN_EXPIRY
+                }
+                example("[pre-authorized][by-reference][no expiry]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY
+                }
+                example("[pre-authorized][by-reference] with credential data override") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
+                }
+                example("[pre-authorized][by-reference] with selective disclosure override") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE
+                }
+                example("Pre-authorized mDOC photo ID offer") {
+                    value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER
+                }
+                example("Authorization-code mDL offer") {
+                    value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER
                 }
             }
         }
         response {
             HttpStatusCode.Created to {
                 description = "Credential offer created"
-                body<CreateCredentialOfferResponse> {
-                    example("Credential offer response") {
-                        value = Issuer2RequestExamples.CREDENTIAL_OFFER_RESPONSE
+                body<CredentialOfferCreateResponse> {
+                    example("Offer response by reference") {
+                        value = Issuer2RequestExamples.CREDENTIAL_OFFER_RESPONSE_BY_REFERENCE
+                    }
+                    example("Offer response by value") {
+                        value = Issuer2RequestExamples.CREDENTIAL_OFFER_RESPONSE_BY_VALUE
+                    }
+                    example("Offer response by value with issuer_state included") {
+                        value = Issuer2RequestExamples.CREDENTIAL_OFFER_RESPONSE_BY_VALUE_WITH_ISSUER_STATE
+                    }
+                    example("Pre-authorized offer response with generated tx_code") {
+                        value = Issuer2RequestExamples.PRE_AUTHORIZED_CREDENTIAL_OFFER_RESPONSE_WITH_GENERATED_TX_CODE
+                    }
+                    example("Pre-authorized offer response with provided tx_code") {
+                        value = Issuer2RequestExamples.PRE_AUTHORIZED_CREDENTIAL_OFFER_RESPONSE_WITH_PROVIDED_TX_CODE
                     }
                 }
             }

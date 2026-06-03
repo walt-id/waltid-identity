@@ -1,12 +1,10 @@
 package id.walt.issuer2.controller
 
-import id.walt.issuer2.controller.dto.CreateCredentialOfferRequest
-import id.walt.issuer2.controller.dto.toCommand
-import id.walt.issuer2.controller.dto.toDto
+import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
-import id.walt.issuer2.service.openid4vci.CredentialOfferService
+import id.walt.issuer2.service.CredentialOfferService
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
@@ -34,7 +32,7 @@ class Issuer2ManagementController(
         }
 
         post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
-            val request = call.receive<CreateCredentialOfferRequest>()
+            val request = call.receive<CredentialOfferCreateRequest>()
             call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request))
         }
 

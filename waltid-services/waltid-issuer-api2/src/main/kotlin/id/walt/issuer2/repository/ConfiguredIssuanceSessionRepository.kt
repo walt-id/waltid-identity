@@ -3,7 +3,10 @@ package id.walt.issuer2.repository
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.issuer2.domain.IssuanceSession
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 class ConfiguredIssuanceSessionRepository : IssuanceSessionRepository {
     private val sessions = ConfiguredPersistence(
@@ -13,7 +16,7 @@ class ConfiguredIssuanceSessionRepository : IssuanceSessionRepository {
     )
 
     override suspend fun save(session: IssuanceSession): IssuanceSession {
-        sessions[session.sessionId] = session
+        sessions.set(session.sessionId, session, ttlUntil(session.expiresAt))
         return session
     }
 
@@ -25,3 +28,6 @@ class ConfiguredIssuanceSessionRepository : IssuanceSessionRepository {
         sessions.remove(sessionId)
     }
 }
+
+private fun ttlUntil(expiresAt: Instant): Duration =
+    (expiresAt - Clock.System.now()).coerceAtLeast(Duration.ZERO)

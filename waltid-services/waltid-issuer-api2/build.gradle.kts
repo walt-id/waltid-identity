@@ -37,6 +37,8 @@ dependencies {
     implementation(identityLibs.ktor.serialization.kotlinx.json)
     implementation(identityLibs.kotlinx.coroutines.core)
     implementation(identityLibs.kotlinx.datetime)
+    implementation(identityLibs.jsonpathkt)
+    implementation(identityLibs.jaywayjsonpath)
 
     implementation("com.sksamuel.hoplite:hoplite-core:${Versions.HOPLITE_VERSION}")
     implementation("com.sksamuel.hoplite:hoplite-hocon:${Versions.HOPLITE_VERSION}")

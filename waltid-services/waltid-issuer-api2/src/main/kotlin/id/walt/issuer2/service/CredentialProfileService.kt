@@ -53,7 +53,7 @@ class CredentialProfileService(
             mapping = mapping,
             selectiveDisclosure = selectiveDisclosure,
             idTokenClaimsMapping = idTokenClaimsMapping,
-            mdocNamespacesDataMapping = mdocNamespacesDataMapping,
+            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             x5Chain = x5Chain,
             webhookUrl = webhookUrl,
         )

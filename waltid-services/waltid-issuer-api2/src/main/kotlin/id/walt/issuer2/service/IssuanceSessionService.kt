@@ -10,6 +10,8 @@ class IssuanceSessionService(
 ) {
     suspend fun createSession(session: IssuanceSession): IssuanceSession = repository.save(session)
 
+    suspend fun saveSession(session: IssuanceSession): IssuanceSession = repository.save(session)
+
     suspend fun getSession(sessionId: String): IssuanceSession =
         repository.get(sessionId) ?: throw NotFoundException("Issuance session not found: $sessionId")
 
@@ -17,12 +19,21 @@ class IssuanceSessionService(
 
     suspend fun listSessions(): List<IssuanceSession> = repository.list()
 
+    suspend fun findByExternalAuthorizationState(state: String): IssuanceSession? =
+        repository.list().firstOrNull { it.externalAuthorizationState == state }
+
     suspend fun updateStatus(
         sessionId: String,
         status: IssuanceSessionStatus,
         reason: String? = null,
+        issuedCredentialFormat: String? = null,
     ): IssuanceSession {
-        val updated = getSession(sessionId).copy(status = status, statusReason = reason)
+        val existing = getSession(sessionId)
+        val updated = existing.copy(
+            status = status,
+            statusReason = reason,
+            issuedCredentialFormat = issuedCredentialFormat ?: existing.issuedCredentialFormat,
+        )
         return repository.save(updated)
     }
 }
