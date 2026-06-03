@@ -75,7 +75,7 @@ object OpenId4VciRoutesDocs {
 
     fun authorize(): RouteConfig.() -> Unit = {
         summary = "Authorization endpoint"
-        description = "OpenID4VCI authorization endpoint for authorization-code flow."
+        description = "The authorization endpoint"
         response {
             HttpStatusCode.Found to {
                 description = "Redirect containing authorization response parameters"
@@ -83,9 +83,19 @@ object OpenId4VciRoutesDocs {
         }
     }
 
+    fun externalOAuthCallback(): RouteConfig.() -> Unit = {
+        summary = "External OAuth callback"
+        description = "Callback endpoint used by the configured external OAuth provider for authorization-code issuance."
+        response {
+            HttpStatusCode.Found to {
+                description = "Redirect back to the wallet client with the OpenID4VCI authorization code"
+            }
+        }
+    }
+
     fun token(): RouteConfig.() -> Unit = {
         summary = "Token endpoint"
-        description = "OAuth token endpoint for authorization-code and pre-authorized-code grants."
+        description = "The token endpoint."
         response {
             HttpStatusCode.OK to {
                 description = "Access token response"
@@ -96,7 +106,7 @@ object OpenId4VciRoutesDocs {
 
     fun credential(): RouteConfig.() -> Unit = {
         summary = "Credential endpoint"
-        description = "OpenID4VCI credential endpoint. Credential signing will be wired in a later implementation step."
+        description = "The credential endpoint."
         response {
             HttpStatusCode.OK to {
                 description = "Credential response"
@@ -107,7 +117,7 @@ object OpenId4VciRoutesDocs {
 
     fun nonce(): RouteConfig.() -> Unit = {
         summary = "Nonce endpoint"
-        description = "Return a fresh credential nonce."
+        description = "Return a nonce."
         response {
             HttpStatusCode.OK to {
                 description = "Nonce response"
