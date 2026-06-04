@@ -12,6 +12,11 @@ kotlin {
             sourceSetTreeName = "androidDeviceTest"
         }.configure {
             instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            packaging {
+                resources.excludes.add("META-INF/DEPENDENCIES")
+                resources.excludes.add("META-INF/LICENSE.md")
+                resources.excludes.add("META-INF/NOTICE.md")
+            }
         }
     }
 
