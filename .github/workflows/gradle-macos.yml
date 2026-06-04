@@ -1,7 +1,10 @@
-name: Run gradle build for iOS
+name: iOS build and test
 
 on:
   workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
 
 jobs:
   gradle:
@@ -15,7 +18,7 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Build iOS Simulator Framework (ARM64)
+      - name: Build and test iOS
         uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
         with:
           waltid-directory: 'waltid-identity'
