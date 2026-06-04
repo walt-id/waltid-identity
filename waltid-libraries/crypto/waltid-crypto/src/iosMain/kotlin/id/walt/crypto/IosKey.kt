@@ -13,18 +13,18 @@ import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.verifierFor
+import at.asitplus.signum.supreme.dsl.REQUIRED
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@Suppress("unused")
 class IosKey private constructor(
     private val options: Options,
     override val hasPrivateKey: Boolean = false
@@ -58,7 +58,7 @@ class IosKey private constructor(
                         this.curve = curve
                     }
                     if (options.inSecureElement) {
-                        hardware { backing = at.asitplus.signum.supreme.dsl.REQUIRED }
+                        hardware { backing = REQUIRED }
                     }
                 }
             } else {
@@ -97,14 +97,16 @@ class IosKey private constructor(
 
     override suspend fun exportJWKObject(): JsonObject {
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
-        val jwkStr = joseCompliantSerializer.encodeToString(signer.publicKey.toJsonWebKey(options.kid))
-        return kotlinx.serialization.json.Json.parseToJsonElement(jwkStr).let { it as JsonObject }
+        val jwk = signer.publicKey.toJsonWebKey(options.kid)
+        return kotlinx.serialization.json.Json.parseToJsonElement(
+            joseCompliantSerializer.encodeToString(jwk)
+        ).jsonObject
     }
 
     override suspend fun exportPEM(): String {
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
         val derBytes = signer.publicKey.encodeToTlv().derEncoded
-        val base64 = kotlin.io.encoding.Base64.Mime.encode(derBytes)
+        val base64 = kotlin.io.encoding.Base64.encode(derBytes).chunked(64).joinToString("\n")
         return "-----BEGIN PUBLIC KEY-----\n$base64\n-----END PUBLIC KEY-----"
     }
 

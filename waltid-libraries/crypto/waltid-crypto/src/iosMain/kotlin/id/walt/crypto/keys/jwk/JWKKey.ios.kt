@@ -6,6 +6,7 @@ import at.asitplus.signum.indispensable.ECCurve
 import at.asitplus.signum.indispensable.SignatureAlgorithm
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.JweAlgorithm
+import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
 import at.asitplus.signum.indispensable.josef.JwsAlgorithm
 import at.asitplus.signum.indispensable.josef.JwsCompact
@@ -22,7 +23,7 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
-import id.walt.crypto.utils.JweEncryptionSupreme
+import id.walt.crypto.utils.JweEncryptionHelper
 import id.walt.crypto.utils.keyFromIntermediate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -71,7 +72,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow()
         val derBytes = cryptoPubKey.encodeToTlv().derEncoded
-        val base64 = Base64.Mime.encode(derBytes)
+        val base64 = Base64.Default.encode(derBytes).chunked(64).joinToString("\n")
         return "-----BEGIN PUBLIC KEY-----\n$base64\n-----END PUBLIC KEY-----"
     }
 
@@ -232,7 +233,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
                 .let { Base64.decode(it) }
 
             val cryptoPubKey = if (pem.contains("BEGIN CERTIFICATE")) {
-                at.asitplus.signum.indispensable.pki.X509Certificate.decodeFromDer(derBytes).decodedPublicKey.getOrThrow()
+                X509Certificate.decodeFromDer(derBytes).decodedPublicKey.getOrThrow()
             } else {
                 CryptoPublicKey.decodeFromDer(derBytes)
             }
@@ -263,7 +264,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
 
         val encryption = header.encryption!!
         val keyLenBits = encryption.combinedEncryptionKeyLength.bits.toInt()
-        val cekBytes = JweEncryptionSupreme.concatKdfPublic(z, keyLenBits, encryption.identifier)
+        val cekBytes = JweEncryptionHelper.concatKdf(z, keyLenBits, encryption.identifier)
 
         val key = keyFromIntermediate(encryption.algorithm, cekBytes)
 
@@ -278,7 +279,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         }
         val recipientKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow() as CryptoPublicKey.EC
-        return JweEncryptionSupreme.encryptEcdhEs(
+        return JweEncryptionHelper.encryptEcdhEs(
             plaintext = plaintext,
             recipientPublicKey = recipientKey,
             encAlg = encAlg,

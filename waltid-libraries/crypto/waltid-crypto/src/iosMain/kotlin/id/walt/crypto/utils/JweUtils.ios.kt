@@ -3,6 +3,7 @@ package id.walt.crypto.utils
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.JweAlgorithm
+import at.asitplus.signum.indispensable.josef.JweHeader
 import at.asitplus.signum.indispensable.josef.JweEncrypted
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.supreme.agree.keyAgreement
@@ -29,7 +30,7 @@ actual object JweUtils {
         val recipientKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk)
             .toCryptoPublicKey().getOrThrow() as CryptoPublicKey.EC
         return kotlinx.coroutines.runBlocking {
-            JweEncryptionSupreme.encryptEcdhEs(
+            JweEncryptionHelper.encryptEcdhEs(
                 plaintext = payload.toString().encodeToByteArray(),
                 recipientPublicKey = recipientKey,
                 encAlg = enc,
@@ -56,7 +57,7 @@ actual object JweUtils {
 
             val encryption = header.encryption!!
             val keyLenBits = encryption.combinedEncryptionKeyLength.bits.toInt()
-            val cekBytes = JweEncryptionSupreme.concatKdfPublic(z, keyLenBits, encryption.identifier)
+            val cekBytes = JweEncryptionHelper.concatKdf(z, keyLenBits, encryption.identifier)
 
             val key = keyFromIntermediate(encryption.algorithm, cekBytes)
 
@@ -69,7 +70,7 @@ actual object JweUtils {
 
         return JwsUtils.JwsParts(
             header = Json.parseToJsonElement(
-                joseCompliantSerializer.encodeToString(at.asitplus.signum.indispensable.josef.JweHeader.serializer(), header)
+                joseCompliantSerializer.encodeToString(JweHeader.serializer(), header)
             ).jsonObject,
             payload = payloadJson,
             signature = ""

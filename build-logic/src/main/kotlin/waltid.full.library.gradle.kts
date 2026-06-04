@@ -23,6 +23,7 @@ kotlin {
         withDeviceTestBuilder {
             sourceSetTreeName = "test"
         }
+        withHostTestBuilder { }
 
         compilations.all {
             compileTaskProvider.configure {

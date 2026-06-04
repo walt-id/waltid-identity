@@ -27,7 +27,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
 @OptIn(ExperimentalEncodingApi::class)
-object JweEncryptionSupreme {
+object JweEncryptionHelper {
 
     suspend fun encryptEcdhEs(
         plaintext: ByteArray,
@@ -85,9 +85,7 @@ object JweEncryptionSupreme {
         ).serialize()
     }
 
-    fun concatKdfPublic(z: ByteArray, keyLenBits: Int, algId: String): ByteArray = concatKdf(z, keyLenBits, algId)
-
-    private fun concatKdf(z: ByteArray, keyLenBits: Int, algId: String): ByteArray {
+    internal fun concatKdf(z: ByteArray, keyLenBits: Int, algId: String): ByteArray {
         val algIdBytes = algId.encodeToByteArray()
         val otherInfo = intTo4Bytes(algIdBytes.size) + algIdBytes +
             intTo4Bytes(0) + intTo4Bytes(0) + intTo4Bytes(keyLenBits)
