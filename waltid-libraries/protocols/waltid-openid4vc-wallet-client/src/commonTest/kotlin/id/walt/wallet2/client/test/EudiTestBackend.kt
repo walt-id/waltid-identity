@@ -7,9 +7,9 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /**
  * Generates credential offers from the public EUDI test backend.
@@ -145,10 +145,9 @@ object EudiTestBackend {
     }
 
     suspend fun waitForVerifierSuccess(transactionId: String, timeoutMs: Long = 90_000) {
-        val startTime = Clock.System.now()
+        val mark = TimeSource.Monotonic.markNow()
         while (true) {
-            val elapsed = Clock.System.now() - startTime
-            if (elapsed > timeoutMs.milliseconds) {
+            if (mark.elapsedNow() > timeoutMs.milliseconds) {
                 error("Verifier did not confirm presentation within ${timeoutMs}ms")
             }
 
