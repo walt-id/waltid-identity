@@ -34,4 +34,4 @@ jobs:
           disable-animations: true
           script: |
             cd waltid-identity
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:connectedAndroidDeviceTestDebugAndroidTest --info
+            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:connectedAndroidDeviceTest --info
