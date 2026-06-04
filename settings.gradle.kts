@@ -1,7 +1,6 @@
 // # walt.id identity build configuration
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
@@ -106,8 +105,8 @@ val modules = listOfNotNull(
     // CLI
     "$applications:waltid-cli",
 
-    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
-    "$applications:waltid-wallet-demo-android" whenEnabled enableAndroidBuild,
+    ":waltid-applications:waltid-android",
+    "$applications:waltid-wallet-demo-android",
 
     "$applications:waltid-wallet-demo-ios" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
