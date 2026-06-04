@@ -13,6 +13,7 @@ import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.verifierFor
+import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
@@ -45,7 +46,7 @@ class IosKey private constructor(
         suspend fun create(options: Options): Key {
             val curve = when (options.keyType) {
                 KeyType.secp256r1 -> ECCurve.SECP_256_R_1
-                KeyType.Ed25519 -> error("Ed25519 not yet supported via Supreme on iOS")
+                KeyType.Ed25519 -> error("Ed25519 is not yet supported on iOS")
                 KeyType.RSA -> null
                 else -> error("Unsupported key type: ${options.keyType}")
             }
@@ -194,9 +195,7 @@ class IosKey private constructor(
         return signer.publicKey.encodeToTlv().derEncoded
     }
 
-    override suspend fun getMeta(): KeyMeta {
-        error("Not yet implemented")
-    }
+    override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
 
     override suspend fun deleteKey(): Boolean = runCatching {
         IosKeychainProvider.deleteSigningKey(options.kid).getOrThrow()

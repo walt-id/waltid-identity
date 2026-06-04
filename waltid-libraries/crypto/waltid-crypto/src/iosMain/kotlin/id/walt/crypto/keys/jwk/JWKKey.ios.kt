@@ -5,6 +5,8 @@ import at.asitplus.signum.indispensable.CryptoSignature
 import at.asitplus.signum.indispensable.ECCurve
 import at.asitplus.signum.indispensable.SignatureAlgorithm
 import at.asitplus.signum.indispensable.josef.JsonWebKey
+import at.asitplus.signum.indispensable.josef.JweAlgorithm
+import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
 import at.asitplus.signum.indispensable.josef.JwsAlgorithm
 import at.asitplus.signum.indispensable.josef.JwsCompact
 import at.asitplus.signum.indispensable.josef.JwsHeader
@@ -13,12 +15,15 @@ import at.asitplus.signum.indispensable.josef.toJsonWebKey
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.SignatureInput
+import at.asitplus.signum.supreme.sign.Signer
 import at.asitplus.signum.supreme.sign.verifierFor
-import id.walt.crypto.utils.JweEncryptionSupreme
+import at.asitplus.signum.supreme.symmetric.decrypt
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
+import id.walt.crypto.utils.JweEncryptionSupreme
+import id.walt.crypto.utils.keyFromIntermediate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -87,7 +92,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         val jwsAlgorithm = when (keyType) {
             KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
             KeyType.RSA -> JwsAlgorithm.Signature.RSA.RS256
-            KeyType.Ed25519 -> error("Ed25519 JWS signing not yet supported via Supreme on iOS")
+            KeyType.Ed25519 -> error("Ed25519 JWS signing is not yet supported on iOS")
             else -> error("Unsupported key type: $keyType")
         }
 
@@ -143,7 +148,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         val sigAlg = when (keyType) {
             KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
             KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPKCS1Padding
-            KeyType.Ed25519 -> error("Ed25519 JWS verification not yet supported via Supreme on iOS")
+            KeyType.Ed25519 -> error("Ed25519 JWS verification is not yet supported on iOS")
             else -> error("Unsupported key type for verification: $keyType")
         }
 
@@ -164,9 +169,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         return cryptoPubKey.encodeToTlv().derEncoded
     }
 
-    actual override suspend fun getMeta(): JwkKeyMeta {
-        TODO("Not yet implemented")
-    }
+    actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
 
     actual override suspend fun deleteKey(): Boolean {
         return runCatching {
@@ -191,7 +194,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
                 KeyType.RSA -> IosKeychainProvider.createSigningKey(kid) {
                     rsa { }
                 }.getOrThrow()
-                KeyType.Ed25519 -> error("Ed25519 key generation not yet supported via Supreme on iOS")
+                KeyType.Ed25519 -> error("Ed25519 key generation is not yet supported on iOS")
                 else -> error("Key generation not supported for $type on iOS")
             }
 
@@ -199,10 +202,16 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
             return JWKKey(jwkJson, kid)
         }
 
+        @OptIn(ExperimentalEncodingApi::class)
         actual override suspend fun importRawPublicKey(
             type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?
         ): Key {
-            TODO("Not yet implemented")
+            val cryptoPubKey = when (type) {
+                KeyType.secp256r1 -> CryptoPublicKey.EC.fromAnsiX963Bytes(ECCurve.SECP_256_R_1, rawPublicKey)
+                else -> CryptoPublicKey.decodeFromDer(rawPublicKey)
+            }
+            val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey(metadata?.keyId))
+            return JWKKey(jwkJson, metadata?.keyId)
         }
 
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> {
@@ -234,7 +243,27 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     }
 
     actual suspend fun decryptJwe(jweString: String): ByteArray {
-        TODO("JWE decryption not yet implemented with Supreme on iOS")
+        check(hasPrivateKey) { "Private key required for decryption." }
+        check(keyType == KeyType.secp256r1) { "ECDH-ES decryption only supported for EC P-256 keys." }
+
+        val jwe = deserialize(jweString).getOrThrow()
+        val header = jwe.header
+        require(header.algorithm == JweAlgorithm.ECDH_ES)
+
+        val epk = header.ephemeralKeyPair?.toCryptoPublicKey()?.getOrThrow() as CryptoPublicKey.EC
+        val signer = IosKeychainProvider.getSignerForKey(getKeyId()).getOrThrow()
+
+        val z = (signer as Signer.ECDSA).keyAgreement(epk).getOrThrow()
+
+        val encryption = header.encryption!!
+        val keyLenBits = encryption.combinedEncryptionKeyLength.bits.toInt()
+        val cekBytes = JweEncryptionSupreme.concatKdfPublic(z, keyLenBits, encryption.identifier)
+
+        val key = keyFromIntermediate(encryption.algorithm, cekBytes)
+
+        val aad = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+            .encode(jwe.headerAsParsed).encodeToByteArray()
+        return key.decrypt(jwe.iv, jwe.ciphertext, jwe.authTag, aad).getOrThrow()
     }
 
     actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
