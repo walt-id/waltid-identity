@@ -15,7 +15,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("dev.whyoleg.cryptography:cryptography-random:0.5.0")
+            implementation("dev.whyoleg.cryptography:cryptography-random:0.6.0")
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.datetime)

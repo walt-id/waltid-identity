@@ -37,7 +37,7 @@ dependencies {
     // Dependency information
     implementation(identityLibs.benmanes.versions)
     //implementation(identityLibs.owasp.dependencycheck)
-    implementation("com.github.jk1.dependency-license-report:com.github.jk1.dependency-license-report.gradle.plugin:3.0.1")
+    implementation("com.github.jk1.dependency-license-report:com.github.jk1.dependency-license-report.gradle.plugin:3.1.2")
 
     // Android
     implementation(identityLibs.android.gradle.plugin)
