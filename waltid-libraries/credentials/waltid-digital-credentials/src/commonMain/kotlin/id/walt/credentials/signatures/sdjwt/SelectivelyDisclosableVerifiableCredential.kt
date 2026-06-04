@@ -21,7 +21,10 @@ interface SelectivelyDisclosableVerifiableCredential {
 
     fun disclose(credential: DigitalCredential, attributes: List<SdJwtSelectiveDisclosure>): String {
         checkNotNull(credential.signed) { "Credential has to be signed to be able to disclose" }
-        return "${credential.signed}~${attributes.joinToString("~") { it.asEncoded() }}"
+        // Use each disclosure's preserved original wire encoding (the issuer hashed exactly these
+        // bytes into the `_sd` digests). Re-serializing [salt, name, value] can differ byte-for-byte
+        // and would yield digests that no longer match, causing verifiers to reject the disclosure.
+        return "${credential.signed}~${attributes.joinToString("~") { it.encoded }}"
     }
 
     fun selfCheck() {

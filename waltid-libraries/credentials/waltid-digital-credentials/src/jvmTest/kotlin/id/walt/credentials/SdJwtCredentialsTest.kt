@@ -32,8 +32,17 @@ class SdJwtCredentialsTest {
         check(disclosures.sortedByName() == vcDisclosures.sortedByName()) { "Expected disclosures != parsed disclosures" }
 
 
-        val selectedDisclosures = disclosures.map { SdJwtSelectiveDisclosure(it, it.toString()) }
+        // Disclose using the disclosures parsed from the credential, which preserve the exact
+        // original base64url wire encoding (so re-assembling reproduces the original SD-JWT).
+        val selectedDisclosures = vc.disclosures!!
         val disclosedVc = vc.disclose(vc, selectedDisclosures)
-        check(example.removeSuffix("~") == disclosedVc.removeSuffix("~")) { "disclosed $disclosedVc != example $example" }
+
+        // Disclosure order is not significant per RFC 9901 (verifiers match by digest), so compare
+        // the issuer-signed JWT and the SET of disclosures rather than the exact concatenation order.
+        fun splitParts(sdJwt: String): Pair<String, Set<String>> {
+            val parts = sdJwt.removeSuffix("~").split("~")
+            return parts.first() to parts.drop(1).toSet()
+        }
+        check(splitParts(example) == splitParts(disclosedVc)) { "disclosed $disclosedVc != example $example" }
     }
 }

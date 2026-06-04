@@ -261,10 +261,14 @@ object CredentialParser {
             }
 
             fun findForHash(hash: String) =
-                /* asHashed() is the spec-compliant SHA-256(base64url(json_array)) method per RFC 9901.
+                /* asHashedFromEncoded() hashes the exact original base64url wire bytes (RFC 9901 §4.2)
+                 - the most reliable match as it is independent of any JSON re-serialization.
+                 asHashed() is SHA-256(base64url(json_array)) recomputed from salt/name/value.
                  asHashed2() is an alternative base64 encoding fallback for some non-standard issuers.
                  asHashed3() (double-base64url) is a non-standard malformed disclosure */
-                availableDisclosures!!.firstOrNull { it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash }
+                availableDisclosures!!.firstOrNull {
+                    it.asHashedFromEncoded() == hash || it.asHashed() == hash || it.asHashed2() == hash || it.asHashed3() == hash
+                }
 
             // Helper to recursively scan a JSON element for more SD-JWT hashes.
             // currentPath is the Claim Path (§4.6.1) of [element] relative to the credential root.

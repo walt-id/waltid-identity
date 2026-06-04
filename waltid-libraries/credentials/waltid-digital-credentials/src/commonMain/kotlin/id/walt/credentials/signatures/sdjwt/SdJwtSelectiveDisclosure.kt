@@ -133,6 +133,14 @@ data class SdJwtSelectiveDisclosure(
     fun asHashed3() = SHA256().digest(encoded.encodeToByteArray().encodeToBase64Url().encodeToByteArray()).encodeToBase64Url()
 
     /**
+     * RFC 9901 §4.2 digest computed over the disclosure's preserved original wire encoding
+     * (`SHA-256(encoded)`, base64url). This matches the digest the issuer placed in `_sd` when
+     * [encoded] is the exact base64url string received on the wire, regardless of any byte-level
+     * re-serialization differences in [asEncoded].
+     */
+    fun asHashedFromEncoded() = SHA256().digest(encoded.encodeToByteArray()).encodeToBase64Url()
+
+    /**
      * Renders this disclosure's [location] Claim Path (SD-JWT VC §4.6.1) as a DIF Presentation
      * Exchange JSONPath string (e.g. `$.credentialSubject.degree.name`, `$.nationalities[0]`).
      *

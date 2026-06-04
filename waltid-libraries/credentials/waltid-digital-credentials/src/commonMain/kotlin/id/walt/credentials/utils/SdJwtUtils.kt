@@ -168,7 +168,11 @@ object SdJwtUtils {
                         salt = jsonArray[0].jsonPrimitive.content,
                         name = name, // Ensure your data class accepts String? here
                         value = value,
-                        encoded = jsonArrayString
+                        // Preserve the EXACT original base64url wire encoding. The issuer's digest in
+                        // `_sd` is SHA-256 over this exact string; re-serializing [salt,name,value]
+                        // can differ byte-for-byte (number/string formatting, key order) and would
+                        // produce a non-matching digest. See SdJwtSelectiveDisclosure.asEncoded().
+                        encoded = it
                     )
                 } else null
             }
