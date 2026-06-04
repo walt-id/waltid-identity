@@ -95,4 +95,39 @@ class W3CNestedDisclosureLocationTest {
             nameLoc
         )
     }
+
+    @Test
+    fun legacyStringLocationDeserializesToClaimPath() {
+        // Backward compatibility: persisted credentials/sessions stored `location` as a JSONPath
+        // string before the Claim Path migration. These must still deserialize.
+        val json = Json { ignoreUnknownKeys = true }
+
+        val legacyTopLevel = json.decodeFromString<SdJwtSelectiveDisclosure>(
+            """{"salt":"s","name":"birthdate","value":"1940-01-01","location":"$.birthdate","encoded":"x"}"""
+        )
+        assertEquals(listOf(JsonPrimitive("birthdate")), legacyTopLevel.location)
+
+        val legacyNested = json.decodeFromString<SdJwtSelectiveDisclosure>(
+            """{"salt":"s","name":"name","value":"x","location":"$.credentialSubject.degree.name","encoded":"x"}"""
+        )
+        assertEquals(
+            listOf(JsonPrimitive("credentialSubject"), JsonPrimitive("degree"), JsonPrimitive("name")),
+            legacyNested.location
+        )
+
+        val legacyArrayIndex = json.decodeFromString<SdJwtSelectiveDisclosure>(
+            """{"salt":"s","name":null,"value":"x","location":"$.nationalities[0]","encoded":"x"}"""
+        )
+        assertEquals(listOf(JsonPrimitive("nationalities"), JsonPrimitive(0)), legacyArrayIndex.location)
+
+        // New array format still round-trips.
+        val newArray = json.decodeFromString<SdJwtSelectiveDisclosure>(
+            """{"salt":"s","name":"birthdate","value":"1940-01-01","location":["birthdate"],"encoded":"x"}"""
+        )
+        assertEquals(listOf(JsonPrimitive("birthdate")), newArray.location)
+
+        // Serialization emits the array form.
+        val serialized = json.encodeToString(SdJwtSelectiveDisclosure.serializer(), legacyTopLevel)
+        assertTrue(serialized.contains("\"location\":[\"birthdate\"]"), "expected array location, got: $serialized")
+    }
 }

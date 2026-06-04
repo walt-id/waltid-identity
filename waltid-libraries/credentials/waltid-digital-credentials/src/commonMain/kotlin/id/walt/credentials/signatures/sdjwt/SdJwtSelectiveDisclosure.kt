@@ -6,14 +6,75 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import org.kotlincrypto.hash.sha2.SHA256
+
+/**
+ * Serializer for the disclosure [SdJwtSelectiveDisclosure.location] Claim Path that is
+ * backward-compatible with the legacy representation.
+ *
+ * - **Writes** the SD-JWT VC §4.6.1 Claim Path as a JSON array of components.
+ * - **Reads** either that array, OR a legacy JSONPath string (e.g. `"$.birthdate"`,
+ *   `"$.credentialSubject.degree.name"`, `"$.nationalities[0]"`) which is parsed into the
+ *   equivalent Claim Path component list. This keeps already-persisted credentials and stored
+ *   sessions deserializable after the migration from a string `location` to a Claim Path array.
+ */
+object ClaimPathSerializer : KSerializer<List<JsonElement>> {
+    private val delegate = ListSerializer(JsonElement.serializer())
+    override val descriptor: SerialDescriptor = delegate.descriptor
+
+    override fun serialize(encoder: Encoder, value: List<JsonElement>) =
+        delegate.serialize(encoder, value)
+
+    override fun deserialize(decoder: Decoder): List<JsonElement> {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: return delegate.deserialize(decoder)
+        return when (val element = jsonDecoder.decodeJsonElement()) {
+            is JsonArray -> element.toList()
+            is JsonPrimitive -> if (element.isString) parseJsonPath(element.content) else listOf(element)
+            else -> emptyList()
+        }
+    }
+
+    /**
+     * Parses a legacy JSONPath-ish string into Claim Path components. Strips a leading `$`,
+     * splits on `.`, and turns `[n]` / `[*]` segments into integer indices / null wildcards.
+     */
+    private fun parseJsonPath(path: String): List<JsonElement> {
+        val result = mutableListOf<JsonElement>()
+        path.removePrefix("$").split('.').forEach { rawSegment ->
+            if (rawSegment.isEmpty()) return@forEach
+            // Separate a key from any trailing array-index/wildcard tokens, e.g. "nationalities[0]".
+            val bracket = rawSegment.indexOf('[')
+            val key = if (bracket >= 0) rawSegment.substring(0, bracket) else rawSegment
+            if (key.isNotEmpty()) result.add(JsonPrimitive(key))
+            if (bracket >= 0) {
+                Regex("""\[([^\]]*)\]""").findAll(rawSegment.substring(bracket)).forEach { m ->
+                    val token = m.groupValues[1]
+                    val idx = token.toIntOrNull()
+                    when {
+                        token == "*" -> result.add(JsonNull)
+                        idx != null -> result.add(JsonPrimitive(idx))
+                        else -> result.add(JsonPrimitive(token))
+                    }
+                }
+            }
+        }
+        return result
+    }
+}
 
 @Serializable
 data class SdJwtSelectiveDisclosure(
@@ -36,8 +97,11 @@ data class SdJwtSelectiveDisclosure(
      * W3C credentials embedded under a `vc` claim, relative to the `vc` content). It points
      * to the claim as if all selectively disclosable claims were disclosed (§4.6.1.2).
      *
-     * `null` when the location has not (yet) been resolved.
+     * `null` when the location has not (yet) been resolved. Deserialization is
+     * backward-compatible with the legacy JSONPath *string* representation (see
+     * [ClaimPathSerializer]).
      */
+    @Serializable(ClaimPathSerializer::class)
     val location: List<JsonElement>? = null,
     @EncodeDefault(EncodeDefault.Mode.ALWAYS)
     var encoded: String = makeEncoded(salt, name, value)
