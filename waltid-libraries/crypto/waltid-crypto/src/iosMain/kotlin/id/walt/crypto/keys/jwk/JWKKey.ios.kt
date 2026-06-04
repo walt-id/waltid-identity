@@ -133,7 +133,10 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         }
 
         val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
-        val signature = CryptoSignature.EC.fromRawBytes(signed)
+        val signature = when (keyType) {
+            KeyType.RSA -> CryptoSignature.RSA(signed)
+            else -> CryptoSignature.EC.fromRawBytes(signed)
+        }
         val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required for verifyRaw" }
         verifier.verify(SignatureInput(plaintext), signature).getOrThrow()
         plaintext
@@ -153,7 +156,10 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         }
 
         val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
-        val signature = CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
+        val signature = when (keyType) {
+            KeyType.RSA -> CryptoSignature.RSA(parsed.plainSignature)
+            else -> CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
+        }
         verifier.verify(SignatureInput(parsed.signatureInput), signature).getOrThrow()
 
         Json.parseToJsonElement(parsed.plainPayload.decodeToString())

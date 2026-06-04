@@ -138,7 +138,10 @@ class AndroidKey private constructor(
             else -> error("Unsupported key type for verification: ${options.keyType}")
         }
         val verifier = sigAlg.verifierFor(signer.publicKey).getOrThrow()
-        val signature = CryptoSignature.EC.fromRawBytes(signed)
+        val signature = when (options.keyType) {
+            KeyType.RSA -> CryptoSignature.RSA(signed)
+            else -> CryptoSignature.EC.fromRawBytes(signed)
+        }
         val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required" }
         verifier.verify(SignatureInput(plaintext), signature).getOrThrow()
         plaintext
@@ -153,7 +156,10 @@ class AndroidKey private constructor(
             else -> error("Unsupported key type for verification: ${options.keyType}")
         }
         val verifier = sigAlg.verifierFor(signer.publicKey).getOrThrow()
-        val signature = CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
+        val signature = when (options.keyType) {
+            KeyType.RSA -> CryptoSignature.RSA(parsed.plainSignature)
+            else -> CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
+        }
         verifier.verify(SignatureInput(parsed.signatureInput), signature).getOrThrow()
         Json.parseToJsonElement(parsed.plainPayload.decodeToString())
     }
