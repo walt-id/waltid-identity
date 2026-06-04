@@ -7,6 +7,12 @@ group = "id.walt.protocols"
 kotlin {
     androidLibrary {
         namespace = "id.walt.wallet2.client"
+
+        withDeviceTestBuilder {
+            sourceSetTreeName = "androidDeviceTest"
+        }.configure {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
     }
 
     sourceSets {
@@ -23,9 +29,25 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
+            implementation(identityLibs.ktor.client.core)
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.kotlinx.datetime)
         }
         iosMain.dependencies {
             implementation(identityLibs.ktor.client.darwin)
+        }
+        iosTest.dependencies {
+            implementation(identityLibs.ktor.client.darwin)
+        }
+        val androidDeviceTest by getting {
+            dependsOn(commonTest.get())
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(identityLibs.kotlinx.coroutines.test)
+                implementation("androidx.test:runner:1.6.2")
+                implementation("androidx.test.ext:junit:1.2.1")
+                implementation(identityLibs.ktor.client.cio)
+            }
         }
     }
 }
