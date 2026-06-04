@@ -25,6 +25,7 @@ android {
         buildConfigField("String", "ATTESTATION_HOST_HEADER", "\"${findProperty("attestation.hostHeader") ?: ""}\"")
     }
 
+
     buildTypes {
         release {
             isMinifyEnabled = false

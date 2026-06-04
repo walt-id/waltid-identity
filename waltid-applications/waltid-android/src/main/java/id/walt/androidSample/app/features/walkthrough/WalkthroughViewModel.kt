@@ -4,7 +4,8 @@ import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import id.walt.androidSample.app.features.walkthrough.model.*
-import id.walt.crypto.keys.AndroidKey
+import id.walt.crypto.AndroidKey
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
 import id.walt.did.dids.registrar.DidResult
@@ -64,15 +65,14 @@ interface WalkthroughViewModel {
         override val selectedKeyAlgorithm = MutableStateFlow(KeyAlgorithmOption.RSA)
         override val generatedKey = MutableStateFlow<String?>(null)
         override val publicKey =
-            MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"ALzEWJVtxmkmYAeEStt8OSv73SbYL65IRMJ0MjgDt3wwj8KV+0mct3v\\/V3hMjqE2nMJBxj88+vNIRxoRIIzdqU\\/yl7BsV3AVib2qgCw5NybiBxTl3YGbPg4VLt2d5TCHfVpIrMDDUMZaHSlXRilGXLN98pae9IJ1MNuufVnId7iuwosvAMAoNhaD6Webglq88fYHGE0p7M+ISwiWVUjiPhK+YahPwKv5TM+q82dUOZ3eReR7NVCHrglLNOjyxqY7Qc7Kea7klOki0tzbcl7KH2kCfubeKirI4EZujjITaMrHahyAAER91Kv3PYJu2m9eR80IoNg0eKh62+XmlzYpBp8=\",\"e\":\"AQAB\"}")
+            MutableStateFlow("{\"kty\":\"RSA\",\"n\":\"...\",\"e\":\"AQAB\"}")
         override val methodOptions = MethodOption.all()
         override val selectedMethod = MutableStateFlow(MethodOption.Key)
-        override val did =
-            MutableStateFlow("did:jwk:eyJrdHkiOiJSU0EiLCJuIjoiQUpkMGFkOG54QkNoSG1KendLUndXSWRGVTE4ZGlHa1E4Y0s5aGVTeXg5RWtnSjE3S2xLK2dueUUyaWF0cDBNT01DUVA5Y1NLcUFkbnRtWTJPOW82MEtnWGswbmxTaUJEVVJsVUZ6aUxpNFhwbXhFVFdzYkhUU00xVU1YTVEraFwvOXBDNE10MGZQd09Vc2ZBNElZbTFIaXExWUNUeDQ4MzFmNFdScDVrbVlReG14YVV1UkxwcnZKS0lWVXlnRWhsRzh4bU1hTDdob2YrWkc3XC9QT21rOTNWZnlzSFFcL25SdzhOaE14NFJvT1lCeHVIXC9zRytKSlJiZzR1dzhkRTlKbmpIMGl2RFJHNHZpUjBURUxnb245R1wvOVwvRk1pRFZaelRLTFhGdThEaHNscjZacDI2bUhKenFxU1FUZWlZVjNNMGpGRmpNXC9aSUMzSUhqZW4rZTYrTTZiN009IiwiZSI6IkFRQUIifQ")
+        override val did = MutableStateFlow("did:jwk:...")
         override val plainText = MutableStateFlow("")
         override val signOptions = SignOption.all()
         override val selectedSignOption = MutableStateFlow(SignOption.Raw)
-        override val signedOutput = MutableStateFlow("QmhjUDl3NExjeGNOUUQ3U09iRzFYT2NPOEc5bHREQ3ZvYW9jWmdoSjZNRjl0dnpFcDBjZ1crTFNR")
+        override val signedOutput = MutableStateFlow("QmhjUDl3...")
         override val verificationResult = MutableStateFlow(VerificationResult.Success)
 
         override fun onKeyAlgorithmSelected(keyAlgorithmOption: KeyAlgorithmOption) = Unit
@@ -102,7 +102,7 @@ interface WalkthroughViewModel {
         override val keyAlgorithmOptions = KeyAlgorithmOption.all()
         override val selectedKeyAlgorithm = MutableStateFlow<KeyAlgorithmOption>(KeyAlgorithmOption.RSA)
 
-        private var key: AndroidKey? = null
+        private var key: Key? = null
         override val generatedKey = MutableStateFlow<String?>(null)
         override val publicKey = MutableStateFlow<String?>(null)
 
@@ -162,12 +162,13 @@ interface WalkthroughViewModel {
         override fun onGenerateKeyClick() {
             viewModelScope.launch {
                 try {
-                    val androidKey = when (selectedKeyAlgorithm.value) {
-                        KeyAlgorithmOption.RSA -> AndroidKey.generate(KeyType.RSA)
-                        KeyAlgorithmOption.Secp256r1 -> AndroidKey.generate(KeyType.secp256r1)
+                    val keyType = when (selectedKeyAlgorithm.value) {
+                        KeyAlgorithmOption.RSA -> KeyType.RSA
+                        KeyAlgorithmOption.Secp256r1 -> KeyType.secp256r1
                     }
-                    key = androidKey
-                    generatedKey.update { androidKey.exportJWK() }
+                    val generatedKey = AndroidKey.create(AndroidKey.Options(keyType = keyType))
+                    key = generatedKey
+                    this@Default.generatedKey.update { generatedKey.exportJWK() }
                 } catch (e: InvalidAlgorithmParameterException) {
                     println("Error generating key: ${e.message}")
                     _events.send(WalkthroughEvent.Biometrics.SecureLockScreenNotEnabled)
@@ -175,22 +176,21 @@ interface WalkthroughViewModel {
             }
         }
 
-        // TODO provide other options to export public key
         override fun onRetrievePublicKeyClick() {
-            key?.let { androidKey ->
+            key?.let { currentKey ->
                 viewModelScope.launch {
-                    publicKey.update { androidKey.getPublicKey().exportJWK() }
+                    publicKey.update { currentKey.getPublicKey().exportJWK() }
                 }
             }
         }
 
         override fun onGenerateDIDClick() {
             viewModelScope.launch {
-                key?.let { androidKey ->
+                key?.let { currentKey ->
                     DidService.minimalInit()
                     val result = when (selectedMethod.value) {
-                        MethodOption.Key -> DidService.registerByKey("key", androidKey)
-                        MethodOption.JWK -> DidService.registerByKey("jwk", androidKey)
+                        MethodOption.Key -> DidService.registerByKey("key", currentKey)
+                        MethodOption.JWK -> DidService.registerByKey("jwk", currentKey)
                     }
                     didResult = result
                     did.update { result.did }
@@ -200,20 +200,20 @@ interface WalkthroughViewModel {
 
         override fun onSignTextClick() {
             viewModelScope.launch {
-                key?.let { androidKey ->
+                key?.let { currentKey ->
                     signedOutput.update {
                         when (selectedSignOption.value) {
                             SignOption.JWS -> {
-                                val signedOutput = androidKey.signJws(
+                                val signedOutput = currentKey.signJws(
                                     plaintext = plainText.value.toByteArray(),
-                                    headers = mapOf("kid" to JsonPrimitive(androidKey.getKeyId()))
+                                    headers = mapOf("kid" to JsonPrimitive(currentKey.getKeyId()))
                                 )
                                 signedOutputJWS = signedOutput
                                 signedOutput
                             }
 
                             SignOption.Raw -> {
-                                val signedByteArray = androidKey.signRaw(plainText.value.toByteArray())
+                                val signedByteArray = currentKey.signRaw(plainText.value.toByteArray()) as ByteArray
                                 signedOutputByteArray = signedByteArray
                                 Base64.encodeToString(signedByteArray, Base64.DEFAULT)
                             }
@@ -225,11 +225,11 @@ interface WalkthroughViewModel {
 
         override fun onVerifyClick() {
             viewModelScope.launch {
-                key?.let { androidKey ->
+                key?.let { currentKey ->
                     when (selectedSignOption.value) {
                         SignOption.Raw -> {
                             signedOutputByteArray?.let { byteArrayToVerify ->
-                                val result = androidKey.verifyRaw(byteArrayToVerify, plainText.value.toByteArray())
+                                val result = currentKey.verifyRaw(byteArrayToVerify, plainText.value.toByteArray())
                                 if (result.isSuccess) {
                                     verificationResult.update { VerificationResult.Success }
                                 } else {
@@ -240,7 +240,7 @@ interface WalkthroughViewModel {
 
                         SignOption.JWS -> {
                             signedOutputJWS?.let { signedJWSToVerify ->
-                                val result = androidKey.verifyJws(signedJWSToVerify)
+                                val result = currentKey.verifyJws(signedJWSToVerify)
                                 if (result.isSuccess) {
                                     verificationResult.update { VerificationResult.Success }
                                 } else {

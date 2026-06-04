@@ -2,7 +2,7 @@ fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
 val enableIosBuild = getSetting("enableIosBuild")
 
 plugins {
-    id("waltid.multiplatform.library")
+    id("waltid.full.library")
     id("waltid.publish.maven")
 }
 
@@ -13,9 +13,8 @@ kotlin {
         outputModuleName = "crypto"
     }
 
-    if(enableIosBuild) {
-        iosArm64()
-        iosSimulatorArm64()
+    androidLibrary {
+        namespace = "id.walt.crypto"
     }
 
     sourceSets {
@@ -49,29 +48,43 @@ kotlin {
             implementation(kotlin("test-annotations-common"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
-        jvmMain.dependencies {
-            // Crypto
-            implementation(identityLibs.tink) // for JOSE using Ed25519
-
-            implementation(identityLibs.bouncycastle.prov) // for secp256k1 (which was removed with Java 17)
-            implementation(identityLibs.bouncycastle.pkix) // PEM import
-
-            implementation(identityLibs.nimbus.jose.jwt)
-            implementation(identityLibs.kotlinx.serialization.cbor)
-
-            // Coroutines
-            implementation(identityLibs.kotlinx.coroutines.jdk8)
+        val jvmAndroidMain by getting {
+            dependencies {
+                implementation(identityLibs.tink)
+                implementation(identityLibs.bouncycastle.prov)
+                implementation(identityLibs.bouncycastle.pkix)
+                implementation(identityLibs.nimbus.jose.jwt)
+                implementation(identityLibs.kotlinx.serialization.cbor)
+                implementation(identityLibs.kotlinx.coroutines.jdk8)
+            }
+        }
+        androidMain {
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.indispensable.josef)
+                implementation(identityLibs.signum.supreme)
+                implementation(identityLibs.kotlinx.coroutines.android)
+            }
+            // Exclude signum's jdk18on BouncyCastle — we use lts8on from jvmAndroidMain
+            configurations.all {
+                exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+                exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+                exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+            }
+        }
+        val androidDeviceTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(identityLibs.kotlinx.coroutines.test)
+                implementation("androidx.test.ext:junit:1.2.1")
+                implementation("androidx.test:runner:1.6.1")
+                implementation("androidx.test:rules:1.6.1")
+            }
         }
         jvmTest.dependencies {
             implementation(kotlin("test"))
-
-            // Logging
             implementation(identityLibs.slf4j.simple)
-
-            // Ktor client
             implementation(identityLibs.ktor.client.java)
-
-            // Test
             implementation(identityLibs.junit.jupiter.api)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.junit.jupiter.params)
