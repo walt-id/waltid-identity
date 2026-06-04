@@ -20,7 +20,6 @@ val modules = listOfNotNull(
         "waltid-crypto-oci",
         "waltid-crypto-aws",
         "waltid-crypto-azure",
-        "waltid-crypto-android" whenEnabled enableAndroidBuild,
         "waltid-crypto2",
         "waltid-cose",
         "waltid-x509",
