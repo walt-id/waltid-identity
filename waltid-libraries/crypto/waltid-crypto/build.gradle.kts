@@ -44,8 +44,7 @@ kotlin {
             implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
         }
         commonTest.dependencies {
-            implementation(kotlin("test-common"))
-            implementation(kotlin("test-annotations-common"))
+            implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         val jvmAndroidMain by getting {
