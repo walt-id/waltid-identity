@@ -14,20 +14,20 @@ runs:
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
-    - name: Install CocoaPods dependencies for iOS libraries
+    - name: Compile iOS targets
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: |
-        ./gradlew podInstall --info
-
-    - name: Build iOS simulator frameworks (ARM64)
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
+      run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
 
     - name: Execute iOS simulator tests (ARM64)
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
-        ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
+        ./gradlew :waltid-libraries:crypto:waltid-crypto:iosSimulatorArm64Test --info
+
+    - name: Compile wallet modules for iOS
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:compileKotlinIosSimulatorArm64
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence:compileKotlinIosSimulatorArm64

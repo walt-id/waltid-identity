@@ -17,6 +17,6 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
       - name: Build and test iOS
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
