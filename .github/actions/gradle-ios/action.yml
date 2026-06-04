@@ -25,9 +25,21 @@ runs:
       shell: bash
       run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
 
-    - name: Execute iOS simulator tests (ARM64)
+    - name: Execute crypto iOS tests
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
         ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
         ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
+
+    - name: Compile wallet modules for iOS
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:compileKotlinIosSimulatorArm64
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-client:compileKotlinIosSimulatorArm64
+
+    - name: Execute wallet-client iOS tests
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:iosSimulatorArm64Test --info
