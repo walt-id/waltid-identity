@@ -7,7 +7,9 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.datetime.Clock
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Generates credential offers from the public EUDI test backend.
@@ -122,6 +124,7 @@ object EudiTestBackend {
         val dcqlQuery = buildDcqlQuery(credentialId)
         val payload = buildJsonObject {
             put("dcql_query", dcqlQuery)
+            @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
             put("nonce", JsonPrimitive(kotlin.uuid.Uuid.random().toString()))
             put("request_uri_method", JsonPrimitive("post"))
             put("profile", JsonPrimitive("openid4vp"))
@@ -142,10 +145,10 @@ object EudiTestBackend {
     }
 
     suspend fun waitForVerifierSuccess(transactionId: String, timeoutMs: Long = 90_000) {
-        val startTime = kotlinx.datetime.Clock.System.now()
+        val startTime = Clock.System.now()
         while (true) {
-            val elapsed = kotlinx.datetime.Clock.System.now() - startTime
-            if (elapsed.inWholeMilliseconds > timeoutMs) {
+            val elapsed = Clock.System.now() - startTime
+            if (elapsed > timeoutMs.milliseconds) {
                 error("Verifier did not confirm presentation within ${timeoutMs}ms")
             }
 
