@@ -31,7 +31,6 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation(identityLibs.kotlinx.datetime)
         }
         iosMain.dependencies {
             implementation(identityLibs.ktor.client.darwin)
