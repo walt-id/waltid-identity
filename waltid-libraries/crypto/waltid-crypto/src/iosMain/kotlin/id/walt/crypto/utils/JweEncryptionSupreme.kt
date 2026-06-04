@@ -55,7 +55,7 @@ object JweEncryptionSupreme {
         val algorithm = jweEncryption.algorithm
         require(algorithm.requiresNonce())
         require(algorithm.isAuthenticated())
-        val symmetricKey = algorithm.keyFromIntermediate(cekBytes)
+        val symmetricKey = keyFromIntermediate(algorithm, cekBytes)
 
         // 5. Build JWE header with ephemeral public key (epk)
         val ephemeralJwk = ephemeralKeyPair.publicValue.asCryptoPublicKey().toJsonWebKey()
@@ -85,6 +85,8 @@ object JweEncryptionSupreme {
         ).serialize()
     }
 
+    fun concatKdfPublic(z: ByteArray, keyLenBits: Int, algId: String): ByteArray = concatKdf(z, keyLenBits, algId)
+
     private fun concatKdf(z: ByteArray, keyLenBits: Int, algId: String): ByteArray {
         val algIdBytes = algId.encodeToByteArray()
         val otherInfo = intTo4Bytes(algIdBytes.size) + algIdBytes +
@@ -101,14 +103,17 @@ object JweEncryptionSupreme {
 }
 
 @Suppress("UNCHECKED_CAST")
-private fun SymmetricEncryptionAlgorithm<AuthCapability.Authenticated<*>, NonceTrait.Required, *>.keyFromIntermediate(
+internal fun keyFromIntermediate(
+    algorithm: SymmetricEncryptionAlgorithm<*, *, *>,
     jweKeyBytes: ByteArray,
-): SymmetricKey<AuthCapability.Authenticated<*>, NonceTrait.Required, *> =
-    (if (hasDedicatedMac())
-        keyFrom(
+): SymmetricKey<AuthCapability.Authenticated<*>, NonceTrait.Required, *> {
+    val typed = algorithm as SymmetricEncryptionAlgorithm<AuthCapability.Authenticated<*>, NonceTrait.Required, *>
+    return (if (typed.hasDedicatedMac())
+        typed.keyFrom(
             jweKeyBytes.drop(jweKeyBytes.size / 2).toByteArray(),
             jweKeyBytes.take(jweKeyBytes.size / 2).toByteArray()
         ).getOrThrow()
     else
-        keyFrom(jweKeyBytes).getOrThrow()
+        typed.keyFrom(jweKeyBytes).getOrThrow()
     ) as SymmetricKey<AuthCapability.Authenticated<*>, NonceTrait.Required, *>
+}
