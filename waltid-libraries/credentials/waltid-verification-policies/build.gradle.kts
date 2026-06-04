@@ -60,7 +60,7 @@ kotlin {
             implementation(identityLibs.ktor.server.test.host)
             implementation(identityLibs.ktor.server.content.negotiation)
             implementation(identityLibs.ktor.server.netty)
-            implementation("io.mockk:mockk:1.14.9")
+            implementation("io.mockk:mockk:1.14.11")
         }
         if (enableIosBuild) {
             iosMain.dependencies {}
