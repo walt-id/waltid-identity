@@ -498,10 +498,12 @@ class Issuer2CredentialOfferEndpointTest {
         assertEquals(listOf(profile.credentialConfigurationId), offer.credentialConfigurationIds)
         when (authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
+                assertNull(response.issuerStateMode)
                 assertNotNull(offer.grants?.preAuthorizedCode?.preAuthorizedCode)
                 assertNull(offer.grants?.authorizationCode)
             }
             AuthenticationMethod.AUTHORIZED -> {
+                assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
                 assertNotNull(offer.grants?.authorizationCode)
                 assertNull(offer.grants?.preAuthorizedCode)
             }

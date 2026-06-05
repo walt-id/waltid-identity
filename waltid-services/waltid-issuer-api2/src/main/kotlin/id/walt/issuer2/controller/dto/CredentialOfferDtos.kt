@@ -26,7 +26,7 @@ data class CredentialOfferRuntimeOverrides(
 data class CredentialOfferCreateRequest(
     val profileId: String,
     val authMethod: AuthenticationMethod,
-    val issuerStateMode: IssuerStateMode = IssuerStateMode.OMIT,
+    val issuerStateMode: IssuerStateMode? = null,
     val valueMode: CredentialOfferValueMode = CredentialOfferValueMode.BY_REFERENCE,
     val expiresInSeconds: Long = 5.minutes.inWholeSeconds,
     val txCode: TxCode? = null,
@@ -45,6 +45,9 @@ data class CredentialOfferCreateRequest(
         require(authMethod == AuthenticationMethod.PRE_AUTHORIZED || txCodeValue == null) {
             "txCodeValue is only supported for PRE_AUTHORIZED credential offers"
         }
+        require(authMethod == AuthenticationMethod.AUTHORIZED || issuerStateMode == null) {
+            "issuerStateMode is only supported for AUTHORIZED credential offers"
+        }
         sessionId?.let { require(it.isNotBlank()) { "sessionId must not be blank" } }
     }
 }
@@ -54,7 +57,7 @@ data class CredentialOfferCreateResponse(
     val offerId: String,
     val profileId: String,
     val authMethod: AuthenticationMethod,
-    val issuerStateMode: IssuerStateMode,
+    val issuerStateMode: IssuerStateMode? = null,
     val expiresAt: Long,
     val txCodeValue: String? = null,
     val credentialOffer: String,

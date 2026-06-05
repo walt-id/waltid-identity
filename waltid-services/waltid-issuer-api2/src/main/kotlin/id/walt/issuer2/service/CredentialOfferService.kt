@@ -37,9 +37,9 @@ class CredentialOfferService(
         val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
         val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
 
-        val effectiveIssuerStateMode = when (request.authMethod) {
-            AuthenticationMethod.PRE_AUTHORIZED -> IssuerStateMode.OMIT
-            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode
+        val issuerStateMode = when (request.authMethod) {
+            AuthenticationMethod.PRE_AUTHORIZED -> null
+            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.OMIT
         }
 
         var resolvedTxCodeValue: String? = null
@@ -69,7 +69,7 @@ class CredentialOfferService(
                 CredentialOffer.withAuthorizationCodeGrant(
                     credentialIssuer = issuerBaseUrl(),
                     credentialConfigurationIds = listOf(profile.credentialConfigurationId),
-                    issuerState = sessionId.takeIf { effectiveIssuerStateMode == IssuerStateMode.INCLUDE },
+                    issuerState = sessionId.takeIf { issuerStateMode == IssuerStateMode.INCLUDE },
                 )
         }
 
@@ -110,7 +110,7 @@ class CredentialOfferService(
             offerId = sessionId,
             profileId = profile.profileId,
             authMethod = request.authMethod,
-            issuerStateMode = effectiveIssuerStateMode,
+            issuerStateMode = issuerStateMode,
             expiresAt = expiresAt.toEpochMilliseconds(),
             txCodeValue = resolvedTxCodeValue,
             credentialOffer = offerRequest.toUrl(),
