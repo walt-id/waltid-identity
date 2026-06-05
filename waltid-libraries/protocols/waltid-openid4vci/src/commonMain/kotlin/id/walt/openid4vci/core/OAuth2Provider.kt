@@ -98,6 +98,8 @@ interface OAuth2Provider {
         validUntil: Instant? = null,
     ): CredentialResponseResult
 
+    fun writeCredentialError(error: OAuthError): CredentialResponseHttp
+
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
 
     fun writeCredentialResponse(request: CredentialRequest, response: CredentialResponse): CredentialResponseHttp

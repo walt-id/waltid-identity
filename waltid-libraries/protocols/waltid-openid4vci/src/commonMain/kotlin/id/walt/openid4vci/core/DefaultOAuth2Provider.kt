@@ -269,7 +269,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
+    override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
         CredentialResponseHttp(
             status = 400,
             payload = buildMap {
@@ -277,6 +277,9 @@ class DefaultOAuth2Provider(
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
         )
+
+    override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
+        writeCredentialError(error)
 
     override fun writeCredentialResponse(
         request: CredentialRequest,

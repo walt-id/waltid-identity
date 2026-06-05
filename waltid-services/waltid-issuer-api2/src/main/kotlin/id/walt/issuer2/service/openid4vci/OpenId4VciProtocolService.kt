@@ -9,6 +9,7 @@ import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
@@ -133,19 +134,19 @@ class OpenId4VciProtocolService(
             )
         ) {
             is CredentialRequestResult.Success -> result.request
-            is CredentialRequestResult.Failure -> return CredentialResponseHttp(
-                status = 400,
-                payload = buildMap {
-                    put("error", JsonPrimitive(result.error.error))
-                    result.error.description?.let { put("error_description", JsonPrimitive(it)) }
-                },
-            )
+            is CredentialRequestResult.Failure -> return oauth2Provider.writeCredentialError(result.error)
         }
         val tokenClaims = accessToken.decodeJws().payload
 
         val credentialConfigurationId = credentialRequest.credentialConfigurationId
             ?: credentialRequest.credentialIdentifier
-            ?: return credentialError("credential_configuration_id or credential_identifier is required")
+            ?: return oauth2Provider.writeCredentialError(
+                credentialRequest,
+                OAuthError(
+                    OAuthErrorCodes.INVALID_REQUEST,
+                    "credential_configuration_id or credential_identifier is required",
+                ),
+            )
         val sessionId = resolveSessionId(tokenClaims)
         val session = sessionService.getSession(sessionId)
         require(session.credentialConfigurationId == credentialConfigurationId) {
@@ -153,7 +154,13 @@ class OpenId4VciProtocolService(
         }
 
         val configuration = metadataService.getCredentialConfiguration(credentialConfigurationId)
-            ?: return credentialError("Unsupported credential_configuration_id: $credentialConfigurationId")
+            ?: return oauth2Provider.writeCredentialError(
+                credentialRequest,
+                OAuthError(
+                    OAuthErrorCodes.INVALID_REQUEST,
+                    "Unsupported credential_configuration_id: $credentialConfigurationId",
+                ),
+            )
         val issuerKey = KeyManager.resolveSerializedKey(profileService.resolveProfile(session.profileId).issuerKey)
         val issuerId = session.issuerDid ?: metadataService.issuerBaseUrl()
         val requestWithSession = credentialRequest
@@ -249,12 +256,4 @@ class OpenId4VciProtocolService(
     private fun JsonObject.stringClaim(name: String): String? =
         this[name]?.jsonPrimitive?.contentOrNull
 
-    private fun credentialError(description: String): CredentialResponseHttp =
-        CredentialResponseHttp(
-            status = 400,
-            payload = mapOf(
-                "error" to JsonPrimitive("invalid_request"),
-                "error_description" to JsonPrimitive(description),
-            ),
-        )
 }
