@@ -124,7 +124,7 @@ class IosKey private constructor(
 
         val jwsAlgorithm = when (options.keyType) {
             KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
-            KeyType.RSA -> JwsAlgorithm.Signature.RSA.RS256
+            KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
             else -> error("Unsupported key type for JWS: ${options.keyType}")
         }
 
@@ -161,7 +161,7 @@ class IosKey private constructor(
 
         val sigAlg = when (options.keyType) {
             KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPKCS1Padding
+            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
             else -> error("Unsupported key type for verification: ${options.keyType}")
         }
 
@@ -182,7 +182,7 @@ class IosKey private constructor(
 
         val sigAlg = when (options.keyType) {
             KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPKCS1Padding
+            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
             else -> error("Unsupported key type for verification: ${options.keyType}")
         }
 
