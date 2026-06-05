@@ -62,25 +62,34 @@ data class MobileSecurityObject(
 }
 
 /**
- * A container for credential status information, typically referencing an external Status List.
- * This allows a verifier to check if the mdoc has been revoked by the issuer.
+ * A container for credential status information per ISO 18013-5 §9.1.2.6.
+ * Both fields are optional - either identifier_list or status_list may be present.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 9.1.2.6 (MSO revocation)
- * @see IETF Draft: draft-ietf-oauth-status-list
- *
- * @property statusList Information needed to locate the credential's status in a Status List Token.
+ * Per ISO 18013-5 §9.1.2.4: both identifier_list and status_list are optional.
  */
 @Serializable
 data class Status(
+    @SerialName("identifier_list")
+    val identifierList: IdentifierListInfo? = null,
     @SerialName("status_list")
-    val statusList: StatusListInfo
+    val statusList: StatusListInfo? = null
 ) {
     /**
-     * Specifies the location of a Status List Token and the specific index within that list
-     * that corresponds to this mdoc's status.
-     *
-     * @property index The non-negative integer representing the position (index) of this mdoc's status within the bit string of the Status List.
-     * @property uri The URI where the Status List Token (containing the status list) can be retrieved.
+     * Identifier list revocation mechanism per ISO 18013-5 §9.1.2.6.
+     * IdentifierListInfo = { "id": Identifier, "uri": URI, ? "certificate": Certificate }
+     */
+    @Serializable
+    data class IdentifierListInfo(
+        /** Unique identifier for this MSO within the revocation list. */
+        @SerialName("id")
+        val id: String,
+        /** URI where the identifier list (status list token) can be fetched. */
+        @SerialName("uri")
+        val uri: UniformResourceIdentifier,
+    )
+
+    /**
+     * Specifies the location of a Status List Token and the specific index within that list.
      */
     @Serializable
     data class StatusListInfo(

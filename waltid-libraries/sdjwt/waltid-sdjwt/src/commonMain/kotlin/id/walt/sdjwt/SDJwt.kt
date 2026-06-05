@@ -234,7 +234,11 @@ open class SDJwt internal constructor(
             val matchResult = Regex(SD_JWT_PATTERN).matchEntire(sdJwt)
                 ?: throw IllegalArgumentException("Invalid SD-JWT format: $sdJwt")
             val matchedGroups = matchResult.groups as MatchNamedGroupCollection
-            val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR)?.toSet() ?: setOf()
+            val disclosures = matchedGroups["disclosures"]?.value?.trim(SEPARATOR)?.split(SEPARATOR) ?: emptyList()
+            val uniqueDisclosures = disclosures.toSet()
+            if (uniqueDisclosures.size != disclosures.size) {
+                throw SDJwtVerificationException("Duplicate disclosure in tilde chain")
+            }
 
             return SDJwt(
                 jwt = matchedGroups["sdjwt"]!!.value,
@@ -243,7 +247,7 @@ open class SDJwt internal constructor(
                 ).jsonObject,
                 sdPayload = SDPayload.parse(
                     jwtBody = matchedGroups["body"]!!.value,
-                    disclosures = disclosures
+                    disclosures = uniqueDisclosures
                 ),
                 keyBindingJwt = matchedGroups["kbjwt"]?.value?.let { KeyBindingJwt.parse(it) },
                 isPresentation = matchedGroups["kbjwt"] != null || sdJwt.endsWith("~")

@@ -16,6 +16,7 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.parseH
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.Url
 import io.ktor.http.contentType
 import io.ktor.http.parseUrlEncodedParameters
 import io.ktor.server.response.respond
@@ -151,7 +152,7 @@ class Verifier2VPDirectPostHandlerParseTest {
         val session = directPostSession(
             expectedState = "expected-state",
             redirects = Verification2Session.VerificationSessionRedirects(
-                errorRedirectUri = "https://verifier.example/error",
+                errorRedirectUri = Url("https://verifier.example/error"),
             ),
         )
 

@@ -7,6 +7,6 @@ import kotlinx.serialization.json.JsonElement
 data class ParsedDisclosure(
     val disclosure: String,
     val salt: String,
-    val key: String,
+    val key: String?,
     val value: JsonElement,
 )

@@ -3,9 +3,7 @@ package id.walt.did.dids.resolver
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.DidUtils.methodFromDid
 import id.walt.did.dids.resolver.local.*
-import io.ktor.client.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.serialization.kotlinx.json.*
+import id.walt.webdatafetching.WebDataFetcher
 import kotlinx.serialization.json.JsonObject
 import love.forte.plugin.suspendtrans.annotation.JsPromise
 import love.forte.plugin.suspendtrans.annotation.JvmAsync
@@ -17,18 +15,18 @@ import kotlin.js.JsExport
 @JsExport
 class LocalResolver : DidResolver {
     override val name = "walt.id local resolver"
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json(DidWebResolver.json)
-        }
-    }
+
+    // Shared WebDataFetcher: the HTTP engine is selected per-platform (Java on JVM => TLS 1.3,
+    // Darwin on iOS/macOS, etc.) instead of relying on engine-less HttpClient {} auto-discovery,
+    // which could resolve to CIO (TLS 1.2 only, and unsupported on Kotlin/Native).
+    private val fetcher = WebDataFetcher(id = "did-local-resolver")
 
     private val resolvers = listOf(
         DidJwkResolver(),
-        DidWebResolver(http),
+        DidWebResolver(fetcher),
         DidKeyResolver(),
-        DidEbsiResolver(http),
-        DidCheqdResolver()
+        DidEbsiResolver(fetcher),
+        DidCheqdResolver(fetcher)
     ).associateBy { it.method }.toMutableMap()
 
     fun deactivateMethod(method: String) {

@@ -11,13 +11,17 @@ data class E2ETestWebService(
     private val webServiceModule = WebService(module).webServiceModule
 
     fun runService(block: suspend () -> Unit, host: String, port: Int): suspend () -> Unit = {
-        embeddedServer(
+        val server = embeddedServer(
             CIO,
             host = host,
             port = port,
             module = webServiceModule
         ).start(wait = false)
 
-        block.invoke()
+        try {
+            block.invoke()
+        } finally {
+            server.stop(gracePeriodMillis = 1000, timeoutMillis = 5000)
+        }
     }
 }

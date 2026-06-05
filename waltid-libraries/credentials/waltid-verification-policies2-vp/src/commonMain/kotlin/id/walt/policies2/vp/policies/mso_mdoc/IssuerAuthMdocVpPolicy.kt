@@ -3,8 +3,8 @@
 package id.walt.policies2.vp.policies
 
 import id.walt.cose.toCoseVerifier
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.keys.jwk.JWKKey.Companion.convertDerCertificateToPemCertificate
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.mso.MobileSecurityObject
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -31,23 +31,32 @@ class IssuerAuthMdocVpPolicy : MdocVPPolicy() {
         verificationContext: VerificationSessionContext?
     ): Result<Unit> = coroutineScope {
         log.trace { "--- Verifying issuer authentication ---" }
-        val issuerAuth = document.issuerSigned.issuerAuth
-        val x5c = issuerAuth.unprotected.x5chain
-        addResult("certificate_chain", x5c?.map { it.rawBytes.toHexString() } ?: emptyList<String>())
-        requireNotNull(x5c) { "Missing certificate chain in mdocs credential" }
 
-        val signerCertificateBytes = x5c.firstOrNull()?.rawBytes
-            ?: throw IllegalArgumentException("Missing signer certificate in x5chain.")
+        // Use getParsedIssuerAuth() which checks unprotected header first, then falls back to
+        // the protected header per ISO 18013-5 §9.1.2.4 ("readers SHOULD support protected header").
+        val parsedIssuerAuth = document.issuerSigned.getParsedIssuerAuth()
 
-        addOptionalResult("signer_pem") { convertDerCertificateToPemCertificate(signerCertificateBytes) }
+        addResult("certificate_chain", parsedIssuerAuth.x5c)
 
-        val issuerKey = JWKKey.importFromDerCertificate(signerCertificateBytes).getOrThrow()
+        val issuerKey = parsedIssuerAuth.signerKey
         log.trace { "Signer key to be used: $issuerKey" }
         addOptionalJsonResult("signer_jwk") { issuerKey.exportJWKObject() }
 
+        val firstCertDer = parsedIssuerAuth.x5c.first().decodeFromBase64()
+        addOptionalResult("signer_pem") { convertDerCertificateToPemCertificate(firstCertDer) }
+
         log.trace { "Verifying issuer auth signature with signer key..." }
+        val issuerAuth = document.issuerSigned.issuerAuth
         if (!issuerAuth.verify(issuerKey.toCoseVerifier())) {
             throw IllegalArgumentException("IssuerAuth COSE_Sign1 signature is invalid.")
+        }
+
+        // Verify the certificate chain when more than one cert is present.
+        if (parsedIssuerAuth.x5c.size > 1) {
+            val chainBytes = parsedIssuerAuth.x5c.map { it.decodeFromBase64() }
+            X5CChainValidator.verifyChain(chainBytes)
+            addResult("chain_length", parsedIssuerAuth.x5c.size.toString())
+            addResult("chain_verified", true.toString())
         }
 
         success()

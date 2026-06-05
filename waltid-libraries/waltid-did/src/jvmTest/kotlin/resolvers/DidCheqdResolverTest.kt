@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidCheqdResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
+import id.walt.webdatafetching.WebDataFetcher
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Disabled
@@ -14,7 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import java.util.stream.Stream
 
 class DidCheqdResolverTest : DidResolverTestBase() {
-    override val resolver: LocalResolverMethod = DidCheqdResolver()
+    override val resolver: LocalResolverMethod = DidCheqdResolver(WebDataFetcher(id = "did-cheqd-resolver-test"))
 
     @ParameterizedTest
     @MethodSource

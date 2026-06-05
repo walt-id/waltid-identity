@@ -32,8 +32,9 @@ data class CoseHeaders(
     //@CborLabel(2) @SerialName("crit") val criticalHeaders: String? = null,
     /** 3: Content type of the payload */
     @CborLabel(3) @SerialName("content type") val contentType: CoseContentType? = null,
-    /** 4: Key identifier */
-    @CborLabel(4) @SerialName("kid") @ByteString val kid: ByteArray? = null,
+    /** 4: Key identifier — per RFC 8152 §3.1, kid is application-defined; in practice it may
+     *  be a byte string (canonical) or a text string (e.g. a UUID). Both are supported here. */
+    @CborLabel(4) @SerialName("kid") @Serializable(CoseKidSerializer::class) val kid: ByteArray? = null,
     /** 5: Full Initialization Vector */
     @CborLabel(5) @SerialName("IV") @ByteString val iv: ByteArray? = null,
     /** 6: Partial Initialization Vector */
@@ -51,10 +52,11 @@ data class CoseHeaders(
      * */
     @Serializable(CoseCertificateSerializer::class)
     @CborLabel(33) @SerialName("x5chain") val x5chain: List<CoseCertificate>? = null,
-    /** 45: Hash of an X.509 certificate (RFC 9360) */
-    //@CborLabel(34) @ByteString val x5t: ByteArray? = null,
+    /** 34: Hash of an X.509 certificate (RFC 9360): COSE_CertHash = [ hashAlg, hashValue ] */
+    @Serializable(CoseCertHashSerializer::class)
+    @CborLabel(34) @SerialName("x5t") val x5t: CoseCertHash? = null,
     /** 35: URI pointing to an X.509 certificate (RFC 9360) */
-    //@CborLabel(35) val x5u: String? = null,
+    @CborLabel(35) @SerialName("x5u") val x5u: String? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -69,6 +71,8 @@ data class CoseHeaders(
         if (!kidContext.contentEquals(other.kidContext)) return false
         if (type != other.type) return false
         if (x5chain != other.x5chain) return false
+        if (x5t != other.x5t) return false
+        if (x5u != other.x5u) return false
 
         return true
     }
@@ -83,6 +87,8 @@ data class CoseHeaders(
         result = 31 * result + (kidContext?.contentHashCode() ?: 0)
         result = 31 * result + (type?.hashCode() ?: 0)
         result = 31 * result + (x5chain?.hashCode() ?: 0)
+        result = 31 * result + (x5t?.hashCode() ?: 0)
+        result = 31 * result + (x5u?.hashCode() ?: 0)
         return result
     }
 }
@@ -165,6 +171,83 @@ object CoseCertificateSerializer : KSerializer<List<CoseCertificate>> {
 
             is CborByteString -> listOf(CoseCertificate(element.value))
             else -> throw IllegalArgumentException("Expected array or bytestring for x5chain, got ${element::class.simpleName}")
+        }
+    }
+}
+
+/**
+ * COSE_CertHash for the `x5t` header parameter (RFC 9360 §2):
+ * `COSE_CertHash = [ hashAlg: int / tstr, hashValue: bstr ]`.
+ *
+ * For ETSI TS 119 472-1 QEAA-6.6.2-03 / PuB-EAA-6.6.3-03 the digest algorithm SHALL be SHA-256,
+ * whose COSE algorithm identifier is -16.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+data class CoseCertHash(
+    /** COSE algorithm identifier of the hash (e.g. -16 for SHA-256). */
+    val hashAlgorithm: Int,
+    val hashValue: ByteArray
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is CoseCertHash) return false
+        return hashAlgorithm == other.hashAlgorithm && hashValue.contentEquals(other.hashValue)
+    }
+
+    override fun hashCode(): Int = 31 * hashAlgorithm + hashValue.contentHashCode()
+
+    companion object {
+        /** COSE algorithm identifier for SHA-256 (RFC 9360 / IANA COSE algorithms). */
+        const val SHA_256: Int = -16
+    }
+}
+
+@OptIn(ExperimentalSerializationApi::class)
+object CoseCertHashSerializer : KSerializer<CoseCertHash> {
+    override val descriptor: SerialDescriptor =
+        ListSerializer(ByteArraySerializer()).descriptor
+
+    override fun serialize(encoder: Encoder, value: CoseCertHash) {
+        val arr = CborArray(listOf(CborInteger(value.hashAlgorithm.toLong()), CborByteString(value.hashValue)))
+        encoder.encodeSerializableValue(CborElement.serializer(), arr)
+    }
+
+    override fun deserialize(decoder: Decoder): CoseCertHash {
+        val element = decoder.decodeSerializableValue(CborElement.serializer())
+        require(element is CborArray && element.size == 2) { "x5t must be a 2-element [hashAlg, hashValue] array" }
+        val alg = element[0]
+        val hash = element[1]
+        require(hash is CborByteString) { "x5t hashValue must be a byte string" }
+        val algInt = when (alg) {
+            is CborInteger -> alg.long.toInt()
+            else -> throw IllegalArgumentException("x5t hashAlg must be an integer COSE algorithm identifier")
+        }
+        return CoseCertHash(algInt, hash.value)
+    }
+}
+
+/**
+ * Serializer for the COSE `kid` header parameter (label 4).
+ * Per RFC 8152 §3.1, `kid` is application-defined and may be a byte string or a text string.
+ * Both representations are handled: byte strings are returned as-is; text strings are
+ * UTF-8 encoded to ByteArray so callers receive a consistent type.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+object CoseKidSerializer : KSerializer<ByteArray?> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("CoseKid", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: ByteArray?) {
+        if (value == null) encoder.encodeNull()
+        else encoder.encodeSerializableValue(CborElement.serializer(), CborByteString(value))
+    }
+
+    override fun deserialize(decoder: Decoder): ByteArray? {
+        val element = decoder.decodeSerializableValue(CborElement.serializer())
+        return when (element) {
+            is CborByteString -> element.value
+            is CborString -> element.value.encodeToByteArray()
+            else -> null
         }
     }
 }

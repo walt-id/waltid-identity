@@ -9,6 +9,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
@@ -24,9 +25,11 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vp.wallet.presentation.LDPPresenter
 import id.waltid.openid4vp.wallet.presentation.MdocPresenter
 import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
+import id.waltid.openid4vp.wallet.presentation.SelfIssuedIdTokenBuilder
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
+import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -38,6 +41,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 
 object WalletPresentFunctionality2 {
@@ -81,7 +85,7 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
+                            holderDid = holderDid
                         )
 
                         "mso_mdoc" -> {
@@ -237,6 +241,12 @@ object WalletPresentFunctionality2 {
         }
     }
 
+    /**
+     * Generates a fresh wallet_nonce per OID4VP 1.0 §5.6.
+     */
+    @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+    private fun generateWalletNonce(): String = Uuid.random().toHexString()
+
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,
         error: String,
@@ -312,8 +322,28 @@ object WalletPresentFunctionality2 {
         // Resolve AuthorizationRequest:
         val authorizationRequest: AuthorizationRequest = if (presentationRequestUrl.parameters.contains("request_uri")) {
             val requestUri = presentationRequestUrl.parameters["request_uri"]!!
-            log.trace { "Resolving AuthorizationRequest from URI: $requestUri" }
-            val httpResponse = webResolveAuthReq.rawFetch(requestUri)
+            val requestUriMethod = presentationRequestUrl.parameters["request_uri_method"]
+
+            log.trace { "Resolving AuthorizationRequest from URI: $requestUri (method=${requestUriMethod ?: "get"})" }
+
+            // Per OID4VP 1.0 §5.1: if request_uri_method=post, send a POST with wallet_nonce
+            // to bind this request and prevent replay attacks.
+            val walletNonce: String? = if (requestUriMethod?.lowercase() == "post") {
+                // Generate a fresh, cryptographically random wallet_nonce (base64url, 128 bits)
+                generateWalletNonce()
+            } else null
+
+            val httpResponse = if (walletNonce != null) {
+                log.trace { "Sending POST to request URI with wallet_nonce (request_uri_method=post)" }
+                webResolveAuthReq.rawFetch(io.ktor.http.Url(requestUri)) {
+                    method = HttpMethod.Post
+                    headers.append(HttpHeaders.ContentType, ContentType.Application.FormUrlEncoded.toString())
+                    headers.append(HttpHeaders.Accept, "application/oauth-authz-req+jwt")
+                    setBody("wallet_nonce=${walletNonce.encodeURLQueryComponent()}")
+                }
+            } else {
+                webResolveAuthReq.rawFetch(requestUri)
+            }
 
             check(httpResponse.status.isSuccess()) { "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}" }
 
@@ -333,7 +363,12 @@ object WalletPresentFunctionality2 {
                     log.trace { "JWT AuthorizationRequest algorithm: $jwtAlg" }
 
                     if (jwtAlg.equals("none", true)) {
-                        Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                        // alg=none means no signature — reject. A request delivered as
+                        // application/oauth-authz-req+jwt via request_uri MUST be signed
+                        // (JAR, RFC 9101).
+                        throw IllegalArgumentException(
+                            "Authorization request JWT uses alg=none — unsigned requests are not accepted for request_uri signed flows."
+                        )
                     } else {
                         val authReqBody = authReqJws.payload
 
@@ -378,7 +413,22 @@ object WalletPresentFunctionality2 {
                                 throw IllegalArgumentException("Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}")
                             }
 
-                            is ClientValidationResult.Success -> Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+                            is ClientValidationResult.Success -> {
+                                val decodedRequest = Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
+
+                                // Per OID4VP 1.0 §5.6: if wallet sent wallet_nonce, the request object
+                                // MUST contain the same value in a wallet_nonce claim.
+                                if (walletNonce != null) {
+                                    val receivedWalletNonce = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
+                                    require(receivedWalletNonce == walletNonce) {
+                                        "wallet_nonce mismatch: sent '$walletNonce' but request object contains '$receivedWalletNonce'. " +
+                                            "Possible replay attack — terminating request processing."
+                                    }
+                                    log.trace { "wallet_nonce validated successfully" }
+                                }
+
+                                decodedRequest
+                            }
                         }
                     }
 
@@ -406,10 +456,16 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 
-        require(authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN) {
-            TODO("Currently only ResponseMode 'vp_token' is supported")
-            // should also support "vp_token id_token"
+        require(
+            authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN ||
+            authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
+        ) {
+            // Other response types (e.g. "code") are not supported in this wallet implementation.
+            "Unsupported response_type '${authorizationRequest.responseType}': " +
+                "only 'vp_token' and 'vp_token id_token' are supported."
         }
+
+        val isSiopv2 = authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
 
         // Build VP Token response
         val credentials = selectCredentialsForQuery(
@@ -454,6 +510,13 @@ object WalletPresentFunctionality2 {
 
         val vpToken = generateVpTokenForRequest(authorizationRequest, credentials, holderKey, holderDid)
 
+        // For vp_token id_token (SIOPv2 combined flow per OID4VP §"Combining with SIOPv2"),
+        // generate a Self-Issued ID Token alongside the VP Token.
+        val idToken: String? = if (isSiopv2) {
+            log.trace { "Generating Self-Issued ID Token for vp_token id_token response type" }
+            SelfIssuedIdTokenBuilder.build(authorizationRequest, holderKey, holderDid)
+        } else null
+
         // Send AuthorizationResponse:
         if (authorizationRequest.responseMode == null) {
             require(authorizationRequest.responseType != null) { "Missing response_type" }
@@ -478,6 +541,7 @@ object WalletPresentFunctionality2 {
                 // Build the parameters that will go into the URL fragment.
                 val fragmentParameters = ParametersBuilder().apply {
                     append("vp_token", vpToken)
+                    idToken?.let { append("id_token", it) }
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
 
@@ -504,6 +568,7 @@ object WalletPresentFunctionality2 {
                 // Build the parameters that will go into the URL query string.
                 val queryParameters = ParametersBuilder().apply {
                     append("vp_token", vpToken)
+                    idToken?.let { append("id_token", it) }
                     authorizationRequest.state?.let { append("state", it) }
                 }.build()
 
@@ -533,6 +598,7 @@ object WalletPresentFunctionality2 {
 
                 val fields = buildList {
                     add("vp_token" to vpToken)
+                    idToken?.let { add("id_token" to it) }
                     authorizationRequest.state?.let { add("state" to it) }
                 }
                 val htmlContent = buildFormPostHtml(
@@ -557,7 +623,7 @@ object WalletPresentFunctionality2 {
                 requireNotNull(responseUri) { "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post'." }
                 val parameters = ParametersBuilder().apply {
                     append("vp_token", vpToken)
-
+                    idToken?.let { append("id_token", it) }
                     if (authorizationRequest.state != null) {
                         append("state", authorizationRequest.state!!)
                     }
@@ -595,6 +661,7 @@ object WalletPresentFunctionality2 {
 
                 val payloadJson = buildJsonObject {
                     put("vp_token", vpTokenElement)
+                    idToken?.let { put("id_token", it) }
                     authorizationRequest.state?.let { put("state", it) }
                 }
 
@@ -622,52 +689,85 @@ object WalletPresentFunctionality2 {
 
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.
+     *
+     * Per OID4VP 1.0 §5.5.1, when the authorization request includes `transaction_data`,
+     * the wallet MUST include `transaction_data_hashes` in the KB-JWT. Each entry is the
+     * base64url-encoded SHA-256 hash of the corresponding base64url-encoded transaction data
+     * item as it appeared in the request. The algorithm is SHA-256 by default.
      */
     internal suspend fun createKeyBindingJwt(
         disclosed: String,
         nonce: String,
         audience: String?,
         selectedDisclosures: List<SdJwtSelectiveDisclosure>,
-        holderKey: Key
+        holderKey: Key,
+        transactionData: List<String>? = null
     ): String {
         selectedDisclosures.map { it.asEncoded() }
         log.trace { "Creating KB+JWT for disclosures: $selectedDisclosures" }
-        // The spec for _sd_hash in KB-JWT sometimes implies hashing the concatenated disclosures
-        // as they would appear in the final presentation string (with ~).
-        // Let's assume for now Verifier will re-calculate based on the presented disclosures.
-        // A common interpretation for `sd_hash` in KB-JWT is a hash of the digests from the `_sd` array
-        // that correspond to the selectedDisclosures. This requires linking disclosures back to their original digests.
-
-        // Simpler approach (hashing concatenated presented disclosures):
-        // This binds the KB-JWT to the exact set and order of presented disclosures.
+        // Per RFC 9901 §4.3.1, sd_hash is computed over:
+        // <Issuer-signed JWT>~<Disclosure 1>~...~<Disclosure N>~
+        // The trailing ~ is always required, even when there are no disclosures.
+        // disclose() returns "issuer_jwt~disc1~disc2" (no trailing ~) for non-empty disclosures,
+        // and "issuer_jwt~" (trailing ~) for zero disclosures — so we only append ~ when needed.
         val stringToHash = if (selectedDisclosures.isNotEmpty()) {
-            "$disclosed~" //selectedDisclosures.joinToString(separator = "~") { it.asEncoded() }
+            "$disclosed~"
         } else {
-            disclosed // If there are no disclosures, what should sd_hash be?
-            // Typically, a KB-JWT implies there are disclosures.
-            // If it's possible to have a KB-JWT without disclosures (e.g. just binding to the core SD-JWT),
-            // then the sd_hash might be calculated differently or be absent.
-            // For now, let's assume selectedDisclosures is non-empty if we are creating a KB-JWT.
-            // If selectedDisclosures can be empty, define how sd_hash is computed then?
-            // Often, an empty string is hashed, or the field is omitted if allowed by profile.
+            disclosed // disclose() already produces "issuer_jwt~" for zero disclosures
         }
 
         log.trace { "Wallet presentation: Calculating hash for SD-JWT kb from: $stringToHash" }
         val sdHash = calculateSha256Base64Url(stringToHash)
 
         val jwsHeaders = buildJsonObject {
-            //put("alg", JsonPrimitive(holderKey.algorithm)) // e.g., "ES256"
+            // alg is REQUIRED in the KB-JWT JOSE header per RFC 9901 §4.3
+            put("alg", JsonPrimitive(holderKey.keyType.jwsAlg))
             put("typ", JsonPrimitive("kb+jwt"))
-            // Add "kid" if holderKey has a key ID and it's useful for the verifier
-            // holderKey.kid?.let { put("kid", JsonPrimitive(it)) }
-        } // The header also needs to be base64url encoded as part of JWS construction
+        }
 
         val kbJwtPayload = buildJsonObject {
             put("aud", JsonPrimitive(audience))
             put("nonce", JsonPrimitive(nonce))
             put("iat", JsonPrimitive(Clock.System.now().epochSeconds))
-            // Add exp if needed
             put("sd_hash", JsonPrimitive(sdHash)) // binding to the selected disclosures
+
+            // Per OID4VP 1.0 §A.3.2: if transaction_data is present in the authorization request,
+            // include transaction_data_hashes (SHA-256 of each raw base64url-encoded item string,
+            // without base64url decoding first) and transaction_data_hashes_alg if the request
+            // specified a preferred algorithm.
+            if (!transactionData.isNullOrEmpty()) {
+                // Determine the hash algorithm: check each item's transaction_data_hashes_alg field.
+                // All items must agree on the algorithm; sha-256 is the default and always supported.
+                val requestedAlgs = transactionData.mapNotNull { itemB64 ->
+                    runCatching {
+                        val itemJson = Json.parseToJsonElement(
+                            itemB64.decodeFromBase64Url().decodeToString()
+                        ).jsonObject
+                        itemJson["transaction_data_hashes_alg"]?.jsonArray
+                            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    }.getOrNull()
+                }.flatten().distinct()
+
+                // Use sha-256 unless the request specifies otherwise (sha-256 is always supported).
+                val algToUse = if (requestedAlgs.isEmpty() || "sha-256" in requestedAlgs) {
+                    "sha-256"
+                } else {
+                    requestedAlgs.firstOrNull() ?: "sha-256"
+                }
+
+                val hashes = transactionData.map { item ->
+                    // Hash is computed over the raw base64url string as received (no decoding first).
+                    JsonPrimitive(calculateSha256Base64Url(item))
+                }
+                put("transaction_data_hashes", JsonArray(hashes))
+
+                // transaction_data_hashes_alg is REQUIRED when transaction_data_hashes_alg was
+                // present in the request; include it always when transaction_data is present
+                // so the verifier knows which algorithm was used.
+                if (requestedAlgs.isNotEmpty()) {
+                    put("transaction_data_hashes_alg", JsonPrimitive(algToUse))
+                }
+            }
         }
         return holderKey.signJws(plaintext = kbJwtPayload.toString().encodeToByteArray(), headers = jwsHeaders)
     }

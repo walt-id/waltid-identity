@@ -76,18 +76,10 @@ class DeviceAuthMdocVpPolicy : MdocVPPolicy() {
             }
 
             deviceAuth.deviceMac != null -> {
-                TODO("Device MAC is not yet validated")
-                /*val eReaderKeyBytes = MdocCrypto.parseSessionTranscript(sessionTranscript)?.eReaderKeyBytes
-                    ?: return false
-                val eReaderPublicKey = MdocCrypto.decodeCoseKey(eReaderKeyBytes)
-
-                MdocCrypto.verifyDeviceMac(
-                    deviceAuthBytes = deviceAuthBytes,
-                    deviceMac = deviceAuth.deviceMac,
-                    sessionTranscript = sessionTranscript,
-                    eReaderPrivateKey,
-                    sDevicePublicKey = devicePublicKey
-                )*/
+                // Device MAC (HMAC 256/256 as per ISO 18013-5 §9.1.3.5) is not yet implemented.
+                throw UnsupportedOperationException(
+                    "Device MAC authentication is not yet supported. Only DeviceSignature is currently validated."
+                )
             }
 
             else -> { // No device authentication provided

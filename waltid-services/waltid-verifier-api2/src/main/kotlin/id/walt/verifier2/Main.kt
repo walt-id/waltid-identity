@@ -5,9 +5,11 @@ import id.walt.commons.ServiceInitialization
 import id.walt.commons.ServiceMain
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.WebService
+import id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.verifier2.config.ClientMetadataHopliteDecoder
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -32,6 +34,8 @@ suspend fun main(args: Array<String>) {
                     registerResolver(LocalResolver())
                     updateResolversForMethods()
                 }
+                // Wire trusted_authorities checker per OID4VP §6.1.1 (AKI-based trust chain)
+                Verifier2VPDirectPostHandler.trustedAuthoritiesChecker = DcqlTrustedAuthoritiesChecker.checker
             },
             run = WebService(Application::verifierModule).run()
         )

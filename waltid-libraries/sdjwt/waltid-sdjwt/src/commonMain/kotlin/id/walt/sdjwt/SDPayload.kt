@@ -30,102 +30,164 @@ data class SDPayload internal constructor(
     val sDisclosures
         get() = digestedDisclosures.values
 
-    /**
-     * Full payload, with all (selected) disclosures resolved recursively
-     */
-    val fullPayload
-        get() = disclosePayloadRecursively(undisclosedPayload, null)
+    /** Full payload, with all selectively-disclosed claims resolved recursively. */
+    val fullPayload: JsonObject get() = walk(select = null).resolved
+
+    /** SDMap regenerated from undisclosed payload and disclosures. */
+    val sdMap get() = SDMap.regenerateSDMap(undisclosedPayload, digestedDisclosures)
+
+    /** Returns a new [SDPayload] keeping only disclosures the holder selected via [sdMap]. */
+    fun withSelectiveDisclosures(sdMap: Map<String, SDField>): SDPayload {
+        val released = walk(select = sdMap).released
+        return SDPayload(
+            undisclosedPayload = undisclosedPayload,
+            digestedDisclosures = digestedDisclosures.filterValues { it.disclosure in released },
+        )
+    }
+
+    /** Mutable state threaded through one [walk]. */
+    private class WalkState(
+        /** Disclosures not yet seen on the wire; anything left after the walk is unreferenced. */
+        val unconsumed: MutableMap<String, SDisclosure>,
+        /** Every digest seen on the wire; detects duplicates across the whole tree. */
+        val seenDigests: MutableSet<String> = mutableSetOf(),
+        /** Disclosure strings the walk chose to reveal. */
+        val released: MutableSet<String> = mutableSetOf(),
+    )
+
+    private class WalkResult(val resolved: JsonObject, val released: Set<String>)
 
     /**
-     * SDMap regenerated from undisclosed payload and disclosures.
+     * Walks the payload once, shared by verifier and holder paths.
+     * `select == null` reveals everything; otherwise reveals only claims marked `sd = true`.
      */
-    val sdMap
-        get() = SDMap.regenerateSDMap(undisclosedPayload, digestedDisclosures)
+    private fun walk(select: Map<String, SDField>?): WalkResult {
+        val state = WalkState(unconsumed = digestedDisclosures.toMutableMap())
+        val resolved = walkObject(undisclosedPayload, select, state)
+        if (state.unconsumed.isNotEmpty()) {
+            throw SDJwtVerificationException("${state.unconsumed.size} disclosure(s) not referenced by any digest")
+        }
+        return WalkResult(resolved, state.released)
+    }
 
-    private fun disclosePayloadRecursively(
+    private fun walkObject(
         payload: JsonObject,
-        verificationDisclosureMap: MutableMap<String, SDisclosure>?
-    ): JsonObject {
-        return buildJsonObject {
-            payload.forEach { entry ->
-                if (entry.key == SDJwt.DIGESTS_KEY) {
-                    if (entry.value !is JsonArray) throw Exception("SD-JWT contains invalid ${SDJwt.DIGESTS_KEY} element")
-                    entry.value.jsonArray.forEach {
-                        unveilDisclosureIfPresent(
-                            digest = it.jsonPrimitive.content,
-                            objectBuilder = this,
-                            verificationDisclosureMap = verificationDisclosureMap
-                        )
-                    }
-                } else if (entry.value is JsonObject) {
-                    put(
-                        entry.key, disclosePayloadRecursively(
-                            payload = entry.value.jsonObject,
-                            verificationDisclosureMap = verificationDisclosureMap
-                        )
-                    )
-                } else {
-                    put(entry.key, entry.value)
+        select: Map<String, SDField>?,
+        state: WalkState,
+    ): JsonObject = buildJsonObject {
+        payload.forEach { entry ->
+            when (entry.key) {
+                SDJwt.DIGESTS_KEY -> {
+                    val digestArray = entry.value as? JsonArray
+                        ?: throw SDJwtVerificationException("${SDJwt.DIGESTS_KEY} must be a JSON array")
+                    digestArray.forEach { unveilObjectDisclosure(digestString(it), select, state, this) }
                 }
+                ARRAY_ELEMENT_WRAPPER_KEY ->
+                    throw SDJwtVerificationException("Reserved name '${entry.key}' used as a plain claim")
+                else -> putUnique(
+                    entry.key,
+                    recurse(entry.value, select?.get(entry.key), select == null, state),
+                )
             }
         }
     }
 
-    private fun unveilDisclosureIfPresent(
+    private fun unveilObjectDisclosure(
         digest: String,
-        objectBuilder: JsonObjectBuilder,
-        verificationDisclosureMap: MutableMap<String, SDisclosure>?
+        select: Map<String, SDField>?,
+        state: WalkState,
+        builder: JsonObjectBuilder,
     ) {
-        val sDisclosure = verificationDisclosureMap?.remove(digest) ?: digestedDisclosures[digest]
-        if (sDisclosure != null) {
-            objectBuilder.put(
-                sDisclosure.key,
-                if (sDisclosure.value is JsonObject) {
-                    disclosePayloadRecursively(
-                        payload = sDisclosure.value.jsonObject,
-                        verificationDisclosureMap = verificationDisclosureMap
-                    )
-                } else sDisclosure.value
+        if (!state.seenDigests.add(digest)) {
+            throw SDJwtVerificationException("Duplicate digest reference: $digest")
+        }
+        // Decoy or holder-stripped: nothing to reveal.
+        val disc = state.unconsumed.remove(digest) ?: return
+        when (disc) {
+            is ArrayElementDisclosure -> throw SDJwtVerificationException(
+                "Expected an object-property disclosure, got an array-element disclosure"
             )
+            is ObjectPropertyDisclosure -> {
+                if (disc.key == SDJwt.DIGESTS_KEY || disc.key == ARRAY_ELEMENT_WRAPPER_KEY) {
+                    throw SDJwtVerificationException("Reserved name '${disc.key}' used as a disclosed claim")
+                }
+                val release = select == null || select[disc.key]?.sd == true
+                if (!release) return
+                state.released += disc.disclosure
+                builder.putUnique(disc.key, recurse(disc.value, select?.get(disc.key), select == null, state))
+            }
         }
-    }
-
-    private fun filterDisclosures(currPayloadObject: JsonObject, sdMap: Map<String, SDField>): Set<String> {
-        if (currPayloadObject.containsKey(SDJwt.DIGESTS_KEY) && currPayloadObject[SDJwt.DIGESTS_KEY] !is JsonArray) {
-            throw Exception("Invalid ${SDJwt.DIGESTS_KEY} format found")
-        }
-
-        return currPayloadObject.filter { entry -> entry.value is JsonObject && !sdMap[entry.key]?.children.isNullOrEmpty() }
-            .flatMap { entry ->
-                filterDisclosures(entry.value.jsonObject, sdMap[entry.key]!!.children!!)
-            }.plus(
-                currPayloadObject[SDJwt.DIGESTS_KEY]?.jsonArray
-                    ?.asSequence()
-                    ?.map { it.jsonPrimitive.content }
-                    ?.filter { digest -> digestedDisclosures.containsKey(digest) }
-                    ?.map { digest -> digestedDisclosures[digest]!! }
-                    ?.filter { sd -> sdMap[sd.key]?.sd == true }
-                    ?.flatMap { sd ->
-                        listOf(sd.disclosure).plus(
-                            if (sd.value is JsonObject && !sdMap[sd.key]?.children.isNullOrEmpty()) {
-                                filterDisclosures(sd.value, sdMap[sd.key]!!.children!!)
-                            } else listOf()
-                        )
-                    }
-                    ?.toList() ?: listOf()
-            ).toSet()
     }
 
     /**
-     * Payload with selectively disclosed fields and undisclosed fields filtered out.
-     * @param sdMap Map indicating per field (recursively) whether they are selected for disclosure
+     * Walks an array. [sdArray] indexes by **logical** position (decoys don't advance it).
+     * `null` reveals everything; otherwise reveals only elements marked `sd = true`.
      */
-    fun withSelectiveDisclosures(sdMap: Map<String, SDField>): SDPayload {
-        val selectedDisclosures = filterDisclosures(undisclosedPayload, sdMap)
-        return SDPayload(
-            undisclosedPayload = undisclosedPayload,
-            digestedDisclosures = digestedDisclosures.filterValues { selectedDisclosures.contains(it.disclosure) }
-        )
+    private fun walkArray(
+        array: JsonArray,
+        sdArray: SDArray?,
+        state: WalkState,
+    ): JsonArray = buildJsonArray {
+        var logicalIndex = 0
+        array.forEach { element ->
+            val digest = arrayElementWrapperHash(element)
+            if (digest != null) {
+                if (!state.seenDigests.add(digest)) {
+                    throw SDJwtVerificationException("Duplicate digest reference: $digest")
+                }
+                when (val disc = state.unconsumed.remove(digest)) {
+                    is ObjectPropertyDisclosure -> throw SDJwtVerificationException(
+                        "Expected an array-element disclosure, got an object-property disclosure"
+                    )
+                    is ArrayElementDisclosure -> {
+                        val field = sdArray?.fieldAt(logicalIndex)
+                        logicalIndex += 1
+                        val release = sdArray == null || field?.sd == true
+                        if (release) {
+                            state.released += disc.disclosure
+                            add(recurse(disc.value, field, sdArray == null, state))
+                        }
+                    }
+                    null -> { /* decoy or holder-stripped: drop the slot. */ }
+                }
+            } else {
+                val field = sdArray?.fieldAt(logicalIndex)
+                logicalIndex += 1
+                add(recurse(element, field, sdArray == null, state))
+            }
+        }
+    }
+
+    private fun SDArray.fieldAt(logicalIndex: Int): SDField? =
+        elements.getOrNull(logicalIndex) ?: wildcard
+
+    /**
+     * Recurse into a nested value. [releaseAll] carries verifier mode down the tree;
+     * when off, an absent [field] means "reveal nothing under this branch".
+     */
+    private fun recurse(
+        value: JsonElement,
+        field: SDField?,
+        releaseAll: Boolean,
+        state: WalkState,
+    ): JsonElement = when (value) {
+        is JsonObject -> walkObject(value, if (releaseAll) null else (field?.children ?: emptyMap()), state)
+        is JsonArray -> walkArray(value, if (releaseAll) null else (field?.arrayChildren ?: SDArray()), state)
+        else -> value
+    }
+
+    private fun digestString(node: JsonElement): String {
+        val p = node as? JsonPrimitive
+        if (p == null || !p.isString) {
+            throw SDJwtVerificationException("${SDJwt.DIGESTS_KEY} entries must be JSON strings")
+        }
+        return p.content
+    }
+
+    private fun JsonObjectBuilder.putUnique(key: String, value: JsonElement) {
+        if (put(key, value) != null) {
+            throw SDJwtVerificationException("Duplicate claim name '$key' at the same object level")
+        }
     }
 
     /**
@@ -135,15 +197,19 @@ data class SDPayload internal constructor(
         return SDPayload(undisclosedPayload, mapOf())
     }
 
-    /**
-     * Verify digests in JWT payload match with disclosures appended to JWT token.
-     */
-    fun verifyDisclosures() = digestedDisclosures.toMutableMap().also {
-        disclosePayloadRecursively(undisclosedPayload, it)
-    }.isEmpty()
+    /** Returns `false` if [fullPayload] would throw any [SDJwtVerificationException]. */
+    fun verifyDisclosures(): Boolean = try {
+        fullPayload
+        true
+    } catch (_: SDJwtVerificationException) {
+        false
+    }
 
     @JsExport.Ignore // see SDPayloadBuilder for JS support
     companion object {
+        /** Marker key inside an array element that names a digest. */
+        internal const val ARRAY_ELEMENT_WRAPPER_KEY = "..."
+
         val sha256 = SHA256()
 
         private fun digest(value: String): String {
@@ -186,7 +252,7 @@ data class SDPayload internal constructor(
                 add(key)
                 add(value)
             }.toString().encodeToByteArray()).let { disclosure ->
-                SDisclosure(
+                ObjectPropertyDisclosure(
                     disclosure = disclosure,
                     salt = salt,
                     key = key,
@@ -195,12 +261,32 @@ data class SDPayload internal constructor(
             }
         }
 
+        /** A 2-element disclosure `[salt, value]` for an array element. */
+        private fun generateArrayElementDisclosure(value: JsonElement): ArrayElementDisclosure {
+            val salt = generateSalt()
+            val encoded = base64Url.encode(buildJsonArray {
+                add(salt)
+                add(value)
+            }.toString().encodeToByteArray())
+            return ArrayElementDisclosure(disclosure = encoded, salt = salt, value = value)
+        }
+
         private fun digestSDClaim(
             key: String,
             value: JsonElement,
             digests2disclosures: MutableMap<String, SDisclosure>
         ): String {
             val disclosure = generateDisclosure(key, value)
+            return digest(disclosure.disclosure).also {
+                digests2disclosures[it] = disclosure
+            }
+        }
+
+        private fun digestArrayElement(
+            value: JsonElement,
+            digests2disclosures: MutableMap<String, SDisclosure>
+        ): String {
+            val disclosure = generateArrayElementDisclosure(value)
             return digest(disclosure.disclosure).also {
                 digests2disclosures[it] = disclosure
             }
@@ -224,9 +310,28 @@ data class SDPayload internal constructor(
             val sdPayload = removeSDFields(payload, sdMap).toMutableMap()
             val digests = payload.filterKeys { key ->
                 // iterate over all fields that are selectively disclosable AND/OR have nested fields that might be:
-                sdMap[key]?.sd == true || !sdMap[key]?.children.isNullOrEmpty()
+                sdMap[key]?.sd == true || !sdMap[key]?.children.isNullOrEmpty() || sdMap[key]?.arrayChildren != null
             }.map { entry ->
-                if (entry.value !is JsonObject || sdMap[entry.key]?.children.isNullOrEmpty()) {
+                val arrayChildren = sdMap[entry.key]?.arrayChildren
+                if (entry.value is JsonArray && arrayChildren != null) {
+                    // this field is an array with selectively disclosable elements:
+                    val transformedArray = generateSDArray(
+                        array = entry.value.jsonArray,
+                        sdArray = arrayChildren,
+                        digests2disclosures = digests2disclosures
+                    )
+                    if (sdMap[entry.key]?.sd == true) {
+                        // the array itself is also selectively disclosable as a whole:
+                        digestSDClaim(
+                            key = entry.key,
+                            value = transformedArray,
+                            digests2disclosures = digests2disclosures
+                        )
+                    } else {
+                        sdPayload[entry.key] = transformedArray
+                        null
+                    }
+                } else if (entry.value !is JsonObject || sdMap[entry.key]?.children.isNullOrEmpty()) {
                     // this field has no nested elements and/or is selectively disclosable only as a whole:
                     digestSDClaim(
                         key = entry.key,
@@ -260,20 +365,51 @@ data class SDPayload internal constructor(
             }.filterNotNull().toSet()
 
             if (digests.isNotEmpty()) {
-                sdPayload[SDJwt.DIGESTS_KEY] = buildJsonArray {
-                    digests.forEach { add(it) }
-                    if (sdMap.decoyMode != DecoyMode.NONE && sdMap.decoys > 0) {
-                        val numDecoys = when (sdMap.decoyMode) {
-                            DecoyMode.RANDOM -> secureRandom.nextInt(1, sdMap.decoys + 1)
-                            DecoyMode.FIXED -> sdMap.decoys
-                        }
-                        repeat(numDecoys) {
-                            add(digest(generateSalt()))
-                        }
-                    }
-                }
+                val mixed = digests.toMutableList()
+                repeat(numDecoys(sdMap.decoyMode, sdMap.decoys)) { mixed += digest(generateSalt()) }
+                // Shuffle so source claim order doesn't leak through _sd.
+                sdPayload[SDJwt.DIGESTS_KEY] = JsonArray(mixed.shuffled(secureRandom).map { JsonPrimitive(it) })
             }
             return JsonObject(sdPayload)
+        }
+
+        /**
+         * Replace each selectively-disclosable element of [array] with a `{"...": "<digest>"}`
+         * wrapper. Decoys are inserted at random positions; real elements keep their relative
+         * order.
+         */
+        private fun generateSDArray(
+            array: JsonArray,
+            sdArray: SDArray,
+            digests2disclosures: MutableMap<String, SDisclosure>
+        ): JsonArray {
+            val transformed = array.mapIndexed { index, element ->
+                val field = sdArray.elements.getOrNull(index) ?: sdArray.wildcard
+                val nested = if (element is JsonObject && field?.children != null) {
+                    generateSDPayload(element, field.children, digests2disclosures)
+                } else if (element is JsonArray && field?.arrayChildren != null) {
+                    generateSDArray(element, field.arrayChildren, digests2disclosures)
+                } else element
+                if (field?.sd == true) {
+                    val hash = digestArrayElement(nested, digests2disclosures)
+                    buildJsonObject { put(ARRAY_ELEMENT_WRAPPER_KEY, hash) }
+                } else {
+                    nested
+                }
+            }
+            val result = transformed.toMutableList()
+            repeat(numDecoys(sdArray.decoyMode, sdArray.decoys)) {
+                val decoy = buildJsonObject { put(ARRAY_ELEMENT_WRAPPER_KEY, digest(generateSalt())) }
+                result.add(secureRandom.nextInt(result.size + 1), decoy)
+            }
+            return JsonArray(result)
+        }
+
+        /** Number of decoys to add for one hierarchical level. */
+        private fun numDecoys(mode: DecoyMode, decoys: Int): Int = when (mode) {
+            DecoyMode.NONE -> 0
+            DecoyMode.RANDOM -> if (decoys > 0) secureRandom.nextInt(decoys + 1) else 0
+            DecoyMode.FIXED -> decoys
         }
 
         /**
@@ -354,14 +490,49 @@ data class SDPayload internal constructor(
         )
 
         /**
-         * Parse SD payload from JWT body and disclosure strings appended to JWT token
+         * Parse SD payload from JWT body and disclosure strings appended to JWT token.
+         * Two distinct disclosures that hash to the same digest throw
+         * [SDJwtVerificationException]; the caller is responsible for rejecting duplicate
+         * disclosure strings before they collapse into [Set].
+         *
          * @param jwtBody  Undisclosed JWT body payload
          * @param disclosures Encoded disclosure string, as appended to JWT token
          */
         fun parse(jwtBody: String, disclosures: Set<String>): SDPayload {
+            val digestMap = mutableMapOf<String, SDisclosure>()
+            disclosures.forEach { d ->
+                val parsed = SDisclosure.parse(d)
+                val digestStr = digest(d)
+                if (digestMap.put(digestStr, parsed) != null) {
+                    throw SDJwtVerificationException(
+                        "Distinct disclosures hash to the same digest: $digestStr"
+                    )
+                }
+            }
             return SDPayload(
                 undisclosedPayload = Json.parseToJsonElement(jwtBody.decodeFromBase64Url().decodeToString()).jsonObject,
-                digestedDisclosures = disclosures.associate { Pair(digest(it), SDisclosure.parse(it)) })
+                digestedDisclosures = digestMap,
+            )
         }
     }
+}
+
+/**
+ * Returns the digest if [element] is a well-formed array-element wrapper
+ * (`{"...": "<digest-string>"}`), `null` if it isn't a wrapper at all. Throws
+ * [SDJwtVerificationException] when [element] looks like a wrapper (has the `...` key)
+ * but is malformed (extra keys or non-string digest).
+ */
+internal fun arrayElementWrapperHash(element: JsonElement): String? {
+    if (element !is JsonObject || !element.containsKey(SDPayload.ARRAY_ELEMENT_WRAPPER_KEY)) return null
+    if (element.size != 1) {
+        throw SDJwtVerificationException(
+            "Array-element wrapper must have exactly one key, got ${element.size}"
+        )
+    }
+    val v = element[SDPayload.ARRAY_ELEMENT_WRAPPER_KEY] as? JsonPrimitive
+    if (v == null || !v.isString) {
+        throw SDJwtVerificationException("Array-element wrapper digest must be a JSON string")
+    }
+    return v.content
 }

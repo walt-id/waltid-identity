@@ -26,6 +26,7 @@ object PolicyClaimChecker {
     }
 
     @Serializable
+    @SerialName("ClaimNotFoundClaimCheckResult")
     class ClaimNotFoundClaimCheckResult(
 
     ) : ClaimCheckResult() {
@@ -39,6 +40,7 @@ object PolicyClaimChecker {
     fun checkClaim(
         credential: DigitalCredential,
         claims: List<JsonPath>,
+        requireField: Boolean = false,
         block: JsonElement.(path: JsonPath) -> Result<ClaimCheckResult>
     ): Result<JsonObject> {
         val credentialData = credential.credentialData
@@ -47,6 +49,10 @@ object PolicyClaimChecker {
         }
 
         if (foundClaim == null) {
+            if (requireField) {
+                val claimNames = claims.joinToString(", ")
+                return Result.failure(IllegalArgumentException("Mandatory claim ($claimNames) is absent"))
+            }
             return Result.success(ClaimNotFoundClaimCheckResult.CLAIM_NOT_FOUND)
         }
 

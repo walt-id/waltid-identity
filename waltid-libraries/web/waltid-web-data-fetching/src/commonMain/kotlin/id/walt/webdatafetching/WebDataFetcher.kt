@@ -3,6 +3,7 @@ package id.walt.webdatafetching
 import id.walt.webdatafetching.config.RequestConfiguration
 import id.walt.webdatafetching.utils.UrlUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
@@ -11,7 +12,17 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 
-class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null): AutoCloseable {
+class WebDataFetcher private constructor(
+    id: String,
+    defaultConfiguration: WebDataFetchingConfiguration?,
+    clientOverride: HttpClient?,
+) : AutoCloseable {
+
+    constructor(id: String, defaultConfiguration: WebDataFetchingConfiguration? = null) : this(
+        id = id,
+        defaultConfiguration = defaultConfiguration,
+        clientOverride = null,
+    )
 
     constructor(id: WebDataFetcherId, defaultConfiguration: WebDataFetchingConfiguration? = null) : this(
         id = id.name,
@@ -21,12 +32,26 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     private val log = KotlinLogging.logger("WebDataFetcher[$id]")
     val dataFetcherConfiguration = WebDataFetcherManager.getConfigurationForId(id, defaultConfiguration)
 
-    val httpClient = dataFetcherConfiguration.http.engineCreator().getHttpClient {
+    val httpClient = clientOverride ?: dataFetcherConfiguration.http.engineCreator().getHttpClient {
         dataFetcherConfiguration.applyConfigurationToHttpClient(this)
 
         install(ContentNegotiation) {
             json()
         }
+    }
+
+    companion object {
+        /**
+         * Build a [WebDataFetcher] backed by a caller-provided [HttpClient] instead of one created
+         * from the configured engine. Use this only when you need engine-specific configuration the
+         * [WebDataFetchingConfiguration] cannot express (e.g. a custom TLS trust manager in tests).
+         * The caller is responsible for configuring content negotiation on the provided client.
+         */
+        fun wrapping(
+            client: HttpClient,
+            id: String,
+            defaultConfiguration: WebDataFetchingConfiguration? = null,
+        ): WebDataFetcher = WebDataFetcher(id = id, defaultConfiguration = defaultConfiguration, clientOverride = client)
     }
 
     val cache = dataFetcherConfiguration.cache?.buildCache<WebDataFetchingResult<*>>()
@@ -137,6 +162,9 @@ class WebDataFetcher(id: String, defaultConfiguration: WebDataFetchingConfigurat
     }
 
     suspend inline fun rawFetch(urlString: String): HttpResponse = rawFetch(UrlUtils.parseUrl(urlString))
+
+    suspend inline fun rawFetch(urlString: String, customRequest: HttpRequestBuilder.() -> Unit): HttpResponse =
+        rawFetch(UrlUtils.parseUrl(urlString), customRequest)
 
     /**
      * Send data to a remote URL

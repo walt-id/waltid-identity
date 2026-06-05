@@ -31,11 +31,11 @@ class TokenRequestBuilder(
     data class TokenResponse(
         val access_token: String,
         val token_type: String,
-        val expires_in: Int? = null,
+        val expires_in: Long? = null,
         val refresh_token: String? = null,
         val scope: String? = null,
         val c_nonce: String? = null,
-        val c_nonce_expires_in: Int? = null,
+        val c_nonce_expires_in: Long? = null,
     )
 
     /**

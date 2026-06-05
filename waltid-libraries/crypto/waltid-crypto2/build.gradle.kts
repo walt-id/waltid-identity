@@ -18,7 +18,7 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
-            implementation(identityLibs.bcprov.lts8on)
+            implementation(identityLibs.bouncycastle.prov)
         }
         jvmTest.dependencies {
             implementation(kotlin("test"))

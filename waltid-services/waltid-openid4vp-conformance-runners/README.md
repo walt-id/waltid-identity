@@ -18,185 +18,167 @@
   </p>
 </div>
 
-## What This Folder Contains
+## Quick Start (Docker)
 
-This folder documents how to set up and run the official **OpenID Conformance Suite** against walt.id implementations for **OpenID4VP 1.0** (Verifier and Wallet flows). It provides:
-- Step‑by‑step setup for the OpenID Conformance Suite using `nix` + `devenv`
-- Configuration snippets and example profiles in `config/`
-- A curated list of test plans to exercise Verifier and Wallet scenarios
+The fastest way to run conformance tests locally:
 
-## Main Purpose
+### Prerequisites
+- Docker and Docker Compose
+- Java 21+
+- `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
 
-Help developers validate walt.id OpenID4VP implementations against the official conformance suite by:
-- Installing and running the suite locally with trusted certificates and hosts
-- Pointing the suite to walt.id Verifier/Wallet endpoints
-- Executing a representative matrix of OpenID4VP 1.0 test cases
-
-## Key Concepts
-
-- **OpenID Conformance Suite**: The official test harness for OpenID/OAuth specs
-- **OpenID4VP 1.0**: Final specification for verifiable presentations; used here for both Verifier and Wallet roles
-- **Request Object Delivery**: `request_uri` (unsigned/signed) consumed by wallets
-- **Response Modes**: `direct_post` and `direct_post.jwt` are typical for cross‑device flows
-- **Client ID Schemes**: `x509_san_dns`, `redirect_uri`, `did`, `web-origin`, etc., used to authenticate verifiers
-
-## Test Plans
-
-OpenID Compliance — OpenID4VP 1.0
-
-- Verifier
-  - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
-  - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
-  - iso_mdl + x509_san_dns + request_uri_signed + direct_post
-  - iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
-- Wallet (for all below run both unsigned/signed + direct_post/direct_post.jwt)
-  - sd_jwt_vc: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-  - iso_mdl: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-
-Note: See `config/` for example configuration files you can adapt for specific runs.
-
-## Install & run OpenID Conformance Suite
-To setup the official conformance suite with devenv (official recommended way), install nix with your package manager (create nix build users on your machine, enable nix-daemon, etc.) and install devenv with nix.
-
-NOTE: This process will install a custom CA + add certificates to your keychain and browser certificate stores, and update your /etc/hosts (handled by hostctl)! 
-
-## Setup the OpenID Conformance Suite
-
-### Clone the OpenID Conformance Suite repository
+Add the hosts entry:
 ```shell
-git clone git@gitlab.com:openid/conformance-suite.git
+echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
 ```
 
-Enter the directory
+### 1. Clone and Start the Conformance Suite
+
 ```shell
-cd conformance-suite
+# Clone the conformance suite (if not already done)
+git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+
+# Start with Docker
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-local.yml up -d
 ```
 
-### Install nix
-
-#### Native
-If your native package manager has it, you can install it using that:
+Wait ~30 seconds for the server to start, then verify:
 ```shell
-sudo pacman -S nix
+curl -k https://localhost.emobix.co.uk:8443/
 ```
 
-#### Nixos
-Alternatively, you can run this multi-user installation script from Nixos:
+### 2. Run the Conformance Tests
+
 ```shell
+# From the waltid-unified-build directory
+cd ~/dev/walt-id/waltid-unified-build
+
+# Run tests
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "id.walt.openid4vp.conformance.ConformanceTests"
+```
+
+Or run the main application:
+```shell
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run
+```
+
+### 3. Stop the Conformance Suite
+
+```shell
+cp ./docker-compose-walt.yml cd ~/dev/openid/conformance-suite
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-local.yml down
+```
+
+## SSL Certificate (Already Configured)
+
+This project includes a bundled truststore (`conformance-truststore.jks`) with the conformance suite's self-signed certificate. It's automatically used when running via Gradle.
+
+### Updating the Certificate
+
+If you rebuild the conformance suite's nginx container, extract and import the new certificate:
+
+```shell
+# Extract certificate from running server
+openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk </dev/null 2>/dev/null | \
+  openssl x509 -outform PEM > conformance-test.pem
+
+# Update truststore
+keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks -storepass changeit 2>/dev/null || true
+keytool -importcert -trustcacerts -alias conformance-test-localhost \
+  -file conformance-test.pem -keystore conformance-truststore.jks \
+  -storepass changeit -noprompt
+```
+
+### Running from IntelliJ
+
+Add these VM options to your run configuration:
+```
+-Djavax.net.ssl.trustStore=/home/pp/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
+-Djavax.net.ssl.trustStorePassword=changeit
+```
+
+---
+
+## Alternative: Setup with Devenv (Nix)
+
+For the full nix/devenv setup (creates CA, manages hosts file automatically):
+
+### Install Nix
+
+```shell
+# Option 1: Native package manager (if available)
+sudo pacman -S nix  # Arch
+# or
+sudo apt install nix  # Debian/Ubuntu
+
+# Option 2: Official installer
 sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
 ```
-Keep in mind that you must be able to authenticate with sudo, your Linux must be running systemd, and SELinux has to be disabled!
 
-#### Third-party
-Alternatively, there is a **third-party** company (Determinate Systems) script: https://zero-to-nix.com/
+Enable and start the nix daemon:
 ```shell
-curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix -o nix-install.sh
-less ./nix-install.sh
-sh ./nix-install.sh install
+sudo systemctl enable --now nix-daemon.service
 ```
 
-### Setup nix
-#### Enable nix service
-```shell
-sudo systemctl start nix-daemon.service && sudo systemctl enable nix-daemon.service
-```
+### Install Devenv
 
-#### Setup nix channels
-```shell
-nix-channel --add https://nixos.org/channels/nixpkgs-unstable
-nix-channel --update
-```
-
-#### Test
-Check if nix is installed correctly:
-```shell
-nix-env -iA nixpkgs.hello
-```
-This command should have installed the hello command at `/nix/store/[hash]-hello-[version]/bin/hello`.
-Run it:
-```shell
-hello
-```
-
-If you cannot run the `hello` program, then likely your path is not setup correctly.
-Add `~/.nix-profile/bin` to your PATH variable.
-```shell
-PATH=$PATH:~/.nix-profile/bin
-```
-
-### Install devenv
-After you have successfully installed & setup nix, you can now use nix to install Cachix devenv.
-
-#### Usual
-Make sure you have setup nix correctly and the **nix daemon is running**!
 ```shell
 nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixpkgs-unstable
 ```
 
-#### Nix profiles
-This requires experimental flags!
+### Run Conformance Suite with Devenv
+
 ```shell
-nix profile install nixpkgs#devenv
-```
-
-#### NixOS/nix-darwin
-`configuration.nix`
-```nix
-environment.systemPackages = [
-  pkgs.devenv
-];
-```
-
-#### home-manager
-`home.nix`
-```nix
-home.packages = [
-  pkgs.devenv
-];
-```
-
-### Devenv optional step: Configure a GitHub access token
-> The Nix ecosystem is heavily dependent on GitHub for hosting and distributing source code, like the source for nixpkgs.
-> This means that Nix will make a lot of un-authenticated requests to the GitHub API and you may encounter rate-limiting.
-
-Create a new token with no extra permissions at https://github.com/settings/personal-access-tokens/new
-
-Add token to `~/.config/nix/nix.conf`:
-```shell
-access-tokens = github.com=<GITHUB_TOKEN>
-```
-
-### Setup conformance suite with devenv
-As you have now installed nix to install devenv you may now use devenv to install conformance suite components.
-Make sure you are in the repository directory!
-
-Run:
-```shell
+cd ~/dev/openid/conformance-suite
 devenv up
 ```
 
-Devenv will now:
-- download the toolchain
-- change your `/etc/hosts` to include `localhost.emobix.co.uk`
-- create a CA
-- create a certificate
-- add the certificate to your keychain + browser certificate store
+In another terminal:
+```shell
+cd ~/dev/openid/conformance-suite
+mvn spring-boot:run
+```
 
-### Run compliance suite application
-- Open another terminal
-- cd into the repository directory again
-- in the second terminal, run `mvn spring-boot:run`
+Visit: https://localhost.emobix.co.uk:8443/
 
-### Visit conformance suite site
-You can now direct your browser to `https://localhost.emobix.co.uk:8443/`
-NOTE: This page has a non-trusted CA certificate, your browser might show
-a small warning, e.g. "Connection verified by a certificate issuer that is not recognized by Mozilla."
+---
 
+## Test Plans
 
-### Further information
-See https://gitlab.com/openid/conformance-suite/-/wikis/Developers/Build-&-Run#intellij to learn
-how to compile the conformance suite yourself.
+OpenID4VP 1.0 test coverage:
 
+**Verifier Tests**
+- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
+- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
+- iso_mdl + x509_san_dns + request_uri_signed + direct_post
+- iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
+
+**Wallet Tests** (unsigned/signed + direct_post/direct_post.jwt)
+- sd_jwt_vc: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
+- iso_mdl: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
+
+See `config/` for example configuration files.
+
+---
+
+## Troubleshooting
+
+### SSL Handshake Errors
+If you see `SSLHandshakeException` or certificate errors:
+1. Ensure `docker-compose-walt.yml` was used (builds nginx with proper cert)
+2. Verify truststore is being used (check Gradle output for JVM args)
+3. Try rebuilding: `docker compose -f docker-compose-walt.yml build nginx`
+
+### Conformance Suite Not Starting
+Check container logs:
+```shell
+docker logs conformance-suite-server-1
+docker logs conformance-suite-nginx-1
+```
+
+---
 
 ## Join the community
 

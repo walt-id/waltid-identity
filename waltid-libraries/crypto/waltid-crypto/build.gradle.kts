@@ -41,6 +41,7 @@ kotlin {
             //
 
             // Hashes
+            implementation(identityLibs.kotlincrypto.hash.sha1)
             implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.kotlincrypto.macs.hmac.sha2)
         }

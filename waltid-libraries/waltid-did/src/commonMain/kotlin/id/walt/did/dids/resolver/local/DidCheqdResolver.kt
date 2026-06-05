@@ -3,7 +3,7 @@ package id.walt.did.dids.resolver.local
 import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidCheqdDocument
 import id.walt.did.dids.document.DidDocument
-import io.ktor.client.*
+import id.walt.webdatafetching.WebDataFetcher
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import kotlinx.serialization.json.Json
@@ -17,8 +17,7 @@ import kotlin.js.JsExport
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
-class DidCheqdResolver : LocalResolverMethod("cheqd") {
-    private val httpClient = HttpClient() //TODO: inject
+class DidCheqdResolver(private val fetcher: WebDataFetcher) : LocalResolverMethod("cheqd") {
 
     @JvmBlocking
     @JvmAsync
@@ -42,7 +41,7 @@ class DidCheqdResolver : LocalResolverMethod("cheqd") {
     private val json = Json { ignoreUnknownKeys = true }
 
     private suspend fun resolveDid(did: String): DidDocument {
-        val response = httpClient.get("https://resolver.cheqd.net/1.0/identifiers/${did}") {
+        val response = fetcher.rawFetch("https://resolver.cheqd.net/1.0/identifiers/${did}") {
             headers {
                 append("contentType", "application/did+ld+json")
             }
