@@ -50,7 +50,7 @@ kotlin {
                 implementation(identityLibs.kotlinx.coroutines.test)
                 implementation("androidx.test:runner:1.6.2")
                 implementation("androidx.test.ext:junit:1.2.1")
-                implementation(identityLibs.ktor.client.cio)
+                implementation(identityLibs.ktor.client.okhttp)
             }
         }
     }
