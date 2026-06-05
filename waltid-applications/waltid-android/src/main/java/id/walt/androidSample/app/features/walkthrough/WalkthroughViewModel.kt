@@ -166,7 +166,7 @@ interface WalkthroughViewModel {
                         KeyAlgorithmOption.RSA -> KeyType.RSA
                         KeyAlgorithmOption.Secp256r1 -> KeyType.secp256r1
                     }
-                    val generatedKey = AndroidKey.create(AndroidKey.Options(keyType = keyType))
+                    val generatedKey = AndroidKey.Hardware.create(AndroidKey.Options(keyType = keyType))
                     key = generatedKey
                     this@Default.generatedKey.update { generatedKey.exportJWK() }
                 } catch (e: InvalidAlgorithmParameterException) {
