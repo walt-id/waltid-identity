@@ -117,6 +117,11 @@ Policy-based access control system for wallet holders to control credential rece
 
 These libraries provide additional functionality:
 
+#### **[🟢 waltid-credential-key-resolver](./waltid-credential-key-resolver)**
+Resolver for JWT signing keys based on DID, x5c, or HTTPS well-known metadata. Provides a unified interface for resolving keys from different sources.
+
+**Use when:** You need to resolve JWT signing keys from DID, x5c, or HTTPS well-known metadata.
+
 #### **[🟢 waltid-digital-credentials-examples](./waltid-digital-credentials-examples)**
 Collection of example credentials in various formats (W3C, SD-JWT, mdoc) for testing and development purposes.
 
