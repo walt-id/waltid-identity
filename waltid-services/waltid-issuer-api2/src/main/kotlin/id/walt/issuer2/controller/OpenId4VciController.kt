@@ -42,7 +42,7 @@ class OpenId4VciController(
             call.respond(metadataService.getVctTypeMetadata(credentialType))
         }
 
-        route.route("openid4vci", { tags = listOf("OpenID4VCI") }) {
+        route.route("openid4vci", { tags = listOf(OpenId4VciRoutesDocs.OPENID4VCI_TAG) }) {
             get("jwks", OpenId4VciRoutesDocs.jwks()) {
                 call.respond(metadataService.listJwks())
             }

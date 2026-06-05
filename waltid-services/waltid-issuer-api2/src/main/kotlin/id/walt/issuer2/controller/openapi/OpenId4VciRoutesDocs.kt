@@ -5,7 +5,10 @@ import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.JsonObject
 
 object OpenId4VciRoutesDocs {
+    const val OPENID4VCI_TAG = "Issuer Service API v2 - OpenID4VCI"
+
     fun credentialIssuerMetadata(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Get Credential Issuer metadata"
         response {
             HttpStatusCode.OK to {
@@ -16,6 +19,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun authorizationServerMetadata(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Get Authorization Server metadata"
         response {
             HttpStatusCode.OK to {
@@ -26,6 +30,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun jwtVcIssuerMetadata(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Get SD-JWT VC issuer metadata"
         response {
             HttpStatusCode.OK to {
@@ -36,6 +41,7 @@ object OpenId4VciRoutesDocs {
     }
 
     fun vctTypeMetadata(): RouteConfig.() -> Unit = {
+        tags = listOf(OPENID4VCI_TAG)
         summary = "Get SD-JWT VC type metadata"
         description = "Resolve self-hosted SD-JWT VC type metadata from a VCT URL path."
         request {
