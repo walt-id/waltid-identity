@@ -3,7 +3,7 @@ package id.walt.wallet2.client
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.IosPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
-import id.walt.wallet2.persistence.stores.HardwareKeyStore
+import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
@@ -14,7 +14,7 @@ actual class MobileWalletClientFactory {
         val queries = db.walletPersistenceQueries
 
         val keyProvider = IosPlatformKeyProvider(useSecureElement = config.preferHardwareKeys)
-        val keyStore = HardwareKeyStore(keyProvider, queries)
+        val keyStore = PlatformKeyStore(keyProvider, queries)
         val credentialStore = SqlDelightCredentialStore(queries)
         val didStore = SqlDelightDidStore(queries)
 

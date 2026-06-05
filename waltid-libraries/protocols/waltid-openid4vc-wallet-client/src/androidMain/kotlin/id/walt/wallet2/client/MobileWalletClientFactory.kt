@@ -4,7 +4,7 @@ import android.content.Context
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
-import id.walt.wallet2.persistence.stores.HardwareKeyStore
+import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
@@ -15,7 +15,7 @@ actual class MobileWalletClientFactory(private val context: Context) {
         val queries = db.walletPersistenceQueries
 
         val keyProvider = AndroidPlatformKeyProvider()
-        val keyStore = HardwareKeyStore(keyProvider, queries)
+        val keyStore = PlatformKeyStore(keyProvider, queries)
         val credentialStore = SqlDelightCredentialStore(queries)
         val didStore = SqlDelightDidStore(queries)
 

@@ -2,7 +2,8 @@ CREATE TABLE key_references (
     key_id TEXT NOT NULL PRIMARY KEY,
     key_type TEXT NOT NULL,
     created_at INTEGER NOT NULL,
-    is_hardware_backed INTEGER NOT NULL DEFAULT 1
+    is_hardware_backed INTEGER NOT NULL DEFAULT 1,
+    key_material TEXT
 );
 
 selectAll:
@@ -12,8 +13,8 @@ selectByKeyId:
 SELECT * FROM key_references WHERE key_id = ?;
 
 insert:
-INSERT OR REPLACE INTO key_references (key_id, key_type, created_at, is_hardware_backed)
-VALUES (?, ?, ?, ?);
+INSERT OR REPLACE INTO key_references (key_id, key_type, created_at, is_hardware_backed, key_material)
+VALUES (?, ?, ?, ?, ?);
 
 deleteByKeyId:
 DELETE FROM key_references WHERE key_id = ?;
