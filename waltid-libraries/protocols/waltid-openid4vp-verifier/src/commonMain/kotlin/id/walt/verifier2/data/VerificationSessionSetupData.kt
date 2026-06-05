@@ -54,7 +54,6 @@ data class GeneralFlowConfig(
     /** certificate chain for signed request */
     val x5c: List<String>? = null,
 
-
     @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null
 ) {
     init {
