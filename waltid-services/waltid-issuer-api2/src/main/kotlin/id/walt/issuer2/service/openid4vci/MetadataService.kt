@@ -31,7 +31,6 @@ class MetadataService(
     }
 
     private val baseUrl = serviceConfig.baseUrl.trimEnd('/') + "/openid4vci"
-    private val vctAuthorityBaseUrl = serviceConfig.baseUrl.trimEnd('/')
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
 
     private val issuerDisplay: List<IssuerDisplay>? =
@@ -129,7 +128,7 @@ class MetadataService(
         if (vct == INTERNAL_VCT_BASE_URL) copy(vct = selfHostedVct(credentialType)) else this
 
     private fun selfHostedVct(credentialType: String): String =
-        "$vctAuthorityBaseUrl/$credentialType"
+        "$baseUrl/$credentialType"
 
     companion object {
         private const val INTERNAL_VCT_BASE_URL = "vctBaseUrl"
