@@ -22,14 +22,16 @@ object EudiTestBackend {
     private const val BACKEND_AUTHORIZE = "https://backend.issuer.eudiw.dev/form_authorize_generate"
     private const val VERIFIER_BACKEND = "https://verifier-backend.eudiw.dev"
 
-    private val client = HttpClient {
-        install(HttpCookies)
-        install(HttpRedirect) { checkHttpMethod = false }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 30_000
-            connectTimeoutMillis = 30_000
+    private val client by lazy {
+        HttpClient {
+            install(HttpCookies)
+            install(HttpRedirect) { checkHttpMethod = false }
+            install(HttpTimeout) {
+                requestTimeoutMillis = 30_000
+                connectTimeoutMillis = 30_000
+            }
+            followRedirects = true
         }
-        followRedirects = true
     }
 
     data class GeneratedOffer(val offerUrl: String, val txCode: String?)

@@ -37,6 +37,9 @@ kotlin {
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
         }
+        androidMain.dependencies {
+            implementation(identityLibs.ktor.client.okhttp)
+        }
         iosMain.dependencies {
             implementation(identityLibs.ktor.client.darwin)
         }
@@ -50,8 +53,13 @@ kotlin {
                 implementation(identityLibs.kotlinx.coroutines.test)
                 implementation("androidx.test:runner:1.6.2")
                 implementation("androidx.test.ext:junit:1.2.1")
-                implementation(identityLibs.ktor.client.okhttp)
             }
         }
+    }
+}
+
+configurations.all {
+    if (name.contains("android", ignoreCase = true)) {
+        exclude(group = "io.ktor", module = "ktor-client-java")
     }
 }
