@@ -116,7 +116,7 @@ data class DcqlQuery(
             )
         )
 
-        val EXAMPLE_ISO_PID = DcqlQuery(
+        val EXAMPLE_EUDI_PID = DcqlQuery(
             credentials = listOf(
                 CredentialQuery(
                     id = "pid",
