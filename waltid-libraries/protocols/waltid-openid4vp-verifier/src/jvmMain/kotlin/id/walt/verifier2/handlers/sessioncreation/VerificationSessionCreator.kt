@@ -237,9 +237,9 @@ object VerificationSessionCreator {
 
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.
-             * Each object structure is represented by [VerifierAttestationItem].
+             * Each object structure is represented by [VerifierInfoItem].
              */
-            //val verifierAttestations: List<VerifierAttestationItem>? = null,
+            verifierInfo = setup.core.verifierInfo,
 
             // SIOPv2 specific parameters (if scope includes "openid") - common but technically from SIOPv2
             /*
