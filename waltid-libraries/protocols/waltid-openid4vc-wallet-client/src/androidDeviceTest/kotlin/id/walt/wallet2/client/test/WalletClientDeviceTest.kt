@@ -6,7 +6,7 @@ import id.walt.wallet2.client.MobileWalletClientFactory
 import id.walt.webdatafetching.WebDataFetcherManager
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertNotNull
@@ -18,7 +18,8 @@ import kotlin.test.assertTrue
  * Exercises the full mobile stack: AndroidKeyStore crypto + SQLDelight persistence
  * + OID4VCI/VP protocol against the public EUDI test backend.
  *
- * Requires: Android emulator or device with API 30+.
+ * Uses runBlocking (not runTest) because real network I/O requires real time
+ * dispatchers — runTest's virtual time expires HTTP timeouts immediately.
  */
 class WalletClientDeviceTest {
 
@@ -27,7 +28,7 @@ class WalletClientDeviceTest {
         @BeforeClass
         fun setupEngine() {
             WebDataFetcherManager.globalDefaultConfiguration =
-                WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
+                WebDataFetchingConfiguration(http = HttpEngine.CIO)
         }
     }
 
@@ -35,7 +36,7 @@ class WalletClientDeviceTest {
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun bootstrapCreatesKeyAndDid() = runTest {
+    fun bootstrapCreatesKeyAndDid() = runBlocking {
         val client = MobileWalletClientFactory(context).create()
         val result = client.bootstrap()
         assertNotNull(result.keyId, "bootstrap should create a key")
@@ -44,7 +45,7 @@ class WalletClientDeviceTest {
     }
 
     @Test
-    fun receiveCredentialFromEudi() = runTest {
+    fun receiveCredentialFromEudi() = runBlocking {
         val client = MobileWalletClientFactory(context).create()
         client.bootstrap()
 
@@ -54,43 +55,36 @@ class WalletClientDeviceTest {
     }
 
     @Test
-    fun receiveAndPresentFullFlow() = runTest {
+    fun receiveAndPresentFullFlow() = runBlocking {
         val client = MobileWalletClientFactory(context).create()
         val bootstrapResult = client.bootstrap()
 
-        // Receive credential from EUDI issuer
         val offer = EudiTestBackend.generateOffer()
         val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
         assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
 
-        // Verify credential is stored
         val credentials = client.credentials()
         assertTrue(credentials.isNotEmpty(), "Should have stored credentials")
 
-        // Present to EUDI verifier
         val transaction = EudiTestBackend.createVerifierTransaction()
         val presentResult = client.present(transaction.authorizationRequestUri, did = bootstrapResult.did)
         assertTrue(presentResult.success, "Presentation should succeed")
 
-        // Verify verifier received the presentation
         EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
     }
 
     @Test
-    fun credentialPersistsAcrossClientRecreation() = runTest {
+    fun credentialPersistsAcrossClientRecreation() = runBlocking {
         val client1 = MobileWalletClientFactory(context).create()
         val bootstrapResult = client1.bootstrap()
 
-        // Receive with first client instance
         val offer = EudiTestBackend.generateOffer()
         client1.receive(offer.offerUrl, txCode = offer.txCode)
 
-        // Create new client instance (simulates app restart — same database file)
         val client2 = MobileWalletClientFactory(context).create()
         val credentials = client2.credentials()
         assertTrue(credentials.isNotEmpty(), "Credentials should persist across client recreation")
 
-        // Present from persisted state
         val transaction = EudiTestBackend.createVerifierTransaction()
         val presentResult = client2.present(transaction.authorizationRequestUri, did = bootstrapResult.did)
         assertTrue(presentResult.success, "Should present from persisted credentials")

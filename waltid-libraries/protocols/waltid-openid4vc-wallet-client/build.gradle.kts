@@ -38,7 +38,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
         }
         androidMain.dependencies {
-            implementation(identityLibs.ktor.client.okhttp)
+            implementation(identityLibs.ktor.client.cio)
         }
         iosMain.dependencies {
             implementation(identityLibs.ktor.client.darwin)
