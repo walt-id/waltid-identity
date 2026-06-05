@@ -25,7 +25,6 @@ object EudiTestBackend {
     private val client by lazy {
         HttpClient {
             install(HttpCookies)
-            install(HttpRedirect) { checkHttpMethod = false }
             install(HttpTimeout) {
                 requestTimeoutMillis = 30_000
                 connectTimeoutMillis = 30_000
@@ -39,10 +38,10 @@ object EudiTestBackend {
     data class VerifierTransaction(val transactionId: String, val authorizationRequestUri: String)
 
     suspend fun generateOffer(credentialId: String = "eu.europa.ec.eudi.pid_jwt_vc_json"): GeneratedOffer {
-        // Step 1: Get entry page, extract redirect form
+        // Step 1: Get entry page (follow redirects manually), extract redirect form
         val entryResponse = client.get(ENTRYPOINT)
         val entryBody = entryResponse.bodyAsText()
-        val entryUrl = entryResponse.request.url.toString()
+        val entryUrl = entryResponse.call.request.url.toString()
 
         val redirectAction = resolveUrl(entryUrl, extractFormAction(entryBody, "redirect_form"))
         val redirectPayload = extractPayload(entryBody)
@@ -56,14 +55,14 @@ object EudiTestBackend {
             append("proceed", "Submit")
         })
         val preauthBody = preauthResponse.bodyAsText()
-        val preauthUrl = preauthResponse.request.url.toString()
+        val preauthUrl = preauthResponse.call.request.url.toString()
 
         // Step 3: Follow redirect form to display page
         val displayAction = resolveUrl(preauthUrl, extractFormAction(preauthBody, "redirect_form"))
         val displayPayload = extractPayload(preauthBody)
         val displayResponse = client.submitForm(displayAction, parameters { append("payload", displayPayload) })
         val displayBody = displayResponse.bodyAsText()
-        val displayUrl = displayResponse.request.url.toString()
+        val displayUrl = displayResponse.call.request.url.toString()
 
         // Step 4: Submit country/user data form
         val countryAction = resolveUrl(displayUrl, extractFormAction(displayBody, "selectCountryForm"))
@@ -78,7 +77,7 @@ object EudiTestBackend {
             append("proceed", "Confirm")
         })
         val authBody = authResponse.bodyAsText()
-        val authUrl = authResponse.request.url.toString()
+        val authUrl = authResponse.call.request.url.toString()
 
         // Step 5: Follow authorization redirect form
         val authFormAction = resolveUrl(authUrl, extractFormAction(authBody, "redirect_form"))
@@ -216,11 +215,13 @@ object EudiTestBackend {
     }
 
     private fun extractFormAction(html: String, formId: String): String {
-        val regex = Regex("""<form\s+[^>]*id="$formId"[^>]*action="([^"]+)"""")
-        val altRegex = Regex("""<form\s+[^>]*action="([^"]+)"[^>]*id="$formId"""")
-        val match = regex.find(html) ?: altRegex.find(html)
+        val formRegex = Regex("""<form\s[^>]*id="$formId"[^>]*>""")
+        val formTag = formRegex.find(html)?.value
             ?: error("Form '$formId' not found in HTML")
-        return htmlUnescape(match.groupValues[1])
+        val actionRegex = Regex("""action="([^"]+)"""")
+        val actionMatch = actionRegex.find(formTag)
+            ?: error("No action attribute in form '$formId'")
+        return htmlUnescape(actionMatch.groupValues[1])
     }
 
     private fun extractPayload(html: String): String {
