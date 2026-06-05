@@ -76,7 +76,7 @@ buildConfig {
 
 ktor {
     docker {
-        portMappings.set(listOf(DockerPortMapping(7003, 7003, DockerPortMappingProtocol.TCP)))
+        portMappings.set(listOf(DockerPortMapping(7002, 7002, DockerPortMappingProtocol.TCP)))
     }
 }
 
