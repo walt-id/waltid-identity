@@ -258,7 +258,7 @@ class AWSKeyRestAPI(
             JWKKey.importJWK(it).getOrThrow()
         }
 
-        else -> getPublicKey()
+        else -> AWSKeyRestAPI.getPublicKey(config!!, id)
     }.also { newBackedKey -> backedKey = newBackedKey }
 
     @JvmBlocking
@@ -536,6 +536,8 @@ ${sha256Hex(canonicalRequest)}
         @JsPromise
         @JsExport.Ignore
         suspend fun getPublicKey(config: AWSKeyMetadata, keyId: String): Key {
+            getAccess(config)
+
             val method = HttpMethod.Post
             val body = """
 {
