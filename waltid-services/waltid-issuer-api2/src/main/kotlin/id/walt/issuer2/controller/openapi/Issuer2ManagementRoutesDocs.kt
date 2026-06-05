@@ -8,6 +8,8 @@ import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
 
 object Issuer2ManagementRoutesDocs {
+    const val CREDENTIAL_ISSUANCE_TAG = "Issuer Service API v2 - Credential Issuance"
+
     fun listProfiles(profileExamples: List<CredentialProfile>): RouteConfig.() -> Unit = {
         summary = "List credential profiles"
         description = """
@@ -68,6 +70,8 @@ object Issuer2ManagementRoutesDocs {
             by reference or by value. Runtime overrides can be applied for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and webhookUrl.
+            credentialData is applied as a partial object patch over the configured profile data:
+            nested objects are merged, while primitive, array, and null values replace the configured value.
             Offer/session expiry is configured with expiresInSeconds. The default is 5 minutes.
             Use -1 for no expiry.
         """.trimIndent()
