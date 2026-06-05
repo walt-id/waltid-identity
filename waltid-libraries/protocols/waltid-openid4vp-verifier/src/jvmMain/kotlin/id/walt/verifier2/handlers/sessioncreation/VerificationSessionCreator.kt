@@ -234,9 +234,10 @@ object VerificationSessionCreator {
              * The decoded JSON object structure is represented by [TransactionDataItem].
              */
             transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null, // List of base64url encoded JSON strings
+
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.
-             * Each object structure is represented by [VerifierAttestationItem].
+             * Each object structure is represented by [VerifierInfoItem].
              */
             verifierInfo = setup.core.verifierInfo,
 
