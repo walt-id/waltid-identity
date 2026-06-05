@@ -14,6 +14,8 @@ import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -32,7 +34,7 @@ class CredentialOfferService(
         val overrides = request.runtimeOverrides
         val issuerDid = overrides?.issuerDid ?: profile.issuerDid
         val webhookUrl = overrides?.webhookUrl ?: profile.webhookUrl
-        val credentialData = overrides?.credentialData ?: profile.credentialData
+        val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
         val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
 
         val effectiveIssuerStateMode = when (request.authMethod) {
@@ -124,5 +126,27 @@ class CredentialOfferService(
         when (expiresInSeconds) {
             -1L -> Instant.DISTANT_FUTURE
             else -> Clock.System.now().plus(expiresInSeconds.seconds)
+        }
+
+    private fun JsonObject.mergeCredentialDataOverride(override: JsonObject?): JsonObject =
+        override?.let { mergeCredentialDataPatch(it) } ?: this
+
+    private fun JsonObject.mergeCredentialDataPatch(patch: JsonObject): JsonObject =
+        JsonObject(
+            toMutableMap().apply {
+                patch.forEach { (key, patchValue) ->
+                    this[key] = mergeCredentialDataValue(this[key], patchValue)
+                }
+            }
+        )
+
+    private fun mergeCredentialDataValue(
+        configuredValue: JsonElement?,
+        patchValue: JsonElement,
+    ): JsonElement =
+        if (configuredValue is JsonObject && patchValue is JsonObject) {
+            configuredValue.mergeCredentialDataPatch(patchValue)
+        } else {
+            patchValue
         }
 }

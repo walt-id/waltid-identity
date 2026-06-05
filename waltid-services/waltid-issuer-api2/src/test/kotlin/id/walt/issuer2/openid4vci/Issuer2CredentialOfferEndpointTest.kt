@@ -250,6 +250,42 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldMergeCredentialDataRuntimeOverridesWithConfiguredProfileData() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val profile = client.getProfile(IDENTITY_SD_JWT_PROFILE_ID)
+
+        val response = client.createCredentialOffer(
+            CredentialOfferCreateRequest(
+                profileId = profile.profileId,
+                authMethod = AuthenticationMethod.AUTHORIZED,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(
+                    credentialData = buildJsonObject {
+                        put("given_name", "Alice")
+                        putJsonObject("address") {
+                            put("locality", "Override City")
+                        }
+                    },
+                ),
+            )
+        )
+
+        // credentialData runtime overrides patch the configured profile data. This lets an
+        // issuer change one claim for a session without sending a full credential payload.
+        val session = client.getSession(response.offerId)
+        assertEquals("Alice", session.credentialData["given_name"]?.jsonPrimitive?.content)
+        assertEquals(profile.credentialData["family_name"], session.credentialData["family_name"])
+        assertEquals(profile.credentialData["email"], session.credentialData["email"])
+
+        val configuredAddress = assertNotNull(profile.credentialData["address"]?.jsonObject)
+        val sessionAddress = assertNotNull(session.credentialData["address"]?.jsonObject)
+        assertEquals("Override City", sessionAddress["locality"]?.jsonPrimitive?.content)
+        assertEquals(configuredAddress["street_address"], sessionAddress["street_address"])
+        assertEquals(configuredAddress["region"], sessionAddress["region"])
+        assertEquals(configuredAddress["country"], sessionAddress["country"])
+    }
+
+    @Test
     fun shouldCreateCredentialOffersForDocumentedModes() = testApplication {
         installIssuer2()
         val client = apiClient()
