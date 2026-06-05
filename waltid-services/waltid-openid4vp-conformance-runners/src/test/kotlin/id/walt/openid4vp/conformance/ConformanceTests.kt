@@ -13,7 +13,7 @@ class ConformanceTests {
 
     companion object {
         val verifier2UrlPrefix: String =
-            "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
+            "http://host.docker.internal:7003/verification-session" // Uses extra_hosts mapping to reach host
         val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud" // conformance-v5-1-43.waltid.cloud
         val conformancePort: Int = 8443 // 443
 
