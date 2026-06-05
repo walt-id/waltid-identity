@@ -3,7 +3,11 @@ package id.walt.wallet2.client.test
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.wallet2.client.MobileWalletClientFactory
+import id.walt.webdatafetching.WebDataFetcherManager
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.HttpEngine
 import kotlinx.coroutines.test.runTest
+import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -17,6 +21,15 @@ import kotlin.test.assertTrue
  * Requires: Android emulator or device with API 30+.
  */
 class WalletClientDeviceTest {
+
+    companion object {
+        @JvmStatic
+        @BeforeClass
+        fun setupEngine() {
+            WebDataFetcherManager.globalDefaultConfiguration =
+                WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
+        }
+    }
 
     private val context: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
