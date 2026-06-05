@@ -90,13 +90,11 @@ object OpenId4VciRoutesDocs {
     }
 
     fun externalOAuthCallback(): RouteConfig.() -> Unit = {
-        summary = "External OAuth callback"
-        description = "Callback endpoint used by the configured external OAuth provider for authorization-code issuance."
-        response {
-            HttpStatusCode.Found to {
-                description = "Redirect back to the wallet client with the OpenID4VCI authorization code"
-            }
-        }
+        hidden = true
+    }
+
+    fun externalLogin(): RouteConfig.() -> Unit = {
+        hidden = true
     }
 
     fun token(): RouteConfig.() -> Unit = {
