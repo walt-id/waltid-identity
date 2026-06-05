@@ -19,7 +19,7 @@ class Issuer2ManagementController(
     private val sessionService: IssuanceSessionService,
     private val offerService: CredentialOfferService,
 ) {
-    fun register(route: Route) = route.route("issuer2", { tags = listOf("Issuer2 Management") }) {
+    fun register(route: Route) = route.route("issuer2", { tags = listOf(Issuer2ManagementRoutesDocs.CREDENTIAL_ISSUANCE_TAG) }) {
         val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
 
         get("profiles", Issuer2ManagementRoutesDocs.listProfiles(profileExamples)) {
