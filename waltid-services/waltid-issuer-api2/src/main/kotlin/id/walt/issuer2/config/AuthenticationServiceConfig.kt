@@ -7,5 +7,7 @@ data class AuthenticationServiceConfig(
     val authorizeUrl: String = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth",
     val accessTokenUrl: String = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token",
     val clientId: String = "issuer_api",
-    val clientSecret: String = "<your-client-secret>",
+    val clientSecret: String = "Y0DyNhF4NgpOS6VMRUtl0JtvxrRYQD4s",
+    val defaultScopes: List<String> = listOf("openid", "profile"),
+    val forwardIssuerStateToAuthorizationServer: Boolean = false,
 ) : WaltConfig()

@@ -9,6 +9,10 @@ import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.createRouteScopedPlugin
+import io.ktor.server.auth.OAuthAccessTokenResponse
+import io.ktor.server.auth.authenticate
+import io.ktor.server.auth.principal
 import io.ktor.server.request.receive
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -61,6 +65,42 @@ class OpenId4VciController(
                 response.redirectUri?.let { redirectUri ->
                     call.respondRedirect(redirectUri)
                 } ?: call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+            }
+
+            val authOAuthInterceptor = createRouteScopedPlugin("issuer2AuthOAuthInterceptor") {
+                onCallRespond { call ->
+                    val internalAuthorizationRequest = call.parameters["internalAuthReq"] ?: return@onCallRespond
+                    protocolService.processExternalLoginInterception(
+                        externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
+                        internalAuthorizationRequest = internalAuthorizationRequest,
+                    )
+                }
+            }
+
+            authenticate("auth-oauth") {
+                install(authOAuthInterceptor)
+
+                get("external_login/{internalAuthReq}", OpenId4VciRoutesDocs.externalLogin()) {
+                    // Ktor OAuth redirects to the configured external authorization server.
+                }
+
+                get("external/oauth/callback", OpenId4VciRoutesDocs.externalOAuthCallback()) {
+                    val principal = call.principal<OAuthAccessTokenResponse.OAuth2>()
+                        ?: throw IllegalArgumentException("External OAuth callback is missing OAuth principal")
+                    val idToken = principal.extraParameters["id_token"]
+                        ?: throw IllegalArgumentException("id_token is missing in the callback request")
+                    val state = call.request.queryParameters["state"]
+                        ?: throw IllegalArgumentException("state parameter is missing in the callback request")
+
+                    val response = protocolService.processExternalAuthorizationCallback(
+                        authServerState = state,
+                        idToken = idToken,
+                    )
+                    response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                    response.redirectUri?.let { redirectUri ->
+                        call.respondRedirect(redirectUri)
+                    } ?: call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                }
             }
 
             post("token", OpenId4VciRoutesDocs.token()) {

@@ -2,7 +2,6 @@ package id.walt.issuer2.application
 
 import id.walt.commons.config.ConfigManager
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
-import id.walt.issuer2.config.CredentialProfileConfigProvider
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -14,7 +13,6 @@ import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeReposito
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
-import id.walt.issuer2.service.openid4vci.ExternalOAuthProviderClient
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
 
@@ -46,7 +44,6 @@ class Issuer2Module(
         serviceConfig = serviceConfig,
         metadataConfig = metadataConfig,
         profileService = credentialProfileService,
-    )
     )
 
     private val credentialOfferService = CredentialOfferService(

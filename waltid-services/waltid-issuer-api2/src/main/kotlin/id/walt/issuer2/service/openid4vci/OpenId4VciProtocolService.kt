@@ -21,6 +21,8 @@ import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.tokens.AccessTokenContext
+import io.ktor.http.encodeURLParameter
+import io.ktor.http.parseQueryString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
@@ -32,7 +34,6 @@ class OpenId4VciProtocolService(
     private val sessionService: IssuanceSessionService,
     private val profileService: CredentialProfileService,
     private val metadataService: MetadataService,
-    private val externalOAuthProviderClient: ExternalOAuthProviderClient,
 ) {
     suspend fun processAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizationResponseHttp {
         val authorizationRequest = when (val result = oauth2Provider.createAuthorizationRequest(parameters)) {
@@ -49,40 +50,53 @@ class OpenId4VciProtocolService(
             "Issuance session $sessionId is not configured for authorization-code flow"
         }
 
-        if (externalOAuthProviderClient.enabled) {
-            val externalState = UUID.randomUUID().toString()
-            sessionService.saveSession(
-                issuanceSession.copy(
-                    authorizationRequest = parameters,
-                    externalAuthorizationState = externalState,
-                )
-            )
-            val redirectUri = externalOAuthProviderClient.buildAuthorizationRedirect(externalState)
-            return AuthorizationResponseHttp(
-                status = 302,
-                redirectUri = redirectUri,
-                headers = mapOf("Location" to redirectUri),
-            )
-        }
-
-        return createAuthorizationResponse(parameters, claims = null)
+        val redirectUri = "${metadataService.issuerBaseUrl()}/external_login/${parameters.toQueryString()}"
+        return AuthorizationResponseHttp(
+            status = 302,
+            redirectUri = redirectUri,
+            headers = mapOf("Location" to redirectUri),
+        )
     }
 
-    suspend fun processExternalAuthorizationCallback(parameters: Map<String, List<String>>): AuthorizationResponseHttp {
-        val state = parameters["state"]?.singleOrNull()
-            ?: throw IllegalArgumentException("External OAuth callback is missing state")
-        val code = parameters["code"]?.singleOrNull()
-            ?: throw IllegalArgumentException("External OAuth callback is missing code")
+    suspend fun processExternalLoginInterception(
+        externalAuthorizationRequest: String?,
+        internalAuthorizationRequest: String?,
+    ) {
+        val externalState = externalAuthorizationRequest
+            ?.substringAfter("?", missingDelimiterValue = "")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { parseQueryParameters(it)["state"]?.singleOrNull() }
+            ?: throw IllegalArgumentException("Missing state in external authorization request")
 
-        val session = sessionService.findByExternalAuthorizationState(state)
+        val authorizationRequestParameters = internalAuthorizationRequest
+            ?.takeIf { it.isNotBlank() }
+            ?.let { parseQueryParameters(it) }
+            ?: throw IllegalArgumentException("Missing internal authorization request")
+
+        val sessionId = authorizationRequestParameters["issuer_state"]?.singleOrNull()
+            ?: throw IllegalArgumentException("Missing issuer_state in internal authorization request")
+        val session = sessionService.getSession(sessionId)
+        sessionService.saveSession(
+            session.copy(
+                authorizationRequest = authorizationRequestParameters,
+                externalAuthorizationState = externalState,
+            )
+        )
+    }
+
+    suspend fun processExternalAuthorizationCallback(
+        authServerState: String,
+        idToken: String,
+    ): AuthorizationResponseHttp {
+        val session = sessionService.findByExternalAuthorizationState(authServerState)
             ?: throw IllegalArgumentException("No issuance session found for external OAuth state")
         val authorizationRequestParameters = session.authorizationRequest
             ?: throw IllegalArgumentException("Issuance session ${session.sessionId} has no stored authorization request")
 
-        val tokenResult = externalOAuthProviderClient.redeemAuthorizationCode(code)
+        val idTokenClaims = idToken.decodeJws().payload
         val credentialData = session.idTokenClaimsMapping?.let { claimsMapping ->
             JsonObjectPathMapper.fromSourceToDestinationJsonPathsMap(
-                source = tokenResult.idTokenClaims,
+                source = idTokenClaims,
                 destination = session.credentialData,
                 jsonPathMapConfig = claimsMapping,
             )
@@ -90,12 +104,12 @@ class OpenId4VciProtocolService(
         sessionService.saveSession(
             session.copy(
                 credentialData = credentialData,
-                authorizationClaims = tokenResult.idTokenClaims,
+                authorizationClaims = idTokenClaims,
                 externalAuthorizationState = null,
             )
         )
 
-        return createAuthorizationResponse(authorizationRequestParameters, claims = tokenResult.idTokenClaims)
+        return createAuthorizationResponse(authorizationRequestParameters, claims = idTokenClaims)
     }
 
     suspend fun processTokenRequest(parameters: Map<String, List<String>>): AccessTokenResponseHttp {
@@ -255,5 +269,15 @@ class OpenId4VciProtocolService(
 
     private fun JsonObject.stringClaim(name: String): String? =
         this[name]?.jsonPrimitive?.contentOrNull
+
+    private fun Map<String, List<String>>.toQueryString(): String =
+        entries.flatMap { (key, values) ->
+            values.map { value ->
+                "${key.encodeURLParameter()}=${value.encodeURLParameter()}"
+            }
+        }.joinToString("&")
+
+    private fun parseQueryParameters(query: String): Map<String, List<String>> =
+        parseQueryString(query).entries().associate { it.key to it.value }
 
 }
