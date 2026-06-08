@@ -25,6 +25,7 @@ The fastest way to run conformance tests locally:
 ### Prerequisites
 - Docker and Docker Compose
 - Java 21+
+- `ngrok`
 - `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
 
 Add the hosts entry:
@@ -34,13 +35,21 @@ echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
 
 ### 1. Clone and Start the Conformance Suite
 
+The canonical compose file lives in this repository:
+`waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml`
+
+Docker Compose must still resolve relative paths such as `./nginx` and `./mongo/data` from the
+OpenID conformance suite checkout, so use `--project-directory ~/dev/openid/conformance-suite`.
+
 ```shell
 # Clone the conformance suite (if not already done)
 git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
 
-# Start with Docker
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml up -d
+# Start with Docker, using the compose file from the walt repo
+docker compose \
+  -f ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml \
+  --project-directory ~/dev/openid/conformance-suite \
+  up -d
 ```
 
 Wait ~30 seconds for the server to start, then verify:
@@ -48,28 +57,88 @@ Wait ~30 seconds for the server to start, then verify:
 curl -k https://localhost.emobix.co.uk:8443/
 ```
 
-### 2. Run the Conformance Tests
+### 2. Start ngrok for the verifier callback port
+
+The local verifier listens on port `7003`. The conformance suite container must call back into that verifier.
+On some machines, `host.docker.internal:7003` is not reachable from the container, so use `ngrok` to expose
+the verifier as a public HTTPS endpoint.
+
+Start the tunnel:
+```shell
+ngrok http 7003
+```
+
+Determine the current public tunnel URL:
+```shell
+curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+```
+
+Example output:
+```text
+https://c117-2001-871-26a-8324-bb52-944b-ae81-350e.ngrok-free.app
+```
+
+Determine just the current ngrok subdomain / hostname:
+```shell
+curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url' | sed 's#https://##'
+```
+
+Example output:
+```text
+c117-2001-871-26a-8324-bb52-944b-ae81-350e.ngrok-free.app
+```
+
+### 3. Run the Conformance Tests
 
 ```shell
 # From the waltid-unified-build directory
 cd ~/dev/walt-id/waltid-unified-build
 
-# Run tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "id.walt.openid4vp.conformance.ConformanceTests"
+# Option A: export the callback base URL once in the shell
+export OPENID4VP_CONFORMANCE_VERIFIER2_URL_PREFIX="$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')/verification-session"
+
+# Run the verifier conformance tests
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+  --tests "id.walt.openid4vp.conformance.ConformanceTests" \
+  --no-daemon \
+  --rerun-tasks
 ```
 
-Or run the main application:
+Or run the test in one command without exporting:
 ```shell
+OPENID4VP_CONFORMANCE_VERIFIER2_URL_PREFIX="$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')/verification-session" \
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+  --tests "id.walt.openid4vp.conformance.ConformanceTests" \
+  --no-daemon \
+  --rerun-tasks
+```
+
+Or run the main application with the same callback override:
+```shell
+OPENID4VP_CONFORMANCE_VERIFIER2_URL_PREFIX="$(curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url')/verification-session" \
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run
 ```
 
-### 3. Stop the Conformance Suite
+### 4. Stop the Conformance Suite
 
 ```shell
-cp ./docker-compose-walt.yml cd ~/dev/openid/conformance-suite
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml down
+docker compose \
+  -f ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml \
+  --project-directory ~/dev/openid/conformance-suite \
+  down
 ```
+
+### Notes
+
+- The callback override can be supplied in two ways:
+  - environment variable: `OPENID4VP_CONFORMANCE_VERIFIER2_URL_PREFIX`
+  - test JVM system property: `openid4vp.conformance.verifier2-url-prefix`
+- In local testing, the environment variable has been the most reliable option.
+- The value must include the `/verification-session` suffix, for example:
+  - `https://<your-ngrok-subdomain>.ngrok-free.app/verification-session`
+- There is also a `docker-compose-walt.yml` inside `~/dev/openid/conformance-suite`, but the recommended
+  source of truth is the one in this repository. Use the commands above so the compose file stays under
+  walt repo control while still using the conformance suite checkout for `nginx/` and `mongo/`.
 
 ## SSL Certificate (Already Configured)
 
@@ -177,6 +246,23 @@ Check container logs:
 docker logs conformance-suite-server-1
 docker logs conformance-suite-nginx-1
 ```
+
+### Conformance Suite Times Out Fetching `request_uri`
+If the conformance suite fails while fetching a verifier `request_uri`, the Docker container probably cannot
+reach your host callback port directly.
+
+Use the ngrok workflow above and verify that the callback override is set:
+```shell
+echo "$OPENID4VP_CONFORMANCE_VERIFIER2_URL_PREFIX"
+```
+
+Verify the tunnel is up:
+```shell
+curl -s http://127.0.0.1:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+```
+
+The verifier callback URLs created during the test should now use the ngrok HTTPS base instead of
+`http://host.docker.internal:7003/...`.
 
 ---
 

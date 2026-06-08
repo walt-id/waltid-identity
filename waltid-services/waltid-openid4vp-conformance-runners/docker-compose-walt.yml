@@ -26,6 +26,8 @@ services:
     # new tag: waltid/openid-conformance-suite:release-v5.1.43
     # latest: registry.gitlab.com/openid/conformance-suite:${IMAGE_TAG:-latest}
     image: waltid/openid-conformance-suite:release-v5.1.43
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       BASE_URL: ${BASE_URL:-https://localhost.emobix.co.uk:8443}
       MONGODB_HOST: mongodb
