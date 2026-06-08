@@ -12,7 +12,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
-            api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence"))
+            api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-client"))
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:waltid-did"))
             implementation(identityLibs.kotlinx.coroutines.core)

@@ -57,7 +57,8 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
-        "waltid-openid4vc-wallet-persistence",
+        "waltid-openid4vc-wallet-persistence-client",
+        "waltid-openid4vc-wallet-persistence-server",
         "waltid-openid4vc-wallet-client",
         "waltid-openid4vc-wallet-server",
     ),
@@ -95,7 +96,7 @@ val modules = listOfNotNull(
     "$services:waltid-verifier-api2",
     "$services:waltid-wallet-api",
     "$services:waltid-wallet-api2",
-    // "$services:waltid-wallet-migration", // removed: Exposed persistence dropped
+    "$services:waltid-wallet-migration",
 
     "$services:waltid-etsi-plugtest-cli",
 
