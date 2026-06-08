@@ -185,13 +185,18 @@ object Wallet2RouteHandler {
                 .getOrElse { CreateWalletRequest() }
             val id = Uuid.random().toString()
 
+            // Auto-created stores are registered under a generated store ID so that:
+            //  - resolveStoreId() can map the store instance back to an ID when storeWallet()
+            //    serializes the Wallet to a WalletDescriptor (otherwise the descriptor would be
+            //    persisted with no attached stores — see resolveStoreId default), and
+            //  - the same store instance is resolvable later via resolveKeyStore()/etc.
             val keyStores: List<WalletKeyStore> = when {
                 req.keyStoreIds != null ->
                     req.keyStoreIds.map {
                         resolver.resolveKeyStore(it) ?: error("Key store '$it' not found")
                     }
                 req.staticKey != null -> emptyList()
-                else -> listOf(InMemoryKeyStore())
+                else -> listOf(InMemoryKeyStore().also { resolver.storeKeyStore("$id-keys", it) })
             }
 
             val credentialStores: List<WalletCredentialStore> = when {
@@ -199,7 +204,7 @@ object Wallet2RouteHandler {
                     req.credentialStoreIds.map {
                         resolver.resolveCredentialStore(it) ?: error("Credential store '$it' not found")
                     }
-                else -> listOf(InMemoryCredentialStore())
+                else -> listOf(InMemoryCredentialStore().also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
             val didStore: WalletDidStore? = when {
@@ -207,7 +212,7 @@ object Wallet2RouteHandler {
                 req.didStoreId != null ->
                     resolver.resolveDidStore(req.didStoreId) ?: error("DID store '${req.didStoreId}' not found")
                 req.staticDid != null -> null
-                else -> InMemoryDidStore()
+                else -> InMemoryDidStore().also { resolver.storeDidStore("$id-dids", it) }
             }
 
             val staticKey = req.staticKey?.let { KeyManager.resolveSerializedKey(it.toString()) }
@@ -237,12 +242,12 @@ object Wallet2RouteHandler {
             description = "When auth is enabled, returns only wallets owned by the authenticated account."
             response { HttpStatusCode.OK to { body<List<String>>() } }
         }) {
-            val ids = if (getAccountId != null) {
+            val ids: List<String> = if (getAccountId != null) {
                 val accountId = call.getAccountId()
-                if (accountId != null) resolver.getWalletIdsForAccount(accountId) ?: resolver.listWalletIds()
-                else resolver.listWalletIds()
+                if (accountId != null) resolver.getWalletIdsForAccount(accountId) ?: resolver.listWalletIds().toList()
+                else resolver.listWalletIds().toList()
             } else {
-                resolver.listWalletIds()
+                resolver.listWalletIds().toList()
             }
             call.respond(ids)
         }
@@ -673,7 +678,7 @@ object Wallet2RouteHandler {
                 summary = "List named key store IDs"
                 response { HttpStatusCode.OK to { body<List<String>>() } }
             }) {
-                call.respond(resolver.listKeyStoreIds())
+                call.respond(resolver.listKeyStoreIds().toList())
             }
             post("/{storeId}", {
                 summary = "Create a named key store"
@@ -691,7 +696,7 @@ object Wallet2RouteHandler {
                 summary = "List named credential store IDs"
                 response { HttpStatusCode.OK to { body<List<String>>() } }
             }) {
-                call.respond(resolver.listCredentialStoreIds())
+                call.respond(resolver.listCredentialStoreIds().toList())
             }
             post("/{storeId}", {
                 summary = "Create a named credential store"
@@ -709,7 +714,7 @@ object Wallet2RouteHandler {
                 summary = "List named DID store IDs"
                 response { HttpStatusCode.OK to { body<List<String>>() } }
             }) {
-                call.respond(resolver.listDidStoreIds())
+                call.respond(resolver.listDidStoreIds().toList())
             }
             post("/{storeId}", {
                 summary = "Create a named DID store"
