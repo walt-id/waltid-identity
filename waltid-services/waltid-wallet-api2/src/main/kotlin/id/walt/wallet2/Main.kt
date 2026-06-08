@@ -9,6 +9,7 @@ import id.walt.commons.web.WebService
 import id.walt.did.dids.DidService
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
+import id.walt.wallet2.config.UrlHopliteDecoder
 import id.walt.wallet2.persistence.ExposedWalletStore
 import id.walt.wallet2.persistence.Wallet2PersistenceConfig
 import id.walt.wallet2.persistence.initWallet2Database
@@ -19,13 +20,14 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.forwardedheaders.*
-import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import org.slf4j.event.Level
 
 suspend fun main(args: Array<String>) {
+    // Register custom decoder for Url before config loading
+    ConfigManager.registerCustomDecoder(UrlHopliteDecoder())
+
     ServiceMain(
         ServiceConfiguration("wallet", version = BuildConfig.VERSION),
         ServiceInitialization(
@@ -57,7 +59,6 @@ fun Application.wallet2Module(withPlugins: Boolean = true) {
 fun Application.configurePlugins() {
     configureHTTP()
     configureMonitoring()
-    configureStatusPages()
 }
 
 fun Application.configureHTTP() {
@@ -82,23 +83,6 @@ fun Application.configureMonitoring() {
     install(CallId) {
         header(HttpHeaders.XRequestId)
         verify { callId: String -> callId.isNotEmpty() }
-    }
-}
-
-fun Application.configureStatusPages() {
-    install(StatusPages) {
-        exception<IllegalArgumentException> { call, cause ->
-            call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "Bad request")))
-        }
-        exception<IllegalStateException> { call, cause ->
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (cause.message ?: "Internal error")))
-        }
-        exception<NotImplementedError> { call, cause ->
-            call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "Not yet implemented"))
-        }
-        exception<Throwable> { call, cause ->
-            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to (cause.message ?: "Unexpected error")))
-        }
     }
 }
 
