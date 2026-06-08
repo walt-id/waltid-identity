@@ -3,14 +3,7 @@ package id.walt.openid4vp.conformance.testplans.runner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfiguration
-import io.ktor.client.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
-import io.ktor.client.plugins.logging.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlin.test.assertEquals
-/*
 
 /**
  * Runner for OpenID4VCI Issuer conformance tests.
@@ -22,38 +15,12 @@ import kotlin.test.assertEquals
  */
 class IssuerTestPlanRunner(
     val config: IssuerTestPlanConfiguration,
-    http: HttpClient,
-
     val conformanceHost: String,
     val conformancePort: Int
 ) {
-    companion object {
-        val baseUrlBuilderSetup: URLBuilder.(host: String, port: Int) -> Unit = { cHost, cPort ->
-            protocol = URLProtocol.HTTPS
-            host = cHost
-            port = cPort
-        }
-    }
-
-    private val conformanceHttp = HttpClient() {
-        followRedirects = false
-
-        defaultRequest {
-            url {
-                baseUrlBuilderSetup(conformanceHost, conformancePort)
-            }
-        }
-        install(ContentNegotiation) {
-            json()
-        }
-        install(Logging) {
-            level = LogLevel.ALL
-        }
-    }
-
     val conformance = ConformanceInterface(conformanceHost, conformancePort)
 
-    suspend fun test(): TestPlanResult {
+    suspend fun test(): List<TestPlanResult> {
         println("-- Conformance OID4VCI Issuer Test -- -> Setup")
 
         // Create test plan
@@ -68,54 +35,63 @@ class IssuerTestPlanRunner(
             throw IllegalStateException("No test modules available for the specified variant. Check your configuration.")
         }
 
-        if (createTestPlanResponse.modules.size > 1) {
-            println("NOTICE: Multiple test modules available: ${createTestPlanResponse.modules.map { it.testModule }}")
-        }
-
         val testPlanId = createTestPlanResponse.id
-        val testModule = createTestPlanResponse.modules.first().testModule
         println("Created test plan: $testPlanId")
-        println("Test module: $testModule")
+        println("The conformance suite will call issuer: ${config.issuerUrl}")
 
-        // Create test
-        val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule)
-        println("Creating test... ($createTestUrl)")
-        val createTestResponse = conformance.createTest(createTestUrl)
-        println()
+        return createTestPlanResponse.modules.map { module ->
+            val testModule = module.testModule
+            val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule, config.moduleVariant)
+            println("Creating test for module $testModule... ($createTestUrl)")
+            val createTestResponse = conformance.createTest(createTestUrl)
+            val testId = createTestResponse.id
 
-        val testId = createTestResponse.id
-        println("Created test: $testId")
+            println("Created test: $testId")
+            println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
+            println("Waiting for conformance suite to complete issuer test...")
 
-        println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=${testId}")
+            waitForIssuerTestCompletion(testId)
 
-        // For issuer tests, the conformance suite (acting as wallet) will:
-        // 1. Call our issuer's /.well-known/openid-credential-issuer endpoint
-        // 2. Initiate the credential issuance flow
-        // 3. Call our authorization endpoint (if using auth code flow)
-        // 4. Exchange tokens
-        // 5. Request credentials
+            val testRunInfo = conformance.getTestRunInfo(testId)
+            println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
 
-        println("Waiting for conformance suite to complete issuer tests...")
-        println("The conformance suite will call our issuer at: ${config.issuerUrl}")
+            assertEquals("FINISHED", testRunInfo.status, "Issuer test $testModule should finish")
 
-        // Wait for the test to complete - for issuer tests, the conformance suite drives the flow
-        conformance.waitForTestStatus(testId, shouldBeWaiting = false)
+            val acceptedResults = if (testModule in config.skippableModules) {
+                setOf("PASSED", "SKIPPED")
+            } else {
+                setOf("PASSED")
+            }
 
-        val testRunInfo = conformance.getTestRunInfo(testId)
-        println("Test run result: $testRunInfo")
-        println("Status: ${testRunInfo.status}")
-        println("Result: ${testRunInfo.result}")
+            require(testRunInfo.result in acceptedResults) {
+                "Issuer test $testModule expected one of $acceptedResults, got ${testRunInfo.result}"
+            }
 
-        // For issuer tests, we mainly care about the conformance suite result
-        assertEquals("FINISHED", testRunInfo.status, "Test should finish")
-        assertEquals("PASSED", testRunInfo.result, "Test should pass")
+            TestPlanResult(
+                conformanceTestId = testId,
+                conformanceStatus = testRunInfo.status,
+                conformanceResult = testRunInfo.result,
+                verifierStatus = null
+            )
+        }
+    }
 
-        return TestPlanResult(
-            conformanceTestId = testId,
-            conformanceStatus = testRunInfo.status,
-            conformanceResult = testRunInfo.result,
-            verifierStatus = null // Not applicable for issuer tests
-        )
+    private suspend fun waitForIssuerTestCompletion(testId: String) {
+        var counter = 0
+        while (true) {
+            counter++
+            val testRunInfo = conformance.getTestRunInfo(testId)
+            println("Current conformance test status: ${testRunInfo.status}")
+
+            if (testRunInfo.status in setOf("FINISHED", "INTERRUPTED")) {
+                return
+            }
+
+            if (counter > 60) {
+                throw IllegalStateException("Waited for issuer test $testId for ${counter - 1} seconds, but it is still ${testRunInfo.status}")
+            }
+
+            kotlinx.coroutines.delay(1_000)
+        }
     }
 }
-*/

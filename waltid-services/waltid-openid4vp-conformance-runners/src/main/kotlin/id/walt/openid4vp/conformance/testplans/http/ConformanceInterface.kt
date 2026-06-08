@@ -76,13 +76,15 @@ class ConformanceInterface(
      * To create a test, some parameters already have to be put into the URL
      * This method allows for creation of said URL to create a test.
      */
-    fun buildCreateTestUrl(testPlanId: String, testModule: String, moduleVariant: String) =
+    fun buildCreateTestUrl(testPlanId: String, testModule: String, moduleVariant: String = "") =
         URLBuilder("/api/runner").apply {
             baseUrlBuilderSetup(conformanceHost, conformancePort)
             parameters.apply {
                 append("test", testModule)
                 append("plan", testPlanId)
-                append("variant", moduleVariant)
+                if (moduleVariant.isNotBlank()) {
+                    append("variant", moduleVariant)
+                }
             }
         }.build()
 

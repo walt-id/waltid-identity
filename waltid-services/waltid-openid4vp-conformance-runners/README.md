@@ -136,6 +136,11 @@ docker compose \
 - In local testing, the environment variable has been the most reliable option.
 - The value must include the `/verification-session` suffix, for example:
   - `https://<your-ngrok-subdomain>.ngrok-free.app/verification-session`
+- The issuer conformance tests now default the client-attestation signing key to:
+  - `/home/pp/dev/walt-id/waltid-enterprise-quickstart/cli/keys/attester-key.json`
+- Override that file when needed with:
+  - environment variable: `OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE`
+  - test JVM system property: `openid4vci.conformance.client-attester-jwks-file`
 - There is also a `docker-compose-walt.yml` inside `~/dev/openid/conformance-suite`, but the recommended
   source of truth is the one in this repository. Use the commands above so the compose file stays under
   walt repo control while still using the conformance suite checkout for `nginx/` and `mongo/`.

@@ -23,9 +23,20 @@ data class IssuerTestPlanConfiguration(
      * Includes issuer URL, client credentials, etc.
      */
     val testPlanCreationConfiguration: JsonObject,
-    
+
+    /**
+     * Variant JSON string shared by all test modules in this plan.
+     */
+    val moduleVariant: String = "",
+
     /**
      * The URL of the issuer being tested.
      */
-    val issuerUrl: String
+    val issuerUrl: String,
+
+    /**
+     * Modules that may legitimately return SKIPPED instead of PASSED.
+     * Used for optional suite checks like signed metadata.
+     */
+    val skippableModules: Set<String> = emptySet()
 )
