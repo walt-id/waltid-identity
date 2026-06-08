@@ -83,12 +83,17 @@ object MdocGenerator {
             (testCase.id.contains("-9") && testCase.id.startsWith("MDOC-EAA")) ||
             (isQeaaOrPubEaa && !testCase.isShortLived)
         val msoStatus: Status? = if (requiresStatus) {
-            Status(identifierList = Status.IdentifierListInfo(
-                id = testCase.id,
+            // ETSI TS 119 472-1 §5.2.10.1 (EAA-5.2.10.1-03..11): the status component is a flat JSON
+            // object with type/purpose/index/uri. ETSI conformance validators (e.g. IGRAN) require
+            // these members directly in the MSO status, rather than the ISO identifier_list shape.
+            Status(
+                type = "TokenStatusList",
+                purpose = "revocation",
+                index = 0,
                 uri = UniformResourceIdentifier(
                     "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
                 )
-            ))
+            )
         } else null
 
         // QEAA-6.6.2-02 / PuB-EAA-6.6.3-02: the CB-AdES protected header of an ISO-mdoc QEAA/PuB-EAA
