@@ -3,6 +3,7 @@ package id.walt.etsi.generator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.etsi.TestCase
 import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -346,6 +347,23 @@ object SdJwtVcGenerator {
                     put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt")
                 }
                 existingKeys.add("status")
+            }
+
+            // QEAA-4.2.6.7-01 / PuB-EAA-4.2.6.8-01: a QEAA/PuBEAA SHALL include either the EAA
+            // subject identifier (sub) or a pseudonym (also_known_as). Add `sub` when neither is
+            // already present (pseudonym test cases set also_known_as below / above).
+            if ((isQeaa || isPubEaa) && !existingKeys.contains("sub") &&
+                !existingKeys.contains("also_known_as") && !testCase.isPseudonym
+            ) {
+                put("sub", "did:example:holder123")
+                existingKeys.add("sub")
+            }
+
+            // EAA-5.2.3 (jti / EAA identifier): include a unique identifier for QEAA/PuBEAA.
+            // Spec marks it optional ("may"), but conformance validators expect it for QEAA/PuBEAA.
+            if ((isQeaa || isPubEaa) && !existingKeys.contains("jti")) {
+                put("jti", "urn:uuid:${randomUUIDString()}")
+                existingKeys.add("jti")
             }
         }
     }
