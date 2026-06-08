@@ -9,6 +9,7 @@ import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -32,7 +33,12 @@ class Issuer2ManagementController(
         }
 
         post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
-            val request = call.receive<CredentialOfferCreateRequest>()
+            val request = try {
+                call.receive<CredentialOfferCreateRequest>()
+            } catch (ex: BadRequestException) {
+                val validationMessage = ex.cause?.cause?.message ?: ex.cause?.message ?: ex.message
+                throw BadRequestException("${ex.message}: $validationMessage")
+            }
             call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request))
         }
 
