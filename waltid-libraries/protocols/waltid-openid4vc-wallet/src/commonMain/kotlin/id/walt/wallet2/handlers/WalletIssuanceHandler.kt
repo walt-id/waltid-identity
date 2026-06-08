@@ -1,12 +1,17 @@
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.handlers.WalletIssuanceHandler.exchangeCode
+import id.walt.wallet2.handlers.WalletIssuanceHandler.generateAuthorizationUrl
+import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
+import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialFlow
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
@@ -14,26 +19,16 @@ import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
-import id.walt.webdatafetching.WebDataFetcher
-import id.walt.webdatafetching.WebDataFetcherId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -63,7 +58,20 @@ data class ReceiveCredentialRequest(
      */
     val offerJson: JsonObject? = null,
 
-    /** ID of the key to use for proof-of-possession. Defaults to wallet's default key. */
+    /**
+     * Inline key to use for proof-of-possession.
+     *
+     * When provided, this serialized key is used directly and takes precedence over [keyId]
+     * and the wallet's stores. This supports store-less / referenced-elsewhere callers that
+     * supply the key material inline (e.g. the Enterprise resolving a `keyReference` Target to a
+     * concrete key before delegating).
+     */
+    val key: DirectSerializedKey? = null,
+
+    /**
+     * ID of the key to use for proof-of-possession (resolved from the wallet's key stores).
+     * Ignored when [key] is provided. Defaults to the wallet's default key.
+     */
     val keyId: String? = null,
 
     /** DID to use as the credential subject / holder binding. Defaults to wallet's default DID. */
@@ -76,7 +84,18 @@ data class ReceiveCredentialRequest(
     val clientId: String = "wallet-client",
 
     /** redirect_uri registered with the authorization server (auth-code flows only). */
-    val redirectUri: Url = Url("openid://")
+    val redirectUri: Url = Url("openid://"),
+
+    /**
+     * Additional HTTP headers to attach to the token request, e.g. the attestation-based client
+     * authentication headers `OAuth-Client-Attestation` / `OAuth-Client-Attestation-PoP`
+     * (OpenID4VCI 1.0 §Token Endpoint; [@!I-D.ietf-oauth-attestation-based-client-auth]).
+     *
+     * Building the attestation + PoP JWTs is the caller's responsibility (the wallet provider /
+     * Enterprise holds the stored client attestation); this handler only forwards the resulting
+     * headers to the token request.
+     */
+    val tokenRequestHeaders: Map<String, String> = emptyMap()
 ) {
     init {
         check(offerUrl != null || offerJson != null) {
@@ -155,6 +174,8 @@ data class RequestTokenResult(
 data class SignProofRequest(
     val issuerUrl: Url,
     val nonce: String,
+    /** Inline key to sign the proof with; takes precedence over [keyId]. */
+    val key: DirectSerializedKey? = null,
     val keyId: String? = null,
     val did: String? = null
 )
@@ -276,8 +297,8 @@ object WalletIssuanceHandler {
          */
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
     ): Flow<StoredCredential> = channelFlow {
-        val key = resolveKey(wallet, request.keyId)
-            ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
+        val key = resolveKey(wallet, request.key, request.keyId)
+            ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
 
         val clientConfig = ClientConfiguration(
@@ -315,6 +336,22 @@ object WalletIssuanceHandler {
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
+        // TODO (missing in openid4vci lib):
+        //   TokenRequestBuilder.exchangePreAuthorizedCode currently only accepts `additionalParameters`
+        //   (form params, for the legacy client_assertion style). To support header-based attestation-
+        //   based client authentication (OpenID4VCI 1.0 Token Endpoint; OAuth-Client-Attestation /
+        //   OAuth-Client-Attestation-PoP headers per ietf-oauth-attestation-based-client-auth),
+        //   it requires something like `additionalHeaders: Map<String,String>` parameter to exchangePreAuthorizedCode /
+        //   exchangeAuthorizationCode / executeTokenRequest and set them on the HTTP request.
+        //   Once available, forward `request.tokenRequestHeaders` here:
+        //       tokenBuilder.exchangePreAuthorizedCode(..., additionalHeaders = request.tokenRequestHeaders)
+        if (request.tokenRequestHeaders.isNotEmpty()) {
+            log.warn {
+                "tokenRequestHeaders were supplied (${request.tokenRequestHeaders.keys}) but TokenRequestBuilder " +
+                        "does not yet support per-request headers; attestation-based client auth headers will NOT be sent. " +
+                        "See TODO(WAL-864 follow-up)."
+            }
+        }
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
@@ -470,7 +507,7 @@ object WalletIssuanceHandler {
     }
 
     suspend fun signProof(wallet: Wallet, request: SignProofRequest): SignProofResult {
-        val key = resolveKey(wallet, request.keyId)
+        val key = resolveKey(wallet, request.key, request.keyId)
             ?: error("No key available for signing proof")
         val proofBuilder = JwtProofBuilder()
         val proofs = if (request.did != null) {
@@ -511,7 +548,8 @@ object WalletIssuanceHandler {
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveKey(wallet: Wallet, keyId: String?) = when {
+    private suspend fun resolveKey(wallet: Wallet, inlineKey: DirectSerializedKey?, keyId: String?) = when {
+        inlineKey != null -> inlineKey.key
         keyId != null -> wallet.findKey(keyId)
             ?: error("Key '$keyId' not found in any wallet key store")
         else -> wallet.defaultKey()
@@ -679,12 +717,16 @@ object WalletIssuanceHandler {
         credentialConfigurationId: String,
         clientId: String = "wallet-client",
         redirectUri: Url = Url("openid://"),
+        /** Inline key for proof-of-possession; takes precedence over the wallet's stores. */
+        inlineKey: DirectSerializedKey? = null,
+        /** Inline DID for holder binding; defaults to the wallet's default DID. */
+        inlineDid: String? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient()
     ): Flow<StoredCredential> = channelFlow {
-        val key = wallet.defaultKey()
+        val key = resolveKey(wallet, inlineKey, keyId = null)
             ?: error("No key available for proof-of-possession")
-        val did = wallet.defaultDid()
+        val did = inlineDid ?: wallet.defaultDid()
 
         // Exchange code for token
         val tokenResult = exchangeCode(ExchangeCodeRequest(
