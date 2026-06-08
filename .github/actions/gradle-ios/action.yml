@@ -30,4 +30,4 @@ runs:
       shell: bash
       run: |
         ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:compileKotlinIosSimulatorArm64
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence:compileKotlinIosSimulatorArm64
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-client:compileKotlinIosSimulatorArm64
