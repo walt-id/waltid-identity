@@ -62,17 +62,29 @@ data class MobileSecurityObject(
 }
 
 /**
- * A container for credential status information per ISO 18013-5 §9.1.2.6.
- * Both fields are optional - either identifier_list or status_list may be present.
+ * A container for credential status information.
  *
- * Per ISO 18013-5 §9.1.2.4: both identifier_list and status_list are optional.
+ * Supports two shapes:
+ * - **ISO/IEC 18013-5 §9.1.2.6**: `identifier_list` and/or `status_list`.
+ * - **ETSI TS 119 472-1 §5.2.10.1 (EAA-5.2.10.1-03..11)**: a flat object with `type`, `purpose`,
+ *   `index`, `uri` members, used by ETSI ISO-mdoc QEAA/PuB-EAA. All four are optional here so the
+ *   same type can express both shapes; ETSI EAA-5.2.10.1-12 permits additional members.
  */
 @Serializable
 data class Status(
     @SerialName("identifier_list")
     val identifierList: IdentifierListInfo? = null,
     @SerialName("status_list")
-    val statusList: StatusListInfo? = null
+    val statusList: StatusListInfo? = null,
+    // ETSI TS 119 472-1 §5.2.10.1 flat status members (for ETSI ISO-mdoc QEAA/PuB-EAA).
+    @SerialName("type")
+    val type: String? = null,
+    @SerialName("purpose")
+    val purpose: String? = null,
+    @SerialName("index")
+    val index: Int? = null,
+    @SerialName("uri")
+    val uri: UniformResourceIdentifier? = null
 ) {
     /**
      * Identifier list revocation mechanism per ISO 18013-5 §9.1.2.6.
