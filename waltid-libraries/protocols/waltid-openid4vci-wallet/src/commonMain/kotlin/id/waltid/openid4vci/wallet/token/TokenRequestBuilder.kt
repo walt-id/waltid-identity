@@ -142,12 +142,15 @@ class TokenRequestBuilder(
             val location = response.headers[HttpHeaders.Location]
             if (location != null) {
                 log.debug { "Following redirect to: $location" }
+                val isSameOrigin = Url(tokenEndpoint).host == Url(location).host
                 response = httpClient.post(location) {
                     contentType(ContentType.Application.FormUrlEncoded)
                     setBody(parameters.formUrlEncode())
-                    attestationHeaders?.let {
-                        header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
-                        header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+                    if (isSameOrigin) {
+                        attestationHeaders?.let {
+                            header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
+                            header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+                        }
                     }
                 }
             }

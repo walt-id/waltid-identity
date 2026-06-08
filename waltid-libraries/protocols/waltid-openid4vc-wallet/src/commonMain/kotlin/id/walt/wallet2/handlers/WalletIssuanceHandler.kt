@@ -355,7 +355,8 @@ object WalletIssuanceHandler {
         for (offeredCredential in offeredCredentials) {
             log.trace { "Issuing credential configId=${offeredCredential.credentialConfigurationId}, format=${offeredCredential.configuration.format}" }
             val proofs = if (offeredCredential.configuration.proofTypesSupported?.isNotEmpty() == true) {
-                val nonce = cNonce ?: tokenResponse.access_token
+                val nonce = cNonce
+                    ?: error("Issuer requires proof but did not provide a c_nonce")
                 log.trace { "Building proof JWT, did=$did, nonce=$nonce" }
                 val preferJwkBinding = shouldPreferJwkBinding(offeredCredential.configuration.cryptographicBindingMethodsSupported)
                 if (did != null && !preferJwkBinding) {
@@ -547,7 +548,12 @@ object WalletIssuanceHandler {
             val location = response.headers[HttpHeaders.Location]
             if (location != null) {
                 log.debug { "Following redirect to: $location" }
-                response = httpClient.post(location, block)
+                val isSameOrigin = Url(url).host == Url(location).host
+                response = if (isSameOrigin) {
+                    httpClient.post(location, block)
+                } else {
+                    httpClient.post(location) { contentType(ContentType.Application.Json) }
+                }
             }
         }
         return response
@@ -720,8 +726,10 @@ object WalletIssuanceHandler {
         tokenEndpoint: Url,
         code: String,
         codeVerifier: String?,
+        credentialIssuer: String,
         credentialEndpoint: Url,
         credentialConfigurationId: String,
+        nonceEndpoint: String? = null,
         clientId: String = "wallet-client",
         redirectUri: Url = Url("openid://"),
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
@@ -741,13 +749,15 @@ object WalletIssuanceHandler {
         ))
         onEvent(WalletSessionEvent.issuance_token_obtained)
 
-        // Sign proof
-        val cNonce = tokenResult.cNonce ?: tokenResult.accessToken
+        // Sign proof — nonce from nonce endpoint or token response (never fall back to access_token)
+        val cNonce = nonceEndpoint?.let { fetchCNonce(httpClient, it) }
+            ?: tokenResult.cNonce
+            ?: error("Issuer did not provide a c_nonce (neither via nonce endpoint nor token response)")
         val proofBuilder = JwtProofBuilder()
         val proofs = if (did != null) {
-            proofBuilder.buildJwtProof(key, credentialEndpoint.host, cNonce, keyId = did)
+            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, keyId = did)
         } else {
-            proofBuilder.buildJwtProof(key, credentialEndpoint.host, cNonce, includeJwk = true)
+            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, includeJwk = true)
         }
         onEvent(WalletSessionEvent.issuance_proof_signed)
 
