@@ -29,6 +29,17 @@ object Issuer2RequestExamples {
         description = "Enter the generated PIN shown by the issuer",
     )
 
+    private val EXAMPLE_ISSUER_KEY = buildJsonObject {
+        put("type", "jwk")
+        putJsonObject("jwk") {
+            put("kty", "EC")
+            put("d", "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ")
+            put("crv", "P-256")
+            put("x", "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM")
+            put("y", "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E")
+        }
+    }
+
     val PROFILE_PRE_AUTHORIZED_OFFER = CredentialOfferCreateRequest(
         profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
@@ -76,6 +87,13 @@ object Issuer2RequestExamples {
         ),
     )
 
+    val PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
+        valueMode = CredentialOfferValueMode.BY_REFERENCE,
+        runtimeOverrides = CredentialOfferRuntimeOverrides(
+            issuerKey = EXAMPLE_ISSUER_KEY,
+        ),
+    )
+
     val PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE = PROFILE_PRE_AUTHORIZED_OFFER.copy(
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
         runtimeOverrides = CredentialOfferRuntimeOverrides(
@@ -91,7 +109,6 @@ object Issuer2RequestExamples {
     val PROFILE_AUTHORIZED_OFFER = CredentialOfferCreateRequest(
         profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
-        issuerStateMode = IssuerStateMode.OMIT,
     )
 
     val PROFILE_AUTHORIZED_OFFER_BY_REFERENCE = PROFILE_AUTHORIZED_OFFER.copy(
@@ -102,12 +119,12 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
-    val PROFILE_AUTHORIZED_OFFER_BY_VALUE_AND_ISSUER_STATE = PROFILE_AUTHORIZED_OFFER.copy(
-        issuerStateMode = IssuerStateMode.INCLUDE,
+    val PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE = PROFILE_AUTHORIZED_OFFER.copy(
+        issuerStateMode = IssuerStateMode.OMIT,
         valueMode = CredentialOfferValueMode.BY_VALUE,
     )
 
-    val PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER = CredentialOfferCreateRequest(
+    val PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = CredentialOfferCreateRequest(
         profileId = MDOC_PHOTO_ID_PROFILE_ID,
         authMethod = AuthenticationMethod.PRE_AUTHORIZED,
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
@@ -128,7 +145,7 @@ object Issuer2RequestExamples {
         ),
     )
 
-    val AUTHORIZED_MDOC_MDL_OFFER = CredentialOfferCreateRequest(
+    val AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE = CredentialOfferCreateRequest(
         profileId = MDOC_MDL_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
         issuerStateMode = IssuerStateMode.INCLUDE,
@@ -167,7 +184,7 @@ object Issuer2RequestExamples {
         offerId = EXAMPLE_OFFER_ID,
         profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
-        issuerStateMode = IssuerStateMode.OMIT,
+        issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
         credentialOffer = byReferenceOfferUrl(),
     )
@@ -176,9 +193,9 @@ object Issuer2RequestExamples {
         offerId = EXAMPLE_OFFER_ID,
         profileId = W3C_PROFILE_ID,
         authMethod = AuthenticationMethod.AUTHORIZED,
-        issuerStateMode = IssuerStateMode.OMIT,
+        issuerStateMode = IssuerStateMode.INCLUDE,
         expiresAt = EXAMPLE_EXPIRES_AT,
-        credentialOffer = byValueAuthorizationOfferUrl(),
+        credentialOffer = byValueAuthorizationOfferUrl(issuerState = EXAMPLE_OFFER_ID),
     )
 
     val CREDENTIAL_OFFER_RESPONSE_BY_VALUE_WITH_ISSUER_STATE = CredentialOfferCreateResponse(

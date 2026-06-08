@@ -72,6 +72,8 @@ object Issuer2ManagementRoutesDocs {
             idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and webhookUrl.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
+            Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only
+            for profile-based offers without runtime overrides.
             Offer/session expiry is configured with expiresInSeconds. The default is 5 minutes.
             Use -1 for no expiry.
         """.trimIndent()
@@ -83,8 +85,8 @@ object Issuer2ManagementRoutesDocs {
                 example("[authorized][by-value]") {
                     value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE
                 }
-                example("[authorized][by-value][issuer_state included]") {
-                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE_AND_ISSUER_STATE
+                example("[authorized][by-value][issuer_state omitted]") {
+                    value = Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_VALUE_WITHOUT_ISSUER_STATE
                 }
                 example("[pre-authorized][by-reference]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE
@@ -104,17 +106,20 @@ object Issuer2ManagementRoutesDocs {
                 example("[pre-authorized][by-reference][no expiry]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITHOUT_EXPIRY
                 }
-                example("[pre-authorized][by-reference] with credential data override") {
+                example("[pre-authorized][by-reference][override credentialData]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
                 }
-                example("[pre-authorized][by-reference] with selective disclosure override") {
+                example("[pre-authorized][by-reference][override issuerKey]") {
+                    value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_ISSUER_KEY_OVERRIDE
+                }
+                example("[pre-authorized][by-reference][override selective disclosure]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE
                 }
-                example("Pre-authorized mDOC photo ID offer") {
-                    value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER
+                example("[pre-authorized][by-reference][override mDOC photo ID credentialData]") {
+                    value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
                 }
-                example("Authorization-code mDL offer") {
-                    value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER
+                example("[authorized][by-reference][override mDOC mDL credentialData]") {
+                    value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
                 }
             }
         }
