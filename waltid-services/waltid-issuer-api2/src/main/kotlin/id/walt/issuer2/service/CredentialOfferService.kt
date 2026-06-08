@@ -32,6 +32,7 @@ class CredentialOfferService(
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
         val expiresAt = expirationTimestamp(request.expiresInSeconds)
         val overrides = request.runtimeOverrides
+        val issuerKey = overrides?.issuerKey ?: profile.issuerKey
         val issuerDid = overrides?.issuerDid ?: profile.issuerDid
         val webhookUrl = overrides?.webhookUrl ?: profile.webhookUrl
         val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
@@ -39,8 +40,10 @@ class CredentialOfferService(
 
         val issuerStateMode = when (request.authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> null
-            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.OMIT
+            AuthenticationMethod.AUTHORIZED -> request.issuerStateMode ?: IssuerStateMode.INCLUDE
         }
+        require(issuerKey.isNotEmpty()) { "issuerKey must not be empty" }
+        require(issuerKey["type"] != null) { "issuerKey must contain a key type" }
 
         var resolvedTxCodeValue: String? = null
         val credentialOffer = when (request.authMethod) {
@@ -85,6 +88,7 @@ class CredentialOfferService(
             profileId = profile.profileId,
             authenticationMethod = request.authMethod,
             credentialConfigurationId = profile.credentialConfigurationId,
+            issuerKey = issuerKey,
             credentialData = credentialData,
             mapping = overrides?.mapping ?: profile.mapping,
             selectiveDisclosure = overrides?.selectiveDisclosure ?: profile.selectiveDisclosure,

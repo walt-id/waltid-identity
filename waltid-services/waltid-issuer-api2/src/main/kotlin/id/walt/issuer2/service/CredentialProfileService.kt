@@ -23,6 +23,15 @@ class CredentialProfileService(
     fun resolveProfile(profileId: String): CredentialProfile =
         getProfile(profileId)
 
+    fun resolveProfileByCredentialConfigurationId(credentialConfigurationId: String): CredentialProfile {
+        val profiles = listProfiles().filter { it.credentialConfigurationId == credentialConfigurationId }
+        require(profiles.size == 1) {
+            "Expected exactly one credential profile for credentialConfigurationId '$credentialConfigurationId', " +
+                "found ${profiles.size}"
+        }
+        return profiles.single()
+    }
+
     private fun validateProfile(profile: CredentialProfile): CredentialProfile {
         require(profile.profileId.isNotBlank()) { "Credential profile id must not be blank" }
         require(!profile.profileId.contains('.')) { "Credential profile id must not contain '.' character" }

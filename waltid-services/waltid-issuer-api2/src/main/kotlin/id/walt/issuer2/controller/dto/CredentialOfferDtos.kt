@@ -13,6 +13,7 @@ import kotlin.time.Duration.Companion.minutes
 @Serializable
 data class CredentialOfferRuntimeOverrides(
     val issuerDid: String? = null,
+    val issuerKey: JsonObject? = null,
     val credentialData: JsonObject? = null,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,
@@ -47,6 +48,13 @@ data class CredentialOfferCreateRequest(
         }
         require(authMethod == AuthenticationMethod.AUTHORIZED || issuerStateMode == null) {
             "issuerStateMode is only supported for AUTHORIZED credential offers"
+        }
+        require(
+            authMethod != AuthenticationMethod.AUTHORIZED ||
+                (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
+                runtimeOverrides == null
+        ) {
+            "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
         }
         sessionId?.let { require(it.isNotBlank()) { "sessionId must not be blank" } }
     }

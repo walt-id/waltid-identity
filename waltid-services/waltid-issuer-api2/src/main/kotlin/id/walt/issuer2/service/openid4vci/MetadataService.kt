@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.service.CredentialProfileService
+import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
@@ -23,6 +24,7 @@ class MetadataService(
     serviceConfig: Issuer2ServiceConfig,
     metadataConfig: Issuer2MetadataConfig,
     private val profileService: CredentialProfileService,
+    private val sessionService: IssuanceSessionService,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -67,6 +69,13 @@ class MetadataService(
     fun getCredentialConfiguration(credentialConfigurationId: String): CredentialConfiguration? =
         credentialConfigurations[credentialConfigurationId]
 
+    fun credentialConfigurationIdsForScopes(scopes: Set<String>): Set<String> =
+        credentialConfigurations
+            .filter { (configurationId, configuration) ->
+                configurationId in scopes || configuration.scope?.let { it in scopes } == true
+            }
+            .keys
+
     fun getVctTypeMetadata(credentialType: String): SdJwtVcTypeMetadataDraft04 {
         val expectedVct = selfHostedVct(credentialType)
         credentialConfigurations.entries.firstOrNull { (_, configuration) ->
@@ -87,10 +96,12 @@ class MetadataService(
         val tokenSigningKey = KeyManager.resolveSerializedKey(tokenSigningKeyConfig)
         val profileIssuerKeys = profileService.listProfiles()
             .map { profile -> KeyManager.resolveSerializedKey(profile.issuerKey) }
+        val sessionIssuerKeys = sessionService.listSessions()
+            .map { session -> KeyManager.resolveSerializedKey(session.issuerKey) }
 
         return buildJsonObject {
             put("keys", buildJsonArray {
-                (listOf(tokenSigningKey) + profileIssuerKeys)
+                (listOf(tokenSigningKey) + profileIssuerKeys + sessionIssuerKeys)
                     .map { key -> key.getPublicJwkWithKid() }
                     .deduplicated()
                     .forEach { add(it) }

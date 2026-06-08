@@ -24,6 +24,7 @@ data class IssuanceSession(
     val profileId: String,
     val authenticationMethod: AuthenticationMethod,
     val credentialConfigurationId: String,
+    val issuerKey: JsonObject,
     val credentialData: JsonObject,
     val mapping: JsonObject? = null,
     val selectiveDisclosure: SDMap? = null,

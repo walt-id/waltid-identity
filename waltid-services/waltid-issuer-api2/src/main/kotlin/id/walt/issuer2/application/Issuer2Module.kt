@@ -44,6 +44,7 @@ class Issuer2Module(
         serviceConfig = serviceConfig,
         metadataConfig = metadataConfig,
         profileService = credentialProfileService,
+        sessionService = issuanceSessionService,
     )
 
     private val credentialOfferService = CredentialOfferService(
