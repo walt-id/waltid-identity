@@ -81,6 +81,13 @@ class DefaultOAuth2Provider(
         )
     }
 
+    override fun writeAuthorizationError(error: OAuthError): AuthorizationResponseHttp =
+        AuthorizationResponseHttp(
+            status = 400,
+            redirectUri = null,
+            body = error.description ?: error.error,
+        )
+
     override fun writeAuthorizationError(
         authorizationRequest: AuthorizationRequest,
         error: OAuthError

@@ -50,6 +50,8 @@ interface OAuth2Provider {
         session: Session
     ): AuthorizationResponseResult
 
+    fun writeAuthorizationError(error: OAuthError): AuthorizationResponseHttp
+
     fun writeAuthorizationError(
         authorizationRequest: AuthorizationRequest,
         error: OAuthError
