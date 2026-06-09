@@ -112,15 +112,21 @@ object MdocGenerator {
             (testCase.id.contains("-9") && testCase.id.startsWith("MDOC-EAA")) ||
             (isQeaaOrPubEaa && !testCase.isShortLived)
         val msoStatus: Status? = if (requiresStatus) {
-            // ETSI TS 119 472-1 §5.2.10.1 (EAA-5.2.10.1-03..11): the status component is a flat JSON
-            // object with type/purpose/index/uri. ETSI conformance validators (e.g. IGRAN) require
-            // these members directly in the MSO status, rather than the ISO identifier_list shape.
+            val statusUri = "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
+            // Emit BOTH status shapes so the broadest set of conformance validators accept it:
+            //  - ETSI TS 119 472-1 §5.2.10.1 flat members (type/purpose/index/uri): some validators
+            //    (e.g. IGRAN) expect these directly in the MSO status.
+            //  - IETF Token Status List nested `status_list` member {idx, uri} (EAA-6.2.10.1-03,
+            //    clause 6.3 of draft-ietf-oauth-status-list): some validators (e.g. BOSA) require it.
+            // ETSI EAA-6.2.10.1-12 permits additional members, so both may coexist.
             Status(
                 type = "TokenStatusList",
                 purpose = "revocation",
                 index = 0,
-                uri = UniformResourceIdentifier(
-                    "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
+                uri = UniformResourceIdentifier(statusUri),
+                statusList = Status.StatusListInfo(
+                    index = 0u,
+                    uri = UniformResourceIdentifier(statusUri),
                 )
             )
         } else null
