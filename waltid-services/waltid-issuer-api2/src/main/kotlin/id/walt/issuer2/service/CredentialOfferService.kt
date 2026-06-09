@@ -4,6 +4,8 @@ import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
 import id.walt.issuer2.controller.dto.CredentialOfferCreateResponse
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.issuer2.notifications.IssuanceNotificationService
+import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.TokenType
@@ -14,8 +16,11 @@ import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -26,7 +31,13 @@ class CredentialOfferService(
     private val sessionService: IssuanceSessionService,
     private val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
     private val config: Issuer2ServiceConfig,
+    private val notificationService: IssuanceNotificationService,
 ) {
+    private val json = Json {
+        ignoreUnknownKeys = true
+        explicitNulls = false
+    }
+
     suspend fun createCredentialOffer(request: CredentialOfferCreateRequest): CredentialOfferCreateResponse {
         val profile = profileService.resolveProfile(request.profileId)
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
@@ -34,7 +45,7 @@ class CredentialOfferService(
         val overrides = request.runtimeOverrides
         val issuerKey = overrides?.issuerKey ?: profile.issuerKey
         val issuerDid = overrides?.issuerDid ?: profile.issuerDid
-        val webhookUrl = overrides?.webhookUrl ?: profile.webhookUrl
+        val notifications = overrides?.notifications ?: profile.notifications
         val credentialData = profile.credentialData.mergeCredentialDataOverride(overrides?.credentialData)
         val idTokenClaimsMapping = overrides?.idTokenClaimsMapping ?: profile.idTokenClaimsMapping
 
@@ -99,7 +110,7 @@ class CredentialOfferService(
             issuerDid = issuerDid,
             credentialOffer = credentialOffer,
             expiresAt = expiresAt,
-            webhookUrl = webhookUrl,
+            notifications = notifications,
         )
         sessionService.createSession(session)
 
@@ -121,8 +132,16 @@ class CredentialOfferService(
         )
     }
 
-    suspend fun getCredentialOffer(sessionId: String): CredentialOffer? =
-        sessionService.getSessionOrNull(sessionId)?.credentialOffer
+    suspend fun getCredentialOffer(sessionId: String): CredentialOffer? {
+        val session = sessionService.getSessionOrNull(sessionId) ?: return null
+        val credentialOffer = session.credentialOffer ?: return null
+        notificationService.notify(
+            session = session,
+            event = IssuanceSessionEvent.resolved_credential_offer,
+            data = json.encodeToJsonElement(credentialOffer).jsonObject,
+        )
+        return credentialOffer
+    }
 
     private fun issuerBaseUrl(): String = config.baseUrl.trimEnd('/') + "/openid4vci"
 

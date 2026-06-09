@@ -1,6 +1,7 @@
 package id.walt.issuer2.controller.dto
 
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
@@ -20,7 +21,7 @@ data class CredentialOfferRuntimeOverrides(
     val idTokenClaimsMapping: Map<String, String>? = null,
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     val x5Chain: List<String>? = null,
-    val webhookUrl: String? = null,
+    val notifications: IssuanceNotifications? = null,
 )
 
 @Serializable

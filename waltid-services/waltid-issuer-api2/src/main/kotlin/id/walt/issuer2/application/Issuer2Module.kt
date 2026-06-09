@@ -7,6 +7,7 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.controller.Issuer2ManagementController
 import id.walt.issuer2.controller.OpenId4VciController
+import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.repository.ConfiguredIssuanceSessionRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
@@ -24,6 +25,7 @@ class Issuer2Module(
     private val issuanceSessionRepository = ConfiguredIssuanceSessionRepository()
     private val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
     private val preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
+    private val notificationService = IssuanceNotificationService()
 
     private val openId4VciModule = OpenId4VciModule.create(
         config = serviceConfig,
@@ -52,6 +54,7 @@ class Issuer2Module(
         sessionService = issuanceSessionService,
         preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
         config = serviceConfig,
+        notificationService = notificationService,
     )
 
     private val protocolService = OpenId4VciProtocolService(
@@ -59,12 +62,14 @@ class Issuer2Module(
         sessionService = issuanceSessionService,
         profileService = credentialProfileService,
         metadataService = metadataService,
+        notificationService = notificationService,
     )
 
     val managementController = Issuer2ManagementController(
         profileService = credentialProfileService,
         sessionService = issuanceSessionService,
         offerService = credentialOfferService,
+        notificationService = notificationService,
     )
 
     val openId4VciController = OpenId4VciController(

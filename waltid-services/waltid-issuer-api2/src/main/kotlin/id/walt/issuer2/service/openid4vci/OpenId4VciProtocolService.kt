@@ -1,13 +1,22 @@
 package id.walt.issuer2.service.openid4vci
 
 import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
+import id.walt.issuer2.notifications.IssuanceNotificationService
+import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.StringElement
+import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.issuersigned.IssuerSigned
+import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
@@ -32,9 +41,12 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
@@ -48,6 +60,7 @@ class OpenId4VciProtocolService(
     private val sessionService: IssuanceSessionService,
     private val profileService: CredentialProfileService,
     private val metadataService: MetadataService,
+    private val notificationService: IssuanceNotificationService,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -181,7 +194,14 @@ class OpenId4VciProtocolService(
                 updatedAccessTokenRequest,
                 OAuthError("invalid_request", "No session subject found"),
             )
-        sessionService.updateStatus(sessionId, IssuanceSessionStatus.TOKEN_REQUESTED)
+        val session = sessionService.getSession(sessionId)
+        notificationService.notify(
+            session = session,
+            event = IssuanceSessionEvent.requested_token,
+            data = buildJsonObject {
+                put("request", json.encodeToJsonElement(session))
+            },
+        )
 
         return oauth2Provider.writeAccessTokenResponse(updatedAccessTokenRequest, response)
     }
@@ -295,12 +315,28 @@ class OpenId4VciProtocolService(
             return failCredentialRequest(requestWithSession, session, e.toCredentialError())
         }
 
-        sessionService.updateStatus(
+        credentialResponse.credentials
+            ?.firstOrNull()
+            ?.credential
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.let { credential ->
+                emitCredentialIssuedEvent(
+                    session = session,
+                    format = configuration.format,
+                    doctype = configuration.doctype,
+                    credential = credential,
+                )
+            }
+
+        val updatedSession = sessionService.updateStatus(
             session.sessionId,
             IssuanceSessionStatus.SUCCESSFUL,
             "Credential issued successfully",
             issuedCredentialFormat = configuration.format.value,
+            close = true,
         )
+        notificationService.emitIssuanceStatus(updatedSession)
 
         return oauth2Provider.writeCredentialResponse(requestWithSession, credentialResponse)
     }
@@ -379,7 +415,7 @@ class OpenId4VciProtocolService(
             issuerDid = issuerDid,
             authorizationRequest = authorizationRequest,
             expiresAt = Clock.System.now() + AUTHORIZATION_CODE_SESSION_LIFETIME,
-            webhookUrl = webhookUrl,
+            notifications = notifications,
         )
 
     private fun resolveRequestedCredentialConfigurationId(
@@ -443,13 +479,61 @@ class OpenId4VciProtocolService(
         session: IssuanceSession,
         error: OAuthError,
     ): CredentialResponseHttp {
-        sessionService.updateStatus(
+        val updatedSession = sessionService.updateStatus(
             session.sessionId,
             IssuanceSessionStatus.UNSUCCESSFUL,
             error.description ?: error.error,
+            close = true,
         )
+        notificationService.emitIssuanceStatus(updatedSession)
         return oauth2Provider.writeCredentialError(request, error)
     }
+
+    private suspend fun emitCredentialIssuedEvent(
+        session: IssuanceSession,
+        format: CredentialFormat,
+        doctype: String?,
+        credential: String,
+    ) {
+        when (format) {
+            CredentialFormat.SD_JWT_VC ->
+                notificationService.notify(
+                    session = session,
+                    event = IssuanceSessionEvent.sdjwt_issue,
+                    data = buildJsonObject { put("sdjwt", credential) },
+                )
+
+            CredentialFormat.JWT_VC_JSON,
+            CredentialFormat.JWT_VC,
+            CredentialFormat.JWT_VC_JSON_LD ->
+                notificationService.notify(
+                    session = session,
+                    event = IssuanceSessionEvent.jwt_issue,
+                    data = buildJsonObject { put("jwt", credential) },
+                )
+
+            CredentialFormat.MSO_MDOC ->
+                notificationService.notify(
+                    session = session,
+                    event = IssuanceSessionEvent.generated_mdoc,
+                    data = buildJsonObject { put("mdoc", credential.toMDocCallbackHex(doctype)) },
+                )
+
+            CredentialFormat.LDP_VC -> Unit
+        }
+    }
+
+    private fun String.toMDocCallbackHex(doctype: String?): String =
+        runCatching {
+            val issuerSigned = IssuerSigned.fromMapElement(DataElement.fromCBOR<MapElement>(decodeFromBase64Url()))
+            MDoc(
+                docType = StringElement(requireNotNull(doctype) { "Missing doctype for mDoc credential configuration" }),
+                issuerSigned = issuerSigned,
+                deviceSigned = null,
+            ).toCBORHex()
+        }.getOrElse {
+            this
+        }
 
     private fun Map<String, List<String>>.withInternalAuthorizationSession(sessionId: String): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER } +

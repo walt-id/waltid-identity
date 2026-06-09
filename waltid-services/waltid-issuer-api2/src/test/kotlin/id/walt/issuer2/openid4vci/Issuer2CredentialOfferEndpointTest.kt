@@ -20,6 +20,7 @@ import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
@@ -241,7 +242,11 @@ class Issuer2CredentialOfferEndpointTest {
                         "family_name" to "$.family_name",
                     ),
                     x5Chain = listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"),
-                    webhookUrl = "https://issuer.example/webhooks/issuer2",
+                    notifications = IssuanceNotifications(
+                        webhook = IssuanceNotifications.WebhookNotification(
+                            url = "https://issuer.example/webhooks/issuer2",
+                        ),
+                    ),
                 ),
             )
         )
@@ -258,7 +263,7 @@ class Issuer2CredentialOfferEndpointTest {
         assertNotNull(sessionSelectiveDisclosure.get("family_name"))
         assertEquals("$.given_name", session.idTokenClaimsMapping?.get("given_name"))
         assertEquals(listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), session.x5Chain)
-        assertEquals("https://issuer.example/webhooks/issuer2", session.webhookUrl)
+        assertEquals("https://issuer.example/webhooks/issuer2", session.notifications?.webhook?.url)
 
         val unchangedProfile = client.getProfile(profile.profileId)
         assertEquals(profile.issuerDid, unchangedProfile.issuerDid)
@@ -492,7 +497,11 @@ class Issuer2CredentialOfferEndpointTest {
                         }
                     },
                     selectiveDisclosure = selectiveDisclosure,
-                    webhookUrl = "https://issuer.example/webhooks/issuance",
+                    notifications = IssuanceNotifications(
+                        webhook = IssuanceNotifications.WebhookNotification(
+                            url = "https://issuer.example/webhooks/issuance",
+                        ),
+                    ),
                 ),
             )
         )
@@ -500,7 +509,7 @@ class Issuer2CredentialOfferEndpointTest {
         val session = client.get("/issuer2/sessions/${response.offerId}").body<IssuanceSession>()
         assertEquals("Jane", session.credentialData["credentialSubject"]?.jsonObject?.get("givenName")?.jsonPrimitive?.content)
         assertEquals("did:example:holder", session.credentialData["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.content)
-        assertEquals("https://issuer.example/webhooks/issuance", session.webhookUrl)
+        assertEquals("https://issuer.example/webhooks/issuance", session.notifications?.webhook?.url)
         assertNotNull(session.selectiveDisclosure?.get("credentialSubject"))
     }
 

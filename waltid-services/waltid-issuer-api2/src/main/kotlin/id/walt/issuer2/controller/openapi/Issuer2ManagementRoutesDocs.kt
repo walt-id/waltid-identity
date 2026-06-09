@@ -69,7 +69,7 @@ object Issuer2ManagementRoutesDocs {
             Supports pre-authorized and authorization-code issuance flows. The offer can be returned
             by reference or by value. Runtime overrides can be applied for one offer only. Supported
             override fields are: issuerDid, credentialData, mapping, selectiveDisclosure,
-            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and webhookUrl.
+            idTokenClaimsMapping, mDocNameSpacesDataMappingConfig, x5Chain, and notifications.
             credentialData is applied as a partial object patch over the configured profile data:
             nested objects are merged, while primitive, array, and null values replace the configured value.
             Authorization-code offers include issuer_state by default. Set issuerStateMode to OMIT only

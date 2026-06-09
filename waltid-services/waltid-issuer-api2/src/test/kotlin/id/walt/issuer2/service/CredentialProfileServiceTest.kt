@@ -3,6 +3,7 @@ package id.walt.issuer2.service
 import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
+import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
@@ -40,7 +41,11 @@ class CredentialProfileServiceTest {
                         "org.iso.18013.5.1" to JsonObjectToCborMappingConfig(emptyMap()),
                     ),
                     x5Chain = listOf("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"),
-                    webhookUrl = "https://issuer.example/webhook",
+                    notifications = IssuanceNotifications(
+                        webhook = IssuanceNotifications.WebhookNotification(
+                            url = "https://issuer.example/webhook",
+                        ),
+                    ),
                 )
             )
         )
@@ -59,7 +64,7 @@ class CredentialProfileServiceTest {
         assertEquals("$.credentialSubject.id", profile.idTokenClaimsMapping?.get("sub"))
         assertEquals(setOf("org.iso.18013.5.1"), profile.mDocNameSpacesDataMappingConfig?.keys)
         assertEquals(listOf("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"), profile.x5Chain)
-        assertEquals("https://issuer.example/webhook", profile.webhookUrl)
+        assertEquals("https://issuer.example/webhook", profile.notifications?.webhook?.url)
     }
 
     @Test
@@ -138,7 +143,7 @@ class CredentialProfileServiceTest {
         idTokenClaimsMapping: Map<String, String>? = null,
         mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
         x5Chain: List<String>? = null,
-        webhookUrl: String? = null,
+        notifications: IssuanceNotifications? = null,
     ): CredentialProfileConfig =
         CredentialProfileConfig(
             name = name,
@@ -151,7 +156,7 @@ class CredentialProfileServiceTest {
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             x5Chain = x5Chain,
-            webhookUrl = webhookUrl,
+            notifications = notifications,
         )
 
     private fun metadataConfig(): Issuer2MetadataConfig =

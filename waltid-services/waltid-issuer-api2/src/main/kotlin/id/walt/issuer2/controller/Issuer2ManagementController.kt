@@ -2,6 +2,7 @@ package id.walt.issuer2.controller
 
 import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
+import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.CredentialOfferService
@@ -14,11 +15,13 @@ import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.sse.sse
+import kotlinx.serialization.json.Json
 
 class Issuer2ManagementController(
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
     private val offerService: CredentialOfferService,
+    private val notificationService: IssuanceNotificationService,
 ) {
     fun register(route: Route) = route.route("issuer2", { tags = listOf(Issuer2ManagementRoutesDocs.CREDENTIAL_ISSUANCE_TAG) }) {
         val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
@@ -52,7 +55,11 @@ class Issuer2ManagementController(
         }
 
         sse("sessions/{sessionId}/events") {
-            send("connected")
+            val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
+            sessionService.getSession(sessionId)
+            notificationService.subscribe(sessionId).collect { update ->
+                send(Json.encodeToString(update))
+            }
         }
     }
 }

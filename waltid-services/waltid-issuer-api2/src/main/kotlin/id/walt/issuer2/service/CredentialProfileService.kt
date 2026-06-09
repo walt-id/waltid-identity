@@ -64,6 +64,6 @@ class CredentialProfileService(
             idTokenClaimsMapping = idTokenClaimsMapping,
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             x5Chain = x5Chain,
-            webhookUrl = webhookUrl,
+            notifications = notifications,
         )
 }

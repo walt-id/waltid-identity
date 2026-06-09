@@ -2,6 +2,7 @@ package id.walt.issuer2.config
 
 import id.walt.commons.config.WaltConfig
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -25,5 +26,5 @@ data class CredentialProfileConfig(
     val idTokenClaimsMapping: Map<String, String>? = null,
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     val x5Chain: List<String>? = null,
-    val webhookUrl: String? = null,
+    val notifications: IssuanceNotifications? = null,
 )

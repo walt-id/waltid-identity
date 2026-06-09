@@ -233,7 +233,7 @@ class Issuer2ProfileEndpointTest {
                     idTokenClaimsMapping = profile.idTokenClaimsMapping,
                     mDocNameSpacesDataMappingConfig = profile.mDocNameSpacesDataMappingConfig,
                     x5Chain = profile.x5Chain,
-                    webhookUrl = profile.webhookUrl,
+                    notifications = profile.notifications,
                 )
             }
         val configuredProfilesById = configuredProfiles.associateBy { it.profileId }
@@ -393,7 +393,7 @@ class Issuer2ProfileEndpointTest {
         profile.x5Chain?.forEachIndexed { index, certificate ->
             assertNoUnresolvedString("$profileId.x5Chain[$index]", certificate)
         }
-        profile.webhookUrl?.let { assertNoUnresolvedString("$profileId.webhookUrl", it) }
+        profile.notifications?.webhook?.url?.let { assertNoUnresolvedString("$profileId.notifications.webhook.url", it) }
     }
 
     private fun assertNoUnresolvedSubstitution(context: String, value: JsonElement) {

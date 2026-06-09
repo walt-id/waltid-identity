@@ -1,6 +1,7 @@
 package id.walt.issuer2.domain
 
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.sdjwt.SDMap
@@ -11,10 +12,9 @@ import kotlin.time.Instant
 @Serializable
 enum class IssuanceSessionStatus {
     ACTIVE,
-    TOKEN_REQUESTED,
-    CREDENTIAL_ISSUED,
     SUCCESSFUL,
     UNSUCCESSFUL,
+    REJECTED_BY_USER,
     EXPIRED,
 }
 
@@ -40,5 +40,6 @@ data class IssuanceSession(
     val status: IssuanceSessionStatus = IssuanceSessionStatus.ACTIVE,
     val statusReason: String? = null,
     val issuedCredentialFormat: String? = null,
-    val webhookUrl: String? = null,
+    val notifications: IssuanceNotifications? = null,
+    val isClosed: Boolean = false,
 )
