@@ -89,16 +89,47 @@ data class Status(
     /**
      * Identifier list revocation mechanism per ISO 18013-5 §9.1.2.6.
      * IdentifierListInfo = { "id": Identifier, "uri": URI, ? "certificate": Certificate }
+     * where `Identifier = bstr` and `Certificate = bstr` (a DER-encoded X.509 certificate).
      */
     @Serializable
     data class IdentifierListInfo(
-        /** Unique identifier for this MSO within the revocation list. */
+        /**
+         * Issuer-defined identifier of this MSO within the revocation (identifier) list.
+         *
+         * Per ISO/IEC 18013-5 §9.1.2.6, `Identifier = bstr` — a CBOR byte string. Issuers that
+         * encode `id` as a CBOR integer or text string are NOT conformant to ISO/IEC 18013-5.
+         */
         @SerialName("id")
-        val id: String,
+        val id: ByteArray,
         /** URI where the identifier list (status list token) can be fetched. */
         @SerialName("uri")
         val uri: UniformResourceIdentifier,
-    )
+        /**
+         * Optional certificate (DER-encoded X.509, a CBOR `bstr`) whose public key signed the
+         * top-level certificate in the `x5chain` of the MSO revocation list (ISO 18013-5 §9.1.2.6).
+         */
+        @SerialName("certificate")
+        val certificate: ByteArray? = null,
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is IdentifierListInfo) return false
+            if (!id.contentEquals(other.id)) return false
+            if (uri != other.uri) return false
+            if (certificate != null) {
+                if (other.certificate == null) return false
+                if (!certificate.contentEquals(other.certificate)) return false
+            } else if (other.certificate != null) return false
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = id.contentHashCode()
+            result = 31 * result + uri.hashCode()
+            result = 31 * result + (certificate?.contentHashCode() ?: 0)
+            return result
+        }
+    }
 
     /**
      * Specifies the location of a Status List Token and the specific index within that list.
