@@ -76,9 +76,12 @@ class AuthorizationCodeTokenEndpoint(
                 audience = record.grantedAudience.firstOrNull(),
                 scopes = scopedRequest.grantedScopes,
                 expiresAt = expiresAt,
-                additional = mapOf(
-                    "client_id" to client.id,
-                ),
+                additional = buildMap {
+                    put("client_id", client.id)
+                    session.customAttributes["issuance_session_id"]?.let {
+                        put("issuance_session_id", it)
+                    }
+                },
             )
 
             val accessToken = tokenService.createAccessToken(claims)
