@@ -22,7 +22,6 @@ import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
 import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.appendArrayIndex
 import id.walt.credentials.utils.SdJwtUtils.appendClaimName
-import id.walt.credentials.utils.SdJwtUtils.parseSdLocationToClaimPath
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -254,12 +253,6 @@ object CredentialParser {
             // object (per SD-JWT VC §4.6.1; relative to the credential root).
             val hashesToVerify = ArrayDeque<Pair<List<JsonElement>, String>>()
 
-            // 1. Initial population from the main payload
-            containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
-                val basePath = parseSdLocationToClaimPath(sdLocation)
-                disclosureHashes.forEach { hash -> hashesToVerify.add(basePath to hash) }
-            }
-
             fun findForHash(hash: String) =
                 /* asHashedFromEncoded() hashes the exact original base64url wire bytes (RFC 9901 §4.2)
                  - the most reliable match as it is independent of any JSON re-serialization.
@@ -305,6 +298,13 @@ object CredentialParser {
                     else -> {} // Primitives contain no hashes
                 }
             }
+
+            // 1. Initial population from the credential-root payload, using the
+            // identification logic in scanForHashes (RFC 9901 §7.1 step 3.b). For W3C JWT-VCs that
+            // embed the credential under a `vc` claim, scan that wrapper's content so Claim Paths
+            // stay relative to the credential root (mirrors parseSdLocationToClaimPath's vc handling).
+            val credentialRoot = (payload["vc"] as? JsonObject) ?: payload
+            scanForHashes(credentialRoot, emptyList())
 
             // 2. Process the queue until all nested hashes are resolved
             while (hashesToVerify.isNotEmpty()) {
