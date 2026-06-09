@@ -48,4 +48,37 @@ class SdJwtVcDiscloseRoundTripTest {
         assertEquals("Silverstone", full["family_name"]?.toString()?.trim('"'))
         assertEquals("1991-11-06", full["birthdate"]?.toString()?.trim('"'))
     }
+
+    /**
+     * Reproduces VerifierPresentCredentialsIntegrationTest.shouldIssueAndPresentSdJwtVc:
+     * present only a SUBSET of disclosures (limit_disclosure=required), then run the legacy
+     * verifier's getFullPayload(). Must NOT throw "N disclosure(s) not referenced by any digest".
+     */
+    @Test
+    fun disclosingSubsetVerifiesWithLegacyVerifier() = runTest {
+        val example = SdJwtExamples.sdJwtVcSignedExample2
+
+        val (_, parsed) = CredentialParser.detectAndParse(example)
+        check(parsed is SelectivelyDisclosableVerifiableCredential)
+        val allDisclosures = parsed.disclosures!!
+        check(allDisclosures.size >= 2) { "Need >=2 disclosures to test a subset, got ${allDisclosures.size}" }
+
+        // Present only ONE disclosure (mimics limit_disclosure with a single requested field).
+        val subset = listOf(allDisclosures.first())
+        val disclosed = parsed.disclose(parsed, subset)
+
+        // Enterprise: SDJwtVC.parse(disclosed).present(discloseAll = true).toString(...)
+        val presented = SDJwtVC.parse(disclosed)
+            .present(discloseAll = true)
+            .toString(formatForPresentation = true, withKBJwt = false)
+
+        // Legacy verifier resolves the full payload — must not throw on the partial presentation.
+        val full = SDJwt.parse(presented).fullPayload
+
+        // The one disclosed claim must be present in the resolved payload.
+        val disclosedKey = subset.first().name
+        if (disclosedKey != null) {
+            assertEquals(true, full.containsKey(disclosedKey), "disclosed claim '$disclosedKey' must resolve")
+        }
+    }
 }
