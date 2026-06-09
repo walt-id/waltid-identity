@@ -2,10 +2,13 @@ package id.waltid.openid4vci.wallet.authorization
 
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 class AuthorizationRequestBuilderTest {
 
@@ -32,8 +35,9 @@ class AuthorizationRequestBuilderTest {
         assertEquals("test-client", params["client_id"])
         assertEquals("https://wallet.example.com/callback", params["redirect_uri"])
         assertNotNull(params["state"])
-        assertNotNull(params["authorization_details"])
-        assertTrue(params["authorization_details"]!!.contains("test_config"))
+        val authorizationDetail = authorizationDetail(params)
+        assertEquals("openid_credential", authorizationDetail["type"]?.jsonPrimitive?.content)
+        assertEquals("test_config", authorizationDetail["credential_configuration_id"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -44,10 +48,10 @@ class AuthorizationRequestBuilderTest {
             usePKCE = true
         )
 
-        assertNotNull(request.pkceData)
+        val pkceData = assertNotNull(request.pkceData)
         val url = Url(request.url)
         val params = url.parameters
-        assertEquals(request.pkceData!!.codeChallenge, params["code_challenge"])
+        assertEquals(pkceData.codeChallenge, params["code_challenge"])
         assertEquals("S256", params["code_challenge_method"])
     }
 
@@ -77,7 +81,17 @@ class AuthorizationRequestBuilderTest {
         assertEquals("code", params["response_type"])
         assertEquals("test-client", params["client_id"])
         assertNotNull(params["authorization_details"])
-        assertNotNull(pkce)
-        assertEquals(pkce!!.codeChallenge, params["code_challenge"])
+        assertEquals(
+            "openid_credential",
+            authorizationDetail(params["authorization_details"]!!)["type"]?.jsonPrimitive?.content,
+        )
+        val pkceData = assertNotNull(pkce)
+        assertEquals(pkceData.codeChallenge, params["code_challenge"])
     }
+
+    private fun authorizationDetail(params: Parameters) =
+        authorizationDetail(params["authorization_details"]!!)
+
+    private fun authorizationDetail(authorizationDetails: String) =
+        Json.parseToJsonElement(authorizationDetails).jsonArray.single().jsonObject
 }
