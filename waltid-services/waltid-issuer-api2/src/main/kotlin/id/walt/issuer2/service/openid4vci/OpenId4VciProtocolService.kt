@@ -14,6 +14,7 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -199,7 +200,13 @@ class OpenId4VciProtocolService(
             is CredentialRequestResult.Success -> result.request
             is CredentialRequestResult.Failure -> return oauth2Provider.writeCredentialError(result.error)
         }
-        val tokenClaims = accessToken.decodeJws().payload
+        val tokenClaims = try {
+            accessToken.decodeJws().payload
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return oauth2Provider.writeCredentialError(credentialRequest, e.toCredentialError())
+        }
 
         val credentialConfigurationId = credentialRequest.credentialConfigurationId
             ?: credentialRequest.credentialIdentifier
@@ -210,28 +217,63 @@ class OpenId4VciProtocolService(
                     "credential_configuration_id or credential_identifier is required",
                 ),
             )
-        val sessionId = resolveSessionId(tokenClaims)
-        val session = sessionService.getSession(sessionId)
-        require(session.credentialConfigurationId == credentialConfigurationId) {
-            "Credential request references $credentialConfigurationId, but session ${session.sessionId} is for ${session.credentialConfigurationId}"
-        }
-
-        val configuration = metadataService.getCredentialConfiguration(credentialConfigurationId)
+        val sessionId = tokenClaims.stringClaim("sub")
             ?: return oauth2Provider.writeCredentialError(
                 credentialRequest,
-                OAuthError(
-                    OAuthErrorCodes.INVALID_REQUEST,
-                    "Unsupported credential_configuration_id: $credentialConfigurationId",
-                ),
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Access token has no session id"),
             )
-        val issuerKey = KeyManager.resolveSerializedKey(session.issuerKey)
+        val session = try {
+            sessionService.getSession(sessionId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return oauth2Provider.writeCredentialError(
+                credentialRequest.withSession(DefaultSession(subject = sessionId)),
+                e.toCredentialError(),
+            )
+        }
         val issuerId = session.issuerDid ?: metadataService.issuerBaseUrl()
         val requestWithSession = credentialRequest
             .withSession(DefaultSession(subject = sessionId))
             .withIssuer(issuerId)
 
-        val credentialResponse = when (
-            val result = oauth2Provider.createCredentialResponse(
+        if (session.credentialConfigurationId != credentialConfigurationId) {
+            return failCredentialRequest(
+                requestWithSession,
+                session,
+                OAuthError(
+                    OAuthErrorCodes.INVALID_REQUEST,
+                    "Credential request references $credentialConfigurationId, but session ${session.sessionId} is for ${session.credentialConfigurationId}",
+                ),
+            )
+        }
+
+        val configuration = metadataService.getCredentialConfiguration(credentialConfigurationId)
+            ?: return failCredentialRequest(
+                requestWithSession,
+                session,
+                OAuthError(
+                    OAuthErrorCodes.INVALID_REQUEST,
+                    "Unsupported credential_configuration_id: $credentialConfigurationId",
+                ),
+            )
+        val issuerKey = try {
+            KeyManager.resolveSerializedKey(session.issuerKey)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
+        }
+        val x5Chain = try {
+            session.x5Chain?.map { id.walt.x509.CertificateDer.fromPEMEncodedString(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
+        }
+
+        val credentialResponse = try {
+            when (val result = oauth2Provider.createCredentialResponse(
                 request = requestWithSession,
                 configuration = configuration,
                 issuerKey = issuerKey,
@@ -239,19 +281,18 @@ class OpenId4VciProtocolService(
                 credentialData = session.credentialData,
                 dataMapping = session.mapping,
                 selectiveDisclosure = session.selectiveDisclosure,
-                x5Chain = session.x5Chain?.map { id.walt.x509.CertificateDer.fromPEMEncodedString(it) },
+                x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
-            )
-        ) {
-            is CredentialResponseResult.Success -> result.response
-            is CredentialResponseResult.Failure -> {
-                sessionService.updateStatus(
-                    session.sessionId,
-                    IssuanceSessionStatus.UNSUCCESSFUL,
-                    result.error.description ?: result.error.error,
-                )
-                return oauth2Provider.writeCredentialError(requestWithSession, result.error)
+            )) {
+                is CredentialResponseResult.Success -> result.response
+                is CredentialResponseResult.Failure -> {
+                    return failCredentialRequest(requestWithSession, session, result.error)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return failCredentialRequest(requestWithSession, session, e.toCredentialError())
         }
 
         sessionService.updateStatus(
@@ -394,12 +435,21 @@ class OpenId4VciProtocolService(
             })
         }
 
-    private fun resolveSessionId(tokenClaims: JsonObject): String =
-        tokenClaims.stringClaim("sub")
-            ?: throw IllegalArgumentException("Access token has no session id")
-
     private fun JsonObject.stringClaim(name: String): String? =
         this[name]?.jsonPrimitive?.contentOrNull
+
+    private suspend fun failCredentialRequest(
+        request: CredentialRequest,
+        session: IssuanceSession,
+        error: OAuthError,
+    ): CredentialResponseHttp {
+        sessionService.updateStatus(
+            session.sessionId,
+            IssuanceSessionStatus.UNSUCCESSFUL,
+            error.description ?: error.error,
+        )
+        return oauth2Provider.writeCredentialError(request, error)
+    }
 
     private fun Map<String, List<String>>.withInternalAuthorizationSession(sessionId: String): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER } +
@@ -426,6 +476,17 @@ class OpenId4VciProtocolService(
             else -> OAuthError(
                 OAuthErrorCodes.SERVER_ERROR,
                 message ?: "Authorization request processing failed",
+            )
+        }
+
+    private fun Exception.toCredentialError(): OAuthError =
+        when (this) {
+            is IllegalArgumentException,
+            is NotFoundException -> OAuthError(OAuthErrorCodes.INVALID_REQUEST, message)
+
+            else -> OAuthError(
+                OAuthErrorCodes.SERVER_ERROR,
+                message ?: "Credential request processing failed",
             )
         }
 
