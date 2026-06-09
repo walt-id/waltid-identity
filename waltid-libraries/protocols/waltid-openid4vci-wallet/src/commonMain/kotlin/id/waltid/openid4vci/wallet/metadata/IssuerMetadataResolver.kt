@@ -184,74 +184,21 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Resolves authorization server metadata with fallback logic:
-     * 1. Try authorization_servers from credential issuer metadata
-     * 2. Fall back to using the credential issuer URL itself
-     * 3. Fall back to OpenID provider metadata
-     *
+     * Resolves authorization server metadata :
      * @param credentialIssuerMetadata The credential issuer metadata
      * @return AuthorizationServerMetadata
      */
     suspend fun resolveAuthorizationServerMetadataWithFallback(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ): AuthorizationServerMetadata {
-        log.info { "Resolving authorization server metadata with fallback logic" }
+        log.info { "Resolving authorization server metadata" }
         
-        // Try authorization_servers if present
         val authorizationServers = credentialIssuerMetadata.authorizationServers
-        if (!authorizationServers.isNullOrEmpty()) {
-            val authServerUrl = authorizationServers.first()
-            log.info { "Attempting to use authorization server from issuer metadata: $authServerUrl" }
-            try {
-                return resolveAuthorizationServerMetadata(authServerUrl)
-            } catch (e: Exception) {
-                log.warn(e) { "Failed to resolve authorization server from issuer metadata, trying fallback strategies" }
-            }
-        }
-
-        val credentialIssuerUrl = credentialIssuerMetadata.credentialIssuer
-
-        log.info { "Fallback strategy 1: Using credential issuer URL as authorization server" }
-        log.trace { "Credential issuer URL: $credentialIssuerUrl" }
-        try {
-            return resolveAuthorizationServerMetadata(credentialIssuerUrl)
-        } catch (e: Exception) {
-            log.warn(e) { "Failed to resolve as authorization server, trying OpenID configuration as final fallback" }
-        }
-
-        log.info { "Fallback strategy 2: Attempting to resolve OpenID Provider metadata" }
-        return try {
-            val oidcMetadata = resolveOpenIDProviderMetadata(credentialIssuerUrl)
-            log.trace { "Converting OpenID Provider metadata to Authorization Server metadata" }
-
-            // Convert OpenIDProviderMetadata to AuthorizationServerMetadata
-            // (they share most fields through inheritance)
-            AuthorizationServerMetadata(
-                issuer = oidcMetadata.issuer,
-                authorizationEndpoint = oidcMetadata.authorizationEndpoint,
-                tokenEndpoint = oidcMetadata.tokenEndpoint,
-                jwksUri = oidcMetadata.jwksUri,
-                registrationEndpoint = oidcMetadata.registrationEndpoint,
-                scopesSupported = oidcMetadata.scopesSupported,
-                responseTypesSupported = oidcMetadata.responseTypesSupported,
-                responseModesSupported = oidcMetadata.responseModesSupported,
-                grantTypesSupported = oidcMetadata.grantTypesSupported,
-                tokenEndpointAuthMethodsSupported = oidcMetadata.tokenEndpointAuthMethodsSupported,
-                tokenEndpointAuthSigningAlgValuesSupported = oidcMetadata.tokenEndpointAuthSigningAlgValuesSupported,
-                serviceDocumentation = oidcMetadata.serviceDocumentation,
-                uiLocalesSupported = oidcMetadata.uiLocalesSupported,
-                opPolicyUri = oidcMetadata.opPolicyUri,
-                opTosUri = oidcMetadata.opTosUri,
-                pushedAuthorizationRequestEndpoint = null,
-                requirePushedAuthorizationRequests = false,
-                dpopSigningAlgValuesSupported = null
-            )
-        } catch (oidcError: Exception) {
-            log.error(oidcError) {
-                "All authorization server metadata resolution strategies failed for issuer: $credentialIssuerUrl"
-            }
-            throw Exception("Failed to resolve authorization server metadata from any source", oidcError)
-        }
+        val authServerUrl = authorizationServers?.first() ?: credentialIssuerMetadata.credentialIssuer
+        log.info { "Attempting to use authorization server from issuer metadata: $authServerUrl" }
+        
+        return resolveAuthorizationServerMetadata(authServerUrl)
+        
     }
 
     /**
