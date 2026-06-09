@@ -3,12 +3,15 @@ package id.walt.issuer2.openid4vci
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
+import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
@@ -34,6 +37,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -74,10 +78,14 @@ class Issuer2MetadataEndpointTest {
         assertEquals(HttpStatusCode.OK, jwtVcIssuerMetadataRaw.status)
         val jwtVcIssuerMetadata = jwtVcIssuerMetadataRaw.body<JWTVCIssuerMetadata>()
 
+        assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/openid-credential-issuer/openid4vci").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/oauth-authorization-server/openid4vci").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer/openid4vci").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/vct/$SD_JWT_INTERNAL_CONFIG_ID").status)
         assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/openid-credential-issuer").status)
         assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/oauth-authorization-server").status)
         assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/jwt-vc-issuer").status)
-        assertEquals(HttpStatusCode.NotFound, client.get("/.well-known/vct").status)
+        assertEquals(HttpStatusCode.NotFound, client.get("$OPENID4VCI_PREFIX/.well-known/vct").status)
 
         assertNull(credentialIssuerMetadata.authorizationServers)
         assertEquals(ISSUER_BASE_URL, credentialIssuerMetadata.credentialIssuer)
@@ -109,8 +117,21 @@ class Issuer2MetadataEndpointTest {
         assertJwtVcJsonConfiguration(credentialIssuerMetadata)
         assertMdocConfiguration(credentialIssuerMetadata)
         assertSdJwtVcConfiguration(credentialIssuerMetadata)
+        assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
         assertExternalSdJwtVcVctPassThrough(credentialIssuerMetadata)
+    }
+
+    private fun assertConfiguredCredentialScenariosAreAdvertised(
+        credentialIssuerMetadata: CredentialIssuerMetadata,
+    ) {
+        Issuer2CredentialScenarios.configured.forEach { scenario ->
+            val configuration = assertNotNull(
+                credentialIssuerMetadata.credentialConfigurationsSupported[scenario.credentialConfigurationId],
+                "Expected metadata for configured issuer2 credential ${scenario.credentialConfigurationId}",
+            )
+            assertEquals(scenario.format, configuration.format.value)
+        }
     }
 
     private suspend fun assertSelfHostedSdJwtVcTypeMetadata(
@@ -212,6 +233,8 @@ class Issuer2MetadataEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            runBlocking { issuer2AuthenticationPluginAmendment() }
+            AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
     }
@@ -248,13 +271,14 @@ class Issuer2MetadataEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7003"
+        const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
+        const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
         const val UNIVERSITY_DEGREE_CONFIG_ID = "UniversityDegree_jwt_vc_json"
         const val MDOC_CONFIG_ID = "org.iso.18013.5.1.mDL"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         const val SD_JWT_EXTERNAL_CONFIG_ID = "my_custom_vct_dc+sd-jwt"
-        const val INTERNAL_SD_JWT_VCT = "$ISSUER_AUTHORITY_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
+        const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
         const val EXTERNAL_SD_JWT_VCT = "https://example.com/my_custom_vct"
 
         val configFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(

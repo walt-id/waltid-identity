@@ -3,6 +3,7 @@ package id.walt.issuer2.openid4vci
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -10,6 +11,7 @@ import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.get
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -106,6 +109,8 @@ class Issuer2JwksEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            runBlocking { issuer2AuthenticationPluginAmendment() }
+            AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
     }

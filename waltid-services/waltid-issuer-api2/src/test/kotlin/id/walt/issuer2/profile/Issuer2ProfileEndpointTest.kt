@@ -3,6 +3,7 @@ package id.walt.issuer2.profile
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -12,6 +13,8 @@ import id.walt.issuer2.config.registerIssuer2ConfigDecoders
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
+import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -36,6 +39,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -252,6 +256,7 @@ class Issuer2ProfileEndpointTest {
 
     private fun assertProfilesCoverCredentialMetadata(profiles: List<CredentialProfile>) {
         val metadataConfigurationIds = ConfigManager.getConfig<Issuer2MetadataConfig>().credentialConfigurations.keys
+        val expectedScenarioProfileIds = Issuer2CredentialScenarios.configured.map { it.profileId }.toSet()
         assertEquals(
             metadataConfigurationIds,
             profiles.map { it.credentialConfigurationId }.toSet(),
@@ -261,6 +266,11 @@ class Issuer2ProfileEndpointTest {
             metadataConfigurationIds.size,
             profiles.size,
             "Expected one issuer2 profile per configured credential metadata entry",
+        )
+        assertEquals(
+            expectedScenarioProfileIds,
+            profiles.map { it.profileId }.toSet(),
+            "Expected configured issuer2 profiles to match the supported credential scenario matrix",
         )
     }
 
@@ -420,6 +430,8 @@ class Issuer2ProfileEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            runBlocking { issuer2AuthenticationPluginAmendment() }
+            AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
     }

@@ -3,6 +3,10 @@ package id.walt.issuer2.openid4vci
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.commons.web.modules.AuthenticationServiceModule
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.CredentialProfileConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
@@ -16,6 +20,7 @@ import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferValueMode
@@ -44,6 +49,8 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -53,7 +60,9 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
+import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -104,7 +113,7 @@ class Issuer2CredentialOfferEndpointTest {
     fun shouldCreateConfiguredCredentialOffersForSupportedModes() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
-        val profile = client.getProfile(UNIVERSITY_DEGREE_PROFILE_ID)
+        val profile = client.getProfile(IDENTITY_SD_JWT_PROFILE_ID)
 
         // These are the modes exposed to issuer clients. They should work from real
         // config, not only from a synthetic in-test profile.
@@ -205,13 +214,19 @@ class Issuer2CredentialOfferEndpointTest {
         val client = apiClient()
         val profile = client.getProfile(IDENTITY_SD_JWT_PROFILE_ID)
         val selectiveDisclosure = SDMap.generateSDMap(listOf("given_name", "family_name"))
+        val issuerKeyOverride = buildJsonObject {
+            put("type", "jwk")
+            put("jwk", JWKKey.generate(KeyType.secp256r1).exportJWKObject())
+        }
 
         val response = client.createCredentialOffer(
             CredentialOfferCreateRequest(
                 profileId = profile.profileId,
                 authMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.INCLUDE,
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     issuerDid = "did:example:issuer-override",
+                    issuerKey = issuerKeyOverride,
                     credentialData = buildJsonObject {
                         put("given_name", "Jane")
                         put("family_name", "Doe")
@@ -235,6 +250,7 @@ class Issuer2CredentialOfferEndpointTest {
         // without changing the configured profile.
         val session = client.getSession(response.offerId)
         assertEquals("did:example:issuer-override", session.issuerDid)
+        assertEquals(issuerKeyOverride, session.issuerKey)
         assertEquals("Jane", session.credentialData["given_name"]?.jsonPrimitive?.content)
         assertEquals("<timestamp>", session.mapping?.get("iat")?.jsonPrimitive?.content)
         val sessionSelectiveDisclosure = assertNotNull(session.selectiveDisclosure)
@@ -246,7 +262,15 @@ class Issuer2CredentialOfferEndpointTest {
 
         val unchangedProfile = client.getProfile(profile.profileId)
         assertEquals(profile.issuerDid, unchangedProfile.issuerDid)
+        assertEquals(profile.issuerKey, unchangedProfile.issuerKey)
         assertEquals(profile.credentialData, unchangedProfile.credentialData)
+
+        val overrideKeyId = KeyManager.resolveSerializedKey(issuerKeyOverride).getKeyId()
+        val jwks = client.get("/openid4vci/jwks").body<JsonObject>()
+        val exposedKids = assertNotNull(jwks["keys"]?.jsonArray)
+            .mapNotNull { key -> key.jsonObject["kid"]?.jsonPrimitive?.contentOrNull }
+            .toSet()
+        assertTrue(overrideKeyId in exposedKids, "Expected runtime issuerKey to be exposed through JWKS")
     }
 
     @Test
@@ -259,6 +283,7 @@ class Issuer2CredentialOfferEndpointTest {
             CredentialOfferCreateRequest(
                 profileId = profile.profileId,
                 authMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.INCLUDE,
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     credentialData = buildJsonObject {
                         put("given_name", "Alice")
@@ -283,6 +308,29 @@ class Issuer2CredentialOfferEndpointTest {
         assertEquals(configuredAddress["street_address"], sessionAddress["street_address"])
         assertEquals(configuredAddress["region"], sessionAddress["region"])
         assertEquals(configuredAddress["country"], sessionAddress["country"])
+    }
+
+    @Test
+    fun shouldRejectRuntimeOverridesForAuthorizedOffersWithoutIssuerState() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            CredentialOfferCreateRequest(
+                profileId = UNIVERSITY_DEGREE_PROFILE_ID,
+                authMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.OMIT,
+                runtimeOverrides = CredentialOfferRuntimeOverrides(
+                    credentialData = buildJsonObject {
+                        putJsonObject("credentialSubject") {
+                            put("givenName", "Jane")
+                        }
+                    },
+                ),
+            )
+        }
+
+        assertEquals(
+            "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers",
+            error.message,
+        )
     }
 
     @Test
@@ -311,7 +359,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         assertEquals(AuthenticationMethod.AUTHORIZED, response.authMethod)
-        assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
+        assertEquals(IssuerStateMode.INCLUDE, response.issuerStateMode)
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(response.credentialOffer)
         assertNull(offerRequest.credentialOffer)
         val credentialOfferUri = assertNotNull(offerRequest.credentialOfferUri)
@@ -319,6 +367,7 @@ class Issuer2CredentialOfferEndpointTest {
             credentialOfferUri.endsWith("/openid4vci/credential-offer?id=${response.offerId}"),
             "Expected by-reference offer URI to point to the OSS issuer2 credential-offer endpoint",
         )
+        assertEquals(response.offerId, response.resolveOffer(client).grants?.authorizationCode?.issuerState)
     }
 
     private suspend fun assertAuthorizedByValueOffer(client: HttpClient) {
@@ -333,7 +382,8 @@ class Issuer2CredentialOfferEndpointTest {
         val offer = response.inlineOffer()
         assertEquals(ISSUER_BASE_URL, offer.credentialIssuer)
         assertEquals(listOf(CREDENTIAL_CONFIGURATION_ID), offer.credentialConfigurationIds)
-        assertNull(offer.grants?.authorizationCode?.issuerState)
+        assertEquals(IssuerStateMode.INCLUDE, response.issuerStateMode)
+        assertEquals(response.offerId, offer.grants?.authorizationCode?.issuerState)
     }
 
     private suspend fun assertAuthorizedByValueOfferWithIssuerState(client: HttpClient) {
@@ -362,7 +412,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         assertEquals(AuthenticationMethod.PRE_AUTHORIZED, response.authMethod)
-        assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
+        assertNull(response.issuerStateMode)
         assertEquals(TX_CODE_VALUE, response.txCodeValue)
         assertEquals(TX_CODE, response.resolveOffer(client).grants?.preAuthorizedCode?.txCode)
     }
@@ -433,6 +483,7 @@ class Issuer2CredentialOfferEndpointTest {
             CredentialOfferCreateRequest(
                 profileId = PROFILE_ID,
                 authMethod = AuthenticationMethod.AUTHORIZED,
+                issuerStateMode = IssuerStateMode.INCLUDE,
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     credentialData = buildJsonObject {
                         putJsonObject("credentialSubject") {
@@ -448,6 +499,7 @@ class Issuer2CredentialOfferEndpointTest {
 
         val session = client.get("/issuer2/sessions/${response.offerId}").body<IssuanceSession>()
         assertEquals("Jane", session.credentialData["credentialSubject"]?.jsonObject?.get("givenName")?.jsonPrimitive?.content)
+        assertEquals("did:example:holder", session.credentialData["credentialSubject"]?.jsonObject?.get("id")?.jsonPrimitive?.content)
         assertEquals("https://issuer.example/webhooks/issuance", session.webhookUrl)
         assertNotNull(session.selectiveDisclosure?.get("credentialSubject"))
     }
@@ -466,7 +518,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
 
         val offer = response.resolveOffer(client)
-        assertEquals(CONFIGURED_ISSUER_BASE_URL, offer.credentialIssuer)
+        assertEquals(configuredIssuerBaseUrl(), offer.credentialIssuer)
         assertEquals(listOf(profile.credentialConfigurationId), offer.credentialConfigurationIds)
         assertNotNull(offer.grants?.preAuthorizedCode?.preAuthorizedCode)
 
@@ -486,7 +538,10 @@ class Issuer2CredentialOfferEndpointTest {
                 profileId = profile.profileId,
                 authMethod = authMethod,
                 valueMode = valueMode,
-                runtimeOverrides = runtimeOverridesForConfiguredProfile(profile.profileId),
+                runtimeOverrides = when (authMethod) {
+                    AuthenticationMethod.PRE_AUTHORIZED -> runtimeOverridesForConfiguredProfile(profile.profileId)
+                    AuthenticationMethod.AUTHORIZED -> null
+                },
             )
         )
 
@@ -494,7 +549,7 @@ class Issuer2CredentialOfferEndpointTest {
             CredentialOfferValueMode.BY_VALUE -> response.inlineOffer()
             CredentialOfferValueMode.BY_REFERENCE -> response.resolveOffer(client)
         }
-        assertEquals(CONFIGURED_ISSUER_BASE_URL, offer.credentialIssuer)
+        assertEquals(configuredIssuerBaseUrl(), offer.credentialIssuer)
         assertEquals(listOf(profile.credentialConfigurationId), offer.credentialConfigurationIds)
         when (authMethod) {
             AuthenticationMethod.PRE_AUTHORIZED -> {
@@ -503,8 +558,9 @@ class Issuer2CredentialOfferEndpointTest {
                 assertNull(offer.grants?.authorizationCode)
             }
             AuthenticationMethod.AUTHORIZED -> {
-                assertEquals(IssuerStateMode.OMIT, response.issuerStateMode)
+                assertEquals(IssuerStateMode.INCLUDE, response.issuerStateMode)
                 assertNotNull(offer.grants?.authorizationCode)
+                assertEquals(response.offerId, offer.grants?.authorizationCode?.issuerState)
                 assertNull(offer.grants?.preAuthorizedCode)
             }
         }
@@ -520,7 +576,6 @@ class Issuer2CredentialOfferEndpointTest {
                 profileId = profile.profileId,
                 authMethod = AuthenticationMethod.AUTHORIZED,
                 expiresInSeconds = TWO_MINUTES_SECONDS,
-                runtimeOverrides = runtimeOverridesForConfiguredProfile(profile.profileId),
             )
         )
         val expectedNotAfter = Clock.System.now().plus(TWO_MINUTES_SECONDS.seconds).toEpochMilliseconds()
@@ -596,6 +651,8 @@ class Issuer2CredentialOfferEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            runBlocking { issuer2AuthenticationPluginAmendment() }
+            AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
     }
@@ -606,6 +663,8 @@ class Issuer2CredentialOfferEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
+            runBlocking { issuer2AuthenticationPluginAmendment() }
+            AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
     }
@@ -727,6 +786,9 @@ class Issuer2CredentialOfferEndpointTest {
         put("issuanceDate", "<timestamp>")
     }
 
+    private fun configuredIssuerBaseUrl(): String =
+        ConfigManager.getConfig<Issuer2ServiceConfig>().baseUrl.trimEnd('/') + "/openid4vci"
+
     private fun runtimeOverridesForConfiguredProfile(profileId: String): CredentialOfferRuntimeOverrides? =
         when (profileId) {
             UNIVERSITY_DEGREE_PROFILE_ID -> CredentialOfferRuntimeOverrides(
@@ -756,7 +818,6 @@ class Issuer2CredentialOfferEndpointTest {
         const val PROFILE_ID = "universityDegree"
         const val CREDENTIAL_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
         const val ISSUER_BASE_URL = "http://localhost/openid4vci"
-        const val CONFIGURED_ISSUER_BASE_URL = "http://localhost:7003/openid4vci"
         const val UNIVERSITY_DEGREE_PROFILE_ID = "universityDegree"
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
