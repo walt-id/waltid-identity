@@ -652,7 +652,7 @@ class Issuer2CredentialOfferEndpointTest {
         )
         ConfigManager.preloadAndRegisterConfig(
             "authentication-service",
-            AuthenticationServiceConfig(enabled = false),
+            AuthenticationServiceConfig(),
         )
         ConfigManager.preloadAndRegisterConfig(
             "credential-issuer-metadata",
