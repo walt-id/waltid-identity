@@ -13,7 +13,14 @@ import kotlin.test.assertTrue
  * Exercises the full mobile stack: iOS Keychain crypto + SQLDelight native persistence
  * + OID4VCI/VP protocol against the public EUDI test backend.
  *
- * Requires: iOS simulator (macOS CI runner).
+ * TODO: These tests compile and link successfully but fail at runtime due to iOS Keychain
+ *       entitlement requirements. Kotlin/Native test binaries don't have keychain access
+ *       entitlements, preventing iOS Keychain operations. Possible solutions:
+ *       1. Run tests via XCTest wrapper with proper entitlements
+ *       2. Create in-memory key provider for test-only usage
+ *       3. Use expect/actual to swap real keychain with mock in tests
+ *
+ * Requires: iOS simulator (macOS CI runner) + keychain entitlements (not currently available in KN tests).
  */
 class WalletClientIosTest {
 

@@ -6,9 +6,8 @@ import io.ktor.client.plugins.cookies.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -181,8 +180,7 @@ object EudiTestBackend {
             val response = client.get("$VERIFIER_BACKEND/ui/presentations/$transactionId/events")
             val body = response.bodyAsText()
             if (body.isNotBlank()) {
-                val responseElement = Json.parseToJsonElement(body)
-                val events = when (responseElement) {
+                val events = when (val responseElement = Json.parseToJsonElement(body)) {
                     is JsonArray -> responseElement
                     is JsonObject -> when (val eventsField = responseElement["events"]) {
                         is JsonArray -> eventsField
@@ -202,7 +200,7 @@ object EudiTestBackend {
                 }
             }
 
-            kotlinx.coroutines.delay(2000)
+            delay(2000.milliseconds)
         }
     }
 
@@ -346,5 +344,5 @@ object EudiTestBackend {
             .replace("&quot;", "\"")
             .replace("&#39;", "'")
 
-    private fun urlEncode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
+    private fun urlEncode(value: String): String = value.encodeURLParameter()
 }
