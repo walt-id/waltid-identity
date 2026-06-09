@@ -93,6 +93,63 @@ object CredentialParser {
 
     fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
 
+    /**
+     * Converts an SD-JWT (VC) encoded using the JWS JSON Serialization (RFC 9901 §8) (either the
+     * Flattened or the General form) into the SD-JWT Compact Serialization, or returns `null` if
+     * [credential] is not a JWS JSON serialized SD-JWT.
+     *
+     * Per RFC 9901 §8.1, the compact form is built by concatenating the `protected` header, the
+     * `payload`, and the `signature` of the JWS with `.`, followed by each Disclosure from the
+     * `disclosures` member of the unprotected header (each prefixed with `~`), and finally the
+     * `kb_jwt` (if present) prefixed with `~`.
+     *
+     * Supporting this format is OPTIONAL per the spec, but issuers MAY use it (SD-JWT VC §2.2), so a
+     * conformant verifier should accept it.
+     *
+     * Flattened: `{ "payload", "protected", "header": { "disclosures": [...], "kb_jwt"? }, "signature" }`
+     * General:   `{ "payload", "signatures": [ { "protected", "header"?, "signature" } ] }`
+     */
+    private fun jwsJsonToCompactSdJwtOrNull(credential: String): String? {
+        if (!credential.startsWith("{")) return null
+
+        val json = runCatching { Json.decodeFromString<JsonObject>(credential) }.getOrNull() ?: return null
+        val payload = (json["payload"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+
+        // Resolve the signature object: Flattened has protected/signature at top level; General nests
+        // them in signatures[0]. The disclosures (and optional kb_jwt) live in the unprotected header.
+        val (protectedHeader, signature, unprotectedHeader) = when {
+            json.containsKey("signatures") -> {
+                val sig = (json["signatures"] as? JsonArray)?.firstOrNull()?.jsonObject ?: return null
+                Triple(
+                    (sig["protected"] as? JsonPrimitive)?.content,
+                    (sig["signature"] as? JsonPrimitive)?.content,
+                    sig["header"] as? JsonObject
+                )
+            }
+
+            json.containsKey("protected") || json.containsKey("signature") -> Triple(
+                (json["protected"] as? JsonPrimitive)?.content,
+                (json["signature"] as? JsonPrimitive)?.content,
+                json["header"] as? JsonObject
+            )
+
+            else -> return null
+        }
+        if (protectedHeader == null || signature == null) return null
+
+        val disclosures = (unprotectedHeader?.get("disclosures") as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+            ?: emptyList()
+        val kbJwt = (unprotectedHeader?.get("kb_jwt") as? JsonPrimitive)?.content
+
+        return buildString {
+            append(protectedHeader).append('.').append(payload).append('.').append(signature)
+            disclosures.forEach { append('~').append(it) }
+            // RFC 9901 §4: a presentation without a KB-JWT ends with a trailing '~'.
+            if (kbJwt != null) append('~').append(kbJwt) else if (disclosures.isNotEmpty()) append('~')
+        }
+    }
+
     suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
         log.trace { "Handle mdocs, string: $credential" }
 
@@ -491,6 +548,13 @@ object CredentialParser {
 
     suspend fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
         val credential = rawCredential.trim()
+
+        // SD-JWT VC may be encoded using the JWS JSON Serialization (RFC 9901 §8), which is a valid
+        // but OPTIONAL format (SD-JWT VC draft §2.2). Detect it and convert to the compact form
+        // (header.payload.signature~disclosure...~kb_jwt) so the rest of the pipeline can parse it.
+        jwsJsonToCompactSdJwtOrNull(credential)?.let { compact ->
+            return detectAndParse(compact)
+        }
 
         return when {
             credential.startsWith("{") -> {
