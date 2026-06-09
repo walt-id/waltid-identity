@@ -143,4 +143,36 @@ class IssuerMetadataResolverTest {
         assertEquals(asUrl, metadata.issuer)
         assertEquals("$asUrl/token", metadata.tokenEndpoint)
     }
+
+    @Test
+    fun testResolveAuthorizationServerMetadataWithAsPath() = runTest {
+        val asUrl = "https://auth.example.com/as"
+        val mockResponse = """
+            {
+                "issuer": "$asUrl",
+                "authorization_endpoint": "$asUrl/authorize",
+                "token_endpoint": "$asUrl/token",
+                "response_types_supported": ["code"]
+            }
+        """.trimIndent()
+
+        val client = createMockClient { request ->
+            if (request.url.toString() == "https://auth.example.com/.well-known/oauth-authorization-server/as") {
+                respond(
+                    content = mockResponse,
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                respondError(HttpStatusCode.NotFound)
+            }
+        }
+
+        val resolver = IssuerMetadataResolver(client)
+        val metadata = resolver.resolveAuthorizationServerMetadata(asUrl)
+
+        assertEquals(asUrl, metadata.issuer)
+        assertEquals("$asUrl/token", metadata.tokenEndpoint)
+    }
+
 }
