@@ -17,6 +17,7 @@ import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.json.JsonElement
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -37,6 +38,7 @@ data class NativeWalletCredential(
 data class NativeWalletPresentationResult(
     val success: Boolean,
     val redirectTo: String?,
+    val verifierResponse: JsonElement? = null,
 )
 
 data class WalletAttestationConfig(
@@ -153,6 +155,7 @@ class NativeWalletClient(
         return NativeWalletPresentationResult(
             success = result.transmissionSuccess ?: false,
             redirectTo = result.redirectTo,
+            verifierResponse = result.verifierResponse,
         )
     }
 }
