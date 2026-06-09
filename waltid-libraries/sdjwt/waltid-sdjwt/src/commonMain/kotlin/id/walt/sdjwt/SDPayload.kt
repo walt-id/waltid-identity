@@ -65,7 +65,13 @@ data class SDPayload internal constructor(
         val state = WalkState(unconsumed = digestedDisclosures.toMutableMap())
         val resolved = walkObject(undisclosedPayload, select, state)
         if (state.unconsumed.isNotEmpty()) {
-            throw SDJwtVerificationException("${state.unconsumed.size} disclosure(s) not referenced by any digest")
+            // Include the unreferenced disclosure key(s) to aid diagnosis.
+            val keys = state.unconsumed.values.joinToString(", ") {
+                (it as? ObjectPropertyDisclosure)?.key ?: "<array-element>"
+            }
+            throw SDJwtVerificationException(
+                "${state.unconsumed.size} disclosure(s) not referenced by any digest (claims: $keys)"
+            )
         }
         return WalkResult(resolved, state.released)
     }
@@ -210,10 +216,8 @@ data class SDPayload internal constructor(
         /** Marker key inside an array element that names a digest. */
         internal const val ARRAY_ELEMENT_WRAPPER_KEY = "..."
 
-        val sha256 = SHA256()
-
         private fun digest(value: String): String {
-            val messageDigest = sha256.digest(value.encodeToByteArray())
+            val messageDigest = SHA256().digest(value.encodeToByteArray())
             return messageDigest.encodeToBase64Url()
         }
 
