@@ -38,6 +38,9 @@ class ConfiguredIssuanceSessionRepositoryTest {
         profileId = "profile-id",
         authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
         credentialConfigurationId = "identity_credential",
+        issuerKey = buildJsonObject {
+            put("type", "jwk")
+        },
         credentialData = buildJsonObject {
             put("given_name", "Jane")
             put("family_name", "Doe")
