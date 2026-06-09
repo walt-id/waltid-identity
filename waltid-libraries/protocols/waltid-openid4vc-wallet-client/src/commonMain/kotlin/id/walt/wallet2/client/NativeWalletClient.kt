@@ -19,7 +19,6 @@ import io.ktor.http.Url
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.JsonElement
 import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 
 data class NativeWalletBootstrapResult(
     val keyId: String,

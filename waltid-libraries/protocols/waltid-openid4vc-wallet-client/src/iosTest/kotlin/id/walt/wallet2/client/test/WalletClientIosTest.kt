@@ -1,6 +1,7 @@
 package id.walt.wallet2.client.test
 
 import id.walt.wallet2.client.MobileWalletClientFactory
+import id.walt.wallet2.client.MobileWalletConfig
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -15,6 +16,10 @@ import kotlin.test.assertTrue
  * Requires: iOS simulator (macOS CI runner).
  */
 class WalletClientIosTest {
+
+    companion object {
+        private const val TEST_WALLET_ID = "ios-test-wallet"
+    }
 
     @Test
     fun bootstrapCreatesKeyAndDid() = runTest {
@@ -50,6 +55,31 @@ class WalletClientIosTest {
         val transaction = EudiTestBackend.createVerifierTransaction()
         val presentResult = client.present(transaction.authorizationRequestUri, did = bootstrapResult.did)
         assertTrue(presentResult.success, "Presentation should succeed")
+
+        EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
+    }
+
+    @Test
+    fun credentialPersistsAcrossClientRecreation() = runTest {
+        val walletConfig = MobileWalletConfig(
+            walletId = TEST_WALLET_ID,
+            onEvent = { event -> println("WALLET EVENT: $event") },
+        )
+
+        val client1 = MobileWalletClientFactory().create(walletConfig)
+        val bootstrapResult = client1.bootstrap()
+
+        val offer = EudiTestBackend.generateOffer()
+        client1.receive(offer.offerUrl, txCode = offer.txCode)
+
+        val client2 = MobileWalletClientFactory().create(walletConfig)
+        val credentials = client2.credentials()
+        assertTrue(credentials.isNotEmpty(), "Credentials should persist across client recreation")
+
+        val credentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offer.offerUrl)
+        val transaction = EudiTestBackend.createVerifierTransaction(credentialId)
+        val presentResult = client2.present(transaction.authorizationRequestUri, did = bootstrapResult.did)
+        assertTrue(presentResult.success, "Should present from persisted credentials: credentials=$credentials, result=$presentResult")
 
         EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
     }
