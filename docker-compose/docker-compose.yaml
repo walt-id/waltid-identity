@@ -15,7 +15,6 @@ services:
       - .env
     extra_hosts:
       - "$SERVICE_HOST:host-gateway"
-      - "waltid.enterprise.localhost:host-gateway"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/data:/waltid-wallet-api/data
@@ -31,6 +30,8 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
@@ -45,6 +46,8 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
     environment:
@@ -61,9 +64,10 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
     volumes:
       - ./verifier-api2/config:/waltid-verifier-api2/config
-
 
   waltid-demo-wallet:
     image: ${IMAGE_PREFIX}waltid/waltid-demo-wallet:${VERSION_TAG:-latest}
