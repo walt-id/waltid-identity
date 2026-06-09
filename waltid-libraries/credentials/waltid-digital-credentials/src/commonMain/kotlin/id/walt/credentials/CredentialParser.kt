@@ -533,14 +533,38 @@ object CredentialParser {
                         }
                         detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to w3cCredential
                     } else {
-                        throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+                        throw NotImplementedError(unknownSdJwtReason(header, payload) + " Credential: $credential")
                     }
                 }
             }
 
             else -> {
-                throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+                throw NotImplementedError(unknownSdJwtReason(header, payload) + " Credential: $credential")
             }
+        }
+    }
+
+    /**
+     * Builds a human-readable reason explaining why an SD-JWT-signed credential could not be
+     * classified into a known credential type (SD-JWT VC or W3C VC). The token is signature-bearing
+     * SD-JWT, but its payload lacks the markers needed to identify what it is.
+     */
+    private fun unknownSdJwtReason(header: JsonObject, payload: JsonObject): String {
+        val typ = header["typ"]?.jsonPrimitive?.contentOrNull
+        val looksLikeSdJwtVc = typ == "dc+sd-jwt" || typ == "vc+sd-jwt" || typ == "vc+sd_jwt"
+        return when {
+            // Clearly intended as an SD-JWT VC (by typ) but missing the mandatory vct claim.
+            looksLikeSdJwtVc && !payload.containsKey("vct") ->
+                "Unknown SD-JWT-signed credential: typ is '$typ' (SD-JWT VC) but the mandatory 'vct' " +
+                        "claim is missing (SD-JWT VC requires 'vct'"
+            // No vct, no @context, no vc wrapper -> cannot be classified as SD-JWT VC or W3C VC.
+            !payload.containsKey("vct") && !payload.containsKey("@context") && !payload.containsKey("vc") ->
+                "Unknown SD-JWT-signed credential: payload has neither a 'vct' claim (SD-JWT VC) nor " +
+                        "'@context'/'vc' (W3C VC), so the credential type cannot be determined" +
+                        (typ?.let { " (typ='$it')" } ?: "") + "."
+            else ->
+                "Unknown SD-JWT-signed credential: could not determine the credential type from the " +
+                        "payload" + (typ?.let { " (typ='$it')" } ?: "") + "."
         }
     }
 
