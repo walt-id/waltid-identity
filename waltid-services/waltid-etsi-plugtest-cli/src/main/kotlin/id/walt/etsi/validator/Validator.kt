@@ -20,6 +20,7 @@ import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.time.Instant
 import java.time.format.DateTimeFormatter
@@ -212,13 +213,13 @@ object CredentialValidator {
         )
     }
 
-    suspend fun validate(vendorFile: VendorFile): ValidationResult {
+    suspend fun validate(vendorFile: VendorFile, schemaResolver: SchemaResolver? = null): ValidationResult {
         val verifiedAt = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
         val hash = computeSha1Hash(vendorFile.content)
 
         return try {
             when (vendorFile.format) {
-                VendorFile.FileFormat.SD_JWT_VC -> validateSdJwtVc(vendorFile, verifiedAt, hash)
+                VendorFile.FileFormat.SD_JWT_VC -> validateSdJwtVc(vendorFile, verifiedAt, hash, schemaResolver)
                 VendorFile.FileFormat.MDOC -> validateMdoc(vendorFile, verifiedAt, hash)
             }
         } catch (e: UnreachableDisclosuresException) {
@@ -262,7 +263,8 @@ object CredentialValidator {
     private suspend fun validateSdJwtVc(
         vendorFile: VendorFile,
         verifiedAt: String,
-        hash: String
+        hash: String,
+        schemaResolver: SchemaResolver? = null
     ): ValidationResult {
         val sdJwtString = vendorFile.content.decodeToString().trim()
 
@@ -319,6 +321,24 @@ object CredentialValidator {
         val etsiStatus = if (etsiResult.isSuccess) ValidationResult.ValidationStatus.VALID
                          else ValidationResult.ValidationStatus.INVALID
         policyResults += policyResult(etsiSdJwtVcPolicy.id, etsiResult, etsiStatus)
+
+        // --- JSON Schema policy (offline, vct -> Type Metadata schema_url -> local SCHEMA file) ---
+        // Only runs when a schema can be resolved for the credential's vct; otherwise SKIPPED (no
+        // published schema for many vcts, e.g. our own urn:etsi:eaa:credential). Uses the shared
+        // waltid JsonSchemaPolicy so the same schema-validation logic is used everywhere.
+        if (schemaResolver != null) {
+            val vct = runCatching { credential.credentialData["vct"]?.jsonPrimitive?.content }.getOrNull()
+            val schema = schemaResolver.resolveSchemaForVct(vct)
+            if (schema != null) {
+                val schemaPolicy = JsonSchemaPolicy(schema = schema)
+                val schemaResult = runCatching { schemaPolicy.verify(credential, context) }.getOrElse { Result.failure(it) }
+                val schemaStatus = if (schemaResult.isSuccess) ValidationResult.ValidationStatus.VALID
+                                   else ValidationResult.ValidationStatus.INVALID
+                policyResults += policyResult(schemaPolicy.id, schemaResult, schemaStatus)
+            } else {
+                log.debug { "No schema resolved for vct '$vct' (${vendorFile.fileName}); schema check skipped" }
+            }
+        }
 
         // Overall signatureStatus: INVALID if any mandatory policy fails, VALID only if all pass.
         // Expiration and not-before are mandatory validity checks — a failed credential MUST be rejected.
