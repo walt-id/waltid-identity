@@ -1,0 +1,6 @@
+{
+  "vct": "urn:example:eaa:medical_license:1",
+  "name": "Medical License EAA",
+  "description": "Medical License qualified EAA (SD-JWT VC).",
+  "schema_url": "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/schemas/medical-license-eaa-v1.schema.json"
+}
