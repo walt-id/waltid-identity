@@ -18,10 +18,10 @@ import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
-import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
-import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.appendArrayIndex
 import id.walt.credentials.utils.SdJwtUtils.appendClaimName
+import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
+import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -404,8 +404,8 @@ object CredentialParser {
             if (availableDisclosures.size != mappedDisclosures.size) {
                 throw UnreachableDisclosuresException(
                     "Invalid disclosures: ${availableDisclosures.size} disclosures provided but " +
-                    "only ${mappedDisclosures.size} are reachable from the payload hashes. " +
-                    "Per RFC 9901 §7.1 step 5 this SD-JWT MUST be rejected."
+                            "only ${mappedDisclosures.size} are reachable from the payload hashes. " +
+                            "Per RFC 9901 §7.1 step 5 this SD-JWT MUST be rejected."
                 )
             }
             availableDisclosures = mappedDisclosures.toList()
@@ -555,16 +555,14 @@ object CredentialParser {
         return when {
             // Clearly intended as an SD-JWT VC (by typ) but missing the mandatory vct claim.
             looksLikeSdJwtVc && !payload.containsKey("vct") ->
-                "Unknown SD-JWT-signed credential: typ is '$typ' (SD-JWT VC) but the mandatory 'vct' " +
-                        "claim is missing (SD-JWT VC requires 'vct'"
+                "Unknown SD-JWT-signed credential: typ is '$typ' (SD-JWT VC) but the mandatory 'vct' claim is missing (SD-JWT VC requires 'vct')."
+
             // No vct, no @context, no vc wrapper -> cannot be classified as SD-JWT VC or W3C VC.
             !payload.containsKey("vct") && !payload.containsKey("@context") && !payload.containsKey("vc") ->
-                "Unknown SD-JWT-signed credential: payload has neither a 'vct' claim (SD-JWT VC) nor " +
-                        "'@context'/'vc' (W3C VC), so the credential type cannot be determined" +
-                        (typ?.let { " (typ='$it')" } ?: "") + "."
+                "Unknown SD-JWT-signed credential: payload has neither a 'vct' claim (SD-JWT VC) nor '@context'/'vc' (W3C VC), so the credential type cannot be determined.${typ?.let { " (typ='$it')" } ?: ""}."
+
             else ->
-                "Unknown SD-JWT-signed credential: could not determine the credential type from the " +
-                        "payload" + (typ?.let { " (typ='$it')" } ?: "") + "."
+                "Unknown SD-JWT-signed credential: could not determine the credential type from the payload${typ?.let { " (typ='$it')" } ?: ""}."
         }
     }
 
