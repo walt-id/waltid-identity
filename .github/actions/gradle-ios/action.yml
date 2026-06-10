@@ -43,3 +43,14 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:iosSimulatorArm64Test --info
+
+    - name: Execute iOS demo app unit tests
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
+      shell: bash
+      run: |
+        xcodebuild test \
+          -workspace iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+          -only-testing:iosAppTests \
+          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
