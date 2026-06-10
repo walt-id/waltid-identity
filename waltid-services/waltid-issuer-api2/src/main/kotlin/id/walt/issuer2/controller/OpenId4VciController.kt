@@ -59,6 +59,11 @@ class OpenId4VciController(
                 )
             }
 
+            post("par", OpenId4VciRoutesDocs.pushedAuthorizationRequest()) {
+                val response = protocolService.processPushedAuthorizationRequest(call.receiveParameters().toMap())
+                call.respond(HttpStatusCode.fromValue(response.status), response.payload)
+            }
+
             get("authorize", OpenId4VciRoutesDocs.authorize()) {
                 val response = protocolService.processAuthorizeRequest(call.parameters.toMap())
                 response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }

@@ -56,6 +56,7 @@ class MetadataService(
     fun getAuthorizationServerMetadata(): AuthorizationServerMetadata =
         AuthorizationServerMetadata.fromBaseUrl(
             baseUrl = baseUrl,
+            pushedAuthorizationRequestEndpointPath = "/par",
         )
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
