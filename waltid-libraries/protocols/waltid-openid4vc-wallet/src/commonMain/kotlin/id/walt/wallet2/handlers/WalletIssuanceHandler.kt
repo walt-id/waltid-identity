@@ -166,8 +166,8 @@ data class RequestTokenRequest(
 @Serializable
 data class RequestTokenResult(
     val accessToken: String,
-    val cNonce: String?,
-    val expiresIn: Long?
+    val cNonce: String? = null,
+    val expiresIn: Long? = null
 )
 
 @Serializable
@@ -238,7 +238,7 @@ data class GenerateAuthorizationUrlRequest(
 data class GenerateAuthorizationUrlResult(
     val authorizationUrl: Url,
     val state: String,
-    val codeVerifier: String?,
+    val codeVerifier: String? = null,
     val credentialConfigurationId: String
 )
 
@@ -312,11 +312,22 @@ object WalletIssuanceHandler {
         // 1. Parse and resolve offer
         val offerString = request.getEffectiveOfferString()
         log.trace { "Parsing offer string: ${offerString.take(120)}..." }
-        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
-        val offer = CredentialOfferResolver(httpClient).resolveCredentialOffer(
-            credentialOffer = offerRequest.credentialOffer,
-            credentialOfferUri = offerRequest.credentialOfferUri
-        )
+        // When offerJson is provided it's already the raw JSON object — decode directly instead of
+        // parsing as a URL (which would fail since JSON is not a valid openid-credential-offer:// URL).
+        val offer = if (request.offerJson != null) {
+            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = inlineOffer,
+                credentialOfferUri = null
+            )
+        } else {
+            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = offerRequest.credentialOffer,
+                credentialOfferUri = offerRequest.credentialOfferUri
+            )
+        }
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
 
@@ -469,11 +480,18 @@ object WalletIssuanceHandler {
 
     suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult {
         val httpClient = defaultHttpClient()
-        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(request.getEffectiveOfferString())
-        val offer = CredentialOfferResolver(httpClient).resolveCredentialOffer(
-            credentialOffer = offerRequest.credentialOffer,
-            credentialOfferUri = offerRequest.credentialOfferUri
-        )
+        val offerString = request.getEffectiveOfferString()
+        val offer = if (request.offerJson != null) {
+            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
+        } else {
+            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = offerRequest.credentialOffer,
+                credentialOfferUri = offerRequest.credentialOfferUri
+            )
+        }
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolveOfferResult(
@@ -578,11 +596,17 @@ object WalletIssuanceHandler {
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult {
         val httpClient = defaultHttpClient()
         val offerString = request.getEffectiveOfferString()
-        val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
-        val offer = CredentialOfferResolver(httpClient).resolveCredentialOffer(
-            credentialOffer = offerRequest.credentialOffer,
-            credentialOfferUri = offerRequest.credentialOfferUri
-        )
+        val offer = if (request.offerJson != null) {
+            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
+        } else {
+            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(
+                credentialOffer = offerRequest.credentialOffer,
+                credentialOfferUri = offerRequest.credentialOfferUri
+            )
+        }
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata = IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
 
