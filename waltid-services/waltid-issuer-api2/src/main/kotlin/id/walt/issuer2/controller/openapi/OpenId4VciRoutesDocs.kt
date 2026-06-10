@@ -79,6 +79,25 @@ object OpenId4VciRoutesDocs {
         }
     }
 
+    fun pushedAuthorizationRequest(): RouteConfig.() -> Unit = {
+        summary = "Pushed Authorization Request (PAR)"
+        description = "RFC 9126 PAR endpoint: submit authorization parameters and receive a request_uri."
+        request {
+            body<Map<String, List<String>>> {
+                description = "Authorization request parameters (form-encoded)"
+            }
+        }
+        response {
+            HttpStatusCode.Created to {
+                description = "PAR response with request_uri"
+                body<JsonObject>()
+            }
+            HttpStatusCode.BadRequest to {
+                description = "Invalid PAR request"
+            }
+        }
+    }
+
     fun authorize(): RouteConfig.() -> Unit = {
         summary = "Authorization endpoint"
         description = "The authorization endpoint"

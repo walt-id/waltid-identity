@@ -19,6 +19,9 @@ import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.core.DefaultPARProvider
+import id.walt.openid4vci.repository.par.InMemoryPARRepository
+import id.walt.openid4vci.requests.par.PushedAuthorizationRequest
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
@@ -67,20 +70,90 @@ class OpenId4VciProtocolService(
         explicitNulls = false
     }
 
+    // PAR provider with in-memory repository (suitable for OSS single-instance)
+    private val parRepository = InMemoryPARRepository()
+    private val parProvider = DefaultPARProvider(parRepository)
+
+    /**
+     * Process Pushed Authorization Request (RFC 9126)
+     */
+    suspend fun processPushedAuthorizationRequest(parameters: Map<String, List<String>>): AccessTokenResponseHttp {
+        return try {
+            val parRequest = PushedAuthorizationRequest.fromParameters(parameters)
+            val parResponse = parProvider.processPushedAuthorizationRequest(parRequest)
+
+            AccessTokenResponseHttp(
+                status = 201, // Created
+                payload = json.encodeToJsonElement(parResponse).jsonObject,
+                headers = emptyMap(),
+            )
+        } catch (e: IllegalArgumentException) {
+            // Validation error
+            val error = OAuthError(
+                error = OAuthErrorCodes.INVALID_REQUEST,
+                description = e.message
+            )
+            AccessTokenResponseHttp(
+                status = 400,
+                payload = json.encodeToJsonElement(error).jsonObject,
+                headers = emptyMap(),
+            )
+        } catch (e: Exception) {
+            // Server error
+            val error = OAuthError(
+                error = OAuthErrorCodes.SERVER_ERROR,
+                description = "PAR processing failed: ${e.message}"
+            )
+            AccessTokenResponseHttp(
+                status = 500,
+                payload = json.encodeToJsonElement(error).jsonObject,
+                headers = emptyMap(),
+            )
+        }
+    }
+
     suspend fun processAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizationResponseHttp {
-        val authorizationRequest = when (val result = oauth2Provider.createAuthorizationRequest(parameters)) {
+        // RFC 9126 §2.3: Check for request_uri and resolve PAR if present
+        val resolvedParameters = parameters["request_uri"]?.firstOrNull()?.let { requestUri ->
+            val clientId = parameters["client_id"]?.firstOrNull()
+                ?: return oauth2Provider.writeAuthorizationError(
+                    OAuthError(
+                        error = OAuthErrorCodes.INVALID_REQUEST,
+                        description = "client_id is required when using request_uri"
+                    )
+                )
+            
+            try {
+                parProvider.resolveRequestUri(requestUri, clientId)
+                    ?: return oauth2Provider.writeAuthorizationError(
+                        OAuthError(
+                            error = OAuthErrorCodes.INVALID_REQUEST,
+                            description = "request_uri is invalid, expired, or already consumed"
+                        )
+                    )
+            } catch (e: IllegalArgumentException) {
+                return oauth2Provider.writeAuthorizationError(
+                    OAuthError(
+                        error = OAuthErrorCodes.INVALID_REQUEST,
+                        description = e.message
+                    )
+                )
+            }
+        } ?: parameters
+
+        val authorizationRequest = when (val result = oauth2Provider.createAuthorizationRequest(resolvedParameters)) {
             is AuthorizationRequestResult.Success -> result.request
             is AuthorizationRequestResult.Failure -> return oauth2Provider.writeAuthorizationError(result.error)
         }
 
         val issuanceSession = try {
-            resolveAuthorizationSession(authorizationRequest, parameters)
+            resolveAuthorizationSession(authorizationRequest, resolvedParameters)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
         }
-        val internalAuthorizationRequest = parameters.withInternalAuthorizationSession(issuanceSession.sessionId)
+        val internalAuthorizationRequest = resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
 
         val redirectUri = "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"
         return AuthorizationResponseHttp(
