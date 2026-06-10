@@ -77,7 +77,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
 spec:
-  storageClassName: azure-managed-standardssd-retain
+  storageClassName: gp3-retain
   accessModes:
     - ReadWriteOnce
   resources:

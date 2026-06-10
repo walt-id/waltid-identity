@@ -40,7 +40,7 @@ web-wallet:
   pvc:
     dataVolumeClaim:
       accessMode: ReadWriteOnce
-      storageClass: azure-managed-standardssd-retain
+      storageClass: gp3-retain
       storageRequest: 1Gi
   walletConfig:
     oidcConf: |-

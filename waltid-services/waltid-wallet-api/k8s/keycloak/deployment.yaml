@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: keycloak-data-volume-claim
 spec:
-  storageClassName: azure-managed-standardssd-retain
+  storageClassName: gp3-retain
   accessModes:
     - ReadWriteOnce
   resources:
