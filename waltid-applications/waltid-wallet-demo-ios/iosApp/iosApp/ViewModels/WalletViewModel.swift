@@ -65,7 +65,7 @@ class WalletViewModel: ObservableObject {
         setLoading("Presenting credential...")
         Task {
             do {
-                let result = try await controller.presentCredential(requestUrl: presentationRequestUrl)
+                let result = try await controller.presentCredential(requestUrl: presentationRequestUrl, did: nil)
                 await MainActor.run {
                     self.setSuccess(result.message)
                 }
