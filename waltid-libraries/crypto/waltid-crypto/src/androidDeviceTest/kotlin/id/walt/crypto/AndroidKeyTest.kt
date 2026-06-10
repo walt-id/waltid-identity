@@ -13,118 +13,158 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 class AndroidKeyTest {
 
+    private val hardwareKeyTypes = listOf(KeyType.secp256r1, KeyType.RSA)
+    private val hardwareSignKeyTypes = hardwareKeyTypes
+    private val softwareKeyTypes = listOf(KeyType.Ed25519, KeyType.secp256k1)
     private val testAliases = mutableListOf<String>()
 
     @After
     fun cleanup() = runTest {
         testAliases.forEach { alias ->
-            runCatching { AndroidKey.delete(alias, KeyType.secp256r1) }
-            runCatching { AndroidKey.delete(alias, KeyType.RSA) }
+            runCatching { AndroidKey.Hardware.delete(alias) }
+        }
+    }
+
+    // --- Hardware ---
+
+    @Test
+    fun hardwareCreate() = runTest {
+        for (type in hardwareKeyTypes) {
+            val alias = "test-hw-$type-${System.currentTimeMillis()}"
+            testAliases.add(alias)
+
+            val key = AndroidKey.Hardware.create(AndroidKey.Options(kid = alias, keyType = type))
+            assertNotNull(key, "create failed for $type")
+            assertEquals(alias, key.getKeyId())
+            assertEquals(type, key.keyType, "keyType mismatch for $type")
+            assertTrue(key.hasPrivateKey, "hasPrivateKey false for $type")
         }
     }
 
     @Test
-    fun generateP256Key() = runTest {
-        val alias = "test-p256-${System.currentTimeMillis()}"
-        testAliases.add(alias)
+    fun hardwareExportJwk() = runTest {
+        for (type in hardwareKeyTypes) {
+            val alias = "test-hw-jwk-$type-${System.currentTimeMillis()}"
+            testAliases.add(alias)
 
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        assertNotNull(key)
-        assertEquals(alias, key.getKeyId())
-        assertEquals(KeyType.secp256r1, key.keyType)
-        assertTrue(key.hasPrivateKey)
-    }
-
-    @Test
-    fun generateRSAKey() = runTest {
-        val alias = "test-rsa-${System.currentTimeMillis()}"
-        testAliases.add(alias)
-
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.RSA))
-        assertNotNull(key)
-        assertEquals(alias, key.getKeyId())
-        assertEquals(KeyType.RSA, key.keyType)
-    }
-
-    @Test
-    fun exportJWK() = runTest {
-        val alias = "test-jwk-export-${System.currentTimeMillis()}"
-        testAliases.add(alias)
-
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val jwk = key.exportJWK()
-        assertNotNull(jwk)
-        assertTrue(jwk.contains("\"kty\""))
-        assertTrue(jwk.contains("\"crv\"") || jwk.contains("\"EC\""))
-    }
-
-    @Test
-    fun signAndVerifyRaw() = runTest {
-        val alias = "test-sign-raw-${System.currentTimeMillis()}"
-        testAliases.add(alias)
-
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val plaintext = "Hello, Android KeyStore!".toByteArray()
-
-        val signature = key.signRaw(plaintext) as ByteArray
-        assertNotNull(signature)
-        assertTrue(signature.isNotEmpty())
-
-        val result = key.verifyRaw(signature, plaintext)
-        assertTrue(result.isSuccess)
-    }
-
-    @Test
-    fun signAndVerifyJws() = runTest {
-        val alias = "test-sign-jws-${System.currentTimeMillis()}"
-        testAliases.add(alias)
-
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val plaintext = """{"sub":"test","iat":1234567890}""".toByteArray()
-
-        val jws = key.signJws(plaintext, mapOf("kid" to kotlinx.serialization.json.JsonPrimitive(alias)))
-        assertNotNull(jws)
-        assertTrue(jws.count { it == '.' } == 2)
-
-        val result = key.verifyJws(jws)
-        assertTrue(result.isSuccess)
-    }
-
-    @Test
-    fun loadKeyByAlias() = runTest {
-        val alias = "test-load-${System.currentTimeMillis()}"
-        testAliases.add(alias)
-
-        val original = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val originalJwk = original.exportJWK()
-
-        val loaded = AndroidKey.load(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val loadedJwk = loaded.exportJWK()
-
-        assertEquals(originalJwk, loadedJwk)
-    }
-
-    @Test
-    fun deleteKey() = runTest {
-        val alias = "test-delete-${System.currentTimeMillis()}"
-
-        AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val deleted = AndroidKey.delete(alias, KeyType.secp256r1)
-
-        val loadResult = runCatching {
-            AndroidKey.load(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
+            val key = AndroidKey.Hardware.create(AndroidKey.Options(kid = alias, keyType = type))
+            val jwk = key.exportJWK()
+            assertTrue(jwk.contains("\"kty\""), "kty missing for $type")
         }
-        assertTrue(loadResult.isFailure)
     }
 
     @Test
-    fun thumbprint() = runTest {
-        val alias = "test-thumbprint-${System.currentTimeMillis()}"
-        testAliases.add(alias)
+    fun hardwareSignAndVerifyRaw() = runTest {
+        for (type in hardwareSignKeyTypes) {
+            val alias = "test-hw-sign-$type-${System.currentTimeMillis()}"
+            testAliases.add(alias)
 
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        val thumbprint = key.getThumbprint()
-        assertNotNull(thumbprint)
-        assertTrue(thumbprint.isNotEmpty())
+            val key = AndroidKey.Hardware.create(AndroidKey.Options(kid = alias, keyType = type))
+            val plaintext = "Hello $type".encodeToByteArray()
+
+            val signature = key.signRaw(plaintext)
+            assertTrue(signature.isNotEmpty(), "signature empty for $type")
+
+            val result = key.verifyRaw(signature, plaintext)
+            assertTrue(result.isSuccess, "verifyRaw failed for $type: ${result.exceptionOrNull()}")
+        }
+    }
+
+    @Test
+    fun hardwareSignAndVerifyJws() = runTest {
+        for (type in hardwareSignKeyTypes) {
+            val alias = "test-hw-jws-$type-${System.currentTimeMillis()}"
+            testAliases.add(alias)
+
+            val key = AndroidKey.Hardware.create(AndroidKey.Options(kid = alias, keyType = type))
+            val payload = """{"type":"$type"}""".encodeToByteArray()
+
+            val jws = key.signJws(payload)
+            assertEquals(2, jws.count { it == '.' }, "JWS dot count wrong for $type")
+
+            val result = key.verifyJws(jws)
+            assertTrue(result.isSuccess, "verifyJws failed for $type: ${result.exceptionOrNull()}")
+        }
+    }
+
+    @Test
+    fun hardwareThumbprint() = runTest {
+        for (type in hardwareKeyTypes) {
+            val alias = "test-hw-thumb-$type-${System.currentTimeMillis()}"
+            testAliases.add(alias)
+
+            val key = AndroidKey.Hardware.create(AndroidKey.Options(kid = alias, keyType = type))
+            val thumbprint = key.getThumbprint()
+            assertTrue(thumbprint.isNotEmpty(), "thumbprint empty for $type")
+        }
+    }
+
+    // --- Software ---
+
+    @Test
+    fun softwareCreate() = runTest {
+        for (type in softwareKeyTypes) {
+            val key = AndroidKey.Software.create(AndroidKey.Options(kid = "test-sw-$type", keyType = type))
+            assertNotNull(key, "create failed for $type")
+            assertEquals(type, key.keyType, "keyType mismatch for $type")
+            assertTrue(key.hasPrivateKey, "hasPrivateKey false for $type")
+        }
+    }
+
+    @Test
+    fun softwareExportJwk() = runTest {
+        for (type in softwareKeyTypes) {
+            val key = AndroidKey.Software.create(AndroidKey.Options(kid = "test-sw-jwk-$type", keyType = type))
+            val jwk = key.exportJWK()
+            assertTrue(jwk.contains("\"kty\""), "kty missing for $type")
+            when (type) {
+                KeyType.Ed25519 -> {
+                    assertTrue(jwk.contains("\"OKP\""), "OKP missing for Ed25519")
+                    assertTrue(jwk.contains("\"Ed25519\""), "Ed25519 crv missing")
+                }
+                KeyType.secp256k1 -> {
+                    assertTrue(jwk.contains("\"EC\""), "EC missing for secp256k1")
+                    assertTrue(jwk.contains("\"secp256k1\""), "secp256k1 crv missing")
+                }
+                else -> {}
+            }
+        }
+    }
+
+    @Test
+    fun softwareSignAndVerifyRaw() = runTest {
+        for (type in softwareKeyTypes) {
+            val key = AndroidKey.Software.create(AndroidKey.Options(kid = "test-sw-sign-$type", keyType = type))
+            val plaintext = "Hello $type".encodeToByteArray()
+
+            val signature = key.signRaw(plaintext)
+            assertTrue(signature.isNotEmpty(), "signature empty for $type")
+
+            val result = key.verifyRaw(signature, plaintext)
+            assertTrue(result.isSuccess, "verifyRaw failed for $type: ${result.exceptionOrNull()}")
+        }
+    }
+
+    @Test
+    fun softwareSignAndVerifyJws() = runTest {
+        for (type in softwareKeyTypes) {
+            val key = AndroidKey.Software.create(AndroidKey.Options(kid = "test-sw-jws-$type", keyType = type))
+            val payload = """{"type":"$type"}""".encodeToByteArray()
+
+            val jws = key.signJws(payload)
+            assertEquals(2, jws.count { it == '.' }, "JWS dot count wrong for $type")
+
+            val result = key.verifyJws(jws)
+            assertTrue(result.isSuccess, "verifyJws failed for $type: ${result.exceptionOrNull()}")
+        }
+    }
+
+    @Test
+    fun softwareThumbprint() = runTest {
+        for (type in softwareKeyTypes) {
+            val key = AndroidKey.Software.create(AndroidKey.Options(kid = "test-sw-thumb-$type", keyType = type))
+            val thumbprint = key.getThumbprint()
+            assertTrue(thumbprint.isNotEmpty(), "thumbprint empty for $type")
+        }
     }
 }

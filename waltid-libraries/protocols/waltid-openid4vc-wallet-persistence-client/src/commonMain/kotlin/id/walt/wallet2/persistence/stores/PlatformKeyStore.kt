@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlin.time.Clock
 
-class HardwareKeyStore(
+class PlatformKeyStore(
     private val keyProvider: PlatformKeyProvider,
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {
@@ -18,7 +18,13 @@ class HardwareKeyStore(
     override suspend fun getKey(keyId: String): Key? {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         val keyType = KeyType.valueOf(ref.key_type)
-        return keyProvider.loadKey(keyId, keyType)
+        return if (ref.is_hardware_backed == 1L) {
+            keyProvider.loadKey(keyId, keyType)
+        } else {
+            val material = ref.key_material?.encodeToByteArray()
+                ?: error("Software key '$keyId' has no stored key material")
+            keyProvider.loadSoftwareKey(keyId, keyType, material)
+        }
     }
 
     override suspend fun listKeys(): Flow<WalletKeyInfo> = flow {
@@ -29,11 +35,15 @@ class HardwareKeyStore(
 
     override suspend fun addKey(key: Key): String {
         val keyId = key.getKeyId()
+        val isHardware = keyProvider.isHardwareBacked(key.keyType)
+        val material = if (!isHardware) keyProvider.exportSoftwareKeyMaterial(key) else null
+
         queries.insert(
             key_id = keyId,
             key_type = key.keyType.name,
             created_at = Clock.System.now().toEpochMilliseconds(),
-            is_hardware_backed = 1L,
+            is_hardware_backed = if (isHardware) 1L else 0L,
+            key_material = material?.decodeToString(),
         )
         return keyId
     }
