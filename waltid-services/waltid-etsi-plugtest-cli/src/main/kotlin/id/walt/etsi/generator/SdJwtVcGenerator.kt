@@ -325,7 +325,7 @@ object SdJwtVcGenerator {
                                 existingKeys.remove("issuing_country")
                                 log.debug { "Omitting issuing_country; qualified certificate carries it (EAA-5.2.4.1-07)" }
                             } else {
-                                put("issuing_country", "DE")
+                                put("issuing_country", "AT")
                             }
                         }
                         // EAA-5.2.4.1-11 / QEAA-5.2.4.2-03 / PuB-EAA-5.2.4.3-03: the registration
@@ -343,7 +343,7 @@ object SdJwtVcGenerator {
                             }
                         }
                         cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
-                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
+                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "AT")
                         cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                         cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
                         // EAA-5.2.10.1: status SHALL be a JSON object (ETSI flat shape
@@ -436,7 +436,7 @@ object SdJwtVcGenerator {
                     existingKeys.add("issuing_authority")
                 }
                 if (!existingKeys.contains("issuing_country")) {
-                    put("issuing_country", "DE")
+                    put("issuing_country", "AT")
                     existingKeys.add("issuing_country")
                 }
                 if (!existingKeys.contains("iss_reg_id")) {
@@ -458,7 +458,7 @@ object SdJwtVcGenerator {
             // Common to all three schemas: issuing_authority, issuing_country (ISO 3166-1 alpha-2),
             // expiry_date (RFC 3339 full-date). issuing_authority/country may already be present.
             putIfAbsent("issuing_authority", JsonPrimitive("ETSI Test Authority"))
-            putIfAbsent("issuing_country", JsonPrimitive("DE"))
+            putIfAbsent("issuing_country", JsonPrimitive("AT"))
             putIfAbsent("expiry_date", JsonPrimitive("2030-01-01"))
 
             when (vct) {
