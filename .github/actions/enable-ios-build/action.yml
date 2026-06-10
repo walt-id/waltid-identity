@@ -31,13 +31,6 @@ runs:
           echo "Added enableIosBuild property"
         fi
 
-        # Add Kotlin compiler strategy for CI to avoid daemon hang
-        # (Kotlin compiler daemon hangs on GitHub Actions macOS runners)
-        if ! grep -q "kotlin.compiler.execution.strategy" "$GRADLE_PROPS"; then
-          echo "kotlin.compiler.execution.strategy=in-process" >> "$GRADLE_PROPS"
-          echo "Added kotlin.compiler.execution.strategy=in-process for CI"
-        fi
-
         # Verify the change
         if grep -q "enableIosBuild=true" "$GRADLE_PROPS"; then
           echo "✅ iOS build successfully enabled"
