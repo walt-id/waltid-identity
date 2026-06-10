@@ -18,7 +18,11 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew podInstall --info
+        # Kill any existing daemons to start fresh
+        ./gradlew --stop || true
+        # Run with debug output to diagnose hang
+        ./gradlew podInstall --debug --stacktrace 2>&1 | tee podInstall.log
+        # If it hangs, at least we'll have logs up to that point
 
     - name: Build iOS simulator frameworks (ARM64)
       working-directory: ${{ inputs.waltid-directory }}
