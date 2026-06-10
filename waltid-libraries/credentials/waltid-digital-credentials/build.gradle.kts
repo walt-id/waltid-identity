@@ -46,14 +46,14 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
         jvmMain.dependencies {
             // Ktor client
             // implementation("io.ktor:ktor-client-okhttp:$ktor_version")
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation("org.slf4j:slf4j-simple:2.0.18")
 
             implementation(identityLibs.junit.jupiter.api)
             implementation(identityLibs.junit.jupiter.params)

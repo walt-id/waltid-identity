@@ -62,7 +62,7 @@ dependencies {
     implementation(identityLibs.bouncycastle.pkix)
 
     // Argon2
-    implementation("de.mkammerer:argon2-jvm:2.11")
+    implementation("de.mkammerer:argon2-jvm:2.12")
 
 
     // walt.id
@@ -103,14 +103,14 @@ dependencies {
     }*/ // Not implemented right now
 
     // DB
-    val exposedVersion = "1.0.0-rc-1"
+    val exposedVersion = "1.3.0"
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-dao:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-json:$exposedVersion")
     // drivers
-    implementation("org.xerial:sqlite-jdbc:3.53.1.0")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
     implementation("org.postgresql:postgresql:42.7.11")
     implementation("com.mysql:mysql-connector-j:9.7.0")
     implementation("com.microsoft.sqlserver:mssql-jdbc:13.4.0.jre11")
@@ -136,9 +136,9 @@ dependencies {
     testImplementation(identityLibs.junit.jupiter.api)
     testImplementation(identityLibs.junit.jupiter.params)
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation(identityLibs.ktor.server.test.host)
-    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation("io.mockk:mockk:1.14.11")
     testImplementation(identityLibs.klogging)
 }
 

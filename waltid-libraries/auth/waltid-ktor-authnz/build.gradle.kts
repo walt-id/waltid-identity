@@ -8,21 +8,21 @@ group = "id.walt"
 dependencies {
     // Auth methods
     // Core Web3j library
-    implementation("org.web3j:core:5.0.2")
+    implementation("org.web3j:core:5.0.3")
 
     // Optional: Web3j utils
-    implementation("org.web3j:utils:5.0.2")
+    implementation("org.web3j:utils:5.0.3")
 
 
     // RADIUS
     implementation("org.aaa4j.radius:aaa4j-radius-client:0.4.0")
 
     // LDAP
-    implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {
+    implementation("org.apache.directory.api:apache-ldap-api:2.1.8") {
         exclude("org.apache.mina:mina-core") // Manually updated due to security CVE
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
-    implementation("org.apache.mina:mina-core:2.2.6")
+    implementation("org.apache.mina:mina-core:2.2.8")
     implementation("org.apache.commons:commons-lang3:3.20.0")
 
     // TOTP/HOTP

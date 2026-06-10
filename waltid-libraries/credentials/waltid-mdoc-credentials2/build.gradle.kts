@@ -27,7 +27,7 @@ kotlin {
             implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Crypto
@@ -44,10 +44,10 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation("org.slf4j:slf4j-simple:2.0.18")
             implementation(project(":waltid-libraries:credentials:waltid-verification-policies2-vp"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:protocols:waltid-openid4vp"))

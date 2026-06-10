@@ -17,7 +17,7 @@ dependencies {
 
     // Testing
     implementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     implementation(identityLibs.ktor.client.java)
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.serialization.kotlinx.json)
