@@ -1,33 +1,39 @@
 package id.walt.crypto.keys.jwk
 
+import at.asitplus.signum.indispensable.CryptoPublicKey
+import at.asitplus.signum.indispensable.CryptoSignature
+import at.asitplus.signum.indispensable.ECCurve
+import at.asitplus.signum.indispensable.SignatureAlgorithm
+import at.asitplus.signum.indispensable.josef.JsonWebKey
+import at.asitplus.signum.indispensable.josef.JweAlgorithm
+import at.asitplus.signum.indispensable.pki.X509Certificate
+import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
+import at.asitplus.signum.indispensable.josef.JwsAlgorithm
+import at.asitplus.signum.indispensable.josef.JwsCompact
+import at.asitplus.signum.indispensable.josef.JwsHeader
+import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
+import at.asitplus.signum.indispensable.josef.toJsonWebKey
+import at.asitplus.signum.supreme.SignatureResult
+import at.asitplus.signum.supreme.os.IosKeychainProvider
+import at.asitplus.signum.supreme.sign.SignatureInput
+import at.asitplus.signum.supreme.sign.Signer
+import at.asitplus.signum.supreme.sign.verifierFor
+import at.asitplus.signum.supreme.symmetric.decrypt
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonObject
-import id.walt.target.ios.keys.Ed25519
-import id.walt.target.ios.keys.JweEncryption
-import id.walt.target.ios.keys.P256
-import id.walt.target.ios.keys.RSA
-import id.walt.target.ios.keys.toNSData
-import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.usePinned
+import id.walt.crypto.utils.JweEncryptionHelper
+import id.walt.crypto.utils.keyFromIntermediate
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import platform.Foundation.CFBridgingRelease
-import platform.Foundation.CFBridgingRetain
-import platform.Foundation.NSData
-import platform.Foundation.create
-import platform.Security.SecCertificateCopyKey
-import platform.Security.SecCertificateCreateWithData
-import platform.Security.SecKeyCopyExternalRepresentation
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 actual class JWKKey actual constructor(private val jwk: String?, private val _keyId: String?) : Key() {
 
@@ -52,91 +58,130 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         return _keyId ?: _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
     }
 
-
-    actual override suspend fun getThumbprint(): String = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
-        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
-        else -> error("Not implemented for $keyType")
-    }.thumbprint()
+    actual override suspend fun getThumbprint(): String {
+        val sigJwk = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
+        return sigJwk.jwkThumbprint
+    }
 
     actual override suspend fun exportJWK(): String = _jwkObj.toString()
 
-
     actual override suspend fun exportJWKObject(): JsonObject = _jwkObj
 
-    actual override suspend fun exportPEM(): String = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
-        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
-        else -> error("Not implemented for $keyType")
-    }.pem()
+    @OptIn(ExperimentalEncodingApi::class)
+    actual override suspend fun exportPEM(): String {
+        val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
+            .toCryptoPublicKey().getOrThrow()
+        val derBytes = cryptoPubKey.encodeToTlv().derEncoded
+        val base64 = Base64.Default.encode(derBytes).chunked(64).joinToString("\n")
+        return "-----BEGIN PUBLIC KEY-----\n$base64\n-----END PUBLIC KEY-----"
+    }
 
-    /**
-     * Signs as a JWS: Signs a message using this private key (with the algorithm this key is based on)
-     * @exception IllegalArgumentException when this is not a private key
-     * @param plaintext data to be signed
-     * @return signed (JWS)
-     */
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         val kid = getKeyId()
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid, inSecureEnclave = false).signRaw(plaintext)
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).signRaw(plaintext)
-            else -> error("signRaw not implemented for $keyType on iOS") // TODO: RSA signing via RSA.PrivateKey.loadFromKeychain
-        }
+        val signer = IosKeychainProvider.getSignerForKey(kid).getOrThrow()
+        val result = signer.sign(plaintext)
+        check(result is SignatureResult.Success) { "Signing failed: $result" }
+        return result.signature.rawByteArray
     }
 
     actual override suspend fun signJws(
         plaintext: ByteArray, headers: Map<String, JsonElement>
     ): String {
         val kid = getKeyId()
-        return when (keyType) {
-            KeyType.secp256r1 -> P256.PrivateKey.loadFromKeychain(kid, inSecureEnclave = false).signJws(plaintext, headers)
-            KeyType.Ed25519 -> Ed25519.PrivateKey.loadFromKeychain(kid).signJws(plaintext, headers)
-            else -> error("signJws not implemented for $keyType on iOS") // TODO: RSA signing via RSA.PrivateKey.loadFromKeychain
+        val signer = IosKeychainProvider.getSignerForKey(kid).getOrThrow()
+
+        val jwsAlgorithm = when (keyType) {
+            KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
+            KeyType.RSA -> JwsAlgorithm.Signature.RSA.RS256
+            KeyType.Ed25519 -> error("Ed25519 JWS signing is not yet supported on iOS")
+            else -> error("Unsupported key type: $keyType")
         }
+
+        val jwkHeader = headers["jwk"]?.let { jwkElement ->
+            runCatching { joseCompliantSerializer.decodeFromString<JsonWebKey>(jwkElement.toString()) }.getOrNull()
+        }
+
+        val header = JwsHeader(
+            algorithm = jwsAlgorithm,
+            keyId = headers["kid"]?.jsonPrimitive?.content,
+            type = headers["typ"]?.jsonPrimitive?.content,
+            contentType = headers["cty"]?.jsonPrimitive?.content,
+            jsonWebKey = jwkHeader,
+        )
+
+        val jws = JwsCompact(
+            protectedHeader = header,
+            payload = plaintext,
+            signer = { data ->
+                val signResult = signer.sign(data)
+                check(signResult is SignatureResult.Success) { "JWS signing failed: $signResult" }
+                signResult.signature.rawByteArray
+            }
+        )
+        return jws.toString()
     }
 
-    /**
-     * Verifies JWS: Verifies a signed message using this public key
-     * @param signed signed
-     * @return Result wrapping the plaintext; Result failure when the signature fails
-     */
     actual override suspend fun verifyRaw(
         signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?
-    ): Result<ByteArray> = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
-        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
-        else -> error("Not implemented for $keyType")
-    }.verifyRaw(signed, detachedPlaintext!!) // TODO: handle null detachedPlaintext (crashes if called without it)
+    ): Result<ByteArray> = runCatching {
+        val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
+            .toCryptoPublicKey().getOrThrow()
 
-    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
-        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
-        else -> error("Not implemented for $keyType")
-    }.verifyJws(signedJws)
+        val sigAlg = when (keyType) {
+            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
+            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPKCS1Padding
+            else -> error("Unsupported key type for verification: $keyType")
+        }
+
+        val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
+        val signature = when (keyType) {
+            KeyType.RSA -> CryptoSignature.RSA(signed)
+            else -> CryptoSignature.EC.fromRawBytes(signed)
+        }
+        val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required for verifyRaw" }
+        verifier.verify(SignatureInput(plaintext), signature).getOrThrow()
+        plaintext
+    }
+
+    actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
+        val parsed = JwsCompact(signedJws)
+
+        val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
+            .toCryptoPublicKey().getOrThrow()
+
+        val sigAlg = when (keyType) {
+            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
+            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPKCS1Padding
+            KeyType.Ed25519 -> error("Ed25519 JWS verification is not yet supported on iOS")
+            else -> error("Unsupported key type for verification: $keyType")
+        }
+
+        val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
+        val signature = when (keyType) {
+            KeyType.RSA -> CryptoSignature.RSA(parsed.plainSignature)
+            else -> CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
+        }
+        verifier.verify(SignatureInput(parsed.signatureInput), signature).getOrThrow()
+
+        Json.parseToJsonElement(parsed.plainPayload.decodeToString())
+    }
 
     actual override suspend fun getPublicKey(): JWKKey = _jwkObj.toMap().filterKeys {
         it !in privateParameters
     }.toJsonObject().toString().let { JWKKey(it) }
 
-
-    actual override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
-        KeyType.secp256r1 -> P256.PublicKey.fromJwk(jwk!!)
-        KeyType.Ed25519 -> Ed25519.PublicKey.fromJwk(jwk!!)
-        KeyType.RSA -> RSA.PublicKey.fromJwk(jwk!!)
-        else -> error("Not implemented for $keyType")
-    }.externalRepresentation()
-
-    actual override suspend fun getMeta(): JwkKeyMeta {
-        TODO("Not yet implemented")
+    actual override suspend fun getPublicKeyRepresentation(): ByteArray {
+        val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
+            .toCryptoPublicKey().getOrThrow()
+        return cryptoPubKey.encodeToTlv().derEncoded
     }
 
+    actual override suspend fun getMeta(): JwkKeyMeta = JwkKeyMeta(getKeyId())
+
     actual override suspend fun deleteKey(): Boolean {
-        TODO("Not yet implemented")
+        return runCatching {
+            IosKeychainProvider.deleteSigningKey(getKeyId()).getOrThrow()
+        }.isSuccess
     }
 
     actual override val hasPrivateKey: Boolean
@@ -148,75 +193,53 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
             type: KeyType, metadata: JwkKeyMeta?
         ): JWKKey {
             val kid = Uuid.random().toString()
-            val jwkJson = when (type) {
-                KeyType.secp256r1 -> P256.PrivateKey.createInKeychain(kid, inSecureEnclave = false).jwk()
-                KeyType.Ed25519 -> Ed25519.PrivateKey.createInKeychain(kid).jwk()
-                KeyType.RSA -> RSA.PrivateKey.createInKeychain(kid, size = 2048u).jwk()
+
+            val signer = when (type) {
+                KeyType.secp256r1 -> IosKeychainProvider.createSigningKey(kid) {
+                    ec { curve = ECCurve.SECP_256_R_1 }
+                }.getOrThrow()
+                KeyType.RSA -> IosKeychainProvider.createSigningKey(kid) {
+                    rsa { }
+                }.getOrThrow()
+                KeyType.Ed25519 -> error("Ed25519 key generation is not yet supported on iOS")
                 else -> error("Key generation not supported for $type on iOS")
             }
-            return JWKKey(jwkJson.toString(), kid)
+
+            val jwkJson = joseCompliantSerializer.encodeToString(signer.publicKey.toJsonWebKey(kid))
+            return JWKKey(jwkJson, kid)
         }
 
+        @OptIn(ExperimentalEncodingApi::class)
         actual override suspend fun importRawPublicKey(
             type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?
         ): Key {
-            TODO("Not yet implemented")
+            val cryptoPubKey = when (type) {
+                KeyType.secp256r1 -> CryptoPublicKey.EC.fromAnsiX963Bytes(ECCurve.SECP_256_R_1, rawPublicKey)
+                else -> CryptoPublicKey.decodeFromDer(rawPublicKey)
+            }
+            val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey(metadata?.keyId))
+            return JWKKey(jwkJson, metadata?.keyId)
         }
 
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> {
             return Result.success(JWKKey(jwk))
         }
 
-        @OptIn(ExperimentalEncodingApi::class, ExperimentalForeignApi::class)
+        @OptIn(ExperimentalEncodingApi::class)
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = runCatching {
             val derBytes = pem.lines()
                 .filter { !it.startsWith("-----") }
                 .joinToString("")
                 .let { Base64.decode(it) }
 
-            val nsData = derBytes.usePinned { pinned ->
-                NSData.create(bytes = pinned.addressOf(0), length = derBytes.size.toULong())
+            val cryptoPubKey = if (pem.contains("BEGIN CERTIFICATE")) {
+                X509Certificate.decodeFromDer(derBytes).decodedPublicKey.getOrThrow()
+            } else {
+                CryptoPublicKey.decodeFromDer(derBytes)
             }
-
-            // TODO: cfData, certificate, and publicKey are CF objects following the Create/Copy Rule
-            // and should be released with CFRelease to avoid memory leaks in long-running processes.
-            @Suppress("UNCHECKED_CAST")
-            val cfData = CFBridgingRetain(nsData) as platform.CoreFoundation.CFDataRef
-
-            val certificate = SecCertificateCreateWithData(null, cfData)
-                ?: error("Failed to create SecCertificate from PEM data")
-
-            val publicKey = SecCertificateCopyKey(certificate)
-                ?: error("Failed to extract public key from certificate")
-
-            val keyData = SecKeyCopyExternalRepresentation(publicKey, null)
-                ?: error("Failed to get external representation of public key")
-
-            val keyNsData = CFBridgingRelease(keyData) as NSData
-            val keyBytes = ByteArray(keyNsData.length.toInt()).also { bytes ->
-                bytes.usePinned { pinned ->
-                    platform.posix.memcpy(pinned.addressOf(0), keyNsData.bytes, keyNsData.length)
-                }
-            }
-
-            val jwkJson = when {
-                keyBytes.size == 65 && keyBytes[0] == 0x04.toByte() -> {
-                    val x = Base64.UrlSafe.encode(keyBytes.sliceArray(1..32)).trimEnd('=')
-                    val y = Base64.UrlSafe.encode(keyBytes.sliceArray(33..64)).trimEnd('=')
-                    """{"kty":"EC","crv":"P-256","x":"$x","y":"$y"}"""
-                }
-                // TODO: RSA parsing is incorrect — SecKeyCopyExternalRepresentation returns PKCS#1 DER
-            // (SEQUENCE { INTEGER n, INTEGER e }), not raw n bytes. Needs ASN.1 parsing.
-            keyBytes.size > 65 -> {
-                    val b64 = Base64.UrlSafe.encode(keyBytes).trimEnd('=')
-                    """{"kty":"RSA","n":"$b64","e":"AQAB"}"""
-                }
-                else -> error("Unsupported key format from certificate (${keyBytes.size} bytes)")
-            }
-
+            val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey())
             JWKKey(jwkJson)
         }
-
     }
 
     override fun hashCode(): Int {
@@ -227,26 +250,41 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     }
 
     actual suspend fun decryptJwe(jweString: String): ByteArray {
-        TODO("Not yet implemented")
+        check(hasPrivateKey) { "Private key required for decryption." }
+        check(keyType == KeyType.secp256r1) { "ECDH-ES decryption only supported for EC P-256 keys." }
+
+        val jwe = deserialize(jweString).getOrThrow()
+        val header = jwe.header
+        require(header.algorithm == JweAlgorithm.ECDH_ES)
+
+        val epk = header.ephemeralKeyPair?.toCryptoPublicKey()?.getOrThrow() as CryptoPublicKey.EC
+        val signer = IosKeychainProvider.getSignerForKey(getKeyId()).getOrThrow()
+
+        val z = (signer as Signer.ECDSA).keyAgreement(epk).getOrThrow()
+
+        val encryption = header.encryption!!
+        val keyLenBits = encryption.combinedEncryptionKeyLength.bits.toInt()
+        val cekBytes = JweEncryptionHelper.concatKdf(z, keyLenBits, encryption.identifier)
+
+        val key = keyFromIntermediate(encryption.algorithm, cekBytes)
+
+        val aad = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+            .encode(jwe.headerAsParsed).encodeToByteArray()
+        return key.decrypt(jwe.iv, jwe.ciphertext, jwe.authTag, aad).getOrThrow()
     }
 
-    @OptIn(ExperimentalForeignApi::class)
     actual suspend fun encryptJwe(plaintext: ByteArray, encAlg: String): String {
-        val recipientJwk = _jwkObj.toString()
-        val kid = _jwkObj["kid"]?.jsonPrimitive?.content
-
-        val result = JweEncryption.encrypt(
-            plaintext.toNSData(),
-            recipientJwk,
-            encAlg,
-            kid
-        )
-
-        check(result.isSuccess()) {
-            result.error ?: "JWE encryption failed"
+        check(keyType == KeyType.secp256r1) {
+            "ECDH-ES is currently only supported for EC P-256 keys. Current key type: $keyType"
         }
-
-        return result.data ?: error("JWE encryption returned no data")
+        val recipientKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
+            .toCryptoPublicKey().getOrThrow() as CryptoPublicKey.EC
+        return JweEncryptionHelper.encryptEcdhEs(
+            plaintext = plaintext,
+            recipientPublicKey = recipientKey,
+            encAlg = encAlg,
+            keyId = _jwkObj["kid"]?.jsonPrimitive?.content
+        )
     }
 
     override fun equals(other: Any?): Boolean {

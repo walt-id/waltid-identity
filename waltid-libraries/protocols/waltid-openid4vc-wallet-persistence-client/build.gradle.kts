@@ -25,17 +25,11 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
-        if (providers.gradleProperty("enableAndroidBuild").orNull.toBoolean()) {
-            androidMain.dependencies {
-                implementation(identityLibs.sqldelight.android.driver)
-                api(project(":waltid-libraries:crypto:waltid-crypto-android"))
-            }
+        androidMain.dependencies {
+            implementation(identityLibs.sqldelight.android.driver)
         }
-        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
-            iosMain.dependencies {
-                api(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation(identityLibs.sqldelight.native.driver)
-            }
+        iosMain.dependencies {
+            implementation(identityLibs.sqldelight.native.driver)
         }
     }
 }

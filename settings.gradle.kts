@@ -1,7 +1,6 @@
 // # walt.id identity build configuration
 
 fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableAndroidBuild = getSetting("enableAndroidBuild")
 val enableIosBuild = getSetting("enableIosBuild")
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
@@ -20,10 +19,6 @@ val modules = listOfNotNull(
         "waltid-crypto-oci",
         "waltid-crypto-aws",
         "waltid-crypto-azure",
-        "waltid-crypto-android" whenEnabled enableAndroidBuild,
-        "waltid-crypto-ios" whenEnabled enableIosBuild,
-        "waltid-target-ios" whenEnabled enableIosBuild,
-        "waltid-target-ios:implementation" whenEnabled enableIosBuild,
         "waltid-crypto2",
         "waltid-cose",
         "waltid-x509",
@@ -65,7 +60,6 @@ val modules = listOfNotNull(
 
     * "$libraries:sdjwt".group(
         "waltid-sdjwt",
-        "waltid-sdjwt-ios" whenEnabled enableIosBuild,
     ),
 
     * "$libraries:auth".group(
@@ -111,11 +105,9 @@ val modules = listOfNotNull(
     // CLI
     "$applications:waltid-cli",
 
-    ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
-    "$applications:waltid-wallet-demo-android" whenEnabled enableAndroidBuild,
+    ":waltid-applications:waltid-android",
+    "$applications:waltid-wallet-demo-android",
 
-    "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
-    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-ios" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )
