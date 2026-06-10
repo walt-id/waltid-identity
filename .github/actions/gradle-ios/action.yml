@@ -10,7 +10,7 @@ runs:
   using: "composite"
   steps:
     - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@6eb327cce1c4d04e3e84caac9695cfda9f7ad66a
+      uses: ./.github/actions/ios-build-setup
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
