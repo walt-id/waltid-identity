@@ -31,7 +31,7 @@ class WalletClientDeviceTest {
         @BeforeClass
         fun setupEngine() {
             WebDataFetcherManager.globalDefaultConfiguration =
-                WebDataFetchingConfiguration(http = HttpEngine.CIO)
+                WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
         }
     }
 

@@ -45,7 +45,7 @@ class WalletViewModel(application: Application) : AndroidViewModel(application) 
     val state: StateFlow<WalletUiState> = _state.asStateFlow()
 
     init {
-        WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.CIO)
+        WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
 
         viewModelScope.launch {
             runCatching { client.bootstrap() }
