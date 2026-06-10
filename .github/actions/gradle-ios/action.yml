@@ -31,10 +31,10 @@ runs:
         ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
         ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
 
-    - name: Generate dummy framework for iOS app
+    - name: Build shared framework for iOS app
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:generateDummyFramework
+      run: ./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:linkDebugFrameworkIosSimulatorArm64
 
     - name: Install CocoaPods for iOS app
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
