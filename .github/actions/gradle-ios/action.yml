@@ -18,7 +18,7 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew podInstall --info
+        ./gradlew podInstall --no-daemon --info
 
     - name: Build iOS simulator frameworks (ARM64)
       working-directory: ${{ inputs.waltid-directory }}
