@@ -39,12 +39,12 @@ runs:
           brew-${{ runner.os }}-${{ runner.arch }}-
 
     - name: Update CocoaPods
-      uses: ./.github/actions/cocoapods-setup
+      uses: ./waltid-identity/.github/actions/cocoapods-setup
 
     - name: Install and run KDoctor
-      uses: ./.github/actions/install-and-run-kdoctor
+      uses: ./waltid-identity/.github/actions/install-and-run-kdoctor
 
     - name: Enable iOS build
-      uses: ./.github/actions/enable-ios-build
+      uses: ./waltid-identity/.github/actions/enable-ios-build
       with:
         gradle-properties-path: ${{ inputs.gradle-properties-path }}
