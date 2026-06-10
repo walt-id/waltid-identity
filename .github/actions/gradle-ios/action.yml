@@ -14,20 +14,31 @@ runs:
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
-    - name: Compile iOS targets
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
-
-    - name: Execute iOS simulator tests (ARM64)
+    - name: Install CocoaPods dependencies for iOS libraries
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:crypto:waltid-crypto:iosSimulatorArm64Test --info
+        ./gradlew podInstall --info
 
-    - name: Compile wallet modules for iOS
+    - name: Build iOS simulator frameworks (ARM64)
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
+
+    - name: Execute crypto iOS tests
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:compileKotlinIosSimulatorArm64
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence:compileKotlinIosSimulatorArm64
+        ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
+        ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
+
+    - name: Execute iOS demo app unit tests
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
+      shell: bash
+      run: |
+        xcodebuild test \
+          -workspace iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+          -only-testing:iosAppTests \
+          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
