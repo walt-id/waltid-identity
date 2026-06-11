@@ -104,3 +104,10 @@ ktor {
         )
     }
 }
+
+tasks.test {
+    // Configure SSL truststore for conformance suite tests
+    val truststorePath = file("conformance-truststore.jks").absolutePath
+    systemProperty("javax.net.ssl.trustStore", truststorePath)
+    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+}
