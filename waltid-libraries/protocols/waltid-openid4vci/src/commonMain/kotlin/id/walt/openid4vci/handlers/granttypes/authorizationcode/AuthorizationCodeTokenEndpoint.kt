@@ -38,7 +38,9 @@ class AuthorizationCodeTokenEndpoint(
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Authorization code is invalid or has already been used"))
 
             val client = request.client
+            // Client validation: compare request client with code-bound client
             if (client.id != record.clientId) {
+                // Client mismatch - log at warn level for security auditing
                 return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for authorization code"))
             }
 

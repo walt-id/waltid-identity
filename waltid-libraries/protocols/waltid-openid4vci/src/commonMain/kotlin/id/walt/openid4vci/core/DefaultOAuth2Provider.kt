@@ -83,6 +83,13 @@ class DefaultOAuth2Provider(
         )
     }
 
+    override fun writeAuthorizationError(error: OAuthError): AuthorizationResponseHttp =
+        AuthorizationResponseHttp(
+            status = 400,
+            redirectUri = null,
+            body = error.description ?: error.error,
+        )
+
     override fun writeAuthorizationError(
         authorizationRequest: AuthorizationRequest,
         error: OAuthError
@@ -120,7 +127,10 @@ class DefaultOAuth2Provider(
         val params = buildMap {
             put("code", response.code)
             response.state?.let { put("state", it) }
-            response.scope?.let { put("scope", it) }
+            // RFC 6749 §4.1.2: Authorization response contains only 'code' and 'state'
+            // The 'scope' parameter belongs in the token response (§5.1), not here
+            // Add iss (issuer) parameter for OAuth 2.0 Security Best Current Practice (RFC 9207)
+            authorizationRequest.issClaim?.let { put("iss", it) }
             putAll(response.extraParameters)
         }
 
@@ -171,7 +181,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp =
+    override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 400,
             payload = buildMap {
@@ -179,6 +189,9 @@ class DefaultOAuth2Provider(
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
         )
+
+    override fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp =
+        writeAccessTokenError(error)
 
     override fun writeAccessTokenResponse(
         request: AccessTokenRequest,
@@ -276,14 +289,17 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
+    override fun writeCredentialError(error: OAuthError): CredentialResponseHttp =
         CredentialResponseHttp(
             status = 400,
             payload = buildMap {
-                put("error", error.error)
-                error.description?.let { put("error_description", it) }
+                put("error", JsonPrimitive(error.error))
+                error.description?.let { put("error_description", JsonPrimitive(it)) }
             },
         )
+
+    override fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp =
+        writeCredentialError(error)
 
     override fun writeCredentialResponse(
         request: CredentialRequest,
@@ -295,21 +311,20 @@ class DefaultOAuth2Provider(
                 response.credentials?.let { issued ->
                     put(
                         "credentials",
-                        issued.map { credentialEntry ->
-                            val credentialValue = credentialEntry.credential.let { element ->
-                                if (element is JsonPrimitive && element.isString) {
-                                    element.content
-                                } else {
-                                    element.toString()
-                                }
+                        buildJsonArray {
+                            issued.forEach { credentialEntry ->
+                                add(
+                                    JsonObject(
+                                        mapOf("credential" to credentialEntry.credential)
+                                    )
+                                )
                             }
-                            mapOf("credential" to credentialValue)
                         }
                     )
                 }
-                response.transactionId?.let { put("transaction_id", it) }
-                response.interval?.let { put("interval", it) }
-                response.notificationId?.let { put("notification_id", it) }
+                response.transactionId?.let { put("transaction_id", JsonPrimitive(it)) }
+                response.interval?.let { put("interval", JsonPrimitive(it)) }
+                response.notificationId?.let { put("notification_id", JsonPrimitive(it)) }
             }
         )
 
