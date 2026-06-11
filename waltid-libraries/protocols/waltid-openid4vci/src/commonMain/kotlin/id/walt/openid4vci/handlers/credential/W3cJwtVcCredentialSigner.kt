@@ -6,8 +6,8 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.did.dids.DidUtils
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.openid4vci.requests.credential.CredentialRequest
-import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDJwtVC.Companion.SD_JWT_VC_TYPE_HEADER
+import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import id.walt.w3c.CredentialBuilder
 import id.walt.w3c.CredentialBuilderType
@@ -110,6 +110,7 @@ object W3cJwtVcCredentialSigner {
             val context = mapOf(
                 "subjectDid" to holderDid,
                 "issuerDid" to issuerId,
+                "issuerId" to issuerId,
                 "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
             ).filterValues {
                 when (it) {
@@ -145,8 +146,8 @@ object W3cJwtVcCredentialSigner {
                     disclosureMap = selectiveDisclosure,
                     context = context,
                     type = when (builderType) {
-                        CredentialBuilderType.W3CV11CredentialBuilder -> "JWT"
                         CredentialBuilderType.W3CV2CredentialBuilder -> SD_JWT_VC_TYPE_HEADER
+                        // Including CredentialBuilderType.W3CV11CredentialBuilder
                         else -> "JWT"
                     }
                 )
