@@ -179,25 +179,33 @@ class IssuanceNotificationRouteTest {
         sessionId: String,
         trigger: suspend () -> Unit,
     ): KtorSessionUpdate =
-        withTimeout(5_000.milliseconds) {
+        withTimeout(15_000.milliseconds) {
             prepareGet("/issuer2/sessions/$sessionId/events") {
                 accept(ContentType.Text.EventStream)
             }.execute { response ->
                 assertEquals(HttpStatusCode.OK, response.status)
+                val channel = response.bodyAsChannel()
+                assertEquals("{}", readNextSseData(channel))
                 trigger()
-                readFirstSseUpdate(response.bodyAsChannel())
+                readFirstSseUpdate(channel)
             }
         }
 
     private suspend fun readFirstSseUpdate(channel: ByteReadChannel): KtorSessionUpdate {
         while (true) {
+            val data = readNextSseData(channel)
+            if (data.isNotEmpty() && data != "{}") {
+                return issuer2TestJson.decodeFromString(data)
+            }
+        }
+    }
+
+    private suspend fun readNextSseData(channel: ByteReadChannel): String {
+        while (true) {
             val line = channel.readUTF8Line()
                 ?: error("SSE stream closed before an event was received")
             if (line.startsWith("data:")) {
-                val data = line.removePrefix("data:").trim()
-                if (data.isNotEmpty() && data != "{}") {
-                    return issuer2TestJson.decodeFromString(data)
-                }
+                return line.removePrefix("data:").trim()
             }
         }
     }
