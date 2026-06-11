@@ -11,6 +11,7 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
+
     js(IR) {
         outputModuleName = "x509"
         nodejs {
@@ -63,6 +64,14 @@ kotlin {
             implementation(kotlin("test-js"))
 
         }
+
+        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+            iosMain.get().dependsOn(commonMain.get())
+            iosArm64Main.dependsOn(iosMain.get())
+            iosSimulatorArm64Main.dependsOn(iosMain.get())
+        }
     }
 }
 
@@ -72,5 +81,4 @@ mavenPublishing {
         description.set("walt.id Kotlin/Java library X.509")
     }
 }
-
 

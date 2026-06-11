@@ -1,3 +1,12 @@
+plugins {
+    id("com.android.application") apply false
+    id("org.jetbrains.kotlin.multiplatform") apply false
+    id("org.jetbrains.kotlin.native.cocoapods") apply false
+    id("org.jetbrains.kotlin.plugin.compose") apply false
+    id("org.jetbrains.kotlin.plugin.serialization") apply false
+    id("com.github.ben-manes.versions") apply false
+}
+
 //  Uncomment the following to run the license report
 // ./gradlew -p waltid-identity aggregateDependencyNotices --no-configuration-cache
 //plugins {

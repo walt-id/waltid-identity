@@ -1,0 +1,91 @@
+# E2E Testing: Mobile Wallet Demos
+
+This folder contains the native E2E paths for wallet demo apps.
+
+Primary goal: keep orchestration thin and move receive/present logic into native tests.
+
+## Kept Test Entrypoints
+
+Local enterprise backend (requires local stack + ngrok):
+- `./e2e-android-local-instrumented.sh` — non-attested (default)
+- `./e2e-android-local-instrumented.sh --attested` — with client attestation
+- `./e2e-ios-local-instrumented.sh` — non-attested (default)
+- `./e2e-ios-local-instrumented.sh --attested` — with client attestation
+
+Convenience wrappers (call the above with `--attested`):
+- `./e2e-android-local-instrumented-attested.sh`
+- `./e2e-ios-local-instrumented-attested.sh`
+
+Public EUDI backend (no local enterprise required):
+- `./e2e-android-public-eudi-instrumented.sh`
+- `./e2e-ios-public-eudi-instrumented.sh`
+
+### Attested vs Non-Attested
+
+The `--attested` flag controls which issuer profile is used:
+- **Non-attested** (default): uses `issuer2-noattest.mdl-profile` — no client attestation required. The script auto-provisions `issuer2-noattest` via API if it doesn't exist.
+- **Attested** (`--attested`): uses `issuer2.mdl-profile` — requires wallet to present client attestation headers.
+
+Legacy non-instrumented scripts (`e2e-android.sh`, `e2e-ios.sh`) are still present but are no longer the recommended path.
+
+## Environment Setup
+
+From `scripts/e2e`:
+
+```bash
+cp e2e.env.example e2e.env
+# set HOST_ALIAS_DOMAIN=<your ngrok domain>
+```
+
+### Local Enterprise Stack Constraints
+
+1. Start enterprise quickstart (`docker compose up -d`, then recreate).
+2. After recreate, comment out `basePort = 7500` in quickstart `enterprise.conf`, then restart enterprise API.
+3. Keep ngrok forwarding `7500`.
+4. For Android local flow, set emulator reverse port:
+
+```bash
+adb reverse tcp:7500 tcp:7500
+```
+
+This is required because verifier callback URLs still reference `localhost:7500` for emulator routing.
+
+## Public EUDI Notes
+
+- Android public EUDI flow is fully native in `EudiPublicBackendReceiveInstrumentedTest.kt` (offer generation + verifier polling inside test).
+- iOS public EUDI flow is fully native in `EudiPublicBackendUITests.swift` (offer generation + verifier polling inside test).
+- No helper Python scripts are required anymore for public EUDI instrumented paths.
+
+## Run Matrix
+
+### Local Enterprise
+
+| # | Command | Result |
+|---|---------|--------|
+| 1 | `./e2e-android-local-instrumented.sh` | PASS |
+| 2 | `./e2e-android-local-instrumented.sh --attested` | PASS |
+| 3 | `./e2e-ios-local-instrumented.sh` | PASS |
+| 4 | `./e2e-ios-local-instrumented.sh --attested` | PASS |
+
+### Public EUDI
+
+| # | Command | Result |
+|---|---------|--------|
+| 5 | `./e2e-android-public-eudi-instrumented.sh` | PASS |
+| 6 | `./e2e-ios-public-eudi-instrumented.sh` | PASS |
+
+## Quick Command Recap
+
+```bash
+cd scripts/e2e
+
+# Local enterprise
+./e2e-android-local-instrumented-attested.sh
+./e2e-android-local-instrumented.sh
+./e2e-ios-local-instrumented-attested.sh
+./e2e-ios-local-instrumented.sh
+
+# Public EUDI
+./e2e-android-public-eudi-instrumented.sh
+./e2e-ios-public-eudi-instrumented.sh
+```

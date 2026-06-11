@@ -52,6 +52,14 @@ kotlin {
             // Logging
             implementation("org.slf4j:slf4j-simple:2.0.17")
         }
+
+        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+            val iosArm64Main by getting
+            val iosSimulatorArm64Main by getting
+            iosMain.get().dependsOn(commonMain.get())
+            iosArm64Main.dependsOn(iosMain.get())
+            iosSimulatorArm64Main.dependsOn(iosMain.get())
+        }
     }
 }
 

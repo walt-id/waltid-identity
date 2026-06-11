@@ -7,6 +7,7 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
+
     sourceSets {
         commonMain.dependencies {
             // Coroutines

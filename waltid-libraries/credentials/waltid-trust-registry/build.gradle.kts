@@ -6,6 +6,7 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+
     sourceSets {
         commonMain.dependencies {
             // Serialization
@@ -26,6 +27,10 @@ kotlin {
         jvmMain.dependencies {
             // OkHttp engine for JVM (SSRF-safe DNS resolver requires OkHttp)
             implementation(identityLibs.ktor.client.okhttp)
+        }
+
+        iosMain.dependencies {
+            implementation(identityLibs.ktor.client.darwin)
         }
 
         commonTest.dependencies {

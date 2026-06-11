@@ -15,7 +15,8 @@ import id.walt.sdjwt.SDJwt
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.sdjwt.SDPayload
-import korlibs.crypto.encoding.ASCII
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -155,6 +156,7 @@ class SDJwtTestIOS {
         presentedJwtWithKb.toString() shouldStartWith presentedJwtNoKb.toString()
         presentedJwtWithKb.keyBindingJwt!!.audience shouldBe aud
         presentedJwtWithKb.keyBindingJwt!!.nonce shouldBe nonce
-        presentedJwtWithKb.keyBindingJwt!!.sdHash shouldBe SHA256().digest(ASCII.encode(presentedJwtNoKb.toString())).base64Url
+        @OptIn(ExperimentalEncodingApi::class)
+        presentedJwtWithKb.keyBindingJwt!!.sdHash shouldBe Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(SHA256().digest(presentedJwtNoKb.toString().encodeToByteArray()))
     }
 }

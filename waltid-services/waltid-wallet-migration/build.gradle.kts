@@ -11,7 +11,7 @@ application {
 
 dependencies {
     // New wallet persistence — provides wallet2 table definitions and store impls
-    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-server"))
 
     // Credential parsing — needed to re-parse old raw credential strings
     implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))

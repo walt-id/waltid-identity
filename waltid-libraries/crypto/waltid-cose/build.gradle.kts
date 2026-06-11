@@ -61,6 +61,10 @@ kotlin {
             implementation(kotlin("test-js"))
         }
 
+        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+            iosMain.dependencies {}
+        }
+
     }
 }
 
