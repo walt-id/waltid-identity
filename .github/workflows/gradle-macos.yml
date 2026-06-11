@@ -8,14 +8,14 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@1b0da1c1cb727dde15fde251365397ec022e6cb4
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@1b0da1c1cb727dde15fde251365397ec022e6cb4
 
       - name: Build iOS Simulator Framework (ARM64)
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@1b0da1c1cb727dde15fde251365397ec022e6cb4
         with:
           waltid-directory: 'waltid-identity'
