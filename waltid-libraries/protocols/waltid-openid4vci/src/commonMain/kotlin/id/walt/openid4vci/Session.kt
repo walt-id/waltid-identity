@@ -16,9 +16,12 @@ sealed interface Session {
     val subject: String?
     @SerialName("expires_at")
     val expiresAt: Map<TokenType, Instant>
+    @SerialName("custom_attributes")
+    val customAttributes: Map<String, String>
 
     fun withExpiresAt(tokenType: TokenType, instant: Instant): Session
     fun withSubject(subject: String?): Session
+    fun withCustomAttribute(name: String, value: String): Session
     fun copy(): Session
 }
 
@@ -34,13 +37,19 @@ data class DefaultSession(
     override val expiresAt: Map<TokenType, Instant> = emptyMap(),
     @SerialName("subject")
     override val subject: String? = null,
+    @SerialName("custom_attributes")
+    override val customAttributes: Map<String, String> = emptyMap(),
 ) : Session {
     override fun withExpiresAt(tokenType: TokenType, instant: Instant): Session =
         copy(expiresAt = expiresAt.toMutableMap().apply { this[tokenType] = instant })
 
     override fun withSubject(subject: String?): Session = copy(subject = subject)
 
+    override fun withCustomAttribute(name: String, value: String): Session =
+        copy(customAttributes = customAttributes.toMutableMap().apply { this[name] = value })
+
     override fun copy(): Session = this.copy(
         expiresAt = expiresAt.toMutableMap(),
+        customAttributes = customAttributes.toMutableMap(),
     )
 }

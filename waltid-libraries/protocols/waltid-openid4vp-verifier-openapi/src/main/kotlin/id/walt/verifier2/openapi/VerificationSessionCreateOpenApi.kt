@@ -98,7 +98,7 @@ object VerificationSessionCreateOpenApi {
                 // ISO Examples
 
                 example("[openid4vp-http][sd-jwt pid]") { value = CrossDeviceFlowSetup.EXAMPLE_SDJWT_PID }
-                example("[openid4vp-http][iso pid]") { value = CrossDeviceFlowSetup.EXAMPLE_ISO_PID }
+                example("[openid4vp-http][iso pid]") { value = CrossDeviceFlowSetup.EXAMPLE_EUDI_PID }
                 example("[openid4vp-http][iso mdl & photo-id]") { value = CrossDeviceFlowSetup.EXAMPLE_MDL_OR_PHOTOID }
                 example("[openid4vp-http][iso mdl] credential status for TokenStatusList") {
                     value = Verifier2OpenApiExamples.openid4vpHttpMdocCredentialStatusTokenStatusList
