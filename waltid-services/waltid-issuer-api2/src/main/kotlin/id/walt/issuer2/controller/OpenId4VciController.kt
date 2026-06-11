@@ -1,14 +1,20 @@
 package id.walt.issuer2.controller
 
+import id.walt.commons.config.ConfigManager
+import id.walt.issuer2.config.AuthenticationServiceConfig
+import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.controller.openapi.OpenId4VciRoutesDocs
 import id.walt.issuer2.service.CredentialOfferService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
 import io.github.smiley4.ktoropenapi.route
+import io.klogging.logger
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.URLBuilder
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.auth.OAuthAccessTokenResponse
 import io.ktor.server.auth.authenticate
@@ -23,11 +29,14 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+private val logger = KotlinLogging.logger {}
+
 class OpenId4VciController(
     private val metadataService: MetadataService,
     private val protocolService: OpenId4VciProtocolService,
     private val offerService: CredentialOfferService,
 ) {
+
     fun register(route: Route) {
         route.get(".well-known/openid-credential-issuer/openid4vci", OpenId4VciRoutesDocs.credentialIssuerMetadata()) {
             call.respond(metadataService.getCredentialIssuerMetadata())
@@ -66,28 +75,54 @@ class OpenId4VciController(
 
             get("authorize", OpenId4VciRoutesDocs.authorize()) {
                 val response = protocolService.processAuthorizeRequest(call.parameters.toMap())
-                response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 response.redirectUri?.let { redirectUri ->
+                    // Don't manually append Location header - respondRedirect handles it
+                    response.headers.filterKeys { it.lowercase() != "location" }
+                        .forEach { (name, value) -> call.response.headers.append(name, value) }
                     call.respondRedirect(redirectUri)
-                } ?: call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                } ?: run {
+                    response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                    call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                }
             }
 
-            val authOAuthInterceptor = createRouteScopedPlugin("issuer2AuthOAuthInterceptor") {
-                onCallRespond { call ->
-                    val internalAuthorizationRequest = call.parameters["internalAuthReq"] ?: return@onCallRespond
+            get("external_login/{internalAuthReq...}", OpenId4VciRoutesDocs.externalLogin()) {
+                // Manually trigger OAuth redirect to Keycloak
+                val allParams = call.parameters.getAll("internalAuthReq")
+                println("[DEBUG] external_login route hit - internalAuthReq params count: ${allParams?.size}")
+                allParams?.forEachIndexed { idx, param ->
+                    println("[DEBUG]   [$idx]: ${param.take(200)}${if (param.length > 200) "..." else ""}")
+                }
+                val internalAuthReq = allParams?.joinToString("/") 
+                    ?: error("Missing internalAuthReq")
+                val internalAuthorizationRequest = internalAuthReq
+                println("[DEBUG] Joined internalAuthorizationRequest length: ${internalAuthorizationRequest.length}")
+                
+                // Build Keycloak redirect URL
+                val authConfig = ConfigManager.getConfig<AuthenticationServiceConfig>()
+                val issuerConfig = ConfigManager.getConfig<Issuer2ServiceConfig>()
+                val redirectUri = "${issuerConfig.baseUrl.trimEnd('/')}/openid4vci/external/oauth/callback"
+                
+                val keycloakUrl = URLBuilder(authConfig.authorizeUrl).apply {
+                    parameters.append("client_id", authConfig.clientId)
+                    parameters.append("redirect_uri", redirectUri)
+                    parameters.append("response_type", "code")
+                    parameters.append("scope", authConfig.defaultScopes.joinToString(" "))
+                    // Generate and store state
+                    val state = java.util.UUID.randomUUID().toString()
+                    parameters.append("state", state)
+                    
+                    // Store internal auth request for later
                     protocolService.processExternalLoginInterception(
-                        externalAuthorizationRequest = call.response.headers.allValues().toMap()["Location"]?.firstOrNull(),
+                        externalAuthorizationRequest = this.buildString(),
                         internalAuthorizationRequest = internalAuthorizationRequest,
                     )
-                }
+                }.buildString()
+                
+                call.respondRedirect(keycloakUrl)
             }
 
             authenticate("auth-oauth") {
-                install(authOAuthInterceptor)
-
-                get("external_login/{internalAuthReq}", OpenId4VciRoutesDocs.externalLogin()) {
-                    // Ktor OAuth redirects to the configured external authorization server.
-                }
 
                 get("external/oauth/callback", OpenId4VciRoutesDocs.externalOAuthCallback()) {
                     val principal = call.principal<OAuthAccessTokenResponse.OAuth2>()

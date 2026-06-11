@@ -2,6 +2,7 @@ package id.walt.issuer2.service.openid4vci
 
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
@@ -167,6 +168,10 @@ class OpenId4VciProtocolService(
         externalAuthorizationRequest: String?,
         internalAuthorizationRequest: String?,
     ) {
+        println("[DEBUG] processExternalLoginInterception called")
+        println("[DEBUG]   externalAuthorizationRequest: ${externalAuthorizationRequest?.take(200)}${if ((externalAuthorizationRequest?.length ?: 0) > 200) "..." else ""}")
+        println("[DEBUG]   internalAuthorizationRequest: ${internalAuthorizationRequest?.take(200)}${if ((internalAuthorizationRequest?.length ?: 0) > 200) "..." else ""}")
+        
         val externalState = externalAuthorizationRequest
             ?.substringAfter("?", missingDelimiterValue = "")
             ?.takeIf { it.isNotBlank() }

@@ -15,27 +15,37 @@ val issuer2AuthenticationPluginAmendment: suspend () -> Unit = suspend {
     val authenticationServiceConfig = ConfigManager.getConfig<AuthenticationServiceConfig>()
     val issuerServiceConfig = ConfigManager.getConfig<Issuer2ServiceConfig>()
 
+    logger.info("Configuring OAuth authentication with Keycloak: ${authenticationServiceConfig.authorizeUrl}")
+
     AuthenticationServiceModule.AuthenticationServiceConfig.apply {
         customAuthentication = {
-            oauth("auth-oauth") {
-                client = HttpClient()
-                providerLookup = {
-                    OAuthServerSettings.OAuth2ServerSettings(
-                        name = authenticationServiceConfig.name,
-                        authorizeUrl = authenticationServiceConfig.authorizeUrl,
-                        accessTokenUrl = authenticationServiceConfig.accessTokenUrl,
-                        clientId = authenticationServiceConfig.clientId,
-                        clientSecret = authenticationServiceConfig.clientSecret,
-                        defaultScopes = authenticationServiceConfig.defaultScopes,
-                        requestMethod = HttpMethod.Post,
-                        authorizeUrlInterceptor = { request ->
-                            if (authenticationServiceConfig.forwardIssuerStateToAuthorizationServer) {
-                                appendForwardedIssuerState(request)
-                            }
-                        },
-                    )
+            logger.info("Installing OAuth authentication provider 'auth-oauth'...")
+            try {
+                oauth("auth-oauth") {
+                    client = HttpClient()
+                    providerLookup = {
+                        logger.info("OAuth providerLookup called - returning server settings")
+                        OAuthServerSettings.OAuth2ServerSettings(
+                            name = authenticationServiceConfig.name,
+                            authorizeUrl = authenticationServiceConfig.authorizeUrl,
+                            accessTokenUrl = authenticationServiceConfig.accessTokenUrl,
+                            clientId = authenticationServiceConfig.clientId,
+                            clientSecret = authenticationServiceConfig.clientSecret,
+                            defaultScopes = authenticationServiceConfig.defaultScopes,
+                            requestMethod = HttpMethod.Post,
+                            authorizeUrlInterceptor = { request ->
+                                if (authenticationServiceConfig.forwardIssuerStateToAuthorizationServer) {
+                                    appendForwardedIssuerState(request)
+                                }
+                            },
+                        )
+                    }
+                    urlProvider = { "${issuerServiceConfig.baseUrl.trimEnd('/')}/openid4vci/external/oauth/callback" }
                 }
-                urlProvider = { "${issuerServiceConfig.baseUrl.trimEnd('/')}/openid4vci/external/oauth/callback" }
+                logger.info("OAuth authentication provider 'auth-oauth' installed successfully")
+            } catch (e: Exception) {
+                logger.error("Failed to install OAuth provider", e)
+                throw e
             }
         }
     }
