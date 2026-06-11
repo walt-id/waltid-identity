@@ -27,6 +27,8 @@ val issuer2ConfigFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(
 )
 
 fun clearIssuer2TestEnvironment() {
+    System.clearProperty("config.file._features")
+    System.clearProperty("config.file.dev-mode")
     issuer2ConfigFiles.forEach { (id, _) -> System.clearProperty("config.file.$id") }
     ConfigManager.preclear()
     FeatureManager.preclear()
