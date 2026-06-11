@@ -126,6 +126,8 @@ class DefaultOAuth2Provider(
             put("code", response.code)
             response.state?.let { put("state", it) }
             response.scope?.let { put("scope", it) }
+            // Add iss (issuer) parameter for OAuth 2.0 Security Best Current Practice (RFC 9207)
+            authorizationRequest.issClaim?.let { put("iss", it) }
             putAll(response.extraParameters)
         }
 

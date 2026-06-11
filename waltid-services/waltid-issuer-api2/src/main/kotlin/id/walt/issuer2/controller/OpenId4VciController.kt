@@ -132,19 +132,41 @@ class OpenId4VciController(
                     val state = call.request.queryParameters["state"]
                         ?: throw IllegalArgumentException("state parameter is missing in the callback request")
 
+                    println("[DEBUG] OAuth callback - state from Keycloak: $state")
                     val response = protocolService.processExternalAuthorizationCallback(
                         authServerState = state,
                         idToken = idToken,
                     )
-                    response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
+                    println("[DEBUG] OAuth callback response - status: ${response.status}, redirectUri: ${response.redirectUri}")
+                    response.redirectUri?.let { uri ->
+                        println("[DEBUG] Redirect URI details: $uri")
+                    }
                     response.redirectUri?.let { redirectUri ->
+                        // Don't manually append Location header - respondRedirect handles it
+                        response.headers.filterKeys { it.lowercase() != "location" }
+                            .forEach { (name, value) -> 
+                                println("[DEBUG] Response header: $name = $value")
+                                call.response.headers.append(name, value)
+                            }
                         call.respondRedirect(redirectUri)
-                    } ?: call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                    } ?: run {
+                        response.headers.forEach { (name, value) -> 
+                            println("[DEBUG] Response header: $name = $value")
+                            call.response.headers.append(name, value) 
+                        }
+                        call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
+                    }
                 }
             }
 
             post("token", OpenId4VciRoutesDocs.token()) {
-                val response = protocolService.processTokenRequest(call.receiveParameters().toMap())
+                val params = call.receiveParameters().toMap()
+                println("[DEBUG] Token endpoint request params: ${params.mapValues { (k, v) -> if (k.contains("assertion") || k.contains("verifier")) "${v.firstOrNull()?.take(50)}..." else v }}")
+                val response = protocolService.processTokenRequest(params)
+                println("[DEBUG] Token endpoint response: status=${response.status}, hasPayload=${response.payload.isNotEmpty()}")
+                if (response.status != 200) {
+                    println("[DEBUG] Token endpoint error payload: ${response.payload}")
+                }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 

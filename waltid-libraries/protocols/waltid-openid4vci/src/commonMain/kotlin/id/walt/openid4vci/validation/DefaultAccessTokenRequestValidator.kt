@@ -8,7 +8,10 @@ import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.serialization.SerializationException
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
+@OptIn(ExperimentalEncodingApi::class)
 class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
 
     override fun validate(parameters: Map<String, List<String>>, session: Session): AccessTokenRequestResult {
@@ -42,13 +45,42 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
         session: Session,
     ): AccessTokenRequestResult {
         // RFC6749 §4.1.3: client_id is optional; required only if client auth is not used.
-        val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() } ?: ""
+        // For private_key_jwt: extract client_id from client_assertion JWT (iss or sub claim)
+        var clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() }
+        
+        // If no explicit client_id but client_assertion is present, extract from JWT
+        if (clientId.isNullOrBlank()) {
+            parameters.optionalSingle("client_assertion")?.let { assertion ->
+                try {
+                    // JWT format: header.payload.signature
+                    val parts = assertion.split(".")
+                    if (parts.size == 3) {
+                        // Decode the payload (second part) - Base64 URL-safe
+                        val payload = parts[1]
+                        // Replace URL-safe characters and add padding if needed
+                        val base64 = payload.replace('-', '+').replace('_', '/')
+                        val padded = base64 + "=".repeat((4 - base64.length % 4) % 4)
+                        val decoded = Base64.decode(padded).decodeToString()
+                        // Simple JSON parsing to extract iss or sub
+                        val issMatch = Regex(""""iss"\s*:\s*"([^"]+)"""").find(decoded)
+                        val subMatch = Regex(""""sub"\s*:\s*"([^"]+)"""").find(decoded)
+                        clientId = issMatch?.groupValues?.get(1) ?: subMatch?.groupValues?.get(1)
+                        println("[DEBUG] Extracted client_id from JWT assertion: $clientId")
+                    }
+                } catch (e: Exception) {
+                    println("[DEBUG] Failed to extract client_id from client_assertion: ${e.message}")
+                }
+            }
+        }
+        
+        val finalClientId = clientId ?: ""
+        println("[DEBUG] Final client_id for token request: $finalClientId")
 
         // RFC6749 §4.1.3: redirect_uri is required only if it was in the authorize request; if supplied, it must be single-valued.
         val redirectUri = parameters.optionalSingle("redirect_uri")?.takeIf { it.isNotBlank() }
 
         val client = DefaultClient(
-            id = clientId,
+            id = finalClientId,
             redirectUris = listOfNotNull(redirectUri),
             responseTypes = setOf(ResponseType.CODE.value),
             grantTypes = setOf(GrantType.AuthorizationCode.value),
