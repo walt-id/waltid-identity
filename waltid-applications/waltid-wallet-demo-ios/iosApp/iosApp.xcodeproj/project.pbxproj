@@ -24,8 +24,8 @@
 		D69044562FDAA61A009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		D69044582FDAA6DB009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
 		D6B7A3542FD94CC6009C69E7 /* shared.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D6B7A3532FD94CC5009C69E7 /* shared.framework */; };
-		E2E00001AAAA000100000001 /* LocalEnterpriseBackendUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00001AAAA000000000001 /* LocalEnterpriseBackendUITests.swift */; };
-		E2E00002AAAA000100000002 /* EudiPublicBackendUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00002AAAA000000000002 /* EudiPublicBackendUITests.swift */; };
+		E2E00001AAAA000100000001 /* LocalEnterpriseBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00001AAAA000000000001 /* LocalEnterpriseBackendE2ETests.swift */; };
+		E2E00002AAAA000100000002 /* EudiPublicBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00002AAAA000000000002 /* EudiPublicBackendE2ETests.swift */; };
 		E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */; };
 /* End PBXBuildFile section */
 
@@ -86,8 +86,8 @@
 		D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TestHelpers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6B7A34A2FD94CC3009C69E7 /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D6B7A3532FD94CC5009C69E7 /* shared.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = shared.framework; path = ../shared/build/cocoapods/framework/shared.framework; sourceTree = "<group>"; };
-		E2E00001AAAA000000000001 /* LocalEnterpriseBackendUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEnterpriseBackendUITests.swift; sourceTree = "<group>"; };
-		E2E00002AAAA000000000002 /* EudiPublicBackendUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiPublicBackendUITests.swift; sourceTree = "<group>"; };
+		E2E00001AAAA000000000001 /* LocalEnterpriseBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEnterpriseBackendE2ETests.swift; sourceTree = "<group>"; };
+		E2E00002AAAA000000000002 /* EudiPublicBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiPublicBackendE2ETests.swift; sourceTree = "<group>"; };
 		E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		E2E00004AAAA000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -230,8 +230,8 @@
 		E2E00010AAAA000000000010 /* iosAppUITests */ = {
 			isa = PBXGroup;
 			children = (
-				E2E00001AAAA000000000001 /* LocalEnterpriseBackendUITests.swift */,
-				E2E00002AAAA000000000002 /* EudiPublicBackendUITests.swift */,
+				E2E00001AAAA000000000001 /* LocalEnterpriseBackendE2ETests.swift */,
+				E2E00002AAAA000000000002 /* EudiPublicBackendE2ETests.swift */,
 				E2E00003AAAA000000000003 /* WalletE2EHelpers.swift */,
 			);
 			path = iosAppUITests;
@@ -483,8 +483,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E2E00002AAAA000100000002 /* EudiPublicBackendUITests.swift in Sources */,
-				E2E00001AAAA000100000001 /* LocalEnterpriseBackendUITests.swift in Sources */,
+				E2E00002AAAA000100000002 /* EudiPublicBackendE2ETests.swift in Sources */,
+				E2E00001AAAA000100000001 /* LocalEnterpriseBackendE2ETests.swift in Sources */,
 				E2E00003AAAA000100000003 /* WalletE2EHelpers.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
