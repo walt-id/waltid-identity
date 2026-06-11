@@ -65,16 +65,15 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
                         val issMatch = Regex(""""iss"\s*:\s*"([^"]+)"""").find(decoded)
                         val subMatch = Regex(""""sub"\s*:\s*"([^"]+)"""").find(decoded)
                         clientId = issMatch?.groupValues?.get(1) ?: subMatch?.groupValues?.get(1)
-                        println("[DEBUG] Extracted client_id from JWT assertion: $clientId")
+                        // Successfully extracted client_id from JWT
                     }
                 } catch (e: Exception) {
-                    println("[DEBUG] Failed to extract client_id from client_assertion: ${e.message}")
+                    // Failed to parse JWT - will fall through to empty client_id
                 }
             }
         }
         
         val finalClientId = clientId ?: ""
-        println("[DEBUG] Final client_id for token request: $finalClientId")
 
         // RFC6749 §4.1.3: redirect_uri is required only if it was in the authorize request; if supplied, it must be single-valued.
         val redirectUri = parameters.optionalSingle("redirect_uri")?.takeIf { it.isNotBlank() }

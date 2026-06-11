@@ -18,6 +18,7 @@ import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
+import io.github.oshai.kotlinlogging.KotlinLogging
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.DefaultPARProvider
@@ -58,6 +59,8 @@ import kotlin.time.Duration.Companion.minutes
 
 private const val INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER = "_issuer2_session_id"
 private val AUTHORIZATION_CODE_SESSION_LIFETIME = 5.minutes
+
+private val logger = KotlinLogging.logger {}
 
 class OpenId4VciProtocolService(
     private val oauth2Provider: OAuth2Provider,
@@ -168,9 +171,9 @@ class OpenId4VciProtocolService(
         externalAuthorizationRequest: String?,
         internalAuthorizationRequest: String?,
     ) {
-        println("[DEBUG] processExternalLoginInterception called")
-        println("[DEBUG]   externalAuthorizationRequest: ${externalAuthorizationRequest?.take(200)}${if ((externalAuthorizationRequest?.length ?: 0) > 200) "..." else ""}")
-        println("[DEBUG]   internalAuthorizationRequest: ${internalAuthorizationRequest?.take(200)}${if ((internalAuthorizationRequest?.length ?: 0) > 200) "..." else ""}")
+        logger.debug { "Processing external login interception" }
+        logger.trace { "  externalAuthorizationRequest: ${externalAuthorizationRequest?.take(150)}..." }
+        logger.trace { "  internalAuthorizationRequest: ${internalAuthorizationRequest?.take(150)}..." }
         
         val externalState = externalAuthorizationRequest
             ?.substringAfter("?", missingDelimiterValue = "")

@@ -89,14 +89,14 @@ class OpenId4VciController(
             get("external_login/{internalAuthReq...}", OpenId4VciRoutesDocs.externalLogin()) {
                 // Manually trigger OAuth redirect to Keycloak
                 val allParams = call.parameters.getAll("internalAuthReq")
-                println("[DEBUG] external_login route hit - internalAuthReq params count: ${allParams?.size}")
+                logger.debug { "External login route hit - internalAuthReq params count: ${allParams?.size}" }
                 allParams?.forEachIndexed { idx, param ->
-                    println("[DEBUG]   [$idx]: ${param.take(200)}${if (param.length > 200) "..." else ""}")
+                    logger.trace { "  internalAuthReq[$idx]: ${param.take(200)}${if (param.length > 200) "..." else ""}" }
                 }
                 val internalAuthReq = allParams?.joinToString("/") 
                     ?: error("Missing internalAuthReq")
                 val internalAuthorizationRequest = internalAuthReq
-                println("[DEBUG] Joined internalAuthorizationRequest length: ${internalAuthorizationRequest.length}")
+                logger.debug { "Joined internalAuthorizationRequest length: ${internalAuthorizationRequest.length}" }
                 
                 // Build Keycloak redirect URL
                 val authConfig = ConfigManager.getConfig<AuthenticationServiceConfig>()
@@ -132,26 +132,24 @@ class OpenId4VciController(
                     val state = call.request.queryParameters["state"]
                         ?: throw IllegalArgumentException("state parameter is missing in the callback request")
 
-                    println("[DEBUG] OAuth callback - state from Keycloak: $state")
+                    logger.debug { "OAuth callback - state from Keycloak: $state" }
                     val response = protocolService.processExternalAuthorizationCallback(
                         authServerState = state,
                         idToken = idToken,
                     )
-                    println("[DEBUG] OAuth callback response - status: ${response.status}, redirectUri: ${response.redirectUri}")
-                    response.redirectUri?.let { uri ->
-                        println("[DEBUG] Redirect URI details: $uri")
-                    }
+                    logger.debug { "OAuth callback response - status: ${response.status}, redirectUri: ${response.redirectUri?.take(100)}" }
+                    
                     response.redirectUri?.let { redirectUri ->
                         // Don't manually append Location header - respondRedirect handles it
                         response.headers.filterKeys { it.lowercase() != "location" }
                             .forEach { (name, value) -> 
-                                println("[DEBUG] Response header: $name = $value")
+                                logger.trace { "OAuth callback response header: $name = $value" }
                                 call.response.headers.append(name, value)
                             }
                         call.respondRedirect(redirectUri)
                     } ?: run {
                         response.headers.forEach { (name, value) -> 
-                            println("[DEBUG] Response header: $name = $value")
+                            logger.trace { "OAuth callback response header: $name = $value" }
                             call.response.headers.append(name, value) 
                         }
                         call.respond(HttpStatusCode.fromValue(response.status), response.body ?: "")
@@ -161,27 +159,43 @@ class OpenId4VciController(
 
             post("token", OpenId4VciRoutesDocs.token()) {
                 val params = call.receiveParameters().toMap()
-                println("[DEBUG] Token endpoint request params: ${params.mapValues { (k, v) -> if (k.contains("assertion") || k.contains("verifier")) "${v.firstOrNull()?.take(50)}..." else v }}")
+                logger.debug { 
+                    "Token endpoint request - grant_type: ${params["grant_type"]?.firstOrNull()}, " +
+                    "code: ${params["code"]?.firstOrNull()?.take(20)}..., " +
+                    "client_auth: ${if (params.containsKey("client_assertion")) "private_key_jwt" else if (params.containsKey("client_secret")) "client_secret" else "none"}" 
+                }
                 val response = protocolService.processTokenRequest(params)
-                println("[DEBUG] Token endpoint response: status=${response.status}, hasPayload=${response.payload.isNotEmpty()}")
+                logger.debug { "Token endpoint response - status: ${response.status}, hasPayload: ${response.payload.isNotEmpty()}" }
                 if (response.status != 200) {
-                    println("[DEBUG] Token endpoint error payload: ${response.payload}")
+                    logger.warn { "Token endpoint error: ${response.payload}" }
                 }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
             post("nonce", OpenId4VciRoutesDocs.nonce()) {
+                // RFC 6749 requires cache-control: no-store for token-like responses
+                call.response.headers.append("cache-control", "no-store")
                 call.respond(buildJsonObject {
                     protocolService.createNonceResponse().forEach { (key, value) -> put(key, value) }
                 })
             }
 
             post("credential", OpenId4VciRoutesDocs.credential()) {
-                val accessToken = call.request.headers[HttpHeaders.Authorization]
-                    ?.substringAfter("Bearer ")
-                    ?: throw IllegalArgumentException("No bearer access token found")
+                val authHeader = call.request.headers[HttpHeaders.Authorization]
+                    ?: throw IllegalArgumentException("No Authorization header found")
+                // Handle both "Bearer" and "bearer" (case-insensitive per RFC 6750 §2.1)
+                val accessToken = when {
+                    authHeader.startsWith("Bearer ", ignoreCase = true) -> authHeader.substring(7)
+                    else -> throw IllegalArgumentException("Authorization header must start with Bearer")
+                }
+                logger.debug { "Credential request - access token length: ${accessToken.length}" }
                 val request = call.receive<JsonObject>()
+                logger.trace { "Credential request payload: ${request.toString().take(200)}..." }
                 val response = protocolService.processCredentialRequest(accessToken, request)
+                logger.debug { "Credential response - status: ${response.status}" }
+                if (response.status != 200) {
+                    logger.warn { "Credential endpoint error: ${response.payload}" }
+                }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
         }
