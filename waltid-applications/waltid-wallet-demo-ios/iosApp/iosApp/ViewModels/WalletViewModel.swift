@@ -79,17 +79,26 @@ class WalletViewModel: ObservableObject {
 
     private func bootstrap() {
         setLoading("Bootstrapping wallet...")
+        logE2E("Bootstrap started")
         Task {
             do {
+                logE2E("Bootstrap: calling controller.bootstrap()")
                 let result = try await controller.bootstrap()
+                logE2E("Bootstrap: success, DID: \(result.message)")
+
+                logE2E("Bootstrap: calling controller.listCredentials()")
                 let list = try await controller.listCredentials()
+                logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
+
                 await MainActor.run {
                     self.did = result.message
                     self.credentials = list
                     self.isReady = true
                     self.setSuccess("Wallet ready")
+                    logE2E("Bootstrap: completed successfully, wallet is ready")
                 }
             } catch {
+                logE2E("Bootstrap: FAILED with error: \(error.localizedDescription)")
                 await MainActor.run {
                     self.setError("Bootstrap failed: \(error.localizedDescription)")
                 }

@@ -56,22 +56,64 @@ runs:
           -only-testing:iosAppTests \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
+    - name: Prepare simulator for UI tests
+      shell: bash
+      run: |
+        # Get the simulator UUID for iPhone 17
+        SIMULATOR_UUID=$(xcrun simctl list devices available | grep "iPhone 17 (" | grep -v "Pro" | head -1 | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
+        echo "Using simulator: $SIMULATOR_UUID"
+
+        # Boot the simulator explicitly
+        xcrun simctl boot "$SIMULATOR_UUID" || true
+
+        # Wait for it to be ready
+        timeout 60 bash -c "while ! xcrun simctl list devices | grep '$SIMULATOR_UUID' | grep -q Booted; do sleep 1; done" || true
+
+        # Set privacy permissions to avoid prompts
+        xcrun simctl privacy "$SIMULATOR_UUID" grant all id.walt.iosApp || true
+
+        echo "Simulator ready: $SIMULATOR_UUID"
+
     - name: Execute iOS demo app UI tests (EUDI public backend only)
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
       run: |
+        # Capture simulator logs in background
+        SIMULATOR_UUID=$(xcrun simctl list devices available | grep "iPhone 17 (" | grep -v "Pro" | head -1 | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
+        echo "Starting log capture for simulator: $SIMULATOR_UUID"
+        xcrun simctl spawn "$SIMULATOR_UUID" log stream --predicate 'processImagePath contains "iosApp"' > test-simulator.log 2>&1 &
+        LOG_PID=$!
+
+        # Run tests with detailed output
+        set +e
         xcodebuild test \
           -workspace iosApp.xcworkspace \
           -scheme iosApp \
-          -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+          -destination "id=$SIMULATOR_UUID" \
           -only-testing:iosAppUITests/EudiPublicBackendE2ETests \
           -resultBundlePath TestResults \
-          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+          -derivedDataPath DerivedData \
+          -enableCodeCoverage NO \
+          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES 2>&1 | tee xcodebuild-output.log
+        TEST_EXIT_CODE=$?
+        set -e
 
-    - name: Upload iOS test results
+        # Stop log capture
+        kill $LOG_PID 2>/dev/null || true
+
+        # Show last 100 lines of app logs
+        echo "=== Last 100 lines of app logs ==="
+        tail -100 test-simulator.log || echo "No app logs captured"
+
+        exit $TEST_EXIT_CODE
+
+    - name: Upload iOS test results and logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: ios-ui-test-results
-        path: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult
+        path: |
+          ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult
+          ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/test-simulator.log
+          ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/xcodebuild-output.log
         retention-days: 7
