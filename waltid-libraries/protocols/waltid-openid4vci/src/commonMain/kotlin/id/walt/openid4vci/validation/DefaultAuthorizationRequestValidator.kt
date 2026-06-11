@@ -50,6 +50,7 @@ class DefaultAuthorizationRequestValidator(
 
             // RFC6749 §3.3 and §4.1.1: scope is optional; if present, space-delimited and case-sensitive.
             val requestedScopes = parameters.optionalAll("scope").toSet()
+            val authorizationDetails = parameters.optionalAuthorizationDetails()
 
             val request = DefaultAuthorizationRequest(
                 client = client,
@@ -61,6 +62,7 @@ class DefaultAuthorizationRequestValidator(
                 responseMode = ResponseMode.QUERY,
                 defaultResponseMode = ResponseMode.QUERY,
                 requestForm = parameters.toMutableMap(),
+                authorizationDetails = authorizationDetails,
             )
 
             issuerState?.let { value ->

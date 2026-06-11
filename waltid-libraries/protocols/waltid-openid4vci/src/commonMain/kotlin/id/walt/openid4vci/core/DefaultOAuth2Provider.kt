@@ -16,20 +16,26 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.withOptions
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
+import id.walt.openid4vci.metadata.issuer.CredentialDisplay
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.crypto.keys.Key
+import id.walt.mdoc.objects.mso.Status
 import id.walt.openid4vci.tokens.AccessTokenContext
-import id.walt.oid4vc.data.DisplayProperties
 import id.walt.sdjwt.SDMap
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlin.time.Instant
 
 
 /**
@@ -142,13 +148,21 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult {
+    override suspend fun createAccessTokenResponse(
+        request: AccessTokenRequest,
+        options: TokenResponseOptions,
+    ): AccessTokenResponseResult {
         for (handler in config.tokenEndpointHandlers.toList()) {
             if (!handler.canHandleTokenEndpointRequest(request)) {
                 continue
             }
 
-            return handler.handleTokenEndpointRequest(request)
+            return when (val result = handler.handleTokenEndpointRequest(request)) {
+                is AccessTokenResponseResult.Success -> result.copy(
+                    response = result.response.withOptions(options, result.request),
+                )
+                is AccessTokenResponseResult.Failure -> result
+            }
         }
 
         val description = request.grantTypes.joinToString(" ").takeIf { it.isNotBlank() }
@@ -227,11 +241,15 @@ class DefaultOAuth2Provider(
         issuerKey: Key,
         issuerId: String,
         credentialData: JsonObject,
-        dataMapping: JsonObject? ,
+        dataMapping: JsonObject?,
         selectiveDisclosure: SDMap?,
-        x5Chain: List<String>?,
-        display: List<DisplayProperties>?,
+        x5Chain: List<CertificateDer>?,
+        display: List<CredentialDisplay>?,
         w3cVersion: String?,
+        mDocNameSpacesDataMappingConfig: Map<String, LegacyMdocJsonObjectToCborMappingConfig>?,
+        credentialStatus: Status?,
+        validFrom: Instant?,
+        validUntil: Instant?,
     ): CredentialResponseResult {
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
@@ -251,6 +269,10 @@ class DefaultOAuth2Provider(
             x5Chain = x5Chain,
             display = display,
             w3cVersion = w3cVersion,
+            mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
+            credentialStatus = credentialStatus,
+            validFrom = validFrom,
+            validUntil = validUntil,
         )
     }
 
@@ -275,7 +297,7 @@ class DefaultOAuth2Provider(
                         "credentials",
                         issued.map { credentialEntry ->
                             val credentialValue = credentialEntry.credential.let { element ->
-                                if (element is kotlinx.serialization.json.JsonPrimitive && element.isString) {
+                                if (element is JsonPrimitive && element.isString) {
                                     element.content
                                 } else {
                                     element.toString()

@@ -12,6 +12,7 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.authorization.VerifierInfoItem
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.utils.UrlUtils
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -51,7 +52,9 @@ data class GeneralFlowConfig(
     /** request signing key */
     val key: DirectSerializedKey? = null,
     /** certificate chain for signed request */
-    val x5c: List<String>? = null
+    val x5c: List<String>? = null,
+
+    @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null
 ) {
     init {
         // Verify if DCQL Query is correct
@@ -132,9 +135,9 @@ data class CrossDeviceFlowSetup(
             )
         )
 
-        val EXAMPLE_ISO_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
+        val EXAMPLE_EUDI_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
             core = BASE_EXAMPLE.core.copy(
-                dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_ISO_PID
+                dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_EUDI_PID
             )
         )
     }

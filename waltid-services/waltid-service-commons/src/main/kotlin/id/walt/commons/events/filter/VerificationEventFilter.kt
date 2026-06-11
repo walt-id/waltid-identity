@@ -1,12 +1,11 @@
 package id.walt.commons.events.filter
 
 import id.walt.commons.events.DeviceFlow
-import id.walt.oid4vc.data.CredentialFormat
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class VerificationEventFilter(
-    val format: Set<CredentialFormat>? = null,
+    val format: Set<String>? = null,
     val signatureAlgorithm: Set<String>? = null,
     val sessionId: String? = null,
     val holder: Set<String>? = null,

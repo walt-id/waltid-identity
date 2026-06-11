@@ -32,13 +32,20 @@ class AWSKey(
 
     @Transient
     override var keyType: KeyType
-        get() = _keyType!!
+        get() = _keyType ?: throw IllegalStateException("Key type not initialized. Call init() first or provide _keyType.")
         set(value) {
             _keyType = value
         }
 
     override val hasPrivateKey: Boolean
         get() = true
+
+    override suspend fun init() {
+        if (_keyType == null) {
+            val publicKey = getPublicKey()
+            _keyType = publicKey.keyType
+        }
+    }
 
 
     override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
@@ -194,6 +201,7 @@ class AWSKey(
                 keySpec = KeySpec.fromValue(keyTypeToAwsKeyMapping(keyType))
                 keyUsage = KeyUsageType.SignVerify
                 tags = awsTags
+                multiRegion = config.multiRegion
             }
 
             val response = KmsClient { region = config.auth.region }.use { kms ->

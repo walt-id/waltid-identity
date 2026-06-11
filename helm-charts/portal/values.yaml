@@ -18,4 +18,4 @@ image:
 
 ingress:
   host: "portal.waltid.cloud"
-  ingressClassName: "nginx"
+  ingressClassName: "traefik"

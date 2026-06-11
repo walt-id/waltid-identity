@@ -1,6 +1,7 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
 import id.walt.openid4vci.handlers.credential.W3cJwtVcCredentialHandler
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeAuthorizationEndpoint
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeTokenEndpoint
@@ -127,5 +128,10 @@ private fun registerDefaultCredentialHandlers(
     val jwtVcFormat = CredentialFormat.JWT_VC
     if (config.credentialEndpointHandlers.get(jwtVcFormat) == null) {
         config.credentialEndpointHandlers.register(jwtVcFormat, W3cJwtVcCredentialHandler())
+    }
+
+    val mdocFormat = CredentialFormat.MSO_MDOC
+    if (config.credentialEndpointHandlers.get(mdocFormat) == null) {
+        config.credentialEndpointHandlers.register(mdocFormat, MdocCredentialHandler())
     }
 }

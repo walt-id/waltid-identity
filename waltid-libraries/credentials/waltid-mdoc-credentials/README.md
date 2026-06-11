@@ -12,9 +12,9 @@
   
   <h2>Status</h2>
   <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+    <img src="https://img.shields.io/badge/�%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
     <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+    <em>This project is planned for deprecation. Our new libraries and services use the waltid-mdoc-credentials2 library instead.</em>
   </p>
 </div>
 

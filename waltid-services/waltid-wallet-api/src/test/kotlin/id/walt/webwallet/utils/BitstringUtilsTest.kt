@@ -7,14 +7,14 @@ class BitstringUtilsTest {
     private val bitString = hexToByteArray("A265")//0b10100010_01100101
 
     @Test
-    fun `test unit bitsize, no overflow`() {
+    fun validateUnitBitsizeNoOverflow() {
         val value = BitstringUtils.getBitValue(inputStream = bitString.inputStream(), index = 6UL, bitSize = 1)
         assertNotNull(value)
         assertEquals(expected = "1", actual = value.joinToString(""))
     }
 
     @Test
-    fun `test non-unit bitsize, no overflow`() {
+    fun validateNonUnitBitsizeNoOverflow() {
         val value = BitstringUtils.getBitValue(inputStream = bitString.inputStream(), index = 4UL, bitSize = 3)
         assertNotNull(value)
         assertEquals(expected = "010", actual = value.joinToString(""))
@@ -22,7 +22,7 @@ class BitstringUtilsTest {
 
     @Test
     @Ignore
-    fun `test unit bitsize, with overflow`() {
+    fun validateUnitBitsizeWithOverflow() {
         assertFailsWith<IllegalStateException> {
             BitstringUtils.getBitValue(
                 inputStream = bitString.inputStream(),
@@ -34,7 +34,7 @@ class BitstringUtilsTest {
 
     @Test
     @Ignore
-    fun `test non-unit bitsize, with overflow`() {
+    fun validateNonUnitBitsizeWithOverflow() {
         assertFailsWith<IllegalStateException> {
             BitstringUtils.getBitValue(
                 inputStream = bitString.inputStream(),
