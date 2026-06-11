@@ -35,3 +35,16 @@ jobs:
           script: |
             cd waltid-identity
             ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:connectedAndroidDeviceTest --info
+
+      - name: Run Android wallet demo E2E tests (EUDI public backend only)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: true
+          script: |
+            cd waltid-identity
+            ./gradlew :waltid-applications:waltid-wallet-demo-android:connectedAndroidTest \
+              -Pandroid.testInstrumentationRunnerArguments.notClass=id.walt.walletdemo.LocalEnterpriseBackendE2ETest \
+              --info
