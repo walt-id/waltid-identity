@@ -3,6 +3,7 @@ package id.walt.walletdemo
 import android.content.Intent
 import android.net.Uri
 import android.util.Base64
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
@@ -27,6 +28,7 @@ import org.junit.runner.RunWith
 class EudiPublicBackendE2ETest {
 
     companion object {
+        private const val TAG = "WalletE2E"
         private const val DEFAULT_CREDENTIAL_ID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
 
         private const val WALLET_READY_TIMEOUT = 60_000L          // 1 min - wallet bootstrap
@@ -54,6 +56,7 @@ class EudiPublicBackendE2ETest {
             ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
+        Log.i(TAG, "App launched, waiting for wallet ready...")
 
         assertTrue(
             "Wallet did not become ready",
@@ -64,12 +67,22 @@ class EudiPublicBackendE2ETest {
                 failurePrefixes = listOf("Bootstrap failed")
             )
         )
+        Log.i(TAG, "Wallet ready, sending deep link: $offerUrl")
 
         val deepLinkIntent = Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl)).apply {
             `package` = context.packageName
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(deepLinkIntent)
+        Log.i(TAG, "Deep link sent, waiting 2 seconds for processing...")
+        // Give the app a moment to process the deep link before checking UI
+        Thread.sleep(2000)
+
+        // Debug: dump all text elements to see what's visible
+        val allTexts = device.findObjects(By.clazz("android.widget.TextView"))
+        Log.i(TAG, "Visible text elements (${allTexts.size}):")
+        allTexts.take(10).forEach { Log.i(TAG, "  - '${it.text}'") }
+
         assertTrue(
             "Offer URL did not appear in UI after deep link",
             waitForOfferUrlInUi(device, timeoutMs = UI_ELEMENT_TIMEOUT)
