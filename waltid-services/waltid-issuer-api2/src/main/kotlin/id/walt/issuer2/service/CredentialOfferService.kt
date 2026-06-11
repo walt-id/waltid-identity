@@ -16,11 +16,8 @@ import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
 import java.util.UUID
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -33,11 +30,6 @@ class CredentialOfferService(
     private val config: Issuer2ServiceConfig,
     private val notificationService: IssuanceNotificationService,
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        explicitNulls = false
-    }
-
     suspend fun createCredentialOffer(request: CredentialOfferCreateRequest): CredentialOfferCreateResponse {
         val profile = profileService.resolveProfile(request.profileId)
         val sessionId = request.sessionId ?: UUID.randomUUID().toString()
@@ -138,7 +130,6 @@ class CredentialOfferService(
         notificationService.notify(
             session = session,
             event = IssuanceSessionEvent.resolved_credential_offer,
-            data = json.encodeToJsonElement(credentialOffer).jsonObject,
         )
         return credentialOffer
     }

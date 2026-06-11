@@ -41,12 +41,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
@@ -198,9 +195,6 @@ class OpenId4VciProtocolService(
         notificationService.notify(
             session = session,
             event = IssuanceSessionEvent.requested_token,
-            data = buildJsonObject {
-                put("request", json.encodeToJsonElement(session))
-            },
         )
 
         return oauth2Provider.writeAccessTokenResponse(updatedAccessTokenRequest, response)
@@ -500,7 +494,6 @@ class OpenId4VciProtocolService(
                 notificationService.notify(
                     session = session,
                     event = IssuanceSessionEvent.sdjwt_issue,
-                    data = buildJsonObject { put("sdjwt", credential) },
                 )
 
             CredentialFormat.JWT_VC_JSON,
@@ -509,14 +502,12 @@ class OpenId4VciProtocolService(
                 notificationService.notify(
                     session = session,
                     event = IssuanceSessionEvent.jwt_issue,
-                    data = buildJsonObject { put("jwt", credential) },
                 )
 
             CredentialFormat.MSO_MDOC ->
                 notificationService.notify(
                     session = session,
                     event = IssuanceSessionEvent.generated_mdoc,
-                    data = buildJsonObject { put("mdoc", credential.toMDocCallbackHex(doctype)) },
                 )
 
             CredentialFormat.LDP_VC -> Unit

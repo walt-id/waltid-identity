@@ -17,6 +17,7 @@ import id.walt.issuer2.testsupport.credentialRequest
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.issuer2TestJson
 import id.walt.issuer2.testsupport.resolveOffer
+import id.walt.ktornotifications.core.KtorSessionUpdate
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
@@ -38,16 +39,15 @@ import io.ktor.server.testing.testApplication
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.readUTF8Line
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.time.Duration.Companion.milliseconds
 
 class IssuanceNotificationRouteTest {
 
@@ -57,7 +57,7 @@ class IssuanceNotificationRouteTest {
     }
 
     @Test
-    fun webhookReceiverGetsIssuer1CompatiblePreAuthorizedEvents() = testApplication {
+    fun webhookReceiverGetsEnterpriseNotificationEnvelopeForPreAuthorizedEvents() = testApplication {
         val notificationServer = Issuer2TestNotificationServer()
         notificationServer.startServer()
 
@@ -88,43 +88,45 @@ class IssuanceNotificationRouteTest {
             expectedEvents.forEach { notificationServer.awaitEvent(createdOffer.offerId, it) }
 
             val receivedUpdates = notificationServer.getReceivedUpdates()
-                .filter { it.id == createdOffer.offerId }
-            assertEquals(expectedEvents, receivedUpdates.map { it.type })
+                .filter { it.target == createdOffer.offerId }
+            assertEquals(expectedEvents.map { it.toString() }, receivedUpdates.map { it.event })
 
             val requestedToken = assertNotNull(
-                receivedUpdates.first { it.type == IssuanceSessionEvent.requested_token }
-                    .data["request"]
-                    ?.jsonObject
+                receivedUpdates.first { it.event == IssuanceSessionEvent.requested_token.toString() }
+                    .session
             )
             assertEquals(createdOffer.offerId, requestedToken["sessionId"]?.jsonPrimitive?.contentOrNull)
             assertEquals("UniversityDegree_jwt_vc_json", requestedToken["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
 
-            val jwtIssue = receivedUpdates.first { it.type == IssuanceSessionEvent.jwt_issue }
-            assertNotNull(jwtIssue.data["jwt"]?.jsonPrimitive?.contentOrNull)
+            val jwtIssue = receivedUpdates.first { it.event == IssuanceSessionEvent.jwt_issue.toString() }
+            assertEquals(createdOffer.offerId, jwtIssue.session["sessionId"]?.jsonPrimitive?.contentOrNull)
 
-            val status = receivedUpdates.first { it.type == IssuanceSessionEvent.issuance_status }
-            assertEquals("SUCCESSFUL", status.data["status"]?.jsonPrimitive?.contentOrNull)
-            assertEquals("true", status.data["closed"]?.jsonPrimitive?.contentOrNull)
+            val status = receivedUpdates.first { it.event == IssuanceSessionEvent.issuance_status.toString() }
+            assertEquals("SUCCESSFUL", status.session["status"]?.jsonPrimitive?.contentOrNull)
+            assertEquals("true", status.session["isClosed"]?.jsonPrimitive?.contentOrNull)
         } finally {
             notificationServer.stopServer()
         }
     }
 
     @Test
-    fun sseRouteStreamsSameNotificationEnvelope() = testApplication {
+    fun sseRouteStreamsEnterpriseNotificationEnvelope() = testApplication {
         installIssuer2WithConfigFiles()
         val client = apiClient()
         val createdOffer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_BY_REFERENCE)
 
-        val resolvedOffer = createdOffer.resolveOffer(client)
-        val update = client.readFirstSseUpdate(createdOffer.offerId)
+        var resolvedOfferCredentialIssuer: String? = null
+        val update = client.readFirstSseUpdate(createdOffer.offerId) {
+            resolvedOfferCredentialIssuer = createdOffer.resolveOffer(client).credentialIssuer
+        }
 
-        assertEquals(createdOffer.offerId, update.id)
-        assertEquals(IssuanceSessionEvent.resolved_credential_offer, update.type)
-        assertEquals(resolvedOffer.credentialIssuer, update.data["credential_issuer"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(createdOffer.offerId, update.target)
+        assertEquals(IssuanceSessionEvent.resolved_credential_offer.toString(), update.event)
+        assertEquals(createdOffer.offerId, update.session["sessionId"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("UniversityDegree_jwt_vc_json", update.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
         assertEquals(
-            resolvedOffer.credentialConfigurationIds.single(),
-            update.data["credential_configuration_ids"]?.jsonArray?.single()?.jsonPrimitive?.contentOrNull,
+            resolvedOfferCredentialIssuer,
+            update.session["credentialOffer"]?.jsonObject?.get("credential_issuer")?.jsonPrimitive?.contentOrNull,
         )
     }
 
@@ -173,23 +175,27 @@ class IssuanceNotificationRouteTest {
         return credentialResponse.body()
     }
 
-    private suspend fun HttpClient.readFirstSseUpdate(sessionId: String): IssuanceSessionUpdate =
-        withTimeout(5_000) {
+    private suspend fun HttpClient.readFirstSseUpdate(
+        sessionId: String,
+        trigger: suspend () -> Unit,
+    ): KtorSessionUpdate =
+        withTimeout(5_000.milliseconds) {
             prepareGet("/issuer2/sessions/$sessionId/events") {
                 accept(ContentType.Text.EventStream)
             }.execute { response ->
                 assertEquals(HttpStatusCode.OK, response.status)
+                trigger()
                 readFirstSseUpdate(response.bodyAsChannel())
             }
         }
 
-    private suspend fun readFirstSseUpdate(channel: ByteReadChannel): IssuanceSessionUpdate {
+    private suspend fun readFirstSseUpdate(channel: ByteReadChannel): KtorSessionUpdate {
         while (true) {
             val line = channel.readUTF8Line()
                 ?: error("SSE stream closed before an event was received")
             if (line.startsWith("data:")) {
                 val data = line.removePrefix("data:").trim()
-                if (data.isNotEmpty()) {
+                if (data.isNotEmpty() && data != "{}") {
                     return issuer2TestJson.decodeFromString(data)
                 }
             }
