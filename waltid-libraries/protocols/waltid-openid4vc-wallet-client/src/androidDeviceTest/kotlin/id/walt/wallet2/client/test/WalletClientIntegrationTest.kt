@@ -15,15 +15,18 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Android instrumented test for the wallet-client library.
+ * Android integration tests for the wallet-client library.
  *
  * Exercises the full mobile stack: AndroidKeyStore crypto + SQLDelight persistence
  * + OID4VCI/VP protocol against the public EUDI test backend.
  *
  * Uses runBlocking (not runTest) because real network I/O requires real time
  * dispatchers — runTest's virtual time expires HTTP timeouts immediately.
+ *
+ * These are integration tests (not E2E UI tests) - they test the library directly
+ * without UI automation. Run on every PR for fast feedback.
  */
-class WalletClientDeviceTest {
+class WalletClientIntegrationTest {
 
     companion object {
         private const val TEST_WALLET_ID = "android-device-test-wallet"

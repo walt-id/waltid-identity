@@ -1,7 +1,14 @@
 import XCTest
 import TestHelpers
 
-final class LocalEnterpriseBackendUITests: XCTestCase {
+/// End-to-end UI test for the wallet demo app against local enterprise backend.
+///
+/// Tests the full user flow: launch app → receive credential → present credential
+/// Uses XCUIApplication for UI interaction and TestHelpers for backend operations.
+///
+/// This is an E2E test (slow, requires UI automation + local infrastructure) - runs locally only.
+/// Requires: enterprise stack running + ngrok tunnel
+final class LocalEnterpriseBackendE2ETests: XCTestCase {
     private let client = WalletE2EClient()
 
     // Timeouts (aligned with Android for cross-platform consistency)

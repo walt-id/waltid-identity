@@ -18,7 +18,7 @@ ISSUER_PROFILE="${ISSUER_PROFILE:-}"
 VERIFIER="${VERIFIER:-verifier2}"
 ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 HOST_ALIAS_DOMAIN="${HOST_ALIAS_DOMAIN:-}"
-TEST_CLASS="id.walt.walletdemo.LocalEnterpriseBackendInstrumentedTest"
+TEST_CLASS="id.walt.walletdemo.LocalEnterpriseBackendE2ETest"
 
 ATTESTED=false
 for arg in "$@"; do

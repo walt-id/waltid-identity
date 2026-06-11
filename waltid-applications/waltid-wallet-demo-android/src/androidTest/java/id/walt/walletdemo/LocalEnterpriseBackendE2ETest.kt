@@ -16,8 +16,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * End-to-end UI test for the wallet demo app against local enterprise backend.
+ *
+ * Tests the full user flow: launch app → receive credential → present credential
+ * Uses UIAutomator for UI interaction and shared LocalEnterpriseTestBackend for backend operations.
+ *
+ * This is an E2E test (slow, requires UI automation + local infrastructure) - runs locally only.
+ * Requires: enterprise stack running + ngrok tunnel + adb reverse tcp:7500
+ */
 @RunWith(AndroidJUnit4::class)
-class LocalEnterpriseBackendInstrumentedTest {
+class LocalEnterpriseBackendE2ETest {
 
     companion object {
         private const val DEFAULT_ADMIN_EMAIL = "admin@walt.id"

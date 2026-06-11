@@ -5,22 +5,23 @@ Shared test infrastructure for iOS and Android mobile wallet tests.
 ## Overview
 
 This module provides:
-- **Shared test backend helpers** - EUDI test backend integration for credential offer generation
+- **EudiTestBackend** - EUDI public backend integration (offer generation, verifier transactions)
+- **LocalEnterpriseTestBackend** - Walt.ID Enterprise backend integration (authentication, offers, verification)
 - **Test utilities** - Common mobile testing helpers
-- **KMP test infrastructure** - Accessible from both Android (Kotlin) and iOS (via KMP bridge)
+- **KMP test infrastructure** - Accessible from both Android (Kotlin) and iOS (via Swift TestHelpers)
 
 ## Module Structure
 
 ```
 waltid-mobile-test-utils/
 ├── src/
-│   ├── commonTest/kotlin/
-│   │   ├── backend/                     # Test backend helpers
-│   │   │   └── EudiTestBackend.kt      # EUDI backend integration
-│   │   └── helpers/                     # Test flow helpers
-│   ├── androidDeviceTest/              # Android-specific test utilities
-│   └── iosMain/                        # iOS bridge exports
+│   └── commonMain/kotlin/
+│       └── backend/                          # Test backend helpers
+│           ├── EudiTestBackend.kt            # EUDI public backend integration
+│           └── LocalEnterpriseTestBackend.kt # Enterprise backend integration
 ```
+
+**Note:** Utilities are in `commonMain` (not `commonTest`) to allow cross-module sharing while remaining test-only via module-level dependency configuration.
 
 ## Usage
 
@@ -29,16 +30,18 @@ waltid-mobile-test-utils/
 Add dependency to your module's `build.gradle.kts`:
 
 ```kotlin
+// For library tests
 sourceSets {
-    commonTest.dependencies {
-        implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
-    }
-    
     val androidDeviceTest by getting {
         dependencies {
             implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
         }
     }
+}
+
+// For demo app E2E tests
+dependencies {
+    androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
 }
 ```
 
@@ -46,23 +49,87 @@ Use in tests:
 
 ```kotlin
 import id.walt.mobile.test.backend.EudiTestBackend
+import id.walt.mobile.test.backend.LocalEnterpriseTestBackend
 
-class MyWalletTest {
+// EUDI Public Backend
+class EudiIntegrationTest {
     @Test
     fun testReceiveCredential() = runBlocking {
         // Generate offer from EUDI backend
         val offer = EudiTestBackend.generateOffer()
         
-        // Use offer.offerUrl with your wallet client
-        val result = walletClient.receiveCredential(offer.offerUrl)
-        assertTrue(result.success)
+        // Use with wallet client
+        val result = walletClient.receive(offer.offerUrl)
+        assertTrue(result.isNotEmpty())
+        
+        // Create verifier transaction
+        val credentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offer.offerUrl)
+        val verifier = EudiTestBackend.createVerifierTransaction(credentialId)
+        
+        // Present credential
+        val presentResult = walletClient.present(verifier.authorizationRequestUri)
+        assertTrue(presentResult.success)
+        
+        // Wait for verifier confirmation
+        EudiTestBackend.waitForVerifierSuccess(verifier.transactionId)
+    }
+}
+
+// Local Enterprise Backend
+class EnterpriseIntegrationTest {
+    private val httpClient = HttpClient(Android)
+    
+    @Test
+    fun testEnterpriseFlow() = runBlocking {
+        val config = LocalEnterpriseTestBackend.BackendConfig(
+            apiBaseUrl = "https://your-ngrok-domain.ngrok.io",
+            ngrokBaseUrl = "https://your-ngrok-domain.ngrok.io",
+            adminEmail = "admin@walt.id",
+            adminPassword = "admin123456",
+            org = "waltid",
+            tenant = "tenant01",
+            issuerProfile = "issuer.mdl-profile",
+            verifier = "verifier"
+        )
+        
+        // Authenticate
+        val token = LocalEnterpriseTestBackend.getAdminToken(config, httpClient)
+        
+        // Create offer
+        val offerUrl = LocalEnterpriseTestBackend.createPreAuthorizedOffer(config, token, httpClient)
+        
+        // Create verifier session
+        val session = LocalEnterpriseTestBackend.createVerifierSession(config, token, httpClient)
+        
+        // ... use with wallet ...
+        
+        // Wait for verification
+        LocalEnterpriseTestBackend.waitForVerifierSuccess(config, session.sessionId, httpClient)
     }
 }
 ```
 
 ### iOS (Swift)
 
-**Note:** iOS cannot directly import from `commonTest` in KMP. iOS tests should keep the existing Swift `EudiTestBackend` implementation in the app bundle. The Kotlin version in this module is used by Android tests only.
+**Note:** iOS cannot directly import from Kotlin `commonMain` in KMP for test utilities. iOS uses the **TestHelpers framework** located in `waltid-applications/waltid-wallet-demo-ios/iosApp/TestHelpers/` which provides equivalent Swift implementations.
+
+```swift
+import TestHelpers
+
+class EudiIntegrationTests: XCTestCase {
+    func testReceiveCredential() async throws {
+        // Generate offer via EudiOfferFlow
+        let flow = EudiOfferFlow(client: WalletE2EClient())
+        let offerURL = try await flow.generate(credentialID: "eu.europa.ec.eudi.pid_vc_sd_jwt")
+        
+        // Use with wallet controller
+        let result = try await controller.receive(offerURL)
+        XCTAssertTrue(result.success)
+    }
+}
+```
+
+See `TestHelpers/` framework documentation for full Swift API.
 
 ## Test Backends
 

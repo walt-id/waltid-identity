@@ -3,12 +3,15 @@ import XCTest
 import shared
 import TestHelpers
 
-/// iOS XCTest unit tests for the wallet-client library.
+/// iOS integration tests for the wallet-client library.
 ///
 /// Tests the WalletDemoBridgeController (iOS bridge to the KMP wallet-client).
 /// Uses real iOS Keychain crypto, SQLDelight persistence, and OID4VCI/VP protocol
 /// against the public EUDI test backend.
-final class WalletClientTests: XCTestCase {
+///
+/// These are integration tests (not E2E UI tests) - they test the library directly
+/// without UI automation. Run on every PR for fast feedback.
+final class WalletClientIntegrationTests: XCTestCase {
 
     private let testWalletId = "ios-unit-test-wallet"
 

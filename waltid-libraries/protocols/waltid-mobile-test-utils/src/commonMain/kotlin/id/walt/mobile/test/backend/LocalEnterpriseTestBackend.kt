@@ -4,8 +4,10 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Test backend utilities for Local Enterprise stack.
@@ -179,7 +181,7 @@ object LocalEnterpriseTestBackend {
                 "FAILED", "ERROR", "EXPIRED" -> return lastStatus
             }
 
-            kotlinx.coroutines.delay(2_000)
+            delay(2_000.milliseconds)
         }
 
         return lastStatus

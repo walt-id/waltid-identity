@@ -29,7 +29,7 @@ log "CHECK" "Simulator: $SIMULATOR_ID"
 curl -sf -o /dev/null https://issuer.eudiw.dev/credential_offer || err "issuer.eudiw.dev is not reachable"
 curl -sf -o /dev/null https://backend.issuer.eudiw.dev/credential_offer || err "backend.issuer.eudiw.dev is not reachable"
 
-log "TEST" "Running EudiPublicBackendUITests"
+log "TEST" "Running EudiPublicBackendE2ETests"
 
 env \
   E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
@@ -38,6 +38,6 @@ env \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     test \
-    -only-testing:iosAppUITests/EudiPublicBackendUITests/testReceiveAndPresentAgainstEudiPublicBackends
+    -only-testing:iosAppUITests/EudiPublicBackendE2ETests/testReceiveAndPresentAgainstEudiPublicBackends
 
 log "DONE" "iOS public EUDI instrumented E2E completed"

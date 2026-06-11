@@ -1,7 +1,13 @@
 import XCTest
 import TestHelpers
 
-final class EudiPublicBackendUITests: XCTestCase {
+/// End-to-end UI test for the wallet demo app against EUDI public backend.
+///
+/// Tests the full user flow: launch app → receive credential → present credential
+/// Uses XCUIApplication for UI interaction and TestHelpers for backend operations.
+///
+/// This is an E2E test (slow, requires UI automation) - runs nightly or on-demand.
+final class EudiPublicBackendE2ETests: XCTestCase {
     private let client = WalletE2EClient()
 
     // Timeouts (aligned with Android for cross-platform consistency)

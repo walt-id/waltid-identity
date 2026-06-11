@@ -15,8 +15,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * End-to-end UI test for the wallet demo app against EUDI public backend.
+ *
+ * Tests the full user flow: launch app → receive credential → present credential
+ * Uses UIAutomator for UI interaction and shared EudiTestBackend for backend operations.
+ *
+ * This is an E2E test (slow, requires UI automation) - runs nightly or on-demand.
+ */
 @RunWith(AndroidJUnit4::class)
-class EudiPublicBackendReceiveInstrumentedTest {
+class EudiPublicBackendE2ETest {
 
     companion object {
         private const val DEFAULT_CREDENTIAL_ID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
