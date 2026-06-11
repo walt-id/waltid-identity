@@ -45,6 +45,4 @@ jobs:
           disable-animations: true
           script: |
             cd waltid-identity
-            ./gradlew :waltid-applications:waltid-wallet-demo-android:connectedAndroidTest \
-              -Pandroid.testInstrumentationRunnerArguments.notClass=id.walt.walletdemo.LocalEnterpriseBackendE2ETest \
-              --info
+            ./gradlew :waltid-applications:waltid-wallet-demo-android:connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.notClass=id.walt.walletdemo.LocalEnterpriseBackendE2ETest --info
