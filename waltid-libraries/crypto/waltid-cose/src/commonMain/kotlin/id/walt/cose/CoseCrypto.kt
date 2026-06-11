@@ -60,4 +60,5 @@ fun KeyType.toCoseAlgorithm(): Int? = when (this) {
     KeyType.RSA -> Cose.Algorithm.RS256
     KeyType.RSA3072 -> Cose.Algorithm.RS384
     KeyType.RSA4096 -> Cose.Algorithm.RS512
+    KeyType.RSA6144 -> Cose.Algorithm.RS512
 }

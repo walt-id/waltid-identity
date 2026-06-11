@@ -27,7 +27,7 @@ object JsonCanonicalizationUtils {
         when (key.keyType) {
             KeyType.Ed25519 -> okpPublicKeyRequiredMembers(it)
             KeyType.secp256k1, KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> ecPublicKeyRequiredMembers(it)
-            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> rsaPublicKeyRequiredMembers(it)
+            KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> rsaPublicKeyRequiredMembers(it)
         }
     }.toString()
 
