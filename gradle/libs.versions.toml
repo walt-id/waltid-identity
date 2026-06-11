@@ -11,7 +11,7 @@ java-library = "17"
 vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.2"
-android-gradle = "8.12.3"
+android-gradle = "9.2.1"
 gradle-shadow = "9.4.1"
 buildconfig = "6.0.9"
 
