@@ -132,3 +132,32 @@ When using `authorization_code` flow:
 
 **406 Not Acceptable?**
 - Use Cloudflare Tunnel, not ngrok (free ngrok shows browser warnings)
+
+## OAuth Authorization Code Flow - Manual Testing
+
+**Important:** Tests using OAuth authorization code flow with Keycloak **cannot run as automated JUnit tests** because they require user interaction (browser login).
+
+### Symptoms
+```
+java.lang.IllegalStateException: Test xyz is stuck in WAITING status
+This typically means the test requires user interaction (OAuth login)
+```
+
+### Solution: Manual Testing
+
+1. **Start the issuer service** with public HTTPS URL (Cloudflare Tunnel)
+2. **Open the conformance suite** at https://localhost.emobix.co.uk:8443
+3. **Create a test plan** manually:
+   - Plan: `oid4vci-1_0-issuer-happy-flow-dpop-private_key_jwt`
+   - Configure issuer URL and OAuth settings
+4. **Complete the test** - Browser will redirect to Keycloak for login
+5. **Review results** - Test will complete after OAuth callback
+
+### Automated Testing
+
+For automated/headless testing, use one of:
+- **Pre-authorized code flow** (`vci_grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code"`)
+- **Client credentials** (no user interaction)
+- **Mock OAuth** (stub the OAuth flow)
+
+OAuth tests are designed for **manual validation** in the conformance suite UI, not automated CI/CD pipelines.

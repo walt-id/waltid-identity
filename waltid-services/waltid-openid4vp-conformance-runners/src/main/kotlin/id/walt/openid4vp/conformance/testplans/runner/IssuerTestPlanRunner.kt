@@ -101,8 +101,19 @@ class IssuerTestPlanRunner(
                 return
             }
 
+            // OAuth authorization_code tests will be stuck in WAITING status when they need
+            // user interaction (browser login). These tests must be completed manually in the
+            // conformance suite UI. For automated tests, use pre-authorized_code grant type.
             if (counter > 60) {
+                if (testRunInfo.status == "WAITING") {
+                    throw IllegalStateException(
+                        "Test $testId is stuck in WAITING status after ${counter - 1} seconds. " +
+                        "This typically means the test requires user interaction (OAuth login). " +
+                        "Please complete the test manually at https://$conformanceHost:$conformancePort/test-info/$testId"
+                    )
+                }
                 throw IllegalStateException("Waited for issuer test $testId for ${counter - 1} seconds, but it is still ${testRunInfo.status}")
+            }
             }
 
             kotlinx.coroutines.delay(1_000)
