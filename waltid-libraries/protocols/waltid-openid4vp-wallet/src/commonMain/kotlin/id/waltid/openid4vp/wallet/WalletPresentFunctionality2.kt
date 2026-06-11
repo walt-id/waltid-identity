@@ -81,7 +81,7 @@ object WalletPresentFunctionality2 {
                             matchResult = matchResult,
                             authorizationRequest = authorizationRequest,
                             holderKey = holderKey,
-                            holderDid = holderDid ?: throw IllegalArgumentException("Missing DID for presentation")
+                            holderDid = holderDid
                         )
 
                         "mso_mdoc" -> {
