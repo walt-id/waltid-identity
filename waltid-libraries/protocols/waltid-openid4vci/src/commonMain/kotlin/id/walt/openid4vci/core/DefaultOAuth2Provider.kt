@@ -125,7 +125,8 @@ class DefaultOAuth2Provider(
         val params = buildMap {
             put("code", response.code)
             response.state?.let { put("state", it) }
-            response.scope?.let { put("scope", it) }
+            // RFC 6749 §4.1.2: Authorization response contains only 'code' and 'state'
+            // The 'scope' parameter belongs in the token response (§5.1), not here
             // Add iss (issuer) parameter for OAuth 2.0 Security Best Current Practice (RFC 9207)
             authorizationRequest.issClaim?.let { put("iss", it) }
             putAll(response.extraParameters)
