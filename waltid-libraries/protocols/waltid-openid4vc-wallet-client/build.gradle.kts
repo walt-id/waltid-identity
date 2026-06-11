@@ -33,6 +33,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
@@ -47,6 +48,7 @@ kotlin {
             dependsOn(commonTest.get())
             dependencies {
                 implementation(kotlin("test"))
+                implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
                 implementation(identityLibs.kotlinx.coroutines.test)
                 implementation("androidx.test:runner:1.6.2")
                 implementation("androidx.test.ext:junit:1.2.1")

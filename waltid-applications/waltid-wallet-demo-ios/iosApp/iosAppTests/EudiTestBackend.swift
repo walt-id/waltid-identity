@@ -1,7 +1,8 @@
 import Foundation
+import TestHelpers
 
 /// EUDI test backend helper for unit tests.
-/// Uses the proven implementation from UI tests.
+/// Uses the shared implementation from TestHelpers framework.
 actor EudiTestBackend {
     static let shared = EudiTestBackend()
 
@@ -54,9 +55,8 @@ actor EudiTestBackend {
     }
 
     func createVerifierTransaction(credentialId: String = "eu.europa.ec.eudi.pid_vc_sd_jwt") async throws -> VerifierTransaction {
-        let dcqlQuery = buildDcqlQuery(credentialId: credentialId)
         let payload: [String: Any] = [
-            "dcql_query": dcqlQuery,
+            "dcql_query": TestHelpers.buildDcqlQuery(credentialID: credentialId),
             "nonce": UUID().uuidString,
             "request_uri_method": "post",
             "profile": "openid4vp",
@@ -78,62 +78,4 @@ actor EudiTestBackend {
         return VerifierTransaction(transactionId: transactionId, authorizationRequestUri: authRequestUri)
     }
 
-    func waitForVerifierSuccess(transactionId: String, timeoutMs: Int = 10_000) async throws {
-        let start = Date()
-        let session = URLSession.shared
-        while Date().timeIntervalSince(start) * 1000 < Double(timeoutMs) {
-            let url = URL(string: "https://verifier-backend.eudiw.dev/ui/presentations/\(transactionId)/events")!
-            let (data, _) = try await session.data(from: url)
-            let body = String(data: data, encoding: .utf8) ?? ""
-
-            if !body.isEmpty {
-                // Response is {"events": [...]} not just [...]
-                let response = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
-                let events = response["events"] as? [[String: Any]] ?? []
-
-                for event in events {
-                    let eventName = (event["event"] as? String ?? "").lowercased()
-                    let cause = (event["cause"] as? String ?? "").lowercased()
-                    let combined = eventName + " " + cause
-
-                    if combined.contains("failed") || combined.contains("error") || combined.contains("invalid") || combined.contains("timed out") {
-                        throw NSError(domain: "EudiTestBackend", code: 2, userInfo: [NSLocalizedDescriptionKey: "Verifier reported failure: \(event)"])
-                    }
-                    if eventName.contains("wallet response posted") || eventName.contains("successful") || eventName.contains("verified") {
-                        return
-                    }
-                }
-            }
-
-            try await Task.sleep(nanoseconds: 2_000_000_000)
-        }
-
-        throw NSError(domain: "EudiTestBackend", code: 3, userInfo: [NSLocalizedDescriptionKey: "Verifier timeout"])
-    }
-
-    private func buildDcqlQuery(credentialId: String) -> [String: Any] {
-        let format: String
-        let meta: [String: Any]
-
-        if credentialId.contains("sd_jwt") || credentialId.contains("jwt_vc") {
-            format = "dc+sd-jwt"
-            meta = ["vct_values": ["urn:eudi:pid:1", "eu.europa.ec.eudi.pid.1"]]
-        } else if credentialId.contains("mdl") {
-            format = "mso_mdoc"
-            meta = ["doctype_value": "org.iso.18013.5.1.mDL"]
-        } else {
-            format = "mso_mdoc"
-            meta = ["doctype_value": "eu.europa.ec.eudi.pid.1"]
-        }
-
-        return [
-            "credentials": [
-                [
-                    "id": "identity",
-                    "format": format,
-                    "meta": meta
-                ]
-            ]
-        ]
-    }
 }

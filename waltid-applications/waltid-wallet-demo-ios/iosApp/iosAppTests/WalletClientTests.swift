@@ -1,6 +1,7 @@
 import XCTest
 @testable import iosApp
 import shared
+import TestHelpers
 
 /// iOS XCTest unit tests for the wallet-client library.
 ///
@@ -10,6 +11,9 @@ import shared
 final class WalletClientTests: XCTestCase {
 
     private let testWalletId = "ios-unit-test-wallet"
+
+    // Timeouts (aligned with Android for cross-platform consistency)
+    private let verifierPollingTimeout: TimeInterval = 30  // 30 sec - backend verification
 
     // MARK: - Tests (mirror Android WalletClientDeviceTest.kt)
 
@@ -76,7 +80,7 @@ final class WalletClientTests: XCTestCase {
         )
 
         // Wait for verifier to confirm receipt
-        try await EudiTestBackend.shared.waitForVerifierSuccess(transactionId: transaction.transactionId)
+        try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 
     func testCredentialPersistsAcrossControllerRecreation() async throws {
@@ -121,6 +125,6 @@ final class WalletClientTests: XCTestCase {
             "Should present from persisted credentials. Credentials: \(credentials), Result: \(presentResult.message)"
         )
 
-        try await EudiTestBackend.shared.waitForVerifierSuccess(transactionId: transaction.transactionId)
+        try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 }

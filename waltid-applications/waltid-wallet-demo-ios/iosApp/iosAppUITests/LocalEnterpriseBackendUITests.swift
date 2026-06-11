@@ -1,7 +1,13 @@
 import XCTest
+import TestHelpers
 
 final class LocalEnterpriseBackendUITests: XCTestCase {
     private let client = WalletE2EClient()
+
+    // Timeouts (aligned with Android for cross-platform consistency)
+    private let walletReadyTimeout: TimeInterval = 60         // 1 min - wallet bootstrap
+    private let credentialOperationTimeout: TimeInterval = 90 // 1.5 min - receive/present
+    private let verifierPollingTimeout: TimeInterval = 30     // 30 sec - backend verification
 
     func testReceiveAndPresentAgainstLocalEnterpriseBackend() async throws {
         let config = LocalEnterpriseConfig.fromEnvironment()
@@ -27,7 +33,7 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
 
         let readyStatus = await ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: 120
+            timeout: walletReadyTimeout
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
@@ -37,7 +43,7 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
 
         let receiveStatus = await ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
-            timeout: 220
+            timeout: credentialOperationTimeout
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
@@ -50,13 +56,13 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
 
         let presentStatus = await ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: 220
+            timeout: credentialOperationTimeout
         )
         XCTAssertNotNil(presentStatus)
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed: \(presentStatus!)")
         XCTAssertFalse(presentStatus!.starts(with: "Receive failed"), "Receive failed after present: \(presentStatus!)")
 
-        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: 220)
+        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status was \(verifierStatus)")
     }
 
@@ -83,7 +89,7 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
         }
 
         // Phase 1: Bootstrap + receive
-        let readyStatus = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 120)
+        let readyStatus = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet not ready: \(readyStatus ?? "nil")")
 
         let offerInput = app.textFields["wallet.offerInput"]
@@ -92,7 +98,7 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
 
         let receiveStatus = await ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
-            timeout: 220
+            timeout: credentialOperationTimeout
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed: \(receiveStatus ?? "nil")")
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
@@ -114,7 +120,7 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
             await ui.launch()
         }
 
-        let readyAfterRestart = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 120)
+        let readyAfterRestart = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
         XCTAssertEqual(readyAfterRestart, "Wallet ready", "Wallet not ready after restart: \(readyAfterRestart ?? "nil")")
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials not persisted — 'No credentials' shown after restart")
 
@@ -126,12 +132,12 @@ final class LocalEnterpriseBackendUITests: XCTestCase {
 
         let presentStatus = await ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
-            timeout: 220
+            timeout: credentialOperationTimeout
         )
         XCTAssertNotNil(presentStatus)
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed after restart: \(presentStatus!)")
 
-        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: 220)
+        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status after restart: \(verifierStatus)")
     }
 

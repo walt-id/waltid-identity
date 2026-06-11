@@ -2,6 +2,7 @@ package id.walt.wallet2.client.test
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
+import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.wallet2.client.MobileWalletConfig
 import id.walt.wallet2.client.MobileWalletClientFactory
 import id.walt.webdatafetching.WebDataFetcherManager
