@@ -114,7 +114,6 @@ class IssuerTestPlanRunner(
                 }
                 throw IllegalStateException("Waited for issuer test $testId for ${counter - 1} seconds, but it is still ${testRunInfo.status}")
             }
-            }
 
             kotlinx.coroutines.delay(1_000)
         }
