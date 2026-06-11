@@ -89,4 +89,4 @@ web:
       imagePullPolicy: Always
 
 ingress:
-  ingressClassName: "nginx"
+  ingressClassName: "traefik"
