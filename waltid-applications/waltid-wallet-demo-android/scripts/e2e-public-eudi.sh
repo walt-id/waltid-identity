@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
 TEST_CLASS="id.walt.walletdemo.EudiPublicBackendE2ETest"
 

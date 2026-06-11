@@ -2,10 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/e2e.env" 2>/dev/null || true
-
-IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
-IOSAPP_DIR="$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-ios/iosApp"
+IOSAPP_DIR="$(cd "$SCRIPT_DIR/../iosApp" && pwd)"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
 
