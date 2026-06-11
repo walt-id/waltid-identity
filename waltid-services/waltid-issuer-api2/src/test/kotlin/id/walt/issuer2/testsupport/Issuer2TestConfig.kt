@@ -32,7 +32,7 @@ fun clearIssuer2TestEnvironment() {
     FeatureManager.preclear()
 }
 
-fun loadIssuer2ConfigFiles() {
+fun loadIssuer2ConfigFiles(baseUrlOverride: String? = KTOR_TEST_APPLICATION_BASE_URL) {
     clearIssuer2TestEnvironment()
     registerIssuer2ConfigDecoders()
 
@@ -42,13 +42,13 @@ fun loadIssuer2ConfigFiles() {
         ConfigManager.registerConfig(id, type)
     }
     ConfigManager.loadConfigs()
-    useKtorTestApplicationBaseUrl()
+    baseUrlOverride?.let { overrideIssuer2BaseUrl(it) }
 }
 
-private fun useKtorTestApplicationBaseUrl() {
+fun overrideIssuer2BaseUrl(baseUrl: String) {
     val serviceConfig = ConfigManager.getConfig<Issuer2ServiceConfig>()
     ConfigManager.loadedConfigurations["issuer-service" to Issuer2ServiceConfig::class] =
-        serviceConfig.copy(baseUrl = KTOR_TEST_APPLICATION_BASE_URL)
+        serviceConfig.copy(baseUrl = baseUrl)
 }
 
 private fun issuer2ConfigDir(): Path =

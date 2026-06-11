@@ -20,12 +20,16 @@ import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.URLBuilder
+import io.ktor.http.contentType
 import io.ktor.http.parseQueryString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -183,6 +187,48 @@ class Issuer2WalletFlowDriver(
             requestMode = requireNotNull(variant.authorizationRequestMode),
             credentialIssuer = credentialIssuer,
         )
+    }
+
+    fun buildAuthorizationRequestUrl(
+        resolvedOffer: ResolvedCredentialOffer,
+        scenario: Issuer2CredentialScenario,
+        issuerState: String?,
+        requestMode: Issuer2AuthorizationRequestMode = Issuer2AuthorizationRequestMode.AUTHORIZATION_DETAILS,
+    ): String =
+        buildAuthorizationRequestUrl(
+            authorizationEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.authorizationEndpoint),
+            scenario = scenario,
+            issuerState = issuerState,
+            requestMode = requestMode,
+        )
+
+    suspend fun exchangeAuthorizationCode(
+        resolvedOffer: ResolvedCredentialOffer,
+        code: String,
+    ): TokenRequestBuilder.TokenResponse =
+        TokenRequestBuilder(walletClientConfig, client).exchangeAuthorizationCode(
+            tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
+            code = code,
+        )
+
+    suspend fun requestCredential(
+        resolvedOffer: ResolvedCredentialOffer,
+        accessToken: String,
+        credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
+    ): JsonObject {
+        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata)
+        val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
+            bearerAuth(accessToken)
+            contentType(ContentType.Application.Json)
+            setBody(
+                credentialRequest(
+                    credentialConfigurationId = credentialConfigurationId,
+                    proofs = proofs,
+                )
+            )
+        }
+        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        return response.body()
     }
 
     private suspend fun startAuthorizationCodeFlow(
