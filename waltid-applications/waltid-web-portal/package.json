@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:ui": "playwright test --config=playwright.config.ts",
+    "test:ui:install-browsers": "playwright install --with-deps chromium"
   },
   "dependencies": {
     "@headlessui/react": "^2.0.4",
@@ -33,6 +35,7 @@
     "uuid": "^10.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.3",
     "prettier": "^3.3.2"
