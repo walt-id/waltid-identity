@@ -98,6 +98,12 @@ application {
     mainClass.set("id.walt.openid4vp.conformance.MainKt")
 }
 
+tasks.test {
+    val truststorePath = file("conformance-truststore.jks").absolutePath
+    systemProperty("javax.net.ssl.trustStore", truststorePath)
+    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+}
+
 ktor {
     docker {
         portMappings.set(
