@@ -33,6 +33,7 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 - **[ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) X.509 certificate tooling (JVM)**:
   - IACA and Document Signer X.509 certificate generation and parsing.
   - Configurable validators with profile-compliant defaults.
+- **CSR Support**: Support for creating and fulfilling Certificate Signing Requests (CSRs) using the PKCS#10 standard.
 - **JVM extensions**: helpers for `X500Name`, `KeyUsage`, and `X509Certificate` v3 extension extraction.
 - **Clear exceptions**: failures raise `X509ValidationException` with context.
 
