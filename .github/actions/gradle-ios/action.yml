@@ -65,4 +65,13 @@ runs:
           -scheme iosApp \
           -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
           -only-testing:iosAppUITests/EudiPublicBackendE2ETests \
+          -resultBundlePath TestResults \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+
+    - name: Upload iOS test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-ui-test-results
+        path: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult
+        retention-days: 7
