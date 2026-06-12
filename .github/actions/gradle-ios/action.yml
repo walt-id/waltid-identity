@@ -75,7 +75,6 @@ runs:
     - name: Execute iOS demo app UI tests (EUDI public backend only)
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
-      timeout-minutes: 15
       run: |
         # Get simulator UUID
         SIMULATOR_UUID=$(xcrun simctl list devices available | grep "iPhone 17 (" | grep -v "Pro" | head -1 | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
