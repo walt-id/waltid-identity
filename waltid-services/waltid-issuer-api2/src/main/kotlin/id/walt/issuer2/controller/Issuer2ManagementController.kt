@@ -53,14 +53,16 @@ class Issuer2ManagementController(
             call.respond(sessionService.getSession(sessionId))
         }
 
-        sse("sessions/{sessionId}/events") {
-            val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
-            sessionService.getSession(sessionId)
-            val sseFlow = SseNotifier.getSseFlow(sessionId)
+        route(Issuer2ManagementRoutesDocs.sessionEvents()) {
+            sse("sessions/{sessionId}/events") {
+                val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
+                sessionService.getSession(sessionId)
+                val sseFlow = SseNotifier.getSseFlow(sessionId)
 
-            send("{}")
-            sseFlow.collect { update ->
-                send(Json.encodeToString(update))
+                send("{}")
+                sseFlow.collect { update ->
+                    send(Json.encodeToString(update))
+                }
             }
         }
     }
