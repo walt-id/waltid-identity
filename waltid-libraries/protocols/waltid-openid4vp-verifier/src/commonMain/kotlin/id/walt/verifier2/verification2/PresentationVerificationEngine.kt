@@ -15,6 +15,7 @@ import id.walt.verifier2.data.SessionFailure
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
+import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import id.walt.verifier2.verification.Verifier2PresentationValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -22,7 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 object PresentationVerificationEngine {
@@ -30,7 +30,18 @@ object PresentationVerificationEngine {
     private val log = KotlinLogging.logger {}
 
     suspend fun parsePresentation(presentationString: String, format: CredentialFormat): VerifiablePresentation = when (format) {
-        CredentialFormat.JWT_VC_JSON -> JwtVcJsonPresentation.parse(presentationString).getOrThrow()
+        CredentialFormat.JWT_VC_JSON -> {
+            // W3C SD-JWT (jwt_vc_json credential wrapped in SD-JWT with ~disclosures~kb-jwt)
+            // is not a supported presentation format. jwt_vc_json expects a plain JWT VP envelope.
+            // The wallet should use dc+sd-jwt format for SD-JWT-based credentials.
+            if (presentationString.contains("~")) {
+                throw UnsupportedOperationException(
+                    "Presentation format 'jwt_vc_json' does not support SD-JWT structure (~). " +
+                        "For SD-JWT Verifiable Credentials, use the 'dc+sd-jwt' format."
+                )
+            }
+            JwtVcJsonPresentation.parse(presentationString).getOrThrow()
+        }
         CredentialFormat.DC_SD_JWT -> DcSdJwtPresentation.parse(presentationString).getOrThrow()
         CredentialFormat.MSO_MDOC -> MsoMdocPresentation.parse(presentationString).getOrThrow()
 
@@ -318,7 +329,7 @@ object PresentationVerificationEngine {
                 presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
             log.warn { "First error: $firstError" }
 
-            val failedPolicies = presentationValidationResult
+            val failedPoliciesMap = presentationValidationResult
                 .mapValues { (_, byPolicy) -> byPolicy.filterValues { it.errors.isNotEmpty() } }
                 .filterValues { it.isNotEmpty() }
 
@@ -326,21 +337,19 @@ object PresentationVerificationEngine {
                 failure = SessionFailure.PresentationValidation(
                     reason = firstError?.message?.let { "Presentation validation failed: $it" }
                         ?: "One or more presentations in vp_token failed validation",
-                    failedPolicies = failedPolicies,
+                    failedPolicies = failedPoliciesMap,
                 )
             }
 
             session.failSession(SessionEvent.presentation_validation_failed)
 
-            throw IllegalArgumentException( // TODO: custom Exception class
-                "One or more presentations in vp_token failed validation. See presentation validation results: ${
-                    Json.encodeToString(
-                        presentationValidationResult
-                    )
-                }"
+            val failedPoliciesNames = presentationValidationResult.flatMap { (queryId, policyResults) ->
+                policyResults.filter { it.value.errors.isNotEmpty() }
+                    .map { (policyId, _) -> "$queryId/$policyId" }
+            }
+            throw PresentationRejectionException(
+                "Presentation validation failed. Failed VP policies: ${failedPoliciesNames.joinToString()}"
             )
-
-            //Verifier2Response.Verifier2Error.PRESENTATION_VALIDATION_FAILED.throwAsError()
         }
 
 
@@ -380,10 +389,10 @@ object PresentationVerificationEngine {
 
             session.failSession(SessionEvent.dcql_fulfillment_check_failed)
 
-            throw IllegalArgumentException(
-                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFailure.message}"
+            throw PresentationRejectionException(
+                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.exceptionOrNull()?.message}",
+                dcqlFulfilled.exceptionOrNull()!!
             )
-            //Verifier2Response.Verifier2Error.REQUIRED_CREDENTIALS_NOT_PROVIDED.throwAsError()
         }
 
         session.updateSession(SessionEvent.presentation_fulfils_dcql_query) {
@@ -422,6 +431,18 @@ object PresentationVerificationEngine {
                     violations = vcPolicyViolations,
                 )
             }
+        }
+
+        if (!verificationSessionPolicyResults.overallSuccess) {
+            val failedVcPolicies = credentialPolicyResults.vcPolicies
+                .filter { !it.success }
+                .map { it.policy.id }
+            val failedSpecificVcPolicies = credentialPolicyResults.specificVcPolicies
+                .flatMap { (queryId, results) -> results.filter { !it.success }.map { "$queryId/${it.policy.id}" } }
+            val allFailed = (failedVcPolicies + failedSpecificVcPolicies).distinct()
+            throw PresentationRejectionException(
+                "Credential policy verification failed. Failed VC policies: ${allFailed.joinToString()}"
+            )
         }
 
     }

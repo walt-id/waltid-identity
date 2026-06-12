@@ -94,8 +94,7 @@ object VerificationSessionCreator {
             }
         }
 
-        val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {
-
+        val effectiveClientMetadata = if (isEncryptedResponse) {
             val keyType = KeyType.secp256r1
 
             if (isDcApiHaip) {
@@ -126,27 +125,28 @@ object VerificationSessionCreator {
                 jwks = jwks,
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
+                    "jwt_vc_json" to JsonObject(mapOf()),
+                    "dc+sd-jwt" to JsonObject(mapOf()),
                     "mso_mdoc" to JsonObject(
                         if (isDcApiHaip) mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
-                            /*"alg_values_supported" to JsonArray(
-                                listOf(JsonPrimitive("ES256"))
-                            )*/
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                         ) else emptyMap()
                     )
                 ),
-                encryptedResponseEncValuesSupported = listOf("A128GCM")
+                encryptedResponseEncValuesSupported = listOf("A128GCM", "A256GCM")
             )
         } else {
             val baseMetadata = clientMetadata ?: ClientMetadata()
             baseMetadata.copy(
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
+                    "jwt_vc_json" to JsonObject(mapOf()),
+                    "dc+sd-jwt" to JsonObject(mapOf()),
                     "mso_mdoc" to JsonObject(
                         mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                         )
                     )
                 )
@@ -276,7 +276,14 @@ object VerificationSessionCreator {
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
             if (expiration != null) headers["exp"] = JsonPrimitive(expiration.epochSeconds)
 
-            key.signJws(Json.encodeToString(authorizationRequest).encodeToByteArray(), headers)
+            // OID4VP 1.0 Final §5.8: when static discovery metadata is used (no dynamic discovery),
+            // aud MUST be "https://self-issued.me/v2"
+            val payloadWithAud = Json.encodeToJsonElement(authorizationRequest).jsonObject
+                .toMutableMap()
+                .apply { put("aud", JsonPrimitive("https://self-issued.me/v2")) }
+                .let { JsonObject(it) }
+
+            key.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
         } else null
 
         val effectivePolicies = Verification2Session.DefinedVerificationPolicies(
