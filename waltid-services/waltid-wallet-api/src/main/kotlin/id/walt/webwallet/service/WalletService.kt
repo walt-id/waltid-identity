@@ -42,6 +42,7 @@ abstract class WalletService(val tenant: String, val accountId: Uuid, val wallet
     abstract suspend fun usePresentationRequest(parameter: PresentationRequestParameter): Result<String?>
 
     abstract suspend fun resolvePresentationRequest(request: String): String
+    abstract suspend fun matchCredentialsForPresentationRequest(request: String): List<WalletCredential>
     abstract suspend fun resolveCredentialOffer(offerRequest: CredentialOfferRequest): CredentialOffer
 
     abstract suspend fun resolveVct(vct: String): SdJwtVcTypeMetadataDraft04

@@ -10,7 +10,7 @@
       <div v-if="matchedCredentials.length == 0">
         <span class="text-red-600 animate-pulse flex items-center gap-1 py-1">
           <Icon name="heroicons:exclamation-circle" class="h-6 w-6" />
-          You don't have any credentials matching this presentation definition
+          You don't have any credentials matching this presentation request
           in your wallet.
         </span>
       </div>
