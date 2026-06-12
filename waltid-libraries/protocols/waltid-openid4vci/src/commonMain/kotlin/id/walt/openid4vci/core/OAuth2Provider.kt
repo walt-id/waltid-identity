@@ -51,6 +51,8 @@ interface OAuth2Provider {
         session: Session
     ): AuthorizationResponseResult
 
+    fun writeAuthorizationError(error: OAuthError): AuthorizationResponseHttp
+
     fun writeAuthorizationError(
         authorizationRequest: AuthorizationRequest,
         error: OAuthError
@@ -71,6 +73,8 @@ interface OAuth2Provider {
         request: AccessTokenRequest,
         options: TokenResponseOptions = TokenResponseOptions(),
     ): AccessTokenResponseResult
+
+    fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp
 
     fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp
 
@@ -99,6 +103,8 @@ interface OAuth2Provider {
         validFrom: Instant? = null,
         validUntil: Instant? = null,
     ): CredentialResponseResult
+
+    fun writeCredentialError(error: OAuthError): CredentialResponseHttp
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
 

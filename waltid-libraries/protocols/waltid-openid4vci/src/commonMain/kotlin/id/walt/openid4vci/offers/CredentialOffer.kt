@@ -5,7 +5,6 @@ import io.ktor.http.Url
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-
 @Serializable
 data class CredentialOffer(
     @SerialName("credential_issuer")
@@ -133,3 +132,21 @@ data class TxCode(
 
 private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
 private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+
+@Serializable
+enum class AuthenticationMethod {
+    PRE_AUTHORIZED,
+    AUTHORIZED,
+}
+
+@Serializable
+enum class IssuerStateMode {
+    INCLUDE,
+    OMIT,
+}
+
+@Serializable
+enum class CredentialOfferValueMode {
+    BY_REFERENCE,
+    BY_VALUE,
+}

@@ -155,7 +155,7 @@ class IssuerMetadataResolver(
         } else {
             mutableListOf(buildMetadataUrl(providerUrl, OPENID_CONFIGURATION_WELL_KNOWN_PATH))
         }
-        
+
         for (metadataUrl in urlsToTry.distinct()) {
             log.debug { "Fetching OpenID provider metadata from: $metadataUrl" }
             val response: HttpResponse = try {
@@ -192,13 +192,13 @@ class IssuerMetadataResolver(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ): AuthorizationServerMetadata {
         log.info { "Resolving authorization server metadata" }
-        
+
         val authorizationServers = credentialIssuerMetadata.authorizationServers
         val authServerUrl = authorizationServers?.first() ?: credentialIssuerMetadata.credentialIssuer
         log.info { "Attempting to use authorization server from issuer metadata: $authServerUrl" }
-        
+
         return resolveAuthorizationServerMetadata(authServerUrl)
-        
+
     }
 
     /**
