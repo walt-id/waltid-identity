@@ -7,7 +7,7 @@ group = "id.walt"
 dependencies {
     // Testing
     implementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.11.0")
     implementation(identityLibs.ktor.server.test.host)
     implementation(identityLibs.ktor.client.java)
     implementation(identityLibs.ktor.client.content.negotiation)
