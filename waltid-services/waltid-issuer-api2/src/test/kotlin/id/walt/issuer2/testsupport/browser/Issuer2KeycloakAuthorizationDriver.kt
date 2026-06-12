@@ -54,15 +54,15 @@ class Issuer2KeycloakAuthorizationDriver(
                 }
                 val parsed = runCatching { Url(currentUrl) }.getOrNull()
                 val isExpectedRedirectTarget = parsed != null &&
-                    parsed.protocol == expectedRedirect.protocol &&
-                    parsed.host == expectedRedirect.host &&
-                    parsed.encodedPath == expectedRedirect.encodedPath
+                        parsed.protocol == expectedRedirect.protocol &&
+                        parsed.host == expectedRedirect.host &&
+                        parsed.encodedPath == expectedRedirect.encodedPath
 
                 if (isExpectedRedirectTarget) {
                     parsed.parameters["error"]?.let { errorCode ->
                         error(
                             "Authorization response returned error '$errorCode' with description: " +
-                                (parsed.parameters["error_description"] ?: "<none>")
+                                    (parsed.parameters["error_description"] ?: "<none>")
                         )
                     }
                     expectedState?.let {
@@ -98,7 +98,7 @@ class Issuer2KeycloakAuthorizationDriver(
                             loginSubmitted = true
                         }
                     } else if ((currentUrl.contains("login-actions/consent") ||
-                            currentUrl.contains("login-actions/required-action")) &&
+                                currentUrl.contains("login-actions/required-action")) &&
                         loginButton != null
                     ) {
                         loginButton.click()
@@ -113,7 +113,7 @@ class Issuer2KeycloakAuthorizationDriver(
                 ?: "<page source unavailable>"
             error(
                 "Timeout waiting for authorization redirect to wallet redirect URI. " +
-                    "Last URL: $lastSeenUrl ; page snippet: $pageSnippet"
+                        "Last URL: $lastSeenUrl ; page snippet: $pageSnippet"
             )
         }
     }

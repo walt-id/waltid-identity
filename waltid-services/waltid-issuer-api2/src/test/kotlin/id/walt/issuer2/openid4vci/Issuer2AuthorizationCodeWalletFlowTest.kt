@@ -55,7 +55,8 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 )
                 val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
 
-                val createdOffer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
+                val createdOffer =
+                    client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
                 assertEquals(AuthenticationMethod.AUTHORIZED, createdOffer.authMethod)
                 assertEquals(IssuerStateMode.INCLUDE, createdOffer.issuerStateMode)
                 assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
@@ -140,8 +141,8 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
         val authorizationSession = client.listSessions().single { session ->
             session.profileId == scenario.profileId &&
-                session.sessionId != createdOffer.offerId &&
-                session.authorizationRequest != null
+                    session.sessionId != createdOffer.offerId &&
+                    session.authorizationRequest != null
         }
         assertNotEquals(createdOffer.offerId, authorizationSession.sessionId)
         assertEquals(AuthenticationMethod.AUTHORIZED, authorizationSession.authenticationMethod)
@@ -169,7 +170,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
         val authorizationSession = client.listSessions().single { session ->
             session.profileId == scenario.profileId &&
-                session.authorizationRequest != null
+                    session.authorizationRequest != null
         }
         assertEquals(AuthenticationMethod.AUTHORIZED, authorizationSession.authenticationMethod)
         assertEquals(scenario.credentialConfigurationId, authorizationSession.credentialConfigurationId)
