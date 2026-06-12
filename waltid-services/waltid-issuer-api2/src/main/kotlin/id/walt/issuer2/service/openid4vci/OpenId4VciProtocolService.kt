@@ -1,7 +1,6 @@
 package id.walt.issuer2.service.openid4vci
 
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
@@ -11,11 +10,6 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
-import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapElement
-import id.walt.mdoc.dataelement.StringElement
-import id.walt.mdoc.doc.MDoc
-import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.core.OAuth2Provider
@@ -309,19 +303,17 @@ class OpenId4VciProtocolService(
             return failCredentialRequest(requestWithSession, session, e.toCredentialError())
         }
 
-        credentialResponse.credentials
+        val issuedCredential = credentialResponse.credentials
             ?.firstOrNull()
             ?.credential
             ?.jsonPrimitive
             ?.contentOrNull
-            ?.let { credential ->
-                emitCredentialIssuedEvent(
-                    session = session,
-                    format = configuration.format,
-                    doctype = configuration.doctype,
-                    credential = credential,
-                )
-            }
+        if (issuedCredential != null) {
+            emitCredentialIssuedEvent(
+                session = session,
+                format = configuration.format,
+            )
+        }
 
         val updatedSession = sessionService.updateStatus(
             session.sessionId,
@@ -486,8 +478,6 @@ class OpenId4VciProtocolService(
     private suspend fun emitCredentialIssuedEvent(
         session: IssuanceSession,
         format: CredentialFormat,
-        doctype: String?,
-        credential: String,
     ) {
         when (format) {
             CredentialFormat.SD_JWT_VC ->
@@ -513,18 +503,6 @@ class OpenId4VciProtocolService(
             CredentialFormat.LDP_VC -> Unit
         }
     }
-
-    private fun String.toMDocCallbackHex(doctype: String?): String =
-        runCatching {
-            val issuerSigned = IssuerSigned.fromMapElement(DataElement.fromCBOR<MapElement>(decodeFromBase64Url()))
-            MDoc(
-                docType = StringElement(requireNotNull(doctype) { "Missing doctype for mDoc credential configuration" }),
-                issuerSigned = issuerSigned,
-                deviceSigned = null,
-            ).toCBORHex()
-        }.getOrElse {
-            this
-        }
 
     private fun Map<String, List<String>>.withInternalAuthorizationSession(sessionId: String): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER } +
