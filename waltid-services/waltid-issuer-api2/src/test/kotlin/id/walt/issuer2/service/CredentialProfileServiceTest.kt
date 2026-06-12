@@ -34,8 +34,8 @@ class CredentialProfileServiceTest {
                         mapOf("credentialSubject" to SDField(sd = true))
                     ),
                     idTokenClaimsMapping = mapOf(
-                        "sub" to "$.credentialSubject.id",
-                        "given_name" to "$.credentialSubject.givenName",
+                        "$.sub" to "$.credentialSubject.id",
+                        "$.given_name" to "$.credentialSubject.givenName",
                     ),
                     mDocNameSpacesDataMappingConfig = mapOf(
                         "org.iso.18013.5.1" to JsonObjectToCborMappingConfig(emptyMap()),
@@ -61,7 +61,7 @@ class CredentialProfileServiceTest {
         assertEquals("UniversityDegreeCredential", profile.credentialData["type"]?.jsonPrimitive?.content)
         assertNotNull(profile.mapping)
         assertNotNull(profile.selectiveDisclosure)
-        assertEquals("$.credentialSubject.id", profile.idTokenClaimsMapping?.get("sub"))
+        assertEquals("$.credentialSubject.id", profile.idTokenClaimsMapping?.get("$.sub"))
         assertEquals(setOf("org.iso.18013.5.1"), profile.mDocNameSpacesDataMappingConfig?.keys)
         assertEquals(listOf("-----BEGIN CERTIFICATE-----", "-----END CERTIFICATE-----"), profile.x5Chain)
         assertEquals("https://issuer.example/webhook", profile.notifications?.webhook?.url)

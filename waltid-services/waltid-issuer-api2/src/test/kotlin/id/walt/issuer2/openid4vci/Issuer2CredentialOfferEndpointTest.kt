@@ -238,8 +238,8 @@ class Issuer2CredentialOfferEndpointTest {
                     },
                     selectiveDisclosure = selectiveDisclosure,
                     idTokenClaimsMapping = mapOf(
-                        "given_name" to "$.given_name",
-                        "family_name" to "$.family_name",
+                        "$.given_name" to "$.given_name",
+                        "$.family_name" to "$.family_name",
                     ),
                     x5Chain = listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"),
                     notifications = IssuanceNotifications(
@@ -261,7 +261,7 @@ class Issuer2CredentialOfferEndpointTest {
         val sessionSelectiveDisclosure = assertNotNull(session.selectiveDisclosure)
         assertNotNull(sessionSelectiveDisclosure.get("given_name"))
         assertNotNull(sessionSelectiveDisclosure.get("family_name"))
-        assertEquals("$.given_name", session.idTokenClaimsMapping?.get("given_name"))
+        assertEquals("$.given_name", session.idTokenClaimsMapping?.get("$.given_name"))
         assertEquals(listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), session.x5Chain)
         assertEquals("https://issuer.example/webhooks/issuer2", session.notifications?.webhook?.url)
 
@@ -325,7 +325,9 @@ class Issuer2CredentialOfferEndpointTest {
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     credentialData = buildJsonObject {
                         putJsonObject("credentialSubject") {
-                            put("givenName", "Jane")
+                            putJsonObject("degree") {
+                                put("name", "Computer Science")
+                            }
                         }
                     },
                 ),
@@ -803,9 +805,9 @@ class Issuer2CredentialOfferEndpointTest {
             UNIVERSITY_DEGREE_PROFILE_ID -> CredentialOfferRuntimeOverrides(
                 credentialData = buildJsonObject {
                     putJsonObject("credentialSubject") {
-                        put("id", "did:example:holder")
-                        put("givenName", "Jane")
-                        put("familyName", "Doe")
+                        putJsonObject("degree") {
+                            put("name", "Computer Science")
+                        }
                     }
                 },
             )

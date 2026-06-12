@@ -79,9 +79,9 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             credentialData = buildJsonObject {
                 putJsonObject("credentialSubject") {
-                    put("givenName", "Jane")
-                    put("familyName", "Doe")
-                    put("degree", "Computer Science")
+                    putJsonObject("degree") {
+                        put("name", "Computer Science")
+                    }
                 }
             },
         ),
@@ -99,8 +99,8 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             selectiveDisclosure = SDMap.generateSDMap(
                 listOf(
-                    "credentialSubject.givenName",
-                    "credentialSubject.familyName",
+                    "credentialSubject.degree.type",
+                    "credentialSubject.degree.name",
                 )
             ),
         ),
