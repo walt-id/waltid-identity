@@ -1,7 +1,7 @@
 package id.walt.issuer2.controller.openapi
 
-import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
-import id.walt.issuer2.controller.dto.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.domain.CredentialProfile
 import id.walt.issuer2.domain.IssuanceSession
 import io.github.smiley4.ktoropenapi.config.RouteConfig
@@ -173,10 +173,38 @@ object Issuer2ManagementRoutesDocs {
     }
 
     fun sessionEvents(): RouteConfig.() -> Unit = {
-        summary = "Subscribe to issuance session events"
-        description = "SSE endpoint for live updates of one issuance session."
+        summary = "Receive issuance session update events via Server-Sent Events (SSE)"
+        description = """
+            Establishes an SSE connection to receive real-time updates about an issuance session.
+
+            Events:
+            - `resolved_credential_offer` - Wallet has resolved the credential offer
+            - `requested_token` - Wallet has requested an access token
+            - `sdjwt_issue` - SD-JWT VC credential has been issued
+            - `jwt_issue` - JWT VC credential has been issued
+            - `generated_mdoc` - mDOC credential has been generated
+            - `issuance_status` - Session status has changed
+
+            Events use the same KtorSessionUpdate envelope as webhook notifications.
+        """.trimIndent()
         request {
-            pathParameter<String>("sessionId")
+            pathParameter<String>("sessionId") {
+                description = "Issuance session identifier returned as offerId when creating a credential offer"
+                example("Session ID") {
+                    value = "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        }
+        response {
+            HttpStatusCode.OK to {
+                description = "SSE connection established. Events are streamed as text/event-stream."
+                body<String> {
+                    description = "Server-Sent Events stream containing issuance session update events"
+                }
+            }
+            HttpStatusCode.NotFound to {
+                description = "Issuance session not found"
+            }
         }
     }
 

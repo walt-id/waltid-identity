@@ -1,8 +1,8 @@
 package id.walt.issuer2.service
 
 import id.walt.issuer2.config.Issuer2ServiceConfig
-import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
-import id.walt.issuer2.controller.dto.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.notifications.IssuanceNotificationService
 import id.walt.issuer2.notifications.IssuanceSessionEvent
