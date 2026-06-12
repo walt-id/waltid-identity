@@ -102,7 +102,7 @@ class Issuer2CredentialOfferEndpointTest {
             client.getProfile(ISO_MDL_PROFILE_ID),
             client.getProfile(ISO_PHOTO_ID_PROFILE_ID),
             client.getProfile(IDENTITY_SD_JWT_PROFILE_ID),
-            client.getProfile(CUSTOM_VCT_SD_JWT_PROFILE_ID),
+            client.getProfile(TAX_ID_SD_JWT_PROFILE_ID),
         )
 
         representativeProfiles.forEach { profile ->
@@ -833,7 +833,7 @@ class Issuer2CredentialOfferEndpointTest {
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-        const val CUSTOM_VCT_SD_JWT_PROFILE_ID = "customVctSdJwt"
+        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
         const val TX_CODE_VALUE = "123456"
         const val TWO_MINUTES_SECONDS = 120L
 

@@ -201,17 +201,7 @@ class Issuer2ProfileEndpointTest {
         )
         assertMdlProfile(mdocMdlProfile)
 
-        val sdJwtProfile = assertNotNull(
-            profiles.firstOrNull { it.profileId == IDENTITY_SD_JWT_PROFILE_ID },
-            "Expected configured profile $IDENTITY_SD_JWT_PROFILE_ID",
-        )
-        assertSdJwtProfile(sdJwtProfile)
-
-        val sdJwtX5Profile = assertNotNull(
-            profiles.firstOrNull { it.profileId == CUSTOM_VCT_SD_JWT_PROFILE_ID },
-            "Expected configured profile $CUSTOM_VCT_SD_JWT_PROFILE_ID",
-        )
-        assertSdJwtX5Profile(sdJwtX5Profile)
+        assertSdJwtCatalogProfiles(profiles)
     }
 
     @Test
@@ -335,23 +325,64 @@ class Issuer2ProfileEndpointTest {
         assertNotNull(entriesConfig["driving_privileges"], "Expected mDL nested driving privilege mapping")
     }
 
+    private fun assertSdJwtCatalogProfiles(profiles: List<CredentialProfile>) {
+        val profilesById = profiles.associateBy { it.profileId }
+
+        SD_JWT_CATALOG_PROFILE_EXPECTATIONS.forEach { expectation ->
+            val profile = assertNotNull(
+                profilesById[expectation.profileId],
+                "Expected configured profile ${expectation.profileId}",
+            )
+
+            assertEquals(expectation.name, profile.name)
+            assertEquals(expectation.credentialConfigurationId, profile.credentialConfigurationId)
+            assertEquals(
+                expectation.sampleClaimValue,
+                profile.credentialData[expectation.sampleClaim]?.jsonPrimitive?.contentOrNull,
+                "Expected ${expectation.profileId} to expose catalog sample claim ${expectation.sampleClaim}",
+            )
+            assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
+            assertNotNull(profile.selectiveDisclosure?.fields)
+
+            if (expectation.usesIssuerDid) {
+                assertEquals(ISSUER_DID, profile.issuerDid)
+                assertNull(profile.x5Chain, "Expected ${expectation.profileId} to be DID/JWK based")
+            } else {
+                assertNull(profile.issuerDid, "Expected ${expectation.profileId} not to be DID based")
+                assertNotNull(profile.x5Chain, "Expected ${expectation.profileId} to be x5-chain based")
+            }
+        }
+
+        assertSdJwtProfile(assertNotNull(profilesById[IDENTITY_SD_JWT_PROFILE_ID]))
+        assertSdJwtX5Profile(assertNotNull(profilesById[TAX_ID_SD_JWT_PROFILE_ID]))
+    }
+
     private fun assertSdJwtProfile(profile: CredentialProfile) {
         assertEquals(IDENTITY_SD_JWT_PROFILE_ID, profile.profileId)
         assertEquals(IDENTITY_SD_JWT_CONFIGURATION_ID, profile.credentialConfigurationId)
+        assertEquals("Identity Credential", profile.name)
         assertEquals(ISSUER_DID, profile.issuerDid)
-        assertEquals("Jane", profile.credentialData["given_name"]?.jsonPrimitive?.content)
+        assertEquals("John", profile.credentialData["given_name"]?.jsonPrimitive?.content)
+        assertEquals("Doe", profile.credentialData["family_name"]?.jsonPrimitive?.content)
         assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
         assertNotNull(profile.selectiveDisclosure?.fields)
         assertEquals("$.given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
+        assertEquals("$.family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
+        assertEquals("$.email", profile.idTokenClaimsMapping?.get("$.email"))
         assertNull(profile.x5Chain, "Expected identity SD-JWT VC profile to be DID/JWK based")
     }
 
     private fun assertSdJwtX5Profile(profile: CredentialProfile) {
-        assertEquals(CUSTOM_VCT_SD_JWT_PROFILE_ID, profile.profileId)
-        assertEquals(CUSTOM_VCT_SD_JWT_CONFIGURATION_ID, profile.credentialConfigurationId)
+        assertEquals(TAX_ID_SD_JWT_PROFILE_ID, profile.profileId)
+        assertEquals(TAX_ID_SD_JWT_CONFIGURATION_ID, profile.credentialConfigurationId)
+        assertEquals("Tax ID Credential", profile.name)
         assertNull(profile.issuerDid, "Expected x5-chain SD-JWT VC profile not to be DID based")
         assertNotNull(profile.x5Chain, "Expected x5-chain SD-JWT VC profile to use issuer1 sample certificate")
-        assertEquals("$.given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
+        assertEquals("91-287/6543", profile.credentialData["tax_number"]?.jsonPrimitive?.content)
+        assertEquals("Musterfrau", profile.credentialData["registered_family_name"]?.jsonPrimitive?.content)
+        assertEquals("$.registered_family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
+        assertEquals("$.registered_given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
+        assertEquals("$.birth_date", profile.idTokenClaimsMapping?.get("$.birthdate"))
     }
 
     private fun assertProfileHasDefaultIssuerKey(profile: CredentialProfile) {
@@ -413,6 +444,15 @@ class Issuer2ProfileEndpointTest {
     private fun assertNoUnresolvedString(context: String, value: String) {
         assertFalse(value.contains("\${"), "Expected $context to have resolved HOCON substitutions, got: $value")
     }
+
+    private data class SdJwtProfileExpectation(
+        val profileId: String,
+        val name: String,
+        val credentialConfigurationId: String,
+        val sampleClaim: String,
+        val sampleClaimValue: String,
+        val usesIssuerDid: Boolean = false,
+    )
 
     private fun assertProfileJsonEquals(
         expected: CredentialProfile,
@@ -478,8 +518,8 @@ class Issuer2ProfileEndpointTest {
         const val ISO_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
-        const val CUSTOM_VCT_SD_JWT_PROFILE_ID = "customVctSdJwt"
-        const val CUSTOM_VCT_SD_JWT_CONFIGURATION_ID = "my_custom_vct_dc+sd-jwt"
+        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
+        const val TAX_ID_SD_JWT_CONFIGURATION_ID = "asit.tax-id-credential"
         const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
         const val MSO_MDOC_FORMAT = "mso_mdoc"
         const val SD_JWT_VC_FORMAT = "dc+sd-jwt"
@@ -489,6 +529,52 @@ class Issuer2ProfileEndpointTest {
         const val DEFAULT_ISSUER_KEY_Y = "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
         const val ISSUER_DID =
             "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
+
+        val SD_JWT_CATALOG_PROFILE_EXPECTATIONS = listOf(
+            SdJwtProfileExpectation(
+                profileId = TAX_ID_SD_JWT_PROFILE_ID,
+                name = "Tax ID Credential",
+                credentialConfigurationId = TAX_ID_SD_JWT_CONFIGURATION_ID,
+                sampleClaim = "tax_number",
+                sampleClaimValue = "91-287/6543",
+            ),
+            SdJwtProfileExpectation(
+                profileId = "certificateOfResidenceSdJwt",
+                name = "Certificate of Residence",
+                credentialConfigurationId = "urn:eu.europa.ec.eudi:cor:1",
+                sampleClaim = "family_name",
+                sampleClaimValue = "Musterfrau",
+            ),
+            SdJwtProfileExpectation(
+                profileId = "powerOfRepresentationSdJwt",
+                name = "Power of Representation",
+                credentialConfigurationId = "urn:eu.europa.ec.eudi:por:1",
+                sampleClaim = "legal_name",
+                sampleClaimValue = "Musterfirma GmbH",
+            ),
+            SdJwtProfileExpectation(
+                profileId = "ehicSdJwt",
+                name = "European Health Insurance Card (EHIC)",
+                credentialConfigurationId = "urn:eudi:ehic:1",
+                sampleClaim = "social_security_number",
+                sampleClaimValue = "1234 250888",
+            ),
+            SdJwtProfileExpectation(
+                profileId = "eudiPidSdJwt",
+                name = "EU PID Credential (SD-JWT VC)",
+                credentialConfigurationId = "urn:eudi:pid:1",
+                sampleClaim = "family_name",
+                sampleClaimValue = "Musterfrau",
+            ),
+            SdJwtProfileExpectation(
+                profileId = IDENTITY_SD_JWT_PROFILE_ID,
+                name = "Identity Credential",
+                credentialConfigurationId = IDENTITY_SD_JWT_CONFIGURATION_ID,
+                sampleClaim = "given_name",
+                sampleClaimValue = "John",
+                usesIssuerDid = true,
+            ),
+        )
 
         val configFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(
             "issuer-service" to Issuer2ServiceConfig::class,

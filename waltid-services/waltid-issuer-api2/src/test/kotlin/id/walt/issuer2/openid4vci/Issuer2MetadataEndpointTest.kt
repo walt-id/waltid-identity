@@ -118,8 +118,8 @@ class Issuer2MetadataEndpointTest {
         assertMdocConfiguration(credentialIssuerMetadata)
         assertSdJwtVcConfiguration(credentialIssuerMetadata)
         assertConfiguredCredentialScenariosAreAdvertised(credentialIssuerMetadata)
+        assertSdJwtCatalogConfigurations(credentialIssuerMetadata)
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
-        assertExternalSdJwtVcVctPassThrough(credentialIssuerMetadata)
     }
 
     private fun assertConfiguredCredentialScenariosAreAdvertised(
@@ -138,29 +138,40 @@ class Issuer2MetadataEndpointTest {
         client: HttpClient,
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
-        val internalSdJwtConfiguration = assertNotNull(
-            credentialIssuerMetadata.credentialConfigurationsSupported[SD_JWT_INTERNAL_CONFIG_ID],
-            "Expected credential configuration for $SD_JWT_INTERNAL_CONFIG_ID",
-        )
-        val publishedVct = assertNotNull(internalSdJwtConfiguration.vct)
+        SD_JWT_CATALOG_CONFIG_IDS.forEach { credentialConfigurationId ->
+            val configuration = assertNotNull(
+                credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId],
+                "Expected credential configuration for $credentialConfigurationId",
+            )
+            val publishedVct = assertNotNull(configuration.vct)
 
-        val vctTypeMetadataRaw = client.get("/.well-known/vct/$SD_JWT_INTERNAL_CONFIG_ID")
-        assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status)
-        val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
-        assertEquals(publishedVct, vctTypeMetadata.vct)
-        assertEquals(SD_JWT_INTERNAL_CONFIG_ID, vctTypeMetadata.name)
-        assertEquals("$SD_JWT_INTERNAL_CONFIG_ID Verifiable Credential", vctTypeMetadata.description)
+            val vctTypeMetadataRaw = client.get("/.well-known/vct/$credentialConfigurationId")
+            assertEquals(HttpStatusCode.OK, vctTypeMetadataRaw.status)
+            val vctTypeMetadata = vctTypeMetadataRaw.body<SdJwtVcTypeMetadataDraft04>()
+            assertEquals(publishedVct, vctTypeMetadata.vct)
+            assertEquals(credentialConfigurationId, vctTypeMetadata.name)
+            assertEquals("$credentialConfigurationId Verifiable Credential", vctTypeMetadata.description)
+        }
     }
 
-    private fun assertExternalSdJwtVcVctPassThrough(
+    private fun assertSdJwtCatalogConfigurations(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
-        val externalSdJwtConfiguration = assertNotNull(
-            credentialIssuerMetadata.credentialConfigurationsSupported[SD_JWT_EXTERNAL_CONFIG_ID],
-            "Expected credential configuration for $SD_JWT_EXTERNAL_CONFIG_ID",
-        )
-        assertEquals(CredentialFormat.SD_JWT_VC.value, externalSdJwtConfiguration.format.value)
-        assertEquals(EXTERNAL_SD_JWT_VCT, externalSdJwtConfiguration.vct)
+        SD_JWT_CATALOG_CONFIG_IDS.forEach { credentialConfigurationId ->
+            val configuration = assertNotNull(
+                credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId],
+                "Expected credential configuration for $credentialConfigurationId",
+            )
+            assertEquals(CredentialFormat.SD_JWT_VC.value, configuration.format.value)
+            assertEquals(
+                setOf(SigningAlgId.Jose("ES256")),
+                configuration.credentialSigningAlgValuesSupported,
+            )
+            assertEquals(JWT_PROOF_BINDING_METHODS, configuration.cryptographicBindingMethodsSupported)
+            assertEquals(credentialConfigurationId, configuration.scope)
+            assertEquals("$ISSUER_BASE_URL/$credentialConfigurationId", configuration.vct)
+            assertNotNull(configuration.proofTypesSupported?.get("jwt"))
+        }
     }
 
     private fun assertJwtVcJsonConfiguration(
@@ -176,13 +187,7 @@ class Issuer2MetadataEndpointTest {
             universityDegreeConfiguration.credentialSigningAlgValuesSupported,
         )
         assertEquals(
-            setOf(
-                CryptographicBindingMethod.Jwk,
-                CryptographicBindingMethod.DidKey,
-                CryptographicBindingMethod.DidWeb,
-                CryptographicBindingMethod.DidJwk,
-                CryptographicBindingMethod.DidEbsi,
-            ),
+            JWT_PROOF_BINDING_METHODS,
             universityDegreeConfiguration.cryptographicBindingMethodsSupported,
         )
         assertEquals(
@@ -221,7 +226,7 @@ class Issuer2MetadataEndpointTest {
             setOf(SigningAlgId.Jose("ES256")),
             sdJwtConfiguration.credentialSigningAlgValuesSupported,
         )
-        assertEquals(setOf(CryptographicBindingMethod.Jwk), sdJwtConfiguration.cryptographicBindingMethodsSupported)
+        assertEquals(JWT_PROOF_BINDING_METHODS, sdJwtConfiguration.cryptographicBindingMethodsSupported)
         assertEquals(SD_JWT_INTERNAL_CONFIG_ID, sdJwtConfiguration.scope)
         assertEquals(INTERNAL_SD_JWT_VCT, sdJwtConfiguration.vct)
         assertNotNull(sdJwtConfiguration.proofTypesSupported?.get("jwt"))
@@ -277,9 +282,24 @@ class Issuer2MetadataEndpointTest {
         const val UNIVERSITY_DEGREE_CONFIG_ID = "UniversityDegree_jwt_vc_json"
         const val MDOC_CONFIG_ID = "org.iso.18013.5.1.mDL"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
-        const val SD_JWT_EXTERNAL_CONFIG_ID = "my_custom_vct_dc+sd-jwt"
         const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
-        const val EXTERNAL_SD_JWT_VCT = "https://example.com/my_custom_vct"
+
+        val SD_JWT_CATALOG_CONFIG_IDS = listOf(
+            "asit.tax-id-credential",
+            "urn:eu.europa.ec.eudi:cor:1",
+            "urn:eu.europa.ec.eudi:por:1",
+            "urn:eudi:ehic:1",
+            "urn:eudi:pid:1",
+            SD_JWT_INTERNAL_CONFIG_ID,
+        )
+
+        val JWT_PROOF_BINDING_METHODS = setOf(
+            CryptographicBindingMethod.Jwk,
+            CryptographicBindingMethod.DidKey,
+            CryptographicBindingMethod.DidWeb,
+            CryptographicBindingMethod.DidJwk,
+            CryptographicBindingMethod.DidEbsi,
+        )
 
         val configFiles: List<Pair<String, KClass<out WaltConfig>>> = listOf(
             "issuer-service" to Issuer2ServiceConfig::class,

@@ -27,9 +27,6 @@ object Issuer2CredentialScenarios {
     const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
     const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
 
-    const val CUSTOM_VCT_SD_JWT_PROFILE_ID = "customVctSdJwt"
-    const val CUSTOM_VCT_SD_JWT_CONFIGURATION_ID = "my_custom_vct_dc+sd-jwt"
-
     const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
     const val MSO_MDOC_FORMAT = "mso_mdoc"
     const val SD_JWT_VC_FORMAT = "dc+sd-jwt"
@@ -60,14 +57,6 @@ object Issuer2CredentialScenarios {
         credentialConfigurationId = IDENTITY_SD_JWT_CONFIGURATION_ID,
         format = SD_JWT_VC_FORMAT,
         family = Issuer2CredentialFamily.SD_JWT_VC,
-    )
-
-    val customVctSdJwt = Issuer2CredentialScenario(
-        profileId = CUSTOM_VCT_SD_JWT_PROFILE_ID,
-        credentialConfigurationId = CUSTOM_VCT_SD_JWT_CONFIGURATION_ID,
-        format = SD_JWT_VC_FORMAT,
-        family = Issuer2CredentialFamily.SD_JWT_VC,
-        authorizationScope = "my_custom_vct_vc+sd-jwt",
     )
 
     private fun jwtVcJson(
@@ -131,10 +120,11 @@ object Issuer2CredentialScenarios {
         jwtVcJson("walletHolderCredential", "WalletHolderCredential_jwt_vc_json"),
         isoPhotoId,
         isoMdl,
+        sdJwtVc("taxIdCredentialSdJwt", "asit.tax-id-credential"),
+        sdJwtVc("certificateOfResidenceSdJwt", "urn:eu.europa.ec.eudi:cor:1"),
+        sdJwtVc("powerOfRepresentationSdJwt", "urn:eu.europa.ec.eudi:por:1"),
+        sdJwtVc("ehicSdJwt", "urn:eudi:ehic:1"),
+        sdJwtVc("eudiPidSdJwt", "urn:eudi:pid:1"),
         identitySdJwt,
-        sdJwtVc("eudiPidSdJwt", "urn:eu.europa.ec.eudi:pid:1"),
-        sdJwtVc("identityCredentialDcSdJwt", "identity_credential_dc+sd-jwt"),
-        customVctSdJwt,
-        sdJwtVc("photoIdCredentialSdJwt", "photoID_credential_dc+sd-jwt"),
     )
 }
