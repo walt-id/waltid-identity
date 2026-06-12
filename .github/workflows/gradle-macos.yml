@@ -26,7 +26,7 @@ jobs:
         uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Build and test iOS
-        timeout-minutes: 45
+        timeout-minutes: 30
         uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'
