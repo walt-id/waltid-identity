@@ -27,14 +27,14 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test-common"))
             implementation(kotlin("test-annotations-common"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
         jvmMain.dependencies {
             // Coroutines
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.10.2")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-jdk8:1.11.0")
 
             // OCI
-            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.81.2")
+            implementation("com.oracle.oci.sdk:oci-java-sdk-shaded-full:3.89.1")
 
             // JOSE
             implementation(identityLibs.nimbus.jose.jwt)

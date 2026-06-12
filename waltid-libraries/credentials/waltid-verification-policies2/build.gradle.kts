@@ -47,7 +47,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
         }
         jvmMain.dependencies {
@@ -55,13 +55,13 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-trust-registry"))
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation("org.slf4j:slf4j-simple:2.0.18")
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.junit.jupiter.params)
             implementation(identityLibs.ktor.server.test.host)
             implementation(identityLibs.ktor.server.content.negotiation)
             implementation(identityLibs.ktor.server.netty)
-            implementation("io.mockk:mockk:1.14.9")
+            implementation("io.mockk:mockk:1.14.11")
         }
     }
 }
