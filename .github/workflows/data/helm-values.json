@@ -100,7 +100,7 @@
     "pvc": {
       "dataVolumeClaim": {
         "accessMode": "ReadWriteOnce",
-        "storageClass": "azure-managed-standardssd-retain"
+        "storageClass": "gp3-retain"
       }
     },
     "ingress": {

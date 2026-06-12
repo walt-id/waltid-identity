@@ -16,6 +16,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenResponseOptions
+import id.walt.openid4vci.responses.token.withOptions
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
@@ -146,13 +148,21 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult {
+    override suspend fun createAccessTokenResponse(
+        request: AccessTokenRequest,
+        options: TokenResponseOptions,
+    ): AccessTokenResponseResult {
         for (handler in config.tokenEndpointHandlers.toList()) {
             if (!handler.canHandleTokenEndpointRequest(request)) {
                 continue
             }
 
-            return handler.handleTokenEndpointRequest(request)
+            return when (val result = handler.handleTokenEndpointRequest(request)) {
+                is AccessTokenResponseResult.Success -> result.copy(
+                    response = result.response.withOptions(options, result.request),
+                )
+                is AccessTokenResponseResult.Failure -> result
+            }
         }
 
         val description = request.grantTypes.joinToString(" ").takeIf { it.isNotBlank() }

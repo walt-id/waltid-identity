@@ -2,11 +2,14 @@ package id.waltid.openid4vci.wallet.authorization
 
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
+import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import id.waltid.openid4vci.wallet.oauth.PKCEManager
 import id.waltid.openid4vci.wallet.oauth.StateManager
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -31,9 +34,11 @@ class AuthorizationRequestBuilder(
     /**
      * Authorization details for OpenID4VCI (RFC 9396)
      */
+    @OptIn(ExperimentalSerializationApi::class)
     @Serializable
     data class AuthorizationDetails(
-        val type: String = "openid_credential",
+        @EncodeDefault(EncodeDefault.Mode.ALWAYS)
+        val type: String = OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE,
         val credential_configuration_id: String,
         val locations: List<String>? = null,
     )

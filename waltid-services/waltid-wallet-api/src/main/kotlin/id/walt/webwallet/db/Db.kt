@@ -116,6 +116,9 @@ object Db {
         }
     }
 
+    private fun isSqlite(): Boolean =
+        datasourceConfig.jdbcUrl?.startsWith(SQLITE_PREFIX) == true
+
     fun start() {
         connect()
 
@@ -126,7 +129,11 @@ object Db {
             recreateDatabase()
         } else {
             transaction {
-                SchemaUtils.createMissingTablesAndColumns(*tables)
+                if (isSqlite()) {
+                    SchemaUtils.create(*tables)
+                } else {
+                    SchemaUtils.createMissingTablesAndColumns(*tables)
+                }
                 if (FeatureManager.isFeatureEnabled(FeatureCatalog.ktorAuthnzAuthenticationFeature)) {
                     SchemaUtils.create(AuthnzUsers, AuthnzAccountIdentifiers, AuthnzStoredData)
                 }

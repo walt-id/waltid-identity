@@ -9,7 +9,7 @@ import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 
 internal class KeyContentSignerWrapper(
-    val key: Key,
+    private val key: Key,
 ) : ContentSigner {
 
     private val algorithmIdentifier = getJcaSigningAlgorithmNameFromKeyType(key.keyType)
@@ -19,10 +19,7 @@ internal class KeyContentSignerWrapper(
 
     override fun getOutputStream(): OutputStream = outputStream
 
-    override fun getSignature(): ByteArray {
-        val data = outputStream.toByteArray()
-        return runBlocking {
-            key.signRaw(data) as ByteArray
-        }
+    override fun getSignature(): ByteArray = runBlocking {
+        key.signRaw(outputStream.toByteArray()) as ByteArray
     }
 }
