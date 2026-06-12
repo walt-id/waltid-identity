@@ -103,6 +103,7 @@ class CredentialOfferService(
             credentialOffer = credentialOffer,
             expiresAt = expiresAt,
             notifications = notifications,
+            credentialStatus = overrides?.credentialStatus ?: profile.credentialStatus,
         )
         sessionService.createSession(session)
 

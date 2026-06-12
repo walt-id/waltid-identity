@@ -54,6 +54,7 @@ dependencies {
     implementation(project(":waltid-libraries:crypto:waltid-crypto-azure"))
     implementation(project(":waltid-libraries:crypto:waltid-x509"))
     implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
+    implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
     implementation(project(":waltid-libraries:web:waltid-ktor-notifications"))
     api(project(":waltid-libraries:waltid-did"))
