@@ -17,7 +17,7 @@ object Issuer2ManagementRoutesDocs {
 
             Profiles are deployment templates used by credential-offer creation. Use the
             returned profileId in POST /issuer2/credential-offers. Runtime overrides may
-            provide credential data, mappings, selective disclosure, mDOC namespace data
+            provide credential data, mappings, selective disclosure, mDoc namespace data
             mappings, ID token claim mappings, x5 chains, and webhook URLs for a single
             issuance session.
         """.trimIndent()
@@ -25,7 +25,7 @@ object Issuer2ManagementRoutesDocs {
             HttpStatusCode.OK to {
                 description = "Configured credential profiles"
                 body<List<CredentialProfile>> {
-                    example("Configured W3C, SD-JWT VC, and mDOC profiles") {
+                    example("Configured W3C, SD-JWT VC, and mDoc profiles") {
                         value = profileExamples
                     }
                 }
@@ -115,10 +115,10 @@ object Issuer2ManagementRoutesDocs {
                 example("[pre-authorized][by-reference][override selective disclosure]") {
                     value = Issuer2RequestExamples.PROFILE_PRE_AUTHORIZED_OFFER_WITH_SELECTIVE_DISCLOSURE_OVERRIDE
                 }
-                example("[pre-authorized][by-reference][override mDOC photo ID credentialData]") {
+                example("[pre-authorized][by-reference][override mDoc photo ID credentialData]") {
                     value = Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
                 }
-                example("[authorized][by-reference][override mDOC mDL credentialData]") {
+                example("[authorized][by-reference][override mDoc mDL credentialData]") {
                     value = Issuer2RequestExamples.AUTHORIZED_MDOC_MDL_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
                 }
             }
@@ -182,7 +182,7 @@ object Issuer2ManagementRoutesDocs {
             - `requested_token` - Wallet has requested an access token
             - `sdjwt_issue` - SD-JWT VC credential has been issued
             - `jwt_issue` - JWT VC credential has been issued
-            - `generated_mdoc` - mDOC credential has been generated
+            - `generated_mdoc` - mDoc credential has been generated
             - `issuance_status` - Session status has changed
 
             Events use the same KtorSessionUpdate envelope as webhook notifications.
