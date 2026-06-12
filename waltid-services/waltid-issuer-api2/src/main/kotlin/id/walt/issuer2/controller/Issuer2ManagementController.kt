@@ -22,48 +22,49 @@ class Issuer2ManagementController(
     private val sessionService: IssuanceSessionService,
     private val offerService: CredentialOfferService,
 ) {
-    fun register(route: Route) = route.route("issuer2", { tags = listOf(Issuer2ManagementRoutesDocs.CREDENTIAL_ISSUANCE_TAG) }) {
-        val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
+    fun register(route: Route) =
+        route.route("issuer2", { tags = listOf(Issuer2ManagementRoutesDocs.CREDENTIAL_ISSUANCE_TAG) }) {
+            val profileExamples = Issuer2ManagementRoutesDocs.selectProfileExamples(profileService.listProfiles())
 
-        get("profiles", Issuer2ManagementRoutesDocs.listProfiles(profileExamples)) {
-            call.respond(profileService.listProfiles())
-        }
-
-        get("profiles/{profileId}", Issuer2ManagementRoutesDocs.getProfile(profileExamples)) {
-            val profileId = requireNotNull(call.parameters["profileId"]) { "Missing profileId" }
-            call.respond(profileService.getProfile(profileId))
-        }
-
-        post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
-            val request = try {
-                call.receive<CredentialOfferCreateRequest>()
-            } catch (ex: BadRequestException) {
-                val validationMessage = ex.cause?.cause?.message ?: ex.cause?.message ?: ex.message
-                throw BadRequestException("${ex.message}: $validationMessage")
+            get("profiles", Issuer2ManagementRoutesDocs.listProfiles(profileExamples)) {
+                call.respond(profileService.listProfiles())
             }
-            call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request))
-        }
 
-        get("sessions", Issuer2ManagementRoutesDocs.listSessions()) {
-            call.respond(sessionService.listSessions())
-        }
+            get("profiles/{profileId}", Issuer2ManagementRoutesDocs.getProfile(profileExamples)) {
+                val profileId = requireNotNull(call.parameters["profileId"]) { "Missing profileId" }
+                call.respond(profileService.getProfile(profileId))
+            }
 
-        get("sessions/{sessionId}", Issuer2ManagementRoutesDocs.getSession()) {
-            val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
-            call.respond(sessionService.getSession(sessionId))
-        }
+            post("credential-offers", Issuer2ManagementRoutesDocs.createCredentialOffer()) {
+                val request = try {
+                    call.receive<CredentialOfferCreateRequest>()
+                } catch (ex: BadRequestException) {
+                    val validationMessage = ex.cause?.cause?.message ?: ex.cause?.message ?: ex.message
+                    throw BadRequestException("${ex.message}: $validationMessage")
+                }
+                call.respond(HttpStatusCode.Created, offerService.createCredentialOffer(request))
+            }
 
-        route(Issuer2ManagementRoutesDocs.sessionEvents()) {
-            sse("sessions/{sessionId}/events") {
+            get("sessions", Issuer2ManagementRoutesDocs.listSessions()) {
+                call.respond(sessionService.listSessions())
+            }
+
+            get("sessions/{sessionId}", Issuer2ManagementRoutesDocs.getSession()) {
                 val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
-                sessionService.getSession(sessionId)
-                val sseFlow = SseNotifier.getSseFlow(sessionId)
+                call.respond(sessionService.getSession(sessionId))
+            }
 
-                send("{}")
-                sseFlow.collect { update ->
-                    send(Json.encodeToString(update))
+            route(Issuer2ManagementRoutesDocs.sessionEvents()) {
+                sse("sessions/{sessionId}/events") {
+                    val sessionId = requireNotNull(call.parameters["sessionId"]) { "Missing sessionId" }
+                    sessionService.getSession(sessionId)
+                    val sseFlow = SseNotifier.getSseFlow(sessionId)
+
+                    send("{}")
+                    sseFlow.collect { update ->
+                        send(Json.encodeToString(update))
+                    }
                 }
             }
         }
-    }
 }

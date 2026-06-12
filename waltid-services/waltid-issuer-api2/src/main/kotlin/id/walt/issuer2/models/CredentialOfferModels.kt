@@ -54,8 +54,8 @@ data class CredentialOfferCreateRequest(
         }
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
-                (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
-                runtimeOverrides == null
+                    (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
+                    runtimeOverrides == null
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
         }
