@@ -69,17 +69,17 @@ class JwsSignatureScheme : SignatureScheme {
     @JsExport.Ignore
     suspend fun getIssuerKeyInfo(jws: String): KeyInfo {
         val jwsParsed = jws.substringBefore("~").decodeJws()
-        
+
 
         val x5cHeader = jwsParsed.header[JwsHeader.X5C]
         if (x5cHeader != null && x5cHeader is JsonArray && x5cHeader.isNotEmpty()) {
             log.trace { "Found x5c header with ${x5cHeader.size} certificate(s), extracting key from leaf certificate" }
             val key = extractKeyFromX5cHeader(x5cHeader)
-            val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content 
+            val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content
                 ?: key.getKeyId()
             return KeyInfo(keyId, key)
         }
-        
+
         // Fall back to DID-based key resolution
         val keyId =
             jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
@@ -104,18 +104,18 @@ class JwsSignatureScheme : SignatureScheme {
     @JsPromise
     @JsExport.Ignore
     suspend fun getIssuerKeysInfo(jws: String): KeysInfo {
-        val jwsParsed = jws.decodeJws()
-        
+        val jwsParsed = jws.substringBefore("~").decodeJws()
+
 
         val x5cHeader = jwsParsed.header[JwsHeader.X5C]
         if (x5cHeader != null && x5cHeader is JsonArray && x5cHeader.isNotEmpty()) {
             log.trace { "Found x5c header with ${x5cHeader.size} certificate(s), extracting key from leaf certificate" }
             val key = extractKeyFromX5cHeader(x5cHeader)
-            val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content 
+            val keyId = jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content
                 ?: key.getKeyId()
             return KeysInfo(keyId, setOf(key))
         }
-        
+
         // Fall back to DID-based key resolution
         val keyId =
             jwsParsed.header[JwsHeader.KEY_ID]?.jsonPrimitive?.content ?: throw IllegalArgumentException("Missing key ID in JWS header")
@@ -133,7 +133,7 @@ class JwsSignatureScheme : SignatureScheme {
             throw UnsupportedOperationException("W3C credentials require either x5c header or DID-based issuer ID for signature verification.")
         return KeysInfo(keyId, keys)
     }
-    
+
     /**
      * Extracts the public key from the leaf certificate in an x5c header.
      * Per RFC 7515 Section 4.1.6, the leaf certificate (containing the signing key) MUST be first in the array.
