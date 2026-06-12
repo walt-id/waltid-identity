@@ -7,6 +7,7 @@ import id.walt.dcql.models.ClaimsQuery
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.JwtVcJsonMeta
+import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
@@ -35,6 +36,10 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.InputStreamReader
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.net.InetSocketAddress
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -43,15 +48,40 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
+import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.TransactionDataProfile
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.dcql.models.CredentialFormat as DcqlCredentialFormat
 
 @OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
 class OpenId4VpPresentationServiceTest {
+    companion object {
+        private const val SUPPORTED_TX_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
+
+        init {
+            ConfigManager.preloadAndRegisterConfig(
+                "transaction-data-profiles",
+                TransactionDataProfilesConfig(
+                    transactionDataProfiles = listOf(
+                        TransactionDataProfile(
+                            type = SUPPORTED_TX_DATA_TYPE,
+                            displayName = "Payment Authorization",
+                            fields = listOf("amount", "currency", "payee"),
+                        )
+                    )
+                )
+            )
+            ConfigManager.loadConfigs(emptyArray())
+        }
+    }
+
     private val json = Json { encodeDefaults = false }
+    private val supportedTransactionDataType = SUPPORTED_TX_DATA_TYPE
 
     private val query = DcqlQuery(
         credentials = listOf(
@@ -64,6 +94,17 @@ class OpenId4VpPresentationServiceTest {
                 claims = listOf(
                     ClaimsQuery(pathStrings = listOf("credentialSubject", "degree", "type")),
                 ),
+            ),
+        ),
+    )
+
+    private val sdJwtQuery = DcqlQuery(
+        credentials = listOf(
+            CredentialQuery(
+                id = "degree",
+                format = DcqlCredentialFormat.DC_SD_JWT,
+                meta = SdJwtVcMeta(vctValues = listOf("https://issuer.example/payment-credential")),
+                requireCryptographicHolderBinding = true,
             ),
         ),
     )
@@ -182,6 +223,47 @@ class OpenId4VpPresentationServiceTest {
     }
 
     @Test
+    fun `normalized request URL rejects unsupported transaction data types`() {
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val request = authorizationRequest(
+            dcqlQuery = sdJwtQuery,
+            transactionData = listOf(
+                transactionDataItem(
+                    type = "unsupported-type",
+                    credentialIds = listOf("degree"),
+                    amount = "42.00",
+                ),
+            ),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking { resolveNormalizedRequestUrl(service, request) }
+        }
+    }
+
+    @Test
+    fun `normalized request URL rejects transaction data for unsupported credential query formats`() {
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val request = authorizationRequest(
+            transactionData = listOf(
+                transactionDataItem(
+                    type = supportedTransactionDataType,
+                    credentialIds = listOf("degree"),
+                    requireCryptographicHolderBinding = true,
+                    amount = "42.00",
+                ),
+            ),
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            runBlocking { resolveNormalizedRequestUrl(service, request) }
+        }
+
+        assertNotNull(error.message)
+        assertTrue(error.message!!.contains("supported format", ignoreCase = true))
+    }
+
+    @Test
     fun `normalized request URL rejects unsigned request objects by default`() {
         val service = OpenId4VpPresentationService(mockk(relaxed = true))
         val requestObject = unsecuredJwt(
@@ -202,6 +284,27 @@ class OpenId4VpPresentationServiceTest {
             "Unsigned AuthorizationRequest object (alg=none) is not allowed",
             error.message,
         )
+    }
+
+    @Test
+    fun `normalized request URL rejects transaction_data when dcql_query is missing`() {
+        val service = OpenId4VpPresentationService(mockk(relaxed = true))
+        val request = authorizationRequest(
+            transactionData = listOf(
+                transactionDataItem(
+                    type = supportedTransactionDataType,
+                    credentialIds = listOf("degree"),
+                    amount = "42.00",
+                ),
+            ),
+            includeDcqlQuery = false,
+        )
+
+        val error = assertFailsWith<IllegalArgumentException> {
+            runBlocking { resolveNormalizedRequestUrl(service, request) }
+        }
+
+        assertEquals("invalid_request: transaction_data requires dcql_query", error.message)
     }
 
     @Test
@@ -695,6 +798,41 @@ class OpenId4VpPresentationServiceTest {
                 val value = URLDecoder.decode(keyValue.getOrElse(1) { "" }, StandardCharsets.UTF_8)
                 key to value
             }
+
+    private fun authorizationRequest(
+        dcqlQuery: DcqlQuery = query,
+        transactionData: List<String>? = null,
+        includeDcqlQuery: Boolean = true,
+    ): String = AuthorizationRequest(
+        clientId = "verifier2",
+        responseMode = OpenID4VPResponseMode.DIRECT_POST,
+        responseUri = "https://verifier.example/response",
+        nonce = "nonce-123",
+        dcqlQuery = dcqlQuery.takeIf { includeDcqlQuery },
+        transactionData = transactionData,
+    ).toHttpUrl().toString()
+
+    private fun transactionDataItem(
+        type: String,
+        credentialIds: List<String>,
+        requireCryptographicHolderBinding: Boolean? = null,
+        amount: String,
+    ): String =
+        encodeBase64Url(
+            buildJsonObject {
+                put("type", type)
+                put("credential_ids", buildJsonArray {
+                    credentialIds.forEach { add(JsonPrimitive(it)) }
+                })
+                requireCryptographicHolderBinding?.let { put("require_cryptographic_holder_binding", it) }
+                put("amount", amount)
+                put("currency", "EUR")
+                put("payee", "ACME Corp")
+            }.toString(),
+        )
+
+    private fun encodeBase64Url(value: String): String =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray())
 
     private fun withAuthorizationRequestServer(
         responseBody: String? = null,

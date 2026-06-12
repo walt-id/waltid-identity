@@ -8,6 +8,7 @@ import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.jwk.KeyUse
 import com.nimbusds.jose.util.Base64URL
 import id.walt.commons.config.ConfigManager
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.FeatureManager.whenFeature
 import id.walt.commons.web.ConflictException
 import id.walt.commons.web.UnsupportedMediaTypeException
@@ -1169,6 +1170,7 @@ class SSIKit2WalletService(
             },
             holderPoliciesToRun = null,
             runPolicies = null,
+            transactionDataTypeRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry(),
         ).mapCatching { result ->
             val redirect = extractRedirect(result)
             logPresentedCredentials(
@@ -1312,7 +1314,6 @@ class SSIKit2WalletService(
                 )
             }
     }
-
     private data class CredentialHolderBinding(
         val publicJwk: JsonObject,
     )

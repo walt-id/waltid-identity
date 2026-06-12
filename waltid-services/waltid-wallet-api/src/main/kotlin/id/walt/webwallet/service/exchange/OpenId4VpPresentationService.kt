@@ -10,7 +10,10 @@ import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
+import id.walt.commons.config.ConfigManager
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialFilterObject
 import id.walt.webwallet.service.credentials.CredentialsService
@@ -59,6 +62,17 @@ class OpenId4VpPresentationService(
                 requestUri = requestUri,
                 requestUriMethod = requestUriMethod,
                 requestUriPostWalletMetadata = runtimeRequestUriPostWalletMetadata,
+            )
+        }.also { resolvedRequest ->
+            val authorizationRequest = resolvedRequest.authorizationRequest
+            require(authorizationRequest.transactionData.isNullOrEmpty() || authorizationRequest.dcqlQuery != null) {
+                "invalid_request: transaction_data requires dcql_query"
+            }
+
+            validateRequestTransactionData(
+                transactionData = authorizationRequest.transactionData,
+                typeRegistry = ConfigManager.getConfig<TransactionDataProfilesConfig>().toTypeRegistry(),
+                credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
             )
         }
     }
