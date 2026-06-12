@@ -8,15 +8,25 @@ jobs:
   gradle:
     runs-on: macos-latest
     steps:
-      - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+      - name: Checkout waltid-identity
+        uses: actions/checkout@v4
         with:
+          repository: walt-id/waltid-identity
+          path: waltid-identity
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Checkout waltid-identity-enterprise
+        uses: actions/checkout@v4
+        with:
+          repository: walt-id/waltid-identity-enterprise
+          path: waltid-identity-enterprise
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: ./waltid-identity/.github/actions/gradle-setup-action
 
       - name: Build and test iOS
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
+        timeout-minutes: 30
+        uses: ./waltid-identity/.github/actions/gradle-ios
         with:
           waltid-directory: 'waltid-identity'

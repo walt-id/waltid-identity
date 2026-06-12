@@ -76,9 +76,9 @@ class WalletDemoBridgeController(
             emptyList() // TODO: log error for debugging
         }
 
-    suspend fun presentCredential(requestUrl: String): BridgeOperationResult {
+    suspend fun presentCredential(requestUrl: String, did: String? = null): BridgeOperationResult {
         return try {
-            val result = client.present(requestUrl = requestUrl)
+            val result = client.present(requestUrl = requestUrl, did = did)
             BridgeOperationResult(
                 success = result.success,
                 message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",

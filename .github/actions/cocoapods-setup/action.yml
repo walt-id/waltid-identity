@@ -12,13 +12,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
+
         if [[ "${{ inputs.version }}" != "" ]]; then
           echo "Installing CocoaPods version ${{ inputs.version }}"
           gem install cocoapods -v ${{ inputs.version }} --no-document
         else
-          echo "Updating CocoaPods to latest version"
-          gem update cocoapods --no-document
+          echo "Updating CocoaPods and xcodeproj for Xcode 16.4 compatibility"
+          # Force install latest versions for Xcode 16.4 (object version 70 support)
+          gem install xcodeproj --no-document
+          gem install cocoapods --no-document
         fi
         
         # Only update repo if cache miss or forced
