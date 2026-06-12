@@ -4,8 +4,8 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
-import id.walt.issuer2.controller.dto.CredentialOfferCreateResponse
-import id.walt.issuer2.controller.dto.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.testsupport.Issuer2TestNotificationServer
 import id.walt.issuer2.testsupport.apiClient

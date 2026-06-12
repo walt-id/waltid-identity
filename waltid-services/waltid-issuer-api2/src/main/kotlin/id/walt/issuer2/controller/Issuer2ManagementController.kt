@@ -1,6 +1,6 @@
 package id.walt.issuer2.controller
 
-import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.controller.openapi.Issuer2ManagementRoutesDocs
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
