@@ -3,11 +3,13 @@ package id.walt.issuer2.testsupport
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.WaltConfig
 import id.walt.commons.featureflag.FeatureManager
+import id.walt.did.dids.DidService
 import id.walt.issuer2.config.AuthenticationServiceConfig
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
@@ -37,6 +39,7 @@ fun clearIssuer2TestEnvironment() {
 fun loadIssuer2ConfigFiles(baseUrlOverride: String? = KTOR_TEST_APPLICATION_BASE_URL) {
     clearIssuer2TestEnvironment()
     registerIssuer2ConfigDecoders()
+    runBlocking { DidService.minimalInit() }
 
     val configDir = issuer2ConfigDir()
     issuer2ConfigFiles.forEach { (id, type) ->
