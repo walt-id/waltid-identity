@@ -24,6 +24,9 @@ object Issuer2CredentialScenarios {
     const val ISO_MDL_PROFILE_ID = "isoMdl"
     const val ISO_MDL_CONFIGURATION_ID = "org.iso.18013.5.1.mDL"
 
+    const val ISO_MDL_AAMVA_PROFILE_ID = "isoMdlAamva"
+    const val ISO_MDL_AAMVA_CONFIGURATION_ID = "org.iso.18013.5.1.mDL.aamva"
+
     const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
     const val IDENTITY_SD_JWT_CONFIGURATION_ID = "identity_credential"
 
@@ -48,6 +51,13 @@ object Issuer2CredentialScenarios {
     val isoMdl = Issuer2CredentialScenario(
         profileId = ISO_MDL_PROFILE_ID,
         credentialConfigurationId = ISO_MDL_CONFIGURATION_ID,
+        format = MSO_MDOC_FORMAT,
+        family = Issuer2CredentialFamily.MDOC,
+    )
+
+    val isoMdlAamva = Issuer2CredentialScenario(
+        profileId = ISO_MDL_AAMVA_PROFILE_ID,
+        credentialConfigurationId = ISO_MDL_AAMVA_CONFIGURATION_ID,
         format = MSO_MDOC_FORMAT,
         family = Issuer2CredentialFamily.MDOC,
     )
@@ -77,6 +87,16 @@ object Issuer2CredentialScenarios {
         credentialConfigurationId = credentialConfigurationId,
         format = SD_JWT_VC_FORMAT,
         family = Issuer2CredentialFamily.SD_JWT_VC,
+    )
+
+    private fun mdoc(
+        profileId: String,
+        credentialConfigurationId: String,
+    ) = Issuer2CredentialScenario(
+        profileId = profileId,
+        credentialConfigurationId = credentialConfigurationId,
+        format = MSO_MDOC_FORMAT,
+        family = Issuer2CredentialFamily.MDOC,
     )
 
     // Keep this list explicit. If a configured credential disappears, the tests should fail
@@ -118,8 +138,13 @@ object Issuer2CredentialScenarios {
         jwtVcJson("verifiablePortableDocumentA1", "VerifiablePortableDocumentA1_jwt_vc_json"),
         jwtVcJson("visa", "Visa_jwt_vc_json"),
         jwtVcJson("walletHolderCredential", "WalletHolderCredential_jwt_vc_json"),
-        isoPhotoId,
         isoMdl,
+        isoMdlAamva,
+        isoPhotoId,
+        mdoc("eudiPidMdoc", "eu.europa.ec.eudi.pid.1"),
+        mdoc("euAgeVerificationMdoc", "eu.europa.ec.av.1"),
+        mdoc("idAustriaMdoc", "at.gv.id-austria.2023.iso"),
+        mdoc("googleIdCardMdoc", "com.google.wallet.idcard.1"),
         sdJwtVc("taxIdCredentialSdJwt", "asit.tax-id-credential"),
         sdJwtVc("certificateOfResidenceSdJwt", "urn:eu.europa.ec.eudi:cor:1"),
         sdJwtVc("powerOfRepresentationSdJwt", "urn:eu.europa.ec.eudi:por:1"),

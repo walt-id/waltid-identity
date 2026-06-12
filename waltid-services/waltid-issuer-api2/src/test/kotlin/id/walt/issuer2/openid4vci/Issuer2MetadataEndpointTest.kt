@@ -200,18 +200,23 @@ class Issuer2MetadataEndpointTest {
     private fun assertMdocConfiguration(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
-        val mdocConfiguration = assertNotNull(
-            credentialIssuerMetadata.credentialConfigurationsSupported[MDOC_CONFIG_ID],
-            "Expected credential configuration for $MDOC_CONFIG_ID",
-        )
-        assertEquals(CredentialFormat.MSO_MDOC.value, mdocConfiguration.format.value)
-        assertEquals(
-            setOf(SigningAlgId.CoseValue(-7), SigningAlgId.CoseValue(-9)),
-            mdocConfiguration.credentialSigningAlgValuesSupported,
-        )
-        assertEquals(setOf(CryptographicBindingMethod.CoseKey), mdocConfiguration.cryptographicBindingMethodsSupported)
-        assertEquals(MDOC_CONFIG_ID, mdocConfiguration.doctype)
-        assertEquals(MDOC_CONFIG_ID, mdocConfiguration.scope)
+        MDOC_CATALOG_CONFIG_IDS.forEach { (credentialConfigurationId, doctype) ->
+            val mdocConfiguration = assertNotNull(
+                credentialIssuerMetadata.credentialConfigurationsSupported[credentialConfigurationId],
+                "Expected credential configuration for $credentialConfigurationId",
+            )
+            assertEquals(CredentialFormat.MSO_MDOC.value, mdocConfiguration.format.value)
+            assertEquals(
+                setOf(SigningAlgId.CoseValue(-7), SigningAlgId.CoseValue(-9)),
+                mdocConfiguration.credentialSigningAlgValuesSupported,
+            )
+            assertEquals(
+                setOf(CryptographicBindingMethod.CoseKey),
+                mdocConfiguration.cryptographicBindingMethodsSupported,
+            )
+            assertEquals(doctype, mdocConfiguration.doctype)
+            assertEquals(credentialConfigurationId, mdocConfiguration.scope)
+        }
     }
 
     private fun assertSdJwtVcConfiguration(
@@ -280,9 +285,18 @@ class Issuer2MetadataEndpointTest {
         const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
         const val UNIVERSITY_DEGREE_CONFIG_ID = "UniversityDegree_jwt_vc_json"
-        const val MDOC_CONFIG_ID = "org.iso.18013.5.1.mDL"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
+
+        val MDOC_CATALOG_CONFIG_IDS = listOf(
+            "org.iso.18013.5.1.mDL" to "org.iso.18013.5.1.mDL",
+            "org.iso.18013.5.1.mDL.aamva" to "org.iso.18013.5.1.mDL",
+            "org.iso.23220.photoid.1" to "org.iso.23220.photoid.1",
+            "eu.europa.ec.eudi.pid.1" to "eu.europa.ec.eudi.pid.1",
+            "eu.europa.ec.av.1" to "eu.europa.ec.av.1",
+            "at.gv.id-austria.2023.iso" to "at.gv.id-austria.2023.iso",
+            "com.google.wallet.idcard.1" to "com.google.wallet.idcard.1",
+        )
 
         val SD_JWT_CATALOG_CONFIG_IDS = listOf(
             "asit.tax-id-credential",

@@ -189,18 +189,7 @@ class Issuer2ProfileEndpointTest {
         assertIssuerKeyIsExposed(profileResponseBody)
         assertProfileJsonEquals(universityDegreeProfile, profileResponseBody)
 
-        val mdocPhotoIdProfile = assertNotNull(
-            profiles.firstOrNull { it.profileId == ISO_PHOTO_ID_PROFILE_ID },
-            "Expected configured profile $ISO_PHOTO_ID_PROFILE_ID",
-        )
-        assertMdocProfile(mdocPhotoIdProfile)
-
-        val mdocMdlProfile = assertNotNull(
-            profiles.firstOrNull { it.profileId == ISO_MDL_PROFILE_ID },
-            "Expected configured profile $ISO_MDL_PROFILE_ID",
-        )
-        assertMdlProfile(mdocMdlProfile)
-
+        assertMdocCatalogProfiles(profiles)
         assertSdJwtCatalogProfiles(profiles)
     }
 
@@ -280,27 +269,64 @@ class Issuer2ProfileEndpointTest {
         assertNull(profile.idTokenClaimsMapping)
     }
 
+    private fun assertMdocCatalogProfiles(profiles: List<CredentialProfile>) {
+        val profilesById = profiles.associateBy { it.profileId }
+
+        MDOC_CATALOG_PROFILE_EXPECTATIONS.forEach { expectation ->
+            val profile = assertNotNull(
+                profilesById[expectation.profileId],
+                "Expected configured profile ${expectation.profileId}",
+            )
+            val namespaceData = assertNotNull(
+                profile.credentialData[expectation.sampleNamespace]?.jsonObject,
+                "Expected ${expectation.profileId} to contain namespace ${expectation.sampleNamespace}",
+            )
+
+            assertEquals(expectation.name, profile.name)
+            assertEquals(expectation.credentialConfigurationId, profile.credentialConfigurationId)
+            assertNull(profile.issuerDid, "Expected ${expectation.profileId} to be x5-chain based")
+            assertNotNull(profile.x5Chain, "Expected ${expectation.profileId} to use issuer1 sample certificate")
+            assertEquals(
+                expectation.sampleClaimValue,
+                namespaceData[expectation.sampleClaim],
+                "Expected ${expectation.profileId} to expose catalog sample claim ${expectation.sampleClaim}",
+            )
+            assertNull(
+                profile.mapping,
+                "mDOC profile ${expectation.profileId} should not define W3C/SD-JWT claim mapping",
+            )
+        }
+
+        assertMdocProfile(assertNotNull(profilesById[ISO_PHOTO_ID_PROFILE_ID]))
+        assertMdlProfile(assertNotNull(profilesById[ISO_MDL_PROFILE_ID]))
+    }
+
     private fun assertMdocProfile(profile: CredentialProfile) {
         assertEquals(ISO_PHOTO_ID_PROFILE_ID, profile.profileId)
         assertEquals(ISO_PHOTO_ID_CONFIGURATION_ID, profile.credentialConfigurationId)
         assertNull(profile.issuerDid, "Expected mDOC profile to be x5-chain based")
         assertNotNull(profile.x5Chain, "Expected mDOC profile to use issuer1 sample certificate")
         assertTrue(
-            profile.credentialData.containsKey(ISO_PHOTO_ID_CONFIGURATION_ID),
-            "Expected mDOC credential data to be namespaced by doctype",
+            profile.credentialData.containsKey(ISO_PHOTO_ID_COMMON_NAMESPACE_ID),
+            "Expected ISO Photo ID credential data to include the ISO 23220 common namespace",
         )
+        val photoIdCommonData = profile.credentialData[ISO_PHOTO_ID_COMMON_NAMESPACE_ID]?.jsonObject
         val photoIdData = profile.credentialData[ISO_PHOTO_ID_CONFIGURATION_ID]?.jsonObject
-        assertEquals(SAMPLE_PORTRAIT_BASE64, photoIdData?.get("portrait")?.jsonPrimitive?.content)
+        assertEquals("Mustermann", photoIdCommonData?.get("family_name")?.jsonPrimitive?.content)
+        assertEquals("Erika", photoIdCommonData?.get("given_name")?.jsonPrimitive?.content)
+        assertEquals("24601", photoIdData?.get("person_id")?.jsonPrimitive?.content)
         assertEquals(
-            "$.['$ISO_PHOTO_ID_CONFIGURATION_ID'].family_name_unicode",
+            "$.['$ISO_PHOTO_ID_COMMON_NAMESPACE_ID'].family_name",
             profile.idTokenClaimsMapping?.get("$.family_name"),
         )
         val entriesConfig = assertNotNull(
             profile.mDocNameSpacesDataMappingConfig
-                ?.get(ISO_PHOTO_ID_CONFIGURATION_ID)
+                ?.get(ISO_PHOTO_ID_COMMON_NAMESPACE_ID)
                 ?.entriesConfigMap,
         )
-        assertNotNull(entriesConfig["portrait"], "Expected portrait byte-string mapping")
+        assertNotNull(entriesConfig["birth_date"], "Expected Photo ID birth date full-date mapping")
+        assertNotNull(entriesConfig["issue_date"], "Expected Photo ID issue date full-date mapping")
+        assertNotNull(entriesConfig["expiry_date"], "Expected Photo ID expiry date full-date mapping")
     }
 
     private fun assertMdlProfile(profile: CredentialProfile) {
@@ -310,10 +336,11 @@ class Issuer2ProfileEndpointTest {
         assertNotNull(profile.x5Chain, "Expected mDL profile to use issuer1 sample certificate")
 
         val mdlData = profile.credentialData[ISO_MDL_NAMESPACE_ID]?.jsonObject
-        assertEquals(SAMPLE_PORTRAIT_BASE64, mdlData?.get("portrait")?.jsonPrimitive?.content)
+        assertEquals(CATALOG_PORTRAIT_BASE64, mdlData?.get("portrait")?.jsonPrimitive?.content)
         assertEquals(2, mdlData?.get("driving_privileges")?.jsonArray?.size)
-        assertEquals("Example Street 1, Vienna", mdlData?.get("resident_address")?.jsonPrimitive?.content)
+        assertEquals("Mariahilfer Straße 120/8", mdlData?.get("resident_address")?.jsonPrimitive?.content)
         assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
+        assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].birth_date", profile.idTokenClaimsMapping?.get("$.birthdate"))
         assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].resident_address", profile.idTokenClaimsMapping?.get("$.address"))
 
         val entriesConfig = assertNotNull(
@@ -323,6 +350,7 @@ class Issuer2ProfileEndpointTest {
         )
         assertNotNull(entriesConfig["portrait"], "Expected mDL portrait byte-string mapping")
         assertNotNull(entriesConfig["driving_privileges"], "Expected mDL nested driving privilege mapping")
+        assertNotNull(entriesConfig["signature_usual_mark"], "Expected mDL signature byte-string mapping")
     }
 
     private fun assertSdJwtCatalogProfiles(profiles: List<CredentialProfile>) {
@@ -454,6 +482,15 @@ class Issuer2ProfileEndpointTest {
         val usesIssuerDid: Boolean = false,
     )
 
+    private data class MdocProfileExpectation(
+        val profileId: String,
+        val name: String,
+        val credentialConfigurationId: String,
+        val sampleNamespace: String,
+        val sampleClaim: String,
+        val sampleClaimValue: JsonPrimitive,
+    )
+
     private fun assertProfileJsonEquals(
         expected: CredentialProfile,
         actualBody: String,
@@ -513,6 +550,7 @@ class Issuer2ProfileEndpointTest {
         const val UNIVERSITY_DEGREE_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
         const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
         const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
+        const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_MDL_CONFIGURATION_ID = "org.iso.18013.5.1.mDL"
         const val ISO_MDL_NAMESPACE_ID = "org.iso.18013.5.1"
@@ -523,12 +561,72 @@ class Issuer2ProfileEndpointTest {
         const val JWT_VC_JSON_FORMAT = "jwt_vc_json"
         const val MSO_MDOC_FORMAT = "mso_mdoc"
         const val SD_JWT_VC_FORMAT = "dc+sd-jwt"
-        const val SAMPLE_PORTRAIT_BASE64 = "AQIDBAUGBwgJCgsMDQ4P"
+        const val CATALOG_PORTRAIT_BASE64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z0i8AAAAASUVORK5CYII="
         const val DEFAULT_ISSUER_KEY_D = "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ"
         const val DEFAULT_ISSUER_KEY_X = "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM"
         const val DEFAULT_ISSUER_KEY_Y = "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"
         const val ISSUER_DID =
             "did:jwk:eyJrdHkiOiJFQyIsImNydiI6IlAtMjU2IiwieCI6IkcwUklOQmlGLW9RVUQzZDVER25lZ1F1WGVuSTI5SkRhTUdvTXZpb0tSQk0iLCJ5IjoiZWQzZUZHczJwRXRycDd2QVo3QkxjYnJVdHBLa1lXQVQySlBVUUs0bE40RSJ9"
+
+        val MDOC_CATALOG_PROFILE_EXPECTATIONS = listOf(
+            MdocProfileExpectation(
+                profileId = ISO_MDL_PROFILE_ID,
+                name = "ISO 18013-5 Mobile Driving License",
+                credentialConfigurationId = ISO_MDL_CONFIGURATION_ID,
+                sampleNamespace = ISO_MDL_NAMESPACE_ID,
+                sampleClaim = "family_name",
+                sampleClaimValue = JsonPrimitive("Musterfrau"),
+            ),
+            MdocProfileExpectation(
+                profileId = "isoMdlAamva",
+                name = "ISO 18013-5 mDL + AAMVA",
+                credentialConfigurationId = "org.iso.18013.5.1.mDL.aamva",
+                sampleNamespace = "org.iso.18013.5.1.aamva",
+                sampleClaim = "name_suffix",
+                sampleClaimValue = JsonPrimitive("Jr III"),
+            ),
+            MdocProfileExpectation(
+                profileId = ISO_PHOTO_ID_PROFILE_ID,
+                name = "ISO Photo ID",
+                credentialConfigurationId = ISO_PHOTO_ID_CONFIGURATION_ID,
+                sampleNamespace = ISO_PHOTO_ID_COMMON_NAMESPACE_ID,
+                sampleClaim = "family_name",
+                sampleClaimValue = JsonPrimitive("Mustermann"),
+            ),
+            MdocProfileExpectation(
+                profileId = "eudiPidMdoc",
+                name = "EU PID Credential (ISO mdoc)",
+                credentialConfigurationId = "eu.europa.ec.eudi.pid.1",
+                sampleNamespace = "eu.europa.ec.eudi.pid.1",
+                sampleClaim = "family_name",
+                sampleClaimValue = JsonPrimitive("Musterfrau"),
+            ),
+            MdocProfileExpectation(
+                profileId = "euAgeVerificationMdoc",
+                name = "EU Age Verification",
+                credentialConfigurationId = "eu.europa.ec.av.1",
+                sampleNamespace = "eu.europa.ec.av.1",
+                sampleClaim = "age_over_18",
+                sampleClaimValue = JsonPrimitive(true),
+            ),
+            MdocProfileExpectation(
+                profileId = "idAustriaMdoc",
+                name = "ID Austria",
+                credentialConfigurationId = "at.gv.id-austria.2023.iso",
+                sampleNamespace = "at.gv.id-austria.2023",
+                sampleClaim = "bpk",
+                sampleClaimValue = JsonPrimitive("AT:BPK:9f4c2a87d1b64d53a7e8c913e4b7f120"),
+            ),
+            MdocProfileExpectation(
+                profileId = "googleIdCardMdoc",
+                name = "Google ID Card",
+                credentialConfigurationId = "com.google.wallet.idcard.1",
+                sampleNamespace = ISO_MDL_NAMESPACE_ID,
+                sampleClaim = "family_name",
+                sampleClaimValue = JsonPrimitive("Mustermann"),
+            ),
+        )
 
         val SD_JWT_CATALOG_PROFILE_EXPECTATIONS = listOf(
             SdJwtProfileExpectation(
