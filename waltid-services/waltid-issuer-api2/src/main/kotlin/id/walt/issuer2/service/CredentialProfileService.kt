@@ -65,5 +65,6 @@ class CredentialProfileService(
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             x5Chain = x5Chain,
             notifications = notifications,
+            credentialStatus = credentialStatus,
         )
 }
