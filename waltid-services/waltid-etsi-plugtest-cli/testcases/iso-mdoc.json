@@ -1,0 +1,931 @@
+{
+  "scraped_at": "2026-06-02T11:12:40.270806+00:00",
+  "source": "https://signature-plugtests.etsi.org/testcases/iso",
+  "sheets": [
+    {
+      "sheetName": "ISO-mdL (ISO-mdoc EAA for mdL)",
+      "profileText": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc QEAA different than mdL\nISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+      "testcases": [
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-2",
+          "name": "MDL-EAA-1",
+          "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign"
+          ]
+        },
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-3",
+          "name": "MDL-EAA-2",
+          "description": "Addition to validityInfo of optional element\nEAA-1 +  expectedUpdate child of validityInfo\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign"
+          ]
+        },
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-4",
+          "name": "MDL-EAA-3",
+          "description": "Test cases with  different contents of deviceKeyInfo\nEAA-1 + deviceKeyInfo.keyAuthorizations.nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo with keyAuthorizations.nameSpaces descendant",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .nameSpaces",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign"
+          ]
+        },
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-5",
+          "name": "MDL-EAA-4",
+          "description": "Test cases with  different contents of deviceKeyInfo\nEAA-1 + deviceKeyInfo.keyAuthorizations.dataElements\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with dataElements child",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .dataElements",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign"
+          ]
+        },
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-6",
+          "name": "MDL-EAA-5",
+          "description": "Test cases with  different contents of deviceKeyInfo\nEAA-1 + deviceKeyInfo.keyAuthorizations\n    .dataElements and \n    .nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with nameSpaces and dataElements children",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .nameSpaces\n        .dataElements",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign"
+          ]
+        },
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-7",
+          "name": "MDL-EAA-6",
+          "description": "EAA-1 + MSO.status.identifier_list\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5\n\n.status.identifier_list",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil",
+            "status\n   .status_list"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign"
+          ]
+        },
+        {
+          "key": "ISO-mdL (ISO-mdoc EAA for mdL)-8",
+          "name": "MDL-EAA-7",
+          "description": "EAA-1 + Optional elements in section 7.2 of ISO 18013-5\n. Mandatory and some Optional elements as per section 7.2.1 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes).Namespace(=\"org.iso.18013.5.1\") Section 10.3.3",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+            "un_distinguishing_sign",
+            "birth_place",
+            "age_birth_year",
+            "resident_address",
+            "resident_city",
+            "resident_postal_code"
+          ]
+        }
+      ]
+    },
+    {
+      "sheetName": "ISO-mdoc EAA (no mdL)",
+      "profileText": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc EAA different than mdL\nISO-mdoc EAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+      "testcases": [
+        {
+          "key": "ISO-mdoc EAA (no mdL)-2",
+          "name": "MDOC-EAA-1",
+          "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5\n\n. Mandatory components of TS 119 472-1\n\n. Some optional components of TS 119 472-1",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-3",
+          "name": "MDOC-EAA-2",
+          "description": "Additions to claims set\nMDOC-EAA-1 + iss_reg_id (TS 119 472-1 clause 6.2.4.2).\nIssuer:legal entity and registration identifier applicable\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "iss_reg_id"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-4",
+          "name": "MDOC-EAA-3",
+          "description": "EAA with pseudonym\nMDOC-EAA-1 - given_name - family_name - document_number + also_knwon (TS 119 472-1 clause 6.2.5.1).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "also_known_as"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-5",
+          "name": "MDOC-EAA-4",
+          "description": "Onte-time use EAA\nMDOC-EAA-1 + oneTime (TS 119 472-1 clause 6.28.2).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "oneTime"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-6",
+          "name": "MDOC-EAA-5",
+          "description": "Short-Lived EAA\nMDOC-EAA-1 + shortLived (TS 119 472-1 clause 6.28.2).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "shortLived"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-7",
+          "name": "MDOC-EAA-6",
+          "description": "Test cases with\nMDOC-EAA-1 + deviceKeyInfo.keyAuthorizations.nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo with keyAuthorizations.nameSpaces descendant",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-8",
+          "name": "MDOC-EAA-7",
+          "description": "different contents\nMDOC-EAA-1 + deviceKeyInfo.keyAuthorizations.dataElements\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with dataElements child",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .dataElements",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-9",
+          "name": "MDOC-EAA-8",
+          "description": "of deviceKeyInfo\nMDOC-EAA-1 + deviceKeyInfo.keyAuthorizations\n    .dataElements and \n    .nameSpaces\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. deviceKeyInfo.keyAuthorizations with nameSpaces and dataElements children",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)\n   .keyAuthorizations\n        .nameSpaces\n        .dataElements",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-10",
+          "name": "MDOC-EAA-9",
+          "description": "MDOC-EAA-1 + MSO.status.identifier_list\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5\n\n.status.identifier_list",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil",
+            "status\n   .status_list"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+          ]
+        },
+        {
+          "key": "ISO-mdoc EAA (no mdL)-11",
+          "name": "MDOC-EAA-10",
+          "description": "MDOC-EAA-1 + Optional elements in section 7.2 of ISO 18013-5\n. Mandatory and some Optional elements as per section 7.2.1 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 12.3.3 of ISO 18013-5",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)"
+          ]
+        }
+      ]
+    },
+    {
+      "sheetName": "ISO-mdoc QEAA (no mdL) ",
+      "profileText": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc QEAA different than mdL\nISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+      "testcases": [
+        {
+          "key": "ISO-mdoc QEAA (no mdL) -2",
+          "name": "MDOC-QEAA-1",
+          "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5\n\n. Mandatory components of TS 119 472-1\n\n. Mandatory category component identifying the QEAA as a QEAA\n\n. Some optional components of TS 119 472-1",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:qualified\")"
+          ]
+        },
+        {
+          "key": "ISO-mdoc QEAA (no mdL) -3",
+          "name": "MDOC-QEAA-2",
+          "description": "Additions to claims set\nMDOC-QEAA-1 + iss_reg_id (TS 119 472-1 clause 6.2.4.2).\nIssuer:legal entity and registration identifier applicable\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+            "iss_reg_id"
+          ]
+        },
+        {
+          "key": "ISO-mdoc QEAA (no mdL) -4",
+          "name": "MDOC-QEAA-3",
+          "description": "QEAA with pseudonym\nMDOC-QEAA-1 - given_name - family_name - document_number + also_knwon (TS 119 472-1 clause 6.2.5.1).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+            "also_known_as"
+          ]
+        },
+        {
+          "key": "ISO-mdoc QEAA (no mdL) -5",
+          "name": "MDOC-QEAA-4",
+          "description": "Onte-time use QEAA\nMDOC-QEAA-1 + oneTime (TS 119 472-1 clause 6.28.2).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+            "oneTime"
+          ]
+        },
+        {
+          "key": "ISO-mdoc QEAA (no mdL) -6",
+          "name": "MDOC-QEAA-5",
+          "description": "Short-Lived QEAA\nMDOC-QEAA-1 + shortLived (TS 119 472-1 clause 6.28.2).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:qualified\")",
+            "shortLived"
+          ]
+        }
+      ]
+    },
+    {
+      "sheetName": "ISO-mdoc PuB-EAA (no mdL)",
+      "profileText": "NOTES: \n. Test cases incorporating components defined in ETSI TS 119 472-1 clause 6.\n\n. This defines ISO-mdoc PuB-EAA different than mdL\nISO-mdoc PuB-EAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2",
+      "testcases": [
+        {
+          "key": "ISO-mdoc PuB-EAA (no mdL)-2",
+          "name": "MDOC-PuBEAA-1",
+          "description": ". Mandatory elements as per section 7.2 of ISO 18013-5.\n\n. Only mandatory elements in IssuerAuth as per section 9.1.2.4 of ISO 18013-5\n\n. Mandatory components of TS 119 472-1\n\n. Mandatory category component identifying the PuB-EAA as a PuB-EAA\n\n. Some optional components of TS 119 472-1",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:pub)"
+          ]
+        },
+        {
+          "key": "ISO-mdoc PuB-EAA (no mdL)-3",
+          "name": "MDOC-PuBEAA-2",
+          "description": "Additions to claims set\nMDOC-PuBEAA-1 + iss_reg_id (TS 119 472-1 clause 6.2.4.2).\nIssuer:legal entity and registration identifier applicable\n. Mandatory elements as per section 7.2.1 of ISO 18013-5.\n\n. Mandatory  elements in IssuerAuth as per section 12.3.3 of ISO 18013-5.\n\n. validityInfo with expectedUpdate child",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil\n   .expectedUpdate"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:pub)",
+            "iss_reg_id"
+          ]
+        },
+        {
+          "key": "ISO-mdoc PuB-EAA (no mdL)-4",
+          "name": "MDOC-PuBEAA-3",
+          "description": "PuB-EAA with pseudonym\nMDOC-PuBEAA-1 - given_name - family_name - document_number + also_knwon (TS 119 472-1 clause 6.2.5.1).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:pub)",
+            "also_known_as"
+          ]
+        },
+        {
+          "key": "ISO-mdoc PuB-EAA (no mdL)-5",
+          "name": "MDOC-PuBEAA-4",
+          "description": "Onte-time use PuB-EAA\nMDOC-PuBEAA-1 + oneTime (TS 119 472-1 clause 6.28.2).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category (\"urn:etsi:esi:eaa:eu:pub)",
+            "oneTime"
+          ]
+        },
+        {
+          "key": "ISO-mdoc PuB-EAA (no mdL)-6",
+          "name": "MDOC-PuBEAA-5",
+          "description": "Short-Lived PuB-EAA\nMDOC-PuBEAA-1 + shortLived (TS 119 472-1 clause 6.28.2).",
+          "protectedHeader": [
+            "alg (1)",
+            "x5chain (33)"
+          ],
+          "cwtClaims": [
+            "iat (6)"
+          ],
+          "payload": [
+            "version (\"1.0\")",
+            "digestAltorithm",
+            "valueDigests",
+            "deviceKeyInfo \n    .deviceKey(COSE_Key with public key of wallet)",
+            "docType (the type assigned to mdL)",
+            "validityInfo\n   .signed\n   .validFrom\n   .validUntil"
+          ],
+          "signature": [],
+          "namespace": [
+            "namespaces(attributes)\n.Namespace(=\"org.iso.23220.1\")\nSection 10.3.3; for the components defined there.\n\n.Namespace(=\"org.etsi.01947201.010101) for elements:\n    category\n    iss_reg_id\n    also_known_as\n    oneTime\n    status_service\n    shortLived",
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "issuing_authority_unicode (as specified in clause 6.3 of ISO/IEC 23220-2)",
+            "document_number \n(as specified in section 6.3 of ISO/IEC 23220-2)",
+            "category(\"urn:etsi:esi:eaa:eu:pub)\"",
+            "shortLived"
+          ]
+        }
+      ]
+    }
+  ]
+}

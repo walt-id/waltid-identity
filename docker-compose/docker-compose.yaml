@@ -14,8 +14,7 @@ services:
     env_file:
       - .env
     extra_hosts:
-      - "$SERVICE_HOST:host-gateway"
-      - "waltid.enterprise.localhost:host-gateway"
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/data:/waltid-wallet-api/data
@@ -31,6 +30,8 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
@@ -45,6 +46,8 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
     environment:
@@ -61,8 +64,29 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./verifier-api2/config:/waltid-verifier-api2/config
+
+  wallet-api2:
+    image: ${IMAGE_PREFIX}waltid/wallet-api2:${VERSION_TAG:-latest}
+    profiles:
+      - services
+      - identity
+      - all
+    pull_policy: missing
+    depends_on:
+      postgres:
+        condition: service_healthy
+      caddy:
+        condition: service_started
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./wallet-api2/config:/waltid-wallet-api2/config
 
 
   waltid-demo-wallet:
@@ -248,6 +272,11 @@ services:
 
       - target: "$VERIFIER_API2_PORT"
         published: $VERIFIER_API2_PORT # verifier-api2
+        protocol: tcp
+        mode: host
+
+      - target: "$WALLET_API2_PORT"
+        published: $WALLET_API2_PORT # wallet-api2
         protocol: tcp
         mode: host
 

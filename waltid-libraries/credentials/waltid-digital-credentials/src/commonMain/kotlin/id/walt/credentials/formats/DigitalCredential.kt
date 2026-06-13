@@ -26,6 +26,13 @@ sealed class DigitalCredential {
      */
     abstract suspend fun getSignerKey(): Key?
 
+    /**
+     * Get holder's public key from the credential's `cnf` claim (or equivalent), if present.
+     * Returns null when the credential has no cryptographic holder binding.
+     * Overridden by credential types that support holder binding (SD-JWT VC, W3C+SD-JWT).
+     */
+    open suspend fun getHolderKey(): Key? = null
+
     // TODO: Signer key should globally move into signature, as such "open" key word to be removed in the future
     //open suspend fun getSignerKey(): Key? = signature?.signerKey
 

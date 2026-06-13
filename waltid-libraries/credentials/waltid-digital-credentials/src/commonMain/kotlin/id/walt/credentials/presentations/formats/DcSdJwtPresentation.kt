@@ -1,6 +1,7 @@
 package id.walt.credentials.presentations.formats
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.AbstractW3C
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
@@ -39,7 +40,7 @@ data class DcSdJwtPresentation(
     /** The holder-signed Key-Binding JWT that proves possession and binds to the transaction. */
     val keyBindingJwt: String,
 
-    val credential: SdJwtCredential,
+    val credential: DigitalCredential,
 
     // claims:
     val audience: String?,
@@ -178,7 +179,9 @@ data class DcSdJwtPresentation(
             // It should verify that the digests in the `_sd` array of the core match the hashes of the provided disclosures.
             val (_, reconstructedCredential) = CredentialParser.detectAndParse(hashableString)
 
-            require(reconstructedCredential is SdJwtCredential) { "Credential is not an SD-JWT credential: $reconstructedCredential" }
+            require(reconstructedCredential is SdJwtCredential || reconstructedCredential is AbstractW3C) {
+                "Expected an SD-JWT credential (IETF SD-JWT VC or W3C+SD-JWT), but got: ${reconstructedCredential::class.simpleName}"
+            }
 
             return Result.success(
                 DcSdJwtPresentation(

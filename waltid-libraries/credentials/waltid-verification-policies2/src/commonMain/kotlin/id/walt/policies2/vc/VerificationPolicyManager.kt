@@ -18,6 +18,7 @@ object VerificationPolicyManager {
         ExpirationDatePolicy(),
         NotBeforePolicy(),
         RevocationPolicy(),
+        VctIntegrityPolicy(),
     ).associateBy { it.id }
 
     fun getSimpleVerificationPolicyByName(id: String): CredentialVerificationPolicy2 =

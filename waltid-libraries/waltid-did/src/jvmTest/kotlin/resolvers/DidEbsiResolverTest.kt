@@ -4,6 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
+import id.walt.webdatafetching.WebDataFetcher
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.*
@@ -22,7 +23,7 @@ import javax.net.ssl.X509TrustManager
 
 class DidEbsiResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod =
-        DidEbsiResolver(HttpClient(CIO) {
+        DidEbsiResolver(WebDataFetcher.wrapping(HttpClient(CIO) {
             engine {
                 https {
                     //disable https certificate verification
@@ -43,7 +44,7 @@ class DidEbsiResolverTest : DidResolverTestBase() {
                     }
                 }
             }
-        })
+        }, id = "did-ebsi-resolver-test"))
 
 
     // TODO: Include test in the scope of WAL-842

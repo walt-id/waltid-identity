@@ -6,13 +6,20 @@ import kotlinx.serialization.json.JsonObject
 
 /**
  * Represents the structure of a decoded item within the 'transaction_data' array.
- * See: Section 5.1 (transaction_data parameter)
+ * See: OID4VP 1.0 §5.1 (transaction_data parameter) and §A.3.2 (SD-JWT VC profile).
  */
 @Serializable
 data class TransactionDataItem(
     val type: String,
     @SerialName("credential_ids")
     val credentialIds: List<String>,
-    // Other transaction data type specific parameters would go here as JsonObject or specific fields
-    val details: JsonObject? = null // For additional type-specific fields
+    /**
+     * OPTIONAL. Non-empty array of hash algorithm identifiers (IANA "Named Information Hash
+     * Algorithm" registry), one of which MUST be used by the wallet to compute
+     * `transaction_data_hashes` in the KB-JWT. If absent, `sha-256` is the default.
+     */
+    @SerialName("transaction_data_hashes_alg")
+    val transactionDataHashesAlg: List<String>? = null,
+    // Additional transaction data type specific parameters
+    val details: JsonObject? = null
 )

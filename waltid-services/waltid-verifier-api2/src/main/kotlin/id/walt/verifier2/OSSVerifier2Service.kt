@@ -13,6 +13,7 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.data.Verifier2SessionUpdate
 import id.walt.verifier2.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
+import id.walt.verifier2.handlers.authrequest.Verifier2RequestUriPostHandler.respondRequestUriPost
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
 import id.walt.verifier2.openapi.VerificationSessionCreateOpenApi
 import id.walt.vical.*
@@ -137,6 +138,23 @@ object Verifier2Service {
                             ?: throw IllegalArgumentException("Unknown session id")
 
                     call.respondAuthorizationRequest(
+                        verificationSession = verificationSession,
+                        updateSessionCallback = updateSessionCallback
+                    )
+                }
+
+                post("request", {
+                        summary = "Wallets POST to the request URI (request_uri_method=post), optionally sending wallet_nonce"
+                        request {
+                            pathParameter<String>(VERIFICATION_SESSION)
+                        }
+                        response { HttpStatusCode.OK to { body<String> { description = "Signed request object JWT (application/oauth-authz-req+jwt)" } } }
+                    }) {
+                    val verificationSession =
+                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
+                            ?: throw IllegalArgumentException("Unknown session id")
+
+                    call.respondRequestUriPost(
                         verificationSession = verificationSession,
                         updateSessionCallback = updateSessionCallback
                     )

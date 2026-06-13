@@ -20,7 +20,7 @@ object SdJwtVcPresenter {
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String
+        holderDid: String?
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
@@ -50,7 +50,8 @@ object SdJwtVcPresenter {
             nonce = authorizationRequest.nonce!!,
             audience = authorizationRequest.clientId,
             selectedDisclosures = disclosuresToPresent,
-            holderKey = holderKey
+            holderKey = holderKey,
+            transactionData = authorizationRequest.transactionData
         )
 
         // Use the disclose method from the interface, then append the KB-JWT

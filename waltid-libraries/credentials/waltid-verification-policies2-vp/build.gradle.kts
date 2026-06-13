@@ -36,8 +36,13 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
 
             implementation("com.soywiz:korlibs-io:6.0.2")
+        }
+        jvmMain.dependencies {
+            // BouncyCastle for X.509 certificate chain validation
+            implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))

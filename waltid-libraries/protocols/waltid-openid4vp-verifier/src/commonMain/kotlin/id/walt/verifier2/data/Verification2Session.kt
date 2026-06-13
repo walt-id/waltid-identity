@@ -117,6 +117,20 @@ data class Verification2Session(
     var statusReason: String? = null,
 
     /**
+     * A fresh cryptographic random value appended to the success `redirect_uri` per
+     * OID4VP 1.0 §implementation_considerations_direct_post (step 6).
+     *
+     * The Verifier's frontend receives this value when the wallet redirects the user browser
+     * back after a successful presentation, and MUST present it alongside the session's
+     * `transaction-id` to the Response Endpoint to fetch the VP Token. This prevents session
+     * fixation: only the browser that received the redirect can complete the flow.
+     *
+     * Null when no `successRedirectUri` was configured or the session hasn't been completed yet.
+     */
+    @SerialName("response_code")
+    var responseCode: String? = null,
+
+    /**
      * Structured failure detail. Populated when the session ends in [VerificationSessionStatus.FAILED]
      * (presentation validation, DCQL fulfillment, VC policy violations, or an OID4VP §8.5 wallet
      * error response). Null for successful sessions or sessions that have not reached a failure
@@ -208,9 +222,9 @@ data class Verification2Session(
     @Serializable
     data class VerificationSessionRedirects(
         @SerialName("success_redirect_uri")
-        var successRedirectUri: String? = null,
+        var successRedirectUri: Url? = null,
         @SerialName("error_redirect_uri")
-        val errorRedirectUri: String? = null,
+        val errorRedirectUri: Url? = null,
     )
 
 

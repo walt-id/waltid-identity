@@ -114,6 +114,12 @@ data class IssuanceRequest(
      * Matches the ISO/IEC 18013-5 MSO `status` structure encoded as JSON (see `waltid-mdoc-credentials` README).
      */
     val mdocStatus: JsonObject? = null,
+
+    /**
+     * Validity period for mdoc credentials in days. Defaults to 365 days.
+     * Used to set the `validUntil` field in the MSO ValidityInfo.
+     */
+    val mdocValidityDays: Int? = null,
 ) {
 
     init {

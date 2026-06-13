@@ -38,6 +38,7 @@ kotlin {
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
             api(project(":waltid-libraries:web:waltid-web-data-fetching"))
+            api(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
@@ -48,8 +49,6 @@ kotlin {
             implementation(identityLibs.ktor.client.cio)
         }
         jvmMain.dependencies {
-            // Json canonicalization
-            implementation("io.github.erdtman:java-json-canonicalization:1.1")
         }
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)

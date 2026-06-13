@@ -1,0 +1,141 @@
+{
+  "scraped_at": "2026-06-02T11:12:40.270806+00:00",
+  "source": "https://signature-plugtests.etsi.org/testcases/tc_negative",
+  "sheets": [
+    {
+      "sheetName": "SD-JWT-VC EAAN",
+      "testcases": [
+        {
+          "key": "SD-JWT-VC EAAN-2",
+          "name": "SJV-EAAN-1",
+          "description": "Malformed JWT because vct#integrity claim is missing"
+        },
+        {
+          "key": "SD-JWT-VC EAAN-3",
+          "name": "SJV-EAAN-2",
+          "description": "Duplicate JSON keys and conflicting values"
+        },
+        {
+          "key": "SD-JWT-VC EAAN-4",
+          "name": "SJV-EAAN-3",
+          "description": "EAA doesn't incorporate technical validity period"
+        },
+        {
+          "key": "SD-JWT-VC EAAN-5",
+          "name": "SJV-EAAN-4",
+          "description": "EAA incorporates both the EAA short-lived component and the EAA status service."
+        },
+        {
+          "key": "SD-JWT-VC EAAN-6",
+          "name": "SJV-EAAN-5",
+          "description": "Tampered payload \u2013 invalid signature, valid token modified after signing altering a claim"
+        },
+        {
+          "key": "SD-JWT-VC EAAN-7",
+          "name": "SJV-EAAN-6",
+          "description": "Malformed JWT including wrong elements (wrong typ value)"
+        },
+        {
+          "key": "SD-JWT-VC EAAN-8",
+          "name": "SJV-EAAN-7",
+          "description": "Expired credential, credential has expired in the past."
+        },
+        {
+          "key": "SD-JWT-VC EAAN-9",
+          "name": "SJV-EAAN-8",
+          "description": "Status check unavailable (fail-open vs fail-closed), status service returns 5xx or network outage."
+        },
+        {
+          "key": "SD-JWT-VC EAAN-10",
+          "name": "SJV-EAAN-9",
+          "description": "Malformed JWT including wrong elements (wrong field name in payload)"
+        },
+        {
+          "key": "SD-JWT-VC EAAN-11",
+          "name": "SJV-EAAN-10",
+          "description": "JWT \u2013 Schema/namespace mismatch, verifier expects a specific schema/namespace; credential uses different one.\n1) Present credential with wrong schema identifier or namespace.\n2) Verify schema validation behavior."
+        },
+        {
+          "key": "SD-JWT-VC EAAN-12",
+          "name": "SJV-EAAN-11",
+          "description": "EAA with a disclosure without having the corresponding digest in the payload. The disclosure may be an object or an element of an array."
+        },
+        {
+          "key": "SD-JWT-VC EAAN-13",
+          "name": "SJV-EAAN-12",
+          "description": "EAA with some mandatory PID elements not present"
+        }
+      ]
+    },
+    {
+      "sheetName": "SD-JWT-VC QEAAN",
+      "testcases": [
+        {
+          "key": "SD-JWT-VC QEAAN-2",
+          "name": "SJV-QEAAN-1",
+          "description": "Mandatory elements, without selective disclosures; without key binding; with wrong EAA category that's different from\n- urn:etsi:esi:eaa:eu:qualified (QEAA)\n- urn:etsi:esi:eaa:eu:pub (Pub-EAA)"
+        },
+        {
+          "key": "SD-JWT-VC QEAAN-3",
+          "name": "SJV-QEAAN-2",
+          "description": "Mandatory elements, without selective disclosures; with the issuer identifier fields including an identifier of a non-EU Member State"
+        },
+        {
+          "key": "SD-JWT-VC QEAAN-4",
+          "name": "SJV-QEAAN-3",
+          "description": "Mandatory elements, without selective disclosures; without the issuer identifier fields"
+        },
+        {
+          "key": "SD-JWT-VC QEAAN-5",
+          "name": "SJV-QEAAN-4",
+          "description": "Mandatory elements, without selective disclosures; \nwithout including either the EAA subject identifier or the pseudonym of the EAA subject."
+        },
+        {
+          "key": "SD-JWT-VC QEAAN-6",
+          "name": "SJV-QEAAN-5",
+          "description": "Mandatory elements, without selective disclosures; \nwithout including either the EAA short-lived component or the EAA status\nservice."
+        },
+        {
+          "key": "SD-JWT-VC QEAAN-7",
+          "name": "SJV-QEAAN-6",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\na digital signature that is not a qualified electronic signature or a qualified electronic seal"
+        }
+      ]
+    },
+    {
+      "sheetName": "SD-JWT-VC PuB-EAAN",
+      "testcases": [
+        {
+          "key": "SD-JWT-VC PuB-EAAN-2",
+          "name": "SJV-PuBEAAN-1",
+          "description": "Mandatory elements, without selective disclosures; without key binding; with wrong EAA category that's different from\n- urn:etsi:esi:eaa:eu:qualified (QEAA)\n- urn:etsi:esi:eaa:eu:pub (Pub-EAA)"
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAAN-3",
+          "name": "SJV-PuBEAAN-2",
+          "description": "Mandatory elements, without selective disclosures; with the issuer identifier fields including an identifier of a non-EU Member State"
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAAN-4",
+          "name": "SJV-PuBEAAN-3",
+          "description": "Mandatory elements, without selective disclosures; without the issuer identifier fields"
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAAN-5",
+          "name": "SJV-PuBEAAN-4",
+          "description": "Mandatory elements, without selective disclosures; \nwithout including either the EAA subject identifier or the pseudonym of the EAA subject."
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAAN-6",
+          "name": "SJV-PuBEAAN-5",
+          "description": "Mandatory elements, without selective disclosures; \nwithout including either the EAA short-lived component or the EAA status\nservice."
+        },
+        {
+          "key": "SD-JWT-VC PuB-EAAN-7",
+          "name": "SJV-PuBEAAN-6",
+          "description": "Mandatory elements, without selective disclosures; \nWITH:\na digital signature that is not a qualified electronic signature or a qualified electronic seal"
+        }
+      ]
+    }
+  ]
+}

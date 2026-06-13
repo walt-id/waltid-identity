@@ -29,6 +29,9 @@ kotlin {
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
+            // Web data fetching (provides platform-correct HTTP engine selection + TLS 1.3 on JVM)
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
+
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 

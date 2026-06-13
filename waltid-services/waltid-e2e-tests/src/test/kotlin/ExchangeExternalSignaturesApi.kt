@@ -20,6 +20,8 @@ import id.walt.oid4vc.data.AuthenticationMethod
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.data.OpenId4VPProfile
 import id.walt.oid4vc.data.ProofType
+import id.walt.sdjwt.ArrayElementDisclosure
+import id.walt.sdjwt.ObjectPropertyDisclosure
 import id.walt.sdjwt.SDField
 import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDisclosure
@@ -688,8 +690,13 @@ class ExchangeExternalSignatures(private val e2e: E2ETest) {
             .joinToString("~") { disclosure ->
                 Base64.UrlSafe.encode(buildJsonArray {
                     add(disclosure.salt)
-                    add(disclosure.key)
-                    add(JsonPrimitive("<forged>"))
+                    when (disclosure) {
+                        is ObjectPropertyDisclosure -> {
+                            add(disclosure.key)
+                            add(JsonPrimitive("<forged>"))
+                        }
+                        is ArrayElementDisclosure -> add(JsonPrimitive("<forged>"))
+                    }
                 }.toString().encodeToByteArray()).trimEnd('=')
             }
     }

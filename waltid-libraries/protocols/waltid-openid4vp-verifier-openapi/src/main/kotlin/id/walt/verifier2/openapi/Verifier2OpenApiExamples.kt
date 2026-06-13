@@ -10,6 +10,7 @@ import id.walt.dcql.models.meta.NoMeta
 import id.walt.dcql.models.meta.SdJwtVcMeta
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.*
+import io.ktor.http.Url
 import id.walt.policies2.vc.policies.status.Values
 import id.walt.policies2.vc.policies.status.model.IETFStatusPolicyAttribute
 import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyAttribute
@@ -480,7 +481,7 @@ object Verifier2OpenApiExamples {
         ),
         urlConfig = UrlConfig(),
         redirects = Verification2Session.VerificationSessionRedirects(
-            successRedirectUri = "https://example.com/verification-successful"
+            successRedirectUri = Url("https://example.com/verification-successful")
         )
     )
 
