@@ -120,6 +120,10 @@ class Issuer2PreAuthorizedWalletFlowTest {
             credentialPayload = credentialPayload,
             expectedVctSuffix = "/${scenario.credentialConfigurationId}",
             expectedDisclosureKeys = setOf("birthdate"),
+            expectedClaims = mapOf(
+                "family_name" to "Doe",
+                "given_name" to "John",
+            ),
         )
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
     }

@@ -56,6 +56,7 @@ fun assertSdJwtVcCredentialPayload(
     credentialPayload: JsonObject,
     expectedVctSuffix: String,
     expectedDisclosureKeys: Set<String>,
+    expectedClaims: Map<String, String> = emptyMap(),
 ): String {
     val issuedCredential = issuedCredentialString(credentialPayload)
     assertTrue(issuedCredential.endsWith("~"), "Expected SD-JWT VC to end with the disclosure separator")
@@ -67,6 +68,9 @@ fun assertSdJwtVcCredentialPayload(
         assertStringClaim(sdJwt.fullPayload["vct"], "sd-jwt.vct").endsWith(expectedVctSuffix),
         "Expected SD-JWT VC vct to end with $expectedVctSuffix",
     )
+    expectedClaims.forEach { (claimName, expectedValue) ->
+        assertEquals(expectedValue, assertStringClaim(sdJwt.fullPayload[claimName], "sd-jwt.$claimName"))
+    }
     return issuedCredential
 }
 
