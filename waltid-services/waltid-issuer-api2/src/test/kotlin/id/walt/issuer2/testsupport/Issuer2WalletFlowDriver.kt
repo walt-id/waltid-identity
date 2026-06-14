@@ -215,8 +215,9 @@ class Issuer2WalletFlowDriver(
         resolvedOffer: ResolvedCredentialOffer,
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
+        didProof: Boolean = true,
     ): JsonObject {
-        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata)
+        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata, didProof = didProof)
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
@@ -300,18 +301,26 @@ class Issuer2WalletFlowDriver(
         }
     }
 
-    suspend fun buildJwtProofs(issuerMetadata: CredentialIssuerMetadata): Proofs {
+    suspend fun buildJwtProofs(
+        issuerMetadata: CredentialIssuerMetadata,
+        didProof: Boolean = true,
+    ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
-        val holderDid = DidJwkRegistrar()
-            .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
-            .did
+        val holderDid = if (didProof) {
+            DidJwkRegistrar()
+                .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
+                .did
+        } else {
+            null
+        }
 
         return JwtProofBuilder().buildJwtProof(
             key = proofKey,
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
-            keyId = "$holderDid#0",
+            keyId = holderDid?.let { "$it#0" },
+            includeJwk = !didProof,
         )
     }
 }

@@ -41,6 +41,48 @@ suspend fun assertSessionStatus(
 
 fun assertJwtVcJsonCredentialPayload(credentialPayload: JsonObject): String {
     val issuedCredential = assertNotNull(
+    val issuedCredential = issuedCredentialString(credentialPayload)
+    assertTrue(issuedCredential.split(".").size >= 3)
+    assertJwtVcJsonMappingFunctionsApplied(issuedCredential)
+    return issuedCredential
+}
+
+fun assertSdJwtVcCredentialPayload(
+    credentialPayload: JsonObject,
+    expectedVctSuffix: String,
+    expectedDisclosureKeys: Set<String>,
+): String {
+    val issuedCredential = issuedCredentialString(credentialPayload)
+    assertTrue(issuedCredential.endsWith("~"), "Expected SD-JWT VC to end with the disclosure separator")
+
+    val sdJwt = SDJwt.parse(issuedCredential)
+    assertEquals("dc+sd-jwt", sdJwt.type)
+    assertSdJwtVcDisclosures(sdJwt, expectedDisclosureKeys)
+    assertTrue(
+        assertStringClaim(sdJwt.fullPayload["vct"], "sd-jwt.vct").endsWith(expectedVctSuffix),
+        "Expected SD-JWT VC vct to end with $expectedVctSuffix",
+    )
+    return issuedCredential
+}
+
+private fun assertSdJwtVcDisclosures(
+    sdJwt: SDJwt,
+    expectedDisclosureKeys: Set<String>,
+) {
+    val disclosures = sdJwt.disclosureObjects
+
+    assertTrue(disclosures.isNotEmpty(), "Expected SD-JWT VC to include at least one parsed disclosure")
+    assertEquals(disclosures.size, sdJwt.disclosures.size)
+    assertEquals(expectedDisclosureKeys, disclosures.map { it.key }.toSet())
+    assertTrue(sdJwt.sdPayload.verifyDisclosures(), "Expected SD-JWT VC disclosures to match the payload digests")
+    disclosures.forEachIndexed { index, disclosure ->
+        assertTrue(disclosure.salt.isNotBlank(), "Expected SD-JWT VC disclosure #$index to have a salt")
+        assertTrue(disclosure.key.isNotBlank(), "Expected SD-JWT VC disclosure #$index to have a claim key")
+    }
+}
+
+private fun issuedCredentialString(credentialPayload: JsonObject): String =
+    assertNotNull(
         credentialPayload["credentials"]
             ?.jsonArray
             ?.single()
