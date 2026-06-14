@@ -130,6 +130,32 @@ fun assertMdocCredentialPayload(
     return issuedCredential
 }
 
+fun assertIsoMdlCredentialPayload(
+    credentialPayload: JsonObject,
+    expectedClaims: Map<String, String> = mapOf(
+        "family_name" to "Musterfrau",
+        "given_name" to "Anna Maria",
+        "document_number" to "DL-AT-2025-00018427",
+    ),
+): String =
+    assertMdocCredentialPayload(
+        credentialPayload = credentialPayload,
+        expectedDocType = "org.iso.18013.5.1.mDL",
+        expectedNamespace = "org.iso.18013.5.1",
+        expectedElementIdentifiers = setOf(
+            "family_name",
+            "given_name",
+            "birth_date",
+            "issue_date",
+            "expiry_date",
+            "issuing_country",
+            "document_number",
+            "portrait",
+            "driving_privileges",
+        ),
+        expectedClaims = expectedClaims,
+    )
+
 private fun issuedCredentialString(credentialPayload: JsonObject): String =
     assertNotNull(
         credentialPayload["credentials"]

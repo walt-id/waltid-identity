@@ -7,8 +7,8 @@ import id.walt.issuer2.testsupport.Issuer2TxCodeMode
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
+import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
-import id.walt.issuer2.testsupport.assertMdocCredentialPayload
 import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
@@ -154,27 +154,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
             accessToken = tokenResponse.access_token,
             includeDidInProof = false,
         )
-        assertMdocCredentialPayload(
-            credentialPayload = credentialPayload,
-            expectedDocType = "org.iso.18013.5.1.mDL",
-            expectedNamespace = "org.iso.18013.5.1",
-            expectedElementIdentifiers = setOf(
-                "family_name",
-                "given_name",
-                "birth_date",
-                "issue_date",
-                "expiry_date",
-                "issuing_country",
-                "document_number",
-                "portrait",
-                "driving_privileges",
-            ),
-            expectedClaims = mapOf(
-                "family_name" to "Musterfrau",
-                "given_name" to "Anna Maria",
-                "document_number" to "DL-AT-2025-00018427",
-            ),
-        )
+        assertIsoMdlCredentialPayload(credentialPayload)
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
     }
 }
