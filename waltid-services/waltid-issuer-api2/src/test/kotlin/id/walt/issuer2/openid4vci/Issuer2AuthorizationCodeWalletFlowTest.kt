@@ -144,7 +144,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
                     accessToken = tokenResponse.access_token,
-                    didProof = false,
+                    includeDidInProof = false,
                 )
                 assertSdJwtVcCredentialPayload(
                     credentialPayload = credentialPayload,

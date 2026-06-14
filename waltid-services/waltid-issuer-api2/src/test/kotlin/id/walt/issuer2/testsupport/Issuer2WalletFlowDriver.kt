@@ -215,9 +215,9 @@ class Issuer2WalletFlowDriver(
         resolvedOffer: ResolvedCredentialOffer,
         accessToken: String,
         credentialConfigurationId: String = resolvedOffer.offer.credentialConfigurationIds.single(),
-        didProof: Boolean = true,
+        includeDidInProof: Boolean = true,
     ): JsonObject {
-        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata, didProof = didProof)
+        val proofs = buildJwtProofs(resolvedOffer.issuerMetadata, includeDidInProof = includeDidInProof)
         val response = client.post(resolvedOffer.issuerMetadata.credentialEndpoint) {
             bearerAuth(accessToken)
             contentType(ContentType.Application.Json)
@@ -303,11 +303,11 @@ class Issuer2WalletFlowDriver(
 
     suspend fun buildJwtProofs(
         issuerMetadata: CredentialIssuerMetadata,
-        didProof: Boolean = true,
+        includeDidInProof: Boolean = true,
     ): Proofs {
         val nonceResponse = client.post(requireNotNull(issuerMetadata.nonceEndpoint)).body<JsonObject>()
         val proofKey = JWKKey.generate(KeyType.secp256r1)
-        val holderDid = if (didProof) {
+        val holderDid = if (includeDidInProof) {
             DidJwkRegistrar()
                 .registerByKey(proofKey, DidJwkCreateOptions(KeyType.secp256r1))
                 .did
@@ -320,7 +320,7 @@ class Issuer2WalletFlowDriver(
             audience = issuerMetadata.credentialIssuer,
             nonce = requireNotNull(nonceResponse["c_nonce"]?.jsonPrimitive?.contentOrNull),
             keyId = holderDid?.let { "$it#0" },
-            includeJwk = !didProof,
+            includeJwk = !includeDidInProof,
         )
     }
 }
