@@ -339,9 +339,9 @@ class Issuer2ProfileEndpointTest {
         assertEquals(CATALOG_PORTRAIT_BASE64, mdlData?.get("portrait")?.jsonPrimitive?.content)
         assertEquals(2, mdlData?.get("driving_privileges")?.jsonArray?.size)
         assertEquals("Mariahilfer Straße 120/8", mdlData?.get("resident_address")?.jsonPrimitive?.content)
+        assertEquals(setOf("$.family_name", "$.given_name"), profile.idTokenClaimsMapping?.keys)
         assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
-        assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].birth_date", profile.idTokenClaimsMapping?.get("$.birthdate"))
-        assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].resident_address", profile.idTokenClaimsMapping?.get("$.address"))
+        assertEquals("$.['$ISO_MDL_NAMESPACE_ID'].given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
 
         val entriesConfig = assertNotNull(
             profile.mDocNameSpacesDataMappingConfig
@@ -394,9 +394,9 @@ class Issuer2ProfileEndpointTest {
         assertEquals("Doe", profile.credentialData["family_name"]?.jsonPrimitive?.content)
         assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
         assertNotNull(profile.selectiveDisclosure?.fields)
+        assertEquals(setOf("$.given_name", "$.family_name"), profile.idTokenClaimsMapping?.keys)
         assertEquals("$.given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
         assertEquals("$.family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
-        assertEquals("$.email", profile.idTokenClaimsMapping?.get("$.email"))
         assertNull(profile.x5Chain, "Expected identity SD-JWT VC profile to be DID/JWK based")
     }
 
@@ -408,9 +408,9 @@ class Issuer2ProfileEndpointTest {
         assertNotNull(profile.x5Chain, "Expected x5-chain SD-JWT VC profile to use issuer1 sample certificate")
         assertEquals("91-287/6543", profile.credentialData["tax_number"]?.jsonPrimitive?.content)
         assertEquals("Musterfrau", profile.credentialData["registered_family_name"]?.jsonPrimitive?.content)
+        assertEquals(setOf("$.family_name", "$.given_name"), profile.idTokenClaimsMapping?.keys)
         assertEquals("$.registered_family_name", profile.idTokenClaimsMapping?.get("$.family_name"))
         assertEquals("$.registered_given_name", profile.idTokenClaimsMapping?.get("$.given_name"))
-        assertEquals("$.birth_date", profile.idTokenClaimsMapping?.get("$.birthdate"))
     }
 
     private fun assertProfileHasDefaultIssuerKey(profile: CredentialProfile) {
