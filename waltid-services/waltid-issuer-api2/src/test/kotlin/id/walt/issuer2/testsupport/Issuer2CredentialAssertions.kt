@@ -1,18 +1,24 @@
 package id.walt.issuer2.testsupport
 
+import id.walt.cose.coseCompliantCbor
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.issuer2.domain.IssuanceSession
+import id.walt.mdoc.objects.document.IssuerSigned
+import id.walt.sdjwt.SDJwt
 import id.waltid.openid4vci.wallet.token.TokenRequestBuilder
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -40,7 +46,6 @@ suspend fun assertSessionStatus(
 }
 
 fun assertJwtVcJsonCredentialPayload(credentialPayload: JsonObject): String {
-    val issuedCredential = assertNotNull(
     val issuedCredential = issuedCredentialString(credentialPayload)
     assertTrue(issuedCredential.split(".").size >= 3)
     assertJwtVcJsonMappingFunctionsApplied(issuedCredential)
@@ -81,6 +86,50 @@ private fun assertSdJwtVcDisclosures(
     }
 }
 
+@OptIn(ExperimentalSerializationApi::class)
+fun assertMdocCredentialPayload(
+    credentialPayload: JsonObject,
+    expectedDocType: String,
+    expectedNamespace: String,
+    expectedElementIdentifiers: Set<String>,
+    expectedClaims: Map<String, String> = emptyMap(),
+): String {
+    val issuedCredential = issuedCredentialString(credentialPayload)
+    assertFalse(issuedCredential.contains("."), "Expected mDOC credential to be CBOR/base64url, not a JWT")
+    assertFalse(issuedCredential.contains("~"), "Expected mDOC credential to be CBOR/base64url, not an SD-JWT")
+    val issuedCredentialBytes = issuedCredential.decodeFromBase64Url()
+    assertTrue(issuedCredentialBytes.isNotEmpty(), "Expected mDOC credential to decode to CBOR bytes")
+
+    val issuerSigned = coseCompliantCbor.decodeFromByteArray<IssuerSigned>(issuedCredentialBytes)
+
+    val mobileSecurityObject = issuerSigned.decodeMobileSecurityObject()
+    assertEquals(expectedDocType, mobileSecurityObject.docType)
+    assertTrue(
+        mobileSecurityObject.valueDigests.containsKey(expectedNamespace),
+        "Expected mDOC MSO value digests for namespace $expectedNamespace",
+    )
+
+    val issuerSignedList = assertNotNull(
+        issuerSigned.namespaces?.get(expectedNamespace),
+        "Expected mDOC namespace $expectedNamespace",
+    )
+    val actualElementIdentifiers = issuerSignedList.entries.map { it.value.elementIdentifier }.toSet()
+    assertTrue(
+        actualElementIdentifiers.containsAll(expectedElementIdentifiers),
+        "Expected mDOC namespace $expectedNamespace to contain $expectedElementIdentifiers, got $actualElementIdentifiers",
+    )
+
+    val namespaceJson = assertNotNull(
+        issuerSigned.namespacesToJson()[expectedNamespace]?.jsonObject,
+        "Expected mDOC namespace $expectedNamespace to be convertible to JSON",
+    )
+    expectedClaims.forEach { (claimName, expectedValue) ->
+        assertEquals(expectedValue, namespaceJson[claimName]?.jsonPrimitive?.contentOrNull)
+    }
+
+    return issuedCredential
+}
+
 private fun issuedCredentialString(credentialPayload: JsonObject): String =
     assertNotNull(
         credentialPayload["credentials"]
@@ -91,10 +140,6 @@ private fun issuedCredentialString(credentialPayload: JsonObject): String =
             ?.jsonPrimitive
             ?.content
     )
-    assertTrue(issuedCredential.split(".").size >= 3)
-    assertJwtVcJsonMappingFunctionsApplied(issuedCredential)
-    return issuedCredential
-}
 
 private fun assertJwtVcJsonMappingFunctionsApplied(issuedCredential: String) {
     val jwtPayload = issuedCredential.decodeJws().payload

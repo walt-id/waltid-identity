@@ -62,6 +62,7 @@ dependencies {
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vci-wallet"))
+    testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)
     testImplementation("com.microsoft.playwright:playwright:1.60.0") {
         exclude(group = "org.junit.jupiter")
