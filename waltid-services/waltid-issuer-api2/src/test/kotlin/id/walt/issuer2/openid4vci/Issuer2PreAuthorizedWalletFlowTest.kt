@@ -8,6 +8,7 @@ import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
+import id.walt.issuer2.testsupport.assertMdocCredentialPayload
 import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
@@ -119,6 +120,60 @@ class Issuer2PreAuthorizedWalletFlowTest {
             credentialPayload = credentialPayload,
             expectedVctSuffix = "/${scenario.credentialConfigurationId}",
             expectedDisclosureKeys = setOf("birthdate"),
+        )
+        assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    @Test
+    fun walletCanCompletePreAuthorizedMdocOfferWithoutTxCode() = testApplication {
+        val scenario = Issuer2CredentialScenarios.isoMdl
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        assertEquals(AuthenticationMethod.PRE_AUTHORIZED, createdOffer.authMethod)
+        assertNull(createdOffer.issuerStateMode)
+        assertNull(createdOffer.txCodeValue)
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        assertEquals(listOf(scenario.credentialConfigurationId), resolvedOffer.offer.credentialConfigurationIds)
+        assertNull(assertNotNull(resolvedOffer.offer.grants?.preAuthorizedCode).txCode)
+
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        assertBearerAccessToken(tokenResponse)
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+
+        val credentialPayload = walletFlow.requestCredential(
+            resolvedOffer = resolvedOffer,
+            accessToken = tokenResponse.access_token,
+            includeDidInProof = false,
+        )
+        assertMdocCredentialPayload(
+            credentialPayload = credentialPayload,
+            expectedDocType = "org.iso.18013.5.1.mDL",
+            expectedNamespace = "org.iso.18013.5.1",
+            expectedElementIdentifiers = setOf(
+                "family_name",
+                "given_name",
+                "birth_date",
+                "issue_date",
+                "expiry_date",
+                "issuing_country",
+                "document_number",
+                "portrait",
+                "driving_privileges",
+            ),
+            expectedClaims = mapOf(
+                "family_name" to "Musterfrau",
+                "given_name" to "Anna Maria",
+                "document_number" to "DL-AT-2025-00018427",
+            ),
         )
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
     }
