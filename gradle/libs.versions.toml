@@ -228,6 +228,52 @@ jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "3.0.2" }
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
 
+## Testing
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+kotest-assertions-json = { module = "io.kotest:kotest-assertions-json", version.ref = "kotest" }
+
+## Korlibs (multiplatform utilities)
+korlibs-io = { module = "com.soywiz:korlibs-io", version.ref = "korlibs-io" }
+korlibs-encoding = { module = "com.soywiz:korlibs-encoding", version.ref = "korlibs-encoding" }
+korlibs-krypto = { module = "com.soywiz.korlibs.krypto:krypto", version.ref = "korlibs-krypto" }
+
+## JVM-only: wallet persistence
+exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
+exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
+exposed-java-time = { module = "org.jetbrains.exposed:exposed-java-time", version.ref = "exposed" }
+exposed-json = { module = "org.jetbrains.exposed:exposed-json", version.ref = "exposed" }
+sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite-jdbc" }
+postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+
+## JVM-only: DID library
+url-encoder = { module = "net.thauvin.erik.urlencoder:urlencoder-lib", version.ref = "url-encoder" }
+java-json-canonicalization = { module = "io.github.erdtman:java-json-canonicalization", version.ref = "java-json-canonicalization" }
+
+## JVM-only: crypto providers
+java-cose = { module = "org.cose:cose-java", version.ref = "java-cose" }
+aws-kms = { module = "aws.sdk.kotlin:kms-jvm", version.ref = "aws-kms" }
+azure-identity = { module = "com.azure:azure-identity", version.ref = "azure-identity" }
+azure-keyvault-keys = { module = "com.azure:azure-security-keyvault-keys", version.ref = "azure-keyvault-keys" }
+netty-codec = { module = "io.netty:netty-codec", version.ref = "netty" }
+netty-codec-dns = { module = "io.netty:netty-codec-dns", version.ref = "netty" }
+netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty" }
+netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
+jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
+oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
+
+## JVM-only: auth
+web3j-core = { module = "org.web3j:core", version.ref = "web3j" }
+web3j-utils = { module = "org.web3j:utils", version.ref = "web3j" }
+aaa4j-radius = { module = "org.aaa4j.radius:aaa4j-radius-client", version.ref = "aaa4j-radius" }
+apache-ldap-api = { module = "org.apache.directory.api:apache-ldap-api", version.ref = "apache-ldap-api" }
+mina-core = { module = "org.apache.mina:mina-core", version.ref = "mina-core" }
+commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "commons-lang3" }
+onetime = { module = "com.atlassian:onetime", version.ref = "onetime" }
+kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
+
 [bundles]
 waltid-ktor-client = [
     "ktor-client-core",
