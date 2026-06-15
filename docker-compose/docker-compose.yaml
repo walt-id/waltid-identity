@@ -35,6 +35,22 @@ services:
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
 
+  issuer-api2:
+    image: ${IMAGE_PREFIX}waltid/issuer-api2:${VERSION_TAG:-latest}
+    profiles:
+      - services
+      - identity
+      - all
+    pull_policy: missing
+    depends_on:
+      - caddy
+    env_file:
+      - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
+    volumes:
+      - ./issuer-api2/config:/waltid-issuer-api2/config
+
   verifier-api:
     image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
     profiles:
@@ -242,6 +258,11 @@ services:
 
       - target: "$ISSUER_API_PORT"
         published: $ISSUER_API_PORT # issuer-api
+        protocol: tcp
+        mode: host
+
+      - target: "$ISSUER_API2_PORT"
+        published: $ISSUER_API2_PORT # issuer-api2
         protocol: tcp
         mode: host
 
