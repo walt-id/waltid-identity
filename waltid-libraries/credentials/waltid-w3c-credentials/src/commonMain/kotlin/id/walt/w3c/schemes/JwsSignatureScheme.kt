@@ -106,7 +106,6 @@ class JwsSignatureScheme : SignatureScheme {
     suspend fun getIssuerKeysInfo(jws: String): KeysInfo {
         val jwsParsed = jws.substringBefore("~").decodeJws()
 
-
         val x5cHeader = jwsParsed.header[JwsHeader.X5C]
         if (x5cHeader != null && x5cHeader is JsonArray && x5cHeader.isNotEmpty()) {
             log.trace { "Found x5c header with ${x5cHeader.size} certificate(s), extracting key from leaf certificate" }

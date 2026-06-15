@@ -2,7 +2,6 @@ package id.walt.verifier.openid.models.authorization
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
 /**
  * Represents the structure of a decoded item within the 'transaction_data' array.
@@ -13,6 +12,8 @@ data class TransactionDataItem(
     val type: String,
     @SerialName("credential_ids")
     val credentialIds: List<String>,
-    // Other transaction data type specific parameters would go here as JsonObject or specific fields
-    val details: JsonObject? = null // For additional type-specific fields
+    @SerialName("transaction_data_hashes_alg")
+    val transactionDataHashesAlg: List<String>? = null,
+    @SerialName("require_cryptographic_holder_binding")
+    val requireCryptographicHolderBinding: Boolean? = null,
 )
