@@ -18,6 +18,7 @@ data class BridgeOperationResult(
 )
 
 class WalletDemoBridgeController(
+    walletId: String = "default",
     attestationBaseUrl: String? = null,
     attestationAttesterPath: String? = null,
     attestationBearerToken: String? = null,
@@ -25,7 +26,7 @@ class WalletDemoBridgeController(
 ) {
     private val client = MobileWalletClientFactory().create(
         MobileWalletConfig(
-            walletId = "default",
+            walletId = walletId,
             attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
                 WalletAttestationConfig(
                     enterpriseBaseUrl = it,
@@ -37,6 +38,19 @@ class WalletDemoBridgeController(
         )
     )
     private var did = ""
+
+    constructor(
+        attestationBaseUrl: String? = null,
+        attestationAttesterPath: String? = null,
+        attestationBearerToken: String? = null,
+        attestationHostHeader: String? = null,
+    ) : this(
+        walletId = "default",
+        attestationBaseUrl = attestationBaseUrl,
+        attestationAttesterPath = attestationAttesterPath,
+        attestationBearerToken = attestationBearerToken,
+        attestationHostHeader = attestationHostHeader,
+    )
 
     suspend fun bootstrap(): BridgeOperationResult {
         if (did.isNotBlank()) {
@@ -76,9 +90,9 @@ class WalletDemoBridgeController(
             emptyList() // TODO: log error for debugging
         }
 
-    suspend fun presentCredential(requestUrl: String): BridgeOperationResult {
+    suspend fun presentCredential(requestUrl: String, did: String? = null): BridgeOperationResult {
         return try {
-            val result = client.present(requestUrl = requestUrl)
+            val result = client.present(requestUrl = requestUrl, did = did)
             BridgeOperationResult(
                 success = result.success,
                 message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",
