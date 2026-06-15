@@ -8,25 +8,25 @@ group = "id.walt"
 dependencies {
     // Auth methods
     // Core Web3j library
-    implementation("org.web3j:core:5.0.2")
+    implementation(identityLibs.web3j.core)
 
     // Optional: Web3j utils
-    implementation("org.web3j:utils:5.0.2")
+    implementation(identityLibs.web3j.utils)
 
 
     // RADIUS
-    implementation("org.aaa4j.radius:aaa4j-radius-client:0.4.0")
+    implementation(identityLibs.aaa4j.radius)
 
     // LDAP
-    implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {
+    implementation(identityLibs.apache.ldap.api) {
         exclude("org.apache.mina:mina-core") // Manually updated due to security CVE
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
-    implementation("org.apache.mina:mina-core:2.2.6")
-    implementation("org.apache.commons:commons-lang3:3.20.0")
+    implementation(identityLibs.mina.core)
+    implementation(identityLibs.commons.lang3)
 
     // TOTP/HOTP
-    implementation("com.atlassian:onetime:2.2.0")
+    implementation(identityLibs.onetime)
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -83,7 +83,7 @@ dependencies {
 
     // Redis
     //implementation("eu.vendeli:rethis:0.3.3")
-    implementation("io.github.domgew:kedis:0.0.12")
+    implementation(identityLibs.kedis)
 
     /* --- Testing --- */
     testImplementation(identityLibs.ktor.client.logging)
