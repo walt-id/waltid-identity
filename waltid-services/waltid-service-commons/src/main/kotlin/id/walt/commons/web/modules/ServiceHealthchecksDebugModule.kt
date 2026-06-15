@@ -15,6 +15,8 @@ import io.klogging.noCoLogger
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
+import kotlinx.coroutines.asCoroutineDispatcher
+import java.util.concurrent.Executors
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
 import java.lang.management.ManagementFactory
@@ -113,6 +115,20 @@ object ServiceHealthChecksDebugModule {
             ConfigManager.getConfig<ServiceDebugModuleConfiguration>()
         else null
 
+        // Use a daemon-thread executor so the healthcheck scheduler never prevents JVM exit.
+        val daemonDispatcher = Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "cohort-healthcheck-scheduler").also { it.isDaemon = true }
+        }.asCoroutineDispatcher()
+
+        val healthCheckRegistry = HealthCheckRegistry(daemonDispatcher) {
+            register("http", {
+                when (KtorStatusChecker.ktorStatus) {
+                    KtorStatus.ServerReady -> HealthCheckResult.healthy("ktor ready")
+                    else -> HealthCheckResult.unhealthy("ktor not ready; in status: ${KtorStatusChecker.ktorStatus}")
+                }
+            }, 2.seconds, 1.seconds)
+        }
+
         install(Cohort) {
             if (debugConfig != null) {
                 heapDump = debugConfig.heapdump
@@ -125,15 +141,19 @@ object ServiceHealthChecksDebugModule {
                 endpointPrefix = debugConfig.endpointPrefix
             }
 
-            healthcheck("livez", HealthCheckRegistry {
-                register("http", {
-                    when (KtorStatusChecker.ktorStatus) {
-                        KtorStatus.ServerReady -> HealthCheckResult.healthy("ktor ready")
-                        else -> HealthCheckResult.unhealthy("ktor not ready; in status: ${KtorStatusChecker.ktorStatus}")
-                    }
-                }, 2.seconds, 1.seconds)
-            })
+            healthcheck("/livez", healthCheckRegistry)
         }
+
+        // Close the registry (shuts down its ScheduledExecutorService) to prevent its non-daemon
+        // threads from keeping the JVM alive indefinitely.
+        // ApplicationStopped covers the production path (server explicitly stopped via OS signal).
+        // The JVM shutdown hook covers the test path where the server is never explicitly stopped.
+        monitor.subscribe(ApplicationStopped) {
+            healthCheckRegistry.close()
+        }
+        Runtime.getRuntime().addShutdownHook(Thread {
+            runCatching { healthCheckRegistry.close() }
+        })
 
         // Custom debug endpoints
         routing {

@@ -7,6 +7,11 @@ on:
         description: "release version"
         required: true
         type: string
+      repository:
+        description: "repository to tag (default: current repo)"
+        required: false
+        type: string
+        default: ${{ github.repository }}
     outputs:
       tag:
         description: "The tag"
@@ -20,6 +25,9 @@ jobs:
       result: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.repository }}
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
       - name: Create and push the git tag
         id: tag
         run: |

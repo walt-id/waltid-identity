@@ -1,6 +1,6 @@
 issuer:
   ingress:
-    ingressClassName: "nginx"
+    ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:
@@ -13,7 +13,7 @@ verifier:
     verifierServiceConf: baseUrl = "https://verifier.portal.test.waltid.cloud"
     entraConf:  callbackUrl = "https://verifier.portal.test.waltid.cloud/entra/verification-callback/"
   ingress:
-    ingressClassName: "nginx"
+    ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:
@@ -28,7 +28,7 @@ portal:
     NEXT_PUBLIC_VERIFIER: "https://verifier.portal.test.waltid.cloud"
     NEXT_PUBLIC_WALLET: "https://wallet.test.waltid.cloud"
   ingress:
-    ingressClassName: "nginx"
+    ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:
@@ -40,7 +40,7 @@ web-wallet:
   pvc:
     dataVolumeClaim:
       accessMode: ReadWriteOnce
-      storageClass: azure-managed-standardssd-retain
+      storageClass: gp3-retain
       storageRequest: 1Gi
   walletConfig:
     oidcConf: |-
@@ -77,7 +77,7 @@ web-wallet:
     demoUi:
       host: wallet.test.waltid.cloud
   ingress:
-    ingressClassName: "nginx"
+    ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:

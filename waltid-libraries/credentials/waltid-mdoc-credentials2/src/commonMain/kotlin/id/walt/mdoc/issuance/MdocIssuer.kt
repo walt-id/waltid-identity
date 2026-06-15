@@ -59,8 +59,9 @@ object MdocIssuer {
                 ValueDigest.fromIssuerSignedItem(issuerSignedItem, namespace, digestAlgorithm)
             })
         }
-        val signedTimestamp = Clock.System.now()
-        val effectiveValidFrom = if (validFrom != null && validFrom > signedTimestamp) validFrom else signedTimestamp
+        val signedTimestamp = Instant.fromEpochSeconds(Clock.System.now().epochSeconds)
+        val effectiveValidFrom = if (validFrom != null && validFrom > signedTimestamp)
+            Instant.fromEpochSeconds(validFrom.epochSeconds) else signedTimestamp
 
         val mso = MobileSecurityObject(
             version = "1.0",
@@ -71,7 +72,8 @@ object MdocIssuer {
             validityInfo = ValidityInfo(
                 signed = signedTimestamp,
                 validFrom = effectiveValidFrom,
-                validUntil = validUntil
+                // ISO 18013-5 MSO tdate fields must not include fractional seconds
+                validUntil = Instant.fromEpochSeconds(validUntil.epochSeconds)
             ),
             status = status
         )

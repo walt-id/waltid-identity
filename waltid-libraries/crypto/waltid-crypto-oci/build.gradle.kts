@@ -46,7 +46,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
 
             // Logging
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
             // Test
             implementation(kotlin("test"))

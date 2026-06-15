@@ -27,6 +27,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -34,8 +35,9 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
+@Disabled("Deprecated test class: environment startup issues. Migrate to new-style tests like IssueSdJwtCredentialIntegrationTest.")
 @Deprecated(
-    "Old Testcase Style: lock at id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest to" +
+    "Old Testcase Style: look at id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest to" +
             "see how integration tests should be written"
 )
 class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {

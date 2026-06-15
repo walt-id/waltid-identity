@@ -17,13 +17,18 @@ import id.walt.policies2.vc.policies.status.model.W3CStatusPolicyListArguments
 import id.walt.policies2.vp.policies.*
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.UrlConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 object Verifier2OpenApiExamples {
+
+    private const val IDENTITY_CREDENTIAL_VCT =
+        "http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential"
 
     val openid4vpHttpW3cVcDefault = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
@@ -307,7 +312,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
@@ -325,7 +330,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
@@ -357,7 +362,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
@@ -377,6 +382,40 @@ object Verifier2OpenApiExamples {
                     ),
                     msoMdoc = listOf()
                 )
+            )
+        )
+    )
+
+    val openid4vpHttpSdJwtVcTransactionData = CrossDeviceFlowSetup(
+        core = GeneralFlowConfig(
+            DcqlQuery(
+                credentials = listOf(
+                    CredentialQuery(
+                        id = "pid",
+                        format = CredentialFormat.DC_SD_JWT,
+                        meta = SdJwtVcMeta(
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
+                        ),
+                        claims = listOf(
+                            ClaimsQuery(pathStrings = listOf("given_name")),
+                            ClaimsQuery(pathStrings = listOf("family_name")),
+                        )
+                    )
+                )
+            )
+        ),
+        openid = OpenId4VPConfig(
+            transactionData = listOf(
+                buildJsonObject {
+                    put("type", JsonPrimitive("org.waltid.transaction-data.payment-authorization"))
+                    put("credential_ids", JsonArray(listOf(JsonPrimitive("pid"))))
+                    put("require_cryptographic_holder_binding", JsonPrimitive(true))
+                    put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+                    put("amount", JsonPrimitive("42.00"))
+                    put("currency", JsonPrimitive("EUR"))
+                    put("payee", JsonPrimitive("ACME Corp"))
+                    put("reference", JsonPrimitive("INV-2026-042"))
+                }
             )
         )
     )
@@ -468,7 +507,7 @@ object Verifier2OpenApiExamples {
                 credentials = listOf(
                     CredentialQuery(
                         id = "pid", format = CredentialFormat.DC_SD_JWT, meta = SdJwtVcMeta(
-                            vctValues = listOf("http://waltid.enterprise.localhost:3000/v1/waltid.issuer/issuer-service-api/openid4vc/draft13/identity_credential")
+                            vctValues = listOf(IDENTITY_CREDENTIAL_VCT)
                         ), claims = listOf(
                             ClaimsQuery(pathStrings = listOf("given_name")),
                             ClaimsQuery(pathStrings = listOf("family_name")),
