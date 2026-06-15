@@ -32,7 +32,7 @@ sealed class VPPolicy2() {
     data class PolicyRunError(
         val error: String,
         val message: String?,
-        val cause: PolicyRunError?
+        val cause: PolicyRunError? = null
     ) {
         constructor(ex: Throwable) : this(
             error = ex::class.simpleName ?: ex::class.portableSimpleName,

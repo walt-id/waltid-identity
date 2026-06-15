@@ -181,6 +181,7 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
             if (FeatureManager.isFeatureEnabled(FeatureCatalog.legacyAuthenticationFeature)) {
                 oauth("auth-oauth") {
                     client = HttpClient()
+                    // Ktor 3.4.x: providerLookup is now a suspend function
                     providerLookup = {
                         OAuthServerSettings.OAuth2ServerSettings(
                             name = oidcConfig.providerName,
@@ -211,7 +212,8 @@ val walletAuthenticationPluginAmendment: suspend () -> Unit = suspend {
                             }
                         }
                     }
-                    urlProvider = { "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
+                    // Ktor 3.4.x: urlProvider is now a suspend function with OAuthServerSettings parameter
+                    urlProvider = { _ -> "${oidcConfig.publicBaseUrl}/wallet-api/auth/oidc-session" }
                 }
 
 

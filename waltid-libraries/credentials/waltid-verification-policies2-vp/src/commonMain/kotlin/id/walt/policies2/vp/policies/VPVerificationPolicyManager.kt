@@ -6,7 +6,8 @@ object VPVerificationPolicyManager {
         AudienceCheckSdJwtVPPolicy(),
         KbJwtSignatureSdJwtVPPolicy(),
         NonceCheckSdJwtVPPolicy(),
-        SdHashCheckSdJwtVPPolicy()
+        SdHashCheckSdJwtVPPolicy(),
+        KbJwtIatCheckSdJwtVPPolicy()
     )
     val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
 
