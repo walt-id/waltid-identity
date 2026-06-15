@@ -42,7 +42,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
 
             // Encodings
-            implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
+            implementation(identityLibs.url.encoder)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -56,7 +56,7 @@ kotlin {
             implementation(identityLibs.ktor.client.java)
 
             // Json canonicalization
-            implementation("io.github.erdtman:java-json-canonicalization:1.1")
+            implementation(identityLibs.java.json.canonicalization)
 
             // Multiformat
             // implementation("com.github.multiformats:java-multibase:v1.1.1")
