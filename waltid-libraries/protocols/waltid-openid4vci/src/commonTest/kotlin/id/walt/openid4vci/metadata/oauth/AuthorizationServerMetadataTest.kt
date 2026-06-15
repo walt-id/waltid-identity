@@ -84,7 +84,11 @@ class AuthorizationServerMetadataTest {
         assertEquals(null, metadata.pushedAuthorizationRequestEndpoint)
         assertEquals(null, metadata.statusListAggregationEndpoint)
         assertEquals(
-            setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
+            setOf(
+                GrantType.AuthorizationCode.value,
+                GrantType.PreAuthorizedCode.value,
+                GrantType.RefreshToken.value
+            ),
             metadata.grantTypesSupported,
         )
     }
