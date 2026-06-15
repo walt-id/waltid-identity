@@ -1,6 +1,6 @@
 [versions]
 # Build/compilation versions
-kotlin = "2.3.20"
+kotlin = "2.4.0"
 suspend-transform = "2.3.20-0.13.2"
 
 # Used for build-plugins
@@ -12,8 +12,8 @@ vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.3"
 android-gradle = "8.12.3"
-gradle-shadow = "9.4.1"
-buildconfig = "6.0.9"
+gradle-shadow = "9.4.2"
+buildconfig = "6.0.10"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -21,21 +21,21 @@ ktor = "3.5.0"
 # ...
 
 # Ktor external plugins
-cohort = "2.9.7"
+cohort = "2.9.9"
 smiley-openapi = "5.7.0"
 
 # Kotlinx
 kotlinx-serialization = "1.11.1-waltid_20260519-SNAPSHOT"
 kotlinx-serialization-cbor-TEMP = "1.11.1-waltid_20260519-SNAPSHOT"
 
-kotlinx-datetime = "0.7.1"
+kotlinx-datetime = "0.8.0"
 kotlinx-coroutines = "1.11.0"
-kotlinx-atomicfu = "0.32.1"
+kotlinx-atomicfu = "0.33.0"
 kotlinx-io = "0.9.0"
 
 # Logging
-kotlinlogging = "8.0.02"
-klogging = "0.11.7"
+kotlinlogging = "8.0.4"
+klogging = "0.11.8"
 slf4j-simple = "2.0.18"
 
 # Misc
@@ -43,15 +43,15 @@ cache4k = "0.14.0"
 
 # Crypto
 bouncycastle = "2.73.11"
-nimbus-jose = "10.9"
+nimbus-jose = "10.9.1"
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
 tink = "1.21.0"
 
 # Testing
-junit-jupiter = "6.0.3"
-mokkery = "3.3.0"
+junit-jupiter = "6.1.0"
+mokkery = "3.4.1"
 
 # HTTP
 okio = "3.17.0"
@@ -183,7 +183,7 @@ clikt-core = { module = "com.github.ajalt.clikt:clikt", version.ref = "clikt" }
 clikt-markdown = { module = "com.github.ajalt.clikt:clikt-markdown", version.ref = "clikt" }
 
 ## JSON handling
-optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.4" }
+optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.5" }
 jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "3.0.2" }
 jaywayjsonpath = { module = "com.jayway.jsonpath:json-path", version = "2.9.0" }
 
@@ -223,4 +223,4 @@ buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
 versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
-license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
+license = { id = "com.github.jk1.dependency-license-report", version = "3.1.4" }
