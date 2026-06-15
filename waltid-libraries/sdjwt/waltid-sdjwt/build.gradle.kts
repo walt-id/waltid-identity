@@ -21,7 +21,7 @@ kotlin {
             implementation(identityLibs.kotlinx.datetime)
             implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.kotlincrypto.random)
-            implementation("com.soywiz:korlibs-encoding:6.0.0")
+            implementation(identityLibs.korlibs.encoding)
             implementation(identityLibs.oshai.kotlinlogging)
         }
         commonTest.dependencies {
