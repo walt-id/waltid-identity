@@ -205,10 +205,14 @@ data class AuthorizationServerMetadata(
             tokenEndpointPath: String = "/token",
             jwksUriPath: String = "/jwks",
             responseTypesSupported: Set<String> = setOf(ResponseType.CODE.value),
-            responseModesSupported: Set<String>? = setOf(ResponseMode.QUERY.value, ResponseMode.FRAGMENT.value),
+            responseModesSupported: Set<String>? = setOf(
+                ResponseMode.QUERY.value,
+                ResponseMode.FRAGMENT.value
+            ),
             grantTypesSupported: Set<String>? = setOf(
                 GrantType.AuthorizationCode.value,
                 GrantType.PreAuthorizedCode.value,
+                GrantType.RefreshToken.value,
             ),
             tokenEndpointAuthMethodsSupported: Set<String>? = setOf("attest_jwt_client_auth"),
             tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
@@ -296,7 +300,8 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 ?.let { put("response_modes_supported", it.toJsonArray()) }
             value.tokenEndpointAuthMethodsSupported?.takeIf { it.isNotEmpty() }
                 ?.let { put("token_endpoint_auth_methods_supported", it.toJsonArray()) }
-            value.grantTypesSupported?.takeIf { it.isNotEmpty() }?.let { put("grant_types_supported", it.toJsonArray()) }
+            value.grantTypesSupported?.takeIf { it.isNotEmpty() }
+                ?.let { put("grant_types_supported", it.toJsonArray()) }
             value.tokenEndpointAuthSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
                 ?.let { put("token_endpoint_auth_signing_alg_values_supported", it.toJsonArray()) }
             value.clientAttestationSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
@@ -305,9 +310,19 @@ internal object AuthorizationServerMetadataSerializer : KSerializer<Authorizatio
                 ?.let { put("client_attestation_pop_signing_alg_values_supported", it.toJsonArray()) }
             value.dpopSigningAlgValuesSupported?.takeIf { it.isNotEmpty() }
                 ?.let { put("dpop_signing_alg_values_supported", it.toJsonArray()) }
-            value.pushedAuthorizationRequestEndpoint?.let { put("pushed_authorization_request_endpoint", JsonPrimitive(it)) }
+            value.pushedAuthorizationRequestEndpoint?.let {
+                put(
+                    "pushed_authorization_request_endpoint",
+                    JsonPrimitive(it)
+                )
+            }
             value.registrationEndpoint?.let { put("registration_endpoint", JsonPrimitive(it)) }
-            value.requirePushedAuthorizationRequests?.let { put("require_pushed_authorization_requests", JsonPrimitive(it)) }
+            value.requirePushedAuthorizationRequests?.let {
+                put(
+                    "require_pushed_authorization_requests",
+                    JsonPrimitive(it)
+                )
+            }
             value.scopesSupported?.takeIf { it.isNotEmpty() }?.let { put("scopes_supported", it.toJsonArray()) }
             value.serviceDocumentation?.let { put("service_documentation", JsonPrimitive(it)) }
             value.uiLocalesSupported?.takeIf { it.isNotEmpty() }?.let { put("ui_locales_supported", it.toJsonArray()) }
