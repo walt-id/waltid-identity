@@ -97,7 +97,12 @@ class ValkeySessionStore(
     }
 
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
-        redis.execute(KedisHashCommands.hashDel("account-sessions:${accountId}"))
+        val sessionIds = redis.execute(KedisHashCommands.hashGetAll("account-sessions:${accountId}"))?.keys ?: emptySet()
+        
+        if (sessionIds.isNotEmpty()) {
+            redis.execute(KedisValueCommands.del(*sessionIds.map { "session:$it" }.toTypedArray()))
+            redis.execute(KedisHashCommands.hashDel("account-sessions:${accountId}"))
+        }
     }
 
     // -- External id --
