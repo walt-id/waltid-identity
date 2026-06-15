@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/e2e.env" 2>/dev/null || true
 
-IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 PORT="${PORT:-7500}"
 API_URL="${API_URL:-http://localhost:$PORT}"
 ANDROID_API_URL="${ANDROID_API_URL:-}"
@@ -18,7 +18,7 @@ ISSUER_PROFILE="${ISSUER_PROFILE:-}"
 VERIFIER="${VERIFIER:-verifier2}"
 ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 HOST_ALIAS_DOMAIN="${HOST_ALIAS_DOMAIN:-}"
-TEST_CLASS="id.walt.walletdemo.LocalEnterpriseBackendInstrumentedTest"
+TEST_CLASS="id.walt.walletdemo.LocalEnterpriseBackendE2ETest"
 
 ATTESTED=false
 for arg in "$@"; do

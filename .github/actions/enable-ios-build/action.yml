@@ -37,4 +37,4 @@ runs:
         else
           echo "::error::Failed to enable iOS build"
           exit 1
-        fi 
+        fi

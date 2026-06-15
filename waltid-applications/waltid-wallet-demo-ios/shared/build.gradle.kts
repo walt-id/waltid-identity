@@ -22,6 +22,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            // Export wallet-client API so tests can use the real SDK
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-client"))
         }
 
