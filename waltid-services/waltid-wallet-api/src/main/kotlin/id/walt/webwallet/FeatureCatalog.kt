@@ -1,6 +1,7 @@
 package id.walt.webwallet
 
 import id.walt.commons.config.list.DevModeConfig
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.commons.featureflag.BaseFeature
 import id.walt.commons.featureflag.OptionalFeature
 import id.walt.commons.featureflag.ServiceFeatureCatalog
@@ -68,6 +69,13 @@ object FeatureCatalog : ServiceFeatureCatalog {
         default = false
     )
 
+    val transactionDataProfilesFeature = OptionalFeature(
+        name = "transaction-data-profiles",
+        description = "Transaction data type profiles for OpenID4VP",
+        config = TransactionDataProfilesConfig::class,
+        default = true
+    )
+
     override val baseFeatures = listOf(
         databaseFeature
     )
@@ -89,5 +97,6 @@ object FeatureCatalog : ServiceFeatureCatalog {
         didWebRegistry,
         x5cAuthFeature,
         externalSignatureEndpointsFeature,
+        transactionDataProfilesFeature,
     )
 }

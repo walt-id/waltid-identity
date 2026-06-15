@@ -7,7 +7,8 @@ object VPVerificationPolicyManager {
         KbJwtSignatureSdJwtVPPolicy(),
         NonceCheckSdJwtVPPolicy(),
         SdHashCheckSdJwtVPPolicy(),
-        KbJwtIatCheckSdJwtVPPolicy()
+        KbJwtIatCheckSdJwtVPPolicy(),
+        TransactionDataHashCheckSdJwtVPPolicy(),
     )
     val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
 
@@ -21,6 +22,7 @@ object VPVerificationPolicyManager {
     val simpleMsoMdocPolicies: Array<MdocVPPolicy> = arrayOf(
         DeviceAuthMdocVpPolicy(),
         DeviceKeyAuthMdocVpPolicy(),
+        TransactionDataMdocVpPolicy(),
         IssuerAuthMdocVpPolicy(),
         IssuerSignedDataMdocVpPolicy(),
         MsoVerificationMdocVpPolicy()
