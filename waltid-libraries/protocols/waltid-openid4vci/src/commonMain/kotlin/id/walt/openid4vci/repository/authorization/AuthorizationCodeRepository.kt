@@ -1,6 +1,7 @@
 package id.walt.openid4vci.repository.authorization
 
 import id.walt.openid4vci.Session
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 /**
@@ -27,6 +28,7 @@ interface AuthorizationCodeRecord {
     val expiresAt: Instant
 }
 
+@Serializable
 data class DefaultAuthorizationCodeRecord(
     override val code: String,
     override val clientId: String,
