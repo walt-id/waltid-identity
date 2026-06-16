@@ -22,7 +22,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class IosKey private constructor(
@@ -30,7 +29,7 @@ class IosKey private constructor(
     override val hasPrivateKey: Boolean = false
 ) : Key() {
 
-    class Options @OptIn(ExperimentalUuidApi::class) constructor(
+    class Options(
         val kid: String = Uuid.random().toString(),
         val keyType: KeyType,
         val inSecureElement: Boolean = false

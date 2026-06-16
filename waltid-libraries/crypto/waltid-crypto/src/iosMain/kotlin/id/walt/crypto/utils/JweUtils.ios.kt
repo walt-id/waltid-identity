@@ -6,7 +6,6 @@ import at.asitplus.signum.indispensable.josef.JweAlgorithm
 import at.asitplus.signum.indispensable.josef.JweHeader
 import at.asitplus.signum.indispensable.josef.JweEncrypted
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
-import at.asitplus.signum.supreme.agree.keyAgreement
 import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.Signer
 import at.asitplus.signum.supreme.symmetric.decrypt
@@ -15,9 +14,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 actual object JweUtils {
     actual fun toJWE(
         payload: JsonObject,

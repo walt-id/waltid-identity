@@ -24,9 +24,7 @@ import at.asitplus.signum.supreme.agree.keyAgreement
 import at.asitplus.signum.supreme.symmetric.encrypt
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 object JweEncryptionHelper {
 
     suspend fun encryptEcdhEs(

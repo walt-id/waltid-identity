@@ -17,12 +17,10 @@ import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Suppress("unused")
@@ -31,7 +29,7 @@ class AndroidKey private constructor(
     override val hasPrivateKey: Boolean = false
 ) : Key() {
 
-    class Options @OptIn(ExperimentalUuidApi::class) constructor(
+    class Options(
         val kid: String = Uuid.random().toString(),
         val keyType: KeyType,
     )

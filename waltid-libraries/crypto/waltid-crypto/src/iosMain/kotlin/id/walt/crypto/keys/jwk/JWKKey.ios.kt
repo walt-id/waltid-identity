@@ -31,8 +31,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 actual class JWKKey actual constructor(private val jwk: String?, private val _keyId: String?) : Key() {
@@ -67,7 +65,6 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
 
     actual override suspend fun exportJWKObject(): JsonObject = _jwkObj
 
-    @OptIn(ExperimentalEncodingApi::class)
     actual override suspend fun exportPEM(): String {
         val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow()
@@ -188,7 +185,6 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         get() = _jwkObj.toMap().any { it.key in privateParameters }
 
     actual companion object : JWKKeyCreator() {
-        @OptIn(ExperimentalUuidApi::class)
         actual override suspend fun generate(
             type: KeyType, metadata: JwkKeyMeta?
         ): JWKKey {
@@ -209,7 +205,6 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
             return JWKKey(jwkJson, kid)
         }
 
-        @OptIn(ExperimentalEncodingApi::class)
         actual override suspend fun importRawPublicKey(
             type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?
         ): Key {
@@ -225,7 +220,6 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
             return Result.success(JWKKey(jwk))
         }
 
-        @OptIn(ExperimentalEncodingApi::class)
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = runCatching {
             val derBytes = pem.lines()
                 .filter { !it.startsWith("-----") }
