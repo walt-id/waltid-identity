@@ -1,10 +1,10 @@
 plugins {
-    id("com.android.application") apply false
-    id("org.jetbrains.kotlin.multiplatform") apply false
-    id("org.jetbrains.kotlin.native.cocoapods") apply false
-    id("org.jetbrains.kotlin.plugin.compose") apply false
-    id("org.jetbrains.kotlin.plugin.serialization") apply false
-    id("com.github.ben-manes.versions") apply false
+    alias(identityLibs.plugins.android.application) apply false
+    alias(identityLibs.plugins.kotlin.multiplatform) apply false
+    alias(identityLibs.plugins.kotlin.cocoapods) apply false
+    alias(identityLibs.plugins.kotlin.compose) apply false
+    alias(identityLibs.plugins.kotlin.serialization) apply false
+    alias(identityLibs.plugins.versions) apply false
 }
 
 //  Uncomment the following to run the license report

@@ -126,16 +126,6 @@ include(*modules.toTypedArray())
 pluginManagement {
     includeBuild("build-logic")
 
-    plugins {
-        id("com.android.application") version "9.2.1"
-        id("org.jetbrains.kotlin.multiplatform") version "2.4.0"
-        id("org.jetbrains.kotlin.native.cocoapods") version "2.4.0"
-        id("org.jetbrains.kotlin.plugin.compose") version "2.4.0"
-        id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0"
-        id("com.github.ben-manes.versions") version "0.54.0"
-        id("app.cash.sqldelight") version "2.3.2"
-    }
-
     repositories {
         google()
         mavenCentral()
