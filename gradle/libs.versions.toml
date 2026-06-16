@@ -12,7 +12,7 @@ vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.3"
 android-gradle = "8.12.3"
-gradle-shadow = "9.4.1"
+gradle-shadow = "9.4.2"
 buildconfig = "6.0.10"
 
 # Plugins / Dependencies
@@ -52,7 +52,7 @@ korlibs-krypto = "4.0.10"
 exposed = "1.3.0"
 sqlite-jdbc = "3.53.2.0"
 postgresql = "42.7.11"
-hikaricp = "5.1.0"
+hikaricp = "7.1.0"
 
 # JVM-only: DID library
 url-encoder = "1.6.0"
@@ -65,7 +65,7 @@ azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
 netty = "4.1.133.Final"
 jackson-core = "2.18.6"
-oci-sdk = "3.81.2"
+oci-sdk = "3.89.1"
 
 # JVM-only: auth (platform-specific, not multiplatform)
 web3j = "5.0.3"
@@ -223,7 +223,7 @@ clikt-markdown = { module = "com.github.ajalt.clikt:clikt-markdown", version.ref
 
 ## JSON handling
 optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.5" }
-jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "3.0.2" }
+jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "4.0.0" }
 
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
