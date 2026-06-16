@@ -26,9 +26,6 @@ import org.web3j.utils.Numeric
 import java.math.BigInteger
 import java.security.SecureRandom
 import kotlin.time.Clock
-
-
-@OptIn(ExperimentalStdlibApi::class)
 object Web3 : AuthenticationMethod("web3") {
     private val log = logger<Web3>()
 

@@ -122,7 +122,6 @@ class AWSKeyRestAPI(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
@@ -354,7 +353,6 @@ class AWSKeyRestAPI(
 
 
         // Utility to hash data using SHA256
-        @OptIn(ExperimentalStdlibApi::class)
         fun sha256Hex(data: String): String = SHA256().digest(data.toByteArray()).toHexString()
 
         // Utility to perform HMAC-SHA256
@@ -409,7 +407,6 @@ ${sha256Hex(canonicalRequest)}
         }
 
         // Generate the final signature
-        @OptIn(ExperimentalStdlibApi::class)
         fun generateSignature(signingKey: ByteArray, stringToSign: String): String {
             return hmacSHA256(signingKey, stringToSign).toHexString()
         }
