@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 package id.walt.test.integration.tests
 
@@ -55,7 +55,6 @@ import java.security.cert.X509Certificate
 import kotlin.test.*
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private const val ISO_IEC_MDL_NAMESPACE_ID = "org.iso.18013.5.1"

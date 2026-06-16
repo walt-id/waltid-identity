@@ -18,7 +18,6 @@ import kotlin.js.JsName
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -35,7 +34,7 @@ enum class CredentialBuilderType {
     MdocsCredentialBuilder // TODO
 }
 
-@OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 class CredentialBuilder(
     val builderType: CredentialBuilderType = W3CV2CredentialBuilder

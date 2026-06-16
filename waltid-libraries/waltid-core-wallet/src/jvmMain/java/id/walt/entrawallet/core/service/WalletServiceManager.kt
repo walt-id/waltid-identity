@@ -12,10 +12,8 @@ import id.walt.webwallet.usecase.exchange.strategies.FilterPresentationDefinitio
 import id.walt.webwallet.utils.WalletHttpClients.getHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object WalletServiceManager {
 
     private val logger = KotlinLogging.logger { }

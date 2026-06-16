@@ -76,7 +76,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 
@@ -93,7 +92,7 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
  *
  * Out of scope: mso_mdoc — the waltid-openid4vci library has no mdoc credential handler.
  */
-@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 class Wallet2IssuerVerifier2IntegrationTest {
 
     // Each test gets its own pair of ports to avoid Address-already-in-use when

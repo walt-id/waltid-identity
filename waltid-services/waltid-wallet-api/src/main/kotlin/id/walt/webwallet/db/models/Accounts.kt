@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.db.models
 
@@ -11,14 +10,12 @@ import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 object Accounts : Table("accounts") {
     val tenant = varchar("tenant", 128).default("")
 
-    @OptIn(ExperimentalUuidApi::class)
-    val id = kotlinxUuid("id").uniqueIndex()
+        val id = kotlinxUuid("id").uniqueIndex()
 
     val name = varchar("name", 128).nullable()
 
@@ -29,8 +26,7 @@ object Accounts : Table("accounts") {
 
     val createdOn = timestamp("createdOn")
 
-    @OptIn(ExperimentalUuidApi::class)
-    override val primaryKey = PrimaryKey(tenant, id)
+        override val primaryKey = PrimaryKey(tenant, id)
 
     /*
     init {

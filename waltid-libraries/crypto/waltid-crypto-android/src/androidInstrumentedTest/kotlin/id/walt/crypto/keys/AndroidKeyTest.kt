@@ -11,7 +11,6 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.uuid.Uuid
 
-@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 @RunWith(AndroidJUnit4::class)
 class AndroidKeyTest {
 

@@ -2,10 +2,8 @@ package id.walt.webwallet.service.category
 
 import id.walt.webwallet.db.models.WalletCategoryData
 import kotlin.random.Random
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object MockCategoryService : CategoryService {
     override fun list(wallet: Uuid): List<WalletCategoryData> = listOfCategories
     override fun get(wallet: Uuid, name: String): WalletCategoryData =

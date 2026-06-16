@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.oid4vc.data
 
@@ -13,7 +12,6 @@ import io.ktor.utils.io.core.*
 import kotlinx.serialization.*
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 
 @ConsistentCopyVisibility
 @OptIn(ExperimentalSerializationApi::class)
@@ -94,8 +92,7 @@ data class ProofOfPossession private constructor(
             trustChain?.let { put("trust_chain", it) }
         }
 
-        @OptIn(ExperimentalUuidApi::class)
-        val payload = buildJsonObject {
+                val payload = buildJsonObject {
             clientId?.let {
                 put(JWTClaims.Payload.issuer, it)
                 put(JWTClaims.Payload.subject, it)

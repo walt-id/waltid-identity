@@ -10,11 +10,10 @@ import kotlin.js.JsExport
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 private val webDataFetcher = WebDataFetcher(WebDataFetcherId.DATA_FUNCTIONS)
 
-@OptIn(ExperimentalJsExport::class, ExperimentalUuidApi::class)
+@OptIn(ExperimentalJsExport::class)
 @JsExport
 val dataFunctions = mapOf<String, suspend (call: CredentialDataMergeUtils.FunctionCall) -> JsonElement>(
     "subjectDid" to { it.fromContext() },
