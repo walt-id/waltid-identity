@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers
 
@@ -18,7 +17,6 @@ import io.ktor.server.response.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.dids() = walletRoute {
     route("dids", {

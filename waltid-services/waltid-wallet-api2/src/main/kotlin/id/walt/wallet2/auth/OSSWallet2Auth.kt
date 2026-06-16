@@ -24,7 +24,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val authLog = KotlinLogging.logger {}
@@ -38,7 +37,6 @@ private val authLog = KotlinLogging.logger {}
  * All data is lost on restart. Replace with an Exposed/SQLite-backed
  * implementation for production persistence.
  */
-@OptIn(ExperimentalUuidApi::class)
 object OSSWallet2AccountStore : EditableAccountStore {
 
     private val accounts = ConcurrentHashMap<String, Account>()
@@ -157,7 +155,6 @@ fun Application.configureWallet2Auth() {
  * Registers /auth/[*] routes.
  * Should be called inside the main routing block when auth is enabled.
  */
-@OptIn(ExperimentalUuidApi::class)
 fun Route.registerWallet2AuthRoutes() {
     route("/auth") {
 

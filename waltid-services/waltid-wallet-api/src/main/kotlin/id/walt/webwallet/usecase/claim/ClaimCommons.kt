@@ -6,10 +6,8 @@ import id.walt.webwallet.service.events.EventType
 import id.walt.webwallet.service.exchange.CredentialDataResult
 import id.walt.webwallet.usecase.event.EventLogUseCase
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object ClaimCommons {
 
     fun convertCredentialDataResultToWalletCredential(

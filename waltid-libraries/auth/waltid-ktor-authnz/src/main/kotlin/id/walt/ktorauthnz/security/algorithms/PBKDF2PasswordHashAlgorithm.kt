@@ -15,8 +15,6 @@ class PBKDF2PasswordHashAlgorithm : PasswordHashAlgorithm() {
         val sd = pbkdf2.secretDerivation(SHA512, 10, 256.bits, salt)
         return sd.deriveSecret(password.encodeToByteString())
     }
-
-    @OptIn(ExperimentalStdlibApi::class)
     override suspend fun hash(password: String, salt: ByteString): String =
         hashInternal(password, salt).toHexString()
 }*/

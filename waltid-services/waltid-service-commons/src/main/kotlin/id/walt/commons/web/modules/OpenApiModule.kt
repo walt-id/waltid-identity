@@ -30,7 +30,6 @@ import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 
 object OpenApiModule {
 
@@ -43,8 +42,7 @@ object OpenApiModule {
     }
 
     // Module
-    @OptIn(ExperimentalUuidApi::class)
-    fun Application.enable() {
+        fun Application.enable() {
         install(OpenApi) {
 
             schemas {

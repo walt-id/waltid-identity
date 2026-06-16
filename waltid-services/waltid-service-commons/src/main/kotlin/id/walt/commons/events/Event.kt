@@ -2,7 +2,6 @@ package id.walt.commons.events
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -12,7 +11,7 @@ data class Action(val type: String)
 data class Status(val type: String)
 
 @Serializable
-sealed class Event @OptIn(ExperimentalUuidApi::class) constructor(
+sealed class Event constructor(
     val eventType: EventType, // event type to be stored in db and for easier filtering
     @SerialName("_id") val id: String = Uuid.random().toString()
 ) {

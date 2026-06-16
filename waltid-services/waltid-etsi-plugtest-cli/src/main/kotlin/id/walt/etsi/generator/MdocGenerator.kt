@@ -68,10 +68,10 @@ object MdocGenerator {
 
     /**
      * Generates an mdoc in IssuerSigned format as required by ETSI plugtest.
-     * 
+     *
      * Per the test case notes:
      * "ISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2"
-     * 
+     *
      * This means we output just the IssuerSigned structure, NOT the full Document wrapper.
      */
     suspend fun generate(
@@ -208,13 +208,13 @@ object MdocGenerator {
                     put("birth_date", "1990-01-15")
                     put("issue_date", "2024-01-01")
                     put("expiry_date", "2034-01-01")
-                    put("issuing_country", "DE")
+                    put("issuing_country", "AT")
                     put("issuing_authority", "Test Authority")
                     put("document_number", "DOC123456789")
                     // Placeholder JPEG-ish bytes; mapped to a CBOR bstr (see portraitByteElements).
                     put("portrait", PORTRAIT_PLACEHOLDER)
                     put("driving_privileges", "")
-                    put("un_distinguishing_sign", "DE")
+                    put("un_distinguishing_sign", "A")
 
                     // Extra optional elements from the test case description (only if NOT already set,
                     // tracked via baseKeys so mandatory values like expiry_date are never overwritten).
@@ -226,7 +226,7 @@ object MdocGenerator {
                             baseKeys.add(cleanItem)
                             when {
                                 cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
-                                cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
+                                cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "AT")
                                 cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                                 cleanItem.contains("number", ignoreCase = true) -> put(cleanItem, "123456789")
                                 cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
@@ -247,7 +247,7 @@ object MdocGenerator {
                     put("birth_date", "1990-01-15")
                     put("issue_date", "2024-01-01")
                     put("expiry_date", "2034-01-01")
-                    put("issuing_country", "DE")
+                    put("issuing_country", "AT")
                     // ISO 23220-2 requires the unicode variant for issuing_authority
                     put("issuing_authority_unicode", "Test Authority")
                     put("document_number", "DOC123456789")

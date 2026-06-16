@@ -41,7 +41,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
 
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
@@ -51,7 +51,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
         }
     }
 }

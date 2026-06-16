@@ -65,7 +65,7 @@ class SdJwtVcGeneratorFixTest {
         val payload = decodePayload(result.sdJwtVc)
 
         // FIX 1: all three issuer-identity claims must be present (cert is unqualified).
-        assertEquals(JsonPrimitive("DE"), payload["issuing_country"], "issuing_country must be present for unqualified-cert PuB-EAA")
+        assertEquals(JsonPrimitive("AT"), payload["issuing_country"], "issuing_country must be present for unqualified-cert PuB-EAA")
         assertNotNull(payload["issuing_authority"], "issuing_authority must be present")
         assertNotNull(payload["iss_reg_id"], "iss_reg_id must be present")
     }
@@ -78,7 +78,7 @@ class SdJwtVcGeneratorFixTest {
             issuerCertificatePem = issuerCertPem,
         )
         val payload = decodePayload(result.sdJwtVc)
-        assertEquals(JsonPrimitive("DE"), payload["issuing_country"], "issuing_country must be present for unqualified-cert QEAA")
+        assertEquals(JsonPrimitive("AT"), payload["issuing_country"], "issuing_country must be present for unqualified-cert QEAA")
     }
 
     @Test

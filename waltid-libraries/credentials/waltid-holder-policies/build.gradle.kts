@@ -20,7 +20,7 @@ kotlin {
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.optimumcode.jsonschemavalidator)
-            implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+            implementation(identityLibs.jsonpathkt)
 
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -37,14 +37,14 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             // Ktor client
             // implementation("io.ktor:ktor-client-okhttp:$ktor_version")
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
         }
     }
 }

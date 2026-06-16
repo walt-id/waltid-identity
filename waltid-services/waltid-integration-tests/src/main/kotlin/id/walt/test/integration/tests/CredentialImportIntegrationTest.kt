@@ -15,10 +15,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 @TestMethodOrder(OrderAnnotation::class)
 class CredentialImportIntegrationTest : AbstractIntegrationTest(), Klogging {
 

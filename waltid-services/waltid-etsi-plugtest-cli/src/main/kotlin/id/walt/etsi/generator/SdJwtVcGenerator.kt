@@ -295,6 +295,25 @@ object SdJwtVcGenerator {
             put("family_name", "Mustermann")
             existingKeys.add("family_name")
 
+            // For array-element SD test cases (EAA-9, EAA-12, EAA-13) include a nationalities array
+            // so that individual array elements can be made selectively disclosable per RFC 9901 §4.2.2.
+            if (testCase.hasArrayElementSd && !existingKeys.contains("nationalities")) {
+                put("nationalities", buildJsonArray { add("DE"); add("AT"); add("FR") })
+                existingKeys.add("nationalities")
+            }
+
+            // For recursive SD test cases (EAA-11, EAA-12, EAA-13) include an address object
+            // so that sub-fields can be recursively made selectively disclosable per RFC 9901 §4.2.
+            if (testCase.hasRecursiveSd && !existingKeys.contains("address")) {
+                putJsonObject("address") {
+                    put("street_address", "Mustergasse 1")
+                    put("locality", "Vienna")
+                    put("region", "Vienna")
+                    put("country", "AT")
+                }
+                existingKeys.add("address")
+            }
+
             val payloadSection = testCase.getPayload()
             payloadSection?.items?.forEach { item ->
                 val cleanItem = item.trim().split(" ").first().split("(").first()
@@ -325,7 +344,7 @@ object SdJwtVcGenerator {
                                 existingKeys.remove("issuing_country")
                                 log.debug { "Omitting issuing_country; qualified certificate carries it (EAA-5.2.4.1-07)" }
                             } else {
-                                put("issuing_country", "DE")
+                                put("issuing_country", "AT")
                             }
                         }
                         // EAA-5.2.4.1-11 / QEAA-5.2.4.2-03 / PuB-EAA-5.2.4.3-03: the registration
@@ -343,16 +362,23 @@ object SdJwtVcGenerator {
                             }
                         }
                         cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
-                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
+                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "AT")
                         cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                         cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
-                        // EAA-5.2.10.1: status SHALL be a JSON object (ETSI flat shape
-                        // { type, purpose, index, uri }), never a bare string.
+                        // EAA-5.2.10.1: status SHALL be a JSON object with ETSI members
+                        // (type, purpose, index, uri) per ETSI TS 119 472-1 §5.2.10.1.
+                        // Additionally include status_list.{idx,uri} per IETF draft-ietf-oauth-status-list
+                        // as required by ETSI §5.2.10.1 ("may contain the status_list member") and expected
+                        // by verifiers that implement the oauth-status-list spec directly.
                         cleanItem == "status" -> putJsonObject("status") {
                             put("type", "TokenStatusList")
                             put("purpose", "revocation")
                             put("index", 0)
                             put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                            putJsonObject("status_list") {
+                                put("idx", 0)
+                                put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                            }
                         }
                         cleanItem == "cnf" -> {
                             putJsonObject("cnf") {
@@ -395,13 +421,17 @@ object SdJwtVcGenerator {
             }
 
             // QEAA-5.2.10.2-01 / PuB-EAA-5.2.10.3-01: QEAA/PuBEAA SHALL include status when shortLived is absent.
-            // Add a minimal valid status object if neither status nor shortLived is present.
+            // Add a valid status object (ETSI members + IETF status_list) if neither status nor shortLived is present.
             if ((isQeaa || isPubEaa) && !existingKeys.contains("status") && !existingKeys.contains("shortLived") && !testCase.isShortLived) {
                 putJsonObject("status") {
                     put("type", "TokenStatusList")
                     put("purpose", "revocation")
                     put("index", 0)
                     put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                    putJsonObject("status_list") {
+                        put("idx", 0)
+                        put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                    }
                 }
                 existingKeys.add("status")
             }
@@ -436,7 +466,7 @@ object SdJwtVcGenerator {
                     existingKeys.add("issuing_authority")
                 }
                 if (!existingKeys.contains("issuing_country")) {
-                    put("issuing_country", "DE")
+                    put("issuing_country", "AT")
                     existingKeys.add("issuing_country")
                 }
                 if (!existingKeys.contains("iss_reg_id")) {
@@ -458,7 +488,7 @@ object SdJwtVcGenerator {
             // Common to all three schemas: issuing_authority, issuing_country (ISO 3166-1 alpha-2),
             // expiry_date (RFC 3339 full-date). issuing_authority/country may already be present.
             putIfAbsent("issuing_authority", JsonPrimitive("ETSI Test Authority"))
-            putIfAbsent("issuing_country", JsonPrimitive("DE"))
+            putIfAbsent("issuing_country", JsonPrimitive("AT"))
             putIfAbsent("expiry_date", JsonPrimitive("2030-01-01"))
 
             when (vct) {
@@ -497,6 +527,68 @@ object SdJwtVcGenerator {
 
         val sdFields = mutableMapOf<String, SDField>()
 
+        // EAA-9 / EAA-12: array-element SD (each element of an array is individually disclosable)
+        // The payload must contain an array-valued claim. We use `nationalities` for this.
+        // Per RFC 9901 §4.2.2, the array in the JWT contains {"...":"<digest>"} placeholders.
+        // SDField with arrayChildren.wildcard=SDField(sd=true) achieves this.
+        if (testCase.hasArrayElementSd && !testCase.hasRecursiveSd) {
+            // EAA-9: non-recursive array element SD (sd the nationalities array elements)
+            if (payload.containsKey("nationalities")) {
+                sdFields["nationalities"] = SDField(
+                    sd = false,  // the claim itself is not hidden; its elements are
+                    arrayChildren = SDArray(wildcard = SDField(sd = true))
+                )
+            }
+            // Also include flat object SD for given_name/family_name as usual
+            listOf("given_name", "family_name").forEach { field ->
+                if (payload.containsKey(field)) sdFields[field] = SDField(true)
+            }
+            return SDMap(sdFields)
+        }
+
+        if (testCase.hasRecursiveSd && !testCase.hasArrayElementSd) {
+            // EAA-11: recursive object SD (sd the address object AND its sub-fields)
+            if (payload.containsKey("address")) {
+                val addrChildren = SDMap(mapOf(
+                    "street_address" to SDField(true),
+                    "locality" to SDField(true),
+                    "region" to SDField(true),
+                    "country" to SDField(true),
+                ))
+                sdFields["address"] = SDField(sd = true, children = addrChildren)
+            }
+            // Also include flat object SD for given_name/family_name
+            listOf("given_name", "family_name").forEach { field ->
+                if (payload.containsKey(field)) sdFields[field] = SDField(true)
+            }
+            return SDMap(sdFields)
+        }
+
+        if (testCase.hasRecursiveSd && testCase.hasArrayElementSd) {
+            // EAA-12/13: recursive array element SD (array of objects where sub-fields are also sd'd)
+            // Use nationalities array with element-level SD, plus address with recursive SD
+            if (payload.containsKey("nationalities")) {
+                sdFields["nationalities"] = SDField(
+                    sd = false,
+                    arrayChildren = SDArray(wildcard = SDField(sd = true))
+                )
+            }
+            if (payload.containsKey("address")) {
+                val addrChildren = SDMap(mapOf(
+                    "street_address" to SDField(true),
+                    "locality" to SDField(true),
+                    "region" to SDField(true),
+                    "country" to SDField(true),
+                ))
+                sdFields["address"] = SDField(sd = true, children = addrChildren)
+            }
+            listOf("given_name", "family_name").forEach { field ->
+                if (payload.containsKey(field)) sdFields[field] = SDField(true)
+            }
+            return SDMap(sdFields)
+        }
+
+        // Default: flat object-level SD (EAA-8, EAA-10, and all other SD test cases)
         val personalFields = listOf("given_name", "family_name", "birth_date", "address", "email", "phone")
         personalFields.forEach { field ->
             if (payload.containsKey(field)) {

@@ -58,14 +58,14 @@ kotlin {
         }
         jvmMain.dependencies {
             implementation(identityLibs.ktor.client.java)
-            implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+            implementation(identityLibs.java.cose)
             implementation(identityLibs.nimbus.jose.jwt)
         }
         jvmTest.dependencies {
             implementation(identityLibs.nimbus.jose.jwt)
-            implementation("io.kotest:kotest-runner-junit5:6.1.7") // should be replaced
-            implementation("io.kotest:kotest-assertions-core:6.1.7") // should be replaced
-            implementation("io.kotest:kotest-assertions-json:6.1.7") // should be replaced
+            implementation(identityLibs.kotest.runner.junit5)
+            implementation(identityLibs.kotest.assertions.core)
+            implementation(identityLibs.kotest.assertions.json)
             implementation(identityLibs.junit.jupiter.params)
             implementation(identityLibs.tink) // for JOSE using Ed25519
             implementation(identityLibs.bouncycastle.prov) // for secp256k1 (which was removed with Java 17)
@@ -83,10 +83,10 @@ kotlin {
             implementation(identityLibs.ktor.client.content.negotiation)
             implementation(identityLibs.ktor.serialization.kotlinx.json)
             implementation(identityLibs.ktor.client.logging)
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.slf4j)
 
-            implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
-            implementation("com.soywiz.korlibs.krypto:krypto:4.0.10")
+            implementation(identityLibs.java.cose)
+            implementation(identityLibs.korlibs.krypto)
 
             implementation(identityLibs.slf4j.simple)
         }

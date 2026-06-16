@@ -80,8 +80,6 @@ class DidCheqdRegistrar : LocalRegistrarMethod("cheqd") {
         createDid(key, options.get<String>("network") ?: "testnet").let {
             DidResult(it.id, id.walt.did.dids.document.DidDocument(DidCheqdDocument(it, key.exportJWKObject()).toMap()))
         }
-
-    @OptIn(ExperimentalStdlibApi::class)
     private suspend fun createDid(key: Key, network: String): DidDocument = let {
         if (key.keyType != KeyType.Ed25519) throw IllegalArgumentException("Key of type Ed25519 expected")
         // step#0. get public key hex

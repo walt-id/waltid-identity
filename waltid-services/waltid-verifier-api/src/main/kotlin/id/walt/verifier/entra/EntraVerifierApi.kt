@@ -25,7 +25,6 @@ import io.ktor.server.util.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
@@ -74,7 +73,6 @@ data class EntraVerificationRequest(
     val credentials: List<EntraAcceptableCredential>,
 )
 
-@OptIn(ExperimentalUuidApi::class)
 object EntraVerifierApi {
     @Serializable
     private data class EntraCreatePresentationRequest(
@@ -198,7 +196,6 @@ data class EntraVerifyResponse(
     val nonce: String,
 )
 
-@OptIn(ExperimentalUuidApi::class)
 fun Application.entraVerifierApi() {
     routing {
 

@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.testing.E2ETest
 import io.ktor.client.*
@@ -7,7 +6,6 @@ import io.ktor.client.request.*
 import kotlinx.serialization.json.JsonObject
 import java.net.URLEncoder
 import kotlin.test.assertEquals
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CategoryApi(private val e2e: E2ETest, private val client: HttpClient) {

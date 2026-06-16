@@ -244,8 +244,7 @@ object WalletPresentFunctionality2 {
     /**
      * Generates a fresh wallet_nonce per OID4VP 1.0 §5.6.
      */
-    @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-    private fun generateWalletNonce(): String = Uuid.random().toHexString()
+        private fun generateWalletNonce(): String = Uuid.random().toHexString()
 
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,

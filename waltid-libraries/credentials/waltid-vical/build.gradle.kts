@@ -29,7 +29,7 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test-common"))
             implementation(kotlin("test-annotations-common"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
 
             implementation(identityLibs.kotlinx.serialization.json)
         }
@@ -38,7 +38,7 @@ kotlin {
         }
         jvmTest.dependencies {
             // Logging
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
             // Test
             implementation(kotlin("test"))

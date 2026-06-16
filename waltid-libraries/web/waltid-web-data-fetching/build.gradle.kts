@@ -23,7 +23,7 @@ kotlin {
             // Cache hashes
             implementation(identityLibs.kotlincrypto.hash.blake2)
 
-            implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
+            implementation(identityLibs.cache4k)
             // For in-memory cache
             //implementation("com.mayakapps.kache:kache:2.1.1")
             // For persistent cache
