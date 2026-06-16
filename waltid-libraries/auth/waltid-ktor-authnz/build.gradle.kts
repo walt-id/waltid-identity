@@ -102,14 +102,25 @@ dependencies {
 // web3j:core → tools.jackson.core:jackson-core:3.1.0
 //   SNYK-JAVA-TOOLSJACKSONCORE-15907550 (CWE-770, CVSS 8.7) — fixed in 3.1.1
 //
-// ktor-openapi → io.netty:netty-codec-compression / netty-transport-classes-epoll (4.2.x branch)
+// web3j:core / ktor-openapi → com.fasterxml.jackson.core:jackson-core
+//   SNYK-JAVA-COMFASTERXMLJACKSONCORE-15365924 (CWE-770) — fixed in 2.18.6; pin to latest
+//
+// web3j:core → org.bouncycastle:bcprov-jdk18on:1.80
+//   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
+//   Snyk said "no supported fix" at 1.80; 1.84 is now available
+//
+// ktor-openapi → io.netty (4.2.x branch):
 //   CVE-2026-42583 (CWE-770, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
 //   CVE-2026-42587 (CWE-409, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
 //   CVE-2026-42577 (CWE-772, CVSS 8.7) — netty-transport-classes-epoll, fixed in 4.2.13.Final
+//   HTTP request smuggling (CWE-444, CVSS 8.8) — netty-codec-http, fixed in 4.2.13.Final
 configurations.all {
     resolutionStrategy.force(
         identityLibs.jackson.core.tools,
+        identityLibs.jackson.core,
+        identityLibs.bcprov.jdk18on,
         identityLibs.netty.codec.compression,
+        identityLibs.netty.codec.http.v2,
         identityLibs.netty.transport.classes.epoll,
     )
 }

@@ -67,6 +67,8 @@ netty = "4.1.133.Final"
 netty-4_2 = "4.2.15.Final"
 jackson-core = "2.22.0"
 jackson-core-3 = "3.1.1"
+# web3j brings bcprov-jdk18on; pin to latest to override its 1.80
+bcprov-jdk18on = "1.84"
 oci-sdk = "3.89.1"
 
 # JVM-only: auth (platform-specific, not multiplatform)
@@ -268,10 +270,11 @@ netty-codec-dns = { module = "io.netty:netty-codec-dns", version.ref = "netty" }
 netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty" }
 netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
 netty-codec-compression = { module = "io.netty:netty-codec-compression", version.ref = "netty-4_2" }
-netty-codec-http-4-2 = { module = "io.netty:netty-codec-http", version.ref = "netty-4_2" }
+netty-codec-http-v2 = { module = "io.netty:netty-codec-http", version.ref = "netty-4_2" }
 netty-transport-classes-epoll = { module = "io.netty:netty-transport-classes-epoll", version.ref = "netty-4_2" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
+bcprov-jdk18on = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bcprov-jdk18on" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
 
 ## JVM-only: auth
