@@ -3,10 +3,8 @@ package id.walt.webwallet.usecase.claim
 import id.walt.crypto.keys.Key
 import id.walt.entrawallet.core.service.SSIKit2WalletService
 import id.walt.entrawallet.core.service.exchange.IssuanceServiceExternalSignatures
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class ExternalSignatureClaimStrategy(
     private val issuanceServiceExternalSignatures: IssuanceServiceExternalSignatures,
 ) {

@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.environment
 
@@ -6,7 +5,6 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.test.integration.environment.api.wallet.WalletApi
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 
 object MDocPreparedWallet {
 

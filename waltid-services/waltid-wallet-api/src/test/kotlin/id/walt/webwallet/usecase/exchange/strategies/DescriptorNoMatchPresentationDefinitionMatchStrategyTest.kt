@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.exchange.strategies
 
@@ -13,9 +12,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 class DescriptorNoMatchPresentationDefinitionMatchStrategyTest {
 
     private val sut = DescriptorNoMatchPresentationDefinitionMatchStrategy()

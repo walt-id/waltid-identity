@@ -47,14 +47,14 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             // X.509 certificate extensions (AKI etc.) for trusted_authorities DCQL matching
             implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
             implementation(identityLibs.junit.jupiter.api)
             implementation(identityLibs.junit.jupiter.params)

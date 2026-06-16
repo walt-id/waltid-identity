@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalSerializationApi::class, ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalSerializationApi::class)
 
 import com.nimbusds.jose.jwk.ECKey
 import com.upokecenter.cbor.CBORObject
@@ -57,7 +57,6 @@ import java.security.cert.X509Certificate
 import kotlin.test.*
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 

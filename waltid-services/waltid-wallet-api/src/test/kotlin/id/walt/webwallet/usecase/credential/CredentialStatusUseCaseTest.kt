@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.credential
 
@@ -16,9 +15,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 class CredentialStatusUseCaseTest {
 
     private val credentialServiceMock = mockk<CredentialsService>()
@@ -51,8 +48,7 @@ class CredentialStatusUseCaseTest {
         format = CredentialFormat.ldp_vc
     )
 
-    @OptIn(ExperimentalUuidApi::class)
-    private val credentialMultiStatus = WalletCredential(
+        private val credentialMultiStatus = WalletCredential(
         wallet = wallet,
         id = credentialId,
         document = """

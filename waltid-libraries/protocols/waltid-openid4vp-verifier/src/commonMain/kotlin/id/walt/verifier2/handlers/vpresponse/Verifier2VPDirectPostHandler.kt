@@ -424,8 +424,7 @@ object Verifier2VPDirectPostHandler {
      * Generates a fresh response_code per OID4VP 1.0 §1758.
      * Uses multiplatform UUID (backed by SecureRandom on JVM) for cryptographic randomness.
      */
-    @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-    private fun generateResponseCode(): String = Uuid.random().toHexString()
+        private fun generateResponseCode(): String = Uuid.random().toHexString()
 
     fun parseVpToken(vpTokenString: String): ParsedVpToken = try {
         Json.Default.decodeFromString(vpTokenString)

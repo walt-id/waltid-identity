@@ -86,7 +86,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 
@@ -102,7 +101,7 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
  * 6. Auth-code grant: generate-authorization-url → exchange-code → receive
  * 7. Credential matching before presentation
  */
-@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 class Wallet2AdditionalUseCasesTest {
 
     private val host = "127.0.0.1"

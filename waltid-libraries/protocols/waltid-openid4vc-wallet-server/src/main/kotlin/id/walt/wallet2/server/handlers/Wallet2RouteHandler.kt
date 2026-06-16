@@ -55,7 +55,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
@@ -140,7 +139,6 @@ data class ImportCredentialRequest(
  * Both the OSS service and the Enterprise service call [registerWallet2Routes],
  * providing their own [WalletResolver]. All HTTP logic lives here.
  */
-@OptIn(ExperimentalUuidApi::class)
 object Wallet2RouteHandler {
 
     private val noopOnEvent: suspend (WalletSessionEvent) -> Unit = {}

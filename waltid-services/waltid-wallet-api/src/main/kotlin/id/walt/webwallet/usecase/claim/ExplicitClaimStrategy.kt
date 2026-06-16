@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.claim
 
@@ -7,7 +6,6 @@ import id.walt.webwallet.service.SSIKit2WalletService
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.exchange.IssuanceService
 import id.walt.webwallet.usecase.event.EventLogUseCase
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class ExplicitClaimStrategy(
@@ -15,8 +13,7 @@ class ExplicitClaimStrategy(
     private val credentialService: CredentialsService,
     private val eventUseCase: EventLogUseCase,
 ) {
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun claim(
+        suspend fun claim(
         tenant: String,
         account: Uuid,
         wallet: Uuid,

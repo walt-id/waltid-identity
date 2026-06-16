@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
@@ -262,7 +261,6 @@ data class ExchangeCodeRequest(
  * Returns a [Flow] of [StoredCredential] for the full flow so callers can
  * react to each credential as it arrives (useful for streaming UIs).
  */
-@OptIn(ExperimentalUuidApi::class)
 object WalletIssuanceHandler {
 
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
@@ -670,8 +668,7 @@ object WalletIssuanceHandler {
      *
      * On success the credential is stored in the wallet's credential store.
      */
-    @OptIn(ExperimentalUuidApi::class)
-    fun pollDeferredFlow(
+        fun pollDeferredFlow(
         wallet: Wallet,
         request: PollDeferredRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
@@ -731,8 +728,7 @@ object WalletIssuanceHandler {
      *
      * This function handles step 3 only, continuing from an authorization code.
      */
-    @OptIn(ExperimentalUuidApi::class)
-    fun receiveCredentialAuthCodeFlow(
+        fun receiveCredentialAuthCodeFlow(
         wallet: Wallet,
         tokenEndpoint: Url,
         code: String,

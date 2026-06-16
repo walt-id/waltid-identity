@@ -36,7 +36,7 @@ dependencies {
 
     // Logging
     implementation(identityLibs.oshai.kotlinlogging)
-    implementation("org.slf4j:slf4j-simple:2.0.17")
+    implementation(identityLibs.slf4j.simple)
 
     // JOSE/JWT
     implementation(identityLibs.nimbus.jose.jwt)

@@ -3,9 +3,6 @@ package id.walt.crypto.utils
 import org.kotlincrypto.hash.sha1.SHA1
 import org.kotlincrypto.hash.sha2.SHA256
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-
-@OptIn(ExperimentalEncodingApi::class)
 private val base64UrlNoPad = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
 
 object ShaUtils {

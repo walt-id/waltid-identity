@@ -25,10 +25,8 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class E2ESdJwtTest(
     private val issuerApi: IssuerApi,
     private val exchangeApi: ExchangeApi,
