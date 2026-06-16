@@ -60,6 +60,10 @@ metadata:
     kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
+  tls:
+    - hosts:
+        - opa.demo.walt.id
+      secretName: opa-tls
   rules:
     - host: opa.demo.walt.id
       http:
