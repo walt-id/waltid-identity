@@ -7,7 +7,6 @@ import id.walt.crypto.keys.AndroidKeystoreLoader
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyAlias
 import id.walt.crypto.keys.KeyType
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class AndroidPlatformKeyProvider : PlatformKeyProvider {
@@ -17,7 +16,6 @@ class AndroidPlatformKeyProvider : PlatformKeyProvider {
 
     override val isHardwareBackingAvailable: Boolean = true
 
-    @OptIn(ExperimentalUuidApi::class)
     override suspend fun generateKey(keyType: KeyType, keyId: String?): Key {
         require(keyType in supportedHardwareKeyTypes) {
             "KeyType $keyType is not supported in Android KeyStore. Supported: $supportedHardwareKeyTypes"

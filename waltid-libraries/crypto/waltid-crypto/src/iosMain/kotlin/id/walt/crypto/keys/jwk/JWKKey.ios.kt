@@ -9,9 +9,8 @@ import id.walt.target.ios.keys.JweEncryption
 import id.walt.target.ios.keys.P256
 import id.walt.target.ios.keys.RSA
 import id.walt.target.ios.keys.toNSData
+import kotlinx.cinterop.BetaInteropApi
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
@@ -143,7 +142,6 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         get() = _jwkObj.toMap().any { it.key in privateParameters }
 
     actual companion object : JWKKeyCreator() {
-        @OptIn(ExperimentalUuidApi::class)
         actual override suspend fun generate(
             type: KeyType, metadata: JwkKeyMeta?
         ): JWKKey {
@@ -167,7 +165,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
             return Result.success(JWKKey(jwk))
         }
 
-        @OptIn(ExperimentalEncodingApi::class, ExperimentalForeignApi::class)
+        @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
         actual override suspend fun importPEM(pem: String): Result<JWKKey> = runCatching {
             val derBytes = pem.lines()
                 .filter { !it.startsWith("-----") }

@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
+import kotlin.uuid.Uuid
 
 /**
  * Generates credential offers from the public EUDI test backend.
@@ -147,8 +148,7 @@ object EudiTestBackend {
         val dcqlQuery = buildDcqlQuery(credentialId)
         val payload = buildJsonObject {
             put("dcql_query", dcqlQuery)
-            @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-            put("nonce", JsonPrimitive(kotlin.uuid.Uuid.random().toString()))
+            put("nonce", JsonPrimitive(Uuid.random().toString()))
             put("request_uri_method", JsonPrimitive("post"))
             put("profile", JsonPrimitive("openid4vp"))
             put("authorization_request_uri", JsonPrimitive("openid4vp://"))

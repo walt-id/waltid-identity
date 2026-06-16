@@ -2,10 +2,8 @@ package id.walt.wallet2.client
 
 import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.data.WalletSessionEvent
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 data class MobileWalletConfig(
     val walletId: String = Uuid.random().toString(),
     val preferHardwareKeys: Boolean = true,

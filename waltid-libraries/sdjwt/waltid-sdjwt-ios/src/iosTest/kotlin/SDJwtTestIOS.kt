@@ -1,14 +1,8 @@
 import kotlinx.serialization.json.*
 import kotlin.test.*
-import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldStartWith
-import kotlinx.cinterop.ExperimentalForeignApi
-import platform.Foundation.NSData
-import platform.Foundation.NSString
-import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.dataUsingEncoding
 import id.walt.sdjwt.HMACJWTCryptoProvider
 import id.walt.sdjwt.ObjectPropertyDisclosure
 import id.walt.sdjwt.SDJwt
@@ -16,7 +10,6 @@ import id.walt.sdjwt.SDMap
 import id.walt.sdjwt.SDMapBuilder
 import id.walt.sdjwt.SDPayload
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -156,7 +149,6 @@ class SDJwtTestIOS {
         presentedJwtWithKb.toString() shouldStartWith presentedJwtNoKb.toString()
         presentedJwtWithKb.keyBindingJwt!!.audience shouldBe aud
         presentedJwtWithKb.keyBindingJwt!!.nonce shouldBe nonce
-        @OptIn(ExperimentalEncodingApi::class)
         presentedJwtWithKb.keyBindingJwt!!.sdHash shouldBe Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT).encode(SHA256().digest(presentedJwtNoKb.toString().encodeToByteArray()))
     }
 }

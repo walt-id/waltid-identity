@@ -3,7 +3,6 @@ package id.walt.wallet2.persistence.keys
 import id.walt.crypto.IosKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class IosPlatformKeyProvider(
@@ -14,7 +13,6 @@ class IosPlatformKeyProvider(
 
     override val isHardwareBackingAvailable: Boolean = true
 
-    @OptIn(ExperimentalUuidApi::class)
     override suspend fun generateKey(keyType: KeyType, keyId: String?): Key {
         val kid = keyId ?: Uuid.random().toString()
         val options = IosKey.Options(

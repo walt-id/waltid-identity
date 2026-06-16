@@ -10,7 +10,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -33,7 +32,6 @@ private class PopTestP256Key : Key() {
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> = Result.success(JsonObject(emptyMap()))
     override suspend fun getPublicKeyRepresentation(): ByteArray = byteArrayOf()
 
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val headerJson = JsonObject(headers).toString()
         val headerB64 = Base64.UrlSafe.encode(headerJson.encodeToByteArray()).trimEnd('=')
@@ -64,7 +62,6 @@ class WalletAttestationPopBuilderTest {
 
     private val builder = WalletAttestationPopBuilder()
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun testPopJwtStructure() = runTest {
         val key = PopTestP256Key()
@@ -92,7 +89,7 @@ class WalletAttestationPopBuilderTest {
 
         val iat = payload["iat"]!!.jsonPrimitive.content.toLong()
         val exp = payload["exp"]!!.jsonPrimitive.content.toLong()
-        assertTrue(exp - iat == 300L, "exp should be iat + 300")
+        assertEquals(exp - iat, 300L, "exp should be iat + 300")
     }
 
     @Test

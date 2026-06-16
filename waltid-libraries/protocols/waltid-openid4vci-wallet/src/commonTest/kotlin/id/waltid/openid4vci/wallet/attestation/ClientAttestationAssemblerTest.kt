@@ -7,10 +7,8 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 private class AssemblerTestP256Key : Key() {
     override val keyType: KeyType = KeyType.secp256r1
@@ -28,7 +26,6 @@ private class AssemblerTestP256Key : Key() {
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> = Result.success(JsonObject(emptyMap()))
     override suspend fun getPublicKeyRepresentation(): ByteArray = byteArrayOf()
 
-    @OptIn(ExperimentalEncodingApi::class)
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val headerJson = JsonObject(headers).toString()
         val headerB64 = Base64.UrlSafe.encode(headerJson.encodeToByteArray()).trimEnd('=')

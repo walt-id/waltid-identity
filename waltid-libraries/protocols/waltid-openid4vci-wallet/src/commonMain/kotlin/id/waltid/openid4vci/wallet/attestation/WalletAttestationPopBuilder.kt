@@ -5,16 +5,13 @@ import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import id.waltid.openid4vci.wallet.proof.ProofBuilderUtils
 import io.ktor.utils.io.core.*
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class WalletAttestationPopBuilder {
 
-    @OptIn(ExperimentalUuidApi::class)
     suspend fun buildPopJwt(
         instanceKey: Key,
         clientId: String,

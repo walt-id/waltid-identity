@@ -18,7 +18,6 @@ import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.JsonElement
-import kotlin.uuid.ExperimentalUuidApi
 
 data class NativeWalletBootstrapResult(
     val keyId: String,
@@ -47,7 +46,6 @@ data class WalletAttestationConfig(
     val enterpriseHostHeader: String = "",
 )
 
-@OptIn(ExperimentalUuidApi::class)
 class NativeWalletClient(
     walletId: String,
     private val keyStore: WalletKeyStore,
