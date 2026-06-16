@@ -8,6 +8,7 @@ import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.minutes
 
@@ -24,6 +25,7 @@ data class CredentialOfferRuntimeOverrides(
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
+    val credentialStatus: JsonElement? = null,
 )
 
 @Serializable
