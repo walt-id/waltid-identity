@@ -158,7 +158,7 @@ class IssuerApiTest {
     }
 
     @Test
-    fun testJwt() = runTest {
+    fun testJwt() {
         val issueRequest =
             IssuanceRequest(
                 issuerKey = jsonKeyObj,
@@ -177,7 +177,7 @@ class IssuerApiTest {
     }
 
     @Test
-    fun testIssuanceWithCredentialDisplayMapping() = runTest {
+    fun testIssuanceWithCredentialDisplayMapping() {
         val issueRequest =
             IssuanceRequest(
                 issuerKey = jsonKeyObj,
@@ -197,7 +197,7 @@ class IssuerApiTest {
 
 
     @Test
-    fun testSdJwt() = runTest {
+    fun testSdJwt() {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
         val jsonVCObj = Json.decodeFromString<JsonObject>(TEST_W3VC)
         val jsonMappingObj = Json.decodeFromString<JsonObject>(TEST_MAPPING)
@@ -277,7 +277,7 @@ class IssuerApiTest {
     }
 
     @Test
-    fun testBatchIssuanceJwt() = runTest {
+    fun testBatchIssuanceJwt() {
         val jsonKeyObj = Json.decodeFromString<JsonObject>(TEST_KEY)
         val jsonVCObj1 = Json.decodeFromString<JsonObject>(TEST_W3VC)
         val jsonVCObj2 = Json.decodeFromString<JsonObject>(TEST_W3VC2)
