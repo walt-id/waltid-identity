@@ -63,20 +63,20 @@ dependencies {
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.serialization.kotlinx.json)
 
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.3")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation(identityLibs.androidx.core.ktx)
+    implementation(identityLibs.androidx.lifecycle.runtime.ktx)
+    implementation(identityLibs.androidx.lifecycle.viewmodel.compose)
+    implementation(identityLibs.androidx.activity.compose)
 
-    implementation(platform("androidx.compose:compose-bom:2024.02.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
+    implementation(platform(identityLibs.androidx.compose.bom))
+    implementation(identityLibs.androidx.compose.ui)
+    implementation(identityLibs.androidx.compose.ui.tooling.preview)
+    implementation(identityLibs.androidx.compose.material3)
 
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation(identityLibs.androidx.compose.ui.tooling)
 
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
-    androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
+    androidTestImplementation(identityLibs.androidx.test.ext.junit)
+    androidTestImplementation(identityLibs.androidx.test.runner)
+    androidTestImplementation(identityLibs.androidx.test.uiautomator)
     androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
 }

@@ -50,8 +50,8 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
                 implementation(identityLibs.kotlinx.coroutines.test)
-                implementation("androidx.test:runner:1.6.2")
-                implementation("androidx.test.ext:junit:1.2.1")
+                implementation(identityLibs.androidx.test.runner)
+                implementation(identityLibs.androidx.test.ext.junit)
                 implementation(identityLibs.ktor.client.android)
             }
         }
