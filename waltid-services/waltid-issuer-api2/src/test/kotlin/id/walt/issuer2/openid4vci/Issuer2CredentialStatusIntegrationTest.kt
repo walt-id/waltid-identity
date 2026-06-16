@@ -1,7 +1,7 @@
 package id.walt.issuer2.openid4vci
 
-import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
-import id.walt.issuer2.controller.dto.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
