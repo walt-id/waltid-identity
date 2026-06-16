@@ -64,7 +64,9 @@ aws-kms = "1.6.96"
 azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
 netty = "4.1.133.Final"
+netty-4_2 = "4.2.15.Final"
 jackson-core = "2.18.6"
+jackson-core-3 = "3.1.1"
 oci-sdk = "3.89.1"
 
 # JVM-only: auth (platform-specific, not multiplatform)
@@ -261,7 +263,10 @@ netty-codec = { module = "io.netty:netty-codec", version.ref = "netty" }
 netty-codec-dns = { module = "io.netty:netty-codec-dns", version.ref = "netty" }
 netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty" }
 netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
+netty-codec-compression = { module = "io.netty:netty-codec-compression", version.ref = "netty-4_2" }
+netty-transport-classes-epoll = { module = "io.netty:netty-transport-classes-epoll", version.ref = "netty-4_2" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
+jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
 oci-sdk = { module = "com.oracle.oci.sdk:oci-java-sdk-shaded-full", version.ref = "oci-sdk" }
 
 ## JVM-only: auth

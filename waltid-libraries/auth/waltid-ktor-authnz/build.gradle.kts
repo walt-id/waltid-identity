@@ -97,6 +97,23 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+// Force-pin vulnerable transitive dependencies.
+//
+// web3j:core → tools.jackson.core:jackson-core:3.1.0
+//   SNYK-JAVA-TOOLSJACKSONCORE-15907550 (CWE-770, CVSS 8.7) — fixed in 3.1.1
+//
+// ktor-openapi → io.netty:netty-codec-compression / netty-transport-classes-epoll (4.2.x branch)
+//   CVE-2026-42583 (CWE-770, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
+//   CVE-2026-42587 (CWE-409, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
+//   CVE-2026-42577 (CWE-772, CVSS 8.7) — netty-transport-classes-epoll, fixed in 4.2.13.Final
+configurations.all {
+    resolutionStrategy.force(
+        identityLibs.jackson.core.tools,
+        identityLibs.netty.codec.compression,
+        identityLibs.netty.transport.classes.epoll,
+    )
+}
+
 mavenPublishing {
     pom {
         name.set("walt.id ktor-authnz")
