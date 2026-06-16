@@ -118,6 +118,10 @@ abstract class OpenIDCredentialVerifier(val config: CredentialVerifierConfig) :
     }
 
     open fun verify(tokenResponse: TokenResponse, session: PresentationSession): PresentationSession {
+        require(session.verificationResult == null) {
+            "This verification session has already been resolved. Replay attempts are not permitted."
+        }
+        
         // https://json-schema.org/specification
         // https://github.com/OptimumCode/json-schema-validator
         // Calculate the remaining time to live based on the session's expiration timestamp

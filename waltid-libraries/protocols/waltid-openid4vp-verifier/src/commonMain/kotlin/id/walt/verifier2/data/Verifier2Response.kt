@@ -37,6 +37,10 @@ sealed class Verifier2Response {
                 error = Verifier2ErrorType.invalid_presentation,
                 errorDescription = "Presentation validation failed: One or more presentations in vp_token failed validation for session"
             )
+
+            val SESSION_ALREADY_RESOLVED = Verifier2Error(
+                errorDescription = "This verification session has already been resolved. Replay attempts are not permitted."
+            )
         }
 
         fun throwAsError(): Nothing = throw IllegalArgumentException("Verifier2 error: $error - $errorDescription")

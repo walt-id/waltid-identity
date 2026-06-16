@@ -293,6 +293,12 @@ object Verifier2VPDirectPostHandler {
             return handleWalletErrorResponse(session, responseData, updateSessionCallback)
         }
 
+
+        if (session.status == SUCCESSFUL || session.status == FAILED) {
+            log.info { "Session ${session.id} already terminated (${session.status}); rejecting VP token replay attempt." }
+            Verifier2Response.Verifier2Error.SESSION_ALREADY_RESOLVED.throwAsError()
+        }
+
         val (vpTokenString, receivedState) = parseResponseBody(
             responseMode = responseMode,
             responseData = responseData,
