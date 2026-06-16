@@ -84,7 +84,8 @@ class OpenId4VciProtocolService(
         }
         val internalAuthorizationRequest = parameters.withInternalAuthorizationSession(issuanceSession.sessionId)
 
-        val redirectUri = "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"
+        val redirectUri =
+            "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"
         return AuthorizationResponseHttp(
             status = 302,
             redirectUri = redirectUri,
@@ -183,7 +184,8 @@ class OpenId4VciProtocolService(
             is AccessTokenRequestResult.Failure -> return oauth2Provider.writeAccessTokenError(result.error)
         }.withIssuer(metadataService.issuerBaseUrl())
 
-        val (updatedAccessTokenRequest, response) = when (val result = oauth2Provider.createAccessTokenResponse(accessTokenRequest)) {
+        val (updatedAccessTokenRequest, response) = when (val result =
+            oauth2Provider.createAccessTokenResponse(accessTokenRequest)) {
             is AccessTokenResponseResult.Success -> result.request to result.response
 
             is AccessTokenResponseResult.Failure -> {
@@ -454,7 +456,7 @@ class OpenId4VciProtocolService(
 
         require(matches.isNotEmpty()) {
             "No credential configuration could be resolved from authorization_details or requested scopes: " +
-                authorizationRequest.requestedScopes
+                    authorizationRequest.requestedScopes
         }
         require(matches.size == 1) {
             "Ambiguous credential configuration for authorization request: $matches"
@@ -490,11 +492,13 @@ class OpenId4VciProtocolService(
 
     private fun JsonObject.toParametersMap(): Map<String, List<String>> =
         entries.associate { (key, value) ->
-            key to listOf(if (value is JsonPrimitive && value.isString) {
-                value.content
-            } else {
-                value.toString()
-            })
+            key to listOf(
+                if (value is JsonPrimitive && value.isString) {
+                    value.content
+                } else {
+                    value.toString()
+                }
+            )
         }
 
     private fun JsonObject.stringClaim(name: String): String? =
@@ -546,7 +550,7 @@ class OpenId4VciProtocolService(
 
     private fun Map<String, List<String>>.withInternalAuthorizationSession(sessionId: String): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER } +
-            (INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER to listOf(sessionId))
+                (INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER to listOf(sessionId))
 
     private fun Map<String, List<String>>.withoutInternalAuthorizationSession(): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER }

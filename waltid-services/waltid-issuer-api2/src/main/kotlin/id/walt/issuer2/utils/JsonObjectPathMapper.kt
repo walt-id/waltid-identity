@@ -33,7 +33,7 @@ object JsonObjectPathMapper {
                 )
             ) {
                 "JSON path $jsonPath does not exist, or evaluates to null, when applied to object $jsonObject. " +
-                    "All specified JSON paths must exist and resolve to non-null values in target JSON objects."
+                        "All specified JSON paths must exist and resolve to non-null values in target JSON objects."
             }
         }
     }

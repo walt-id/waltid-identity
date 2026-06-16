@@ -6,10 +6,13 @@ import id.walt.issuer2.testsupport.Issuer2CredentialScenarios
 import id.walt.issuer2.testsupport.Issuer2WalletFlowDriver
 import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
+import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
+import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
+import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.listSessions
 import id.walt.issuer2.testsupport.browser.Issuer2KeycloakAuthorizationDriver
@@ -55,7 +58,8 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                 )
                 val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
 
-                val createdOffer = client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
+                val createdOffer =
+                    client.createCredentialOffer(Issuer2RequestExamples.PROFILE_AUTHORIZED_OFFER_BY_REFERENCE)
                 assertEquals(AuthenticationMethod.AUTHORIZED, createdOffer.authMethod)
                 assertEquals(IssuerStateMode.INCLUDE, createdOffer.issuerStateMode)
                 assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
@@ -86,6 +90,137 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     accessToken = tokenResponse.access_token,
                 )
                 assertJwtVcJsonCredentialPayload(credentialPayload)
+                assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+            } finally {
+                client.close()
+            }
+        }
+    }
+
+    @Test
+    @Tag("browser")
+    @Tag("keycloak")
+    fun walletCanCompleteAuthorizationCodeSdJwtVcFlowWithDefaultKeycloak() = runBlocking {
+        Issuer2BrowserTestServer().use { server ->
+            server.start()
+            val client = server.httpClient()
+            try {
+                val scenario = Issuer2CredentialScenarios.identitySdJwt
+                val walletClientConfig = ClientConfiguration(
+                    clientId = "issuer2-keycloak-browser-test",
+                    redirectUris = listOf(WALLET_REDIRECT_URI),
+                )
+                val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
+
+                val createdOffer = client.createWalletFlowCredentialOffer(
+                    scenario = scenario,
+                    authenticationMethod = AuthenticationMethod.AUTHORIZED,
+                )
+                assertEquals(AuthenticationMethod.AUTHORIZED, createdOffer.authMethod)
+                assertEquals(IssuerStateMode.INCLUDE, createdOffer.issuerStateMode)
+                assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+
+                val resolvedOffer = walletFlow.resolve(createdOffer)
+                assertEquals(listOf(scenario.credentialConfigurationId), resolvedOffer.offer.credentialConfigurationIds)
+                val issuerState = assertNotNull(resolvedOffer.offer.grants?.authorizationCode?.issuerState)
+                assertEquals(createdOffer.offerId, issuerState)
+
+                val authorizationUrl = walletFlow.buildAuthorizationRequestUrl(
+                    resolvedOffer = resolvedOffer,
+                    scenario = scenario,
+                    issuerState = issuerState,
+                )
+                val authorizationCode = Issuer2KeycloakAuthorizationDriver().loginAndGetAuthorizationCode(
+                    authorizeUrl = authorizationUrl,
+                    redirectUri = WALLET_REDIRECT_URI,
+                    expectedState = Url(authorizationUrl).parameters["state"],
+                )
+
+                val tokenResponse = walletFlow.exchangeAuthorizationCode(
+                    resolvedOffer = resolvedOffer,
+                    code = authorizationCode,
+                )
+                assertBearerAccessToken(tokenResponse)
+
+                val credentialPayload = walletFlow.requestCredential(
+                    resolvedOffer = resolvedOffer,
+                    accessToken = tokenResponse.access_token,
+                    includeDidInProof = false,
+                )
+                assertSdJwtVcCredentialPayload(
+                    credentialPayload = credentialPayload,
+                    expectedVctSuffix = "/${scenario.credentialConfigurationId}",
+                    expectedDisclosureKeys = setOf("birthdate"),
+                    expectedClaims = mapOf(
+                        "family_name" to "Doe",
+                        "given_name" to "Jane",
+                    ),
+                )
+                assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+            } finally {
+                client.close()
+            }
+        }
+    }
+
+    @Test
+    @Tag("browser")
+    @Tag("keycloak")
+    fun walletCanCompleteAuthorizationCodeMdocFlowWithDefaultKeycloak() = runBlocking {
+        Issuer2BrowserTestServer().use { server ->
+            server.start()
+            val client = server.httpClient()
+            try {
+                val scenario = Issuer2CredentialScenarios.isoMdl
+                val walletClientConfig = ClientConfiguration(
+                    clientId = "issuer2-keycloak-browser-test",
+                    redirectUris = listOf(WALLET_REDIRECT_URI),
+                )
+                val walletFlow = Issuer2WalletFlowDriver(client, walletClientConfig)
+
+                val createdOffer = client.createWalletFlowCredentialOffer(
+                    scenario = scenario,
+                    authenticationMethod = AuthenticationMethod.AUTHORIZED,
+                )
+                assertEquals(AuthenticationMethod.AUTHORIZED, createdOffer.authMethod)
+                assertEquals(IssuerStateMode.INCLUDE, createdOffer.issuerStateMode)
+                assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+
+                val resolvedOffer = walletFlow.resolve(createdOffer)
+                assertEquals(listOf(scenario.credentialConfigurationId), resolvedOffer.offer.credentialConfigurationIds)
+                val issuerState = assertNotNull(resolvedOffer.offer.grants?.authorizationCode?.issuerState)
+                assertEquals(createdOffer.offerId, issuerState)
+
+                val authorizationUrl = walletFlow.buildAuthorizationRequestUrl(
+                    resolvedOffer = resolvedOffer,
+                    scenario = scenario,
+                    issuerState = issuerState,
+                )
+                val authorizationCode = Issuer2KeycloakAuthorizationDriver().loginAndGetAuthorizationCode(
+                    authorizeUrl = authorizationUrl,
+                    redirectUri = WALLET_REDIRECT_URI,
+                    expectedState = Url(authorizationUrl).parameters["state"],
+                )
+
+                val tokenResponse = walletFlow.exchangeAuthorizationCode(
+                    resolvedOffer = resolvedOffer,
+                    code = authorizationCode,
+                )
+                assertBearerAccessToken(tokenResponse)
+
+                val credentialPayload = walletFlow.requestCredential(
+                    resolvedOffer = resolvedOffer,
+                    accessToken = tokenResponse.access_token,
+                    includeDidInProof = false,
+                )
+                assertIsoMdlCredentialPayload(
+                    credentialPayload = credentialPayload,
+                    expectedClaims = mapOf(
+                        "family_name" to "Doe",
+                        "given_name" to "Jane",
+                        "document_number" to "DL-AT-2025-00018427",
+                    ),
+                )
                 assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
             } finally {
                 client.close()
@@ -140,8 +275,8 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
         val authorizationSession = client.listSessions().single { session ->
             session.profileId == scenario.profileId &&
-                session.sessionId != createdOffer.offerId &&
-                session.authorizationRequest != null
+                    session.sessionId != createdOffer.offerId &&
+                    session.authorizationRequest != null
         }
         assertNotEquals(createdOffer.offerId, authorizationSession.sessionId)
         assertEquals(AuthenticationMethod.AUTHORIZED, authorizationSession.authenticationMethod)
@@ -169,7 +304,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
         val authorizationSession = client.listSessions().single { session ->
             session.profileId == scenario.profileId &&
-                session.authorizationRequest != null
+                    session.authorizationRequest != null
         }
         assertEquals(AuthenticationMethod.AUTHORIZED, authorizationSession.authenticationMethod)
         assertEquals(scenario.credentialConfigurationId, authorizationSession.credentialConfigurationId)

@@ -13,6 +13,7 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.config.registerIssuer2ConfigDecoders
+import id.walt.issuer2.controller.openapi.Issuer2RequestExamples
 import id.walt.issuer2.models.CredentialOfferCreateRequest
 import id.walt.issuer2.models.CredentialOfferCreateResponse
 import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
@@ -22,6 +23,9 @@ import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.issuer2.issuer2Module
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
+import id.walt.mdoc.dataelement.json.JsonElementToCborMappingConfig
+import id.walt.mdoc.dataelement.json.JsonStringToCborMappingConfig
+import id.walt.mdoc.dataelement.json.StringToCborTypeConversion
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferValueMode
@@ -65,6 +69,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -102,7 +107,7 @@ class Issuer2CredentialOfferEndpointTest {
             client.getProfile(ISO_MDL_PROFILE_ID),
             client.getProfile(ISO_PHOTO_ID_PROFILE_ID),
             client.getProfile(IDENTITY_SD_JWT_PROFILE_ID),
-            client.getProfile(CUSTOM_VCT_SD_JWT_PROFILE_ID),
+            client.getProfile(TAX_ID_SD_JWT_PROFILE_ID),
         )
 
         representativeProfiles.forEach { profile ->
@@ -238,8 +243,8 @@ class Issuer2CredentialOfferEndpointTest {
                     },
                     selectiveDisclosure = selectiveDisclosure,
                     idTokenClaimsMapping = mapOf(
-                        "given_name" to "$.given_name",
-                        "family_name" to "$.family_name",
+                        "$.given_name" to "$.given_name",
+                        "$.family_name" to "$.family_name",
                     ),
                     x5Chain = listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"),
                     notifications = IssuanceNotifications(
@@ -261,7 +266,7 @@ class Issuer2CredentialOfferEndpointTest {
         val sessionSelectiveDisclosure = assertNotNull(session.selectiveDisclosure)
         assertNotNull(sessionSelectiveDisclosure.get("given_name"))
         assertNotNull(sessionSelectiveDisclosure.get("family_name"))
-        assertEquals("$.given_name", session.idTokenClaimsMapping?.get("given_name"))
+        assertEquals("$.given_name", session.idTokenClaimsMapping?.get("$.given_name"))
         assertEquals(listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), session.x5Chain)
         assertEquals("https://issuer.example/webhooks/issuer2", session.notifications?.webhook?.url)
 
@@ -316,6 +321,51 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     @Test
+    fun shouldCreateDocumentedMdocPhotoIdOfferWithMappedCredentialDataOverrides() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+
+        val response = client.createCredentialOffer(
+            Issuer2RequestExamples.PRE_AUTHORIZED_MDOC_PHOTO_ID_OFFER_WITH_CREDENTIAL_DATA_OVERRIDE
+        )
+
+        // Keep the Swagger example aligned with the configured mDOC namespaces. Date
+        // overrides belong to the common ISO 23220 namespace, where the full-date mapping
+        // is configured before the credential is encoded as CBOR.
+        val session = client.getSession(response.offerId)
+        val commonNamespace = assertNotNull(
+            session.credentialData[ISO_PHOTO_ID_COMMON_NAMESPACE_ID]?.jsonObject,
+            "Expected Photo ID common namespace override data",
+        )
+        val photoIdNamespace = assertNotNull(
+            session.credentialData[ISO_PHOTO_ID_CONFIGURATION_ID]?.jsonObject,
+            "Expected Photo ID extension namespace override data",
+        )
+
+        assertEquals("Jane", commonNamespace["given_name"]?.jsonPrimitive?.content)
+        assertEquals("Doe", commonNamespace["family_name"]?.jsonPrimitive?.content)
+        assertEquals("2003-12-21", commonNamespace["birth_date"]?.jsonPrimitive?.content)
+        assertEquals("2025-12-13", commonNamespace["issue_date"]?.jsonPrimitive?.content)
+        assertEquals("2026-12-13", commonNamespace["expiry_date"]?.jsonPrimitive?.content)
+        assertNull(
+            photoIdNamespace["birth_date"],
+            "Date fields must not be placed in the Photo ID extension namespace",
+        )
+        assertEquals("123456", photoIdNamespace["person_id"]?.jsonPrimitive?.content)
+        assertEquals("654321", photoIdNamespace["administrative_number"]?.jsonPrimitive?.content)
+
+        val commonNamespaceMapping = assertNotNull(
+            session.mDocNameSpacesDataMappingConfig
+                ?.get(ISO_PHOTO_ID_COMMON_NAMESPACE_ID)
+                ?.entriesConfigMap,
+            "Expected Photo ID common namespace mDOC mapping",
+        )
+        assertStringConversion(commonNamespaceMapping, "birth_date", StringToCborTypeConversion.STRING_TO_FULL_DATE)
+        assertStringConversion(commonNamespaceMapping, "issue_date", StringToCborTypeConversion.STRING_TO_FULL_DATE)
+        assertStringConversion(commonNamespaceMapping, "expiry_date", StringToCborTypeConversion.STRING_TO_FULL_DATE)
+    }
+
+    @Test
     fun shouldRejectRuntimeOverridesForAuthorizedOffersWithoutIssuerState() {
         val error = assertFailsWith<IllegalArgumentException> {
             CredentialOfferCreateRequest(
@@ -325,7 +375,9 @@ class Issuer2CredentialOfferEndpointTest {
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     credentialData = buildJsonObject {
                         putJsonObject("credentialSubject") {
-                            put("givenName", "Jane")
+                            putJsonObject("degree") {
+                                put("name", "Computer Science")
+                            }
                         }
                     },
                 ),
@@ -803,9 +855,9 @@ class Issuer2CredentialOfferEndpointTest {
             UNIVERSITY_DEGREE_PROFILE_ID -> CredentialOfferRuntimeOverrides(
                 credentialData = buildJsonObject {
                     putJsonObject("credentialSubject") {
-                        put("id", "did:example:holder")
-                        put("givenName", "Jane")
-                        put("familyName", "Doe")
+                        putJsonObject("degree") {
+                            put("name", "Computer Science")
+                        }
                     }
                 },
             )
@@ -823,6 +875,17 @@ class Issuer2CredentialOfferEndpointTest {
             else -> null
         }
 
+    private fun assertStringConversion(
+        entriesConfig: Map<String, JsonElementToCborMappingConfig>,
+        field: String,
+        expectedConversion: StringToCborTypeConversion,
+    ) {
+        val fieldMapping = assertIs<JsonStringToCborMappingConfig>(
+            assertNotNull(entriesConfig[field], "Expected mDOC mapping for $field")
+        )
+        assertEquals(expectedConversion, fieldMapping.conversionType)
+    }
+
     private companion object {
         const val PROFILE_ID = "universityDegree"
         const val CREDENTIAL_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
@@ -830,8 +893,10 @@ class Issuer2CredentialOfferEndpointTest {
         const val UNIVERSITY_DEGREE_PROFILE_ID = "universityDegree"
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
+        const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
+        const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
         const val IDENTITY_SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
-        const val CUSTOM_VCT_SD_JWT_PROFILE_ID = "customVctSdJwt"
+        const val TAX_ID_SD_JWT_PROFILE_ID = "taxIdCredentialSdJwt"
         const val TX_CODE_VALUE = "123456"
         const val TWO_MINUTES_SECONDS = 120L
 

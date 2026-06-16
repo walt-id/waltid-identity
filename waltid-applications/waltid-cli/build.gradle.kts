@@ -61,7 +61,7 @@ kotlin {
         }
         jvmTest.dependencies {
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("com.wolpl.clikt-testkit:clikt-testkit:3.0.0")
+            implementation("com.wolpl.clikt-testkit:clikt-testkit:3.1.1")
 
             implementation(identityLibs.junit.jupiter.params)
 

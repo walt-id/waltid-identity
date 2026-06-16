@@ -1,3 +1,4 @@
+import com.google.cloud.tools.jib.gradle.JibExtension
 import io.ktor.plugin.features.*
 
 object Versions {
@@ -63,6 +64,7 @@ dependencies {
     testImplementation(identityLibs.kotlinx.coroutines.test)
     testImplementation(identityLibs.bundles.waltid.ktortesting)
     testImplementation(project(":waltid-libraries:protocols:waltid-openid4vci-wallet"))
+    testImplementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
     testImplementation(identityLibs.junit.jupiter.api)
     testImplementation("com.microsoft.playwright:playwright:1.60.0") {
         exclude(group = "org.junit.jupiter")
@@ -85,6 +87,17 @@ buildConfig {
 ktor {
     docker {
         portMappings.set(listOf(DockerPortMapping(7002, 7002, DockerPortMappingProtocol.TCP)))
+    }
+}
+
+configure<JibExtension> {
+    extraDirectories {
+        paths {
+            path {
+                setFrom(file("config"))
+                setInto("/${project.name}/config")
+            }
+        }
     }
 }
 

@@ -4,6 +4,10 @@
     "image": "issuer-api"
   },
   {
+    "commandPath": ":waltid-services:waltid-issuer-api2",
+    "image": "issuer-api2"
+  },
+  {
     "commandPath": ":waltid-services:waltid-verifier-api",
     "image": "verifier-api"
   },

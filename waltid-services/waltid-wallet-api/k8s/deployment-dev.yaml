@@ -76,7 +76,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: wallet-data-volume-claim
 spec:
-  storageClassName: azure-managed-standardssd-retain
+  storageClassName: gp3-retain
   accessModes:
     - ReadWriteOnce
   resources:
@@ -287,12 +287,8 @@ kind: Ingress
 metadata:
   name: wallet-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    ingress.kubernetes.io/configuration-snippet: |
-      if ($host ~ ^(.+)\.waltid\.org$) {
-        return 301 https://$1.walt-test.cloud$request_uri;
-      }
 spec:
   tls:
     - hosts:
