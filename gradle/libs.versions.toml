@@ -65,7 +65,7 @@ azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
 netty = "4.1.133.Final"
 netty-4_2 = "4.2.15.Final"
-jackson-core = "2.18.6"
+jackson-core = "2.22.0"
 jackson-core-3 = "3.1.1"
 oci-sdk = "3.89.1"
 
@@ -73,7 +73,7 @@ oci-sdk = "3.89.1"
 web3j = "5.0.3"
 aaa4j-radius = "0.4.0"
 apache-ldap-api = "2.1.8"
-mina-core = "2.2.6"
+mina-core = "2.2.8"
 commons-lang3 = "3.20.0"
 onetime = "2.2.0"
 kedis = "0.0.12"
@@ -84,6 +84,9 @@ nimbus-jose = "10.9.1"
 jose-npm = "5.10.0"
 kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
+
+# whyoleg cryptography (multiplatform)
+whyoleg-cryptography-random = "0.6.0"
 tink = "1.21.0"
 
 # Testing
@@ -196,6 +199,7 @@ kotlincrypto-hash-sha1 = { module = "org.kotlincrypto.hash:sha1", version.ref = 
 kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
 kotlincrypto-macs-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
 kotlincrypto-random = { module = "org.kotlincrypto.random:crypto-rand", version.ref = "kotlincrypto-rand" }
+whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "whyoleg-cryptography-random" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-lts8on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "bouncycastle" }
@@ -264,6 +268,7 @@ netty-codec-dns = { module = "io.netty:netty-codec-dns", version.ref = "netty" }
 netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "netty" }
 netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "netty" }
 netty-codec-compression = { module = "io.netty:netty-codec-compression", version.ref = "netty-4_2" }
+netty-codec-http-4-2 = { module = "io.netty:netty-codec-http", version.ref = "netty-4_2" }
 netty-transport-classes-epoll = { module = "io.netty:netty-transport-classes-epoll", version.ref = "netty-4_2" }
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
 jackson-core-tools = { module = "tools.jackson.core:jackson-core", version.ref = "jackson-core-3" }
