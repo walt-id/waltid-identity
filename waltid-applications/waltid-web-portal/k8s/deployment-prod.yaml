@@ -80,13 +80,15 @@ kind: Ingress
 metadata:
   name: portal-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
     - hosts:
         - portal.demo.walt.id
         - portal.walt.id
+        - issuer.walt.id
+        - verifier.walt.id
       secretName: web-portal-tls-secret
   rules:
     - host: portal.demo.walt.id
@@ -137,21 +139,51 @@ spec:
                 name: web-portal
                 port:
                   name: http
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/permanent-redirect: "https://portal.walt.id/"
-  name: iss-vfr-redirect
-spec:
-  tls:
-  - hosts:
-      - verifier.walt.id
-      - issuer.walt.id
-    secretName: iss-vfr-tls-secret
-  rules:
-  - host: verifier.walt.id
-  - host: issuer.walt.id
+    - host: issuer.walt.id
+      http:
+        paths:
+          - path: /offer
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  number: 80
+          - path: /verify
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal
+                port:
+                  name: http
+    - host: verifier.walt.id
+      http:
+        paths:
+          - path: /offer
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer
+                port:
+                  number: 80
+          - path: /verify
+            pathType: Prefix
+            backend:
+              service:
+                name: verifier
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal
+                port:
+                  name: http

@@ -298,7 +298,7 @@ kind: Ingress
 metadata:
   name: issuer
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
@@ -322,7 +322,7 @@ kind: Ingress
 metadata:
   name: verifier
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:
@@ -388,7 +388,7 @@ kind: Ingress
 metadata:
   name: wallet-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
     ingress.kubernetes.io/configuration-snippet: |
       if ($host ~ ^(.+)\.waltid\.org$) {
