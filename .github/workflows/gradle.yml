@@ -23,12 +23,12 @@ jobs:
         os: [ ubuntu-22.04 ]
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@d53d92cf3434925c8a2af103bf2590ddb0f7bf2f
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Configure gradle
-        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@d53d92cf3434925c8a2af103bf2590ddb0f7bf2f
 
       - name: Start tunnel and get URL
         id: tunnel
@@ -84,7 +84,7 @@ jobs:
 
       - name: Build iOS Simulator Framework (ARM64)
         if: ${{ runner.os == 'macos'}}
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@d53d92cf3434925c8a2af103bf2590ddb0f7bf2f
         with:
           waltid-directory: 'waltid-identity'
 
