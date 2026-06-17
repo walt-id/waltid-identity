@@ -11,6 +11,7 @@ import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
 import id.walt.policies2.vp.policies.VerificationSessionContext
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
 import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.SessionFailure
@@ -39,14 +40,15 @@ object PresentationVerificationEngine {
                 // migration to the correct dc+sd-jwt format identifier.
                 log.warn {
                     "Received SD-JWT structure (~) under jwt_vc_json format — " +
-                        "attempting dc+sd-jwt parsing as a fallback. " +
-                        "The wallet should use the 'dc+sd-jwt' DCQL format identifier for SD-JWT credentials."
+                            "attempting dc+sd-jwt parsing as a fallback. " +
+                            "The wallet should use the 'dc+sd-jwt' DCQL format identifier for SD-JWT credentials."
                 }
                 DcSdJwtPresentation.parse(presentationString).getOrThrow()
             } else {
                 JwtVcJsonPresentation.parse(presentationString).getOrThrow()
             }
         }
+
         CredentialFormat.DC_SD_JWT -> DcSdJwtPresentation.parse(presentationString).getOrThrow()
         CredentialFormat.MSO_MDOC -> MsoMdocPresentation.parse(presentationString).getOrThrow()
 
@@ -60,6 +62,7 @@ object PresentationVerificationEngine {
         presentation: VerifiablePresentation,
         presentationString: String,
         session: Verification2Session,
+        expectedTransactionData: List<String>?,
     ): Map<String, VPPolicy2.PolicyRunResult> {
         requireNotNull(session.policies.vp_policies) { "TODO: vpPolicies cannot be null right now" }
 
@@ -76,6 +79,7 @@ object PresentationVerificationEngine {
             expectedNonce = session.authorizationRequest.nonce!!,
             expectedAudience = expectedAudience,
             expectedOrigins = session.authorizationRequest.expectedOrigins,
+            expectedTransactionData = expectedTransactionData,
             responseUri = authorizationRequest.responseUri,
             responseMode = responseMode!!,
             isSigned = session.signedAuthorizationRequestJwt != null,
@@ -100,7 +104,16 @@ object PresentationVerificationEngine {
     ): Map<String, Map<String, VPPolicy2.PolicyRunResult>> {
         val verifiedPresentations = parsedPresentations.map { (entry, presentation) ->
             val (presentationString, query) = entry
-            val policyResults = verifySinglePresentation(presentation, presentationString, session)
+            val expectedTransactionData = filterTransactionDataForCredentialId(
+                transactionData = session.authorizationRequest.transactionData,
+                credentialId = query.id,
+            ).takeIf(List<String>::isNotEmpty)
+            val policyResults = verifySinglePresentation(
+                presentation = presentation,
+                presentationString = presentationString,
+                session = session,
+                expectedTransactionData = expectedTransactionData,
+            )
 
             query.id to policyResults
         }.toMap()
@@ -160,7 +173,6 @@ object PresentationVerificationEngine {
 
 
     }
-
 
 
     /**
@@ -257,6 +269,7 @@ object PresentationVerificationEngine {
                     }
                     presentation.credentials ?: emptyList()
                 }
+
                 is DcSdJwtPresentation -> listOf(presentation.credential)
                 is MsoMdocPresentation -> listOf(presentation.mdoc)
                 is LdpVcPresentation -> throw NotImplementedError()

@@ -25,10 +25,13 @@ import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.data.CrossDeviceFlowSetup
 import id.walt.verifier2.data.GeneralFlowConfig
+import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
 import id.walt.verifier2.verifierModule
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier2.PAYMENT_TYPE
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -42,6 +45,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
+
 
 class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
 
@@ -126,6 +130,11 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
         core = GeneralFlowConfig(
             dcqlQuery = sdJwtVcDcqlQuery,
             policies = additionalSdjwtvcPolicies
+        ),
+        openid = OpenId4VPConfig(
+            transactionData = listOf(
+                transactionDataItem(credentialId = "my_pid", amount = "42.00")
+            )
         )
     )
 
@@ -435,7 +444,8 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     presentationRequestUrl = bootstrapUrl!!,
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
-                    runPolicies = null
+                    runPolicies = null,
+                    transactionDataTypeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE),
                 )
             }
 
@@ -486,8 +496,22 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                 assertTrue { info2.policyResults!!.overallSuccess }
 
                 assertTrue { info2.policyResults!!.vcPolicies.size == additionalSdjwtvcPolicies.vc_policies?.policies?.size }
+                assertTrue {
+                    info2.policyResults!!.vpPolicies["my_pid"]
+                        ?.get("dc+sd-jwt/transaction-data-hash-check")?.success == true
+                }
             }
         }
+    }
+
+    private fun transactionDataItem(credentialId: String, amount: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive(PAYMENT_TYPE))
+        put("credential_ids", JsonArray(listOf(JsonPrimitive(credentialId))))
+        put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
+        put("amount", JsonPrimitive(amount))
+        put("currency", JsonPrimitive("EUR"))
+        put("payee", JsonPrimitive("ACME Corp"))
+        put("reference", JsonPrimitive("INV-2026-042"))
     }
 
     // Utils:
