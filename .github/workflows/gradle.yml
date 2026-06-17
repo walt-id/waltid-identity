@@ -65,22 +65,30 @@ jobs:
 
       - name: Clean and build with all tests
         if: ${{ runner.os != 'macos' }}
-        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --max-workers=3
+        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
         env:
           CI: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
-      - name: Upload test reports
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v6
+        if: always()
+        with:
+          report_paths: '**/build/test-results/**/*.xml'
+          detailed_summary: true
+          include_passed: false
+          include_skipped: false
+
+      - name: Upload Gradle problems report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: test-reports
-          path: |
-            **/build/reports/tests/test/
-            **/build/reports/tests/allTests/
-          retention-days: 30
+          name: gradle-problems-report
+          path: '**/build/reports/problems/problems-report.html'
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build iOS Simulator Framework (ARM64)
         if: ${{ runner.os == 'macos'}}
