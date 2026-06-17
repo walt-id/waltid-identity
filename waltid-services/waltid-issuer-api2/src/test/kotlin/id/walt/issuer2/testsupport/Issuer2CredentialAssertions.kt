@@ -82,11 +82,14 @@ private fun assertSdJwtVcDisclosures(
 
     assertTrue(disclosures.isNotEmpty(), "Expected SD-JWT VC to include at least one parsed disclosure")
     assertEquals(disclosures.size, sdJwt.disclosures.size)
-    assertEquals(expectedDisclosureKeys, disclosures.map { it.key }.toSet())
+    val objectDisclosures = disclosures.filterIsInstance<id.walt.sdjwt.ObjectPropertyDisclosure>()
+    assertEquals(expectedDisclosureKeys, objectDisclosures.map { it.key }.toSet())
     assertTrue(sdJwt.sdPayload.verifyDisclosures(), "Expected SD-JWT VC disclosures to match the payload digests")
     disclosures.forEachIndexed { index, disclosure ->
         assertTrue(disclosure.salt.isNotBlank(), "Expected SD-JWT VC disclosure #$index to have a salt")
-        assertTrue(disclosure.key.isNotBlank(), "Expected SD-JWT VC disclosure #$index to have a claim key")
+    }
+    objectDisclosures.forEachIndexed { index, disclosure ->
+        assertTrue(disclosure.key.isNotBlank(), "Expected SD-JWT VC object-property disclosure #$index to have a claim key")
     }
 }
 
