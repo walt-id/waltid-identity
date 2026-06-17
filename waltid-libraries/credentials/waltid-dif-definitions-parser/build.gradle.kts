@@ -14,7 +14,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // JSON
-            implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+            implementation("com.eygraber:jsonpathkt-kotlinx:4.0.0")
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.optimumcode.jsonschemavalidator)
 
