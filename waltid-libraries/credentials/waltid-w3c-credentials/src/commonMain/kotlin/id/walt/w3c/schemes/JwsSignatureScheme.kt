@@ -27,6 +27,7 @@ class JwsSignatureScheme : SignatureScheme {
 
     object JwsHeader {
         const val KEY_ID = "kid"
+        const val X5C = "x5c"
     }
 
     object JwsOption {
@@ -116,7 +117,7 @@ class JwsSignatureScheme : SignatureScheme {
     @JsPromise
     @JsExport.Ignore
     suspend fun verify(data: String): Result<JsonElement> = runCatching {
-        // Try to verify with all keys from the issuer's DID document
+        // Get keys from either x5c header or DID document
         val keysInfo = getIssuerKeysInfo(data)
         val jws = data.split("~")[0]
 
@@ -131,13 +132,13 @@ class JwsSignatureScheme : SignatureScheme {
             }
 
             if (result.isSuccess) {
-                log.trace { "Verification successful with one of the keys from the DID document" }
+                log.trace { "Verification successful with key" }
                 return result
             }
         }
 
         // If we get here, all keys failed
-        return Result.failure(lastException ?: CryptoArgumentException("Verification failed with all keys from the DID document"))
+        return Result.failure(lastException ?: CryptoArgumentException("Verification failed with all available keys"))
     }
 
     @JvmBlocking

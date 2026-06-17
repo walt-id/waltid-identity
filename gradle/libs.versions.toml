@@ -258,6 +258,7 @@ clikt-markdown = { module = "com.github.ajalt.clikt:clikt-markdown", version.ref
 ## JSON handling
 optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-validator", version = "0.5.5" }
 jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "4.0.0" }
+jaywayjsonpath = { module = "com.jayway.jsonpath:json-path", version = "2.9.0" }
 
 ## Persistence
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }

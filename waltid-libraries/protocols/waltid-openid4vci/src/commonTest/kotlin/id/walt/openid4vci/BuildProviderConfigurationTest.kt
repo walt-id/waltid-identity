@@ -59,6 +59,17 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
+    fun `writeAuthorizationError without request returns bad request`() {
+        val provider = buildOAuth2Provider(createTestConfig())
+
+        val response = provider.writeAuthorizationError(OAuthError("invalid_request", "Missing response_type"))
+
+        assertEquals(400, response.status)
+        assertEquals(null, response.redirectUri)
+        assertEquals("Missing response_type", response.body)
+    }
+
+    @Test
     fun `buildProvider rejects duplicate grant handlers should fail`() {
         val authorizationCodeRepository = defaultAuthorizationCodeRepository()
         val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
