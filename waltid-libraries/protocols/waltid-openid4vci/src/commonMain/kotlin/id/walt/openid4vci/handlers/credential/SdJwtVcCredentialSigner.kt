@@ -76,6 +76,7 @@ object SdJwtVcCredentialSigner {
                 context = mapOf(
                     "subjectDid" to holderDid,
                     "issuerDid" to issuerId,
+                    "issuerId" to issuerId,
                     "display" to Json.encodeToJsonElement(display ?: emptyList()).jsonArray,
                 ).filterValues {
                     when (it) {

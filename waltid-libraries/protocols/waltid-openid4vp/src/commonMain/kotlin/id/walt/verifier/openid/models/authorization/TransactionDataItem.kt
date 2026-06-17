@@ -21,5 +21,7 @@ data class TransactionDataItem(
     @SerialName("transaction_data_hashes_alg")
     val transactionDataHashesAlg: List<String>? = null,
     // Additional transaction data type specific parameters
-    val details: JsonObject? = null
+    val details: JsonObject? = null,
+    @SerialName("require_cryptographic_holder_binding")
+    val requireCryptographicHolderBinding: Boolean? = null,
 )

@@ -10,6 +10,7 @@ export default function handler(
     NEXT_PUBLIC_VC_REPO: process.env.NEXT_PUBLIC_VC_REPO,
     NEXT_PUBLIC_ISSUER: process.env.NEXT_PUBLIC_ISSUER,
     NEXT_PUBLIC_VERIFIER: process.env.NEXT_PUBLIC_VERIFIER,
+    NEXT_PUBLIC_VERIFIER2: process.env.NEXT_PUBLIC_VERIFIER2,
     NEXT_PUBLIC_WALLET: process.env.NEXT_PUBLIC_WALLET,
   });
 }
