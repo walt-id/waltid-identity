@@ -27,7 +27,7 @@ kotlin {
             implementation(identityLibs.jsonpathkt)
 
             // CBOR
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation(identityLibs.kotlinx.serialization.cbor)
 
             // Crypto
@@ -44,7 +44,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
