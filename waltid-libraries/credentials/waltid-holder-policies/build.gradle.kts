@@ -20,7 +20,7 @@ kotlin {
             // JSON
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.optimumcode.jsonschemavalidator)
-            implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+            implementation("com.eygraber:jsonpathkt-kotlinx:4.0.0")
 
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
