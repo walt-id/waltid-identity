@@ -21,6 +21,7 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -43,7 +44,7 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
-    fun `buildProvider surfaces validator failures`() {
+    fun `buildProvider surfaces validator failures`() = runTest {
         val failingValidator = AuthorizationRequestValidator {
             AuthorizationRequestResult.Failure(OAuthError("invalid_client"))
         }

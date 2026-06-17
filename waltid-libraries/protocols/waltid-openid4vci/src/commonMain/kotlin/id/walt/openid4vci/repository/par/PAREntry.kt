@@ -1,6 +1,5 @@
 package id.walt.openid4vci.repository.par
 
-import id.walt.openid4vci.requests.par.PushedAuthorizationRequest
 import kotlin.time.Instant
 
 /**
@@ -15,9 +14,9 @@ data class PAREntry(
     val requestId: String,
 
     /**
-     * The pushed authorization request
+     * Stored authorization request parameters, preserving multi-valued form data.
      */
-    val request: PushedAuthorizationRequest,
+    val requestParameters: Map<String, List<String>>,
 
     /**
      * When this PAR entry was created
@@ -39,9 +38,15 @@ data class PAREntry(
      */
     val clientMetadata: Map<String, String> = emptyMap(),
 ) {
+    val clientId: String = requestParameters["client_id"].orEmpty().singleOrNull()?.takeIf { it.isNotBlank() }
+        ?: throw IllegalArgumentException("PAR entry must contain exactly one non-blank client_id")
+
     init {
         require(requestId.isNotBlank()) { "requestId must not be blank" }
         require(expiresAt > createdAt) { "expiresAt must be after createdAt" }
+        require(requestParameters["request_uri"].orEmpty().none { it.isNotBlank() }) {
+            "PAR entry must not contain request_uri"
+        }
     }
 
     /**

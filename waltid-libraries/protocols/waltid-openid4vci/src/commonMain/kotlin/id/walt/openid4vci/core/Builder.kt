@@ -3,6 +3,7 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.handlers.credential.SdJwtVcCredentialHandler
 import id.walt.openid4vci.handlers.credential.MdocCredentialHandler
 import id.walt.openid4vci.handlers.credential.W3cJwtVcCredentialHandler
+import id.walt.openid4vci.handlers.endpoints.par.DefaultPushedAuthorizationEndpoint
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeAuthorizationEndpoint
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeTokenEndpoint
 import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCodeTokenEndpoint
@@ -47,6 +48,7 @@ fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
+    includePushedAuthorizationDefaultHandlers: Boolean = true,
     includeCredentialDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
     val resolvedConfig = applyIssuerStateValidator(config)
@@ -54,6 +56,10 @@ fun buildOAuth2Provider(
         config = resolvedConfig,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
+    )
+    registerDefaultPushedAuthorizationHandlers(
+        config = resolvedConfig,
+        includePushedAuthorizationDefaultHandlers = includePushedAuthorizationDefaultHandlers,
     )
     registerDefaultCredentialHandlers(
         config = resolvedConfig,
@@ -108,6 +114,23 @@ private fun registerDefaultGrantTypeHandlers(
             handler = preAuthorizedTokenHandler,
         )
     }
+}
+
+private fun registerDefaultPushedAuthorizationHandlers(
+    config: OAuth2ProviderConfig,
+    includePushedAuthorizationDefaultHandlers: Boolean,
+) {
+    val pushedAuthorizationConfig = config.pushedAuthorizationConfig
+    val repository = pushedAuthorizationConfig.repository ?: return
+    if (!includePushedAuthorizationDefaultHandlers) return
+
+    config.pushedAuthorizationEndpointHandlers.append(
+        DefaultPushedAuthorizationEndpoint(
+            parRepository = repository,
+            requestUriPrefix = pushedAuthorizationConfig.requestUriPrefix,
+            requestLifetimeSeconds = pushedAuthorizationConfig.lifetimeSeconds,
+        )
+    )
 }
 
 private fun registerDefaultCredentialHandlers(

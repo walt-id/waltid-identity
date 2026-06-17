@@ -30,13 +30,13 @@ class PushedAuthorizationResponseTest {
     }
 
     @Test
-    fun `should fail when request_uri does not follow RFC 9126 format`() {
-        assertFailsWith<IllegalArgumentException> {
-            PushedAuthorizationResponse(
-                requestUri = "https://example.com/request/123",
-                expiresIn = 90
-            )
-        }
+    fun `should allow configured request_uri prefix`() {
+        val response = PushedAuthorizationResponse(
+            requestUri = "https://issuer.example/par/request/123",
+            expiresIn = 90
+        )
+
+        assertEquals("https://issuer.example/par/request/123", response.requestUri)
     }
 
     @Test
@@ -113,6 +113,12 @@ class PushedAuthorizationResponseTest {
     }
 
     @Test
+    fun `should return null when request_uri has no request ID after prefix`() {
+        val requestId = PushedAuthorizationResponse.extractRequestId("urn:ietf:params:oauth:request_uri:")
+        assertNull(requestId)
+    }
+
+    @Test
     fun `should handle request_uri with special characters in request ID`() {
         val response = PushedAuthorizationResponse.create(
             requestId = "request-123_abc.xyz",
@@ -121,5 +127,22 @@ class PushedAuthorizationResponseTest {
 
         val extractedId = PushedAuthorizationResponse.extractRequestId(response.requestUri)
         assertEquals("request-123_abc.xyz", extractedId)
+    }
+
+    @Test
+    fun `should create and extract request ID with configured prefix`() {
+        val response = PushedAuthorizationResponse.create(
+            requestId = "custom-request",
+            expiresIn = 90,
+            requestUriPrefix = "https://issuer.example/par/request/",
+        )
+
+        val extractedId = PushedAuthorizationResponse.extractRequestId(
+            requestUri = response.requestUri,
+            requestUriPrefix = "https://issuer.example/par/request/",
+        )
+
+        assertEquals("https://issuer.example/par/request/custom-request", response.requestUri)
+        assertEquals("custom-request", extractedId)
     }
 }

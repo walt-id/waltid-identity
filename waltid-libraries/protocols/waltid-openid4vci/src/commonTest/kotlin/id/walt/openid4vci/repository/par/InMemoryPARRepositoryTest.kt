@@ -9,7 +9,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
-import id.walt.openid4vci.requests.par.PushedAuthorizationRequest
 
 class InMemoryPARRepositoryTest {
 
@@ -27,7 +26,8 @@ class InMemoryPARRepositoryTest {
 
         assertNotNull(retrieved)
         assertEquals("test-123", retrieved.requestId)
-        assertEquals("test-client", retrieved.request.clientId)
+        assertEquals("test-client", retrieved.clientId)
+        assertEquals(listOf("test-client"), retrieved.requestParameters["client_id"])
     }
 
     @Test
@@ -172,7 +172,7 @@ class InMemoryPARRepositoryTest {
         val now = Clock.System.now()
         val entry = PAREntry(
             requestId = "metadata-test",
-            request = PushedAuthorizationRequest(clientId = "test-client"),
+            requestParameters = testRequestParameters(),
             createdAt = now,
             expiresAt = now + 90.seconds,
             clientMetadata = mapOf(
@@ -206,9 +206,15 @@ class InMemoryPARRepositoryTest {
         }
         return PAREntry(
             requestId = requestId,
-            request = PushedAuthorizationRequest(clientId = "test-client"),
+            requestParameters = testRequestParameters(),
             createdAt = createdAt,
             expiresAt = expiresAt,
         )
     }
+
+    private fun testRequestParameters(): Map<String, List<String>> =
+        mapOf(
+            "client_id" to listOf("test-client"),
+            "response_type" to listOf("code"),
+        )
 }

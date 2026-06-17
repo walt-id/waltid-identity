@@ -29,6 +29,16 @@ interface PARRepository {
     suspend fun markConsumed(requestId: String): PAREntry?
 
     /**
+     * Atomically retrieve and consume a PAR entry.
+     *
+     * Implementations should override this when the backing store supports atomic delete/update.
+     */
+    suspend fun consume(requestId: String, now: Instant): PAREntry? {
+        val entry = findByRequestId(requestId, now) ?: return null
+        return if (markConsumed(requestId) != null) entry else null
+    }
+
+    /**
      * Delete expired PAR entries (cleanup)
      * @return number of entries deleted
      */

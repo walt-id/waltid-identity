@@ -36,6 +36,12 @@ class InMemoryPARRepository : PARRepository {
         }
     }
 
+    override suspend fun consume(requestId: String, now: Instant): PAREntry? = mutex.withLock {
+        val entry = storage[requestId]?.takeIf { it.isValid(now) } ?: return@withLock null
+        storage[requestId] = entry.markConsumed()
+        entry
+    }
+
     override suspend fun deleteExpired(now: Instant): Int = mutex.withLock {
         val expired = storage.values.filter { !it.isValid(now) }
         expired.forEach { storage.remove(it.requestId) }

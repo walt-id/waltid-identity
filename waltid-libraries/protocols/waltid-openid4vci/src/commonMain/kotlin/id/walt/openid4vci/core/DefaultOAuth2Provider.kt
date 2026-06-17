@@ -4,6 +4,7 @@ import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -13,6 +14,9 @@ import id.walt.openid4vci.requests.credential.CredentialRequest
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
@@ -33,6 +37,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 
@@ -54,8 +59,14 @@ class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
 
-    override fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
-        config.authorizationRequestValidator.validate(parameters)
+    override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
+        when (val resolution = resolveAuthorizationParameters(parameters)) {
+            is AuthorizationParameterResolution.Success ->
+                config.authorizationRequestValidator.validate(resolution.parameters)
+
+            is AuthorizationParameterResolution.Failure ->
+                AuthorizationRequestResult.Failure(resolution.error)
+        }
 
     override suspend fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
@@ -142,6 +153,70 @@ class DefaultOAuth2Provider(
             headers = headers,
         )
     }
+
+    override fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult {
+        if (parameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
+            return AuthorizationRequestResult.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST,
+                    description = "request_uri is not allowed at the pushed authorization request endpoint",
+                )
+            )
+        }
+        return config.authorizationRequestValidator.validate(parameters)
+    }
+
+    override suspend fun createPushedAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        clientAuthentication: Map<String, String>,
+    ): PushedAuthorizationResponseResult {
+        val failures = mutableListOf<PushedAuthorizationResponseResult.Failure>()
+
+        for (handler in config.pushedAuthorizationEndpointHandlers) {
+            when (
+                val result = handler.handlePushedAuthorizationEndpointRequest(
+                    authorizationRequest = authorizationRequest,
+                    clientAuthentication = clientAuthentication,
+                )
+            ) {
+                is PushedAuthorizationResponseResult.Success -> return result
+                is PushedAuthorizationResponseResult.Failure -> failures += result
+            }
+        }
+
+        return failures.firstOrNull() ?: PushedAuthorizationResponseResult.Failure(
+            OAuthError(
+                error = OAuthErrorCodes.SERVER_ERROR,
+                description = "No pushed authorization endpoint handler is configured",
+            )
+        )
+    }
+
+    override fun writePushedAuthorizationError(error: OAuthError): PushedAuthorizationResponseHttp =
+        PushedAuthorizationResponseHttp(
+            status = oauthJsonErrorStatus(error),
+            payload = oauthErrorPayload(error),
+            headers = noStoreHeaders(),
+        )
+
+    override fun writePushedAuthorizationError(
+        authorizationRequest: AuthorizationRequest,
+        error: OAuthError,
+    ): PushedAuthorizationResponseHttp =
+        writePushedAuthorizationError(error)
+
+    override fun writePushedAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        response: PushedAuthorizationResponse,
+    ): PushedAuthorizationResponseHttp =
+        PushedAuthorizationResponseHttp(
+            status = 201,
+            payload = buildMap {
+                put("request_uri", JsonPrimitive(response.requestUri))
+                put("expires_in", JsonPrimitive(response.expiresIn))
+            },
+            headers = noStoreHeaders(),
+        )
 
     override fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
@@ -332,5 +407,107 @@ class DefaultOAuth2Provider(
         val hashIndex = base.indexOf("#")
         val baseWithoutFragment = if (hashIndex >= 0) base.substring(0, hashIndex) else base
         return "$baseWithoutFragment#$fragment"
+    }
+
+    private suspend fun resolveAuthorizationParameters(
+        parameters: Map<String, List<String>>,
+    ): AuthorizationParameterResolution {
+        val requestUriValues = parameters["request_uri"].orEmpty().filter { it.isNotBlank() }
+        if (requestUriValues.size > 1) {
+            return AuthorizationParameterResolution.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Multiple values for request_uri not allowed")
+            )
+        }
+
+        val requestUri = requestUriValues.firstOrNull()
+        if (requestUri == null) {
+            return if (config.pushedAuthorizationConfig.enforcePushedAuthorizationRequests) {
+                AuthorizationParameterResolution.Failure(
+                    OAuthError(
+                        error = OAuthErrorCodes.INVALID_REQUEST,
+                        description = "Pushed authorization requests are required",
+                    )
+                )
+            } else {
+                AuthorizationParameterResolution.Success(parameters)
+            }
+        }
+
+        val clientIdValues = parameters["client_id"].orEmpty().filter { it.isNotBlank() }
+        val clientId = when (clientIdValues.size) {
+            0 -> return AuthorizationParameterResolution.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST,
+                    description = "client_id is required when using request_uri",
+                )
+            )
+
+            1 -> clientIdValues.first()
+            else -> return AuthorizationParameterResolution.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Multiple values for client_id not allowed")
+            )
+        }
+
+        val requestId = PushedAuthorizationResponse.extractRequestId(
+            requestUri = requestUri,
+            requestUriPrefix = config.pushedAuthorizationConfig.requestUriPrefix,
+        ) ?: return AuthorizationParameterResolution.Failure(
+            OAuthError(
+                error = OAuthErrorCodes.INVALID_REQUEST_URI,
+                description = "request_uri is invalid",
+            )
+        )
+
+        val repository = config.pushedAuthorizationConfig.repository ?: return AuthorizationParameterResolution.Failure(
+            OAuthError(
+                error = OAuthErrorCodes.SERVER_ERROR,
+                description = "PAR repository is not configured",
+            )
+        )
+
+        val entry = repository.consume(requestId, Clock.System.now())
+            ?: return AuthorizationParameterResolution.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST_URI,
+                    description = "request_uri is invalid, expired, or already consumed",
+                )
+            )
+
+        if (entry.clientId != clientId) {
+            return AuthorizationParameterResolution.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST,
+                    description = "client_id mismatch between pushed and authorization requests",
+                )
+            )
+        }
+
+        return AuthorizationParameterResolution.Success(entry.requestParameters)
+    }
+
+    private fun oauthErrorPayload(error: OAuthError): Map<String, JsonElement> =
+        buildMap {
+            put("error", JsonPrimitive(error.error))
+            error.description?.let { put("error_description", JsonPrimitive(it)) }
+        }
+
+    private fun oauthJsonErrorStatus(error: OAuthError): Int =
+        when (error.error) {
+            OAuthErrorCodes.INVALID_CLIENT -> 401
+            OAuthErrorCodes.SERVER_ERROR,
+            OAuthErrorCodes.TEMPORARILY_UNAVAILABLE -> 500
+
+            else -> 400
+        }
+
+    private fun noStoreHeaders(): Map<String, String> =
+        mapOf(
+            "Cache-Control" to "no-store",
+            "Pragma" to "no-cache",
+        )
+
+    private sealed class AuthorizationParameterResolution {
+        data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
+        data class Failure(val error: OAuthError) : AuthorizationParameterResolution()
     }
 }
