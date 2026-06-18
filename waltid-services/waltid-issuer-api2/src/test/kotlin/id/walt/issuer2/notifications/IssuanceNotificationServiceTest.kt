@@ -1,7 +1,6 @@
 package id.walt.issuer2.notifications
 
 import id.walt.issuer2.domain.IssuanceSession
-import id.walt.issuer2.domain.IssuanceSessionStatus
 import id.walt.openid4vci.offers.AuthenticationMethod
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
