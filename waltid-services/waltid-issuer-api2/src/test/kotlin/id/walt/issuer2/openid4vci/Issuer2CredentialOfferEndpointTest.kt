@@ -61,7 +61,6 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
-import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -259,8 +258,8 @@ class Issuer2CredentialOfferEndpointTest {
         assertEquals("Jane", session.credentialData["given_name"]?.jsonPrimitive?.content)
         assertEquals("<timestamp>", session.mapping?.get("iat")?.jsonPrimitive?.content)
         val sessionSelectiveDisclosure = assertNotNull(session.selectiveDisclosure)
-        assertNotNull(sessionSelectiveDisclosure.get("given_name"))
-        assertNotNull(sessionSelectiveDisclosure.get("family_name"))
+        assertNotNull(sessionSelectiveDisclosure["given_name"])
+        assertNotNull(sessionSelectiveDisclosure["family_name"])
         assertEquals("$.given_name", session.idTokenClaimsMapping?.get("given_name"))
         assertEquals(listOf("-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----"), session.x5Chain)
         assertEquals("https://issuer.example/webhooks/issuer2", session.notifications?.webhook?.url)
@@ -660,7 +659,7 @@ class Issuer2CredentialOfferEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
-            runBlocking { issuer2AuthenticationPluginAmendment() }
+            issuer2AuthenticationPluginAmendment()
             AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
@@ -672,7 +671,7 @@ class Issuer2CredentialOfferEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
-            runBlocking { issuer2AuthenticationPluginAmendment() }
+            issuer2AuthenticationPluginAmendment()
             AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }
