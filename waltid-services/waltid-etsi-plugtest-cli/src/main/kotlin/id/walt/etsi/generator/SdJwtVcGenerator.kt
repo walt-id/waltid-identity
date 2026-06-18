@@ -3,6 +3,7 @@ package id.walt.etsi.generator
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.ShaUtils
+import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.etsi.TestCase
 import id.walt.sdjwt.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -18,6 +19,57 @@ object SdJwtVcGenerator {
     /** qcStatements extension OID (RFC 3739 / ETSI EN 319 412-5) marking a qualified certificate. */
     private const val QC_STATEMENTS_OID = "1.3.6.1.5.5.7.1.3"
 
+    // Per-tier credential types (vct) for the ETSI plugtest, matching the provided Type Metadata /
+    // JSON Schemas: EAA -> PID, QEAA -> Medical License, PuB-EAA -> Birth Certificate.
+    private const val VCT_PID = "urn:eudi:pid:1"
+    private const val VCT_MEDICAL_LICENSE = "urn:example:eaa:medical_license:1"
+    private const val VCT_BIRTH_CERTIFICATE = "urn:example:eaa:birth_certificate:1"
+
+    /** Base URL where our Type Metadata documents are hosted (for vct#integrity resolution). */
+    private const val TYPE_METADATA_BASE =
+        "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/type-metadata"
+
+    /**
+     * Resolves the credential type (vct) for a test case by tier (EAA/QEAA/PuB-EAA), unless an
+     * explicit [override] vct was supplied on the CLI.
+     */
+    private fun resolveVct(testCase: TestCase, override: String?): String {
+        if (override != null) return override
+        val u = testCase.id.uppercase()
+        return when {
+            u.contains("QEAA") -> VCT_MEDICAL_LICENSE
+            u.contains("PUBEAA") -> VCT_BIRTH_CERTIFICATE
+            else -> VCT_PID
+        }
+    }
+
+    /** Bundled Type Metadata document resource name per vct (also hosted under [TYPE_METADATA_BASE]). */
+    private fun typeMetadataResource(vct: String): String? = when (vct) {
+        VCT_PID -> "type-metadata/urn-eudi-pid-1.json"
+        VCT_MEDICAL_LICENSE -> "type-metadata/urn-example-eaa-medical_license-1.json"
+        VCT_BIRTH_CERTIFICATE -> "type-metadata/urn-example-eaa-birth_certificate-1.json"
+        else -> null
+    }
+
+    /**
+     * Computes `vct#integrity` per SD-JWT VC (draft-16, §"vct#integrity"): the SHA-256 digest of the
+     * exact Type Metadata document bytes, as a `sha256-<base64url>` integrity string. Returns null
+     * when no Type Metadata document is bundled for the [vct] (e.g. a custom CLI --vct override),
+     * in which case the vct#integrity claim is omitted (it is OPTIONAL).
+     *
+     * The hashed bytes are identical to the document hosted at
+     * [TYPE_METADATA_BASE]/<file>, so a verifier fetching the Type Metadata can reproduce the hash.
+     */
+    private fun computeVctIntegrity(vct: String): String? {
+        val resource = typeMetadataResource(vct) ?: return null
+        val bytes = this::class.java.classLoader.getResourceAsStream(resource)?.readBytes()
+            ?: run {
+                log.warn { "Type Metadata resource '$resource' not found; omitting vct#integrity for vct '$vct'" }
+                return null
+            }
+        return "sha256-" + ShaUtils.sha256Base64Url(bytes)
+    }
+
     data class SdJwtGenerationResult(
         val testCaseId: String,
         val sdJwtVc: String,
@@ -31,10 +83,13 @@ object SdJwtVcGenerator {
         issuerCertificatePem: String,
         holderKey: Key? = null,
         issuerUrl: String = "https://issuer.example.com",
-        vct: String = "urn:etsi:eaa:credential",
+        /** Explicit vct override (CLI --vct). When null, the vct is chosen per tier (PID/medical_license/birth_certificate). */
+        vct: String? = null,
         x5u: String? = null
     ): SdJwtGenerationResult {
         log.info { "Generating SD-JWT-VC for test case: ${testCase.id}" }
+
+        val effectiveVct = resolveVct(testCase, vct)
 
         val x5cChain = buildX5cChain(issuerCertificatePem)
         val x5tS256 = computeX5tS256(issuerCertificatePem)
@@ -43,7 +98,7 @@ object SdJwtVcGenerator {
         // certificate. With a non-qualified certificate, QEAA-5.2.4.2-01/-02 (and PuB-EAA
         // equivalents) require these claims to be present in the payload.
         val issuerCertQualified = certIsQualified(issuerCertificatePem)
-        val payload = buildPayload(testCase, issuerUrl, vct, holderKey, issuerCertQualified)
+        val payload = buildPayload(testCase, issuerUrl, effectiveVct, holderKey, issuerCertQualified)
         val selectiveDisclosures = buildSelectiveDisclosures(testCase, payload)
 
         // QEAA-5.6.2-02 / PuB-EAA-5.6.3-02 (ETSI TS 119 472-1): x5u SHALL be present
@@ -189,8 +244,9 @@ object SdJwtVcGenerator {
 
         val existingKeys = mutableSetOf<String>()
 
-        // Compute vct#integrity as SHA-256 of the VCT URI bytes (base64url, no padding)
-        val vctIntegrity = "sha256-" + ShaUtils.sha256Base64Url(vct.toByteArray(Charsets.UTF_8))
+        // vct#integrity = SHA-256 of the Type Metadata document bytes (SD-JWT VC). Null (omitted)
+        // when no Type Metadata is bundled for this vct (e.g. a custom --vct override).
+        val vctIntegrity = computeVctIntegrity(vct)
 
         // Export holder JWK outside buildJsonObject to avoid runBlocking inside coroutine
         val holderJwkString: String? = holderKey?.let {
@@ -202,8 +258,10 @@ object SdJwtVcGenerator {
             existingKeys.add("iss")
             put("vct", vct)
             existingKeys.add("vct")
-            put("vct#integrity", vctIntegrity)
-            existingKeys.add("vct#integrity")
+            if (vctIntegrity != null) {
+                put("vct#integrity", vctIntegrity)
+                existingKeys.add("vct#integrity")
+            }
             put("nbf", now)
             existingKeys.add("nbf")
             put("exp", expiry)
@@ -237,6 +295,25 @@ object SdJwtVcGenerator {
             put("family_name", "Mustermann")
             existingKeys.add("family_name")
 
+            // For array-element SD test cases (EAA-9, EAA-12, EAA-13) include a nationalities array
+            // so that individual array elements can be made selectively disclosable per RFC 9901 §4.2.2.
+            if (testCase.hasArrayElementSd && !existingKeys.contains("nationalities")) {
+                put("nationalities", buildJsonArray { add("DE"); add("AT"); add("FR") })
+                existingKeys.add("nationalities")
+            }
+
+            // For recursive SD test cases (EAA-11, EAA-12, EAA-13) include an address object
+            // so that sub-fields can be recursively made selectively disclosable per RFC 9901 §4.2.
+            if (testCase.hasRecursiveSd && !existingKeys.contains("address")) {
+                putJsonObject("address") {
+                    put("street_address", "Mustergasse 1")
+                    put("locality", "Vienna")
+                    put("region", "Vienna")
+                    put("country", "AT")
+                }
+                existingKeys.add("address")
+            }
+
             val payloadSection = testCase.getPayload()
             payloadSection?.items?.forEach { item ->
                 val cleanItem = item.trim().split(" ").first().split("(").first()
@@ -267,7 +344,7 @@ object SdJwtVcGenerator {
                                 existingKeys.remove("issuing_country")
                                 log.debug { "Omitting issuing_country; qualified certificate carries it (EAA-5.2.4.1-07)" }
                             } else {
-                                put("issuing_country", "DE")
+                                put("issuing_country", "AT")
                             }
                         }
                         // EAA-5.2.4.1-11 / QEAA-5.2.4.2-03 / PuB-EAA-5.2.4.3-03: the registration
@@ -285,16 +362,23 @@ object SdJwtVcGenerator {
                             }
                         }
                         cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
-                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
+                        cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "AT")
                         cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                         cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
-                        // EAA-5.2.10.1: status SHALL be a JSON object (ETSI flat shape
-                        // { type, purpose, index, uri }), never a bare string.
+                        // EAA-5.2.10.1: status SHALL be a JSON object with ETSI members
+                        // (type, purpose, index, uri) per ETSI TS 119 472-1 §5.2.10.1.
+                        // Additionally include status_list.{idx,uri} per IETF draft-ietf-oauth-status-list
+                        // as required by ETSI §5.2.10.1 ("may contain the status_list member") and expected
+                        // by verifiers that implement the oauth-status-list spec directly.
                         cleanItem == "status" -> putJsonObject("status") {
                             put("type", "TokenStatusList")
                             put("purpose", "revocation")
                             put("index", 0)
-                            put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt")
+                            put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                            putJsonObject("status_list") {
+                                put("idx", 0)
+                                put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                            }
                         }
                         cleanItem == "cnf" -> {
                             putJsonObject("cnf") {
@@ -337,15 +421,101 @@ object SdJwtVcGenerator {
             }
 
             // QEAA-5.2.10.2-01 / PuB-EAA-5.2.10.3-01: QEAA/PuBEAA SHALL include status when shortLived is absent.
-            // Add a minimal valid status object if neither status nor shortLived is present.
+            // Add a valid status object (ETSI members + IETF status_list) if neither status nor shortLived is present.
             if ((isQeaa || isPubEaa) && !existingKeys.contains("status") && !existingKeys.contains("shortLived") && !testCase.isShortLived) {
                 putJsonObject("status") {
                     put("type", "TokenStatusList")
                     put("purpose", "revocation")
                     put("index", 0)
-                    put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt")
+                    put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                    putJsonObject("status_list") {
+                        put("idx", 0)
+                        put("uri", "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.jwt")
+                    }
                 }
                 existingKeys.add("status")
+            }
+
+            // QEAA-4.2.6.7-01 / PuB-EAA-4.2.6.8-01: a QEAA/PuBEAA SHALL include either the EAA
+            // subject identifier (sub) or a pseudonym (also_known_as). Add `sub` when neither is
+            // already present (pseudonym test cases set also_known_as below / above).
+            if ((isQeaa || isPubEaa) && !existingKeys.contains("sub") &&
+                !existingKeys.contains("also_known_as") && !testCase.isPseudonym
+            ) {
+                put("sub", "did:example:holder123")
+                existingKeys.add("sub")
+            }
+
+            // EAA-5.2.3 (jti / EAA identifier): include a unique identifier for QEAA/PuBEAA.
+            // Spec marks it optional ("may"), but conformance validators expect it for QEAA/PuBEAA.
+            if ((isQeaa || isPubEaa) && !existingKeys.contains("jti")) {
+                put("jti", "urn:uuid:${randomUUIDString()}")
+                existingKeys.add("jti")
+            }
+
+            // QEAA-5.2.4.2-01/-02/-03 & PuB-EAA-5.2.4.3-01/-02/-03: the issuer identity triple
+            // (issuing_authority, issuing_country, iss_reg_id) SHALL be present in the payload when
+            // the credential does NOT incorporate a *qualified* certificate that carries them
+            // (EAA-5.2.4.1-03/-07/-11 only allow omission with a qualified cert).
+            // The current Plugtest certificate is NOT qualified (no qcStatements), so a QEAA/PuBEAA
+            // MUST carry all three. BOSA flags the missing issuing_country specifically:
+            //   "'issuing_country' is required when no qualified certificate provides the issuer country".
+            if ((isQeaa || isPubEaa) && !issuerCertQualified) {
+                if (!existingKeys.contains("issuing_authority")) {
+                    put("issuing_authority", "ETSI Test Authority")
+                    existingKeys.add("issuing_authority")
+                }
+                if (!existingKeys.contains("issuing_country")) {
+                    put("issuing_country", "AT")
+                    existingKeys.add("issuing_country")
+                }
+                if (!existingKeys.contains("iss_reg_id")) {
+                    put("iss_reg_id", "VATAT-U12345678")
+                    existingKeys.add("iss_reg_id")
+                }
+            }
+
+            // Per-vct schema-required claims (ETSI plugtest Type Metadata / JSON Schemas):
+            //   PID (urn:eudi:pid:1):                 issuing_authority, issuing_country, expiry_date, given_name, family_name
+            //   Medical License (…:medical_license:1): + license_number, profession
+            //   Birth Certificate (…:birth_certificate:1): + date_of_birth, place_of_birth{locality,country}, parents[…]
+            // given_name/family_name are already set above. We add the remaining required claims so
+            // the issued credential validates against its own published schema.
+            fun putIfAbsent(key: String, value: JsonElement) {
+                if (!existingKeys.contains(key)) { put(key, value); existingKeys.add(key) }
+            }
+
+            // Common to all three schemas: issuing_authority, issuing_country (ISO 3166-1 alpha-2),
+            // expiry_date (RFC 3339 full-date). issuing_authority/country may already be present.
+            putIfAbsent("issuing_authority", JsonPrimitive("ETSI Test Authority"))
+            putIfAbsent("issuing_country", JsonPrimitive("AT"))
+            putIfAbsent("expiry_date", JsonPrimitive("2030-01-01"))
+
+            when (vct) {
+                VCT_MEDICAL_LICENSE -> {
+                    putIfAbsent("license_number", JsonPrimitive("ML-123456"))
+                    putIfAbsent("profession", JsonPrimitive("Physician"))
+                }
+                VCT_BIRTH_CERTIFICATE -> {
+                    putIfAbsent("date_of_birth", JsonPrimitive("1990-01-15"))
+                    putIfAbsent("place_of_birth", buildJsonObject {
+                        put("locality", "Vienna")
+                        put("country", "AT")
+                    })
+                    putIfAbsent("parents", buildJsonArray {
+                        add(buildJsonObject {
+                            put("relation", "mother")
+                            put("given_name", "Maria")
+                            put("family_name", "Mustermann")
+                        })
+                        add(buildJsonObject {
+                            put("relation", "father")
+                            put("given_name", "Martin")
+                            put("family_name", "Mustermann")
+                        })
+                    })
+                }
+                // VCT_PID: only the common required claims (already added above).
             }
         }
     }
@@ -357,6 +527,68 @@ object SdJwtVcGenerator {
 
         val sdFields = mutableMapOf<String, SDField>()
 
+        // EAA-9 / EAA-12: array-element SD (each element of an array is individually disclosable)
+        // The payload must contain an array-valued claim. We use `nationalities` for this.
+        // Per RFC 9901 §4.2.2, the array in the JWT contains {"...":"<digest>"} placeholders.
+        // SDField with arrayChildren.wildcard=SDField(sd=true) achieves this.
+        if (testCase.hasArrayElementSd && !testCase.hasRecursiveSd) {
+            // EAA-9: non-recursive array element SD (sd the nationalities array elements)
+            if (payload.containsKey("nationalities")) {
+                sdFields["nationalities"] = SDField(
+                    sd = false,  // the claim itself is not hidden; its elements are
+                    arrayChildren = SDArray(wildcard = SDField(sd = true))
+                )
+            }
+            // Also include flat object SD for given_name/family_name as usual
+            listOf("given_name", "family_name").forEach { field ->
+                if (payload.containsKey(field)) sdFields[field] = SDField(true)
+            }
+            return SDMap(sdFields)
+        }
+
+        if (testCase.hasRecursiveSd && !testCase.hasArrayElementSd) {
+            // EAA-11: recursive object SD (sd the address object AND its sub-fields)
+            if (payload.containsKey("address")) {
+                val addrChildren = SDMap(mapOf(
+                    "street_address" to SDField(true),
+                    "locality" to SDField(true),
+                    "region" to SDField(true),
+                    "country" to SDField(true),
+                ))
+                sdFields["address"] = SDField(sd = true, children = addrChildren)
+            }
+            // Also include flat object SD for given_name/family_name
+            listOf("given_name", "family_name").forEach { field ->
+                if (payload.containsKey(field)) sdFields[field] = SDField(true)
+            }
+            return SDMap(sdFields)
+        }
+
+        if (testCase.hasRecursiveSd && testCase.hasArrayElementSd) {
+            // EAA-12/13: recursive array element SD (array of objects where sub-fields are also sd'd)
+            // Use nationalities array with element-level SD, plus address with recursive SD
+            if (payload.containsKey("nationalities")) {
+                sdFields["nationalities"] = SDField(
+                    sd = false,
+                    arrayChildren = SDArray(wildcard = SDField(sd = true))
+                )
+            }
+            if (payload.containsKey("address")) {
+                val addrChildren = SDMap(mapOf(
+                    "street_address" to SDField(true),
+                    "locality" to SDField(true),
+                    "region" to SDField(true),
+                    "country" to SDField(true),
+                ))
+                sdFields["address"] = SDField(sd = true, children = addrChildren)
+            }
+            listOf("given_name", "family_name").forEach { field ->
+                if (payload.containsKey(field)) sdFields[field] = SDField(true)
+            }
+            return SDMap(sdFields)
+        }
+
+        // Default: flat object-level SD (EAA-8, EAA-10, and all other SD test cases)
         val personalFields = listOf("given_name", "family_name", "birth_date", "address", "email", "phone")
         personalFields.forEach { field ->
             if (payload.containsKey(field)) {

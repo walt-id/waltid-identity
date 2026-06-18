@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.testing.E2ETest
 import id.walt.crypto.keys.KeyGenerationRequest
@@ -11,7 +10,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class KeysApi(private val e2e: E2ETest, private val client: HttpClient) {

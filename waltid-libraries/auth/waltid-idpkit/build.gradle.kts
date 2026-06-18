@@ -28,7 +28,7 @@ dependencies {
     // JSON
     implementation(identityLibs.kotlinx.serialization.json)
     implementation(identityLibs.kotlinx.datetime)
-    implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+    implementation(identityLibs.jsonpathkt)
 
     // OIDC
     implementation(identityLibs.nimbus.jose.jwt)

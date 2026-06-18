@@ -15,7 +15,6 @@ services:
       - .env
     extra_hosts:
       - "$SERVICE_HOST:host-gateway"
-      - "waltid.enterprise.localhost:host-gateway"
     volumes:
       - ./wallet-api/config:/waltid-wallet-api/config
       - ./wallet-api/data:/waltid-wallet-api/data
@@ -31,8 +30,26 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
     volumes:
       - ./issuer-api/config:/waltid-issuer-api/config
+
+  issuer-api2:
+    image: ${IMAGE_PREFIX}waltid/issuer-api2:${VERSION_TAG:-latest}
+    profiles:
+      - services
+      - identity
+      - all
+    pull_policy: missing
+    depends_on:
+      - caddy
+    env_file:
+      - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
+    volumes:
+      - ./issuer-api2/config:/waltid-issuer-api2/config
 
   verifier-api:
     image: ${IMAGE_PREFIX}waltid/verifier-api:${VERSION_TAG:-latest}
@@ -45,6 +62,8 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
     volumes:
       - ./verifier-api/config:/waltid-verifier-api/config
     environment:
@@ -61,6 +80,8 @@ services:
       - caddy
     env_file:
       - .env
+    extra_hosts:
+      - "$SERVICE_HOST:host-gateway"
     volumes:
       - ./verifier-api2/config:/waltid-verifier-api2/config
 
@@ -78,6 +99,8 @@ services:
         condition: service_started
     env_file:
       - .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./wallet-api2/config:/waltid-wallet-api2/config
 
@@ -134,6 +157,7 @@ services:
       NEXT_PUBLIC_VC_REPO: "http://$SERVICE_HOST:$VC_REPO_PORT"
       NEXT_PUBLIC_ISSUER: "http://$SERVICE_HOST:$ISSUER_API_PORT"
       NEXT_PUBLIC_VERIFIER: "http://$SERVICE_HOST:$VERIFIER_API_PORT"
+      NEXT_PUBLIC_VERIFIER2: "http://$SERVICE_HOST:$VERIFIER_API2_PORT"
       NEXT_PUBLIC_WALLET: "http://$SERVICE_HOST:$DEMO_WALLET_FRONTEND_PORT"
       PORT: $WEB_PORTAL_PORT
 
@@ -255,6 +279,11 @@ services:
 
       - target: "$ISSUER_API_PORT"
         published: $ISSUER_API_PORT # issuer-api
+        protocol: tcp
+        mode: host
+
+      - target: "$ISSUER_API2_PORT"
+        published: $ISSUER_API2_PORT # issuer-api2
         protocol: tcp
         mode: host
 

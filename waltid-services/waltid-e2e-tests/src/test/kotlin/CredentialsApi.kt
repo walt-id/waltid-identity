@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.testing.E2ETest
 import id.walt.webwallet.db.models.WalletCredential
@@ -12,7 +11,6 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.Assertions.assertTrue
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CredentialsApi(private val e2e: E2ETest, private val client: HttpClient) {

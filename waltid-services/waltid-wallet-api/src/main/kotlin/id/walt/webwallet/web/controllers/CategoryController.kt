@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers
 
@@ -9,7 +8,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.util.*
-import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.categories() = walletRoute {
     route("categories", {

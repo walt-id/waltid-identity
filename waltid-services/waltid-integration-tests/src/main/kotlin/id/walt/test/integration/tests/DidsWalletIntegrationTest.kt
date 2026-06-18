@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.tests
 
@@ -14,7 +13,6 @@ import org.junit.jupiter.api.MethodOrderer.OrderAnnotation
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 
 @TestMethodOrder(OrderAnnotation::class)
 class DidsWalletIntegrationTest : AbstractIntegrationTest() {

@@ -18,11 +18,10 @@ import id.walt.credentials.signatures.SdJwtCredentialSignature
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
 import id.walt.credentials.utils.JwtUtils
 import id.walt.credentials.utils.JwtUtils.isJwt
-import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
-import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.appendArrayIndex
 import id.walt.credentials.utils.SdJwtUtils.appendClaimName
-import id.walt.credentials.utils.SdJwtUtils.parseSdLocationToClaimPath
+import id.walt.credentials.utils.SdJwtUtils.dropDollarPrefix
+import id.walt.credentials.utils.SdJwtUtils.getSdArrays
 import id.walt.credentials.utils.SdJwtUtils.parseDisclosureString
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -93,6 +92,63 @@ object CredentialParser {
         data["credentialSubject"].getItAsStringOrId() ?: data["vc"]?.jsonObject?.get("credentialSubject")?.getItAsStringOrId()
 
     fun getJwtHeaderOrDataSubject(data: JsonObject) = data.getString("sub") ?: getCredentialDataSubject(data)
+
+    /**
+     * Converts an SD-JWT (VC) encoded using the JWS JSON Serialization (RFC 9901 §8) (either the
+     * Flattened or the General form) into the SD-JWT Compact Serialization, or returns `null` if
+     * [credential] is not a JWS JSON serialized SD-JWT.
+     *
+     * Per RFC 9901 §8.1, the compact form is built by concatenating the `protected` header, the
+     * `payload`, and the `signature` of the JWS with `.`, followed by each Disclosure from the
+     * `disclosures` member of the unprotected header (each prefixed with `~`), and finally the
+     * `kb_jwt` (if present) prefixed with `~`.
+     *
+     * Supporting this format is OPTIONAL per the spec, but issuers MAY use it (SD-JWT VC §2.2), so a
+     * conformant verifier should accept it.
+     *
+     * Flattened: `{ "payload", "protected", "header": { "disclosures": [...], "kb_jwt"? }, "signature" }`
+     * General:   `{ "payload", "signatures": [ { "protected", "header"?, "signature" } ] }`
+     */
+    private fun jwsJsonToCompactSdJwtOrNull(credential: String): String? {
+        if (!credential.startsWith("{")) return null
+
+        val json = runCatching { Json.decodeFromString<JsonObject>(credential) }.getOrNull() ?: return null
+        val payload = (json["payload"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+
+        // Resolve the signature object: Flattened has protected/signature at top level; General nests
+        // them in signatures[0]. The disclosures (and optional kb_jwt) live in the unprotected header.
+        val (protectedHeader, signature, unprotectedHeader) = when {
+            json.containsKey("signatures") -> {
+                val sig = (json["signatures"] as? JsonArray)?.firstOrNull()?.jsonObject ?: return null
+                Triple(
+                    (sig["protected"] as? JsonPrimitive)?.content,
+                    (sig["signature"] as? JsonPrimitive)?.content,
+                    sig["header"] as? JsonObject
+                )
+            }
+
+            json.containsKey("protected") || json.containsKey("signature") -> Triple(
+                (json["protected"] as? JsonPrimitive)?.content,
+                (json["signature"] as? JsonPrimitive)?.content,
+                json["header"] as? JsonObject
+            )
+
+            else -> return null
+        }
+        if (protectedHeader == null || signature == null) return null
+
+        val disclosures = (unprotectedHeader?.get("disclosures") as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
+            ?: emptyList()
+        val kbJwt = (unprotectedHeader?.get("kb_jwt") as? JsonPrimitive)?.content
+
+        return buildString {
+            append(protectedHeader).append('.').append(payload).append('.').append(signature)
+            disclosures.forEach { append('~').append(it) }
+            // RFC 9901 §4: a presentation without a KB-JWT ends with a trailing '~'.
+            if (kbJwt != null) append('~').append(kbJwt) else if (disclosures.isNotEmpty()) append('~')
+        }
+    }
 
     suspend fun handleMdocs(credential: String, base64: Boolean = false): Pair<CredentialDetectionResult, MdocsCredential> {
         log.trace { "Handle mdocs, string: $credential" }
@@ -254,12 +310,6 @@ object CredentialParser {
             // object (per SD-JWT VC §4.6.1; relative to the credential root).
             val hashesToVerify = ArrayDeque<Pair<List<JsonElement>, String>>()
 
-            // 1. Initial population from the main payload
-            containedDisclosables.entries.forEach { (sdLocation, disclosureHashes) ->
-                val basePath = parseSdLocationToClaimPath(sdLocation)
-                disclosureHashes.forEach { hash -> hashesToVerify.add(basePath to hash) }
-            }
-
             fun findForHash(hash: String) =
                 /* asHashedFromEncoded() hashes the exact original base64url wire bytes (RFC 9901 §4.2)
                  - the most reliable match as it is independent of any JSON re-serialization.
@@ -306,6 +356,13 @@ object CredentialParser {
                 }
             }
 
+            // 1. Initial population from the credential-root payload, using the
+            // identification logic in scanForHashes (RFC 9901 §7.1 step 3.b). For W3C JWT-VCs that
+            // embed the credential under a `vc` claim, scan that wrapper's content so Claim Paths
+            // stay relative to the credential root (mirrors parseSdLocationToClaimPath's vc handling).
+            val credentialRoot = (payload["vc"] as? JsonObject) ?: payload
+            scanForHashes(credentialRoot, emptyList())
+
             // 2. Process the queue until all nested hashes are resolved
             while (hashesToVerify.isNotEmpty()) {
                 val (basePath, hash) = hashesToVerify.removeFirst()
@@ -347,8 +404,8 @@ object CredentialParser {
             if (availableDisclosures.size != mappedDisclosures.size) {
                 throw UnreachableDisclosuresException(
                     "Invalid disclosures: ${availableDisclosures.size} disclosures provided but " +
-                    "only ${mappedDisclosures.size} are reachable from the payload hashes. " +
-                    "Per RFC 9901 §7.1 step 5 this SD-JWT MUST be rejected."
+                            "only ${mappedDisclosures.size} are reachable from the payload hashes. " +
+                            "Per RFC 9901 §7.1 step 5 this SD-JWT MUST be rejected."
                 )
             }
             availableDisclosures = mappedDisclosures.toList()
@@ -476,14 +533,36 @@ object CredentialParser {
                         }
                         detectedSdjwtSigned(CredentialPrimaryDataType.W3C, w3cModelVersion) to w3cCredential
                     } else {
-                        throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+                        throw NotImplementedError(unknownSdJwtReason(header, payload) + " Credential: $credential")
                     }
                 }
             }
 
             else -> {
-                throw NotImplementedError("Unknown SD-JWT-signed credential: $credential")
+                throw NotImplementedError(unknownSdJwtReason(header, payload) + " Credential: $credential")
             }
+        }
+    }
+
+    /**
+     * Builds a human-readable reason explaining why an SD-JWT-signed credential could not be
+     * classified into a known credential type (SD-JWT VC or W3C VC). The token is signature-bearing
+     * SD-JWT, but its payload lacks the markers needed to identify what it is.
+     */
+    private fun unknownSdJwtReason(header: JsonObject, payload: JsonObject): String {
+        val typ = header["typ"]?.jsonPrimitive?.contentOrNull
+        val looksLikeSdJwtVc = typ == "dc+sd-jwt" || typ == "vc+sd-jwt" || typ == "vc+sd_jwt"
+        return when {
+            // Clearly intended as an SD-JWT VC (by typ) but missing the mandatory vct claim.
+            looksLikeSdJwtVc && !payload.containsKey("vct") ->
+                "Unknown SD-JWT-signed credential: typ is '$typ' (SD-JWT VC) but the mandatory 'vct' claim is missing (SD-JWT VC requires 'vct')."
+
+            // No vct, no @context, no vc wrapper -> cannot be classified as SD-JWT VC or W3C VC.
+            !payload.containsKey("vct") && !payload.containsKey("@context") && !payload.containsKey("vc") ->
+                "Unknown SD-JWT-signed credential: payload has neither a 'vct' claim (SD-JWT VC) nor '@context'/'vc' (W3C VC), so the credential type cannot be determined.${typ?.let { " (typ='$it')" } ?: ""}."
+
+            else ->
+                "Unknown SD-JWT-signed credential: could not determine the credential type from the payload${typ?.let { " (typ='$it')" } ?: ""}."
         }
     }
 
@@ -491,6 +570,13 @@ object CredentialParser {
 
     suspend fun detectAndParse(rawCredential: String): Pair<CredentialDetectionResult, DigitalCredential> {
         val credential = rawCredential.trim()
+
+        // SD-JWT VC may be encoded using the JWS JSON Serialization (RFC 9901 §8), which is a valid
+        // but OPTIONAL format (SD-JWT VC draft §2.2). Detect it and convert to the compact form
+        // (header.payload.signature~disclosure...~kb_jwt) so the rest of the pipeline can parse it.
+        jwsJsonToCompactSdJwtOrNull(credential)?.let { compact ->
+            return detectAndParse(compact)
+        }
 
         return when {
             credential.startsWith("{") -> {

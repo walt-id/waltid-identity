@@ -1,9 +1,7 @@
 package id.walt.commons.events
 
 import kotlinx.serialization.Serializable
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 @Serializable
 class IssuanceWalletEvent(
     override val originator: String? = null,

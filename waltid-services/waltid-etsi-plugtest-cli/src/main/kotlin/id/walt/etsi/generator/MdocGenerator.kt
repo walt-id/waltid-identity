@@ -17,6 +17,7 @@ import id.walt.mdoc.schema.MdocsSchemaMappingFunction.jsonToCborElement
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.CborElement
+import kotlinx.serialization.cbor.CborByteString
 import kotlinx.serialization.encodeToByteArray
 import kotlinx.serialization.json.*
 
@@ -32,17 +33,45 @@ object MdocGenerator {
         val issuerSigned: IssuerSigned
     )
 
+    /**
+     * Placeholder value for binary mDL elements (e.g. `portrait`). The actual bytes are irrelevant
+     * for the plugtest; what matters is that the element is encoded as a CBOR byte string (bstr),
+     * as required by ISO/IEC 18013-5 §7.2.1. Encoded as a JSON array of byte values so it can be
+     * carried in the namespace [JsonObject] and converted to a `bstr` by [defaultValueMappingFunction].
+     */
+    private val PORTRAIT_PLACEHOLDER: JsonArray = buildJsonArray {
+        // Minimal JPEG SOI/EOI marker bytes (0xFF 0xD8 ... 0xFF 0xD9) as a stand-in image.
+        listOf(0xFF, 0xD8, 0xFF, 0xD9).forEach { add(JsonPrimitive(it)) }
+    }
+
+    /**
+     * mDL/mdoc data elements that ISO/IEC 18013-5 / 23220 define as CBOR byte strings (bstr) and
+     * must therefore be encoded as such (not as text strings). Encoded from a JSON array of byte
+     * values when present, otherwise from the UTF-8 bytes of a text placeholder.
+     */
+    private val BINARY_ELEMENTS = setOf("portrait", "fingerprint", "signature_usual_mark", "biometric_template_face")
+
     private val defaultValueMappingFunction: (docType: String, namespace: String, elementIdentifier: String, elementValueJson: JsonElement) -> CborElement? =
-        { _, _, _, elementValueJson ->
-            elementValueJson.jsonToCborElement()
+        { _, _, elementIdentifier, elementValueJson ->
+            if (elementIdentifier in BINARY_ELEMENTS) {
+                // ISO 18013-5 §7.2.1: encode as a CBOR byte string (bstr).
+                val bytes = when (elementValueJson) {
+                    is JsonArray -> elementValueJson.map { it.jsonPrimitive.int.toByte() }.toByteArray()
+                    is JsonPrimitive -> elementValueJson.content.encodeToByteArray()
+                    else -> ByteArray(0)
+                }
+                CborByteString(bytes)
+            } else {
+                elementValueJson.jsonToCborElement()
+            }
         }
 
     /**
      * Generates an mdoc in IssuerSigned format as required by ETSI plugtest.
-     * 
+     *
      * Per the test case notes:
      * "ISO-mdoc QEAA shall be an instance of IssuerSigned type as per section 10.3.3 of ISO 18013-5, clause 8.3.2.1.2.2"
-     * 
+     *
      * This means we output just the IssuerSigned structure, NOT the full Document wrapper.
      */
     suspend fun generate(
@@ -83,12 +112,23 @@ object MdocGenerator {
             (testCase.id.contains("-9") && testCase.id.startsWith("MDOC-EAA")) ||
             (isQeaaOrPubEaa && !testCase.isShortLived)
         val msoStatus: Status? = if (requiresStatus) {
-            Status(identifierList = Status.IdentifierListInfo(
-                id = testCase.id,
-                uri = UniformResourceIdentifier(
-                    "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
+            val statusUri = "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/identifier-list.cwt"
+            // Emit BOTH status shapes so the broadest set of conformance validators accept it:
+            //  - ETSI TS 119 472-1 §5.2.10.1 flat members (type/purpose/index/uri): some validators
+            //    (e.g. IGRAN) expect these directly in the MSO status.
+            //  - IETF Token Status List nested `status_list` member {idx, uri} (EAA-6.2.10.1-03,
+            //    clause 6.3 of draft-ietf-oauth-status-list): some validators (e.g. BOSA) require it.
+            // ETSI EAA-6.2.10.1-12 permits additional members, so both may coexist.
+            Status(
+                type = "TokenStatusList",
+                purpose = "revocation",
+                index = 0,
+                uri = UniformResourceIdentifier(statusUri),
+                statusList = Status.StatusListInfo(
+                    index = 0u,
+                    uri = UniformResourceIdentifier(statusUri),
                 )
-            ))
+            )
         } else null
 
         // QEAA-6.6.2-02 / PuB-EAA-6.6.3-02: the CB-AdES protected header of an ISO-mdoc QEAA/PuB-EAA
@@ -153,29 +193,40 @@ object MdocGenerator {
         return when {
             // mDL uses a single ISO 18013-5 namespace
             docType == "org.iso.18013.5.1.mDL" -> {
+                // Base mandatory data elements. `portrait` is encoded as a CBOR byte string (bstr)
+                // by the value-mapping function (ISO 18013-5 §7.2.1 requires portrait to be a bstr),
+                // so a non-empty placeholder is used here. issue_date (2024) must be strictly before
+                // expiry_date (2034); birth_date is a distinct date — none may be clobbered below.
+                val baseKeys = mutableSetOf(
+                    "family_name", "given_name", "birth_date", "issue_date", "expiry_date",
+                    "issuing_country", "issuing_authority", "document_number", "portrait",
+                    "driving_privileges", "un_distinguishing_sign"
+                )
                 val ns = buildJsonObject {
                     put("family_name", "Mustermann")
                     put("given_name", "Max")
                     put("birth_date", "1990-01-15")
                     put("issue_date", "2024-01-01")
                     put("expiry_date", "2034-01-01")
-                    put("issuing_country", "DE")
+                    put("issuing_country", "AT")
                     put("issuing_authority", "Test Authority")
                     put("document_number", "DOC123456789")
-                    put("portrait", "")
+                    // Placeholder JPEG-ish bytes; mapped to a CBOR bstr (see portraitByteElements).
+                    put("portrait", PORTRAIT_PLACEHOLDER)
                     put("driving_privileges", "")
-                    put("distinguishing_sign", "DE")
+                    put("un_distinguishing_sign", "A")
 
-                    // Extra optional elements from the test case description
+                    // Extra optional elements from the test case description (only if NOT already set,
+                    // tracked via baseKeys so mandatory values like expiry_date are never overwritten).
                     val namespaceSection = testCase.getNamespace()
                     namespaceSection?.items?.forEach { item ->
                         val cleanItem = item.trim().split(" ").first().split("(").first()
                         if (cleanItem.isNotBlank() && !cleanItem.contains("namespace", ignoreCase = true) &&
-                            !cleanItem.contains("namespaces", ignoreCase = true) &&
-                            !this@buildJsonObject.toString().contains("\"$cleanItem\"")) {
+                            cleanItem !in baseKeys) {
+                            baseKeys.add(cleanItem)
                             when {
                                 cleanItem.contains("date", ignoreCase = true) -> put(cleanItem, "2024-01-01")
-                                cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "DE")
+                                cleanItem.contains("country", ignoreCase = true) -> put(cleanItem, "AT")
                                 cleanItem.contains("authority", ignoreCase = true) -> put(cleanItem, "Test Authority")
                                 cleanItem.contains("number", ignoreCase = true) -> put(cleanItem, "123456789")
                                 cleanItem.contains("name", ignoreCase = true) -> put(cleanItem, "Test Name")
@@ -196,7 +247,7 @@ object MdocGenerator {
                     put("birth_date", "1990-01-15")
                     put("issue_date", "2024-01-01")
                     put("expiry_date", "2034-01-01")
-                    put("issuing_country", "DE")
+                    put("issuing_country", "AT")
                     // ISO 23220-2 requires the unicode variant for issuing_authority
                     put("issuing_authority_unicode", "Test Authority")
                     put("document_number", "DOC123456789")

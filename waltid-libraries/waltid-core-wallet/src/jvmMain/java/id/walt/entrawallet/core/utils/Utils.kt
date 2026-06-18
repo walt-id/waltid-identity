@@ -6,8 +6,6 @@ import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.util.Base64
 import java.util.BitSet
-
-@OptIn(ExperimentalStdlibApi::class)
 object StringUtils {
     fun hexToInt(hex: String) = hex.removePrefix("0x").hexToInt()
     fun hexToByteArray(hex: String) = hex.removePrefix("0x").hexToByteArray()

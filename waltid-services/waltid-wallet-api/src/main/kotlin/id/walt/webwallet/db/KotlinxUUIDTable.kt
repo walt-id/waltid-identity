@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.db
 
@@ -7,7 +6,6 @@ import org.jetbrains.exposed.v1.core.ColumnType
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.vendors.currentDialect
 import java.nio.ByteBuffer
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
@@ -20,8 +18,7 @@ import kotlin.uuid.toKotlinUuid
 // * @param columnName for a primary key column, `"id"` by default.
 // * @param random is used to generate unique Uuids.
 // */
-//@OptIn(ExperimentalUuidApi::class)
-//public open class KotlinxUuidTable(
+////public open class KotlinxUuidTable(
 //    name: String = "",
 //    columnName: String = "id",
 //) : IdTable<CompositeID>(name) {

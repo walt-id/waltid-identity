@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.environment
 
@@ -33,7 +32,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 val defaultTestTimeout = 5.minutes

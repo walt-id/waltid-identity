@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.event
 
@@ -17,9 +16,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 class EventFilterUseCaseTest {
     private val eventServiceMock = mockk<EventService>()
     private val issuerNameResolutionMock = mockk<EntityNameResolutionUseCase>()

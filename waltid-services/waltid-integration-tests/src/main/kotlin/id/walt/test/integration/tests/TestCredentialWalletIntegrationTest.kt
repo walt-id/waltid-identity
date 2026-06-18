@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.tests
 
@@ -21,7 +20,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Test
 import kotlin.test.*
-import kotlin.uuid.ExperimentalUuidApi
 
 
 class TestOpenIdCredentialWalletIntegrationTest : AbstractIntegrationTest() {

@@ -15,7 +15,7 @@ api:
 pvc:
   dataVolumeClaim:
     accessMode: ReadWriteOnce
-    storageClass: azure-managed-standardssd-retain
+    storageClass: gp3-retain
     storageRequest: 1Gi
 
 walletConfig:
@@ -89,4 +89,4 @@ web:
       imagePullPolicy: Always
 
 ingress:
-  ingressClassName: "nginx"
+  ingressClassName: "traefik"

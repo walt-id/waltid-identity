@@ -8,25 +8,25 @@ group = "id.walt"
 dependencies {
     // Auth methods
     // Core Web3j library
-    implementation("org.web3j:core:5.0.2")
+    implementation(identityLibs.web3j.core)
 
     // Optional: Web3j utils
-    implementation("org.web3j:utils:5.0.2")
+    implementation(identityLibs.web3j.utils)
 
 
     // RADIUS
-    implementation("org.aaa4j.radius:aaa4j-radius-client:0.4.0")
+    implementation(identityLibs.aaa4j.radius)
 
     // LDAP
-    implementation("org.apache.directory.api:apache-ldap-api:2.1.7") {
+    implementation(identityLibs.apache.ldap.api) {
         exclude("org.apache.mina:mina-core") // Manually updated due to security CVE
         exclude("org.apache.commons:commons-lang3") // Manually updated due to security CVE
     }
-    implementation("org.apache.mina:mina-core:2.2.6")
-    implementation("org.apache.commons:commons-lang3:3.20.0")
+    implementation(identityLibs.mina.core)
+    implementation(identityLibs.commons.lang3)
 
     // TOTP/HOTP
-    implementation("com.atlassian:onetime:2.2.0")
+    implementation(identityLibs.onetime)
 
     // JWT
     implementation(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -83,7 +83,7 @@ dependencies {
 
     // Redis
     //implementation("eu.vendeli:rethis:0.3.3")
-    implementation("io.github.domgew:kedis:0.0.12")
+    implementation(identityLibs.kedis)
 
     /* --- Testing --- */
     testImplementation(identityLibs.ktor.client.logging)
@@ -95,6 +95,34 @@ dependencies {
 
     // Kotlin
     testImplementation(kotlin("test"))
+}
+
+// Force-pin vulnerable transitive dependencies.
+//
+// web3j:core → tools.jackson.core:jackson-core:3.1.0
+//   SNYK-JAVA-TOOLSJACKSONCORE-15907550 (CWE-770, CVSS 8.7) — fixed in 3.1.1
+//
+// web3j:core / ktor-openapi → com.fasterxml.jackson.core:jackson-core
+//   SNYK-JAVA-COMFASTERXMLJACKSONCORE-15365924 (CWE-770) — fixed in 2.18.6; pin to latest
+//
+// web3j:core → org.bouncycastle:bcprov-jdk18on:1.80
+//   CWE-327 (broken crypto, CVSS 8.7), CWE-1240 (timing attack), CWE-90 (LDAP injection)
+//   Snyk said "no supported fix" at 1.80; 1.84 is now available
+//
+// ktor-openapi → io.netty (4.2.x branch):
+//   CVE-2026-42583 (CWE-770, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
+//   CVE-2026-42587 (CWE-409, CVSS 8.7) — netty-codec-compression, fixed in 4.2.13.Final
+//   CVE-2026-42577 (CWE-772, CVSS 8.7) — netty-transport-classes-epoll, fixed in 4.2.13.Final
+//   HTTP request smuggling (CWE-444, CVSS 8.8) — netty-codec-http, fixed in 4.2.13.Final
+configurations.all {
+    resolutionStrategy.force(
+        identityLibs.jackson.core.tools,
+        identityLibs.jackson.core,
+        identityLibs.bcprov.jdk18on,
+        identityLibs.netty.codec.compression,
+        identityLibs.netty.codec.http.v2,
+        identityLibs.netty.transport.classes.epoll,
+    )
 }
 
 mavenPublishing {

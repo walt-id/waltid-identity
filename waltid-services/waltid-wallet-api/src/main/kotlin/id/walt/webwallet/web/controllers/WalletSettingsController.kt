@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers
 
@@ -12,7 +11,6 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import kotlinx.serialization.json.JsonObject
-import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.settings() = walletRoute {
     route("settings", {

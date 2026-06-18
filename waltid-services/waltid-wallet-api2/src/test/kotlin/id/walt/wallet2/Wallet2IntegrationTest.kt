@@ -13,6 +13,7 @@ import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletDidEntry
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.http.Url
 import kotlin.test.Test
@@ -66,6 +67,15 @@ class Wallet2IntegrationTest {
                 assertEquals(1, info.credentialStoreCount)
                 assertTrue(info.hasDidStore)
                 info
+            }
+
+            // 2b. List wallets
+            testAndReturn("List wallets") {
+                val ids = http.get("/wallet")
+                    .also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
+                    .body<List<String>>()
+                assertTrue(ids.contains(walletId), "Created wallet $walletId should be listed, got $ids")
+                ids
             }
 
             // 3. Generate a key

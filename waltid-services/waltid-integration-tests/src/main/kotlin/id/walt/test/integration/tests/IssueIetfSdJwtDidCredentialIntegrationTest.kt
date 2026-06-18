@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.tests
 
@@ -19,7 +18,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
-import kotlin.uuid.ExperimentalUuidApi
 
 private val credentialIetfSdJwtDidIssuanceRequest = IssuanceRequest(
     issuerKey = loadJsonResource("issuance/key.json"),

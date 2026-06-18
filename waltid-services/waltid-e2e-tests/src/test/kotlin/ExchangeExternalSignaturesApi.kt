@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
@@ -55,10 +54,8 @@ import kotlin.io.encoding.Base64
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class ExchangeExternalSignatures(private val e2e: E2ETest) {
 
     private var client: HttpClient
