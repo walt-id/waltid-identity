@@ -126,7 +126,7 @@ class BuildProviderConfigurationTest {
         )
 
         val provider = buildOAuth2Provider(config)
-        val result = provider.createAuthorizationRequest(emptyMap<String, List<String>>())
+        val result = provider.createAuthorizationRequest(emptyMap())
         assertTrue(result is AuthorizationRequestResult.Failure)
         assertEquals("invalid_client", result.error.error)
     }
