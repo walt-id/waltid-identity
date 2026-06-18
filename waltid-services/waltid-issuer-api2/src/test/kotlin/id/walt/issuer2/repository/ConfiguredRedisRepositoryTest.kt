@@ -12,6 +12,7 @@ import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
+import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
@@ -36,10 +37,12 @@ class ConfiguredRedisRepositoryTest {
         val sessionRepository = ConfiguredIssuanceSessionRepository()
         val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
         val preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
+        val parRepository = ConfiguredPARRepository()
 
         val session = testSession(suffix)
         val authorizationCode = testAuthorizationCode(suffix)
         val preAuthorizedCode = testPreAuthorizedCode(suffix)
+        val pushedAuthorizationRequest = testPushedAuthorizationRequest(suffix)
 
         try {
             sessionRepository.save(session)
@@ -53,10 +56,18 @@ class ConfiguredRedisRepositoryTest {
             assertEquals(preAuthorizedCode, preAuthorizedCodeRepository.get(preAuthorizedCode.code))
             assertEquals(preAuthorizedCode, preAuthorizedCodeRepository.consume(preAuthorizedCode.code))
             assertNull(preAuthorizedCodeRepository.get(preAuthorizedCode.code))
+
+            parRepository.save(pushedAuthorizationRequest)
+            assertEquals(
+                pushedAuthorizationRequest,
+                parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now()),
+            )
+            assertNull(parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now()))
         } finally {
             sessionRepository.remove(session.sessionId)
             authorizationCodeRepository.consume(authorizationCode.code)
             preAuthorizedCodeRepository.consume(preAuthorizedCode.code)
+            parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now())
         }
     }
 
@@ -121,4 +132,19 @@ class ConfiguredRedisRepositoryTest {
         credentialNonceExpiresAt = Clock.System.now().plus(5.minutes),
         issuanceSessionId = "redis-session-$suffix",
     )
+
+    private fun testPushedAuthorizationRequest(suffix: String): DefaultPARRecord {
+        val now = Clock.System.now()
+        return DefaultPARRecord(
+            requestId = "redis-par-$suffix",
+            requestParameters = mapOf(
+                "client_id" to listOf("wallet-client"),
+                "response_type" to listOf("code"),
+                "redirect_uri" to listOf("https://wallet.example/callback"),
+                "scope" to listOf("openid"),
+            ),
+            createdAt = now,
+            expiresAt = now.plus(5.minutes),
+        )
+    }
 }
