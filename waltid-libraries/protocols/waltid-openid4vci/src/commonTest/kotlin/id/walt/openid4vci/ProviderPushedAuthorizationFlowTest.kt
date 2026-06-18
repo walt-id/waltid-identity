@@ -4,8 +4,8 @@ import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.PushedAuthorizationConfig
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
-import id.walt.openid4vci.repository.par.PAREntry
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import kotlinx.coroutines.test.runTest
@@ -115,14 +115,45 @@ class ProviderPushedAuthorizationFlowTest {
     }
 
     @Test
+    fun `provider rejects request_uri when PAR is not configured`() = runTest {
+        val provider = buildOAuth2Provider(createTestConfig())
+
+        val result = assertIs<AuthorizationRequestResult.Failure>(
+            provider.createAuthorizationRequest(
+                mapOf(
+                    "client_id" to listOf("demo-client"),
+                    "request_uri" to listOf("urn:ietf:params:oauth:request_uri:missing-config"),
+                )
+            )
+        )
+
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST_URI, result.error.error)
+    }
+
+    @Test
+    fun `provider returns server error when PAR endpoint is used without PAR configuration`() = runTest {
+        val provider = buildOAuth2Provider(createTestConfig())
+        val pushedRequest = assertIs<AuthorizationRequestResult.Success>(
+            provider.createPushedAuthorizationRequest(validPushedParameters())
+        ).request
+
+        val result = assertIs<PushedAuthorizationResponseResult.Failure>(
+            provider.createPushedAuthorizationResponse(pushedRequest)
+        )
+
+        assertEquals(OAuthErrorCodes.SERVER_ERROR, result.error.error)
+        assertEquals("Pushed authorization requests are not configured", result.error.description)
+    }
+
+    @Test
     fun `provider rejects expired request_uri`() = runTest {
         val repository = InMemoryPARRepository()
         val provider = buildParProvider(repository)
         val parameters = validPushedParameters(clientId = "expired-client")
         val now = Clock.System.now()
 
-        repository.store(
-            PAREntry(
+        repository.save(
+            DefaultPARRecord(
                 requestId = "expired-request",
                 requestParameters = parameters,
                 createdAt = now - 2.seconds,
