@@ -12,7 +12,6 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
 import id.walt.mdoc.dataelement.DataElement
-import id.walt.mdoc.dataelement.MapElement
 import id.walt.mdoc.dataelement.StringElement
 import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
@@ -112,9 +111,11 @@ class OpenId4VciProtocolService(
         } catch (e: Exception) {
             return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
         }
-        val internalAuthorizationRequest = resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
+        val internalAuthorizationRequest =
+            resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
 
-        val redirectUri = "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"
+        val redirectUri =
+            "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"
         return AuthorizationResponseHttp(
             status = 302,
             redirectUri = redirectUri,
@@ -213,7 +214,8 @@ class OpenId4VciProtocolService(
             is AccessTokenRequestResult.Failure -> return oauth2Provider.writeAccessTokenError(result.error)
         }.withIssuer(metadataService.issuerBaseUrl())
 
-        val (updatedAccessTokenRequest, response) = when (val result = oauth2Provider.createAccessTokenResponse(accessTokenRequest)) {
+        val (updatedAccessTokenRequest, response) = when (val result =
+            oauth2Provider.createAccessTokenResponse(accessTokenRequest)) {
             is AccessTokenResponseResult.Success -> result.request to result.response
 
             is AccessTokenResponseResult.Failure -> {
@@ -460,7 +462,7 @@ class OpenId4VciProtocolService(
 
         require(matches.isNotEmpty()) {
             "No credential configuration could be resolved from authorization_details or requested scopes: " +
-                authorizationRequest.requestedScopes
+                    authorizationRequest.requestedScopes
         }
         require(matches.size == 1) {
             "Ambiguous credential configuration for authorization request: $matches"
@@ -496,11 +498,13 @@ class OpenId4VciProtocolService(
 
     private fun JsonObject.toParametersMap(): Map<String, List<String>> =
         entries.associate { (key, value) ->
-            key to listOf(if (value is JsonPrimitive && value.isString) {
-                value.content
-            } else {
-                value.toString()
-            })
+            key to listOf(
+                if (value is JsonPrimitive && value.isString) {
+                    value.content
+                } else {
+                    value.toString()
+                }
+            )
         }
 
     private fun JsonObject.stringClaim(name: String): String? =
@@ -557,7 +561,7 @@ class OpenId4VciProtocolService(
 
     private fun String.toMDocCallbackHex(doctype: String?): String =
         runCatching {
-            val issuerSigned = IssuerSigned.fromMapElement(DataElement.fromCBOR<MapElement>(decodeFromBase64Url()))
+            val issuerSigned = IssuerSigned.fromMapElement(DataElement.fromCBOR(decodeFromBase64Url()))
             MDoc(
                 docType = StringElement(requireNotNull(doctype) { "Missing doctype for mDoc credential configuration" }),
                 issuerSigned = issuerSigned,
@@ -569,7 +573,7 @@ class OpenId4VciProtocolService(
 
     private fun Map<String, List<String>>.withInternalAuthorizationSession(sessionId: String): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER } +
-            (INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER to listOf(sessionId))
+                (INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER to listOf(sessionId))
 
     private fun Map<String, List<String>>.withoutInternalAuthorizationSession(): Map<String, List<String>> =
         filterKeys { it != INTERNAL_AUTHORIZATION_SESSION_ID_PARAMETER }
