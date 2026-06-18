@@ -15,7 +15,7 @@ import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 import io.ktor.http.Url
 import io.ktor.util.toMap
 import kotlinx.coroutines.runBlocking
@@ -39,8 +39,8 @@ class ProviderCredentialIssuanceTest {
         val accessTokenKey = KeyManager.resolveSerializedKey(
             KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1))
         )
-        val accessTokenService = JwtAccessTokenIssuer(resolver = { accessTokenKey })
-        val config = createTestConfig(accessTokenService = accessTokenService)
+        val accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey })
+        val config = createTestConfig(accessTokenIssuer = accessTokenIssuer)
 
         val provider = buildOAuth2Provider(config)
 

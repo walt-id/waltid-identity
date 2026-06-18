@@ -3,7 +3,7 @@ package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.StubTokenService
+import id.walt.openid4vci.StubTokenIssuer
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
 class PreAuthorizedCodeGrantHandlerTest {
 
     private val repository = InMemoryPreAuthorizedCodeRepository()
-    private val handler = PreAuthorizedCodeTokenEndpoint(repository, StubTokenService())
+    private val handler = PreAuthorizedCodeTokenEndpoint(repository, StubTokenIssuer())
     private val issuer = DefaultPreAuthorizedCodeIssuer(repository)
 
     @OptIn(ExperimentalCoroutinesApi::class)

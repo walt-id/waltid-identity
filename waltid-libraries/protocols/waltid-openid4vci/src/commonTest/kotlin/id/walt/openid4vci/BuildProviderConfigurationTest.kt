@@ -7,6 +7,7 @@ import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
@@ -39,7 +40,7 @@ class BuildProviderConfigurationTest {
         val provider = buildOAuth2Provider(config)
         assertIs<OAuth2Provider>(provider)
         assertEquals(1, config.authorizationEndpointHandlers.count())
-        assertEquals(2, config.tokenEndpointHandlers.count())
+        assertEquals(3, config.tokenEndpointHandlers.count())
     }
 
     @Test
@@ -89,7 +90,10 @@ class BuildProviderConfigurationTest {
                 authorizationCodeRepository = authorizationCodeRepository,
                 preAuthorizedCodeRepository = preAuthorizedCodeRepository,
                 preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-                accessTokenService = StubTokenService(),
+                accessTokenIssuer = StubTokenIssuer(),
+                refreshTokenIssuer = TestRefreshTokenIssuer(),
+                refreshTokenVerifier = TestRefreshTokenIssuer(),
+                refreshTokenRepository = defaultRefreshTokenRepository(),
                 credentialRequestValidator = DefaultCredentialRequestValidator(),
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
@@ -117,7 +121,10 @@ class BuildProviderConfigurationTest {
             authorizationCodeRepository = authorizationCodeRepository,
             preAuthorizedCodeRepository = preAuthorizedCodeRepository,
             preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-            accessTokenService = StubTokenService(),
+            accessTokenIssuer = StubTokenIssuer(),
+            refreshTokenIssuer = TestRefreshTokenIssuer(),
+            refreshTokenVerifier = TestRefreshTokenIssuer(),
+            refreshTokenRepository = defaultRefreshTokenRepository(),
             credentialRequestValidator = DefaultCredentialRequestValidator(),
             credentialEndpointHandlers = CredentialEndpointHandlers()
         )

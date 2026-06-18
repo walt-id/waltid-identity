@@ -66,6 +66,41 @@ class DefaultAccessRequestValidatorTest {
     }
 
     @Test
+    fun `validate accepts refresh token grant`() {
+        val result = validator.validate(
+            mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "client_id" to listOf("client-123"),
+                "refresh_token" to listOf("refresh-token"),
+                "scope" to listOf("openid profile"),
+            ),
+            DefaultSession(),
+        )
+
+        assertTrue(result.isSuccess())
+        val request = (result as AccessTokenRequestResult.Success).request
+        assertTrue(request.grantTypes.contains(GrantType.RefreshToken.value))
+        assertEquals("client-123", request.client.id)
+        assertEquals("refresh-token", request.requestForm["refresh_token"]?.firstOrNull())
+        assertTrue(request.requestedScopes.contains("openid"))
+    }
+
+    @Test
+    fun `validate rejects refresh token grant missing refresh token`() {
+        val result = validator.validate(
+            mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "client_id" to listOf("client-123"),
+            ),
+            DefaultSession(),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AccessTokenRequestResult.Failure).error
+        assertEquals("invalid_request", error.error)
+    }
+
+    @Test
     fun `validate rejects unsupported grant type`() {
         val result = validator.validate(
             mapOf(
