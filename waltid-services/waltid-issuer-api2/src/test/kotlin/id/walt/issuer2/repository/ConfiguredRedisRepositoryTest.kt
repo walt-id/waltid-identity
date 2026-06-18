@@ -7,6 +7,7 @@ import id.walt.commons.persistence.PersistenceConfiguration
 import id.walt.commons.persistence.PersistenceNode
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
+import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.offers.AuthenticationMethod
