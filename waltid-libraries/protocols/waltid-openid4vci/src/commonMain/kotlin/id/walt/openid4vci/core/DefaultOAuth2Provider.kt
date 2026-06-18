@@ -85,7 +85,7 @@ class DefaultOAuth2Provider(
         val failure = responses.filterIsInstance<AuthorizationResponseResult.Failure>().firstOrNull()
         return failure ?: AuthorizationResponseResult.Failure(
             OAuthError(
-                error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
+                error = OAuthErrorCodes.UNSUPPORTED_RESPONSE_TYPE,
                 description = authorizationRequest.responseTypes.joinToString(" ")
                     .ifBlank { "No authorize handler could handle the requested response type." },
             ),
