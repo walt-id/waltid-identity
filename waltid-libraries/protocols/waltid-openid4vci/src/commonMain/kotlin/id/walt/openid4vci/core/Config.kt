@@ -36,7 +36,7 @@ data class OAuth2ProviderConfig(
     val authorizationCodeRepository: AuthorizationCodeRepository,
 
     val pushedAuthorizationEndpointHandlers: PushedAuthorizationEndpointHandlers = PushedAuthorizationEndpointHandlers(),
-    val pushedAuthorizationConfig: PushedAuthorizationConfig = PushedAuthorizationConfig(),
+    val pushedAuthorizationConfig: PushedAuthorizationConfig? = null,
 
     val accessTokenRequestValidator: AccessTokenRequestValidator,
     val tokenEndpointHandlers: TokenEndpointHandlers,
@@ -51,7 +51,7 @@ data class OAuth2ProviderConfig(
 )
 
 data class PushedAuthorizationConfig(
-    val repository: PARRepository? = null,
+    val repository: PARRepository,
     val requestUriPrefix: String = PushedAuthorizationResponse.DEFAULT_REQUEST_URI_PREFIX,
     val lifetimeSeconds: Int = 90,
     val enforcePushedAuthorizationRequests: Boolean = false,

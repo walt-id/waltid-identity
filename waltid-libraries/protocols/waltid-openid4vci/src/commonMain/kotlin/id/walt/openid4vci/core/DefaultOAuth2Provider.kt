@@ -154,7 +154,7 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult {
+    override suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult {
         if (parameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
             return AuthorizationRequestResult.Failure(
                 OAuthError(
@@ -170,6 +170,15 @@ class DefaultOAuth2Provider(
         authorizationRequest: AuthorizationRequest,
         clientAuthentication: Map<String, String>,
     ): PushedAuthorizationResponseResult {
+        if (config.pushedAuthorizationConfig == null && config.pushedAuthorizationEndpointHandlers.count() == 0) {
+            return PushedAuthorizationResponseResult.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.SERVER_ERROR,
+                    description = "Pushed authorization requests are not configured",
+                )
+            )
+        }
+
         val failures = mutableListOf<PushedAuthorizationResponseResult.Failure>()
 
         for (handler in config.pushedAuthorizationEndpointHandlers) {
@@ -420,8 +429,9 @@ class DefaultOAuth2Provider(
         }
 
         val requestUri = requestUriValues.firstOrNull()
+        val pushedAuthorizationConfig = config.pushedAuthorizationConfig
         if (requestUri == null) {
-            return if (config.pushedAuthorizationConfig.enforcePushedAuthorizationRequests) {
+            return if (pushedAuthorizationConfig?.enforcePushedAuthorizationRequests == true) {
                 AuthorizationParameterResolution.Failure(
                     OAuthError(
                         error = OAuthErrorCodes.INVALID_REQUEST,
@@ -431,6 +441,15 @@ class DefaultOAuth2Provider(
             } else {
                 AuthorizationParameterResolution.Success(parameters)
             }
+        }
+
+        if (pushedAuthorizationConfig == null) {
+            return AuthorizationParameterResolution.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_REQUEST_URI,
+                    description = "request_uri is not supported",
+                )
+            )
         }
 
         val clientIdValues = parameters["client_id"].orEmpty().filter { it.isNotBlank() }
@@ -450,7 +469,7 @@ class DefaultOAuth2Provider(
 
         val requestId = PushedAuthorizationResponse.extractRequestId(
             requestUri = requestUri,
-            requestUriPrefix = config.pushedAuthorizationConfig.requestUriPrefix,
+            requestUriPrefix = pushedAuthorizationConfig.requestUriPrefix,
         ) ?: return AuthorizationParameterResolution.Failure(
             OAuthError(
                 error = OAuthErrorCodes.INVALID_REQUEST_URI,
@@ -458,14 +477,7 @@ class DefaultOAuth2Provider(
             )
         )
 
-        val repository = config.pushedAuthorizationConfig.repository ?: return AuthorizationParameterResolution.Failure(
-            OAuthError(
-                error = OAuthErrorCodes.SERVER_ERROR,
-                description = "PAR repository is not configured",
-            )
-        )
-
-        val entry = repository.consume(requestId, Clock.System.now())
+        val entry = pushedAuthorizationConfig.repository.consume(requestId, Clock.System.now())
             ?: return AuthorizationParameterResolution.Failure(
                 OAuthError(
                     error = OAuthErrorCodes.INVALID_REQUEST_URI,

@@ -66,7 +66,7 @@ interface OAuth2Provider {
     ): AuthorizationResponseHttp
 
     // OAuth2.0 - Pushed Authorization Request Endpoint
-    fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+    suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
 
     suspend fun createPushedAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
