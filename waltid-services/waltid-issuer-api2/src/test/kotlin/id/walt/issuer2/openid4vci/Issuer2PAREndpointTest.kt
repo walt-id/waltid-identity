@@ -1,35 +1,40 @@
 package id.walt.issuer2.openid4vci
 
-import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
-import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.issuer2.application.openid4vci.OpenId4VciModule
+import id.walt.issuer2.config.Issuer2ServiceConfig
+import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
+import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
+import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
-import id.walt.openid4vci.core.DefaultPARProvider
+import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
 
-/**
- * Unit tests for PAR endpoint in OSS Issuer2.
- *
- * Tests PAR ingestion, request_uri generation, and basic validation.
- */
 class Issuer2PAREndpointTest {
 
     @Test
-    fun `should create PAR with valid parameters`() = runTest {
-        val repo = InMemoryPARRepository()
-        val provider = DefaultPARProvider(repo)
+    fun `issuer module provider allows direct authorization when PAR is not enforced by default`() = runTest {
+        val provider = issuerProvider()
+        val parameters = validParameters()
 
-        val parameters = mapOf(
-            "client_id" to listOf("test-client"),
-            "response_type" to listOf("code"),
-            "redirect_uri" to listOf("https://example.com/callback"),
-            "scope" to listOf("openid"),
-            "state" to listOf("state123"),
-        )
+        val result = provider.createAuthorizationRequest(parameters)
 
-        val parRequest = id.walt.openid4vci.requests.par.PushedAuthorizationRequest.fromParameters(parameters)
-        val response = provider.processPushedAuthorizationRequest(parRequest)
+        assertTrue(result is AuthorizationRequestResult.Success)
+        assertEquals(parameters, (result as AuthorizationRequestResult.Success).request.requestForm)
+    }
+
+    @Test
+    fun `issuer module provider creates PAR with valid parameters`() = runTest {
+        val provider = issuerProvider()
+
+        val response = pushAuthorizationRequest(provider, validParameters())
 
         assertNotNull(response.requestUri)
         assertTrue(response.requestUri.startsWith("urn:ietf:params:oauth:request_uri:"))
@@ -37,75 +42,90 @@ class Issuer2PAREndpointTest {
     }
 
     @Test
-    fun `should resolve request_uri and retrieve original parameters`() = runTest {
-        val repo = InMemoryPARRepository()
-        val provider = DefaultPARProvider(repo)
-
-        val parameters = mapOf(
-            "client_id" to listOf("test-client"),
-            "response_type" to listOf("code"),
-            "redirect_uri" to listOf("https://example.com/callback"),
-            "scope" to listOf("openid profile"),
-            "state" to listOf("state456"),
+    fun `issuer module provider resolves request_uri and retrieves original parameters`() = runTest {
+        val provider = issuerProvider()
+        val parameters = validParameters(
+            scope = listOf("openid", "profile"),
+            state = "state456",
         )
 
-        val parRequest = id.walt.openid4vci.requests.par.PushedAuthorizationRequest.fromParameters(parameters)
-        val parResponse = provider.processPushedAuthorizationRequest(parRequest)
+        val parResponse = pushAuthorizationRequest(provider, parameters)
+        val authorizeResult = provider.createAuthorizationRequest(
+            mapOf(
+                "client_id" to listOf("test-client"),
+                "request_uri" to listOf(parResponse.requestUri),
+            )
+        )
 
-        // Resolve request_uri
-        val resolved = provider.resolveRequestUri(parResponse.requestUri, "test-client")
-
-        assertNotNull(resolved)
-        assertEquals(listOf("test-client"), resolved!!["client_id"])
-        assertEquals(listOf("code"), resolved["response_type"])
-        assertEquals(listOf("https://example.com/callback"), resolved["redirect_uri"])
-        assertEquals(listOf("openid profile"), resolved["scope"])
-        assertEquals(listOf("state456"), resolved["state"])
+        assertTrue(authorizeResult is AuthorizationRequestResult.Success)
+        assertEquals(parameters, (authorizeResult as AuthorizationRequestResult.Success).request.requestForm)
     }
 
     @Test
-    fun `should enforce single-use request_uri`() = runTest {
-        val repo = InMemoryPARRepository()
-        val provider = DefaultPARProvider(repo)
-
-        val parameters = mapOf(
+    fun `issuer module provider enforces single-use request_uri`() = runTest {
+        val provider = issuerProvider()
+        val parResponse = pushAuthorizationRequest(provider, validParameters())
+        val authorizeParameters = mapOf(
             "client_id" to listOf("test-client"),
-            "response_type" to listOf("code"),
+            "request_uri" to listOf(parResponse.requestUri),
         )
 
-        val parRequest = id.walt.openid4vci.requests.par.PushedAuthorizationRequest.fromParameters(parameters)
-        val parResponse = provider.processPushedAuthorizationRequest(parRequest)
+        assertTrue(provider.createAuthorizationRequest(authorizeParameters) is AuthorizationRequestResult.Success)
 
-        // First resolution should succeed
-        val firstResolve = provider.resolveRequestUri(parResponse.requestUri, "test-client")
-        assertNotNull(firstResolve)
-
-        // Second resolution should fail (already consumed)
-        val secondResolve = provider.resolveRequestUri(parResponse.requestUri, "test-client")
-        assertEquals(null, secondResolve, "request_uri should be single-use")
+        val replay = provider.createAuthorizationRequest(authorizeParameters)
+        assertTrue(replay is AuthorizationRequestResult.Failure)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST_URI, (replay as AuthorizationRequestResult.Failure).error.error)
     }
 
     @Test
-    fun `should validate PKCE parameters`() = runTest {
-        val repo = InMemoryPARRepository()
-        val provider = DefaultPARProvider(repo)
+    fun `issuer module provider rejects client_id mismatch`() = runTest {
+        val provider = issuerProvider()
+        val parResponse = pushAuthorizationRequest(provider, validParameters(clientId = "original-client"))
 
-        val parametersWithPKCE = mapOf(
-            "client_id" to listOf("test-client"),
-            "code_challenge" to listOf("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"),
-            "code_challenge_method" to listOf("S256"),
+        val result = provider.createAuthorizationRequest(
+            mapOf(
+                "client_id" to listOf("different-client"),
+                "request_uri" to listOf(parResponse.requestUri),
+            )
         )
 
-        val parRequest = id.walt.openid4vci.requests.par.PushedAuthorizationRequest.fromParameters(parametersWithPKCE)
-        val response = provider.processPushedAuthorizationRequest(parRequest)
+        assertTrue(result is AuthorizationRequestResult.Failure)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, (result as AuthorizationRequestResult.Failure).error.error)
+    }
 
-        assertNotNull(response.requestUri)
+    @Test
+    fun `issuer module provider rejects request_uri at PAR endpoint`() = runTest {
+        val provider = issuerProvider()
 
-        // Verify PKCE params are preserved
-        val resolved = provider.resolveRequestUri(response.requestUri, "test-client")
-        assertNotNull(resolved)
-        assertEquals(listOf("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"), resolved!!["code_challenge"])
-        assertEquals(listOf("S256"), resolved["code_challenge_method"])
+        val result = provider.createPushedAuthorizationRequest(
+            validParameters() + ("request_uri" to listOf("urn:ietf:params:oauth:request_uri:nested"))
+        )
+
+        assertTrue(result is AuthorizationRequestResult.Failure)
+        assertEquals(OAuthErrorCodes.INVALID_REQUEST, (result as AuthorizationRequestResult.Failure).error.error)
+    }
+
+    @Test
+    fun `issuer module provider enforces PAR when configured`() = runTest {
+        val provider = issuerProvider(enforcePushedAuthorizationRequests = true)
+        val parameters = validParameters(clientId = "required-par-client")
+
+        val directAuthorize = provider.createAuthorizationRequest(parameters)
+        assertTrue(directAuthorize is AuthorizationRequestResult.Failure)
+        assertEquals(
+            OAuthErrorCodes.INVALID_REQUEST,
+            (directAuthorize as AuthorizationRequestResult.Failure).error.error,
+        )
+
+        val parResponse = pushAuthorizationRequest(provider, parameters)
+        val authorizeResult = provider.createAuthorizationRequest(
+            mapOf(
+                "client_id" to listOf("required-par-client"),
+                "request_uri" to listOf(parResponse.requestUri),
+            )
+        )
+
+        assertTrue(authorizeResult is AuthorizationRequestResult.Success)
     }
 
     @Test
@@ -115,4 +135,43 @@ class Issuer2PAREndpointTest {
 
         assertEquals("abc123xyz", requestId)
     }
+
+    private fun issuerProvider(enforcePushedAuthorizationRequests: Boolean = false): OAuth2Provider =
+        OpenId4VciModule.create(
+            config = Issuer2ServiceConfig(
+                baseUrl = "http://localhost",
+                enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+            ),
+            authorizationCodeRepository = ConfiguredAuthorizationCodeRepository(),
+            preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
+            parRepository = InMemoryPARRepository(),
+        ).oauth2Provider
+
+    private suspend fun pushAuthorizationRequest(
+        provider: OAuth2Provider,
+        parameters: Map<String, List<String>>,
+    ): PushedAuthorizationResponse {
+        val pushedRequest = provider.createPushedAuthorizationRequest(parameters)
+        assertTrue(pushedRequest is AuthorizationRequestResult.Success)
+
+        val pushedResponse = provider.createPushedAuthorizationResponse(
+            (pushedRequest as AuthorizationRequestResult.Success).request
+        )
+        assertTrue(pushedResponse is PushedAuthorizationResponseResult.Success)
+
+        return (pushedResponse as PushedAuthorizationResponseResult.Success).response
+    }
+
+    private fun validParameters(
+        clientId: String = "test-client",
+        scope: List<String> = listOf("openid"),
+        state: String = "state123",
+    ): Map<String, List<String>> =
+        mapOf(
+            "client_id" to listOf(clientId),
+            "response_type" to listOf(ResponseType.CODE.value),
+            "redirect_uri" to listOf("https://example.com/callback"),
+            "scope" to scope,
+            "state" to listOf(state),
+        )
 }

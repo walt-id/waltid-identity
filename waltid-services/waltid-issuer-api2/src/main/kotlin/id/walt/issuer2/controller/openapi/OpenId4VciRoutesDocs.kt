@@ -1,6 +1,9 @@
 package id.walt.issuer2.controller.openapi
 
+import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.json.JsonObject
 
@@ -85,15 +88,21 @@ object OpenId4VciRoutesDocs {
         request {
             body<Map<String, List<String>>> {
                 description = "Authorization request parameters (form-encoded)"
+                mediaTypes(ContentType.Application.FormUrlEncoded)
             }
         }
         response {
             HttpStatusCode.Created to {
                 description = "PAR response with request_uri"
-                body<JsonObject>()
+                body<PushedAuthorizationResponse>()
             }
             HttpStatusCode.BadRequest to {
                 description = "Invalid PAR request"
+                body<OAuthError>()
+            }
+            HttpStatusCode.InternalServerError to {
+                description = "PAR processing failed"
+                body<OAuthError>()
             }
         }
     }
