@@ -34,6 +34,7 @@ class MetadataService(
 
     private val baseUrl = serviceConfig.baseUrl.trimEnd('/') + "/openid4vci"
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
+    private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
@@ -57,6 +58,7 @@ class MetadataService(
         AuthorizationServerMetadata.fromBaseUrl(
             baseUrl = baseUrl,
             pushedAuthorizationRequestEndpointPath = "/par",
+            requirePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
         )
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
