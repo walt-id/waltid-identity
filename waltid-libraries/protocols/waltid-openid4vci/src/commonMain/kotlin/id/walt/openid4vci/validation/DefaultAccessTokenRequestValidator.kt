@@ -20,10 +20,11 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             when (grantType) {
                 GrantType.AuthorizationCode -> validateAuthorizationCodeGrant(parameters, session)
                 GrantType.PreAuthorizedCode -> validatePreAuthorizedCodeGrant(parameters, session)
+                GrantType.RefreshToken -> validateRefreshTokenGrant(parameters, session)
                 else -> AccessTokenRequestResult.Failure(
                     OAuthError(
                         error = id.walt.openid4vci.errors.OAuthErrorCodes.UNSUPPORTED_GRANT_TYPE,
-                        description = "Supported grants: authorization_code, ${GrantType.PreAuthorizedCode.value}",
+                        description = "Supported grants: authorization_code, ${GrantType.PreAuthorizedCode.value}, refresh_token",
                     ),
                 )
             }
@@ -51,7 +52,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             id = clientId,
             redirectUris = listOfNotNull(redirectUri),
             responseTypes = setOf(ResponseType.CODE.value),
-            grantTypes = setOf(GrantType.AuthorizationCode.value),
+            grantTypes = setOf(GrantType.AuthorizationCode.value, GrantType.RefreshToken.value),
         )
 
         // RFC6749 §4.1.3: code is required and must be single-valued.
@@ -112,6 +113,48 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             requestedAudience = emptySet(),
             grantedAudience = emptySet(),
             requestForm = parameters.toMap(),
+            session = session,
+        )
+
+        return AccessTokenRequestResult.Success(request)
+    }
+
+    private fun validateRefreshTokenGrant(
+        parameters: Map<String, List<String>>,
+        session: Session,
+    ): AccessTokenRequestResult {
+        val refreshToken = parameters.requireSingle("refresh_token").takeIf { it.isNotBlank() }
+            ?: return AccessTokenRequestResult.Failure(
+                OAuthError(
+                    error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
+                    description = "Missing refresh_token",
+                ),
+            )
+
+        val clientId = parameters.requireSingle("client_id").takeIf { it.isNotBlank() }
+            ?: return AccessTokenRequestResult.Failure(
+                OAuthError(
+                    error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
+                    description = "Missing client_id",
+                ),
+            )
+
+        val client = DefaultClient(
+            id = clientId,
+            redirectUris = emptyList(),
+            grantTypes = setOf(GrantType.RefreshToken.value),
+            responseTypes = emptySet(),
+        )
+
+        val requestedScopes = parameters.optionalAll("scope").toSet()
+
+        val request = DefaultAccessTokenRequest(
+            client = client,
+            grantTypes = setOf(GrantType.RefreshToken.value),
+            requestedScopes = requestedScopes,
+            requestedAudience = emptySet(),
+            grantedAudience = emptySet(),
+            requestForm = parameters.toMap() + ("refresh_token" to listOf(refreshToken)),
             session = session,
         )
 

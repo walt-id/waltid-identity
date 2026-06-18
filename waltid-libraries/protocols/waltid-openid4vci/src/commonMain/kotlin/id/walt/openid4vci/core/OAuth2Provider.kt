@@ -22,7 +22,7 @@ import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
@@ -37,7 +37,7 @@ import kotlin.time.Instant
  *   DTOs instead of writing to HTTP primitives.
  * - `writeAuthorizationError`/`writeAuthorizationResponse` encapsulate response-mode formatting for tests
  *   and framework integration.
- * - `createAccessTokenRequest`/`createAccessResponse` cover the token endpoint, and the `write*` variants
+ * - `createAccessTokenRequest`/`createAccessTokenResponse` cover the token endpoint, and the `write*` variants
  *   produce RFC6749-compliant bodies.
  *
  * Parameters will be changed. However, we have to keep the implementation framework-agnostic (Ktor, Spring).

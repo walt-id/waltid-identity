@@ -1,16 +1,26 @@
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
-import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.Session
+import id.walt.openid4vci.TokenType
+import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
+import id.walt.openid4vci.repository.authorization.DuplicateCodeException
+import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
+import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
-import id.walt.openid4vci.tokens.AccessTokenService
+import id.walt.openid4vci.requests.token.sanitizeForStorage
+import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.tokens.access.AccessTokenIssuer
+import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
+import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlinx.serialization.SerializationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -18,9 +28,12 @@ import kotlin.time.Instant
  * Token endpoint handler for the authorization-code code grant.
  */
 class AuthorizationCodeTokenEndpoint(
-        private val codeRepository: AuthorizationCodeRepository,
-        private val tokenService: AccessTokenService,
-    ) : TokenEndpointHandler {
+    private val codeRepository: AuthorizationCodeRepository,
+    private val accessTokenIssuer: AccessTokenIssuer,
+    private val refreshTokenRepository: RefreshTokenRepository,
+    private val refreshTokenIssuer: RefreshTokenIssuer,
+    private val refreshTokenLifetimeSeconds: Long = DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS,
+) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
         request.grantTypes.contains(GrantType.AuthorizationCode.value)
@@ -58,13 +71,12 @@ class AuthorizationCodeTokenEndpoint(
 
             // RFC6749 §5.1 and §3.3: If requested scope exceeds granted scope, reject; otherwise cap to granted.
             val requestedScope = updatedRequest.requestedScopes.ifEmpty { record.grantedScopes }
-            val effectiveGrantedScope = record.grantedScopes.intersect(requestedScope)
-            if (effectiveGrantedScope.isEmpty() && record.grantedScopes.isNotEmpty()) {
+            if (!record.grantedScopes.containsAll(requestedScope)) {
                 return AccessTokenResponseResult.Failure(OAuthError("invalid_scope", "Requested scopes exceed the authorized scope"))
             }
-            val scopedRequest = updatedRequest.withGrantedScopes(effectiveGrantedScope)
+            val scopedRequest = updatedRequest.withGrantedScopes(requestedScope.toSet())
 
-            val sessionExpiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
+            val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]
             val expiresAt = sessionExpiresAt ?: (Clock.System.now() + 3600.seconds)
 
             val subject = session.subject?.takeIf { it.isNotBlank() }
@@ -84,7 +96,21 @@ class AuthorizationCodeTokenEndpoint(
                 },
             )
 
-            val accessToken = tokenService.createAccessToken(claims)
+            val accessToken = accessTokenIssuer.issue(claims)
+
+            val extra = mutableMapOf<String, Any?>()
+            issueRefreshTokenIfAllowed(
+                request = scopedRequest,
+                accessToken = accessToken,
+                session = session,
+                subject = subject,
+                issuer = scopedRequest.issClaim ?: client.id,
+                clientId = client.id,
+                grantedScopes = scopedRequest.grantedScopes,
+                grantedAudience = record.grantedAudience,
+            )?.let { refreshToken ->
+                extra["refresh_token"] = refreshToken
+            }
 
             // If no explicit session expiry is configured, return the spec-default lifetime as exact 3600.
             // If an explicit expiry exists, return the real remaining lifetime from now.
@@ -94,18 +120,68 @@ class AuthorizationCodeTokenEndpoint(
                 request = scopedRequest,
                 AccessTokenResponse(
                     accessToken = accessToken,
-                    tokenType = id.walt.openid4vci.core.TOKEN_TYPE_BEARER,
+                    tokenType = TOKEN_TYPE_BEARER,
                     expiresIn = expiresIn,
-                    extra = emptyMap(),
-                )
+                    extra = extra,
+                ),
             )
         } catch (e: SerializationException) {
             AccessTokenResponseResult.Failure(OAuthError("invalid_request", e.message))
+        } catch (e: DuplicateCodeException) {
+            AccessTokenResponseResult.Failure(OAuthError("server_error", e.message))
         }
+    }
+
+    private suspend fun issueRefreshTokenIfAllowed(
+        request: AccessTokenRequest,
+        accessToken: String,
+        session: Session,
+        subject: String,
+        issuer: String,
+        clientId: String,
+        grantedScopes: Set<String>,
+        grantedAudience: Set<String>,
+    ): String? {
+        if (!request.client.grantTypes.contains(GrantType.RefreshToken.value)) {
+            return null
+        }
+
+        val refreshTokenExpiresAt = session.expiresAt[TokenType.REFRESH_TOKEN]
+            ?: (Clock.System.now() + refreshTokenLifetimeSeconds.seconds)
+        val refreshSession = session.copy().withExpiresAt(TokenType.REFRESH_TOKEN, refreshTokenExpiresAt)
+        val refreshToken = refreshTokenIssuer.issue(
+            RefreshTokenGenerationRequest(
+                issuer = issuer,
+                subject = subject,
+                clientId = clientId,
+                scopes = grantedScopes,
+                expiresAt = refreshTokenExpiresAt,
+                sessionId = refreshSession.customAttributes["issuance_session_id"],
+            )
+        )
+
+        refreshTokenRepository.save(
+            DefaultRefreshTokenRecord(
+                tokenSignature = refreshTokenIssuer.signature(refreshToken),
+                requester = request.sanitizeForStorage(),
+                accessTokenSignature = accessTokenIssuer.signature(accessToken),
+                clientId = clientId,
+                grantedScopes = grantedScopes,
+                grantedAudience = grantedAudience,
+                session = refreshSession,
+                expiresAt = refreshTokenExpiresAt,
+            ),
+        )
+
+        return refreshToken
     }
 
     private fun computeRemainingSeconds(expiresAt: Instant): Long {
         val remaining = expiresAt - Clock.System.now()
         return if (remaining.isNegative()) 0 else remaining.inWholeSeconds
+    }
+
+    private companion object {
+        val DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS = 30.days.inWholeSeconds
     }
 }

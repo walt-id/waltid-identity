@@ -1,15 +1,17 @@
 package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 
-import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
+import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.TokenType
+import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.errors.OAuthError
-import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.preauthorized.hashTxCode
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
-import id.walt.openid4vci.tokens.AccessTokenService
+import id.walt.openid4vci.responses.token.AccessTokenResponse
+import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
@@ -22,7 +24,7 @@ import kotlin.time.Instant
  */
 class PreAuthorizedCodeTokenEndpoint(
     private val codeRepository: PreAuthorizedCodeRepository,
-    private val tokenService: AccessTokenService,
+    private val accessTokenIssuer: AccessTokenIssuer,
 ) : TokenEndpointHandler {
 
     override fun canHandleTokenEndpointRequest(request: AccessTokenRequest): Boolean =
@@ -100,7 +102,7 @@ class PreAuthorizedCodeTokenEndpoint(
         }
         val clientRequest = updatedRequest.withClient(clientToUse)
 
-        val sessionExpiresAt = session.expiresAt[id.walt.openid4vci.TokenType.ACCESS_TOKEN]
+        val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]
         val expiresAt = sessionExpiresAt ?: (Clock.System.now() + 3600.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
@@ -119,7 +121,7 @@ class PreAuthorizedCodeTokenEndpoint(
             },
         )
 
-        val accessToken = tokenService.createAccessToken(claims)
+        val accessToken = accessTokenIssuer.issue(claims)
 
         val extra = buildMap<String, Any?> {
             if (clientRequest.grantedScopes.isNotEmpty()) {
@@ -139,7 +141,7 @@ class PreAuthorizedCodeTokenEndpoint(
             request = clientRequest,
             AccessTokenResponse(
                 accessToken = accessToken,
-                tokenType = id.walt.openid4vci.core.TOKEN_TYPE_BEARER,
+                tokenType = TOKEN_TYPE_BEARER,
                 expiresIn = expiresIn,
                 extra = extra,
             ),
