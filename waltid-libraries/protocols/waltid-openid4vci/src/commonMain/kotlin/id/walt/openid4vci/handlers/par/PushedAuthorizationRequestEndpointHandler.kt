@@ -55,7 +55,7 @@ class PushedAuthorizationRequestEndpointHandler(
                     requestUriPrefix = requestUriPrefix,
                 ),
             )
-        } catch (e: DuplicatePARRecordException) {
+        } catch (_: DuplicatePARRecordException) {
             PushedAuthorizationResponseResult.Failure(
                 OAuthError(OAuthErrorCodes.SERVER_ERROR, "Unable to store pushed authorization request"),
             )
