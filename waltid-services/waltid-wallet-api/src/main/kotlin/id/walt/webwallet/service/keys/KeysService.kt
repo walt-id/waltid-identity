@@ -26,8 +26,9 @@ object KeysService {
         WalletKeys.selectAll().where { WalletKeys.keyId eq keyId }.firstOrNull()?.let { WalletKey(it) }
     }
 
-    fun list(wallet: Uuid): List<WalletKey> =
+    fun list(wallet: Uuid): List<WalletKey> = transaction {
         WalletKeys.selectAll().where { WalletKeys.wallet eq wallet.toJavaUuid() }.map { WalletKey(it) }
+    }
 
     fun add(wallet: Uuid, keyId: String, document: String, name: String? = null) = transaction {
         WalletKeys.insert {

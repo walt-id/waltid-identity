@@ -2,7 +2,11 @@
 
 package id.waltid.openid4vp.wallet.presentation
 
-import id.walt.cose.*
+import id.walt.cose.CoseHeaders
+import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
+import id.walt.cose.toCoseAlgorithm
+import id.walt.cose.toCoseSigner
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.MdocsCredential
 import id.walt.crypto.keys.Key
@@ -17,11 +21,21 @@ import id.walt.mdoc.objects.document.DeviceAuth
 import id.walt.mdoc.objects.document.Document
 import id.walt.mdoc.objects.document.IssuerSigned
 import id.walt.mdoc.objects.elements.DeviceNameSpaces
+import id.walt.mdoc.objects.elements.DeviceSignedItem
+import id.walt.mdoc.objects.elements.DeviceSignedItemList
 import id.walt.mdoc.objects.elements.IssuerSignedList
 import id.walt.mdoc.objects.handover.OpenID4VPHandover
 import id.walt.mdoc.objects.handover.OpenID4VPHandoverInfo
 import id.walt.mdoc.objects.sha256
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.verifier.openid.transactiondata.DEFAULT_HASH_ALGORITHM
+import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
+import id.walt.verifier.openid.transactiondata.decodeList
+import id.walt.verifier.openid.transactiondata.filterTransactionDataForCredentialId
+import id.walt.verifier.openid.transactiondata.normalizeHashAlgorithm
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
+import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToByteArray
@@ -87,7 +101,8 @@ object MdocPresenter {
         digitalCredential: DigitalCredential,
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
-        holderKey: Key
+        holderKey: Key,
+        typeRegistry: TransactionDataTypeRegistry,
     ): JsonPrimitive {
         log.debug { "Handling mso_mdoc credential" }
 
@@ -102,7 +117,14 @@ object MdocPresenter {
         val sessionTranscript = buildSessionTranscript(authorizationRequest, responseUri)
 
         // Determine which namespaces and elements to disclose based on the DCQL match
-        val disclosedDeviceNamespaces = DeviceNameSpaces(emptyMap()) // Assuming selective disclosure for device data
+        val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
+            mdocsCredential = mdocsCredential,
+            transactionData = filterTransactionDataForCredentialId(
+                transactionData = authorizationRequest.transactionData,
+                credentialId = matchResult.originalQuery.id,
+            ),
+            typeRegistry = typeRegistry,
+        )
 
         val deviceAuth = buildDeviceAuth(
             sessionTranscript = sessionTranscript,
@@ -179,4 +201,58 @@ object MdocPresenter {
         return JsonPrimitive(deviceResponseBytes.encodeToBase64Url())
     }
 
+    private fun buildTransactionDataNamespaces(
+        mdocsCredential: MdocsCredential,
+        transactionData: List<String>,
+        typeRegistry: TransactionDataTypeRegistry,
+    ): DeviceNameSpaces {
+        if (transactionData.isEmpty()) return DeviceNameSpaces(emptyMap())
+
+        val decoded = decodeList(transactionData)
+        val hashAlgorithm = resolveHashAlgorithm(decoded) ?: DEFAULT_HASH_ALGORITHM
+
+        val namespaces = buildMap {
+            decoded.forEach {
+                val type = it.transactionData.type
+                typeRegistry.requireKnown(type)
+                require(type !in this) { "mdoc transaction_data supports one item per response namespace: $type" }
+                put(type, buildDeviceSignedItems(it.encoded, it.transactionData.transactionDataHashesAlg, hashAlgorithm))
+            }
+        }
+
+        requireTransactionDataAuthorization(mdocsCredential, namespaces)
+        return DeviceNameSpaces(namespaces)
+    }
+
+    private fun buildDeviceSignedItems(
+        encoded: String,
+        transactionDataHashesAlg: List<String>?,
+        hashAlgorithm: String,
+    ): DeviceSignedItemList {
+        val hash = calculateTransactionDataHashes(listOf(encoded), hashAlgorithm).single()
+        val items = buildList {
+            add(DeviceSignedItem("transaction_data_hash", hash.decodeFromBase64Url()))
+            if (!transactionDataHashesAlg.isNullOrEmpty()) {
+                add(DeviceSignedItem("transaction_data_hash_alg", normalizeHashAlgorithm(hashAlgorithm)))
+            }
+        }
+        return DeviceSignedItemList(items)
+    }
+
+    private fun requireTransactionDataAuthorization(
+        mdocsCredential: MdocsCredential,
+        namespaces: Map<String, DeviceSignedItemList>,
+    ) {
+        val keyAuthorizations = requireNotNull(mdocsCredential.documentMso.deviceKeyInfo.keyAuthorizations) {
+            "transaction_data requires mdoc keyAuthorizations for docType ${mdocsCredential.docType}"
+        }
+        namespaces.forEach { (namespace, items) ->
+            val elementKeys = items.entries.map { it.key }.toSet()
+            val isNamespaceAuthorized = keyAuthorizations.namespaces?.contains(namespace) == true
+            val authorizedElements = keyAuthorizations.dataElements?.get(namespace).orEmpty().toSet()
+            require(isNamespaceAuthorized || authorizedElements.containsAll(elementKeys)) {
+                "transaction_data type '$namespace' is not authorized for mdoc docType ${mdocsCredential.docType}"
+            }
+        }
+    }
 }

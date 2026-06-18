@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalSerializationApi::class)
+
 package id.walt.openid4vp.conformance.testplans
 
 import id.walt.commons.config.ConfigManager
@@ -6,14 +8,14 @@ import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.MdlX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPost
+import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.OSSVerifier2FeatureCatalog
 import id.walt.verifier2.OSSVerifier2ServiceConfig
 import id.walt.verifier2.verifierModule
 import io.ktor.server.application.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
@@ -26,7 +28,7 @@ class ConformanceTestRunner(
 
     private val testPlans: List<TestPlan> = listOf(
         MdlX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort),
-        SdJwtVcX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort)
+        SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt(verifier2UrlPrefix, conformanceHost, conformancePort)
     )
 
 
@@ -40,10 +42,6 @@ class ConformanceTestRunner(
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
                         clientId = "NOT-CONFIGURED_verifier2",
-                        clientMetadata = ClientMetadata(
-                            clientName = "Verifier2",
-                            logoUri = "https://images.squarespace-cdn.com/content/v1/609c0ddf94bcc0278a7cbdb4/4d493ccf-c893-4882-925f-fda3256c38f4/Walt.id_Logo_transparent.png"
-                        ),
                         urlPrefix = "NOT-CONFIGURED_http://$localVerifierHost:$localVerifierPort/verification-session",
                         urlHost = "NOT-CONFIGURED_openid4vp://authorize"
                     )
@@ -73,7 +71,12 @@ class ConformanceTestRunner(
                 val planName = plan::class.simpleName ?: plan::class.jvmName
 
                 test(planName) {
-                    TestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
+                    val results = TestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
+                    println("Plan $planName completed: ${results.size} modules run")
+                    results.forEachIndexed { i, r ->
+                        println("  [$i] ${r.conformanceTestId}: conformance=${r.conformanceResult}, verifier=${r.verifierStatus}")
+                    }
+                    results
                 }
             }
         }

@@ -27,7 +27,7 @@ class CredentialProfileService(
         val profiles = listProfiles().filter { it.credentialConfigurationId == credentialConfigurationId }
         require(profiles.size == 1) {
             "Expected exactly one credential profile for credentialConfigurationId '$credentialConfigurationId', " +
-                "found ${profiles.size}"
+                    "found ${profiles.size}"
         }
         return profiles.single()
     }
@@ -65,5 +65,6 @@ class CredentialProfileService(
             mDocNameSpacesDataMappingConfig = mDocNameSpacesDataMappingConfig,
             x5Chain = x5Chain,
             notifications = notifications,
+            credentialStatus = credentialStatus,
         )
 }

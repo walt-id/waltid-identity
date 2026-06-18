@@ -1,8 +1,8 @@
 package id.walt.issuer2.controller.openapi
 
-import id.walt.issuer2.controller.dto.CredentialOfferCreateRequest
-import id.walt.issuer2.controller.dto.CredentialOfferCreateResponse
-import id.walt.issuer2.controller.dto.CredentialOfferRuntimeOverrides
+import id.walt.issuer2.models.CredentialOfferCreateRequest
+import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.issuer2.models.CredentialOfferRuntimeOverrides
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.CredentialOfferRequest
@@ -79,9 +79,9 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             credentialData = buildJsonObject {
                 putJsonObject("credentialSubject") {
-                    put("givenName", "Jane")
-                    put("familyName", "Doe")
-                    put("degree", "Computer Science")
+                    putJsonObject("degree") {
+                        put("name", "Computer Science")
+                    }
                 }
             },
         ),
@@ -99,8 +99,8 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             selectiveDisclosure = SDMap.generateSDMap(
                 listOf(
-                    "credentialSubject.givenName",
-                    "credentialSubject.familyName",
+                    "credentialSubject.degree.type",
+                    "credentialSubject.degree.name",
                 )
             ),
         ),
@@ -130,16 +130,19 @@ object Issuer2RequestExamples {
         valueMode = CredentialOfferValueMode.BY_REFERENCE,
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             credentialData = buildJsonObject {
-                putJsonObject("org.iso.23220.photoid.1") {
+                putJsonObject("org.iso.23220.1") {
                     put("age_over_18", true)
                     put("issuing_country", "AT")
-                    put("given_name_unicode", "Jane")
-                    put("family_name_unicode", "Doe")
+                    put("given_name", "Jane")
+                    put("family_name", "Doe")
                     put("birth_date", "2003-12-21")
-                    put("issuance_date", "2025-12-13")
+                    put("issue_date", "2025-12-13")
                     put("issuing_authority_unicode", "Walt.id Issuer")
                     put("expiry_date", "2026-12-13")
-                    put("portrait", "AQIDBAUGBwgJCgsMDQ4P")
+                }
+                putJsonObject("org.iso.23220.photoid.1") {
+                    put("person_id", "123456")
+                    put("administrative_number", "654321")
                 }
             },
         ),

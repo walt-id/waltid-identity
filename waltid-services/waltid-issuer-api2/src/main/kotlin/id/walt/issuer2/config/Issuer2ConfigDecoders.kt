@@ -47,7 +47,7 @@ private class Issuer2KotlinxConfigDecoder<T : Any>(
     override fun decode(node: Node, type: KType, context: DecoderContext): ConfigResult<T> =
         try {
             Validated.Valid(json.decodeFromJsonElement(serializer, node.toJsonElement()))
-        } catch (ex: Exception) {
+        } catch (_: Exception) {
             Validated.Invalid(ConfigFailure.DecodeError(node, type))
         }
 

@@ -3,8 +3,8 @@ package id.walt.openid4vci
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
-import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.Test
 import kotlin.test.assertTrue
 
 class DefaultAuthorizeRequestValidatorTest {
@@ -32,6 +32,83 @@ class DefaultAuthorizeRequestValidatorTest {
         assertTrue(request.requestedScopes.contains("openid"))
         assertEquals("xyz", request.state)
         assertEquals("issuer-state-123", request.issuerState)
+    }
+
+    @Test
+    fun `validate parses authorization_details`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf(ResponseType.CODE.value),
+                "authorization_details" to listOf(
+                    """[{"type":"openid_credential","credential_configuration_id":"w3c_jwt_c"}]"""
+                ),
+            ),
+        )
+
+        assertTrue(result.isSuccess())
+        val request = (result as AuthorizationRequestResult.Success).request
+        assertEquals(1, request.authorizationDetails.size)
+        assertEquals("openid_credential", request.authorizationDetails.single().type)
+        assertEquals("w3c_jwt_c", request.authorizationDetails.single().credentialConfigurationId)
+    }
+
+    @Test
+    fun `validate accepts unknown authorization_details fields`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf(ResponseType.CODE.value),
+                "authorization_details" to listOf(
+                    """[{"type":"openid_credential","credential_configuration_id":"w3c_jwt_c","unexpected":"value"}]"""
+                ),
+            ),
+        )
+
+        assertTrue(result.isSuccess())
+        val request = (result as AuthorizationRequestResult.Success).request
+        assertEquals("w3c_jwt_c", request.authorizationDetails.single().credentialConfigurationId)
+    }
+
+    @Test
+    fun `validate rejects malformed authorization_details JSON`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf(ResponseType.CODE.value),
+                "authorization_details" to listOf("not-json"),
+            ),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AuthorizationRequestResult.Failure).error
+        assertEquals("invalid_request", error.error)
+        assertTrue(
+            error.description?.contains("Invalid authorization_details") == true,
+            "Expected invalid authorization_details error description"
+        )
+    }
+
+    @Test
+    fun `validate rejects duplicate authorization_details parameters`() {
+        val result = validator.validate(
+            mapOf(
+                "client_id" to listOf("client-123"),
+                "response_type" to listOf(ResponseType.CODE.value),
+                "authorization_details" to listOf(
+                    """[{"type":"openid_credential","credential_configuration_id":"w3c_jwt_c"}]""",
+                    """[{"type":"openid_credential","credential_configuration_id":"w3c_jwt_c"}]""",
+                ),
+            ),
+        )
+
+        assertTrue(!result.isSuccess())
+        val error = (result as AuthorizationRequestResult.Failure).error
+        assertEquals("invalid_request", error.error)
+        assertTrue(
+            error.description?.contains("Multiple values for authorization_details") == true,
+            "Expected duplicate authorization_details to be rejected"
+        )
     }
 
     @Test

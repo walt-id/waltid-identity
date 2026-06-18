@@ -1,16 +1,19 @@
-package id.walt.issuer2.controller.dto
+package id.walt.issuer2.models
 
-import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
+import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOfferValueMode
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.offers.TxCode
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.minutes
 
+// The management API and offer service currently use the same data shape.
+// Keep one shared model instead of duplicating DTO and service variants until those contracts diverge.
 @Serializable
 data class CredentialOfferRuntimeOverrides(
     val issuerDid: String? = null,
@@ -22,6 +25,7 @@ data class CredentialOfferRuntimeOverrides(
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
+    val credentialStatus: JsonElement? = null,
 )
 
 @Serializable
@@ -52,8 +56,8 @@ data class CredentialOfferCreateRequest(
         }
         require(
             authMethod != AuthenticationMethod.AUTHORIZED ||
-                (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
-                runtimeOverrides == null
+                    (issuerStateMode ?: IssuerStateMode.INCLUDE) != IssuerStateMode.OMIT ||
+                    runtimeOverrides == null
         ) {
             "runtimeOverrides require issuerStateMode INCLUDE for AUTHORIZED credential offers"
         }

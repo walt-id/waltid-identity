@@ -51,6 +51,7 @@ Configuration files live in `config/`:
 | File | Purpose |
 |------|---------|
 | `_features.conf` | Enables optional service features |
+| `dev-mode.conf` | Development-mode settings, including DID Web HTTP resolver support |
 | `web.conf` | Host and port configuration |
 | `issuer-service.conf` | Base URL and issuer token signing key |
 | `credential-issuer-metadata.conf` | OpenID4VCI issuer and authorization server metadata |

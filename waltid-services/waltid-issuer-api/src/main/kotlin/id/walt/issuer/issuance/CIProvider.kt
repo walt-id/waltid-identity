@@ -20,6 +20,8 @@ import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
 import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
 import id.walt.mdoc.mso.DeviceKeyInfo
@@ -62,7 +64,6 @@ import org.cose.java.OneKey
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-
 
 /**
  * OIDC for Verifiable Credential Issuance service provider, implementing abstract service provider from OIDC4VC library.
@@ -492,7 +493,8 @@ open class CIProvider(
                         holderKey.publicKey,
                         null
                     ).AsCBOR().EncodeToBytes()
-                )
+                ),
+                keyAuthorizations = buildKeyAuthorizations(request.authorizedTransactionDataTypes),
             ),
             cryptoProvider = cryptoProvider,
             keyID = keyID,
@@ -512,6 +514,13 @@ open class CIProvider(
             customParameters = mapOf("credential_encoding" to JsonPrimitive("issuer-signed"))
         )
     }
+
+    private fun buildKeyAuthorizations(authorizedTransactionDataTypes: List<String>?): MapElement? =
+        authorizedTransactionDataTypes
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { types ->
+                mapOf("nameSpaces" to types.map { it.toDataElement() }.toDataElement()).toDataElement()
+            }
 
     fun generateBatchCredentialResponse(
         batchCredentialRequest: BatchCredentialRequest,

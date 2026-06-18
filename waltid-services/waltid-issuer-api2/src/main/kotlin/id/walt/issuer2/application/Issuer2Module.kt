@@ -72,7 +72,6 @@ class Issuer2Module(
         profileService = credentialProfileService,
         sessionService = issuanceSessionService,
         offerService = credentialOfferService,
-        notificationService = notificationService,
     )
 
     val openId4VciController = OpenId4VciController(

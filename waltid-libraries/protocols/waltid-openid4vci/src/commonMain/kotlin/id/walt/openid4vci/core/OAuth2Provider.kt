@@ -19,6 +19,7 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
@@ -91,7 +92,10 @@ interface OAuth2Provider {
         session: Session? = null
     ): AccessTokenRequestResult
 
-    suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult
+    suspend fun createAccessTokenResponse(
+        request: AccessTokenRequest,
+        options: TokenResponseOptions = TokenResponseOptions(),
+    ): AccessTokenResponseResult
 
     fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp
 

@@ -60,6 +60,7 @@ Libraries for cryptographic operations and key management:
 - **[🟡 waltid-crypto-android](./crypto/waltid-crypto-android)**: Android-specific cryptographic implementations
 - **[🟡 waltid-crypto-ios](./crypto/waltid-crypto-ios)**: iOS-specific cryptographic implementations
 - **[🟡 waltid-crypto-aws](./crypto/waltid-crypto-aws)**: AWS Key Management Service (KMS) integration
+- **[🟡 waltid-crypto-azure](./crypto/waltid-crypto-azure)**: Azure Key Vault integration for key management and cryptographic operations
 - **[🟡 waltid-crypto-oci](./crypto/waltid-crypto-oci)**: Oracle Cloud Infrastructure (OCI) KMS integration
 - **[🟡 waltid-target-ios](./crypto/waltid-target-ios)**: iOS target support for multiplatform crypto libraries
 
@@ -67,24 +68,29 @@ Libraries for cryptographic operations and key management:
 Libraries for working with digital credentials across multiple formats:
 - **[🟢 waltid-digital-credentials](./credentials/waltid-digital-credentials)**: Unified abstraction layer for parsing and verifying credentials (W3C, SD-JWT, mdoc)
 - **[🟢 waltid-w3c-credentials](./credentials/waltid-w3c-credentials)**: W3C Verifiable Credentials implementation (v1.1 and v2.0)
-- **[🟢 waltid-mdoc-credentials](./credentials/waltid-mdoc-credentials)**: ISO/IEC 18013-5:2021 mdoc implementation
+- **[🟠 waltid-mdoc-credentials](./credentials/waltid-mdoc-credentials)**: ISO/IEC 18013-5:2021 mdoc implementation
 - **[🟢 waltid-mdoc-credentials2](./credentials/waltid-mdoc-credentials2)**: Modern mdoc credentials implementation
 - **[🟢 waltid-dcql](./credentials/waltid-dcql)**: Digital Credentials Query Language (DCQL) for OpenID4VP 1.0
 - **[🟠 waltid-dif-definitions-parser](./credentials/waltid-dif-definitions-parser)**: DIF Presentation Definition parser
 - **[🟠 waltid-verification-policies](./credentials/waltid-verification-policies)**: Legacy verification policy system for draft implementations
 - **[🟢 waltid-verification-policies2](./credentials/waltid-verification-policies2)**: Modern verification policy system for OpenID4VP 1.0
+- **[🟢 waltid-verification-policies2-vp](./credentials/waltid-verification-policies2-vp)**: Verification policies for Verifiable Presentations (VP)
 - **[🟢 waltid-holder-policies](./credentials/waltid-holder-policies)**: Policy-based access control for wallet holders
 - **[🟢 waltid-digital-credentials-examples](./credentials/waltid-digital-credentials-examples)**: Example credentials for testing and development
 - **[🟢 waltid-vical](./credentials/waltid-vical)**: VICAL trust list validation for mdoc credentials
+- **[🟢 waltid-trust-registry](./credentials/waltid-trust-registry)**: EU Trusted Lists and Lists of Trusted Entities parsing and querying
 
 ### [Protocols](./protocols/)
 Libraries implementing identity and credential protocols:
 - **[🟠 waltid-openid4vc](./protocols/waltid-openid4vc)**: OpenID for Verifiable Credentials (OID4VCI, OID4VP, SIOPv2) - draft implementations
+- **[🟢 waltid-openid4vci](./protocols/waltid-openid4vci)**: OpenID for Verifiable Credential Issuance (OpenID4VCI) 1.0 OAuth2 provider
+- **[🟢 waltid-openid4vci-wallet](./protocols/waltid-openid4vci-wallet)**: OpenID4VCI 1.0 wallet (holder) implementation
 - **[🟢 waltid-openid4vp](./protocols/waltid-openid4vp)**: Core OpenID4VP 1.0 library with DCQL support
+  - **[🟢 waltid-openid4vp-clientidprefix](./protocols/waltid-openid4vp-clientidprefix)**: Client ID prefix parsing and authentication for OpenID4VP
+  - **[🟢 waltid-openid4vp-verifier-openapi](./protocols/waltid-openid4vp-verifier-openapi)**: OpenAPI schema generation for OpenID4VP verifier endpoints
 - **[🟢 waltid-openid4vp-verifier](./protocols/waltid-openid4vp-verifier)**: OpenID4VP 1.0 verifier implementation
 - **[🟢 waltid-openid4vp-wallet](./protocols/waltid-openid4vp-wallet)**: OpenID4VP 1.0 wallet implementation
-- **[🟢 waltid-openid4vp-clientidprefix](./protocols/waltid-openid4vp-clientidprefix)**: Client ID prefix parsing and authentication for OpenID4VP
-- **[🟢 waltid-openid4vp-verifier-openapi](./protocols/waltid-openid4vp-verifier-openapi)**: OpenAPI schema generation for OpenID4VP verifier endpoints
+- **[🟢 waltid-18013-7-verifier](./protocols/waltid-18013-7-verifier)**: ISO/IEC 18013-7 Annex C (DC API / Apple Wallet) verifier support
 
 ### [SD-JWT](./sdjwt/)
 Libraries for Selective Disclosure JWT (SD-JWT) credentials:
@@ -95,11 +101,12 @@ Libraries for Selective Disclosure JWT (SD-JWT) credentials:
 Libraries for web server functionality:
 - **[🟢 waltid-ktor-notifications-core](./web/waltid-ktor-notifications-core)**: Core library for Ktor server notifications (SSE, webhooks)
 - **[🟢 waltid-ktor-notifications](./web/waltid-ktor-notifications)**: Ktor plugin for session notifications
+- **[🟢 waltid-web-data-fetching](./web/waltid-web-data-fetching)**: Configurable HTTP data fetching with caching, retry logic, and URL filtering
 
 ### Core Libraries
 Standalone libraries providing core functionality:
 - **[🟢 waltid-did](./waltid-did)**: Decentralized Identifier (DID) library with support for multiple DID methods
-- **[🟢 waltid-core-wallet](./waltid-core-wallet)**: Core wallet helpers for building wallets on top of OpenID4VC
+- **[🟠 waltid-core-wallet](./waltid-core-wallet)**: Core wallet helpers for building wallets on top of OpenID4VC
 - **[🟢 waltid-library-commons](./waltid-library-commons)**: Common utilities and shared code for walt.id libraries
 - **[🟢 waltid-java-compat](./waltid-java-compat)**: Java compatibility layer for Kotlin libraries
 
