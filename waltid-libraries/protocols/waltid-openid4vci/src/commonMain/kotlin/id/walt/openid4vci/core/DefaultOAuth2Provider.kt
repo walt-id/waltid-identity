@@ -200,6 +200,8 @@ class DefaultOAuth2Provider(
                 put("token_type", JsonPrimitive(response.tokenType))
                 put("access_token", JsonPrimitive(response.accessToken))
                 response.expiresIn?.let { put("expires_in", JsonPrimitive(it)) }
+                response.refreshToken?.let { put("refresh_token", JsonPrimitive(it)) }
+                response.scope?.let { put("scope", JsonPrimitive(it)) }
                 response.extra.forEach { (key, value) ->
                     put(key, value.toJsonElement())
                 }
