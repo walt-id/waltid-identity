@@ -7,7 +7,7 @@ data class RefreshTokenClaims(
     val issuer: String,
     val subject: String,
     val type: String,
-    val issuedFor: String,
+    val issuedFor: String?,
     val audience: Set<String>,
     val scopes: Set<String>,
     val sessionId: String?,
@@ -16,5 +16,5 @@ data class RefreshTokenClaims(
 )
 
 interface RefreshTokenVerifier {
-    suspend fun verify(token: String, expectedIssuer: String?, expectedClientId: String): RefreshTokenClaims
+    suspend fun verify(token: String, expectedIssuer: String?, expectedClientId: String?): RefreshTokenClaims
 }

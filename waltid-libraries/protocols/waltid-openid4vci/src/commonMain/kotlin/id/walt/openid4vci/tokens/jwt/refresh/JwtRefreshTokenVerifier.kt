@@ -22,10 +22,8 @@ class JwtRefreshTokenVerifier(
     override suspend fun verify(
         token: String,
         expectedIssuer: String?,
-        expectedClientId: String,
+        expectedClientId: String?,
     ): RefreshTokenClaims {
-        require(expectedClientId.isNotBlank()) { "expectedClientId is required for refresh token verification" }
-
         val payload = verifier.verify(token, "Refresh token")
 
         val type = payload.stringClaim(JwtPayloadClaims.TYPE)
@@ -40,9 +38,11 @@ class JwtRefreshTokenVerifier(
             }
         }
 
-        val issuedFor = payload.stringClaim(JwtPayloadClaims.AUTHORIZED_PARTY)
-        require(issuedFor == expectedClientId) {
-            "Refresh token client mismatch (expected=$expectedClientId, got=$issuedFor)"
+        val issuedFor = payload.optionalStringClaim(JwtPayloadClaims.AUTHORIZED_PARTY)
+        if (!expectedClientId.isNullOrBlank()) {
+            require(issuedFor == expectedClientId) {
+                "Refresh token client mismatch (expected=$expectedClientId, got=$issuedFor)"
+            }
         }
 
         val expiresAt = Instant.fromEpochSeconds(payload.longClaim(JwtPayloadClaims.EXPIRATION))
@@ -76,6 +76,9 @@ class JwtRefreshTokenVerifier(
     private fun JsonObject.stringClaim(name: String): String =
         this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
             ?: throw IllegalArgumentException("Refresh token is missing $name claim")
+
+    private fun JsonObject.optionalStringClaim(name: String): String? =
+        this[name]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
 
     private fun JsonObject.longClaim(name: String): Long =
         this[name]?.jsonPrimitive?.longOrNull

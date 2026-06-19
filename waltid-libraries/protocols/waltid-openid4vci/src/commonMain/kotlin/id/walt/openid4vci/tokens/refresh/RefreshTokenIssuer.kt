@@ -6,7 +6,7 @@ import kotlin.time.Instant
 data class RefreshTokenGenerationRequest(
     val issuer: String,
     val subject: String,
-    val clientId: String,
+    val clientId: String?,
     val scopes: Set<String>,
     val expiresAt: Instant,
     val sessionId: String?,

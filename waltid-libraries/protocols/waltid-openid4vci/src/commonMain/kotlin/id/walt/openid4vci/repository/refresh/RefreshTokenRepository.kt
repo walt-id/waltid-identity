@@ -25,7 +25,7 @@ interface RefreshTokenRecord {
     val active: Boolean
     val requester: AccessTokenRequest
     val accessTokenSignature: String
-    val clientId: String
+    val clientId: String?
     val grantedScopes: Set<String>
     val grantedAudience: Set<String>
     val session: Session
@@ -37,7 +37,7 @@ data class DefaultRefreshTokenRecord(
     override val active: Boolean = true,
     override val requester: AccessTokenRequest,
     override val accessTokenSignature: String,
-    override val clientId: String,
+    override val clientId: String?,
     override val grantedScopes: Set<String>,
     override val grantedAudience: Set<String>,
     override val session: Session,

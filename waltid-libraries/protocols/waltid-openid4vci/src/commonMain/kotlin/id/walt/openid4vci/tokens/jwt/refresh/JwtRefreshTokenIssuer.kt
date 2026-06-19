@@ -27,7 +27,6 @@ class JwtRefreshTokenIssuer internal constructor(
     override suspend fun issue(request: RefreshTokenGenerationRequest): String {
         require(request.issuer.isNotBlank()) { "issuer is required for refresh token generation" }
         require(request.subject.isNotBlank()) { "subject is required for refresh token generation" }
-        require(request.clientId.isNotBlank()) { "clientId is required for refresh token generation" }
 
         val claims = buildMap<String, Any?> {
             put(JwtPayloadClaims.JWT_ID, generateTokenId())
@@ -37,7 +36,9 @@ class JwtRefreshTokenIssuer internal constructor(
             put(JwtPayloadClaims.ISSUED_AT, request.issuedAt.epochSeconds)
             put(JwtPayloadClaims.EXPIRATION, request.expiresAt.epochSeconds)
             put(JwtPayloadClaims.TYPE, KEYCLOAK_REFRESH_TOKEN_TYPE)
-            put(JwtPayloadClaims.AUTHORIZED_PARTY, request.clientId)
+            request.clientId?.takeIf { it.isNotBlank() }?.let {
+                put(JwtPayloadClaims.AUTHORIZED_PARTY, it)
+            }
             request.sessionId?.takeIf { it.isNotBlank() }?.let { put(JwtPayloadClaims.SESSION_ID, it) }
             request.scopes.takeIf { it.isNotEmpty() }?.let { put(JwtPayloadClaims.SCOPE, it.joinToString(" ")) }
         }
