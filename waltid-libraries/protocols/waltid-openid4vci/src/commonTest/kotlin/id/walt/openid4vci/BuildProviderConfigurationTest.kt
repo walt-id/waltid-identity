@@ -10,8 +10,6 @@ import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepo
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
-import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
-import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers

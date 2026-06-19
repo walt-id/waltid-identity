@@ -14,8 +14,6 @@ import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
-import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.tokens.AccessTokenVerifier
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator

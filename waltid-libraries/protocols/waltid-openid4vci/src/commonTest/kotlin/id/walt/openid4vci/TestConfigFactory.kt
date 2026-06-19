@@ -4,10 +4,6 @@ import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.tokens.AccessTokenVerifier
-import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
-import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
