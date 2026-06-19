@@ -208,7 +208,7 @@ class ProviderCombinedFlowTest {
 
             assertEquals(TOKEN_TYPE_BEARER, tokenResponse.tokenType)
             assertTrue((tokenResponse.expiresIn ?: -1) >= 0)
-            assertTrue((tokenResponse.extra["refresh_token"] as? String)?.isNotBlank() == true)
+            assertTrue(tokenResponse.refreshToken?.isNotBlank() == true)
             return tokenResponse to accessRequest
         }
 
