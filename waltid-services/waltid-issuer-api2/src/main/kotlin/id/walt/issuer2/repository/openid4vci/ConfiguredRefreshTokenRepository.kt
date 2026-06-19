@@ -21,7 +21,7 @@ import kotlin.time.Instant
 
 class ConfiguredRefreshTokenRepository : RefreshTokenRepository {
     private val records = ConfiguredPersistence(
-        "issuer2_refresh_tokens", defaultExpiration = 30.days,
+        "issuer2_refresh_tokens", defaultExpiration = 1.days,
         encoding = { Json.encodeToString(StoredRefreshTokenRecord.serializer(), it) },
         decoding = { Json.decodeFromString(StoredRefreshTokenRecord.serializer(), it) },
     )
