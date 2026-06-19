@@ -11,7 +11,7 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +27,7 @@ import kotlin.test.assertTrue
 class PreAuthorizedCodeGrantHandlerTest {
 
     private val repository = InMemoryPreAuthorizedCodeRepository()
-    private val refreshTokenRepository = defaultRefreshTokenRepository()
+    private val refreshTokenRepository = InMemoryRefreshTokenRepository()
     private val refreshTokenIssuer = TestRefreshTokenIssuer()
     private val handler = PreAuthorizedCodeTokenEndpoint(
         codeRepository = repository,

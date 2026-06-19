@@ -4,7 +4,7 @@ import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
-import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
@@ -28,7 +28,7 @@ class ProviderRefreshTokenFlowTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `authorization code flow stores refresh token by signature and refresh rotates it`() = runTest {
-        val refreshTokenRepository = defaultRefreshTokenRepository()
+        val refreshTokenRepository = InMemoryRefreshTokenRepository()
         val refreshTokenIssuer = TestRefreshTokenIssuer()
         val accessTokenIssuer = CountingTokenIssuer()
         val provider = buildTestProvider(refreshTokenRepository, refreshTokenIssuer, accessTokenIssuer)
@@ -146,7 +146,7 @@ class ProviderRefreshTokenFlowTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `unbound refresh token grant does not require client identity`() = runTest {
-        val refreshTokenRepository = defaultRefreshTokenRepository()
+        val refreshTokenRepository = InMemoryRefreshTokenRepository()
         val refreshTokenIssuer = TestRefreshTokenIssuer()
         val config = createTestConfig(
             refreshTokenRepository = refreshTokenRepository,
@@ -209,7 +209,7 @@ class ProviderRefreshTokenFlowTest {
     }
 
     private fun buildTestProvider(
-        refreshTokenRepository: RefreshTokenRepository = defaultRefreshTokenRepository(),
+        refreshTokenRepository: RefreshTokenRepository = InMemoryRefreshTokenRepository(),
         refreshTokenIssuer: RefreshTokenIssuer = TestRefreshTokenIssuer(),
         accessTokenIssuer: AccessTokenIssuer = CountingTokenIssuer(),
     ): OAuth2Provider =

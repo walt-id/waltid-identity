@@ -5,7 +5,7 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
-import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import id.walt.openid4vci.tokens.access.AccessTokenVerifier
 import id.walt.openid4vci.tokens.refresh.RefreshTokenClaims
@@ -36,7 +36,7 @@ internal fun createTestConfig(
     accessTokenVerifier: AccessTokenVerifier? = null,
     refreshTokenIssuer: RefreshTokenIssuer = TestRefreshTokenIssuer(),
     refreshTokenVerifier: RefreshTokenVerifier = refreshTokenIssuer as? RefreshTokenVerifier ?: TestRefreshTokenIssuer(),
-    refreshTokenRepository: RefreshTokenRepository = defaultRefreshTokenRepository(),
+    refreshTokenRepository: RefreshTokenRepository = InMemoryRefreshTokenRepository(),
     issuerStateValidator: IssuerStateValidator? = null,
 ): OAuth2ProviderConfig {
     val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
