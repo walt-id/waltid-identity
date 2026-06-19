@@ -8,6 +8,7 @@ import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
+import id.walt.issuer2.testsupport.assertRefreshToken
 import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
@@ -84,6 +85,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
@@ -141,6 +143,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
@@ -207,6 +210,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
