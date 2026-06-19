@@ -98,8 +98,7 @@ class AuthorizationCodeTokenEndpoint(
 
             val accessToken = accessTokenIssuer.issue(claims)
 
-            val extra = mutableMapOf<String, Any?>()
-            issueRefreshTokenIfAllowed(
+            val refreshToken = issueRefreshToken(
                 request = scopedRequest,
                 accessToken = accessToken,
                 session = session,
@@ -108,9 +107,7 @@ class AuthorizationCodeTokenEndpoint(
                 clientId = client.id,
                 grantedScopes = scopedRequest.grantedScopes,
                 grantedAudience = record.grantedAudience,
-            )?.let { refreshToken ->
-                extra["refresh_token"] = refreshToken
-            }
+            )
 
             // If no explicit session expiry is configured, return the spec-default lifetime as exact 3600.
             // If an explicit expiry exists, return the real remaining lifetime from now.
@@ -122,7 +119,7 @@ class AuthorizationCodeTokenEndpoint(
                     accessToken = accessToken,
                     tokenType = TOKEN_TYPE_BEARER,
                     expiresIn = expiresIn,
-                    extra = extra,
+                    refreshToken = refreshToken,
                 ),
             )
         } catch (e: SerializationException) {
@@ -132,7 +129,7 @@ class AuthorizationCodeTokenEndpoint(
         }
     }
 
-    private suspend fun issueRefreshTokenIfAllowed(
+    private suspend fun issueRefreshToken(
         request: AccessTokenRequest,
         accessToken: String,
         session: Session,
@@ -141,11 +138,7 @@ class AuthorizationCodeTokenEndpoint(
         clientId: String,
         grantedScopes: Set<String>,
         grantedAudience: Set<String>,
-    ): String? {
-        if (!request.client.grantTypes.contains(GrantType.RefreshToken.value)) {
-            return null
-        }
-
+    ): String {
         val refreshTokenExpiresAt = session.expiresAt[TokenType.REFRESH_TOKEN]
             ?: (Clock.System.now() + refreshTokenLifetimeSeconds.seconds)
         val refreshSession = session.copy().withExpiresAt(TokenType.REFRESH_TOKEN, refreshTokenExpiresAt)
