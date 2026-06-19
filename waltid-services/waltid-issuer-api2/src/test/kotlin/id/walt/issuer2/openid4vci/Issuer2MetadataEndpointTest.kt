@@ -105,7 +105,11 @@ class Issuer2MetadataEndpointTest {
         assertEquals(setOf("ES256"), authorizationServerMetadata.dpopSigningAlgValuesSupported)
         assertEquals(true, authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported)
         assertEquals(
-            setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
+            setOf(
+                GrantType.AuthorizationCode.value,
+                GrantType.PreAuthorizedCode.value,
+                GrantType.RefreshToken.value,
+            ),
             authorizationServerMetadata.grantTypesSupported,
         )
         assertFalse("code_challenge_methods_supported" in authorizationServerMetadataJson)
