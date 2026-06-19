@@ -123,6 +123,8 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
         parameters: Map<String, List<String>>,
         session: Session,
     ): AccessTokenRequestResult {
+        // RFC6749 §6 requires grant_type=refresh_token and refresh_token. Client identity can be
+        // supplied by client authentication outside the request body.
         val refreshToken = parameters.requireSingle("refresh_token").takeIf { it.isNotBlank() }
             ?: return AccessTokenRequestResult.Failure(
                 OAuthError(
@@ -131,16 +133,10 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
                 ),
             )
 
-        val clientId = parameters.requireSingle("client_id").takeIf { it.isNotBlank() }
-            ?: return AccessTokenRequestResult.Failure(
-                OAuthError(
-                    error = id.walt.openid4vci.errors.OAuthErrorCodes.INVALID_REQUEST,
-                    description = "Missing client_id",
-                ),
-            )
+        val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() }
 
         val client = DefaultClient(
-            id = clientId,
+            id = clientId.orEmpty(),
             redirectUris = emptyList(),
             grantTypes = setOf(GrantType.RefreshToken.value),
             responseTypes = emptySet(),
