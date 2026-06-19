@@ -20,8 +20,10 @@ import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -68,6 +70,44 @@ class BuildProviderConfigurationTest {
         assertEquals(400, response.status)
         assertEquals(null, response.redirectUri)
         assertEquals("Missing response_type", response.body)
+    }
+
+    @Test
+    fun `writeAccessTokenResponse includes no-store headers`() {
+        val provider = buildOAuth2Provider(createTestConfig())
+        val request = DefaultAccessTokenRequest(
+            client = DefaultClient(
+                id = "client-123",
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.RefreshToken.value),
+                responseTypes = emptySet(),
+            ),
+            grantTypes = setOf(GrantType.RefreshToken.value),
+        )
+
+        val response = provider.writeAccessTokenResponse(
+            request = request,
+            response = AccessTokenResponse(
+                accessToken = "access-token",
+                refreshToken = "refresh-token",
+                scope = "openid email",
+            ),
+        )
+
+        assertEquals("no-store", response.headers["Cache-Control"])
+        assertEquals("no-cache", response.headers["Pragma"])
+        assertEquals("refresh-token", response.payload["refresh_token"]?.jsonPrimitive?.content)
+        assertEquals("openid email", response.payload["scope"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `writeAccessTokenError includes no-store headers`() {
+        val provider = buildOAuth2Provider(createTestConfig())
+
+        val response = provider.writeAccessTokenError(OAuthError("invalid_request"))
+
+        assertEquals("no-store", response.headers["Cache-Control"])
+        assertEquals("no-cache", response.headers["Pragma"])
     }
 
     @Test
