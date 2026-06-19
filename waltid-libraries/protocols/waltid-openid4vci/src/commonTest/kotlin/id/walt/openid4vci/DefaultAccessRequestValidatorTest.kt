@@ -26,6 +26,7 @@ class DefaultAccessRequestValidatorTest {
         assertTrue(result.isSuccess())
         val request = (result as AccessTokenRequestResult.Success).request
         assertTrue(request.grantTypes.contains(GrantType.AuthorizationCode.value))
+        assertEquals(setOf(GrantType.AuthorizationCode.value), request.client.grantTypes)
         assertEquals("auth-code", request.requestForm["code"]?.firstOrNull())
         assertEquals("client-123", request.client.id)
     }
@@ -46,6 +47,7 @@ class DefaultAccessRequestValidatorTest {
         assertTrue(result.isSuccess())
         val request = (result as AccessTokenRequestResult.Success).request
         assertTrue(request.grantTypes.contains(GrantType.PreAuthorizedCode.value))
+        assertEquals(setOf(GrantType.PreAuthorizedCode.value), request.client.grantTypes)
         assertEquals("pre-auth-code", request.requestForm["pre-authorized_code"]?.firstOrNull())
         assertEquals("1234", request.requestForm["tx_code"]?.firstOrNull())
         assertTrue(request.requestedScopes.contains("openid"))
@@ -66,7 +68,7 @@ class DefaultAccessRequestValidatorTest {
     }
 
     @Test
-    fun `validate accepts refresh token grant`() {
+    fun `validate accepts refresh token grant with client id`() {
         val result = validator.validate(
             mapOf(
                 "grant_type" to listOf(GrantType.RefreshToken.value),
@@ -83,6 +85,23 @@ class DefaultAccessRequestValidatorTest {
         assertEquals("client-123", request.client.id)
         assertEquals("refresh-token", request.requestForm["refresh_token"]?.firstOrNull())
         assertTrue(request.requestedScopes.contains("openid"))
+    }
+
+    @Test
+    fun `validate accepts refresh token grant without client id`() {
+        val result = validator.validate(
+            mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "refresh_token" to listOf("refresh-token"),
+            ),
+            DefaultSession(),
+        )
+
+        assertTrue(result.isSuccess())
+        val request = (result as AccessTokenRequestResult.Success).request
+        assertTrue(request.grantTypes.contains(GrantType.RefreshToken.value))
+        assertEquals("", request.client.id)
+        assertEquals("refresh-token", request.requestForm["refresh_token"]?.firstOrNull())
     }
 
     @Test
