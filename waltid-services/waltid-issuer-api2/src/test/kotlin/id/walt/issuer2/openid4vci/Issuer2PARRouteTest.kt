@@ -92,6 +92,40 @@ class Issuer2PARRouteTest {
         assertEquals("90", payload["expires_in"]?.jsonPrimitive?.content)
     }
 
+    @Test
+    fun `token route returns no-store headers on errors`() = testApplication {
+        application {
+            install(ServerContentNegotiation) {
+                json(json)
+            }
+            install(Authentication) {
+                bearer("auth-oauth") {}
+            }
+            routing {
+                testController().register(this)
+            }
+        }
+        val client = createClient {
+            install(ClientContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val response = client.post("/openid4vci/token") {
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("grant_type", "unsupported")
+                    }
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+        assertEquals("no-cache", response.headers[HttpHeaders.Pragma])
+    }
+
     private fun testController(): OpenId4VciController {
         val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
         val metadataConfig = Issuer2MetadataConfig()
