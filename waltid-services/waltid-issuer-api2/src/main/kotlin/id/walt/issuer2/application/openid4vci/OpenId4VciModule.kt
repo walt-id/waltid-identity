@@ -12,8 +12,11 @@ import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenVerifier
+import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
@@ -48,8 +51,11 @@ data class OpenId4VciModule(
 
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),
-                    accessTokenService = JwtAccessTokenIssuer(signingKeyResolver),
+                    accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),
                     accessTokenVerifier = accessTokenVerifier,
+                    refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver),
+                    refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver),
+                    refreshTokenRepository = defaultRefreshTokenRepository(),
 
                     preAuthorizedCodeRepository = preAuthorizedCodeRepository,
                     preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,

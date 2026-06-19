@@ -27,7 +27,7 @@ import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenContext
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.parseQueryString
 import io.ktor.server.plugins.NotFoundException
