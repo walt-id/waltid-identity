@@ -220,8 +220,8 @@ data class AuthorizationServerMetadata(
             clientAttestationPopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             dpopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             codeChallengeMethodsSupported: List<String>? = null,
-            requirePushedAuthorizationRequests: Boolean? = null,
-            pushedAuthorizationRequestEndpointPath: String? = null,
+            requirePushedAuthorizationRequests: Boolean? = false,
+            pushedAuthorizationRequestEndpointPath: String? = "/par",
             statusListAggregationEndpointPath: String? = null,
             preAuthorizedGrantAnonymousAccessSupported: Boolean? = true,
         ): AuthorizationServerMetadata {

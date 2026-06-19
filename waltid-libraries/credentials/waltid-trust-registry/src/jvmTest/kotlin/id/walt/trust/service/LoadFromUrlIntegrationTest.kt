@@ -26,7 +26,7 @@ class LoadFromUrlIntegrationTest {
 
         val result = service.loadSourceFromUrl(
             sourceId = "at-tsl",
-            url = "https://www.signatur.rtr.at/currenttl.xml",
+            url = "https://www.signatur.rtr.at/vertrauensliste.xml",
             validateSignature = true
         )
 

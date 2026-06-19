@@ -4,13 +4,19 @@ import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.core.OAuth2ProviderConfig
+import id.walt.openid4vci.core.PushedAuthorizationConfig
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
+import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
+import id.walt.openid4vci.repository.par.InMemoryPARRepository
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
+import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.repository.authorization.defaultAuthorizationCodeRepository
 import id.walt.openid4vci.repository.preauthorized.defaultPreAuthorizedCodeRepository
 import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandler
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
@@ -20,9 +26,11 @@ import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,7 +54,73 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
-    fun `buildProvider surfaces validator failures`() {
+    fun `buildProvider registers default PAR handler when PAR is configured`() {
+        val config = createTestConfig(
+            authorizationRequestValidator = stubAuthorizeValidator(),
+            accessRequestValidator = stubAccessValidator(),
+        ).copy(
+            pushedAuthorizationConfig = PushedAuthorizationConfig(
+                repository = InMemoryPARRepository(),
+            )
+        )
+
+        val provider = buildOAuth2Provider(config)
+        assertIs<OAuth2Provider>(provider)
+        assertEquals(1, config.pushedAuthorizationEndpointHandlers.count())
+    }
+
+    @Test
+    fun `buildProvider rejects PAR handlers without PAR configuration`() {
+        val config = createTestConfig().apply {
+            pushedAuthorizationEndpointHandlers.append(NoopPushedAuthorizationHandler)
+        }
+
+        val failure = assertFailsWith<IllegalStateException> {
+            buildOAuth2Provider(config)
+        }
+
+        assertEquals("PAR endpoint handlers require pushedAuthorizationConfig", failure.message)
+    }
+
+    @Test
+    fun `buildProvider rejects PAR configuration without handlers`() {
+        val config = createTestConfig().copy(
+            pushedAuthorizationConfig = PushedAuthorizationConfig(
+                repository = InMemoryPARRepository(),
+            )
+        )
+
+        val failure = assertFailsWith<IllegalStateException> {
+            buildOAuth2Provider(
+                config = config,
+                includePushedAuthorizationDefaultHandlers = false,
+            )
+        }
+
+        assertEquals("PAR is configured but no pushed authorization endpoint handler is registered", failure.message)
+    }
+
+    @Test
+    fun `buildProvider allows custom PAR handler with PAR configuration`() {
+        val config = createTestConfig().copy(
+            pushedAuthorizationConfig = PushedAuthorizationConfig(
+                repository = InMemoryPARRepository(),
+            )
+        ).apply {
+            pushedAuthorizationEndpointHandlers.append(NoopPushedAuthorizationHandler)
+        }
+
+        val provider = buildOAuth2Provider(
+            config = config,
+            includePushedAuthorizationDefaultHandlers = false,
+        )
+
+        assertIs<OAuth2Provider>(provider)
+        assertEquals(1, config.pushedAuthorizationEndpointHandlers.count())
+    }
+
+    @Test
+    fun `buildProvider surfaces validator failures`() = runTest {
         val failingValidator = AuthorizationRequestValidator {
             AuthorizationRequestResult.Failure(OAuthError("invalid_client"))
         }
@@ -56,7 +130,7 @@ class BuildProviderConfigurationTest {
         )
 
         val provider = buildOAuth2Provider(config)
-        val result = provider.createAuthorizationRequest(emptyMap<String, List<String>>())
+        val result = provider.createAuthorizationRequest(emptyMap())
         assertTrue(result is AuthorizationRequestResult.Failure)
         assertEquals("invalid_client", result.error.error)
     }
@@ -112,8 +186,8 @@ class BuildProviderConfigurationTest {
 
     @Test
     fun `buildProvider rejects duplicate grant handlers should fail`() {
-        val authorizationCodeRepository = defaultAuthorizationCodeRepository()
-        val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
+        val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
+        val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
 
         assertFailsWith<IllegalStateException> {
             val duplicateGrantHandlerA = DuplicateGrantHandler()
@@ -148,8 +222,8 @@ class BuildProviderConfigurationTest {
 
     @Test
     fun `buildProvider allows custom grant handlers`() {
-        val authorizationCodeRepository = defaultAuthorizationCodeRepository()
-        val preAuthorizedCodeRepository = defaultPreAuthorizedCodeRepository()
+        val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
+        val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
 
         val config = OAuth2ProviderConfig(
             authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
@@ -190,6 +264,14 @@ class BuildProviderConfigurationTest {
 
         override suspend fun handleTokenEndpointRequest(request: AccessTokenRequest): AccessTokenResponseResult =
             AccessTokenResponseResult.Success(request, AccessTokenResponse(accessToken = "custom"))
+    }
+
+    private object NoopPushedAuthorizationHandler : PushedAuthorizationEndpointHandler {
+        override suspend fun handlePushedAuthorizationEndpointRequest(
+            authorizationRequest: AuthorizationRequest,
+            clientAuthentication: Map<String, String>,
+        ): PushedAuthorizationResponseResult =
+            PushedAuthorizationResponseResult.Failure(OAuthError("server_error"))
     }
 
     private fun stubAuthorizeValidator(): AuthorizationRequestValidator = AuthorizationRequestValidator {

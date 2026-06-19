@@ -5,6 +5,7 @@ import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
 import id.walt.issuer2.notifications.IssuanceNotifications
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 data class Issuer2ProfilesConfig(
@@ -27,4 +28,5 @@ data class CredentialProfileConfig(
     val mDocNameSpacesDataMappingConfig: Map<String, JsonObjectToCborMappingConfig>? = null,
     val x5Chain: List<String>? = null,
     val notifications: IssuanceNotifications? = null,
+    val credentialStatus: JsonElement? = null,
 )

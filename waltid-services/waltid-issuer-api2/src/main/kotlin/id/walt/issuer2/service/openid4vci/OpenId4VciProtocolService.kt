@@ -10,11 +10,18 @@ import id.walt.issuer2.notifications.IssuanceSessionEvent
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.utils.JsonObjectPathMapper
+import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
+import id.walt.mdoc.dataelement.NumberElement
+import id.walt.mdoc.dataelement.StringElement
+import id.walt.mdoc.doc.MDoc
+import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -25,19 +32,26 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.mdoc.objects.mso.Status as MdocStatus
+import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.parseQueryString
 import io.ktor.server.plugins.NotFoundException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
@@ -58,20 +72,48 @@ class OpenId4VciProtocolService(
         explicitNulls = false
     }
 
+    suspend fun processPushedAuthorizationRequest(parameters: Map<String, List<String>>): PushedAuthorizationResponseHttp {
+        return try {
+            val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters)) {
+                is AuthorizationRequestResult.Success -> result.request
+                is AuthorizationRequestResult.Failure -> return oauth2Provider.writePushedAuthorizationError(result.error)
+            }
+
+            when (val result = oauth2Provider.createPushedAuthorizationResponse(parRequest)) {
+                is PushedAuthorizationResponseResult.Success ->
+                    oauth2Provider.writePushedAuthorizationResponse(result.request, result.response)
+
+                is PushedAuthorizationResponseResult.Failure ->
+                    oauth2Provider.writePushedAuthorizationError(parRequest, result.error)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            oauth2Provider.writePushedAuthorizationError(
+                OAuthError(
+                    error = OAuthErrorCodes.SERVER_ERROR,
+                    description = "PAR processing failed: ${e.message}",
+                )
+            )
+        }
+    }
+
     suspend fun processAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizationResponseHttp {
         val authorizationRequest = when (val result = oauth2Provider.createAuthorizationRequest(parameters)) {
             is AuthorizationRequestResult.Success -> result.request
             is AuthorizationRequestResult.Failure -> return oauth2Provider.writeAuthorizationError(result.error)
         }
+        val resolvedParameters = authorizationRequest.requestForm
 
         val issuanceSession = try {
-            resolveAuthorizationSession(authorizationRequest, parameters)
+            resolveAuthorizationSession(authorizationRequest, resolvedParameters)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
         }
-        val internalAuthorizationRequest = parameters.withInternalAuthorizationSession(issuanceSession.sessionId)
+        val internalAuthorizationRequest =
+            resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
 
         val redirectUri =
             "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"
@@ -282,17 +324,45 @@ class OpenId4VciProtocolService(
             return failCredentialRequest(requestWithSession, session, e.toCredentialError())
         }
 
+        // Prepare credential data with status injection for W3C/IETF formats
+        val credentialDataWithStatus = session.credentialStatus?.let { status ->
+            when (configuration.format) {
+                CredentialFormat.JWT_VC_JSON, CredentialFormat.JWT_VC, CredentialFormat.JWT_VC_JSON_LD -> {
+                    // Inject credentialStatus into credential data for W3C VCs
+                    JsonObject(session.credentialData.toMutableMap().apply {
+                        put("credentialStatus", status)
+                    })
+                }
+                CredentialFormat.SD_JWT_VC -> {
+                    // For SD-JWT VC, inject status at root level (as "status" claim)
+                    JsonObject(session.credentialData.toMutableMap().apply {
+                        put("status", status)
+                    })
+                }
+                else -> session.credentialData
+            }
+        } ?: session.credentialData
+
+        // Convert credentialStatus to Status object for mDoc
+        val mDocStatus = session.credentialStatus?.let { status ->
+            when (configuration.format) {
+                CredentialFormat.MSO_MDOC -> parseStatusFromJsonElement(status)
+                else -> null
+            }
+        }
+
         val credentialResponse = try {
             when (val result = oauth2Provider.createCredentialResponse(
                 request = requestWithSession,
                 configuration = configuration,
                 issuerKey = issuerKey,
                 issuerId = issuerId,
-                credentialData = session.credentialData,
+                credentialData = credentialDataWithStatus,
                 dataMapping = session.mapping,
                 selectiveDisclosure = session.selectiveDisclosure,
                 x5Chain = x5Chain,
                 mDocNameSpacesDataMappingConfig = session.mDocNameSpacesDataMappingConfig,
+                credentialStatus = mDocStatus,
             )) {
                 is CredentialResponseResult.Success -> result.response
                 is CredentialResponseResult.Failure -> {
@@ -404,6 +474,7 @@ class OpenId4VciProtocolService(
             authorizationRequest = authorizationRequest,
             expiresAt = Clock.System.now() + AUTHORIZATION_CODE_SESSION_LIFETIME,
             notifications = notifications,
+            credentialStatus = credentialStatus,
         )
 
     private fun resolveRequestedCredentialConfigurationId(
@@ -546,5 +617,28 @@ class OpenId4VciProtocolService(
                 message ?: "Credential request processing failed",
             )
         }
+
+    /**
+     * Parse JsonElement to Status object for mDoc credentials.
+     * Supports status_list format with idx and uri fields.
+     */
+    private fun parseStatusFromJsonElement(status: JsonElement): MdocStatus? {
+        return try {
+            val statusObj = status.jsonObject
+            val statusList = statusObj["status_list"]?.jsonObject
+                ?: statusObj["statusList"]?.jsonObject
+                ?: return null
+
+            val idx = statusList["idx"]?.jsonPrimitive?.longOrNull?.toULong()
+                ?: statusList["index"]?.jsonPrimitive?.longOrNull?.toULong()
+                ?: return null
+            val uri = statusList["uri"]?.jsonPrimitive?.content
+                ?: return null
+
+            MdocStatus(statusList = MdocStatusListInfo(index = idx, uri = id.walt.mdoc.objects.mso.UniformResourceIdentifier(uri)))
+        } catch (e: Exception) {
+            null
+        }
+    }
 
 }

@@ -81,7 +81,8 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf("ES256"), metadata.dpopSigningAlgValuesSupported)
         assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
         assertEquals(null, metadata.codeChallengeMethodsSupported)
-        assertEquals(null, metadata.pushedAuthorizationRequestEndpoint)
+        assertEquals("https://issuer.example/par", metadata.pushedAuthorizationRequestEndpoint)
+        assertEquals(false, metadata.requirePushedAuthorizationRequests)
         assertEquals(null, metadata.statusListAggregationEndpoint)
         assertEquals(
             setOf(
