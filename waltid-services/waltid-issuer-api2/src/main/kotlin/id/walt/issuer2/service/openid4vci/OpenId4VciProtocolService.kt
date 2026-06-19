@@ -19,9 +19,9 @@ import id.walt.mdoc.doc.MDoc
 import id.walt.mdoc.issuersigned.IssuerSigned
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
+import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequest
@@ -32,6 +32,8 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.tokens.AccessTokenContext
@@ -69,20 +71,51 @@ class OpenId4VciProtocolService(
         explicitNulls = false
     }
 
+    /**
+     * Process Pushed Authorization Request (RFC 9126)
+     */
+    suspend fun processPushedAuthorizationRequest(parameters: Map<String, List<String>>): PushedAuthorizationResponseHttp {
+        return try {
+            val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters)) {
+                is AuthorizationRequestResult.Success -> result.request
+                is AuthorizationRequestResult.Failure -> return oauth2Provider.writePushedAuthorizationError(result.error)
+            }
+
+            when (val result = oauth2Provider.createPushedAuthorizationResponse(parRequest)) {
+                is PushedAuthorizationResponseResult.Success ->
+                    oauth2Provider.writePushedAuthorizationResponse(result.request, result.response)
+
+                is PushedAuthorizationResponseResult.Failure ->
+                    oauth2Provider.writePushedAuthorizationError(parRequest, result.error)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            oauth2Provider.writePushedAuthorizationError(
+                OAuthError(
+                    error = OAuthErrorCodes.SERVER_ERROR,
+                    description = "PAR processing failed: ${e.message}",
+                )
+            )
+        }
+    }
+
     suspend fun processAuthorizeRequest(parameters: Map<String, List<String>>): AuthorizationResponseHttp {
         val authorizationRequest = when (val result = oauth2Provider.createAuthorizationRequest(parameters)) {
             is AuthorizationRequestResult.Success -> result.request
             is AuthorizationRequestResult.Failure -> return oauth2Provider.writeAuthorizationError(result.error)
         }
+        val resolvedParameters = authorizationRequest.requestForm
 
         val issuanceSession = try {
-            resolveAuthorizationSession(authorizationRequest, parameters)
+            resolveAuthorizationSession(authorizationRequest, resolvedParameters)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             return oauth2Provider.writeAuthorizationError(authorizationRequest, e.toAuthorizationError())
         }
-        val internalAuthorizationRequest = parameters.withInternalAuthorizationSession(issuanceSession.sessionId)
+        val internalAuthorizationRequest =
+            resolvedParameters.withInternalAuthorizationSession(issuanceSession.sessionId)
 
         val redirectUri =
             "${metadataService.issuerBaseUrl()}/external_login/${internalAuthorizationRequest.toQueryString()}"

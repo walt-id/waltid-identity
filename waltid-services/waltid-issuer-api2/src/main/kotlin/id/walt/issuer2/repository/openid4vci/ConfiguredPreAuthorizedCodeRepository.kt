@@ -27,10 +27,7 @@ class ConfiguredPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {
         records[code]?.takeIf { Clock.System.now() <= it.expiresAt }
 
     override suspend fun consume(code: String): PreAuthorizedCodeRecord? {
-        // Follows issuer1's ConfiguredPersistence style. ConfiguredPersistence does not expose
-        // atomic get-and-remove semantics yet, so stricter replay protection belongs in commons.
-        val record = records[code] ?: return null
-        records.remove(code)
+        val record = records.getAndRemove(code) ?: return null
         return record.takeIf { Clock.System.now() <= it.expiresAt }
     }
 }
