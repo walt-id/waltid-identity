@@ -75,7 +75,7 @@ internal class TestRefreshTokenIssuer : RefreshTokenIssuer, RefreshTokenVerifier
         val payload = listOf(
             request.issuer,
             request.subject,
-            request.clientId,
+            request.clientId.orEmpty(),
             request.issuedAt.epochSeconds.toString(),
             request.expiresAt.epochSeconds.toString(),
             request.sessionId.orEmpty(),
@@ -89,13 +89,13 @@ internal class TestRefreshTokenIssuer : RefreshTokenIssuer, RefreshTokenVerifier
     override suspend fun verify(
         token: String,
         expectedIssuer: String?,
-        expectedClientId: String,
+        expectedClientId: String?,
     ): RefreshTokenClaims {
         val claims = decodeClaims(token)
         if (!expectedIssuer.isNullOrBlank() && claims.issuer != expectedIssuer) {
             throw IllegalArgumentException("Issuer mismatch")
         }
-        if (claims.issuedFor != expectedClientId) {
+        if (!expectedClientId.isNullOrBlank() && claims.issuedFor != expectedClientId) {
             throw IllegalArgumentException("Client mismatch")
         }
         if (Clock.System.now() >= claims.expiresAt) {
@@ -125,7 +125,7 @@ internal class TestRefreshTokenIssuer : RefreshTokenIssuer, RefreshTokenVerifier
             issuer = values[0],
             subject = values[1],
             type = KEYCLOAK_REFRESH_TOKEN_TYPE,
-            issuedFor = values[2],
+            issuedFor = values[2].takeIf { it.isNotBlank() },
             audience = setOf(values[0]),
             scopes = scopes,
             sessionId = values[5].takeIf { it.isNotBlank() },
