@@ -85,11 +85,19 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
-                assertRefreshToken(tokenResponse)
+                val refreshToken = assertRefreshToken(tokenResponse)
+
+                val refreshedTokenResponse = walletFlow.refreshAccessToken(
+                    resolvedOffer = resolvedOffer,
+                    refreshToken = refreshToken,
+                )
+                assertBearerAccessToken(refreshedTokenResponse)
+                val rotatedRefreshToken = assertRefreshToken(refreshedTokenResponse)
+                assertNotEquals(refreshToken, rotatedRefreshToken)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
-                    accessToken = tokenResponse.access_token,
+                    accessToken = refreshedTokenResponse.access_token,
                 )
                 assertJwtVcJsonCredentialPayload(credentialPayload)
                 assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")

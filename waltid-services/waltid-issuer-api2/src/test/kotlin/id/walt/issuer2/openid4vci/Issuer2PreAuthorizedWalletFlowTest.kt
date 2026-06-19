@@ -31,6 +31,7 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -129,6 +130,36 @@ class Issuer2PreAuthorizedWalletFlowTest {
             ),
         )
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    @Test
+    fun walletCanRefreshPreAuthorizedAccessToken() = testApplication {
+        val scenario = Issuer2CredentialScenarios.identitySdJwt
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        assertBearerAccessToken(tokenResponse)
+        val refreshToken = assertRefreshToken(tokenResponse)
+
+        val refreshedTokenResponse = walletFlow.refreshAccessToken(
+            resolvedOffer = resolvedOffer,
+            refreshToken = refreshToken,
+        )
+
+        assertBearerAccessToken(refreshedTokenResponse)
+        val rotatedRefreshToken = assertRefreshToken(refreshedTokenResponse)
+        assertNotEquals(refreshToken, rotatedRefreshToken)
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
     }
 
     @Test
