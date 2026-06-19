@@ -52,7 +52,7 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
             id = clientId,
             redirectUris = listOfNotNull(redirectUri),
             responseTypes = setOf(ResponseType.CODE.value),
-            grantTypes = setOf(GrantType.AuthorizationCode.value, GrantType.RefreshToken.value),
+            grantTypes = setOf(GrantType.AuthorizationCode.value),
         )
 
         // RFC6749 §4.1.3: code is required and must be single-valued.
