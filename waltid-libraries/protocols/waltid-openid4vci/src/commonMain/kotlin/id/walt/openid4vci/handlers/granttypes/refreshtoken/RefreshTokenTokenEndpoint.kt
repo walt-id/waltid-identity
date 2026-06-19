@@ -43,7 +43,6 @@ class RefreshTokenTokenEndpoint(
             val rawRefreshToken = request.requestForm["refresh_token"]?.firstOrNull()
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "Missing refresh_token"))
             val clientId = request.client.id.takeIf { it.isNotBlank() }
-                ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "client_id is required"))
             val verifiedRefreshToken = refreshTokenVerifier.verify(
                 token = rawRefreshToken,
                 expectedIssuer = request.issClaim,
@@ -57,7 +56,15 @@ class RefreshTokenTokenEndpoint(
                 return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Refresh token is invalid"))
             }
 
-            if (clientId != record.clientId) {
+            val tokenClientId = verifiedRefreshToken.issuedFor?.takeIf { it.isNotBlank() }
+            if (record.clientId != null) {
+                if (tokenClientId != record.clientId) {
+                    return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for refresh token"))
+                }
+                if (clientId != null && clientId != record.clientId) {
+                    return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for refresh token"))
+                }
+            } else if (tokenClientId != null) {
                 return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Client mismatch for refresh token"))
             }
 
@@ -71,11 +78,20 @@ class RefreshTokenTokenEndpoint(
                 ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
 
             val grantedScopes = requestedScope.toSet()
+            val effectiveClientId = clientId ?: record.clientId ?: tokenClientId
             val updatedClient = if (request.client.grantTypes.contains(GrantType.RefreshToken.value)) {
-                request.client
+                request.client.takeIf { it.id == effectiveClientId.orEmpty() }
+                    ?: DefaultClient(
+                        id = effectiveClientId.orEmpty(),
+                        redirectUris = request.client.redirectUris,
+                        grantTypes = request.client.grantTypes,
+                        responseTypes = request.client.responseTypes,
+                        scopes = request.client.scopes,
+                        audience = request.client.audience,
+                    )
             } else {
                 DefaultClient(
-                    id = clientId,
+                    id = effectiveClientId.orEmpty(),
                     redirectUris = request.client.redirectUris,
                     grantTypes = request.client.grantTypes + GrantType.RefreshToken.value,
                     responseTypes = request.client.responseTypes,
@@ -93,16 +109,17 @@ class RefreshTokenTokenEndpoint(
             val now = Clock.System.now()
             val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]?.takeIf { it > now }
             val accessTokenExpiresAt = sessionExpiresAt ?: (now + 3600.seconds)
+            val issuer = updatedRequest.issClaim ?: verifiedRefreshToken.issuer
             val accessToken = accessTokenIssuer.issue(
                 defaultAccessTokenClaims(
                     subject = subject,
-                    issuer = updatedRequest.issClaim ?: clientId,
+                    issuer = issuer,
                     audience = record.grantedAudience.firstOrNull(),
                     scopes = grantedScopes,
                     issuedAt = now,
                     expiresAt = accessTokenExpiresAt,
                     additional = buildMap {
-                        put("client_id", clientId)
+                        effectiveClientId?.let { put("client_id", it) }
                         session.customAttributes["issuance_session_id"]?.let {
                             put("issuance_session_id", it)
                         }
@@ -112,9 +129,9 @@ class RefreshTokenTokenEndpoint(
 
             val newRefreshToken = refreshTokenIssuer.issue(
                 RefreshTokenGenerationRequest(
-                    issuer = updatedRequest.issClaim ?: verifiedRefreshToken.issuer,
+                    issuer = issuer,
                     subject = subject,
-                    clientId = clientId,
+                    clientId = record.clientId,
                     scopes = record.grantedScopes,
                     expiresAt = record.expiresAt,
                     sessionId = session.customAttributes["issuance_session_id"],
@@ -125,7 +142,7 @@ class RefreshTokenTokenEndpoint(
                 tokenSignature = refreshTokenIssuer.signature(newRefreshToken),
                 accessTokenRequest = updatedRequest.sanitizeForStorage(),
                 accessTokenSignature = accessTokenIssuer.signature(accessToken),
-                clientId = clientId,
+                clientId = record.clientId,
                 grantedScopes = record.grantedScopes,
                 grantedAudience = record.grantedAudience,
                 session = session,
@@ -137,12 +154,7 @@ class RefreshTokenTokenEndpoint(
             }
 
             val expiresIn = if (sessionExpiresAt == null) 3600L else computeRemainingSeconds(accessTokenExpiresAt)
-            val extra = buildMap<String, Any?> {
-                put("refresh_token", newRefreshToken)
-                if (grantedScopes.isNotEmpty()) {
-                    put("scope", grantedScopes.joinToString(" "))
-                }
-            }
+            val scope = grantedScopes.takeIf { it.isNotEmpty() }?.joinToString(" ")
 
             AccessTokenResponseResult.Success(
                 request = updatedRequest,
@@ -150,7 +162,8 @@ class RefreshTokenTokenEndpoint(
                     accessToken = accessToken,
                     tokenType = TOKEN_TYPE_BEARER,
                     expiresIn = expiresIn,
-                    extra = extra,
+                    refreshToken = newRefreshToken,
+                    scope = scope,
                 ),
             )
         } catch (e: DuplicateCodeException) {
