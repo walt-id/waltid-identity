@@ -1,5 +1,7 @@
 package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 
+import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
+import id.walt.openid4vci.DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.Session
@@ -20,7 +22,6 @@ import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -113,7 +114,7 @@ class PreAuthorizedCodeTokenEndpoint(
         val clientRequest = updatedRequest.withClient(clientToUse)
 
         val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]
-        val expiresAt = sessionExpiresAt ?: (Clock.System.now() + 3600.seconds)
+        val expiresAt = sessionExpiresAt ?: (Clock.System.now() + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
 
         val subject = session.subject?.takeIf { it.isNotBlank() }
             ?: return AccessTokenResponseResult.Failure(OAuthError("invalid_request", "subject is required in session"))
@@ -155,9 +156,13 @@ class PreAuthorizedCodeTokenEndpoint(
             }
         }
 
-        // If no explicit session expiry is configured, return the spec-default lifetime as exact 3600.
+        // If no explicit session expiry is configured, return the default lifetime exactly.
         // If an explicit expiry exists, return the real remaining lifetime from now.
-        val expiresIn = if (sessionExpiresAt == null) 3600L else computeRemainingSeconds(expiresAt)
+        val expiresIn = if (sessionExpiresAt == null) {
+            DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
+        } else {
+            computeRemainingSeconds(expiresAt)
+        }
 
         return AccessTokenResponseResult.Success(
             request = clientRequest,
@@ -216,9 +221,5 @@ class PreAuthorizedCodeTokenEndpoint(
     private fun computeRemainingSeconds(expiresAt: Instant): Long {
         val remaining = expiresAt - Clock.System.now()
         return if (remaining.isNegative()) 0 else remaining.inWholeSeconds
-    }
-
-    private companion object {
-        val DEFAULT_REFRESH_TOKEN_LIFETIME_SECONDS = 30.days.inWholeSeconds
     }
 }

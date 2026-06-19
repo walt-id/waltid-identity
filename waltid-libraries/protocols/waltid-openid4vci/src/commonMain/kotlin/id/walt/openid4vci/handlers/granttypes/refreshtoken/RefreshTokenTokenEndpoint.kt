@@ -1,5 +1,6 @@
 package id.walt.openid4vci.handlers.granttypes.refreshtoken
 
+import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.TokenType
@@ -108,7 +109,7 @@ class RefreshTokenTokenEndpoint(
 
             val now = Clock.System.now()
             val sessionExpiresAt = session.expiresAt[TokenType.ACCESS_TOKEN]?.takeIf { it > now }
-            val accessTokenExpiresAt = sessionExpiresAt ?: (now + 3600.seconds)
+            val accessTokenExpiresAt = sessionExpiresAt ?: (now + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds)
             val issuer = updatedRequest.issClaim ?: verifiedRefreshToken.issuer
             val accessToken = accessTokenIssuer.issue(
                 defaultAccessTokenClaims(
@@ -153,7 +154,11 @@ class RefreshTokenTokenEndpoint(
                 return AccessTokenResponseResult.Failure(OAuthError("invalid_grant", "Refresh token is invalid"))
             }
 
-            val expiresIn = if (sessionExpiresAt == null) 3600L else computeRemainingSeconds(accessTokenExpiresAt)
+            val expiresIn = if (sessionExpiresAt == null) {
+                DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
+            } else {
+                computeRemainingSeconds(accessTokenExpiresAt)
+            }
             val scope = grantedScopes.takeIf { it.isNotEmpty() }?.joinToString(" ")
 
             AccessTokenResponseResult.Success(
