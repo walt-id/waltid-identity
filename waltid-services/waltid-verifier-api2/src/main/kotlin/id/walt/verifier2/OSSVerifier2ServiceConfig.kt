@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class OSSVerifier2ServiceConfig(
     val clientId: String,
-    val clientMetadata: ClientMetadata,
+    val clientMetadata: ClientMetadata? = null,
     val urlPrefix: String,
     val urlHost: String,
     val key: JsonObject? = null,

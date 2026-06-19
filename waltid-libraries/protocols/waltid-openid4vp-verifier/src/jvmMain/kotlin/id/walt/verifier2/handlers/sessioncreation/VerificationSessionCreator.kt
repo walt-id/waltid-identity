@@ -6,7 +6,9 @@ import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import id.walt.dcql.models.CredentialFormat
 import id.walt.iso18013.annexc.AnnexC
 import id.walt.iso18013.annexc.AnnexCTranscriptBuilder
 import id.walt.iso18013.annexc.protocol.AnnexCRequestResponse
@@ -17,12 +19,16 @@ import id.walt.mdoc.objects.deviceretrieval.DeviceRequestInfo
 import id.walt.mdoc.objects.deviceretrieval.UseCase
 import id.walt.policies2.vc.VCPolicyList
 import id.walt.policies2.vc.policies.CredentialSignaturePolicy
+import id.walt.policies2.vp.policies.TransactionDataHashCheckSdJwtVPPolicy
+import id.walt.policies2.vp.policies.TransactionDataMdocVpPolicy
+import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyList
 import id.walt.policies2.vp.policies.VPVerificationPolicyManager
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.validateRequestTransactionDataStructure
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthentication
 import id.walt.verifier2.handlers.sessioncreation.annexc.ReaderAuthenticationAll
@@ -43,6 +49,29 @@ import kotlin.uuid.Uuid
 object VerificationSessionCreator {
 
     private val log = KotlinLogging.logger { }
+
+    private fun defaultVpPolicies() = VPPolicyList(
+        jwtVcJson = VPVerificationPolicyManager.defaultJwtVcJsonPolicies,
+        dcSdJwt = VPVerificationPolicyManager.defaultDcSdJwtPolicies,
+        msoMdoc = VPVerificationPolicyManager.defaultMsoMdocPolicies
+    )
+
+    private fun VPPolicyList.withMandatoryTransactionDataPolicies(formats: Set<CredentialFormat>): VPPolicyList = copy(
+        dcSdJwt = dcSdJwt.withPolicyIfMissing(
+            shouldInclude = CredentialFormat.DC_SD_JWT in formats,
+            policy = TransactionDataHashCheckSdJwtVPPolicy(),
+        ),
+        msoMdoc = msoMdoc.withPolicyIfMissing(
+            shouldInclude = CredentialFormat.MSO_MDOC in formats,
+            policy = TransactionDataMdocVpPolicy(),
+        ),
+    )
+
+    private fun <Policy : VPPolicy2> List<Policy>.withPolicyIfMissing(
+        shouldInclude: Boolean,
+        policy: Policy,
+    ): List<Policy> =
+        if (!shouldInclude || any { it.id == policy.id }) this else this + policy
 
     private suspend fun getKid(clientId: String?, key: Key): String {
         val prefix = "decentralized_identifier:"
@@ -94,8 +123,7 @@ object VerificationSessionCreator {
             }
         }
 
-        val effectiveClientMetadata = if (isDcApi && isEncryptedResponse) {
-
+        val effectiveClientMetadata = if (isEncryptedResponse) {
             val keyType = KeyType.secp256r1
 
             if (isDcApiHaip) {
@@ -126,27 +154,28 @@ object VerificationSessionCreator {
                 jwks = jwks,
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
+                    "jwt_vc_json" to JsonObject(mapOf()),
+                    "dc+sd-jwt" to JsonObject(mapOf()),
                     "mso_mdoc" to JsonObject(
                         if (isDcApiHaip) mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
-                            /*"alg_values_supported" to JsonArray(
-                                listOf(JsonPrimitive("ES256"))
-                            )*/
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                         ) else emptyMap()
                     )
                 ),
-                encryptedResponseEncValuesSupported = listOf("A128GCM")
+                encryptedResponseEncValuesSupported = listOf("A128GCM", "A256GCM")
             )
         } else {
             val baseMetadata = clientMetadata ?: ClientMetadata()
             baseMetadata.copy(
                 // Ensure vp_formats_supported includes mso_mdoc for HAIP
                 vpFormatsSupported = baseMetadata.vpFormatsSupported ?: mapOf(
+                    "jwt_vc_json" to JsonObject(mapOf()),
+                    "dc+sd-jwt" to JsonObject(mapOf()),
                     "mso_mdoc" to JsonObject(
                         mapOf(
                             "issuerauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() }),
-                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50, -65537).map { it.toJsonElement() })
+                            "deviceauth_alg_values" to JsonArray(listOf(Cose.Algorithm.ES256, -9, -50).map { it.toJsonElement() })
                         )
                     )
                 )
@@ -189,6 +218,23 @@ object VerificationSessionCreator {
             nonce = null, // not required in the initial request yet
             responseType = null
         )
+        val transactionDataJsonObjects = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null
+        val transactionData = transactionDataJsonObjects?.map { jsonObj ->
+            jsonObj.toString().encodeToByteArray().encodeToBase64Url()
+        }
+        val credentialQueriesById = transactionData?.let {
+            requireNotNull(setup.core.dcqlQuery) { "transaction_data requires a dcql_query" }
+                .credentials
+                .associateBy { credentialQuery -> credentialQuery.id }
+        }
+        val decodedTransactionData = validateRequestTransactionDataStructure(
+            transactionData = transactionData,
+            credentialQueriesById = credentialQueriesById,
+        )
+        val transactionDataFormats = decodedTransactionData
+            .flatMap { decodedItem -> decodedItem.transactionData.credentialIds }
+            .mapNotNull { credentialId -> credentialQueriesById?.get(credentialId)?.format }
+            .toSet()
 
         val authorizationRequest = AuthorizationRequest(
             responseType = if (!isAnnexC) OpenID4VPResponseType.VP_TOKEN else null,
@@ -233,13 +279,13 @@ object VerificationSessionCreator {
              * containing details about the transaction the Verifier is requesting the End-User to authorize.
              * The decoded JSON object structure is represented by [TransactionDataItem].
              */
-            transactionData = if (setup is OpenID4VP1FlowSetup) setup.openid?.transactionData else null, // List of base64url encoded JSON strings
+            transactionData = transactionData, // List of base64url encoded JSON strings
 
             /*
              * OPTIONAL. An array of attestations about the Verifier relevant to the Credential Request.
-             * Each object structure is represented by [VerifierAttestationItem].
+             * Each object structure is represented by [VerifierInfoItem].
              */
-            //val verifierAttestations: List<VerifierAttestationItem>? = null,
+            verifierInfo = setup.core.verifierInfo,
 
             // SIOPv2 specific parameters (if scope includes "openid") - common but technically from SIOPv2
             /*
@@ -276,15 +322,20 @@ object VerificationSessionCreator {
             if (x5c != null) headers["x5c"] = JsonArray(x5c.map { JsonPrimitive(it) })
             if (expiration != null) headers["exp"] = JsonPrimitive(expiration.epochSeconds)
 
-            key.signJws(Json.encodeToString(authorizationRequest).encodeToByteArray(), headers)
+            // OID4VP 1.0 Final §5.8: when static discovery metadata is used (no dynamic discovery),
+            // aud MUST be "https://self-issued.me/v2"
+            val payloadWithAud = Json.encodeToJsonElement(authorizationRequest).jsonObject
+                .toMutableMap()
+                .apply { put("aud", JsonPrimitive("https://self-issued.me/v2")) }
+                .let { JsonObject(it) }
+
+            key.signJws(Json.encodeToString(payloadWithAud).encodeToByteArray(), headers)
         } else null
 
+        val effectiveVpPolicies = (setup.core.policies.vp_policies ?: defaultVpPolicies())
+            .withMandatoryTransactionDataPolicies(transactionDataFormats)
         val effectivePolicies = Verification2Session.DefinedVerificationPolicies(
-            vp_policies = setup.core.policies.vp_policies ?: VPPolicyList(
-                jwtVcJson = VPVerificationPolicyManager.defaultJwtVcJsonPolicies,
-                dcSdJwt = VPVerificationPolicyManager.defaultDcSdJwtPolicies,
-                msoMdoc = VPVerificationPolicyManager.defaultMsoMdocPolicies
-            ),
+            vp_policies = effectiveVpPolicies,
             vc_policies = setup.core.policies.vc_policies ?: VCPolicyList(
                 policies = listOf(CredentialSignaturePolicy())
             ),

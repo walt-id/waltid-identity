@@ -20,18 +20,13 @@ class BitValueReader(
     ) = getBitValue(expansionAlgorithm(bitstring), idx, bitSize)
 
     private fun getBitValue(input: ByteArray, index: ULong, bitSize: Int): List<Char> {
-        logger.debug { "available bytes: ${bitmap(input)}" }
 
         // TODO: bitSize constraints
         val bitStartPosition = index * bitSize.toUInt()
-        logger.debug { "bitStartPosition overall: $bitStartPosition" }
 
         val byteStart = bitStartPosition / BITS_PER_BYTE_UNSIGNED
-        logger.debug { "skipping: $byteStart bytes" }
-        logger.debug { "available: ${input.size - byteStart.toInt()} bytes" }
 
         val bytesToRead = (bitSize - 1) / BITS_PER_BYTE_UNSIGNED.toInt() + 1
-        logger.debug { "readingNext: $bytesToRead bytes" }
 
         val startIndex = byteStart.toInt()
         val endIndex = minOf(startIndex + bytesToRead, input.size)
@@ -41,10 +36,8 @@ class BitValueReader(
     }
 
     private fun extractBitValue(bytes: ByteArray, index: ULong, bitSize: UInt): List<Char> {
-        logger.debug { "selected byte: ${bitmap(bytes)}" }
         val bits = bytes.toBitSequence()
         val bitStartPosition = index * bitSize % BITS_PER_BYTE_UNSIGNED
-        logger.debug { "bitStartPosition within byte: $bitStartPosition" }
         val bitSet = bits.drop(bitStartPosition.toInt()).iterator()
         val result = mutableListOf<Boolean>()
         var b = 0u

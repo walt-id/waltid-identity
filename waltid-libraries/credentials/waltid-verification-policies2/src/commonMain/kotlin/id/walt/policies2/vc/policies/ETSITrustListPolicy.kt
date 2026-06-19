@@ -80,7 +80,7 @@ private val log = KotlinLogging.logger { }
  * {
  *   "policy": "etsi-trust-list",
  *   "trustLists": [
- *     "https://www.signatur.rtr.at/currenttl.xml",
+ *     "https://www.signatur.rtr.at/vertrauensliste.xml",
  *     "https://ewc-consortium.github.io/ewc-trust-list/EWC-TL"
  *   ],
  *   "expectedEntityType": "WALLET_PROVIDER"

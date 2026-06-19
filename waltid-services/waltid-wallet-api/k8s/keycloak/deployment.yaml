@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: keycloak-data-volume-claim
 spec:
-  storageClassName: azure-managed-standardssd-retain
+  storageClassName: gp3-retain
   accessModes:
     - ReadWriteOnce
   resources:
@@ -82,7 +82,7 @@ kind: Ingress
 metadata:
   name: keycloak-ingress
   annotations:
-    kubernetes.io/ingress.class: "nginx"
+    kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
   tls:

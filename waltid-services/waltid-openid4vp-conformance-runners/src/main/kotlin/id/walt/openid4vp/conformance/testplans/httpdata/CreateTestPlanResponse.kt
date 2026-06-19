@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.httpdata
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -15,6 +16,10 @@ data class CreateTestPlanResponse(
         val variant: Variant? = null
     ) {
         @Serializable
-        class Variant
+        data class Variant(
+            @SerialName("client_id_prefix") val clientIdPrefix: String? = null,
+            @SerialName("request_method") val requestMethod: String? = null,
+            @SerialName("vp_profile") val vpProfile: String? = null
+        )
     }
 }

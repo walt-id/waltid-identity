@@ -154,8 +154,8 @@ Build an OAuth2 provider with default handlers:
 
 ```kotlin
 import id.walt.openid4vci.core.*
-import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRepository
-import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
 
 // Create configuration
@@ -164,8 +164,8 @@ val config = OAuth2ProviderConfig(
     accessRequestValidator = DefaultAccessRequestValidator(),
     authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
     tokenEndpointHandlers = TokenEndpointHandlers(),
-    authorizationCodeRepository = DefaultAuthorizationCodeRepository(),
-    preAuthorizedCodeRepository = DefaultPreAuthorizedCodeRepository(),
+    authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
+    preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
     preAuthorizedCodeIssuer = PreAuthorizedCodeIssuer(),
     tokenService = JwtAccessTokenService(signingKey, issuer)
 )

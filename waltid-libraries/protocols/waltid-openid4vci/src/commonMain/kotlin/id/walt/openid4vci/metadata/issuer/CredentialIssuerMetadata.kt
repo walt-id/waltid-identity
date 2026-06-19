@@ -191,10 +191,16 @@ internal object CredentialIssuerMetadataSerializer : KSerializer<CredentialIssue
             value.deferredCredentialEndpoint?.let { put("deferred_credential_endpoint", JsonPrimitive(it)) }
             value.notificationEndpoint?.let { put("notification_endpoint", JsonPrimitive(it)) }
             value.credentialRequestEncryption?.let {
-                put("credential_request_encryption", Json.encodeToJsonElement(CredentialRequestEncryption.serializer(), it))
+                put(
+                    "credential_request_encryption",
+                    Json.encodeToJsonElement(CredentialRequestEncryption.serializer(), it)
+                )
             }
             value.credentialResponseEncryption?.let {
-                put("credential_response_encryption", Json.encodeToJsonElement(CredentialResponseEncryption.serializer(), it))
+                put(
+                    "credential_response_encryption",
+                    Json.encodeToJsonElement(CredentialResponseEncryption.serializer(), it)
+                )
             }
             value.batchCredentialIssuance?.let {
                 put("batch_credential_issuance", Json.encodeToJsonElement(BatchCredentialIssuance.serializer(), it))

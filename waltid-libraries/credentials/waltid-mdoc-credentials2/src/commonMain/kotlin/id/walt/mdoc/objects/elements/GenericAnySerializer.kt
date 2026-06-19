@@ -1,6 +1,7 @@
 package id.walt.mdoc.objects.elements
 
 import kotlinx.datetime.LocalDate
+import id.walt.mdoc.encoding.MdocTDateInstantSerializer
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ByteArraySerializer
 import kotlinx.serialization.builtins.ListSerializer
@@ -25,7 +26,7 @@ object GenericAnySerializer : KSerializer<Any> {
             is Boolean -> encoder.encodeBoolean(value)
             is ByteArray -> encoder.encodeSerializableValue(ByteArraySerializer(), value)
             is LocalDate -> encoder.encodeSerializableValue(LocalDate.serializer(), value)
-            is Instant -> encoder.encodeSerializableValue(InstantStringSerializer, value)
+            is Instant -> encoder.encodeSerializableValue(MdocTDateInstantSerializer, value)
             is List<*> -> encoder.encodeSerializableValue(
                 ListSerializer(GenericAnySerializer),
                 value.filterNotNull().also {

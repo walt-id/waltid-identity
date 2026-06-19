@@ -27,5 +27,5 @@ authServiceConf: |-
   clientId = "issuer_api"
 
 ingress:
-  ingressClassName: nginx # or traefik
+  ingressClassName: traefik # nginx
   host: issuer.portal.waltid.cloud

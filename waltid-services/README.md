@@ -47,10 +47,15 @@ This directory contains production-ready services built on top of the walt.id li
 
 ### Core Services
 
-### [🟢 waltid-issuer-api](./waltid-issuer-api)
-Credential Issuer API service. Provides a complete REST API for issuing verifiable credentials in multiple formats (W3C, SD-JWT, mdoc). Supports OpenID4VCI flows, credential templates, and issuer metadata management.
+### [🟠 waltid-issuer-api](./waltid-issuer-api)
+Credential Issuer API service (legacy, planned for deprecation). Provides a complete REST API for issuing verifiable credentials in multiple formats (W3C, SD-JWT, mdoc). Supports OpenID4VCI draft flows, credential templates, and issuer metadata management.
 
-**Use when:** You need a production-ready service for issuing verifiable credentials to wallets and supporting credential issuance workflows.
+**Use when:** You need compatibility with existing draft-based issuer integrations. For new OpenID4VCI 1.0 integrations, use [waltid-issuer-api2](./waltid-issuer-api2).
+
+### [🟢 waltid-issuer-api2](./waltid-issuer-api2)
+Issuer API 2 service (OpenID4VCI 1.0). Modern issuer service for profile-based credential offers, OpenID4VCI metadata, authorization and token flows, credential issuance, nonce handling, session inspection, and SSE session updates.
+
+**Use when:** You need a production-ready issuer service for OpenID4VCI 1.0 credential issuance workflows.
 
 ### [🟠 waltid-verifier-api](./waltid-verifier-api)
 Verifier API service (legacy). Provides a REST API for requesting and verifying verifiable presentations using OpenID4VP draft implementations (draft 14, draft 20) with Presentation Definition support.
@@ -106,7 +111,7 @@ End-to-end test suite for walt.id services. Complete end-to-end tests covering f
 
 ## Getting Started
 
-- **Issuing credentials?** See [waltid-issuer-api](./waltid-issuer-api) for a complete issuer service
+- **Issuing credentials?** See [waltid-issuer-api2](./waltid-issuer-api2) for OpenID4VCI 1.0 or [waltid-issuer-api](./waltid-issuer-api) for draft/legacy integrations
 - **Verifying credentials?** Check [waltid-verifier-api2](./waltid-verifier-api2) for OpenID4VP 1.0 or [waltid-verifier-api](./waltid-verifier-api) for draft implementations
 - **Building a wallet?** Start with [waltid-wallet-api](./waltid-wallet-api) for complete wallet backend functionality
 - **Running tests?** See [waltid-integration-tests](./waltid-integration-tests).
