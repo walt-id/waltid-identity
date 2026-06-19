@@ -18,6 +18,7 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.forms.FormDataContent
@@ -140,6 +141,7 @@ class Issuer2PARRouteTest {
             authorizationCodeRepository = NoopAuthorizationCodeRepository,
             preAuthorizedCodeRepository = NoopPreAuthorizedCodeRepository,
             parRepository = InMemoryPARRepository(),
+            refreshTokenRepository = InMemoryRefreshTokenRepository(),
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,
