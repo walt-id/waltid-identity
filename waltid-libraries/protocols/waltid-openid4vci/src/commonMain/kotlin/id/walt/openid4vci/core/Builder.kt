@@ -108,6 +108,8 @@ private fun registerDefaultGrantTypeHandlers(
         val preAuthorizedTokenHandler = PreAuthorizedCodeTokenEndpoint(
             codeRepository = config.preAuthorizedCodeRepository,
             accessTokenIssuer = config.accessTokenIssuer,
+            refreshTokenRepository = config.refreshTokenRepository,
+            refreshTokenIssuer = config.refreshTokenIssuer,
         )
         config.tokenEndpointHandlers.appendForGrant(
             grantType = GrantType.PreAuthorizedCode,
