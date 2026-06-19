@@ -2,6 +2,7 @@ package id.walt.openid4vci
 
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
 import id.walt.openid4vci.repository.refresh.defaultRefreshTokenRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -33,6 +34,7 @@ class ProviderRefreshTokenFlowTest {
         val provider = buildTestProvider(refreshTokenRepository, refreshTokenIssuer, accessTokenIssuer)
 
         val initial = executeAuthorizationCodeTokenFlow(provider)
+        assertEquals(setOf(GrantType.AuthorizationCode.value), initial.accessRequestClientGrantTypes)
         val refreshToken = initial.refreshToken
         val refreshTokenSignature = refreshTokenIssuer.signature(refreshToken)
 
@@ -42,15 +44,14 @@ class ProviderRefreshTokenFlowTest {
         assertTrue(stored.active)
         assertEquals("demo-client", stored.clientId)
         assertEquals(accessTokenIssuer.signature(initial.accessToken), stored.accessTokenSignature)
-        assertEquals(initial.accessRequestId, stored.requester.id)
-        assertEquals(setOf("grant_type", "client_id"), stored.requester.requestForm.keys)
-        assertFalse(stored.requester.requestForm.containsKey("code"))
-        assertFalse(stored.requester.requestForm.containsKey("redirect_uri"))
+        assertEquals(initial.accessRequestId, stored.accessTokenRequest.id)
+        assertEquals(setOf("grant_type", "client_id"), stored.accessTokenRequest.requestForm.keys)
+        assertFalse(stored.accessTokenRequest.requestForm.containsKey("code"))
+        assertFalse(stored.accessTokenRequest.requestForm.containsKey("redirect_uri"))
 
         val refreshResult = refresh(provider, refreshToken)
         val refreshResponse = refreshResult as AccessTokenResponseResult.Success
-        val newRefreshToken = refreshResponse.response.extra["refresh_token"] as? String
-        assertNotNull(newRefreshToken)
+        val newRefreshToken = assertNotNull(refreshResponse.response.refreshToken)
         assertNotEquals(refreshToken, newRefreshToken)
         assertNotEquals(initial.accessToken, refreshResponse.response.accessToken)
 
@@ -62,8 +63,8 @@ class ProviderRefreshTokenFlowTest {
         assertNotNull(newStored)
         assertTrue(newStored.active)
         assertEquals(accessTokenIssuer.signature(refreshResponse.response.accessToken), newStored.accessTokenSignature)
-        assertEquals(setOf("grant_type", "client_id"), newStored.requester.requestForm.keys)
-        assertFalse(newStored.requester.requestForm.containsKey("refresh_token"))
+        assertEquals(setOf("grant_type", "client_id"), newStored.accessTokenRequest.requestForm.keys)
+        assertFalse(newStored.accessTokenRequest.requestForm.containsKey("refresh_token"))
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -90,6 +91,105 @@ class ProviderRefreshTokenFlowTest {
 
         assertTrue(result is AccessTokenResponseResult.Failure)
         assertEquals("invalid_grant", result.error.error)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `refresh token grant accepts client identity resolved outside request body`() = runTest {
+        val provider = buildTestProvider()
+        val initial = executeAuthorizationCodeTokenFlow(provider)
+        val requestResult = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "refresh_token" to listOf(initial.refreshToken),
+            ),
+        )
+        require(requestResult is AccessTokenRequestResult.Success)
+
+        val parsedClient = requestResult.request.client
+        val resolvedClient = DefaultClient(
+            id = "demo-client",
+            redirectUris = parsedClient.redirectUris,
+            grantTypes = parsedClient.grantTypes,
+            responseTypes = parsedClient.responseTypes,
+            scopes = parsedClient.scopes,
+            audience = parsedClient.audience,
+        )
+        val result = provider.createAccessTokenResponse(
+            requestResult.request
+                .withClient(resolvedClient)
+                .withIssuer("test-issuer"),
+        )
+
+        assertTrue(result is AccessTokenResponseResult.Success)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `refresh token grant without resolved client identity uses stored client binding`() = runTest {
+        val provider = buildTestProvider()
+        val initial = executeAuthorizationCodeTokenFlow(provider)
+        val requestResult = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "refresh_token" to listOf(initial.refreshToken),
+            ),
+        )
+        require(requestResult is AccessTokenRequestResult.Success)
+
+        val result = provider.createAccessTokenResponse(requestResult.request.withIssuer("test-issuer"))
+
+        assertTrue(result is AccessTokenResponseResult.Success)
+        assertNotNull(result.response.refreshToken)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `unbound refresh token grant does not require client identity`() = runTest {
+        val refreshTokenRepository = defaultRefreshTokenRepository()
+        val refreshTokenIssuer = TestRefreshTokenIssuer()
+        val config = createTestConfig(
+            refreshTokenRepository = refreshTokenRepository,
+            refreshTokenIssuer = refreshTokenIssuer,
+            accessTokenIssuer = CountingTokenIssuer(),
+        )
+        val provider = buildOAuth2Provider(config)
+        val issued = config.preAuthorizedCodeIssuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = null,
+                scopes = setOf("openid"),
+                session = DefaultSession(subject = "anonymous-subject"),
+            ),
+        )
+        val accessRequestResult = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                "pre-authorized_code" to listOf(issued.code),
+            ),
+        )
+        require(accessRequestResult is AccessTokenRequestResult.Success)
+        val accessResponse = provider.createAccessTokenResponse(
+            accessRequestResult.request.withIssuer("test-issuer"),
+        )
+        require(accessResponse is AccessTokenResponseResult.Success)
+        val refreshToken = assertNotNull(accessResponse.response.refreshToken)
+        val storedRefreshToken = refreshTokenRepository.get(refreshTokenIssuer.signature(refreshToken))
+        assertNotNull(storedRefreshToken)
+        assertNull(storedRefreshToken.clientId)
+
+        val refreshRequestResult = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.RefreshToken.value),
+                "refresh_token" to listOf(refreshToken),
+            ),
+        )
+        require(refreshRequestResult is AccessTokenRequestResult.Success)
+        val refreshResponse = provider.createAccessTokenResponse(
+            refreshRequestResult.request.withIssuer("test-issuer"),
+        )
+
+        assertTrue(refreshResponse is AccessTokenResponseResult.Success)
+        assertNotNull(refreshResponse.response.refreshToken)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -151,13 +251,14 @@ class ProviderRefreshTokenFlowTest {
         val accessResponse = provider.createAccessTokenResponse(accessRequest)
         require(accessResponse is AccessTokenResponseResult.Success)
 
-        val refreshToken = accessResponse.response.extra["refresh_token"] as? String
+        val refreshToken = accessResponse.response.refreshToken
         require(!refreshToken.isNullOrBlank())
 
         return InitialTokenResult(
             accessToken = accessResponse.response.accessToken,
             refreshToken = refreshToken,
             accessRequestId = accessRequest.id,
+            accessRequestClientGrantTypes = accessRequest.client.grantTypes,
         )
     }
 
@@ -181,6 +282,7 @@ class ProviderRefreshTokenFlowTest {
         val accessToken: String,
         val refreshToken: String,
         val accessRequestId: String,
+        val accessRequestClientGrantTypes: Set<String>,
     )
 
     private class CountingTokenIssuer : AccessTokenIssuer {
