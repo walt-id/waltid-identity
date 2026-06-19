@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -55,6 +56,38 @@ class JwtRefreshTokenIssuerTest {
         assertEquals("subject-1", verified.subject)
         assertEquals(setOf("openid", "email"), verified.scopes)
         assertTrue(verified.id.isNotBlank())
+    }
+
+    @Test
+    fun `generates unbound jwt refresh token without authorized party`() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val issuer = JwtRefreshTokenIssuer(
+            signingKeyResolver = { key },
+        )
+        val verifier = JwtRefreshTokenVerifier { _ -> key.getPublicKey() }
+
+        val token = issuer.issue(
+            RefreshTokenGenerationRequest(
+                issuer = "https://issuer.example",
+                subject = "subject-1",
+                clientId = null,
+                scopes = setOf("openid"),
+                expiresAt = Clock.System.now() + 30.days,
+                sessionId = "issuance-session-1",
+            )
+        )
+
+        val decoded = token.decodeJws().payload
+        assertEquals(KEYCLOAK_REFRESH_TOKEN_TYPE, decoded["typ"]?.jsonPrimitive?.content)
+        assertNull(decoded["azp"])
+
+        val verified = verifier.verify(
+            token = token,
+            expectedIssuer = "https://issuer.example",
+            expectedClientId = null,
+        )
+        assertNull(verified.issuedFor)
+        assertEquals(setOf("openid"), verified.scopes)
     }
 
     @Test
