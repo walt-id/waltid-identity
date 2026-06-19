@@ -37,6 +37,7 @@ import id.walt.wallet2.handlers.SignProofResult
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.server.WalletResolver
+import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
@@ -169,16 +170,7 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?
     ) {
 
-        post("", {
-            summary = "Create a new wallet"
-            description =
-                "Creates a wallet with optional named stores. " +
-                "Omitting store IDs auto-creates one in-memory store of each type."
-            request { body<CreateWalletRequest> { required = false } }
-            response {
-                HttpStatusCode.Created to { body<WalletCreatedResponse>() }
-            }
-        }) {
+        post("", Wallet2OpenApiDocs.createWallet()) {
             val req = runCatching { call.receive<CreateWalletRequest>() }
                 .getOrElse { CreateWalletRequest() }
             val id = Uuid.random().toString()
@@ -292,11 +284,7 @@ object Wallet2RouteHandler {
                     call.respond(wallet.listAllKeys())
                 }
 
-                post("/generate", {
-                    summary = "Generate a new key"
-                    request { pathParameter<String>("walletId"); body<GenerateKeyRequest>() }
-                    response { HttpStatusCode.Created to { body<WalletKeyInfo>() } }
-                }) {
+                post("/generate", Wallet2OpenApiDocs.generateKey()) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<GenerateKeyRequest>()
                     val keyType = KeyType.valueOf(req.keyType)
@@ -367,11 +355,7 @@ object Wallet2RouteHandler {
                     call.respond(wallet.didStore?.listDids()?.toList() ?: emptyList<WalletDidEntry>())
                 }
 
-                post("/create", {
-                    summary = "Create a DID"
-                    request { pathParameter<String>("walletId"); body<CreateDidRequest>() }
-                    response { HttpStatusCode.Created to { body<WalletDidEntry>() } }
-                }) {
+                post("/create", Wallet2OpenApiDocs.createDid()) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<CreateDidRequest>()
                     val didStore = wallet.didStore
