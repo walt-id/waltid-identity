@@ -163,7 +163,7 @@ class AuthorizationCodeTokenEndpoint(
         refreshTokenRepository.save(
             DefaultRefreshTokenRecord(
                 tokenSignature = refreshTokenIssuer.signature(refreshToken),
-                requester = request.sanitizeForStorage(),
+                accessTokenRequest = request.sanitizeForStorage(),
                 accessTokenSignature = accessTokenIssuer.signature(accessToken),
                 clientId = clientId,
                 grantedScopes = grantedScopes,

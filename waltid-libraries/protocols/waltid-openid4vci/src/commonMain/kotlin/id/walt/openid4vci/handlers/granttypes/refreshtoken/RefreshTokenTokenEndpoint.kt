@@ -123,7 +123,7 @@ class RefreshTokenTokenEndpoint(
             )
             val newRecord = DefaultRefreshTokenRecord(
                 tokenSignature = refreshTokenIssuer.signature(newRefreshToken),
-                requester = updatedRequest.sanitizeForStorage(),
+                accessTokenRequest = updatedRequest.sanitizeForStorage(),
                 accessTokenSignature = accessTokenIssuer.signature(accessToken),
                 clientId = clientId,
                 grantedScopes = record.grantedScopes,
