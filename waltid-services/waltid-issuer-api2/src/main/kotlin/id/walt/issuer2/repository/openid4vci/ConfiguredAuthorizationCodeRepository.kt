@@ -7,9 +7,7 @@ import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecor
 import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
-import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Instant
 
 class ConfiguredAuthorizationCodeRepository : AuthorizationCodeRepository {
     private val records = ConfiguredPersistence(
@@ -26,16 +24,10 @@ class ConfiguredAuthorizationCodeRepository : AuthorizationCodeRepository {
     }
 
     override suspend fun consume(code: String): AuthorizationCodeRecord? {
-        // Follows issuer1's ConfiguredPersistence style. ConfiguredPersistence does not expose
-        // atomic get-and-remove semantics yet, so stricter replay protection belongs in commons.
-        val record = records[code] ?: return null
-        records.remove(code)
+        val record = records.getAndRemove(code) ?: return null
         return record.takeIf { Clock.System.now() <= it.expiresAt }
     }
 }
-
-internal fun ttlUntil(expiresAt: Instant): Duration =
-    (expiresAt - Clock.System.now()).coerceAtLeast(Duration.ZERO)
 
 private fun AuthorizationCodeRecord.toDefaultRecord() = DefaultAuthorizationCodeRecord(
     code = code,
