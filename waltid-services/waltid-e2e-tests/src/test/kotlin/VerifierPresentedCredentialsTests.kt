@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.testing.E2ETest
 import id.walt.commons.testing.utils.ServiceTestUtils
@@ -27,7 +26,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.assertDoesNotThrow
 import kotlin.test.*
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class VerifierPresentedCredentialsTests(val e2e: E2ETest) {

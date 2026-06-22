@@ -62,25 +62,77 @@ data class MobileSecurityObject(
 }
 
 /**
- * A container for credential status information, typically referencing an external Status List.
- * This allows a verifier to check if the mdoc has been revoked by the issuer.
+ * A container for credential status information.
  *
- * @see ISO/IEC 18013-5:xxxx(E), 9.1.2.6 (MSO revocation)
- * @see IETF Draft: draft-ietf-oauth-status-list
- *
- * @property statusList Information needed to locate the credential's status in a Status List Token.
+ * Supports two shapes:
+ * - **ISO/IEC 18013-5 §9.1.2.6**: `identifier_list` and/or `status_list`.
+ * - **ETSI TS 119 472-1 §5.2.10.1 (EAA-5.2.10.1-03..11)**: a flat object with `type`, `purpose`,
+ *   `index`, `uri` members, used by ETSI ISO-mdoc QEAA/PuB-EAA. All four are optional here so the
+ *   same type can express both shapes; ETSI EAA-5.2.10.1-12 permits additional members.
  */
 @Serializable
 data class Status(
+    @SerialName("identifier_list")
+    val identifierList: IdentifierListInfo? = null,
     @SerialName("status_list")
-    val statusList: StatusListInfo
+    val statusList: StatusListInfo? = null,
+    // ETSI TS 119 472-1 §5.2.10.1 flat status members (for ETSI ISO-mdoc QEAA/PuB-EAA).
+    @SerialName("type")
+    val type: String? = null,
+    @SerialName("purpose")
+    val purpose: String? = null,
+    @SerialName("index")
+    val index: Int? = null,
+    @SerialName("uri")
+    val uri: UniformResourceIdentifier? = null
 ) {
     /**
-     * Specifies the location of a Status List Token and the specific index within that list
-     * that corresponds to this mdoc's status.
-     *
-     * @property index The non-negative integer representing the position (index) of this mdoc's status within the bit string of the Status List.
-     * @property uri The URI where the Status List Token (containing the status list) can be retrieved.
+     * Identifier list revocation mechanism per ISO 18013-5 §9.1.2.6.
+     * IdentifierListInfo = { "id": Identifier, "uri": URI, ? "certificate": Certificate }
+     * where `Identifier = bstr` and `Certificate = bstr` (a DER-encoded X.509 certificate).
+     */
+    @Serializable
+    data class IdentifierListInfo(
+        /**
+         * Issuer-defined identifier of this MSO within the revocation (identifier) list.
+         *
+         * Per ISO/IEC 18013-5 §9.1.2.6, `Identifier = bstr` — a CBOR byte string. Issuers that
+         * encode `id` as a CBOR integer or text string are NOT conformant to ISO/IEC 18013-5.
+         */
+        @SerialName("id")
+        val id: ByteArray,
+        /** URI where the identifier list (status list token) can be fetched. */
+        @SerialName("uri")
+        val uri: UniformResourceIdentifier,
+        /**
+         * Optional certificate (DER-encoded X.509, a CBOR `bstr`) whose public key signed the
+         * top-level certificate in the `x5chain` of the MSO revocation list (ISO 18013-5 §9.1.2.6).
+         */
+        @SerialName("certificate")
+        val certificate: ByteArray? = null,
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is IdentifierListInfo) return false
+            if (!id.contentEquals(other.id)) return false
+            if (uri != other.uri) return false
+            if (certificate != null) {
+                if (other.certificate == null) return false
+                if (!certificate.contentEquals(other.certificate)) return false
+            } else if (other.certificate != null) return false
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = id.contentHashCode()
+            result = 31 * result + uri.hashCode()
+            result = 31 * result + (certificate?.contentHashCode() ?: 0)
+            return result
+        }
+    }
+
+    /**
+     * Specifies the location of a Status List Token and the specific index within that list.
      */
     @Serializable
     data class StatusListInfo(

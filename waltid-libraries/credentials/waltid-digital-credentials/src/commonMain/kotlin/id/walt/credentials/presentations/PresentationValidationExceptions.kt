@@ -16,7 +16,9 @@ enum class W3CPresentationValidationError(override val errorMessage: String) : P
     SIGNATURE_VERIFICATION_FAILED("Signature verification failed."),
     AUDIENCE_MISMATCH("W3C VP JWT 'aud' claim mismatch."),
     NONCE_MISMATCH("W3C VP JWT 'nonce' claim mismatch."),
-    MISSING_VP("W3C VP JWT 'vp' claim is missing.")
+    MISSING_VP("W3C VP JWT 'vp' claim is missing."),
+    PRESENTATION_EXPIRED("W3C VP JWT 'exp' claim indicates the presentation has expired."),
+    PRESENTATION_NOT_YET_VALID("W3C VP JWT 'nbf' claim indicates the presentation is not yet valid.")
 }
 
 enum class DcSdJwtPresentationValidationError(override val errorMessage: String) : PresentationValidationErrors {
@@ -31,7 +33,12 @@ enum class DcSdJwtPresentationValidationError(override val errorMessage: String)
     NONCE_MISMATCH("KB-JWT 'nonce' claim mismatch."),
     MISSING_SD_HASH("KB-JWT 'sd_hash' claim is missing."),
     SD_HASH_MISMATCH("KB-JWT 'sd_hash' mismatch. The KB-JWT is not bound to the presented disclosures."),
-    MISMATCH_PRESENTED_CLAIMS("Claims in validated credential do not match the original DCQL claims query.")
+    MISMATCH_PRESENTED_CLAIMS("Claims in validated credential do not match the original DCQL claims query."),
+    MISSING_TRANSACTION_DATA_HASHES("KB-JWT 'transaction_data_hashes' claim is missing."),
+    TRANSACTION_DATA_HASHES_MISMATCH("KB-JWT 'transaction_data_hashes' do not match the requested transaction data."),
+    TRANSACTION_DATA_HASH_ALGORITHM_MISMATCH("KB-JWT 'transaction_data_hashes_alg' does not match the requested algorithm."),
+    SD_JWT_EXPIRED("SD-JWT credential 'exp' claim indicates it has expired."),
+    SD_JWT_NOT_YET_VALID("SD-JWT credential 'nbf' claim indicates it is not yet valid.")
 }
 
 enum class DcqlValidationError(override val errorMessage: String) : PresentationValidationErrors {

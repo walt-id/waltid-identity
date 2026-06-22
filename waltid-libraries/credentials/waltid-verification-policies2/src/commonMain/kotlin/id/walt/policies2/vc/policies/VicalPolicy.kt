@@ -7,11 +7,11 @@ import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.vical.Vical
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.x509.CertificateDer
 import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.io.bytestring.ByteString
-import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -57,6 +57,10 @@ data class VicalPolicy(
     val enableRevocation: Boolean = false
 ) : CredentialVerificationPolicy2() {
     override val id = "vical"
+
+    companion object {
+        private val fetcher = WebDataFetcher(WebDataFetcherId.VICAL_POLICY)
+    }
 
     init {
         require(vical.isNotBlank() || vicalUrl != null) {
@@ -134,28 +138,26 @@ data class VicalPolicy(
      * @throws Exception if the network request fails.
      */
     private suspend fun fetchVicalFromUrl(url: String): ByteArray {
-        HttpClient().use { client ->
-            val response = client.get(url) {
-                headers {
-                    append(HttpHeaders.Accept, "application/cbor, application/octet-stream, */*")
-                }
+        val response = fetcher.rawFetch(url) {
+            headers {
+                append(HttpHeaders.Accept, "application/cbor, application/octet-stream, */*")
             }
-            if (!response.status.isSuccess()) {
-                throw IllegalStateException(
-                    "Failed to fetch VICAL from $url \u2014 HTTP ${response.status.value} ${response.status.description}"
-                )
-            }
-            val contentType = response.contentType()
-            return if (contentType?.match(ContentType.Application.Cbor) == true ||
-                       contentType?.match(ContentType.Application.OctetStream) == true) {
-                log.debug { "VICAL response is binary ($contentType)" }
-                response.body()
-            } else {
-                // Assume hex-encoded text (the default format of the enterprise VICAL endpoint)
-                val text = response.bodyAsText().trim()
-                log.debug { "VICAL response is text ($contentType), decoding ${text.length} hex chars" }
-                text.decodeHexToBytes()
-            }
+        }
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException(
+                "Failed to fetch VICAL from $url \u2014 HTTP ${response.status.value} ${response.status.description}"
+            )
+        }
+        val contentType = response.contentType()
+        return if (contentType?.match(ContentType.Application.Cbor) == true ||
+                   contentType?.match(ContentType.Application.OctetStream) == true) {
+            log.debug { "VICAL response is binary ($contentType)" }
+            response.body()
+        } else {
+            // Assume hex-encoded text (the default format of the enterprise VICAL endpoint)
+            val text = response.bodyAsText().trim()
+            log.debug { "VICAL response is text ($contentType), decoding ${text.length} hex chars" }
+            text.decodeHexToBytes()
         }
     }
 

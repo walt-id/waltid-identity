@@ -114,6 +114,20 @@ data class IssuanceRequest(
      * Matches the ISO/IEC 18013-5 MSO `status` structure encoded as JSON (see `waltid-mdoc-credentials` README).
      */
     val mdocStatus: JsonObject? = null,
+
+    /**
+     * Optional list of transaction data type identifiers that the device key is authorized to sign.
+     * Each type becomes a namespace in the MSO's KeyAuthorizations (per OpenID4VP transaction_data spec).
+     * Example: `["org.example.payment-authorization"]`
+     * When null, the credential does not support transaction data.
+     */
+    val authorizedTransactionDataTypes: List<String>? = null,
+
+    /**
+     * Validity period for mdoc credentials in days. Defaults to 365 days.
+     * Used to set the `validUntil` field in the MSO ValidityInfo.
+     */
+    val mdocValidityDays: Int? = null,
 ) {
 
     init {

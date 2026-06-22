@@ -15,10 +15,12 @@ import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.VerifierInfoItem
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.utils.UrlUtils
+import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -88,8 +90,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
-    // List of base64url encoded JSON strings
-    val transactionData: List<String>? = null
+    val transactionData: List<JsonObject>? = null
 )
 
 /** Allow exposing certain OpenID4VP specific options */
@@ -119,7 +120,7 @@ data class CrossDeviceFlowSetup(
                 dcqlQuery = DcqlQuery(listOf(CredentialQuery("stub", CredentialFormat.AC_VP, meta = NoMeta)))
             ), urlConfig = UrlConfig(
             ), redirects = Verification2Session.VerificationSessionRedirects(
-                successRedirectUri = "https://example.com/success", errorRedirectUri = "https://example.com/not-successful"
+                successRedirectUri = Url("https://example.com/success"), errorRedirectUri = io.ktor.http.Url("https://example.com/not-successful")
             )
         )
 

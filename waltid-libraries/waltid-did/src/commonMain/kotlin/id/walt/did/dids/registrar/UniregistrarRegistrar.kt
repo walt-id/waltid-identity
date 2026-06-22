@@ -1,15 +1,12 @@
 package id.walt.did.dids.registrar
 
 import id.walt.crypto.keys.Key
+import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.registrar.dids.DidCreateOptions
-import io.ktor.client.*
-import io.ktor.client.call.*
-import io.ktor.client.plugins.*
-import io.ktor.client.plugins.contentnegotiation.*
+import id.walt.webdatafetching.WebDataFetcher
+import id.walt.webdatafetching.WebDataFetchingConfiguration
+import id.walt.webdatafetching.config.LoggingConfiguration
 import io.ktor.client.plugins.logging.*
-import io.ktor.client.request.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import love.forte.plugin.suspendtrans.annotation.JsPromise
@@ -31,18 +28,12 @@ class UniregistrarRegistrar(var registrarUrl: String = DEFAULT_REGISTRAR_URL) : 
 
     override val name = "uniresolver @ $registrarUrl"
 
-    private val http = HttpClient {
-        install(ContentNegotiation) {
-            json()
-        }
-        defaultRequest {
-            header(HttpHeaders.ContentType, ContentType.Application.Json)
-        }
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.ALL
-        }
-    }
+    private val fetcher = WebDataFetcher(
+        id = "did-uniregistrar",
+        defaultConfiguration = WebDataFetchingConfiguration(
+            logging = LoggingConfiguration(enable = true, level = LogLevel.ALL)
+        )
+    )
 
     @JvmBlocking
     @JvmAsync
@@ -51,8 +42,7 @@ class UniregistrarRegistrar(var registrarUrl: String = DEFAULT_REGISTRAR_URL) : 
     override suspend fun getSupportedMethods() = runCatching { lazyOf(getMethods()).value }
 
     private suspend fun getMethods(): Set<String> =
-        http.get("$registrarUrl/methods")
-            .body<JsonArray>()
+        fetcher.fetch<JsonArray>("$registrarUrl/methods").body
             .map { it.jsonPrimitive.content }
             .toSet()
 
@@ -61,9 +51,7 @@ class UniregistrarRegistrar(var registrarUrl: String = DEFAULT_REGISTRAR_URL) : 
     @JsPromise
     @JsExport.Ignore
     override suspend fun create(options: DidCreateOptions): DidResult {
-        return DidResult("TODO" /* TODO */, http.post("$registrarUrl/create?method=${options.method}") {
-            setBody(options.config)
-        }.body())
+        return DidResult("TODO" /* TODO */, fetcher.send<_, DidDocument>("$registrarUrl/create?method=${options.method}", options.config).body)
     }
 
     @JvmBlocking

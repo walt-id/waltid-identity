@@ -1,43 +1,19 @@
-<div align="center">
-<h1>walt.id Libraries</h1>
- <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Comprehensive collection of multiplatform libraries for digital identity, credentials, and cryptography</p>
+# walt.id Libraries
 
-  <a href="https://walt.id/community">
-  <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
-  </a>
-  <a href="https://www.linkedin.com/company/walt-id/">
-  <img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
-  </a>
-  
-  <h2>Statuses Explained</h2>
-  <table>
-    <tr>
-      <td align="center" width="50%">
-        <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-        <br/>
-        <em>This project is being actively maintained by the development team at walt.id. Regular updates, bug fixes, and new features are being added.</em>
-      </td>
-      <td align="center" width="50%">
-        <img src="https://img.shields.io/badge/🟡%20Unmaintained-yellow?style=for-the-badge&logo=warning" alt="Status: Unmaintained" />
-        <br/>
-        <em>This project is not actively maintained. Certain features may be outdated or not working as expected. We encourage users to contribute to the project to help keep it up to date.</em>
-      </td>
-    </tr> 
-    <tr>
-      <td align="center" width="50%">
-        <img src="https://img.shields.io/badge/🔴%20Deprecated-red?style=for-the-badge&logo=no-entry" alt="Status: Deprecated" />
-        <br/>
-        <em>This project is deprecated and no longer maintained. It should not be used in new projects. Please use our alternative libraries or migrate to recommended replacements.</em>
-      </td>
-      <td align="center" width="50%">
-        <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
-        <br/>
-        <em>This project is still supported by the development team at walt.id, but is planned for deprecation. We encourage users to migrate to using our alternative libraries.</em>
-      </td>
-    </tr>
-  </table>
-</div>
+by [walt.id](https://walt.id)
+
+Comprehensive collection of multiplatform libraries for digital identity, credentials, and cryptography
+
+
+
+## Statuses Explained
+
+
+|                                                                                                                                                                            |                                                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| *This project is being actively maintained by the development team at walt.id. Regular updates, bug fixes, and new features are being added.*                              | *This project is not actively maintained. Certain features may be outdated or not working as expected. We encourage users to contribute to the project to help keep it up to date.* |
+| *This project is deprecated and no longer maintained. It should not be used in new projects. Please use our alternative libraries or migrate to recommended replacements.* | *This project is still supported by the development team at walt.id, but is planned for deprecation. We encourage users to migrate to using our alternative libraries.*             |
+
 
 ## Overview
 
@@ -46,15 +22,18 @@ This directory contains all the core libraries that power the walt.id identity e
 ## Library Categories
 
 ### [Authentication & Authorization](./auth/)
+
 Libraries for implementing authentication and authorization systems:
+
 - **[🟢 waltid-ktor-authnz](./auth/waltid-ktor-authnz)**: Flexible authentication and authorization framework for Ktor applications with multi-method support
 - **[🟢 waltid-permissions](./auth/waltid-permissions)**: Permission management system for access control
 - **[🟡 waltid-idpkit](./auth/waltid-idpkit)**: Identity Provider toolkit for OIDC-based authentication with verifiable credentials
 
 ### [Cryptography](./crypto/)
+
 Libraries for cryptographic operations and key management:
+
 - **[🟢 waltid-crypto](./crypto/waltid-crypto)**: Multiplatform cryptographic library with support for multiple algorithms and KMS backends
-- **[🔨 waltid-crypto2](./crypto/waltid-crypto2)**: WORK IN PROGRESS: Modern cryptographic library implementation
 - **[🟢 waltid-cose](./crypto/waltid-cose)**: CBOR Object Signing and Encryption (COSE) implementation
 - **[🟢 waltid-x509](./crypto/waltid-x509)**: X.509 certificate handling and validation
 - **[🟡 waltid-crypto-android](./crypto/waltid-crypto-android)**: Android-specific cryptographic implementations
@@ -65,7 +44,9 @@ Libraries for cryptographic operations and key management:
 - **[🟡 waltid-target-ios](./crypto/waltid-target-ios)**: iOS target support for multiplatform crypto libraries
 
 ### [Credentials](./credentials/)
+
 Libraries for working with digital credentials across multiple formats:
+
 - **[🟢 waltid-digital-credentials](./credentials/waltid-digital-credentials)**: Unified abstraction layer for parsing and verifying credentials (W3C, SD-JWT, mdoc)
 - **[🟢 waltid-w3c-credentials](./credentials/waltid-w3c-credentials)**: W3C Verifiable Credentials implementation (v1.1 and v2.0)
 - **[🟠 waltid-mdoc-credentials](./credentials/waltid-mdoc-credentials)**: ISO/IEC 18013-5:2021 mdoc implementation
@@ -79,32 +60,44 @@ Libraries for working with digital credentials across multiple formats:
 - **[🟢 waltid-digital-credentials-examples](./credentials/waltid-digital-credentials-examples)**: Example credentials for testing and development
 - **[🟢 waltid-vical](./credentials/waltid-vical)**: VICAL trust list validation for mdoc credentials
 - **[🟢 waltid-trust-registry](./credentials/waltid-trust-registry)**: EU Trusted Lists and Lists of Trusted Entities parsing and querying
+- **[🟢 waltid-credential-key-resolver](./credentials/waltid-credential-key-resolver)**: JWT signing key resolution via DID, x5c, or HTTPS well-known metadata
 
 ### [Protocols](./protocols/)
+
 Libraries implementing identity and credential protocols:
+
 - **[🟠 waltid-openid4vc](./protocols/waltid-openid4vc)**: OpenID for Verifiable Credentials (OID4VCI, OID4VP, SIOPv2) - draft implementations
 - **[🟢 waltid-openid4vci](./protocols/waltid-openid4vci)**: OpenID for Verifiable Credential Issuance (OpenID4VCI) 1.0 OAuth2 provider
 - **[🟢 waltid-openid4vci-wallet](./protocols/waltid-openid4vci-wallet)**: OpenID4VCI 1.0 wallet (holder) implementation
 - **[🟢 waltid-openid4vp](./protocols/waltid-openid4vp)**: Core OpenID4VP 1.0 library with DCQL support
-  - **[🟢 waltid-openid4vp-clientidprefix](./protocols/waltid-openid4vp-clientidprefix)**: Client ID prefix parsing and authentication for OpenID4VP
-  - **[🟢 waltid-openid4vp-verifier-openapi](./protocols/waltid-openid4vp-verifier-openapi)**: OpenAPI schema generation for OpenID4VP verifier endpoints
 - **[🟢 waltid-openid4vp-verifier](./protocols/waltid-openid4vp-verifier)**: OpenID4VP 1.0 verifier implementation
 - **[🟢 waltid-openid4vp-wallet](./protocols/waltid-openid4vp-wallet)**: OpenID4VP 1.0 wallet implementation
+- **[🟢 waltid-openid4vp-clientidprefix](./protocols/waltid-openid4vp-clientidprefix)**: Client ID prefix parsing and authentication for OpenID4VP
+- **[🟢 waltid-openid4vp-verifier-openapi](./protocols/waltid-openid4vp-verifier-openapi)**: OpenAPI schema generation for OpenID4VP verifier endpoints
 - **[🟢 waltid-18013-7-verifier](./protocols/waltid-18013-7-verifier)**: ISO/IEC 18013-7 Annex C (DC API / Apple Wallet) verifier support
+- **[🟢 waltid-openid4vc-wallet](./protocols/waltid-openid4vc-wallet)**: Wallet SDK for OpenID4VCI 1.0 issuance and OpenID4VP 1.0 presentation
+- **[🟢 waltid-openid4vc-wallet-persistence](./protocols/waltid-openid4vc-wallet-persistence)**: SQL-backed persistence for the Wallet SDK (SQLite, PostgreSQL)
+- **[🟢 waltid-openid4vc-wallet-server](./protocols/waltid-openid4vc-wallet-server)**: Ktor HTTP route handlers for the Wallet SDK
 
 ### [SD-JWT](./sdjwt/)
+
 Libraries for Selective Disclosure JWT (SD-JWT) credentials:
+
 - **[🟢 waltid-sdjwt](./sdjwt/waltid-sdjwt)**: Multiplatform SD-JWT implementation with selective disclosure support
 - **[🟡 waltid-sdjwt-ios](./sdjwt/waltid-sdjwt-ios)**: iOS-specific SD-JWT implementations
 
 ### [Web](./web/)
+
 Libraries for web server functionality:
+
 - **[🟢 waltid-ktor-notifications-core](./web/waltid-ktor-notifications-core)**: Core library for Ktor server notifications (SSE, webhooks)
 - **[🟢 waltid-ktor-notifications](./web/waltid-ktor-notifications)**: Ktor plugin for session notifications
 - **[🟢 waltid-web-data-fetching](./web/waltid-web-data-fetching)**: Configurable HTTP data fetching with caching, retry logic, and URL filtering
 
 ### Core Libraries
+
 Standalone libraries providing core functionality:
+
 - **[🟢 waltid-did](./waltid-did)**: Decentralized Identifier (DID) library with support for multiple DID methods
 - **[🟠 waltid-core-wallet](./waltid-core-wallet)**: Core wallet helpers for building wallets on top of OpenID4VC
 - **[🟢 waltid-library-commons](./waltid-library-commons)**: Common utilities and shared code for walt.id libraries
@@ -114,15 +107,16 @@ Standalone libraries providing core functionality:
 
 Each library has its own README with detailed documentation. For quick reference:
 
-- **Building a wallet?** Start with [waltid-core-wallet](./waltid-core-wallet) and [waltid-openid4vc](./protocols/waltid-openid4vc)
+- **Building a wallet?** Start with [waltid-openid4vc-wallet](./protocols/waltid-openid4vc-wallet) for the new Wallet SDK supporting OpenID4VCI 1.0 and OpenID4VP 1.0
 - **Working with credentials?** See [waltid-digital-credentials](./credentials/waltid-digital-credentials) for the unified abstraction
 - **Need cryptography?** Check [waltid-crypto](./crypto/waltid-crypto) for key management and operations
 - **Building authentication?** See [waltid-ktor-authnz](./auth/waltid-ktor-authnz) for flexible auth systems
-- **Implementing protocols?** Review [waltid-openid4vc](./protocols/waltid-openid4vc) for credential issuance and presentation
+- **Implementing protocols?** Review [waltid-openid4vci](./protocols/waltid-openid4vci) for credential issuance and [waltid-openid4vp](./protocols/waltid-openid4vp) for presentation
 
 ## Multiplatform Support
 
 Most libraries in this directory support multiple platforms:
+
 - **JVM**: Full support for Kotlin/Java applications
 - **JavaScript**: Browser and Node.js support
 - **iOS**: Native iOS support (enabled via `enableIosBuild=true` Gradle property)
@@ -131,15 +125,11 @@ Platform-specific implementations are provided where needed (e.g., `waltid-crypt
 
 ## Join the community
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-* Find more indepth documentation on our [docs site](https://docs.walt.id)
+- Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+- Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+- Find more indepth documentation on our [docs site](https://docs.walt.id)
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-
-<div align="center">
-<img src="../assets/walt-banner.png" alt="walt.id banner" />
-</div>
 

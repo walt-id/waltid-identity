@@ -7,20 +7,27 @@ object VPVerificationPolicyManager {
         KbJwtSignatureSdJwtVPPolicy(),
         NonceCheckSdJwtVPPolicy(),
         SdHashCheckSdJwtVPPolicy(),
-        KbJwtIatCheckSdJwtVPPolicy()
+        KbJwtIatCheckSdJwtVPPolicy(),
+        ExpCheckSdJwtVPPolicy(),
+        NbfCheckSdJwtVPPolicy(),
+        TransactionDataHashesVPPolicy(),
+        TransactionDataHashCheckSdJwtVPPolicy(),
     )
     val defaultDcSdJwtPolicies = simpleDcSdJwtPolicies.toList()
 
     val simpleJwtVcJsonPolicies: Array<JwtVcJsonVPPolicy> = arrayOf(
         AudienceCheckJwtVcJsonVPPolicy(),
         NonceCheckJwtVcJsonVPPolicy(),
-        SignatureJwtVcJsonVPPolicy()
+        SignatureJwtVcJsonVPPolicy(),
+        ExpCheckJwtVcJsonVPPolicy(),
+        NbfCheckJwtVcJsonVPPolicy(),
     )
     val defaultJwtVcJsonPolicies = simpleJwtVcJsonPolicies.toList()
 
     val simpleMsoMdocPolicies: Array<MdocVPPolicy> = arrayOf(
         DeviceAuthMdocVpPolicy(),
         DeviceKeyAuthMdocVpPolicy(),
+        TransactionDataMdocVpPolicy(),
         IssuerAuthMdocVpPolicy(),
         IssuerSignedDataMdocVpPolicy(),
         MsoVerificationMdocVpPolicy()

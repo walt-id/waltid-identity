@@ -19,6 +19,7 @@ kotlin {
 
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
 
             implementation(project(":waltid-libraries:protocols:waltid-openid4vc"))
             implementation(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
@@ -34,7 +35,7 @@ kotlin {
 
             // Problematic libraries:
             implementation(identityLibs.nimbus.jose.jwt)
-            implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
+            implementation(identityLibs.java.cose)
         }
         jvmMain.dependencies {
             // Ktor client
@@ -42,12 +43,12 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
             implementation(identityLibs.junit.jupiter.api)
             implementation(identityLibs.kotlinx.serialization.json)
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
         }
     }
 }

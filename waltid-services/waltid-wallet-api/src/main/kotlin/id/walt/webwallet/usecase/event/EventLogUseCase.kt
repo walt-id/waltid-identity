@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.event
 
@@ -6,14 +5,15 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.oid4vc.data.CredentialFormat
 import id.walt.oid4vc.requests.AuthorizationRequest
+import id.walt.verifier.openid.models.authorization.AuthorizationRequest as OpenId4VpAuthorizationRequest
 import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.utils.JsonUtils
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
@@ -102,8 +102,16 @@ class EventLogUseCase(
         }
 
     fun verifierData(request: AuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
-        did = request.clientId.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable,
+        did = normalizeVerifierDid(request.clientId),
+        name = null,
         policies = emptyList(),//TODO: from input-descriptors?
+    )
+
+    @OptIn(ExperimentalSerializationApi::class)
+    fun verifierData(request: OpenId4VpAuthorizationRequest) = CredentialEventDataActor.Organization.Verifier(
+        did = normalizeVerifierDid(request.clientId),
+        name = request.clientMetadata?.clientName,
+        policies = listOfNotNull(request.clientMetadata?.policyUri),
     )
 
     fun didEventData(did: String, document: DidDocument) = didEventData(did, document.toString())
@@ -129,6 +137,9 @@ class EventLogUseCase(
                 else -> it
             }
         }?.jsonPrimitive?.content
+
+    private fun normalizeVerifierDid(clientId: String?): String =
+        clientId?.trim()?.takeIf { it.isNotEmpty() } ?: EventDataNotAvailable
 
     data class EventFilterParameter(
         val accountId: Uuid,

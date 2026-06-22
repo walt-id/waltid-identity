@@ -1,18 +1,21 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.verifier2
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.fetchBinaryFile
 import id.walt.commons.web.plugins.httpJson
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.ktornotifications.KtorNotifications.notifySessionUpdate
 import id.walt.ktornotifications.SseNotifier
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.commons.config.list.TransactionDataProfile
+import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.verifier2.data.SessionEvent
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.data.Verifier2SessionUpdate
 import id.walt.verifier2.handlers.authrequest.Verifier2AuthorizationRequestHandler.respondAuthorizationRequest
+import id.walt.verifier2.handlers.authrequest.Verifier2RequestUriPostHandler.respondRequestUriPost
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.respondHandleDirectPostResponse
 import id.walt.verifier2.openapi.VerificationSessionCreateOpenApi
 import id.walt.vical.*
@@ -31,7 +34,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.uuid.ExperimentalUuidApi
 
 
 private val log = logger("Verifier2Service")
@@ -142,6 +144,23 @@ object Verifier2Service {
                     )
                 }
 
+                post("request", {
+                        summary = "Wallets POST to the request URI (request_uri_method=post), optionally sending wallet_nonce"
+                        request {
+                            pathParameter<String>(VERIFICATION_SESSION)
+                        }
+                        response { HttpStatusCode.OK to { body<String> { description = "Signed request object JWT (application/oauth-authz-req+jwt)" } } }
+                    }) {
+                    val verificationSession =
+                        sessions[call.parameters.getOrFail(VERIFICATION_SESSION)]
+                            ?: throw IllegalArgumentException("Unknown session id")
+
+                    call.respondRequestUriPost(
+                        verificationSession = verificationSession,
+                        updateSessionCallback = updateSessionCallback
+                    )
+                }
+
                 route("") {
                     install(DoubleReceive)
 
@@ -167,6 +186,17 @@ object Verifier2Service {
                 }
             }
         }
+        get("transaction-data-profiles", {
+            tags("Transaction Data")
+            summary = "List available transaction data type profiles"
+            response {
+                HttpStatusCode.OK to { body<List<TransactionDataProfile>>() }
+            }
+        }) {
+            val config = ConfigManager.getConfig<TransactionDataProfilesConfig>()
+            call.respond(config.transactionDataProfiles)
+        }
+
         route(VICAL) {
             route("", {
                 tags("VICAL")

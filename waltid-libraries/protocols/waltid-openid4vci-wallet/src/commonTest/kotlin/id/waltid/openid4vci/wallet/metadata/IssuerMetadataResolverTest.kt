@@ -101,6 +101,7 @@ class IssuerMetadataResolverTest {
         assertEquals(issuerUrl, metadata.credentialIssuer)
         assertEquals("$issuerUrl/credential", metadata.credentialEndpoint)
     }
+
     @Test
     fun testResolveCredentialIssuerMetadataNotFound() = runTest {
         val client = createMockClient { _ ->

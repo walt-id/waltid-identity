@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.exchange
 
@@ -17,7 +16,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 
 class MatchPresentationDefinitionCredentialsUseCaseTest {
 

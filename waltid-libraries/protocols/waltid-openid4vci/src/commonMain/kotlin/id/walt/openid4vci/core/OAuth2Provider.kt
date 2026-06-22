@@ -13,6 +13,9 @@ import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
@@ -44,12 +47,14 @@ import kotlin.time.Instant
  */
 interface OAuth2Provider {
     // OAuth2.0 - Authorization Endpoint
-    fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+    suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
 
     suspend fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         session: Session
     ): AuthorizationResponseResult
+
+    fun writeAuthorizationError(error: OAuthError): AuthorizationResponseHttp
 
     fun writeAuthorizationError(
         authorizationRequest: AuthorizationRequest,
@@ -61,6 +66,26 @@ interface OAuth2Provider {
         response: AuthorizationResponse
     ): AuthorizationResponseHttp
 
+    // OAuth2.0 - Pushed Authorization Request Endpoint
+    suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+
+    suspend fun createPushedAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        clientAuthentication: Map<String, String> = emptyMap(),
+    ): PushedAuthorizationResponseResult
+
+    fun writePushedAuthorizationError(error: OAuthError): PushedAuthorizationResponseHttp
+
+    fun writePushedAuthorizationError(
+        authorizationRequest: AuthorizationRequest,
+        error: OAuthError,
+    ): PushedAuthorizationResponseHttp
+
+    fun writePushedAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        response: PushedAuthorizationResponse,
+    ): PushedAuthorizationResponseHttp
+
     // OAuth2.0 - Token Endpoint
     fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
@@ -71,6 +96,8 @@ interface OAuth2Provider {
         request: AccessTokenRequest,
         options: TokenResponseOptions = TokenResponseOptions(),
     ): AccessTokenResponseResult
+
+    fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp
 
     fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp
 
@@ -99,6 +126,8 @@ interface OAuth2Provider {
         validFrom: Instant? = null,
         validUntil: Instant? = null,
     ): CredentialResponseResult
+
+    fun writeCredentialError(error: OAuthError): CredentialResponseHttp
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
 

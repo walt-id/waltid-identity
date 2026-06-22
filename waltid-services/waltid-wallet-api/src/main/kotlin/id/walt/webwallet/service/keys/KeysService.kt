@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.service.keys
 
@@ -12,7 +11,6 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
@@ -26,8 +24,9 @@ object KeysService {
         WalletKeys.selectAll().where { WalletKeys.keyId eq keyId }.firstOrNull()?.let { WalletKey(it) }
     }
 
-    fun list(wallet: Uuid): List<WalletKey> =
+    fun list(wallet: Uuid): List<WalletKey> = transaction {
         WalletKeys.selectAll().where { WalletKeys.wallet eq wallet.toJavaUuid() }.map { WalletKey(it) }
+    }
 
     fun add(wallet: Uuid, keyId: String, document: String, name: String? = null) = transaction {
         WalletKeys.insert {

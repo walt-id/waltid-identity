@@ -140,6 +140,7 @@ open class DeviceSignedItemListSerializer(private val namespace: String) :
         // These are the ones that map to different CBOR data types, the rest don't, so if it is not registered, we'll
         // lose type information. No others must be added here, as they could consume data from the underlying bytes
         runCatching { return decodeStringElement(descriptor, index) }
+        runCatching { return decodeSerializableElement(descriptor, index, ByteArraySerializer()) }
         runCatching { return decodeLongElement(descriptor, index) }
         runCatching { return decodeDoubleElement(descriptor, index) }
         runCatching { return decodeBooleanElement(descriptor, index) }

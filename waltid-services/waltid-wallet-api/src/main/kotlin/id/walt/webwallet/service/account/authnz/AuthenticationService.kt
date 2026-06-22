@@ -16,9 +16,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.util.UUID
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 class AuthenticationService(private val dispatcher: CoroutineDispatcher = Dispatchers.IO) {
 
     val editableAccountStore = object : EditableAccountStore {

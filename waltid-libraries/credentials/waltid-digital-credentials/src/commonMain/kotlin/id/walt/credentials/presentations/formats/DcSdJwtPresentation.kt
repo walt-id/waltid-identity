@@ -1,6 +1,7 @@
 package id.walt.credentials.presentations.formats
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.AbstractW3C
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.formats.SdJwtCredential
 import id.walt.credentials.presentations.DcSdJwtPresentationValidationError
@@ -16,6 +17,10 @@ import id.walt.dcql.models.ClaimsQuery
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -39,12 +44,14 @@ data class DcSdJwtPresentation(
     /** The holder-signed Key-Binding JWT that proves possession and binds to the transaction. */
     val keyBindingJwt: String,
 
-    val credential: SdJwtCredential,
+    val credential: DigitalCredential,
 
     // claims:
     val audience: String?,
     val nonce: String?,
     val sdHash: String?,
+    val transactionDataHashes: List<String>? = null,
+    val transactionDataHashesAlg: String? = null,
     val presentationStringHashable: String, // If only the single hash variant is allowed
     //val hashablePresentationStringVariants: List<String> // If multiple hash variants would be allowed
 ) : VerifiablePresentation(format = PresentationFormat.dc_sd_jwt) {
@@ -52,7 +59,7 @@ data class DcSdJwtPresentation(
     suspend fun presentationVerification(
         expectedAudience: String?,
         expectedNonce: String,
-        originalClaimsQuery: List<ClaimsQuery>?
+        originalClaimsQuery: List<ClaimsQuery>?,
     ) {
         // Validate Key Binding JWT
 
@@ -146,6 +153,10 @@ data class DcSdJwtPresentation(
             val aud = kbJwtPayload["aud"]?.jsonPrimitive?.contentOrNull
             val nonce = kbJwtPayload["nonce"]?.jsonPrimitive?.contentOrNull
             val sdHash = kbJwtPayload["sd_hash"]?.jsonPrimitive?.contentOrNull
+            val transactionDataHashes = kbJwtPayload.getStringArray("transaction_data_hashes")
+                .getOrElse { return Result.failure(it) }
+            val transactionDataHashesAlg = kbJwtPayload.getString("transaction_data_hashes_alg")
+                .getOrElse { return Result.failure(it) }
 
             val presentedDisclosureString =
                 if (presentedDisclosures.isNotEmpty())
@@ -178,7 +189,9 @@ data class DcSdJwtPresentation(
             // It should verify that the digests in the `_sd` array of the core match the hashes of the provided disclosures.
             val (_, reconstructedCredential) = CredentialParser.detectAndParse(hashableString)
 
-            require(reconstructedCredential is SdJwtCredential) { "Credential is not an SD-JWT credential: $reconstructedCredential" }
+            require(reconstructedCredential is SdJwtCredential || reconstructedCredential is AbstractW3C) {
+                "Expected an SD-JWT credential (IETF SD-JWT VC or W3C+SD-JWT), but got: ${reconstructedCredential::class.simpleName}"
+            }
 
             return Result.success(
                 DcSdJwtPresentation(
@@ -189,6 +202,8 @@ data class DcSdJwtPresentation(
                     audience = aud,
                     nonce = nonce,
                     sdHash = sdHash,
+                    transactionDataHashes = transactionDataHashes,
+                    transactionDataHashesAlg = transactionDataHashesAlg,
                     //hashablePresentationStringVariants = hashablePresentationStringVariants
                     presentationStringHashable = hashableString
                 )
@@ -218,7 +233,20 @@ data class DcSdJwtPresentation(
             }
             return Result.success(Unit)
         }
+
+        private fun JsonElement.asString(key: String): String =
+            (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+                ?: throw IllegalArgumentException("$key must be a string")
+
+        private fun JsonObject.getString(key: String): Result<String?> =
+            runCatching { this[key]?.asString(key) }
+
+        private fun JsonObject.getStringArray(key: String): Result<List<String>?> =
+            runCatching {
+                this[key]?.let { element ->
+                    require(element is JsonArray) { "$key must be an array" }
+                    element.map { it.asString(key) }
+                }
+            }
     }
-
-
 }

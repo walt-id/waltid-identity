@@ -6,13 +6,11 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
  * Temporarily required until kotlinx.serialization 1.8.0
  */
-@ExperimentalUuidApi
 object UuidSerializer : KSerializer<Uuid> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("waltid-kotlin.uuid.Uuid", PrimitiveKind.STRING)
 

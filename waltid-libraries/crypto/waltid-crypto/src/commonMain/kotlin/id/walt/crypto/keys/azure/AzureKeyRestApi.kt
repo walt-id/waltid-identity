@@ -140,7 +140,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalStdlibApi::class)
     /**
      * Executes Azure sign operation, and converts Azure signature to DER by default (for ECC keys)
      * @param ieeeP1363Signature set to true to leave signature in Azure IEEE P1363 format (no conversion)
@@ -178,7 +177,6 @@ class AzureKeyRestApi(
     @JvmAsync
     @JsPromise
     @JsExport.Ignore
-    @OptIn(ExperimentalStdlibApi::class)
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         return signRawAzure(plaintext, ieeeP1363Signature = false)
     }
