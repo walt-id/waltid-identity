@@ -1,5 +1,6 @@
 package id.walt.openid4vci.repository.par
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Instant
 
 /**
@@ -8,7 +9,7 @@ import kotlin.time.Instant
  * Implementations must enforce single-use semantics in [consume].
  */
 interface PARRepository {
-    @Throws(DuplicatePARRecordException::class)
+    @Throws(DuplicatePARRecordException::class, CancellationException::class)
     suspend fun save(record: PARRecord)
     suspend fun consume(requestId: String, now: Instant): PARRecord?
 }
