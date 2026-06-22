@@ -23,7 +23,7 @@ ktor = "3.5.0"
 # ...
 
 # Ktor external plugins
-cohort = "2.9.7"
+cohort = "2.9.9"
 smiley-openapi = "5.7.0"
 
 # Kotlinx
@@ -32,7 +32,7 @@ kotlinx-serialization-cbor-TEMP = "1.11.1-waltid_20260519-SNAPSHOT"
 
 kotlinx-datetime = "0.8.0"
 kotlinx-coroutines = "1.11.0"
-kotlinx-atomicfu = "0.32.1"
+kotlinx-atomicfu = "0.33.0"
 kotlinx-io = "0.9.0"
 
 # Logging
@@ -62,16 +62,16 @@ java-json-canonicalization = "1.1"
 
 # JVM-only: crypto providers
 java-cose = "1.1.1-WALT-SNAPSHOT"
-aws-kms = "1.6.96"
+aws-kms = "1.6.97"
 azure-identity = "1.18.4"
 azure-keyvault-keys = "4.11.0"
-netty = "4.1.133.Final"
+netty = "4.1.135.Final"
 netty-4_2 = "4.2.15.Final"
 jackson-core = "2.22.0"
 jackson-core-3 = "3.1.1"
 # web3j brings bcprov-jdk18on; pin to latest to override its 1.80
 bcprov-jdk18on = "1.84"
-oci-sdk = "3.89.1"
+oci-sdk = "3.90.0"
 
 # JVM-only: auth (platform-specific, not multiplatform)
 web3j = "5.0.3"
