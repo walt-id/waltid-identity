@@ -86,7 +86,7 @@ internal suspend fun executeAuthorizationCodeFlow(
     require(authorizeResponse is AuthorizationResponseResult.Success)
     val code = authorizeResponse.response.code
 
-    val AccessTokenRequestResult = provider.createAccessTokenRequest(
+    val accessTokenRequestResult = provider.createAccessTokenRequest(
         mapOf(
             "grant_type" to listOf(GrantType.AuthorizationCode.value),
             "client_id" to listOf(clientId),
@@ -94,9 +94,9 @@ internal suspend fun executeAuthorizationCodeFlow(
             "redirect_uri" to listOf("https://client.example/callback"),
         ),
     )
-    require(AccessTokenRequestResult is AccessTokenRequestResult.Success)
+    require(accessTokenRequestResult is AccessTokenRequestResult.Success)
 
-    val accessRequestWithIssuer = AccessTokenRequestResult.request.withIssuer(issuerId)
+    val accessRequestWithIssuer = accessTokenRequestResult.request.withIssuer(issuerId)
 
     val accessResponse = provider.createAccessTokenResponse(accessRequestWithIssuer)
     require(accessResponse is AccessTokenResponseResult.Success)

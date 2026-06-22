@@ -1,6 +1,7 @@
 package id.waltid.openid4vci.wallet.token
 
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -10,6 +11,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 private val log = KotlinLogging.logger {}
 
@@ -37,6 +39,7 @@ class TokenRequestBuilder(
         val scope: String? = null,
         val c_nonce: String? = null,
         val c_nonce_expires_in: Long? = null,
+        val authorization_details: List<AuthorizationDetail>? = null
     )
 
     /**

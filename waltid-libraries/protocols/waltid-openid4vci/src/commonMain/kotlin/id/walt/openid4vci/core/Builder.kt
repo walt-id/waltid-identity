@@ -6,6 +6,7 @@ import id.walt.openid4vci.handlers.credential.W3cJwtVcCredentialHandler
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeAuthorizationEndpoint
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeTokenEndpoint
 import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCodeTokenEndpoint
+import id.walt.openid4vci.handlers.par.PushedAuthorizationRequestEndpointHandler
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
@@ -47,6 +48,7 @@ fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
+    includePushedAuthorizationDefaultHandlers: Boolean = true,
     includeCredentialDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
     val resolvedConfig = applyIssuerStateValidator(config)
@@ -54,6 +56,10 @@ fun buildOAuth2Provider(
         config = resolvedConfig,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
+    )
+    registerDefaultPushedAuthorizationHandlers(
+        config = resolvedConfig,
+        includePushedAuthorizationDefaultHandlers = includePushedAuthorizationDefaultHandlers,
     )
     registerDefaultCredentialHandlers(
         config = resolvedConfig,
@@ -107,6 +113,32 @@ private fun registerDefaultGrantTypeHandlers(
             grantType = GrantType.PreAuthorizedCode,
             handler = preAuthorizedTokenHandler,
         )
+    }
+}
+
+private fun registerDefaultPushedAuthorizationHandlers(
+    config: OAuth2ProviderConfig,
+    includePushedAuthorizationDefaultHandlers: Boolean,
+) {
+    val pushedAuthorizationConfig = config.pushedAuthorizationConfig
+    check(pushedAuthorizationConfig != null || config.pushedAuthorizationEndpointHandlers.count() == 0) {
+        "PAR endpoint handlers require pushedAuthorizationConfig"
+    }
+
+    if (pushedAuthorizationConfig == null) return
+
+    if (includePushedAuthorizationDefaultHandlers) {
+        config.pushedAuthorizationEndpointHandlers.append(
+            PushedAuthorizationRequestEndpointHandler(
+                parRepository = pushedAuthorizationConfig.repository,
+                requestUriPrefix = pushedAuthorizationConfig.requestUriPrefix,
+                requestLifetimeSeconds = pushedAuthorizationConfig.lifetimeSeconds,
+            )
+        )
+    }
+
+    check(config.pushedAuthorizationEndpointHandlers.count() > 0) {
+        "PAR is configured but no pushed authorization endpoint handler is registered"
     }
 }
 
