@@ -43,6 +43,7 @@ class ConfiguredPersistence<V : Any>(
 
     override fun get(id: String): V? = underlyingPersistence[id]
     override fun remove(id: String) = underlyingPersistence.remove(id)
+    override fun getAndRemove(id: String): V? = underlyingPersistence.getAndRemove(id)
     override fun contains(id: String): Boolean = underlyingPersistence.contains(id)
     override fun listAllKeys(): Set<String> = underlyingPersistence.listAllKeys()
 

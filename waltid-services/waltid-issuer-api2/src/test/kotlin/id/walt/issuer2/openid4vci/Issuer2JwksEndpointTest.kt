@@ -32,7 +32,6 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.reflect.KClass
-import kotlinx.coroutines.runBlocking
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -109,7 +108,7 @@ class Issuer2JwksEndpointTest {
             install(ServerContentNegotiation) {
                 json(json)
             }
-            runBlocking { issuer2AuthenticationPluginAmendment() }
+            issuer2AuthenticationPluginAmendment()
             AuthenticationServiceModule.run { enable() }
             issuer2Module(withPlugins = true)
         }

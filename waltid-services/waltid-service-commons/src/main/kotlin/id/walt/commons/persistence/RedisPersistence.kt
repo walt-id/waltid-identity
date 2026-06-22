@@ -35,6 +35,9 @@ class RedisPersistence<V>(
         pool.del("$discriminator:$id")
     }
 
+    override fun getAndRemove(id: String): V? =
+        pool.getDel("$discriminator:$id")?.let { decoding.invoke(it) }
+
     override fun contains(id: String): Boolean = pool.exists("$discriminator:$id")
 
     override fun listAllKeys(): Set<String> = pool.keys("$discriminator:*").map { it.removePrefix("session_type:") }.toSet()

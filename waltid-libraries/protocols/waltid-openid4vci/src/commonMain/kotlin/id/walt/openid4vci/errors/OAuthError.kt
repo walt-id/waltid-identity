@@ -22,4 +22,5 @@ object OAuthErrorCodes {
     const val INVALID_CLIENT = "invalid_client"
     const val INVALID_GRANT = "invalid_grant"
     const val UNSUPPORTED_GRANT_TYPE = "unsupported_grant_type"
+    const val INVALID_REQUEST_URI = "invalid_request_uri"
 }
