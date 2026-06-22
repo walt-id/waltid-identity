@@ -11,7 +11,7 @@ jobs:
   version:
     uses: walt-id/waltid-identity/.github/workflows/version.yml@6f15f719a6820cf631bce0399a89b3f060302d3d
   gradle-build:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@58b4c3ea37d8dcecc0f4cb2ea05bc88a86104780
+    uses: ./.github/workflows/gradle.yml
     secrets: inherit
     needs: version
     with:
