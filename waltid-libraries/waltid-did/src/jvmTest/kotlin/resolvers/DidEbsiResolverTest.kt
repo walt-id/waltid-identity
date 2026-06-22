@@ -21,7 +21,7 @@ import java.util.stream.Stream
 
 class DidEbsiResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod =
-        DidEbsiResolver(HttpClient(Java))
+        DidEbsiResolver(WebDataFetcher.wrapping(HttpClient(Java), "ebsi-test"))
 
 
     // TODO: Include test in the scope of WAL-842
