@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers
 
@@ -10,7 +9,6 @@ import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import kotlin.uuid.ExperimentalUuidApi
 
 fun Application.history() = walletRoute {
     route("history", {

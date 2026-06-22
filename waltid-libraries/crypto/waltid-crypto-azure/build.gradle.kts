@@ -9,7 +9,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.junit.jupiter.api)
 
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+    testImplementation(identityLibs.kotlinx.coroutines.test)
 
     // walt.id
     api(project(":waltid-libraries:crypto:waltid-crypto"))
@@ -19,15 +19,15 @@ dependencies {
 
     // Coroutines
     implementation(identityLibs.kotlinx.coroutines.core)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.10.2")
+    implementation(identityLibs.kotlinx.coroutines.reactor)
 
     // Azure Identity (for Managed Identity authentication)
     // 1.19.0-beta.2 pulled Netty 4.1.130 (multiple CVEs); 1.18.3 pulls 4.1.132 (partially fixed).
     // Remaining CVEs (netty-codec/dns/http/http2 ≥4.1.133, jackson-core ≥2.18.6) are force-pinned below.
-    implementation("com.azure:azure-identity:1.18.3")
+    implementation(identityLibs.azure.identity)
 
     // Azure Key Vault Keys (for cryptographic operations)
-    implementation("com.azure:azure-security-keyvault-keys:4.10.5")
+    implementation(identityLibs.azure.keyvault.keys)
 
     // JOSE
     implementation(identityLibs.nimbus.jose.jwt)
@@ -43,11 +43,11 @@ dependencies {
 // jackson-core ≥2.18.6 fixes: SNYK-JAVA-COMFASTERXMLJACKSONCORE-15365924
 configurations.all {
     resolutionStrategy.force(
-        "io.netty:netty-codec:4.1.133.Final",
-        "io.netty:netty-codec-dns:4.1.133.Final",
-        "io.netty:netty-codec-http:4.1.133.Final",
-        "io.netty:netty-codec-http2:4.1.133.Final",
-        "com.fasterxml.jackson.core:jackson-core:2.18.6"
+        identityLibs.netty.codec,
+        identityLibs.netty.codec.dns,
+        identityLibs.netty.codec.http,
+        identityLibs.netty.codec.http2,
+        identityLibs.jackson.core
     )
 }
 

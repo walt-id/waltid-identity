@@ -25,7 +25,6 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 import java.sql.Connection
 import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
-import kotlin.uuid.ExperimentalUuidApi
 
 object Db {
 
@@ -82,8 +81,7 @@ object Db {
         AuthnzStoredData
     ).toTypedArray()
 
-    @OptIn(ExperimentalUuidApi::class)
-    private fun recreateDatabase() {
+        private fun recreateDatabase() {
         transaction {
 //            addLogger(StdOutSqlLogger)
 

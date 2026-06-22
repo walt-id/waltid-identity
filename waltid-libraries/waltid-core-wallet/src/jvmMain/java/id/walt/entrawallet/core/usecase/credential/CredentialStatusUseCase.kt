@@ -1,9 +1,7 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.credential
 
 import kotlinx.serialization.Serializable
-import kotlin.uuid.ExperimentalUuidApi
 
 
 /*class CredentialStatusUseCase(

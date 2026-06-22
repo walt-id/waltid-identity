@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.tests
 
@@ -29,7 +28,6 @@ import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.uuid.ExperimentalUuidApi
 
 private val sdjwtCredential = IssuanceRequest(
     issuerKey = loadJsonResource("issuance/key.json"),

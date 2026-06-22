@@ -9,7 +9,6 @@ import id.walt.target.ios.keys.RSA
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Suppress("unused")
@@ -18,7 +17,7 @@ class IosKey private constructor(
     override val hasPrivateKey: Boolean = false
 ) : Key() {
 
-    class Options @OptIn(ExperimentalUuidApi::class) constructor(
+    class Options constructor(
         val kid: String = Uuid.random().toString(),
         val keyType: KeyType,
         val inSecureElement: Boolean = false

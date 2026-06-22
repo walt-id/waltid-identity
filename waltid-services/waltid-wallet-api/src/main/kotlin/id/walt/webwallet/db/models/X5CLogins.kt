@@ -2,9 +2,7 @@ package id.walt.webwallet.db.models
 
 import id.walt.webwallet.db.kotlinxUuid
 import org.jetbrains.exposed.v1.core.Table
-import kotlin.uuid.ExperimentalUuidApi
 
-@OptIn(ExperimentalUuidApi::class)
 object X5CLogins : Table("x5clogins") {
     val tenant = varchar("tenant", 128).default("")
     val accountId = kotlinxUuid("accountId")
