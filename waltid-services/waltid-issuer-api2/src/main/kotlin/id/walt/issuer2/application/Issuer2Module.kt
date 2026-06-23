@@ -49,7 +49,7 @@ class Issuer2Module(
         sessionService = issuanceSessionService,
     )
 
-    private val credentialOfferService = CredentialOfferService(
+    val credentialOfferService = CredentialOfferService(
         profileService = credentialProfileService,
         sessionService = issuanceSessionService,
         preAuthorizedCodeIssuer = openId4VciModule.preAuthorizedCodeIssuer,
