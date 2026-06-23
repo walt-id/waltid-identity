@@ -1,0 +1,7 @@
+# Android SDK location (required for Android builds)
+# Example: sdk.dir=/Users/username/Library/Android/sdk
+sdk.dir=/path/to/android-sdk
+
+# CocoaPods binary path (macOS only, required for iOS builds)
+# Example: Apple Silicon Macs use: /opt/homebrew/bin/pod; Intel Macs use: /usr/local/bin/pod
+kotlin.apple.cocoapods.bin=/path/to/cocoapods

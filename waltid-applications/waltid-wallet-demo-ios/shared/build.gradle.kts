@@ -31,16 +31,8 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.test)
         }
 
-        val iosArm64Main by getting
-        val iosSimulatorArm64Main by getting
-
-        val iosMain by creating {
-            dependsOn(commonMain.get())
-            iosArm64Main.dependsOn(this)
-            iosSimulatorArm64Main.dependsOn(this)
-            dependencies {
-                implementation(identityLibs.ktor.client.darwin)
-            }
+        iosMain.dependencies {
+            implementation(identityLibs.ktor.client.darwin)
         }
     }
 }

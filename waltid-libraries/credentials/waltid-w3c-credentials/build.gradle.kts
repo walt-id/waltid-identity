@@ -5,9 +5,6 @@ plugins {
 }
 
 group = "id.walt.credentials"
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
     js(IR) {
         outputModuleName.set("w3c-credentials")

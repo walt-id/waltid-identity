@@ -57,11 +57,13 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
-        "waltid-openid4vc-wallet-persistence-client",
+        "waltid-openid4vc-wallet-persistence-client" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-persistence-client" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-persistence-server",
-        "waltid-openid4vc-wallet-client",
+        "waltid-openid4vc-wallet-client" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-client" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-server",
-        "waltid-mobile-test-utils",
+        "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
     ),
 
     * "$libraries:sdjwt".group(
@@ -122,7 +124,7 @@ val modules = listOfNotNull(
     "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )
 
-include(*modules.toTypedArray())
+include(*modules.distinct().toTypedArray())
 
 pluginManagement {
     includeBuild("build-logic")

@@ -1,6 +1,3 @@
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 plugins {
     id("waltid.multiplatform.library")
     id("waltid.publish.maven")
@@ -13,7 +10,7 @@ kotlin {
         outputModuleName = "crypto"
     }
 
-    if(enableIosBuild) {
+    if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
     }

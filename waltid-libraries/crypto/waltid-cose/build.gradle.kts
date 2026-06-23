@@ -10,7 +10,6 @@ plugins {
 
 group = "id.walt.crypto"
 
-
 kotlin {
     js(IR) {
         outputModuleName = "cose"
@@ -60,11 +59,6 @@ kotlin {
         jsTest.dependencies {
             implementation(kotlin("test-js"))
         }
-
-        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
-            iosMain.dependencies {}
-        }
-
     }
 }
 

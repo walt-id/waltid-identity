@@ -6,8 +6,12 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "id.walt.wallet2.persistence"
+
+        if (enableAndroidBuild) {
+            withHostTestBuilder {}
+        }
     }
 
     sourceSets {
@@ -21,17 +25,13 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
         }
-        commonTest.dependencies {
-            implementation(kotlin("test"))
-            implementation(identityLibs.kotlinx.coroutines.test)
-        }
-        if (providers.gradleProperty("enableAndroidBuild").orNull.toBoolean()) {
+        if (enableAndroidBuild) {
             androidMain.dependencies {
                 implementation(identityLibs.sqldelight.android.driver)
                 api(project(":waltid-libraries:crypto:waltid-crypto-android"))
             }
         }
-        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
+        if (enableIosBuild) {
             iosMain.dependencies {
                 api(project(":waltid-libraries:crypto:waltid-crypto-ios"))
                 implementation(identityLibs.sqldelight.native.driver)

@@ -27,3 +27,12 @@ val Project.javaLibraryVersion: Int
 
 val Project.javaServiceVersion: Int
     get() = identityCatalog.findVersion("java-service").get().requiredVersion.toInt()
+
+fun Project.getBooleanProperty(name: String): Boolean =
+    providers.gradleProperty(name).orNull.toBoolean()
+
+val Project.enableAndroidBuild: Boolean
+    get() = getBooleanProperty("enableAndroidBuild")
+
+val Project.enableIosBuild: Boolean
+    get() = getBooleanProperty("enableIosBuild")

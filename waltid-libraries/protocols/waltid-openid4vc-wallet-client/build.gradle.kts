@@ -5,8 +5,10 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "id.walt.wallet2.client"
+
+        withHostTestBuilder {}
 
         withDeviceTestBuilder {
             sourceSetTreeName = "androidDeviceTest"
@@ -33,26 +35,30 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)
         }
-        androidMain.dependencies {
-            implementation(identityLibs.ktor.client.android)
-        }
-        iosMain.dependencies {
-            implementation(identityLibs.ktor.client.darwin)
-        }
-        val androidDeviceTest by getting {
-            dependsOn(commonTest.get())
-            dependencies {
-                implementation(kotlin("test"))
-                implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
-                implementation(identityLibs.kotlinx.coroutines.test)
-                implementation(identityLibs.androidx.test.runner)
-                implementation(identityLibs.androidx.test.ext.junit)
+        if (enableAndroidBuild) {
+            androidMain.dependencies {
                 implementation(identityLibs.ktor.client.android)
+            }
+        }
+        if (enableIosBuild) {
+            iosMain.dependencies {
+                implementation(identityLibs.ktor.client.darwin)
+            }
+        }
+        if (enableAndroidBuild) {
+            val androidDeviceTest by getting {
+                dependencies {
+                    implementation(kotlin("test"))
+                    implementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.androidx.test.runner)
+                    implementation(identityLibs.androidx.test.ext.junit)
+                    implementation(identityLibs.ktor.client.android)
+                }
             }
         }
     }

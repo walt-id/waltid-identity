@@ -17,7 +17,7 @@ kotlin {
     applyDefaultHierarchyTemplate()
     jvmToolchain(project.javaLibraryVersion)
 
-    androidLibrary {
+    android {
         compileSdk = WaltidBuildConstants.COMPILE_SDK
         minSdk = WaltidBuildConstants.MIN_SDK
         compilations.all {
@@ -44,7 +44,9 @@ kotlin {
     }
 }
 
-powerAssert {
-    includedSourceSets = listOf("commonTest")
-    functions = WaltidBuildConstants.POWER_ASSERT_FUNCTIONS
+if (project.file("src/commonTest").exists()) {
+    powerAssert {
+        includedSourceSets = listOf("commonTest")
+        functions = WaltidBuildConstants.POWER_ASSERT_FUNCTIONS
+    }
 }

@@ -7,9 +7,6 @@ plugins {
 group = "id.walt.policies"
 
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
     js(IR) {
         outputModuleName = "verification-policies"
@@ -60,9 +57,6 @@ kotlin {
             implementation(identityLibs.ktor.server.content.negotiation)
             implementation(identityLibs.ktor.server.netty)
             implementation(identityLibs.mockk)
-        }
-        if (enableIosBuild) {
-            iosMain.dependencies {}
         }
     }
 }

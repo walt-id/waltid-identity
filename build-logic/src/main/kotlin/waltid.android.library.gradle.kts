@@ -6,7 +6,7 @@ plugins {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = project.group.toString()
         compileSdk = WaltidBuildConstants.COMPILE_SDK
         minSdk = WaltidBuildConstants.MIN_SDK
