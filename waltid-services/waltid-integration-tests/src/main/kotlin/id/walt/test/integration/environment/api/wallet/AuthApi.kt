@@ -18,7 +18,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class AuthApi(
@@ -109,8 +108,7 @@ class AuthApi(
         message = "This API is for old integration tests",
         replaceWith = ReplaceWith("listAccountWalletsRaw()")
     )
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun userWallets(expectedAccountId: Uuid, output: ((AccountWalletListing) -> Unit)? = null) =
+        suspend fun userWallets(expectedAccountId: Uuid, output: ((AccountWalletListing) -> Unit)? = null) =
         e2e.test("/wallet-api/wallet/accounts/wallets - get wallets") {
             client.get("/wallet-api/wallet/accounts/wallets").expectSuccess().apply {
                 val listing = body<AccountWalletListing>()

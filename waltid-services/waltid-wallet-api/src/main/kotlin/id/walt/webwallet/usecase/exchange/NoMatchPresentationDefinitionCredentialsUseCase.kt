@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.exchange
 
@@ -8,7 +7,6 @@ import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.usecase.exchange.strategies.PresentationDefinitionMatchStrategy
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.jsonArray
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 

@@ -29,7 +29,7 @@ enum class CredentialFormat(vararg val id: String) {
     @SerialName("dc+sd-jwt")
     DC_SD_JWT(
         "dc+sd-jwt",
-        "vc-sd_jwt" // old ID
+        "vc-sd_jwt" // matches @SerialName on SdJwtCredential sealed class — used for DCQL format matching of stored credentials
     ),
 
     /** AnonCreds (support pending) */

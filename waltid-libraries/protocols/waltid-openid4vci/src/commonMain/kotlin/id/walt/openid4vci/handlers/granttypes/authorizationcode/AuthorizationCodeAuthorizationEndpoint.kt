@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
 
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
@@ -16,7 +15,6 @@ import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration.Companion.seconds
 
 /**

@@ -4,7 +4,6 @@ import id.walt.trust.model.*
 import id.walt.trust.utils.HashUtils.computeCertificateSha256
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 /**
@@ -16,7 +15,6 @@ import kotlin.time.Instant
  * Note: this parser handles the MVP JSON shape. It is intentionally lenient —
  * unknown fields are ignored. The format is provisional pending TS 119 605 stabilisation.
  */
-@OptIn(ExperimentalEncodingApi::class)
 object LoteJsonParser {
 
     // ---------------------------------------------------------------------------

@@ -4,8 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
-import io.ktor.client.*
-import io.ktor.client.engine.java.*
+import id.walt.webdatafetching.WebDataFetcher
 import io.ktor.client.plugins.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
@@ -20,7 +19,7 @@ import java.util.stream.Stream
 
 class DidEbsiResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod =
-        DidEbsiResolver(HttpClient(Java))
+        DidEbsiResolver(WebDataFetcher("did-ebsi-resolver-test"))
 
 
     // TODO: Include test in the scope of WAL-842

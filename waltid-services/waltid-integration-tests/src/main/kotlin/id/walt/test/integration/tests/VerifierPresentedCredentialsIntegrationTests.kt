@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.tests
 
@@ -36,7 +35,6 @@ import kotlin.text.isBlank
 import kotlin.text.isNotBlank
 import kotlin.text.toByteArray
 import kotlin.text.trimIndent
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @TestMethodOrder(OrderAnnotation::class)

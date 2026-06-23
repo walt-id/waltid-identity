@@ -1,11 +1,9 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.event
 
 import id.walt.webwallet.service.events.*
 import id.walt.webwallet.usecase.entity.EntityNameResolutionUseCase
 import kotlinx.serialization.json.*
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 

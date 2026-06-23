@@ -1,8 +1,11 @@
 package id.walt.verifier2.verification2
 
 import id.walt.credentials.presentations.formats.*
+import id.walt.dcql.DcqlCredential
+import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
+import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.policies2.vc.policies.PolicyExecutionContext
 import id.walt.policies2.vp.policies.VPPolicy2
 import id.walt.policies2.vp.policies.VPPolicyRunner
@@ -18,11 +21,6 @@ import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyVal
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 object PresentationVerificationEngine {
@@ -31,17 +29,26 @@ object PresentationVerificationEngine {
 
     suspend fun parsePresentation(presentationString: String, format: CredentialFormat): VerifiablePresentation = when (format) {
         CredentialFormat.JWT_VC_JSON -> {
-            // W3C SD-JWT (jwt_vc_json credential wrapped in SD-JWT with ~disclosures~kb-jwt)
-            // is not a supported presentation format. jwt_vc_json expects a plain JWT VP envelope.
-            // The wallet should use dc+sd-jwt format for SD-JWT-based credentials.
             if (presentationString.contains("~")) {
-                throw UnsupportedOperationException(
-                    "Presentation format 'jwt_vc_json' does not support SD-JWT structure (~). " +
-                        "For SD-JWT Verifiable Credentials, use the 'dc+sd-jwt' format."
-                )
+                // The presentation string has SD-JWT structure (~) under a jwt_vc_json query.
+                // Per OID4VP §jwt_vc_json, this format expects a plain JWT VP envelope; SD-JWT
+                // structure is not defined for jwt_vc_json. The correct format identifier for
+                // W3C VCDM secured with SD-JWT is dc+sd-jwt (SD-JWT VCLD, OID4VP §sd-jwt_vcld).
+                //
+                // As a pragmatic fallback for wallets that present W3C+SD-JWT under jwt_vc_json,
+                // we attempt to parse it as dc+sd-jwt. This allows interoperability during the
+                // migration to the correct dc+sd-jwt format identifier.
+                log.warn {
+                    "Received SD-JWT structure (~) under jwt_vc_json format — " +
+                            "attempting dc+sd-jwt parsing as a fallback. " +
+                            "The wallet should use the 'dc+sd-jwt' DCQL format identifier for SD-JWT credentials."
+                }
+                DcSdJwtPresentation.parse(presentationString).getOrThrow()
+            } else {
+                JwtVcJsonPresentation.parse(presentationString).getOrThrow()
             }
-            JwtVcJsonPresentation.parse(presentationString).getOrThrow()
         }
+
         CredentialFormat.DC_SD_JWT -> DcSdJwtPresentation.parse(presentationString).getOrThrow()
         CredentialFormat.MSO_MDOC -> MsoMdocPresentation.parse(presentationString).getOrThrow()
 
@@ -79,7 +86,8 @@ object PresentationVerificationEngine {
             isEncrypted = isEncrypted,
             jwkThumbprint = jwkThumbprint,
             isAnnexC = session.setup is DcApiAnnexCFlowSetup,
-            customData = session.data as? JsonObject
+            customData = session.data as? JsonObject,
+            transactionData = authorizationRequest.transactionData
         )
 
         return VPPolicyRunner.verifyPresentation(
@@ -165,6 +173,8 @@ object PresentationVerificationEngine {
 
 
     }
+
+
     /**
     1. VP
     2. DCQL
@@ -174,7 +184,17 @@ object PresentationVerificationEngine {
         vpTokenContents: ParsedVpToken, session: Verification2Session,
         updateSessionCallback: suspend (session: Verification2Session, event: SessionEvent, block: Verification2Session.() -> Unit) -> Unit,
         failSessionCallback: suspend (session: Verification2Session, event: SessionEvent, updateSession: suspend (Verification2Session, SessionEvent, block: Verification2Session.() -> Unit) -> Unit) -> Unit,
-        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty
+        policyContext: PolicyExecutionContext = PolicyExecutionContext.Empty,
+        /**
+         * Optional callback for checking `trusted_authorities` constraints declared in a DCQL
+         * `CredentialQuery`. Receives the credential (wrapped as [DcqlCredential]) and the list of
+         * authority constraints; returns true if the credential satisfies at least one entry.
+         *
+         * When null (default), `trusted_authorities` constraints are not enforced.
+         * Pass [id.walt.credentials.trustedauthorities.DcqlTrustedAuthoritiesChecker.checker]
+         * from JVM callers to enable AKI-based authority verification.
+         */
+        trustedAuthoritiesChecker: ((DcqlCredential, List<TrustedAuthoritiesQuery>) -> Boolean)? = null,
     ) {
         // syntax sugar:
         suspend fun Verification2Session.updateSession(event: SessionEvent, block: Verification2Session.() -> Unit) =
@@ -241,7 +261,15 @@ object PresentationVerificationEngine {
 
         val allSuccessfullyValidatedAndProcessedData = parsedPresentations.map {
             it.key.second.id to when (val presentation = it.value) {
-                is JwtVcJsonPresentation -> presentation.credentials ?: emptyList()
+                is JwtVcJsonPresentation -> {
+                    if (presentation.vp == null) {
+                        throw PresentationRejectionException(
+                            "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
+                        )
+                    }
+                    presentation.credentials ?: emptyList()
+                }
+
                 is DcSdJwtPresentation -> listOf(presentation.credential)
                 is MsoMdocPresentation -> listOf(presentation.mdoc)
                 is LdpVcPresentation -> throw NotImplementedError()
@@ -250,6 +278,41 @@ object PresentationVerificationEngine {
 
         session.updateSession(SessionEvent.validated_credentials_available) {
             presentedCredentials = allSuccessfullyValidatedAndProcessedData
+        }
+
+        // --- trusted_authorities check ---
+        // Per OID4VP §6.1.1: if a CredentialQuery specifies trusted_authorities, every credential
+        // presented for that query MUST satisfy at least one authority entry.
+        if (trustedAuthoritiesChecker != null) {
+            val dcqlQuery = session.authorizationRequest.dcqlQuery
+            if (dcqlQuery != null) {
+                for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
+                    val credentialQuery = dcqlQuery.credentials.find { it.id == queryId }
+                    val authorities = credentialQuery?.trustedAuthorities
+                    if (!authorities.isNullOrEmpty()) {
+                        for (credential in credentials) {
+                            val dcqlCredential = RawDcqlCredential(
+                                id = queryId,
+                                format = credentialQuery.format.name,
+                                data = credential.credentialData,
+                                originalCredential = credential
+                            )
+                            if (!trustedAuthoritiesChecker(dcqlCredential, authorities)) {
+                                val msg = "Credential for query '$queryId' does not satisfy trusted_authorities constraint"
+                                log.warn { msg }
+                                session.updateSession(SessionEvent.presentation_validation_available) {
+                                    failure = SessionFailure.PresentationValidation(
+                                        reason = msg,
+                                        failedPolicies = emptyMap()
+                                    )
+                                }
+                                session.failSession(SessionEvent.presentation_validation_failed)
+                                throw PresentationRejectionException(msg)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // --- DCQL validation ---

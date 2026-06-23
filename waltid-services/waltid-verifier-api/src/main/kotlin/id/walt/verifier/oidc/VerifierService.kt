@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
 
 package id.walt.verifier.oidc
 
@@ -31,7 +30,6 @@ import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.plugins.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Duration
 
 
