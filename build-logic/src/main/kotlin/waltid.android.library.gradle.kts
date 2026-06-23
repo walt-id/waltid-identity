@@ -8,8 +8,8 @@ plugins {
 kotlin {
     android {
         namespace = project.group.toString()
-        compileSdk = WaltidBuildConstants.COMPILE_SDK
-        minSdk = WaltidBuildConstants.MIN_SDK
+        compileSdk = BuildConstants.COMPILE_SDK
+        minSdk = BuildConstants.MIN_SDK
 
         withJava()
 
@@ -23,7 +23,7 @@ kotlin {
 
         packaging {
             resources {
-                excludes += WaltidBuildConstants.META_INF_EXCLUDES
+                excludes += BuildConstants.META_INF_EXCLUDES
             }
         }
     }

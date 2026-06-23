@@ -8,20 +8,22 @@ plugins {
 android {
     namespace = project.group.toString()
 
-    compileSdk = WaltidBuildConstants.COMPILE_SDK
-    defaultConfig { minSdk = WaltidBuildConstants.MIN_SDK }
+    compileSdk = BuildConstants.COMPILE_SDK
+    defaultConfig { minSdk = BuildConstants.MIN_SDK }
     compileOptions {
         sourceCompatibility = JavaVersion.toVersion(project.javaLibraryVersion)
         targetCompatibility = JavaVersion.toVersion(project.javaLibraryVersion)
     }
     packaging {
         resources {
-            excludes += WaltidBuildConstants.META_INF_EXCLUDES
-        }
-    }
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
+            excludes += BuildConstants.META_INF_EXCLUDES
         }
     }
 }
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
+    }
+}
+
