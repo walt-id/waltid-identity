@@ -3,10 +3,10 @@ package id.walt.walletdemo
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import id.walt.wallet2.client.MobileWalletClientFactory
-import id.walt.wallet2.client.MobileWalletConfig
-import id.walt.wallet2.client.NativeWalletCredential
-import id.walt.wallet2.client.WalletAttestationConfig
+import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.webdatafetching.WebDataFetcherManager
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
@@ -24,11 +24,11 @@ data class WalletUiState(
     val did: String = "",
     val offerUrl: String = "",
     val presentationRequestUrl: String = "",
-    val credentials: List<NativeWalletCredential> = emptyList(),
+    val credentials: List<MobileWalletCredential> = emptyList(),
 )
 
 class WalletViewModel(application: Application) : AndroidViewModel(application) {
-    private val client = MobileWalletClientFactory(application).create(
+    private val client = MobileWalletFactory(application).create(
         MobileWalletConfig(
             walletId = "default",
             attestationConfig = BuildConfig.ATTESTATION_BASE_URL.takeIf { it.isNotBlank() }?.let {

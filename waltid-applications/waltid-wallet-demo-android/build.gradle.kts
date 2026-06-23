@@ -57,7 +57,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-client"))
+    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
 
     implementation(identityLibs.ktor.client.android)
     implementation(identityLibs.ktor.client.content.negotiation)

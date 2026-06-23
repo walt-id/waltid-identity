@@ -161,7 +161,7 @@ Schema migrations are handled automatically by Exposed's `SchemaUtils.createMiss
 ## Related Libraries
 
 - **[waltid-openid4vc-wallet](../waltid-openid4vc-wallet)** — Core wallet library (store interfaces)
-- **[waltid-openid4vc-wallet-persistence-client](../waltid-openid4vc-wallet-persistence-client)** — Mobile SQLDelight persistence
+- **[waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile)** — Mobile SQLDelight persistence
 - **[waltid-openid4vc-wallet-server](../waltid-openid4vc-wallet-server)** — HTTP route handlers
 
 ## Join the community
