@@ -36,7 +36,7 @@ data class W3C11(
         is JwtCredentialSignature -> "jwt_vc_json"
         is SdJwtCredentialSignature -> "jwt_vc_json"
         is DataIntegrityProofCredentialSignature -> "ldp_vc"
-        is CoseCredentialSignature -> throw NotImplementedError("Unsupported format: $signature of ${this::class.simpleName}")
+        is CoseCredentialSignature -> "vc+cose"  // W3C VCDM secured with COSE_Sign1 (vc-jose-cose)
         null -> "unsigned"
     }
 }

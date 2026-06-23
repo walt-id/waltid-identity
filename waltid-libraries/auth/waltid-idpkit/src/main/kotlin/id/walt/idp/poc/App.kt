@@ -39,7 +39,6 @@ import java.io.File
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /*
@@ -142,7 +141,6 @@ fun signPayload(payload: JsonObject) = JWSObject(
 }.serialize()
 
 
-@OptIn(ExperimentalUuidApi::class)
 fun Application.test() {
     routing {
 

@@ -88,7 +88,9 @@ class SDJwtVC(sdJwt: SDJwt) :
     }
 
     companion object {
-        const val SD_JWT_VC_TYPE_HEADER = "vc+sd-jwt"
+        // Changed from "vc+sd-jwt" to "dc+sd-jwt" per draft-ietf-oauth-sd-jwt-vc-16 §2.2.1
+        // (typ MUST be "dc+sd-jwt"; both values should be accepted during the transitional period)
+        const val SD_JWT_VC_TYPE_HEADER = "dc+sd-jwt"
 
         fun parse(sdJwt: String) = SDJwtVC(SDJwt.parse(sdJwt))
 

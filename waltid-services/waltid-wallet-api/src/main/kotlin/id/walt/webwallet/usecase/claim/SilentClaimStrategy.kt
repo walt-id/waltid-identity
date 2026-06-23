@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.claim
 
@@ -21,10 +20,8 @@ import id.walt.webwallet.usecase.notification.NotificationDispatchUseCase
 import id.walt.webwallet.usecase.notification.NotificationUseCase
 import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class SilentClaimStrategy(
     private val walletProvider: (account: Uuid, wallet: Uuid, did: String) -> TestCredentialWallet,
     private val issuanceService: IssuanceService,

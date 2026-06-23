@@ -13,10 +13,8 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object EmailAccountStrategy : PasswordAccountStrategy<EmailAccountRequest>() {
 
     override suspend fun register(tenant: String, request: EmailAccountRequest): Result<RegistrationResult> = runCatching {

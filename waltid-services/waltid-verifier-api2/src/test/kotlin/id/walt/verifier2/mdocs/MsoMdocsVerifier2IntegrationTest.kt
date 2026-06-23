@@ -210,9 +210,8 @@ class MsoMdocsVerifier2IntegrationTest {
                 format = credential.format,
                 data = credential.credentialData,
                 originalCredential = credential,
-                disclosures = if (credential is SelectivelyDisclosableVerifiableCredential)
-                    credential.disclosures?.map { DcqlDisclosure(it.name, it.value) }
-                else null
+                // walletCredentials only contains MdocsCredential in this test; no SD disclosures
+                disclosures = null
             )
         }
 

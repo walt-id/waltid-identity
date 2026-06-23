@@ -34,7 +34,7 @@ class ProviderAuthorizationOnlyFlowTest {
         )
 
         // 1) Parse the authorize request received from the wallet.
-        val AuthorizationRequestResult = provider.createAuthorizationRequest(
+        val authorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
@@ -42,8 +42,8 @@ class ProviderAuthorizationOnlyFlowTest {
                 "scope" to listOf("openid name credential"),
             ),
         )
-        assertTrue(AuthorizationRequestResult.isSuccess())
-        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request
+        assertTrue(authorizationRequestResult.isSuccess())
+        val authorizeRequest = (authorizationRequestResult as AuthorizationRequestResult.Success).request
             .withIssuer(issuerId)
 
         // Client constructs its session object after authenticating/authorizing the user.
@@ -207,7 +207,7 @@ class ProviderAuthorizationOnlyFlowTest {
             includePreAuthorizedCodeDefaultHandlers = false,
         )
 
-        val AuthorizationRequestResult = provider.createAuthorizationRequest(
+        val authorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
@@ -215,8 +215,8 @@ class ProviderAuthorizationOnlyFlowTest {
             ),
         )
 
-        assertTrue(AuthorizationRequestResult.isSuccess())
-        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request
+        assertTrue(authorizationRequestResult.isSuccess())
+        val authorizeRequest = (authorizationRequestResult as AuthorizationRequestResult.Success).request
 
         val authorizeResponse = provider.createAuthorizationResponse(
             authorizeRequest,
@@ -237,11 +237,11 @@ class ProviderAuthorizationOnlyFlowTest {
     @Test
     fun `access request rejects unsupported grant_type`() = runTest {
         val provider = buildOAuth2Provider(createTestConfig())
-        val AccessTokenRequestResult = provider.createAccessTokenRequest(
+        val accessTokenRequestResult = provider.createAccessTokenRequest(
             mapOf("grant_type" to listOf("client_credentials")),
         )
-        assertTrue(AccessTokenRequestResult is AccessTokenRequestResult.Failure)
-        assertEquals("unsupported_grant_type", AccessTokenRequestResult.error.error)
+        assertTrue(accessTokenRequestResult is AccessTokenRequestResult.Failure)
+        assertEquals("unsupported_grant_type", accessTokenRequestResult.error.error)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -277,16 +277,16 @@ class ProviderAuthorizationOnlyFlowTest {
             includeAuthorizationCodeDefaultHandlers = false,
             includePreAuthorizedCodeDefaultHandlers = false,
         )
-        val AuthorizationRequestResult = provider.createAuthorizationRequest(
+        val authorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
                 "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
             ),
         )
-        assertTrue(AuthorizationRequestResult is AuthorizationRequestResult.Success)
+        assertTrue(authorizationRequestResult is AuthorizationRequestResult.Success)
         val authorizeResponse = provider.createAuthorizationResponse(
-            AuthorizationRequestResult.request,
+            authorizationRequestResult.request,
             DefaultSession(subject = "sub"),
         )
         assertTrue(authorizeResponse is AuthorizationResponseResult.Failure)

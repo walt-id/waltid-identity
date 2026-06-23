@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.environment.api.wallet
 
@@ -10,7 +9,6 @@ import id.walt.webwallet.web.model.X5CAccountRequest
 import io.klogging.Klogging
 import io.ktor.client.*
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class WalletContainerApi(

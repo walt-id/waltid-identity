@@ -13,7 +13,6 @@ kotlin {
 
             // HTTP
             implementation(identityLibs.bundles.waltid.ktor.client)
-            implementation(identityLibs.ktor.client.cio)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -24,7 +23,7 @@ kotlin {
             // Cache hashes
             implementation(identityLibs.kotlincrypto.hash.blake2)
 
-            implementation("io.github.reactivecircus.cache4k:cache4k:0.14.0")
+            implementation(identityLibs.cache4k)
             // For in-memory cache
             //implementation("com.mayakapps.kache:kache:2.1.1")
             // For persistent cache
@@ -38,6 +37,7 @@ kotlin {
         }
 
         jvmMain.dependencies {
+            implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.java)
             implementation(identityLibs.ktor.client.apache5)
             implementation(identityLibs.ktor.client.okhttp)
@@ -56,14 +56,17 @@ kotlin {
             implementation(identityLibs.ktor.client.darwin)
         }
         macosMain.dependencies {
+            implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.darwin)
         }
 
         linuxMain.dependencies {
+            implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.curl)
         }
 
         mingwMain.dependencies {
+            implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.winhttp)
         }
 

@@ -3,7 +3,6 @@ package id.walt.ktorauthnz.tokens.ktorauthnztoken
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.sessions.AuthSession
 import id.walt.ktorauthnz.tokens.TokenHandler
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class KtorAuthNzTokenHandler : TokenHandler {
@@ -12,8 +11,7 @@ class KtorAuthNzTokenHandler : TokenHandler {
 
     var tokenStore: KtorAuthnzTokenStore = InMemoryKtorAuthNzTokenStore()
 
-    @OptIn(ExperimentalUuidApi::class)
-    override suspend fun generateToken(session: AuthSession): String {
+        override suspend fun generateToken(session: AuthSession): String {
         val newToken = Uuid.random().toString()
 
         tokenStore.mapToken(newToken, session.id)

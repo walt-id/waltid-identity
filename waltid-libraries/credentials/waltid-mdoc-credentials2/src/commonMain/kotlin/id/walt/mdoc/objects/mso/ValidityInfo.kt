@@ -56,8 +56,8 @@ data class ValidityInfo(
 ) {
     fun validate() {
         val now = Clock.System.now()
-        require(validFrom <= now) { "MSO is not yet valid" }
-        require(validUntil >= now) { "MSO is no longer valid" }
+        require(validFrom <= now) { "MSO is not yet valid (becomes valid in ${validFrom - now})" }
+        require(validUntil >= now) { "MSO is no longer valid (expired ${now - validFrom} ago)" }
     }
 
     fun precheck() {

@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers.auth
 
@@ -48,7 +47,6 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.temporal.ChronoUnit
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 
@@ -197,7 +195,6 @@ fun ApplicationCall.getUserId() =
         ?: principal<UserIdPrincipal>() // bearer is registered with no name for some reason
         ?: throw UnauthorizedException("Could not find user authorization within request.")
 
-@OptIn(ExperimentalUuidApi::class)
 suspend fun ApplicationCall.getUserUUID() =
     runCatching {
         when {
@@ -207,7 +204,6 @@ suspend fun ApplicationCall.getUserUUID() =
         }
     }.getOrElse { throw IllegalArgumentException("Invalid user id: $it") }
 
-@OptIn(ExperimentalUuidApi::class)
 fun ApplicationCall.getWalletId() =
     runCatching {
         Uuid.parse(parameters["wallet"] ?: throw IllegalArgumentException("No wallet ID provided"))
@@ -216,7 +212,6 @@ fun ApplicationCall.getWalletId() =
             ensurePermissionsForWallet(AccountWalletPermissions.READ_ONLY, walletId = it)
         }
 
-@OptIn(ExperimentalUuidApi::class)
 suspend fun ApplicationCall.getWalletService(walletId: Uuid? = null) =
     WalletServiceManager.getWalletService("", getUserUUID(), walletId ?: getWalletId()) // FIXME -> TENANT HERE
 

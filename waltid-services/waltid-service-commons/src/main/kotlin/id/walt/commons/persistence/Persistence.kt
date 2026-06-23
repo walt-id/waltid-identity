@@ -27,6 +27,7 @@ abstract class Persistence<V>(
 
     fun put(id: String, value: V, ttl: Duration? = null) = set(id, value, ttl)
     abstract fun remove(id: String)
+    abstract fun getAndRemove(id: String): V?
     fun mutate(id: String, mutation: (V) -> V, ttl: Duration? = null) {
         set(id, mutation.invoke(get(id) ?: error("Not found in $discriminator: $id")), ttl)
     }
@@ -45,5 +46,3 @@ abstract class Persistence<V>(
     abstract fun listAdd(id: String, value: V, ttl: Duration? = null)
     abstract fun listSize(id: String): Int
 }
-
-

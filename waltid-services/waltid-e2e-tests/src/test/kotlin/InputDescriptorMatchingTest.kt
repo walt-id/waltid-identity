@@ -9,7 +9,6 @@ import io.ktor.server.util.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.*
 import kotlin.test.assertContains
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class InputDescriptorMatchingTest(
@@ -18,8 +17,7 @@ class InputDescriptorMatchingTest(
     private val sessionApi: Verifier.SessionApi,
     private val verificationApi: Verifier.VerificationApi
 ) {
-    @OptIn(ExperimentalUuidApi::class)
-    fun e2e(wallet: Uuid, did: String) = runTest {
+        fun e2e(wallet: Uuid, did: String) = runTest {
         /*
         Issue credential:
         {
@@ -72,8 +70,7 @@ class InputDescriptorMatchingTest(
         verifyCredential(getPresentationRequestByDegreeType("UniversityDegree"), wallet, did, newCredential1, false)
     }
 
-    @OptIn(ExperimentalUuidApi::class)
-    private suspend fun issueCredential(
+        private suspend fun issueCredential(
         issuanceRequest: IssuanceRequest,
         wallet: Uuid,
         sdJwt: Boolean
@@ -104,8 +101,7 @@ class InputDescriptorMatchingTest(
         return newCredential
     }
 
-    @OptIn(ExperimentalUuidApi::class)
-    private suspend fun verifyCredential(
+        private suspend fun verifyCredential(
         presentationRequest: String,
         wallet: Uuid,
         did: String,
