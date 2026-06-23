@@ -25,7 +25,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Run Android wallet-client integration tests
+      - name: Run Android wallet-mobile integration tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -34,7 +34,7 @@ jobs:
           disable-animations: true
           script: |
             cd waltid-identity
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:connectedAndroidDeviceTest --info
+            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest --info
 
       - name: Upload Android device test reports
         if: always()
