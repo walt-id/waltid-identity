@@ -16,9 +16,7 @@ abstract class LogoutControllerBase(
     protected val logger = KotlinLogging.logger {}
 
     override fun routes(name: String): Route.() -> Route = {
-        route(path, { tags = tagList }) {
-            post(name, apiBuilder()) { execute() }
-        }
+        post(name, apiBuilder()) { execute() }
     }
 
     override fun apiBuilder(): RouteConfig.() -> Unit = {
