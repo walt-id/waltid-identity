@@ -6,11 +6,21 @@ inputs:
     required: false
     type: string
     default: '.'
+  xcode-developer-dir:
+    description: 'Full path to the Xcode Developer directory to select'
+    required: false
+    type: string
+    default: ''
+  simulator-destination:
+    description: 'xcodebuild simulator destination for iOS app tests'
+    required: false
+    type: string
+    default: ''
 runs:
   using: "composite"
   steps:
     - name: Configure iOS build environment
-      uses: ./waltid-identity/.github/actions/ios-build-setup
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
@@ -24,11 +34,25 @@ runs:
       shell: bash
       run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
 
-    - name: Set Xcode version
+    - name: Select Xcode toolchain
       shell: bash
       run: |
-        sudo xcode-select -s /Applications/Xcode_26.5.app/Contents/Developer
-        echo "DEVELOPER_DIR=/Applications/Xcode_26.5.app/Contents/Developer" >> $GITHUB_ENV
+        XCODE_DEVELOPER_DIR="${{ inputs.xcode-developer-dir }}"
+        if [[ -n "$XCODE_DEVELOPER_DIR" ]]; then
+          if [[ ! -d "$XCODE_DEVELOPER_DIR" ]]; then
+            echo "::error::Xcode developer directory not found: $XCODE_DEVELOPER_DIR"
+            echo "Available Xcode installations under /Applications:"
+            ls -1 /Applications | grep '^Xcode' || true
+            exit 1
+          fi
+
+          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
+          echo "Selected Xcode developer directory: $XCODE_DEVELOPER_DIR"
+          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> $GITHUB_ENV
+        else
+          echo "Using runner default Xcode selection"
+        fi
+
         xcodebuild -version
 
     - name: Cleanup simulators before tests
@@ -39,11 +63,15 @@ runs:
         echo "Available simulators:"
         xcrun simctl list devices | grep "iPhone"
 
-    - name: Execute crypto iOS tests
+    - name: Execute crypto iOS simulator tests
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
+
+    - name: Execute SD-JWT iOS simulator tests
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
         ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
 
     - name: Build shared framework for iOS app (CocoaPods location)
@@ -60,6 +88,34 @@ runs:
       shell: bash
       run: pod install
 
+    - name: Resolve iOS simulator destination
+      id: resolve-simulator
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
+      shell: bash
+      run: |
+        SIMULATOR_DESTINATION="${{ inputs.simulator-destination }}"
+        if [[ -n "$SIMULATOR_DESTINATION" ]]; then
+          echo "Using configured simulator destination: $SIMULATOR_DESTINATION"
+          echo "destination=$SIMULATOR_DESTINATION" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "Resolving a compatible iPhone simulator destination from xcodebuild..."
+        DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -workspace iosApp.xcworkspace -scheme iosApp 2>&1)
+        MATCHING_LINE=$(printf '%s\n' "$DESTINATIONS_OUTPUT" | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -n 1 || true)
+        SIMULATOR_ID=$(printf '%s\n' "$MATCHING_LINE" | sed -n 's/.*id:\([^,}]*\).*/\1/p' | tr -d ' ')
+
+        if [[ -z "$SIMULATOR_ID" ]]; then
+          echo "::error::Failed to resolve an iPhone simulator destination for iosApp"
+          printf '%s\n' "$DESTINATIONS_OUTPUT"
+          exit 1
+        fi
+
+        RESOLVED_DESTINATION="platform=iOS Simulator,id=$SIMULATOR_ID"
+        echo "Resolved simulator destination: $RESOLVED_DESTINATION"
+        echo "Matched destination line: $MATCHING_LINE"
+        echo "destination=$RESOLVED_DESTINATION" >> $GITHUB_OUTPUT
+
     - name: Execute iOS demo app integration tests
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
@@ -67,7 +123,7 @@ runs:
         xcodebuild test \
           -workspace iosApp.xcworkspace \
           -scheme iosApp \
-          -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
+          -destination "${{ steps.resolve-simulator.outputs.destination }}" \
           -only-testing:iosAppTests \
           -skip-testing:iosAppUITests \
           -resultBundlePath TestResults \
