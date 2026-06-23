@@ -8,12 +8,18 @@ import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
 actual class MobileWalletClientFactory {
-    actual fun create(config: MobileWalletConfig): NativeWalletClient {
+    actual fun create(config: MobileWalletConfig): NativeWalletClient =
+        create(config, IosWalletSecurityConfig())
+
+    fun create(
+        config: MobileWalletConfig,
+        iosConfig: IosWalletSecurityConfig,
+    ): NativeWalletClient {
         val driver = DriverFactory().createDriver("wallet_${config.walletId}")
         val db = WalletPersistenceDatabase(driver)
         val queries = db.walletPersistenceQueries
 
-        val keyProvider = IosPlatformKeyProvider(useSecureElement = config.preferHardwareKeys)
+        val keyProvider = IosPlatformKeyProvider(useSecureElement = iosConfig.useSecureElement)
         val keyStore = HardwareKeyStore(keyProvider, queries)
         val credentialStore = SqlDelightCredentialStore(queries)
         val didStore = SqlDelightDidStore(queries)
@@ -24,6 +30,7 @@ actual class MobileWalletClientFactory {
             didStore = didStore,
             credentialStore = credentialStore,
             keyGenerator = { keyType -> keyProvider.generateKey(keyType) },
+            defaultKeyType = config.defaultKeyType,
             attestationConfig = config.attestationConfig,
             onEvent = config.onEvent,
         )

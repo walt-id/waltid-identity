@@ -1,7 +1,7 @@
 <div align="center">
-<h1>walt.id Wallet SDK - Persistence Layer</h1>
+<h1>walt.id Wallet SDK - Mobile Persistence Layer</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>SQL-backed storage implementations for the walt.id Wallet SDK using Exposed ORM</p>
+ <p>SQLDelight-backed mobile persistence for the walt.id Wallet SDK</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -20,17 +20,17 @@
 
 ## Overview
 
-This library provides SQL-backed implementations of the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses JetBrains Exposed ORM with HikariCP connection pooling, supporting SQLite (default) and PostgreSQL databases.
+This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, plus platform key stores for hardware-backed key references.
 
-Use this library when you need persistent wallet storage that survives application restarts.
+Use this library when you need persistent wallet storage inside a mobile wallet application.
 
 ## Features
 
-- **Exposed ORM** — Type-safe SQL with Kotlin DSL
-- **HikariCP** — Production-ready connection pooling
-- **SQLite** — Zero-configuration default database
-- **PostgreSQL** — Production database support
-- **Auto-migration** — Automatic schema creation and updates
+- **SQLDelight** — Kotlin Multiplatform database layer for Android and iOS
+- **Platform key stores** — Android KeyStore and iOS Keychain / Secure Enclave integration
+- **Credential persistence** — SQL-backed credential storage with metadata
+- **DID persistence** — SQL-backed DID document storage
+- **Shared schema** — Common mobile schema across supported platforms
 
 ## Installation
 
@@ -42,126 +42,54 @@ repositories {
 }
 
 dependencies {
-    implementation("id.walt.protocols:waltid-openid4vc-wallet-persistence:<version>")
-    
-    // Include PostgreSQL driver if needed
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
-}
-```
-
-## Configuration
-
-### SQLite (Default)
-
-```hocon
-wallet2-persistence {
-  jdbcUrl = "jdbc:sqlite:wallet2.db"
-  driverClassName = "org.sqlite.JDBC"
-}
-```
-
-### PostgreSQL
-
-```hocon
-wallet2-persistence {
-  jdbcUrl = "jdbc:postgresql://localhost:5432/wallet2"
-  driverClassName = "org.postgresql.Driver"
-  username = "wallet"
-  password = "secret"
-  maximumPoolSize = 10
+    implementation("id.walt.protocols:waltid-openid4vc-wallet-persistence-client:<version>")
 }
 ```
 
 ## Usage
 
-### Initialize Database
-
-Call `initWallet2Database()` once at application startup:
+### Constructing Stores
 
 ```kotlin
-import id.walt.wallet2.persistence.initWallet2Database
-import id.walt.wallet2.persistence.Wallet2PersistenceConfig
+import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
+import id.walt.wallet2.persistence.stores.DriverFactory
+import id.walt.wallet2.persistence.stores.HardwareKeyStore
+import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
+import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
-// With default SQLite configuration
-val db = initWallet2Database()
+val driver = DriverFactory(context).createDriver("wallet_wallet-id")
+val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
-// With custom configuration
-val db = initWallet2Database(
-    Wallet2PersistenceConfig(
-        jdbcUrl = "jdbc:postgresql://localhost:5432/wallet2",
-        driverClassName = "org.postgresql.Driver",
-        username = "wallet",
-        password = "secret",
-        maximumPoolSize = 10
-    )
-)
-```
-
-### Using Exposed Stores
-
-```kotlin
-import id.walt.wallet2.persistence.ExposedWalletStore
-import id.walt.wallet2.persistence.ExposedKeyStore
-import id.walt.wallet2.persistence.ExposedCredentialStore
-import id.walt.wallet2.persistence.ExposedDidStore
-import id.walt.wallet2.data.Wallet
-
-// Create stores backed by the database
-val walletStore = ExposedWalletStore(db)
-val keyStore = ExposedKeyStore(db)
-val credentialStore = ExposedCredentialStore(db)
-val didStore = ExposedDidStore(db)
-
-// Create a wallet using the persistent stores
-val wallet = Wallet(
-    id = "my-wallet",
-    keyStores = listOf(keyStore),
-    credentialStores = listOf(credentialStore),
-    didStore = didStore
-)
-
-// Store the wallet
-walletStore.storeWallet(wallet)
-
-// Retrieve later
-val loaded = walletStore.resolveWallet("my-wallet")
+val keyProvider = AndroidPlatformKeyProvider()
+val keyStore = HardwareKeyStore(keyProvider, queries)
+val credentialStore = SqlDelightCredentialStore(queries)
+val didStore = SqlDelightDidStore(queries)
 ```
 
 ## Store Implementations
 
 | Interface | Implementation | Description |
 |-----------|----------------|-------------|
-| `WalletStore` | `ExposedWalletStore` | Wallet metadata and store references |
-| `WalletKeyStore` | `ExposedKeyStore` | Cryptographic keys (serialized JWK) |
-| `WalletCredentialStore` | `ExposedCredentialStore` | Stored credentials with metadata |
-| `WalletDidStore` | `ExposedDidStore` | DIDs and their documents |
+| `WalletKeyStore` | `HardwareKeyStore` | Hardware-backed platform key references |
+| `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
+| `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
 
 ## Database Schema
 
-The library automatically creates the following tables:
+The mobile schema includes the following tables:
 
-- `wallet2_wallets` — Wallet instances
 - `wallet2_keys` — Stored keys
 - `wallet2_credentials` — Stored credentials
 - `wallet2_dids` — Stored DIDs
 
-Schema migrations are handled automatically by Exposed's `SchemaUtils.createMissingTablesAndColumns()`.
-
-## Configuration Reference
-
-| Property | Default | Description |
-|----------|---------|-------------|
-| `jdbcUrl` | `jdbc:sqlite:wallet2.db` | JDBC connection URL |
-| `driverClassName` | `org.sqlite.JDBC` | JDBC driver class |
-| `username` | `""` | Database username |
-| `password` | `""` | Database password |
-| `maximumPoolSize` | `5` | HikariCP max connections |
-| `minimumIdle` | `1` | HikariCP min idle connections |
+Schema creation and migration are managed by SQLDelight on the target platform driver.
 
 ## Related Libraries
 
 - **[waltid-openid4vc-wallet](../waltid-openid4vc-wallet)** — Core wallet library (store interfaces)
-- **[waltid-openid4vc-wallet-server](../waltid-openid4vc-wallet-server)** — HTTP route handlers
+- **[waltid-openid4vc-wallet-client](../waltid-openid4vc-wallet-client)** — Mobile wallet facade built on these stores
+- **[waltid-openid4vc-wallet-persistence-server](../waltid-openid4vc-wallet-persistence-server)** — Server-side Exposed persistence
 
 ## Join the community
 

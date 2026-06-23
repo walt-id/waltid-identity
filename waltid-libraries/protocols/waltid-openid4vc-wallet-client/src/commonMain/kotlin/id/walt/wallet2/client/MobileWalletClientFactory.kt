@@ -6,7 +6,6 @@ import kotlin.uuid.Uuid
 
 data class MobileWalletConfig(
     val walletId: String = Uuid.random().toString(),
-    val preferHardwareKeys: Boolean = true,
     val defaultKeyType: KeyType = KeyType.secp256r1,
     val attestationConfig: WalletAttestationConfig? = null,
     val onEvent: suspend (WalletSessionEvent) -> Unit = {},

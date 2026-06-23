@@ -52,6 +52,7 @@ class NativeWalletClient(
     private val didStore: WalletDidStore,
     private val credentialStore: WalletCredentialStore,
     private val keyGenerator: suspend (KeyType) -> Key,
+    private val defaultKeyType: KeyType = KeyType.secp256r1,
     private val attestationConfig: WalletAttestationConfig? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
 ) {
@@ -74,7 +75,7 @@ class NativeWalletClient(
     )
 
     suspend fun bootstrap(
-        keyType: KeyType = KeyType.secp256r1,
+        keyType: KeyType? = null,
         didMethod: String = "key",
     ): NativeWalletBootstrapResult {
         DidService.minimalInit()
@@ -82,13 +83,17 @@ class NativeWalletClient(
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
             val existingKeys = keyStore.listKeys().toList()
+            require(existingKeys.isNotEmpty()) {
+                "Wallet '${wallet.id}' has persisted DIDs but no persisted keys"
+            }
             return NativeWalletBootstrapResult(
-                keyId = existingKeys.firstOrNull()?.keyId ?: "",
+                keyId = existingKeys.first().keyId,
                 did = existingDids.first().did,
             )
         }
 
-        val key = keyGenerator(keyType)
+        val effectiveKeyType = keyType ?: defaultKeyType
+        val key = keyGenerator(effectiveKeyType)
         val keyId = keyStore.addKey(key)
         val didResult = DidService.registerByKey(didMethod, key)
 

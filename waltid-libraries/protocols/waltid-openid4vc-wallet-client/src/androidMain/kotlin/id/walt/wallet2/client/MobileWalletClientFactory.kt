@@ -25,6 +25,7 @@ actual class MobileWalletClientFactory(private val context: Context) {
             didStore = didStore,
             credentialStore = credentialStore,
             keyGenerator = { keyType -> keyProvider.generateKey(keyType) },
+            defaultKeyType = config.defaultKeyType,
             attestationConfig = config.attestationConfig,
             onEvent = config.onEvent,
         )

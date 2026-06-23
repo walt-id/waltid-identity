@@ -42,7 +42,7 @@ repositories {
 }
 
 dependencies {
-    implementation("id.walt.protocols:waltid-openid4vc-wallet-persistence:<version>")
+    implementation("id.walt.protocols:waltid-openid4vc-wallet-persistence-server:<version>")
     
     // Include PostgreSQL driver if needed
     runtimeOnly("org.postgresql:postgresql:42.7.3")
@@ -161,6 +161,7 @@ Schema migrations are handled automatically by Exposed's `SchemaUtils.createMiss
 ## Related Libraries
 
 - **[waltid-openid4vc-wallet](../waltid-openid4vc-wallet)** — Core wallet library (store interfaces)
+- **[waltid-openid4vc-wallet-persistence-client](../waltid-openid4vc-wallet-persistence-client)** — Mobile SQLDelight persistence
 - **[waltid-openid4vc-wallet-server](../waltid-openid4vc-wallet-server)** — HTTP route handlers
 
 ## Join the community

@@ -91,6 +91,7 @@ class TokenRequestBuilder(
         preAuthorizedCode: String,
         txCode: String? = null,
         additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
@@ -100,6 +101,7 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Transaction code (PIN) present: ${txCode != null}" }
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
+        log.trace { "Additional headers: ${additionalHeaders.keys}" }
         log.trace { "Client attestation: ${attestationHeaders != null}" }
 
         val parameters = Parameters.build {
@@ -113,7 +115,7 @@ class TokenRequestBuilder(
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters, attestationHeaders)
+        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
     }
 
     /**
@@ -122,6 +124,7 @@ class TokenRequestBuilder(
     private suspend fun executeTokenRequest(
         tokenEndpoint: String,
         parameters: Parameters,
+        additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
     ): TokenResponse {
         log.debug { "Sending token request to authorization server" }
@@ -131,6 +134,7 @@ class TokenRequestBuilder(
             httpClient.post(tokenEndpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(parameters.formUrlEncode())
+                additionalHeaders.forEach { (name, value) -> header(name, value) }
                 attestationHeaders?.let {
                     header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
                     header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
@@ -145,11 +149,18 @@ class TokenRequestBuilder(
             val location = response.headers[HttpHeaders.Location]
             if (location != null) {
                 log.debug { "Following redirect to: $location" }
-                val isSameOrigin = Url(tokenEndpoint).host == Url(location).host
+                val isSameOrigin = isSameOrigin(tokenEndpoint, location)
+                if (!isSameOrigin && (additionalHeaders.isNotEmpty() || attestationHeaders != null)) {
+                    error(
+                        "Cross-origin redirect from $tokenEndpoint to $location is not supported when token request " +
+                            "headers are present"
+                    )
+                }
                 response = httpClient.post(location) {
                     contentType(ContentType.Application.FormUrlEncoded)
                     setBody(parameters.formUrlEncode())
                     if (isSameOrigin) {
+                        additionalHeaders.forEach { (name, value) -> header(name, value) }
                         attestationHeaders?.let {
                             header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
                             header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
@@ -188,5 +199,13 @@ class TokenRequestBuilder(
             }
             throw Exception("Failed to parse token response", e)
         }
+    }
+
+    private fun isSameOrigin(source: String, target: String): Boolean {
+        val sourceUrl = Url(source)
+        val targetUrl = Url(target)
+        return sourceUrl.protocol == targetUrl.protocol &&
+            sourceUrl.host == targetUrl.host &&
+            sourceUrl.port == targetUrl.port
     }
 }

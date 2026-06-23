@@ -368,6 +368,7 @@ object WalletIssuanceHandler {
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
             txCode = effectiveTxCode,
+            additionalHeaders = request.tokenRequestHeaders,
             attestationHeaders = attestationHeaders,
         )
         log.trace { "Token obtained, c_nonce=${tokenResponse.c_nonce}" }
@@ -588,12 +589,10 @@ object WalletIssuanceHandler {
             val location = response.headers[HttpHeaders.Location]
             if (location != null) {
                 log.debug { "Following redirect to: $location" }
-                val isSameOrigin = Url(url).host == Url(location).host
-                response = if (isSameOrigin) {
-                    httpClient.post(location, block)
-                } else {
-                    httpClient.post(location) { contentType(ContentType.Application.Json) }
+                check(isSameOrigin(url, location)) {
+                    "Cross-origin redirect from $url to $location is not supported for wallet POST requests"
                 }
+                response = httpClient.post(location, block)
             }
         }
         return response
@@ -617,6 +616,14 @@ object WalletIssuanceHandler {
         val supportsJwk = methods.any { it is CryptographicBindingMethod.Jwk }
         val supportsDid = methods.any { it is CryptographicBindingMethod.Did }
         return supportsJwk && !supportsDid
+    }
+
+    private fun isSameOrigin(source: String, target: String): Boolean {
+        val sourceUrl = Url(source)
+        val targetUrl = Url(target)
+        return sourceUrl.protocol == targetUrl.protocol &&
+            sourceUrl.host == targetUrl.host &&
+            sourceUrl.port == targetUrl.port
     }
 
     // ---------------------------------------------------------------------------

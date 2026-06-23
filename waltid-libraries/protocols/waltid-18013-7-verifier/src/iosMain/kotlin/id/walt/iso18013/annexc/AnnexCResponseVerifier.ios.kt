@@ -7,6 +7,6 @@ actual object AnnexCResponseVerifier {
         origin: String,
         recipientPrivateKey: id.walt.crypto.keys.jwk.JWKKey
     ): ByteArray {
-        TODO("Not yet implemented on iOS")
+        throw UnsupportedOperationException("Annex C response decryption is not supported on iOS yet")
     }
 }
