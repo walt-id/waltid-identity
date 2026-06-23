@@ -50,10 +50,10 @@ class NativeWalletClient(
     walletId: String,
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
-    private val credentialStore: WalletCredentialStore,
+    credentialStore: WalletCredentialStore,
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: KeyType = KeyType.secp256r1,
-    private val attestationConfig: WalletAttestationConfig? = null,
+    attestationConfig: WalletAttestationConfig? = null,
     private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
 ) {
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
