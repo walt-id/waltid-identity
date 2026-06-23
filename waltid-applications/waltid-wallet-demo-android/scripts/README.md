@@ -35,7 +35,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 
 ### Setup for Local Tests
 
-1. Start enterprise stack (see `scripts/demo/`)
+1. Start enterprise stack
 2. Set up port forwarding:
    ```bash
    adb reverse tcp:7500 tcp:7500
