@@ -7,6 +7,7 @@ import io.ktor.http.*
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -152,10 +153,10 @@ object LocalEnterpriseTestBackend {
         client: HttpClient,
         timeoutMs: Long = 30_000,
     ): String {
-        val deadline = System.currentTimeMillis() + timeoutMs
+        val deadline = Clock.System.now().toEpochMilliseconds() + timeoutMs
         var lastStatus = "UNKNOWN"
 
-        while (System.currentTimeMillis() < deadline) {
+        while (Clock.System.now().toEpochMilliseconds() < deadline) {
             // Get fresh token for each poll
             val token = getAdminToken(config, client)
 

@@ -309,23 +309,23 @@ object EudiTestBackend {
         val actionRegex = Regex("""action="([^"]+)"""")
         val actionMatch = actionRegex.find(formTag)
             ?: error("No action attribute in form '$formId'")
-        return htmlUnescape(actionMatch.groupValues[1])
+        return htmlUnescape(actionMatch.groups[1]?.value ?: error("Action group not found"))
     }
 
     private fun extractPayload(html: String): String {
-        val regex = Regex("""name="payload"\s+value='(.*?)'\s*>""", RegexOption.DOT_MATCHES_ALL)
+        val regex = Regex("""(?s)name="payload"\s+value='(.*?)'\s*>""")
         val match = regex.find(html) ?: error("Payload not found in HTML")
-        return htmlUnescape(match.groupValues[1])
+        return htmlUnescape(match.groups[1]?.value ?: error("Payload group not found"))
     }
 
     private fun extractUserId(html: String): String {
         val regex = Regex("""name="user_id"\s+value="([^"]+)"""")
         val match = regex.find(html)
-        if (match != null) return match.groupValues[1]
+        if (match != null) return match.groups[1]?.value ?: error("user_id group not found")
 
         val uuidRegex = Regex("""value="([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"""")
         val uuidMatch = uuidRegex.find(html) ?: error("user_id not found in HTML")
-        return uuidMatch.groupValues[1]
+        return uuidMatch.groups[1]?.value ?: error("UUID group not found")
     }
 
     private fun resolveUrl(baseUrl: String, relative: String): String {
