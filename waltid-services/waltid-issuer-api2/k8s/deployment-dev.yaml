@@ -19,7 +19,7 @@ data:
         name = "walt.id Issuer"
         locale = "en-US"
         logo = {
-          uri = "https://issuer.example.com/logo.png"
+          uri = "https://docs.walt.id/logo-2.png"
           alt_text = "walt.id Issuer logo"
         }
       },
