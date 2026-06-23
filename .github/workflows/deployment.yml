@@ -40,6 +40,9 @@ jobs:
           - k8s: waltid-identity/waltid-services/waltid-issuer-api/k8s
             name: issuer
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-services/waltid-issuer-api2/k8s
+            name: issuer2
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s
             name: verifier
             namespace: ${{ inputs.oss }}
