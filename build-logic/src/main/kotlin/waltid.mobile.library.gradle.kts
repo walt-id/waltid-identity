@@ -10,16 +10,13 @@ plugins {
     id("com.android.kotlin.multiplatform.library")
 }
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
     applyDefaultHierarchyTemplate()
     jvmToolchain(project.javaLibraryVersion)
 
-    androidLibrary {
-        compileSdk = WaltidBuildConstants.COMPILE_SDK
-        minSdk = WaltidBuildConstants.MIN_SDK
+    android {
+        compileSdk = BuildConstants.COMPILE_SDK
+        minSdk = BuildConstants.MIN_SDK
         compilations.all {
             compileTaskProvider.configure {
                 compilerOptions {
@@ -29,7 +26,7 @@ kotlin {
         }
         packaging {
             resources {
-                excludes += WaltidBuildConstants.META_INF_EXCLUDES
+                excludes += BuildConstants.META_INF_EXCLUDES
             }
         }
     }
@@ -44,7 +41,9 @@ kotlin {
     }
 }
 
-powerAssert {
-    includedSourceSets = listOf("commonTest")
-    functions = WaltidBuildConstants.POWER_ASSERT_FUNCTIONS
+if (project.file("src/commonTest").exists()) {
+    powerAssert {
+        includedSourceSets = listOf("commonTest")
+        functions = BuildConstants.POWER_ASSERT_FUNCTIONS
+    }
 }

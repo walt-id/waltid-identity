@@ -67,7 +67,7 @@ actor EudiTestBackend {
             url: URL(string: "https://verifier-backend.eudiw.dev/ui/presentations/v2")!,
             method: "POST",
             headers: ["Content-Type": "application/json"],
-            body: Data(try! jsonString(payload).utf8)
+            body: Data(try jsonString(payload).utf8)
         )
 
         guard let transactionId = response["transaction_id"] as? String,

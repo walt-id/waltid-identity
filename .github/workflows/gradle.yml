@@ -22,6 +22,14 @@ jobs:
         # currently configured on workflow dispatch as a separate workflow (gradle-macos)
         os: [ ubuntu-22.04 ]
     steps:
+      - name: Set up swap space
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
         with:
@@ -29,6 +37,18 @@ jobs:
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Enable Android build
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'waltid-identity/gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Enable Android build in unified-build root
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'gradle.properties'
+          properties: 'enableAndroidBuild=true'
 
       - name: Start tunnel and get URL
         id: tunnel

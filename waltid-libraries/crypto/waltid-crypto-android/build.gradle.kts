@@ -6,7 +6,7 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = group.toString()
 
         withJava()

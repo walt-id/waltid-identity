@@ -7,9 +7,6 @@ plugins {
 group = "id.walt.openid4vc"
 
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
     if (enableIosBuild) {
         iosArm64()

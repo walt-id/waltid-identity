@@ -5,8 +5,10 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "id.walt.mobile.test"
+
+        withHostTestBuilder {}
     }
 
     sourceSets {

@@ -1,8 +1,24 @@
 // # walt.id identity build configuration
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableAndroidBuild = getSetting("enableAndroidBuild")
-val enableIosBuild = getSetting("enableIosBuild")
+import java.util.Properties
+
+fun properties(path: String) = file(path)
+    .takeIf { it.isFile }
+    ?.inputStream()
+    ?.use { Properties().apply { load(it) } }
+    ?: Properties()
+
+val localProperties = properties("local.properties")
+
+fun setting(name: String) =
+    (startParameter.projectProperties[name]
+        ?: localProperties.getProperty(name)
+        ?: providers.gradleProperty(name).orNull
+        ?: "false")
+        .toBoolean()
+
+val enableAndroidBuild = setting("enableAndroidBuild")
+val enableIosBuild = setting("enableIosBuild")
 val enableWalletDemoCompose = enableAndroidBuild || enableIosBuild
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
@@ -58,11 +74,13 @@ val modules = listOfNotNull(
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
         "waltid-openid4vc-wallet",
-        "waltid-openid4vc-wallet-persistence-client",
+        "waltid-openid4vc-wallet-persistence-mobile" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-persistence-mobile" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-persistence-server",
-        "waltid-openid4vc-wallet-client",
+        "waltid-openid4vc-wallet-mobile" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-mobile" whenEnabled enableIosBuild,
         "waltid-openid4vc-wallet-server",
-        "waltid-mobile-test-utils",
+        "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
     ),
 
     * "$libraries:sdjwt".group(
@@ -128,7 +146,7 @@ val modules = listOfNotNull(
     "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )
 
-include(*modules.toTypedArray())
+include(*modules.distinct().toTypedArray())
 
 pluginManagement {
     includeBuild("build-logic")

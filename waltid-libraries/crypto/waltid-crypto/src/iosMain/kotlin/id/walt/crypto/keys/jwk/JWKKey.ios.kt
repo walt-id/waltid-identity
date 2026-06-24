@@ -203,11 +203,8 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
                     val y = Base64.UrlSafe.encode(keyBytes.sliceArray(33..64)).trimEnd('=')
                     """{"kty":"EC","crv":"P-256","x":"$x","y":"$y"}"""
                 }
-                // TODO: RSA parsing is incorrect — SecKeyCopyExternalRepresentation returns PKCS#1 DER
-            // (SEQUENCE { INTEGER n, INTEGER e }), not raw n bytes. Needs ASN.1 parsing.
-            keyBytes.size > 65 -> {
-                    val b64 = Base64.UrlSafe.encode(keyBytes).trimEnd('=')
-                    """{"kty":"RSA","n":"$b64","e":"AQAB"}"""
+                keyBytes.size > 65 -> {
+                    error("RSA certificate import is not supported on iOS yet")
                 }
                 else -> error("Unsupported key format from certificate (${keyBytes.size} bytes)")
             }

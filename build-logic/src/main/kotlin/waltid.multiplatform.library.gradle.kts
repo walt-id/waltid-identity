@@ -4,9 +4,6 @@ plugins {
     id("love.forte.plugin.suspend-transform")
 }
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
     jvm()
 

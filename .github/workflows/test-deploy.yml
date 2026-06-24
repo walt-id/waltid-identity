@@ -12,7 +12,7 @@ jobs:
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@58b4c3ea37d8dcecc0f4cb2ea05bc88a86104780
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@eaccd4adc8aaef403c9089d26575890c08ac310d
     secrets: inherit
     needs: version
     with:
@@ -42,7 +42,7 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@a94c6f2e4a57a8e2d6c95e071a6162cd865d3e35
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@9d2ebba0ec06f2eca70c7f95d679588d397188f4
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:

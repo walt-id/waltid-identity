@@ -1,10 +1,10 @@
 package id.walt.walletdemo.compose.logic
 
 import android.content.Context
-import id.walt.wallet2.client.MobileWalletClientFactory
-import id.walt.wallet2.client.MobileWalletConfig
-import id.walt.wallet2.client.NativeWalletClient
-import id.walt.wallet2.client.WalletAttestationConfig
+import id.walt.wallet2.mobile.MobileWallet
+import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.webdatafetching.WebDataFetcherManager
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
@@ -16,7 +16,7 @@ fun createAndroidWalletDemoClient(
     WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
 
     return NativeWalletDemoClient(
-        MobileWalletClientFactory(context).create(
+        MobileWalletFactory(context).create(
             MobileWalletConfig(
                 walletId = config.walletId,
                 attestationConfig = config.toNativeAttestationConfig(),
@@ -26,7 +26,7 @@ fun createAndroidWalletDemoClient(
 }
 
 private class NativeWalletDemoClient(
-    private val client: NativeWalletClient,
+    private val client: MobileWallet,
 ) : WalletDemoClient {
     override suspend fun bootstrap(): WalletDemoBootstrapResult =
         client.bootstrap().let { result ->

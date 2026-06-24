@@ -6,7 +6,7 @@ plugins {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         compilations.all {
             compileTaskProvider.configure {
                 compilerOptions {

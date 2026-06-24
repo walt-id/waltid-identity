@@ -19,10 +19,8 @@ abstract class LoginControllerBase(
     override fun routes(
         name: String,
     ): Route.() -> Route = {
-        route(path, { tags = tagList }) {
-            rateLimit(RateLimitName(name)) {
-                post(name, apiBuilder()) { execute() }
-            }
+        rateLimit(RateLimitName(name)) {
+            post(name, apiBuilder()) { execute() }
         }
     }
 
