@@ -19,10 +19,16 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Enable Android build
+      - name: Enable Android build in identity repo
         uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
         with:
           file: 'waltid-identity/gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Enable Android build in unified-build root
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'gradle.properties'
           properties: 'enableAndroidBuild=true'
 
       - name: Enable KVM
@@ -39,8 +45,7 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
-            cd waltid-identity
-            ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest --info
+            ./waltid-identity/gradlew -p waltid-identity :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest --info
 
       - name: Upload Android device test reports
         if: always()
