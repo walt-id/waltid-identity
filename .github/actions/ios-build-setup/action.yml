@@ -45,6 +45,7 @@ runs:
       uses: walt-id/waltid-identity/.github/actions/install-and-run-kdoctor@94f207f4e29487705df200318f624842efcc8d95
 
     - name: Enable iOS build
-      uses: walt-id/waltid-identity/.github/actions/enable-ios-build@44512a55c75a4296ccb833492c574f24a52f9c8f
+      uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
       with:
-        gradle-properties-path: ${{ inputs.gradle-properties-path }}
+        file: ${{ inputs.gradle-properties-path }}
+        properties: 'enableIosBuild=true'
