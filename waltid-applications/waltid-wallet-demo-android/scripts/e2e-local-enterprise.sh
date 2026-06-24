@@ -46,7 +46,7 @@ get_token() {
     | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])"
 }
 
-[ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e/e2e.env or env"
+[ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e.env or env"
 
 # Detect emulator vs physical device
 if adb devices -l | grep -q "emulator-"; then

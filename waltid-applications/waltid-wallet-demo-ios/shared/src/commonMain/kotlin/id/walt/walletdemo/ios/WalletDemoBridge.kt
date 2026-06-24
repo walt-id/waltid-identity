@@ -87,7 +87,8 @@ class WalletDemoBridgeController(
                 )
             }
         } catch (e: Throwable) {
-            emptyList() // TODO: log error for debugging
+            println("WalletDemoBridgeController.listCredentials failed: ${e.message ?: e::class.simpleName}")
+            emptyList()
         }
 
     suspend fun presentCredential(requestUrl: String, did: String? = null): BridgeOperationResult {
