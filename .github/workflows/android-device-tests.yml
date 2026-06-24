@@ -19,6 +19,11 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
+      - name: Enable Android build
+        uses: walt-id/waltid-identity/.github/actions/enable-android-build@d33e42ba9a0b37927f588130241e9ae812a2b248
+        with:
+          gradle-properties-path: 'waltid-identity/gradle.properties'
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
