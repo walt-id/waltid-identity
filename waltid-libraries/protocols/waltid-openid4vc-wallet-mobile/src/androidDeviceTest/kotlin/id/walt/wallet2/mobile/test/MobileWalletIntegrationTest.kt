@@ -84,7 +84,7 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun credentialPersistsAcrossClientRecreation() = runBlocking {
+    fun credentialPersistsAcrossWalletRecreation() = runBlocking {
         val walletConfig = MobileWalletConfig(
             walletId = TEST_WALLET_ID,
             onEvent = { event -> println("WALLET EVENT: $event") },
