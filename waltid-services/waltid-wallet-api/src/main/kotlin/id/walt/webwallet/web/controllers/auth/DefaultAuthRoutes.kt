@@ -47,8 +47,8 @@ fun Application.defaultAuthRoutes() = webWalletRoute {
                 call.respond(mapOf("token" to mapOf("accessToken" to token)))
             }
         }
+        object : RegisterControllerBase() {}.routes("register")(this)
+        object : LoginControllerBase() {}.routes("login")(this)
+        object : LogoutControllerBase() {}.routes("logout")(this)
     }
-    object : RegisterControllerBase() {}.routes("register")(this)
-    object : LoginControllerBase() {}.routes("login")(this)
-    object : LogoutControllerBase() {}.routes("logout")(this)
 }
