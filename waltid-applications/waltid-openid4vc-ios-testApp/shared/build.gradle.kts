@@ -52,7 +52,7 @@ kotlin {
             iosSimulatorArm64Main.dependsOn(this)
             dependencies {
                 implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation("io.ktor:ktor-client-darwin:3.2.3")
+                implementation("io.ktor:ktor-client-darwin:3.5.0")
             }
         }
     }

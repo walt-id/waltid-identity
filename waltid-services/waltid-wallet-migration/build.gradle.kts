@@ -24,6 +24,6 @@ dependencies {
     implementation(identityLibs.slf4j.julbridge)
 
     // JDBC drivers — source and target databases
-    implementation("org.xerial:sqlite-jdbc:3.47.0.0")
-    runtimeOnly("org.postgresql:postgresql:42.7.3")
+    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
+    runtimeOnly("org.postgresql:postgresql:42.7.11")
 }
