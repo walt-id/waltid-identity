@@ -35,7 +35,7 @@ tasks.withType<Test> {
 
 mavenPublishing {
     pom {
-        name.set("Walt.id Crypto AWS")
-        description.set("Walt.id Crypto AWS Integration")
+        name.set("walt.id Crypto AWS")
+        description.set("walt.id Crypto AWS Integration")
     }
 }

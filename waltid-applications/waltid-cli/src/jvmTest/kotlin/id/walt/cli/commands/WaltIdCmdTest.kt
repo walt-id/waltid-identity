@@ -23,7 +23,7 @@ class WaltIdCmdTest {
 
     @Test
     fun testMainHelp() = runTest {
-        assertFailsWith<PrintHelpMessage>(message = "Walt.id CLI usage") {
+        assertFailsWith<PrintHelpMessage>(message = "walt.id CLI usage") {
             WaltIdCmd().parse(listOf("--help"))
         }
     }
