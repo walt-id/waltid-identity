@@ -1,8 +1,24 @@
 // # walt.id identity build configuration
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableAndroidBuild = getSetting("enableAndroidBuild")
-val enableIosBuild = getSetting("enableIosBuild")
+import java.util.Properties
+
+fun properties(path: String) = file(path)
+    .takeIf { it.isFile }
+    ?.inputStream()
+    ?.use { Properties().apply { load(it) } }
+    ?: Properties()
+
+val localProperties = properties("local.properties")
+
+fun setting(name: String) =
+    (startParameter.projectProperties[name]
+        ?: localProperties.getProperty(name)
+        ?: providers.gradleProperty(name).orNull
+        ?: "false")
+        .toBoolean()
+
+val enableAndroidBuild = setting("enableAndroidBuild")
+val enableIosBuild = setting("enableIosBuild")
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
 fun String.group(vararg elements: String?) = elements.map { it?.let { "$this:$it" } }.toTypedArray()
