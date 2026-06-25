@@ -46,8 +46,7 @@ jobs:
           disable-animations: true
           script: |
             ./waltid-identity/gradlew -p waltid-identity :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest --info
-            ./waltid-identity/gradlew -p waltid-identity :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest --info \
-              -Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.EudiPublicBackendE2ETest
+            ./waltid-identity/gradlew -p waltid-identity :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest --info -Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.EudiPublicBackendE2ETest
 
       - name: Publish Android device test report
         if: always()
