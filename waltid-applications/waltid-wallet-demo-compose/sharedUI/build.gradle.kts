@@ -1,6 +1,7 @@
 @file:OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
 
 import java.io.File
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.cocoapods.CocoapodsExtension
 
@@ -22,8 +23,12 @@ if (enableCocoaPods) {
 }
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "id.walt.walletdemo.compose.ui"
+
+        withHostTestBuilder {}.configure {
+            isIncludeAndroidResources = true
+        }
     }
 
     wasmJs {
@@ -39,6 +44,40 @@ kotlin {
             implementation(identityLibs.compose.ui)
             implementation(identityLibs.compose.material3)
         }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+
+        val mobileUiTest by creating {
+            dependsOn(commonTest.get())
+
+            dependencies {
+                implementation(identityLibs.kotlinx.coroutines.test)
+                implementation(identityLibs.compose.ui.test)
+            }
+        }
+
+        if (enableIosBuild) {
+            val iosTest by getting {
+                dependsOn(mobileUiTest)
+            }
+        }
+
+        val androidHostTest by getting {
+            dependsOn(mobileUiTest)
+
+            dependencies {
+                implementation(identityLibs.junit)
+                implementation(identityLibs.robolectric)
+            }
+        }
+    }
+}
+
+tasks.withType<Test>().configureEach {
+    if (name == "testAndroidHostTest") {
+        useJUnit()
     }
 }
 

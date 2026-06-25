@@ -27,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -91,7 +92,9 @@ private fun PinScreen(controller: WalletDemoController, state: WalletDemoUiState
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
             isError = state.pinError != null,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("wallet.pinInput"),
             singleLine = true,
         )
 
@@ -103,7 +106,9 @@ private fun PinScreen(controller: WalletDemoController, state: WalletDemoUiState
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                 isError = state.pinError != null,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("wallet.pinConfirmationInput"),
                 singleLine = true,
             )
         }
@@ -115,7 +120,9 @@ private fun PinScreen(controller: WalletDemoController, state: WalletDemoUiState
         Button(
             onClick = controller::submitPin,
             enabled = !state.isBusy,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("wallet.pinSubmitButton"),
         ) {
             Text(if (state.pinMode == WalletDemoPinMode.Setup) "Set PIN" else "Unlock")
         }
@@ -202,7 +209,8 @@ private fun StatusCard(state: WalletDemoUiState) {
             text = state.status,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .testTag("wallet.status"),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -224,11 +232,17 @@ private fun UrlActionSection(
             value = value,
             onValueChange = onValueChange,
             label = { Text(label) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag(if (title == "Receive") "wallet.offerInput" else "wallet.presentationInput"),
             minLines = 3,
             maxLines = 3,
         )
-        Button(enabled = enabled, onClick = onClick) {
+        Button(
+            enabled = enabled,
+            onClick = onClick,
+            modifier = Modifier.testTag(if (title == "Receive") "wallet.receiveButton" else "wallet.presentButton"),
+        ) {
             Text(buttonText)
         }
     }
