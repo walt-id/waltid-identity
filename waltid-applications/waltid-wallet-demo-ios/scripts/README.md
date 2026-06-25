@@ -17,6 +17,10 @@ Tests against the public EUDI backend at `issuer.eudiw.dev`:
 
 **Runs in CI**: ✅ Yes (via `.github/actions/gradle-ios/action.yml`)
 
+The native iOS workflow runs the `iosAppTests` integration target in CI. Full UI
+E2E coverage for the public backend is mirrored in the Compose iOS demo app and
+runs there in CI.
+
 ## Local Enterprise Backend (Requires Infrastructure)
 
 Tests against local enterprise stack (requires docker-compose + ngrok):
@@ -54,7 +58,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 
 The CI runs:
 - ✅ Unit tests (`iosAppTests`)
-- ✅ EUDI UI tests (`EudiPublicBackendE2ETests`)
+- ✅ Compose iOS EUDI UI tests (`EudiPublicBackendE2ETests`)
 - ❌ Local enterprise UI tests (excluded - needs infrastructure)
 
 See `.github/actions/gradle-ios/action.yml` for CI configuration.
