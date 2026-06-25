@@ -9,5 +9,6 @@ actual fun validateCertificateChain(
     enableSystemTrustAnchors: Boolean,
     enableRevocation: Boolean
 ) {
+    // TODO(iOS): Implement certificate chain validation, then remove the guarded iOS X.509 tests.
     throw X509ValidationException("Certificate chain validation is not implemented on iOS yet.")
 }

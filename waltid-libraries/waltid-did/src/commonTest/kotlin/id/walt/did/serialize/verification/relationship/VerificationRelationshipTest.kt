@@ -6,6 +6,7 @@ import id.walt.did.dids.document.models.verification.method.VerificationMethod
 import id.walt.did.dids.document.models.verification.method.VerificationMethodType
 import id.walt.did.dids.document.models.verification.relationship.VerificationRelationship
 import id.walt.did.utils.JsonCanonicalization
+import id.walt.did.utils.supportsJsonCanonicalizationTests
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -34,6 +35,8 @@ class VerificationRelationshipTest {
 
     @Test
     fun testVerificationRelationshipMethod() = runTest {
+        if (!supportsJsonCanonicalizationTests) return@runTest
+
         val keyString =
             """{"alg":"EdDSA","crv":"Ed25519","kid":"151df6ec01714883b812f26f2d63e584","kty":"OKP","use":"sig","x":"qBDsYw3k62mUT8UmEx99Xz3yckiSRmTsL6aa21ZcAVM"}"""
         val key = JWKKey.importJWK(keyString).getOrThrow()

@@ -4,18 +4,16 @@ import io.ktor.utils.io.core.*
 import kotlinx.serialization.json.*
 
 /**
- * Default JWT signer that follows callback-based key resolution.
- * It chooses the JWS algorithm from the key metadata,
- * builds a compact JWT, and exposes both the token and signature.
+ * JWT signer that follows callback-based key resolution.
  */
-open class DefaultJwtAccessTokenSigner(
+internal class JwtTokenSigner(
     private val resolver: JwtSigningKeyResolver,
     private val json: Json = Json { encodeDefaults = true },
-) : JwtAccessTokenSigner {
+) {
 
-    override suspend fun sign(
+    suspend fun sign(
         claims: Map<String, Any?>,
-        header: Map<String, Any?>,
+        header: Map<String, Any?> = emptyMap(),
     ): String {
         val key = resolver.resolveSigningKey()
 

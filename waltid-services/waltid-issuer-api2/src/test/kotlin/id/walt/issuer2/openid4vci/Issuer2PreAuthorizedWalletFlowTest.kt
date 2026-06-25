@@ -9,6 +9,7 @@ import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
+import id.walt.issuer2.testsupport.assertRefreshToken
 import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
@@ -30,6 +31,7 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -67,6 +69,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
 
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
+        assertRefreshToken(tokenResponse)
         assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
 
         val proofs = walletFlow.buildJwtProofs(resolvedOffer.issuerMetadata)
@@ -109,6 +112,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
 
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
+        assertRefreshToken(tokenResponse)
         assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
 
         val credentialPayload = walletFlow.requestCredential(
@@ -126,6 +130,36 @@ class Issuer2PreAuthorizedWalletFlowTest {
             ),
         )
         assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
+    }
+
+    @Test
+    fun walletCanRefreshPreAuthorizedAccessToken() = testApplication {
+        val scenario = Issuer2CredentialScenarios.identitySdJwt
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+        val walletFlow = Issuer2WalletFlowDriver(client)
+
+        val createdOffer = client.createWalletFlowCredentialOffer(
+            scenario = scenario,
+            authenticationMethod = AuthenticationMethod.PRE_AUTHORIZED,
+            txCodeMode = Issuer2TxCodeMode.NONE,
+        )
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
+
+        val resolvedOffer = walletFlow.resolve(createdOffer)
+        val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
+        assertBearerAccessToken(tokenResponse)
+        val refreshToken = assertRefreshToken(tokenResponse)
+
+        val refreshedTokenResponse = walletFlow.refreshAccessToken(
+            resolvedOffer = resolvedOffer,
+            refreshToken = refreshToken,
+        )
+
+        assertBearerAccessToken(refreshedTokenResponse)
+        val rotatedRefreshToken = assertRefreshToken(refreshedTokenResponse)
+        assertNotEquals(refreshToken, rotatedRefreshToken)
+        assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
     }
 
     @Test
@@ -151,6 +185,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
 
         val tokenResponse = walletFlow.exchangePreAuthorizedCode(resolvedOffer, txCode = null)
         assertBearerAccessToken(tokenResponse)
+        assertRefreshToken(tokenResponse)
         assertSessionStatus(client, createdOffer.offerId, "ACTIVE")
 
         val credentialPayload = walletFlow.requestCredential(

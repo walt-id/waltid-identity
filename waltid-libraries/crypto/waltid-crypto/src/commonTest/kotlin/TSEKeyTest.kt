@@ -33,9 +33,13 @@ class TSEKeyTest {
         val TESTABLE_KEY_TYPES = listOf(KeyType.Ed25519)
     }
 
-    private val http = HttpClient()
     private suspend fun isVaultAvailable() = runCatching {
-        http.get(Config.BASE_SERVER).status == HttpStatusCode.OK
+        val http = HttpClient()
+        try {
+            http.get(Config.BASE_SERVER).status == HttpStatusCode.OK
+        } finally {
+            http.close()
+        }
     }.fold(onSuccess = { it }, onFailure = { false })
 
     lateinit var keys: List<TSEKey>

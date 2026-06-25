@@ -3,13 +3,15 @@ package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.StubTokenService
+import id.walt.openid4vci.StubTokenIssuer
+import id.walt.openid4vci.TestRefreshTokenIssuer
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -25,7 +27,14 @@ import kotlin.test.assertTrue
 class PreAuthorizedCodeGrantHandlerTest {
 
     private val repository = InMemoryPreAuthorizedCodeRepository()
-    private val handler = PreAuthorizedCodeTokenEndpoint(repository, StubTokenService())
+    private val refreshTokenRepository = InMemoryRefreshTokenRepository()
+    private val refreshTokenIssuer = TestRefreshTokenIssuer()
+    private val handler = PreAuthorizedCodeTokenEndpoint(
+        codeRepository = repository,
+        accessTokenIssuer = StubTokenIssuer(),
+        refreshTokenRepository = refreshTokenRepository,
+        refreshTokenIssuer = refreshTokenIssuer,
+    )
     private val issuer = DefaultPreAuthorizedCodeIssuer(repository)
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -48,11 +57,39 @@ class PreAuthorizedCodeGrantHandlerTest {
 
         val result = handler.handleTokenEndpointRequest(request)
         assertTrue(result is AccessTokenResponseResult.Success)
+        assertEquals(setOf(GrantType.PreAuthorizedCode.value), result.request.client.grantTypes)
+        val refreshToken = assertNotNull(result.response.refreshToken)
+        val storedRefreshToken = refreshTokenRepository.get(refreshTokenIssuer.signature(refreshToken))
+        assertNotNull(storedRefreshToken)
+        assertEquals("client-pre", storedRefreshToken.clientId)
+        assertEquals(setOf("openid"), storedRefreshToken.grantedScopes)
+        assertEquals(setOf(GrantType.PreAuthorizedCode.value), storedRefreshToken.accessTokenRequest.client.grantTypes)
         val extra = result.response.extra
         assertNotNull(extra["c_nonce"])
         assertTrue((extra["c_nonce_expires_in"] as? Long ?: 0) >= 0)
-        // Request client remains whatever the validator provided; handler internal client selection is not reflected on the immutable request.
         assertNull(repository.get(code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `issues unbound refresh token for anonymous pre-authorized code`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = null,
+                scopes = setOf("openid"),
+                session = DefaultSession(subject = "anonymous-subject"),
+            ),
+        )
+
+        val result = handler.handleTokenEndpointRequest(
+            createAccessRequestWithGrant(code = issued.code).withIssuer("test-issuer"),
+        )
+
+        assertTrue(result is AccessTokenResponseResult.Success)
+        val refreshToken = assertNotNull(result.response.refreshToken)
+        val storedRefreshToken = refreshTokenRepository.get(refreshTokenIssuer.signature(refreshToken))
+        assertNotNull(storedRefreshToken)
+        assertNull(storedRefreshToken.clientId)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

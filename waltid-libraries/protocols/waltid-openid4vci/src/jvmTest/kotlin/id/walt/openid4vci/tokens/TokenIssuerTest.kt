@@ -3,8 +3,9 @@ package id.walt.openid4vci.tokens
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.access.AccessTokenContext
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -31,15 +32,16 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 
-class TokenServiceTest {
+class TokenIssuerTest {
 
     @Test
     fun `resolves key from resolver and signs token`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val service = JwtAccessTokenIssuer({ key })
+        val issuer = JwtAccessTokenIssuer({ key })
 
-        val token = service.createAccessToken(mapOf("sub" to "alice"))
+        val token = issuer.issue(mapOf("sub" to "alice"))
         assertTrue(token.isNotBlank())
+        assertEquals(token.substringAfterLast('.'), issuer.signature(token))
 
         val header = decodeHeader(token)
         assertEquals(key.keyType.jwsAlg, header["alg"])
@@ -49,8 +51,8 @@ class TokenServiceTest {
     @Test
     fun `authorization code flow embeds granted scopes into JWT scope claim`(): Unit = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val accessTokenService = JwtAccessTokenIssuer(resolver = { key })
-        val provider = buildOAuth2Provider(createTestConfig(accessTokenService = accessTokenService))
+        val accessTokenIssuer = JwtAccessTokenIssuer(resolver = { key })
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenIssuer = accessTokenIssuer))
 
         val issuerId = "issuer-scope"
         val scope = "openid email profile"
@@ -99,7 +101,7 @@ class TokenServiceTest {
     }
 
     @Test
-    fun `single service signs with different keys per call`() = runBlocking {
+    fun `single issuer signs with different keys per call`() = runBlocking {
         val keys = listOf(
             JWKKey.generate(KeyType.Ed25519),
             JWKKey.generate(KeyType.secp256r1),
@@ -107,11 +109,11 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val service = JwtAccessTokenIssuer(resolver = { currentKey.get() ?: error("No key in context") })
+        val issuer = JwtAccessTokenIssuer(resolver = { currentKey.get() ?: error("No key in context") })
 
         val tokens = keys.map { key ->
             async(currentKey.asContextElement(value = key)) {
-                service.createAccessToken(mapOf("sub" to "alice"))
+                issuer.issue(mapOf("sub" to "alice"))
             }
         }.awaitAll()
 
@@ -130,10 +132,10 @@ class TokenServiceTest {
 
         val currentKey = ThreadLocal<Key?>()
         val resolver = JwtSigningKeyResolver { resolveCurrentKey(currentKey) }
-        val service = JwtAccessTokenIssuer(resolver)
+        val issuer = JwtAccessTokenIssuer(resolver)
 
         suspend fun signFor(key: Key): String = withContext(currentKey.asContextElement(key)) {
-            service.createAccessToken(mapOf("sub" to "demo"))
+            issuer.issue(mapOf("sub" to "demo"))
         }
 
         val tokenA = signFor(issuerAKey)
@@ -157,8 +159,8 @@ class TokenServiceTest {
         )
 
         val currentKey = ThreadLocal<Key?>()
-        val accessTokenService = JwtAccessTokenIssuer(resolver = { resolveCurrentKey(currentKey) })
-        val provider = buildOAuth2Provider(createTestConfig(accessTokenService = accessTokenService))
+        val accessTokenIssuer = JwtAccessTokenIssuer(resolver = { resolveCurrentKey(currentKey) })
+        val provider = buildOAuth2Provider(createTestConfig(accessTokenIssuer = accessTokenIssuer))
 
         suspend fun runFlow(issuerId: String): String =
             withContext(currentKey.asContextElement(keysByIssuer.getValue(issuerId))) {
@@ -209,16 +211,16 @@ class TokenServiceTest {
     @Test
     fun `credential request verifies access token when context is provided`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val accessTokenService = JwtAccessTokenIssuer(resolver = { key })
+        val accessTokenIssuer = JwtAccessTokenIssuer(resolver = { key })
         val accessTokenVerifier = JwtAccessTokenVerifier { _ -> key.getPublicKey() }
         val provider = buildOAuth2Provider(
             createTestConfig(
-                accessTokenService = accessTokenService,
+                accessTokenIssuer = accessTokenIssuer,
                 accessTokenVerifier = accessTokenVerifier,
             )
         )
 
-        val token = accessTokenService.createAccessToken(
+        val token = accessTokenIssuer.issue(
             defaultAccessTokenClaims(
                 subject = "alice",
                 issuer = "https://issuer.example",
@@ -243,16 +245,16 @@ class TokenServiceTest {
     @Test
     fun `credential request fails when access token issuer mismatches`() = runBlocking {
         val key = JWKKey.generate(KeyType.Ed25519)
-        val accessTokenService = JwtAccessTokenIssuer(resolver = { key })
+        val accessTokenIssuer = JwtAccessTokenIssuer(resolver = { key })
         val accessTokenVerifier = JwtAccessTokenVerifier { _ -> key.getPublicKey() }
         val provider = buildOAuth2Provider(
             createTestConfig(
-                accessTokenService = accessTokenService,
+                accessTokenIssuer = accessTokenIssuer,
                 accessTokenVerifier = accessTokenVerifier,
             )
         )
 
-        val token = accessTokenService.createAccessToken(
+        val token = accessTokenIssuer.issue(
             defaultAccessTokenClaims(
                 subject = "alice",
                 issuer = "https://issuer.example",

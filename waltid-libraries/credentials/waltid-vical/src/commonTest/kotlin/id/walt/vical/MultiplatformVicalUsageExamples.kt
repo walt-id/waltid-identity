@@ -2,28 +2,31 @@ package id.walt.vical
 
 import id.walt.cose.Cose
 import id.walt.cose.CoseCertificate
-import id.walt.cose.toCoseSigner
-import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.cose.CoseSigner
+import id.walt.cose.CoseVerifier
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 
 class MultiplatformVicalUsageExamples {
 
     @Test
     fun `Multiplatform VICAL usage`() = runTest {
-        println("Creating VICAL Provider Key...")
-        val vicalProviderKey: Key = JWKKey.generate(KeyType.secp256r1)
-        println("Step 1: Generated VICAL provider key with ID: ${vicalProviderKey.getKeyId()}")
+        val signatureSuffix = "vical-test-signature".encodeToByteArray()
+        val vicalProviderSigner = CoseSigner { data -> data + signatureSuffix }
+        val vicalProviderVerifier = CoseVerifier { data, signature ->
+            signature.contentEquals(data + signatureSuffix)
+        }
+        println("Step 1: Created deterministic VICAL test signer.")
 
         // 2. SETUP: Create a DER-encoded certificate for the provider.
         // In a real scenario, a proper X.509 certificate containing the public key would be used.
-        // For this simple test, we'll use the key's public representation as a stand-in for the certificate bytes for now.
+        // For this simple test, deterministic bytes stand in for the certificate.
         println("Provider certificate setup...")
-        val vicalProviderCertificate = CoseCertificate(vicalProviderKey.getPublicKeyRepresentation())
+        val vicalProviderCertificate = CoseCertificate("vical-test-certificate".encodeToByteArray())
 
         // 3. CREATE VICAL DATA: Define the content of the VICAL payload.
         println("IACA Certificate info...")
@@ -50,10 +53,9 @@ class MultiplatformVicalUsageExamples {
 
         // 4. SIGN: Create a CoseSigner from the key and sign the VICAL data.
         println("Signing VICAL...")
-        val signer = vicalProviderKey.toCoseSigner()
         val signedVical = Vical.createAndSign(
             vicalData = vicalData,
-            signer = signer,
+            signer = vicalProviderSigner,
             algorithmId = Cose.Algorithm.ES256, // ES256 for secp256r1 = -7
             signerCertificateChain = listOf(vicalProviderCertificate)
         )
@@ -73,5 +75,9 @@ class MultiplatformVicalUsageExamples {
         println("Step 5: Client decoded the VICAL.")
         println(" - Provider: ${receivedVical.vicalData.vicalProvider}")
         println(" - Certificates found: ${receivedVical.vicalData.certificateInfos.size}")
+
+        assertTrue(receivedVical.verify(vicalProviderVerifier))
+        assertEquals(vicalData, receivedVical.vicalData)
+        assertEquals(listOf(vicalProviderCertificate), receivedVical.getCertificateChain())
     }
 }

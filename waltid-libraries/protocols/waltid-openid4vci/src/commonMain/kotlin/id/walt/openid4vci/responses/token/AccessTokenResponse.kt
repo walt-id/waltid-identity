@@ -15,8 +15,26 @@ data class AccessTokenResponse(
     val tokenType: String = TOKEN_TYPE_BEARER,
     val accessToken: String,
     val expiresIn: Long? = null,
+    val refreshToken: String? = null,
+    val scope: String? = null,
     val extra: Map<String, Any?> = emptyMap(),
-)
+) {
+    init {
+        require(extra.keys.none { it in STANDARD_RESPONSE_PARAMETERS }) {
+            "extra must not override standard token response fields"
+        }
+    }
+
+    private companion object {
+        val STANDARD_RESPONSE_PARAMETERS = setOf(
+            "access_token",
+            "token_type",
+            "expires_in",
+            "refresh_token",
+            "scope",
+        )
+    }
+}
 
 data class TokenResponseOptions(
     val authorizationDetails: List<AuthorizationDetail> = emptyList(),
