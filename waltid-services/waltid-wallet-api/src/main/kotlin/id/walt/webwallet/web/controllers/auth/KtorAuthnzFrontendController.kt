@@ -121,11 +121,17 @@ fun Application.ktorAuthnzFrontendRoutes() {
 
                     if (accountId == null) {
                         // Have to create account (first login with this OIDC issuer/subject combination)
+                        val claims = oidcData.userInfoClaims ?: oidcData.idTokenClaims
+                        val displayName = claims?.let {
+                            it["preferred_username"]?.jsonPrimitive?.contentOrNull
+                                ?: it["name"]?.jsonPrimitive?.contentOrNull
+                        } ?: oidcIdentifier.subject
+                        val email = claims?.get("email")?.jsonPrimitive?.contentOrNull
                         val createdAccountId = ktorAuthnzCreateAccount(
                             method = "email",
                             identifier = oidcIdentifier,
-                            name = oidcIdentifier.subject,
-                            email = null
+                            name = displayName,
+                            email = email
                         )
                         session.accountId = createdAccountId.toString()
                         SessionManager.updateSession(session)
