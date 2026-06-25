@@ -43,7 +43,9 @@ fun WalletDemoApp(controller: WalletDemoController) {
 
     MaterialTheme {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .exportTestTagsForPlatformAutomation(),
             color = MaterialTheme.colorScheme.background,
         ) {
             Box(

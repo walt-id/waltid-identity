@@ -17,6 +17,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "ATTESTATION_BASE_URL", "\"${findProperty("attestation.baseUrl") ?: ""}\"")
         buildConfigField("String", "ATTESTATION_ATTESTER_PATH", "\"${findProperty("attestation.attesterPath") ?: ""}\"")
@@ -52,4 +53,10 @@ dependencies {
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedLogic"))
     implementation(project(":waltid-applications:waltid-wallet-demo-compose:sharedUI"))
     implementation(identityLibs.androidx.activity.compose)
+
+    androidTestImplementation(identityLibs.androidx.test.ext.junit)
+    androidTestImplementation(identityLibs.androidx.test.runner)
+    androidTestImplementation(identityLibs.androidx.test.uiautomator)
+    androidTestImplementation(identityLibs.ktor.client.android)
+    androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
 }
