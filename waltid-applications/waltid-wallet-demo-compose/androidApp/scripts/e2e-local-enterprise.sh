@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/e2e.env" 2>/dev/null || true
 
-IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
+IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../../../.." && pwd)}"
 PORT="${PORT:-7500}"
 API_URL="${API_URL:-http://localhost:$PORT}"
 ANDROID_API_URL="${ANDROID_API_URL:-}"
@@ -18,7 +18,7 @@ ISSUER_PROFILE="${ISSUER_PROFILE:-}"
 VERIFIER="${VERIFIER:-verifier2}"
 ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 HOST_ALIAS_DOMAIN="${HOST_ALIAS_DOMAIN:-}"
-TEST_CLASS="id.walt.walletdemo.LocalEnterpriseBackendE2ETest"
+TEST_CLASS="id.walt.walletdemo.compose.android.LocalEnterpriseBackendE2ETest"
 
 ATTESTED=false
 for arg in "$@"; do
@@ -66,7 +66,7 @@ if [ -z "$ANDROID_API_HOST_HEADER" ] && echo "$ANDROID_API_URL" | grep -Eq '10\.
   ANDROID_API_HOST_HEADER="${ORG}.enterprise.localhost"
 fi
 [ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
-[ -f "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" ] || err "AndroidManifest.xml not found"
+[ -f "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-compose/androidApp/src/main/AndroidManifest.xml" ] || err "AndroidManifest.xml not found"
 
 log "CHECK" "Verifying Android + backend prerequisites (emulator=$IS_EMULATOR)"
 adb devices | grep -q "device$" || err "No Android emulator/device connected"
@@ -79,7 +79,7 @@ curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS
 
 if [ "$IS_EMULATOR" = true ]; then
   grep -q 'cleartextTrafficPermitted=\"true\"' \
-    "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/debug/res/xml/network_security_config.xml" \
+    "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-compose/androidApp/src/debug/res/xml/network_security_config.xml" \
     || err "Missing cleartext permission in debug network_security_config.xml (needed for emulator local-enterprise E2E)"
 fi
 
@@ -139,7 +139,7 @@ PY
 fi
 
 GRADLE_ARGS=(
-  :waltid-applications:waltid-wallet-demo-android:connectedDebugAndroidTest
+  :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest
   --no-configuration-cache
   -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASS"
   -Pandroid.testInstrumentationRunnerArguments.e2e_host_alias_domain="$HOST_ALIAS_DOMAIN"
@@ -182,12 +182,12 @@ fi
 log "TEST" "Running $TEST_CLASS"
 # Android 16+ (targetSdk 37) requires ACCESS_LOCAL_NETWORK for emulator 10.0.2.2 connections.
 # Pre-install the APK so we can grant the runtime permission before connectedAndroidTest runs.
-"$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" :waltid-applications:waltid-wallet-demo-android:installDebug --no-configuration-cache \
+"$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" :waltid-applications:waltid-wallet-demo-compose:androidApp:installDebug --no-configuration-cache \
   -Pattestation.baseUrl="${ATTESTATION_BASE_URL:-}" \
   -Pattestation.attesterPath="${ATTESTER_PATH:-}" \
   -Pattestation.bearerToken="${TOKEN:-}" \
   -Pattestation.hostHeader="${ATTESTATION_HOST_HEADER:-}"
-adb shell pm grant id.walt.walletdemo android.permission.ACCESS_LOCAL_NETWORK 2>/dev/null || true
+adb shell pm grant id.walt.walletdemo.compose android.permission.ACCESS_LOCAL_NETWORK 2>/dev/null || true
 "$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" "${GRADLE_ARGS[@]}"
 
 log "DONE" "Local enterprise instrumented E2E completed (attested=$ATTESTED)"

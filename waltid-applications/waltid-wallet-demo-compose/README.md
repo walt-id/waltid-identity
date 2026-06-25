@@ -1,7 +1,7 @@
 <div align="center">
-<h1>walt.id Android Wallet Demo</h1>
+<h1>walt.id Compose Wallet Demo</h1>
  <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Native Android demo app for wallet SDK credential issuance and presentation.</p>
+ <p>Compose Multiplatform demo app for wallet SDK credential issuance and presentation.</p>
 
 <a href="https://walt.id/community">
 <img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
@@ -20,18 +20,19 @@
 
 ## Overview
 
-Native Android demo app for the mobile wallet SDK. It demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, Android KeyStore-backed keys, and SQLDelight-backed wallet persistence.
+Compose Multiplatform demo app for the mobile wallet SDK. It demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, platform-backed keys, and SQLDelight-backed wallet persistence on Android and iOS.
 
 For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
 ## Common commands
 
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-android:assembleDebug
-./gradlew :waltid-applications:waltid-wallet-demo-android:installDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:allTests
 ```
 
-E2E scripts live in [scripts](scripts/README.md).
+Android E2E scripts live in [androidApp/scripts](androidApp/scripts/README.md).
 
 ## Related modules
 

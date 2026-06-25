@@ -1,6 +1,6 @@
-# Android Wallet Demo E2E Tests
+# Compose Android Wallet Demo E2E Tests
 
-Scripts to run end-to-end tests for the Android wallet demo app.
+Scripts to run end-to-end tests for the Compose Android wallet demo app.
 
 ## Prerequisites
 
@@ -50,7 +50,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 ## What Gets Tested
 
 - **Device tests** (`waltid-openid4vc-wallet-mobile`): Mobile wallet library tests with hardware keys
-- **UI tests** (`waltid-wallet-demo-android`): Full app E2E flows with UIAutomator
+- **UI tests** (`waltid-wallet-demo-compose:androidApp`): Full app E2E flows with UIAutomator
   - `EudiPublicBackendE2ETest`: Receive + present against EUDI backend
   - `LocalEnterpriseBackendE2ETest`: Receive + present against local enterprise
 

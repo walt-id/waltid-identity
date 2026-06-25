@@ -187,5 +187,5 @@ When adding new test utilities:
 
 - `waltid-openid4vc-wallet-mobile` - Mobile wallet library (uses this for tests)
 - `waltid-openid4vc-wallet-persistence-mobile` - Wallet persistence layer
-- `waltid-wallet-demo-android` - Android demo app
+- `waltid-wallet-demo-compose` - Compose demo app
 - `waltid-wallet-demo-ios` - iOS demo app

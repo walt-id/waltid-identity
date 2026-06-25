@@ -8,7 +8,7 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 |------|------------|
 | Shared mobile wallet API | [waltid-openid4vc-wallet-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md) |
 | Mobile persistence | [waltid-openid4vc-wallet-persistence-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md) |
-| Android demo app | [waltid-wallet-demo-android](../waltid-applications/waltid-wallet-demo-android/README.md) |
+| Compose demo app | [waltid-wallet-demo-compose](../waltid-applications/waltid-wallet-demo-compose/README.md) |
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
 | Android key storage | [waltid-crypto-android](../waltid-libraries/crypto/waltid-crypto-android/README.md) |
 | iOS key storage | [waltid-crypto-ios](../waltid-libraries/crypto/waltid-crypto-ios/README.md) |
@@ -46,7 +46,7 @@ Enable only the platform builds your machine can support. Android requires an An
 Android:
 
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-android:assembleDebug
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest
 ```
 
@@ -61,7 +61,7 @@ open iosApp.xcworkspace
 Public EUDI and local Enterprise E2E scripts live under:
 
 ```text
-waltid-applications/waltid-wallet-demo-android/scripts/
+waltid-applications/waltid-wallet-demo-compose/androidApp/scripts/
 waltid-applications/waltid-wallet-demo-ios/scripts/
 ```
 

@@ -133,7 +133,6 @@ val modules = listOfNotNull(
     "$applications:waltid-cli",
 
     ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
-    "$applications:waltid-wallet-demo-android" whenEnabled enableAndroidBuild,
     "$applications:waltid-wallet-demo-compose:sharedLogic" whenEnabled enableWalletDemoCompose,
     "$applications:waltid-wallet-demo-compose:sharedUI" whenEnabled enableWalletDemoCompose,
     "$applications:waltid-wallet-demo-compose:androidApp" whenEnabled enableAndroidBuild,
