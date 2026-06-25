@@ -1,4 +1,4 @@
-package id.walt.openid4vci.tokens
+package id.walt.openid4vci.tokens.access
 
 import kotlinx.serialization.json.JsonObject
 

@@ -1,4 +1,4 @@
-package id.walt.openid4vci.tokens
+package id.walt.openid4vci.tokens.access
 
 /**
  * Context for access token verification.

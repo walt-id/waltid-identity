@@ -36,7 +36,7 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenContext
 import id.walt.mdoc.objects.mso.Status as MdocStatus
 import id.walt.mdoc.objects.mso.Status.StatusListInfo as MdocStatusListInfo
 import io.ktor.http.encodeURLParameter
@@ -71,9 +71,6 @@ class OpenId4VciProtocolService(
         explicitNulls = false
     }
 
-    /**
-     * Process Pushed Authorization Request (RFC 9126)
-     */
     suspend fun processPushedAuthorizationRequest(parameters: Map<String, List<String>>): PushedAuthorizationResponseHttp {
         return try {
             val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters)) {
