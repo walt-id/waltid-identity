@@ -99,6 +99,19 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun receiveIgnoresBlankOfferUrl() = runTest {
+        val client = FakeWalletDemoClient()
+        val controller = unlockedControllerWith(client, this)
+
+        controller.updateOfferUrl("   ")
+        controller.receive()
+        runCurrent()
+
+        assertEquals(null, client.receivedOfferUrl)
+        assertEquals("Wallet ready", controller.state.value.status)
+    }
+
+    @Test
     fun presentUpdatesStatusOnSuccess() = runTest {
         val client = FakeWalletDemoClient(presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"))
         val controller = unlockedControllerWith(client, this)
@@ -109,6 +122,33 @@ class WalletDemoControllerTest {
 
         assertEquals("openid4vp://example", client.presentedRequestUrl)
         assertEquals("Presentation sent", controller.state.value.status)
+    }
+
+    @Test
+    fun presentIgnoresBlankRequestUrl() = runTest {
+        val client = FakeWalletDemoClient()
+        val controller = unlockedControllerWith(client, this)
+
+        controller.updatePresentationRequestUrl("   ")
+        controller.present()
+        runCurrent()
+
+        assertEquals(null, client.presentedRequestUrl)
+        assertEquals("Wallet ready", controller.state.value.status)
+    }
+
+    @Test
+    fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
+        val controller = controllerWith(FakeWalletDemoClient(), this)
+        val offerUrl = "openid-credential-offer://example"
+        val presentationUrl = "openid4vp://example"
+
+        controller.handleDeepLink(offerUrl)
+        controller.handleDeepLink(presentationUrl)
+        controller.handleDeepLink("https://example.com/ignored")
+
+        assertEquals(offerUrl, controller.state.value.offerUrl)
+        assertEquals(presentationUrl, controller.state.value.presentationRequestUrl)
     }
 
     private fun controllerWith(client: WalletDemoClient, scope: TestScope): WalletDemoController =
