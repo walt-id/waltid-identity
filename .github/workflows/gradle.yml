@@ -12,14 +12,16 @@ on:
         required: false
         type: boolean
         default: false
+      report-check-name:
+        description: "Visible GitHub check run name to update with the JUnit report"
+        required: true
+        type: string
 
 jobs:
   gradle:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-latest disabled until all multiplatform modules set up properly
-        # currently configured on workflow dispatch as a separate workflow (gradle-macos)
         os: [ ubuntu-22.04 ]
     steps:
       - name: Set up swap space
@@ -84,7 +86,6 @@ jobs:
 #            "$FILE"
 
       - name: Clean and build with all tests
-        if: ${{ runner.os != 'macos' }}
         run: ./gradlew clean cleanAllTests build allTests --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
         env:
           CI: "true"
@@ -96,16 +97,12 @@ jobs:
         uses: mikepenz/action-junit-report@v6
         if: always()
         with:
+          update_check: true
+          job_name: ${{ inputs.report-check-name }}
           report_paths: '**/build/test-results/**/*.xml'
           detailed_summary: true
           include_passed: false
           include_skipped: false
-
-      - name: Build iOS Simulator Framework (ARM64)
-        if: ${{ runner.os == 'macos'}}
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
-        with:
-          waltid-directory: 'waltid-identity'
 
       - name: Set version
         if: ${{ inputs.version != '' && runner.os == 'linux' }}

@@ -32,7 +32,7 @@ runs:
     - name: Build iOS simulator frameworks (ARM64)
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
+      run: ./gradlew linkPodDebugFrameworkIosSimulatorArm64
 
     - name: Select Xcode toolchain
       shell: bash
@@ -131,6 +131,90 @@ runs:
           -enableCodeCoverage NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
+    - name: Collect iOS test reports
+      if: always()
+      id: ios_test_report
+      shell: bash
+      run: |
+        WALTID_DIR="${{ inputs.waltid-directory }}"
+        REPORT_ROOT="$WALTID_DIR/build/ios-test-reports"
+        XCODE_REPORT_DIR="$REPORT_ROOT/xcresult"
+        GRADLE_REPORT_DIR="$REPORT_ROOT/gradle"
+
+        rm -rf "$REPORT_ROOT"
+        mkdir -p "$XCODE_REPORT_DIR" "$GRADLE_REPORT_DIR"
+
+        xcode_report_count=0
+        gradle_report_count=0
+        xcresultparser_ready=false
+
+        for xcode_search_root in "$WALTID_DIR" /tmp/xcode-derived/Logs/Test; do
+          [[ -d "$xcode_search_root" ]] || continue
+
+          while IFS= read -r -d '' bundle; do
+            if [[ "$xcresultparser_ready" != "true" ]]; then
+              if ! command -v xcresultparser >/dev/null 2>&1; then
+                brew install xcresultparser
+              fi
+              xcresultparser_ready=true
+            fi
+
+            if [[ "$bundle" == "$WALTID_DIR/"* ]]; then
+              relative_bundle="${bundle#$WALTID_DIR/}"
+            else
+              relative_bundle="$bundle"
+            fi
+            safe_name=$(printf '%s' "$relative_bundle" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+            report_file="$XCODE_REPORT_DIR/${xcode_report_count}-${safe_name}.xml"
+
+            if xcresultparser "$bundle" --output-format=junit > "$report_file"; then
+              echo "Converted iOS xcresult bundle to JUnit: $relative_bundle"
+              xcode_report_count=$((xcode_report_count + 1))
+            else
+              echo "::warning::Failed to convert iOS xcresult bundle at $bundle"
+              rm -f "$report_file"
+            fi
+          done < <(find "$xcode_search_root" -name '*.xcresult' -prune -print0 2>/dev/null || true)
+        done
+
+        if (( xcode_report_count > 0 )); then
+          echo "Converted $xcode_report_count iOS xcresult bundle(s)."
+        fi
+
+        while IFS= read -r -d '' gradle_report; do
+          relative_report="${gradle_report#$WALTID_DIR/}"
+          safe_name=$(printf '%s' "$relative_report" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+          cp "$gradle_report" "$GRADLE_REPORT_DIR/$safe_name"
+          gradle_report_count=$((gradle_report_count + 1))
+        done < <(find "$WALTID_DIR" -path '*/build/test-results/*' -name '*.xml' -type f -print0 2>/dev/null || true)
+
+        {
+          echo "## iOS Test Report Collection"
+          echo "- Xcode result bundles converted: $xcode_report_count"
+          echo "- Gradle XML reports collected: $gradle_report_count"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if (( xcode_report_count == 0 && gradle_report_count == 0 )); then
+          echo "::warning::No iOS test reports found under $WALTID_DIR"
+          echo "has_report=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+    - name: Publish iOS test report
+      if: always() && steps.ios_test_report.outputs.has_report == 'true'
+      uses: mikepenz/action-junit-report@v6
+      with:
+        update_check: true
+        job_name: gradle
+        check_name: iOS Test Report
+        report_paths: ${{ inputs.waltid-directory }}/build/ios-test-reports/**/*.xml
+        detailed_summary: true
+        include_passed: false
+        include_skipped: false
+        require_tests: true
+
     - name: Cleanup simulators after tests
       if: always()
       shell: bash
@@ -143,5 +227,9 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: ios-integration-test-results
-        path: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp/TestResults.xcresult
+        path: |
+          ${{ inputs.waltid-directory }}/build/ios-test-reports/**
+          ${{ inputs.waltid-directory }}/**/*.xcresult
+          /tmp/xcode-derived/Logs/Test/**/*.xcresult
+          ${{ inputs.waltid-directory }}/**/build/test-results/**
         retention-days: 7

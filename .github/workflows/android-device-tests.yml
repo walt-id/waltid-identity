@@ -47,6 +47,19 @@ jobs:
           script: |
             ./waltid-identity/gradlew -p waltid-identity :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest --info
 
+      - name: Publish Android device test report
+        if: always()
+        uses: mikepenz/action-junit-report@v6
+        with:
+          update_check: true
+          job_name: android-device-tests
+          check_name: Android Device Test Report
+          report_paths: 'waltid-identity/**/build/outputs/androidTest-results/**/*.xml'
+          detailed_summary: true
+          include_passed: false
+          include_skipped: false
+          require_tests: true
+
       - name: Upload Android device test reports
         if: always()
         uses: actions/upload-artifact@v4
