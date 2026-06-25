@@ -11,7 +11,23 @@
 		B33B17EA2C2C394F001A32F7 /* iosAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* iosAppApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
+		C0DE00000000000000000101 /* LocalEnterpriseBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000001 /* LocalEnterpriseBackendE2ETests.swift */; };
+		C0DE00000000000000000102 /* EudiPublicBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000002 /* EudiPublicBackendE2ETests.swift */; };
+		C0DE00000000000000000103 /* WalletE2EHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000003 /* WalletE2EHelpers.swift */; };
+		C0DE00000000000000000104 /* EudiOfferFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000005 /* EudiOfferFlow.swift */; };
+		C0DE00000000000000000105 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000006 /* TestHelpers.swift */; };
+		C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000007 /* WalletE2EClient.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		C0DE00000000000000000201 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B33B17DE2C2C394F001A32F7 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B33B17E52C2C394F001A32F7;
+			remoteInfo = iosApp;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		5E74965B4EAF6C908029258B /* Pods-iosApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.debug.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.debug.xcconfig"; sourceTree = "<group>"; };
@@ -22,6 +38,13 @@
 		B33B17EB2C2C394F001A32F7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B33B17ED2C2C3957001A32F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		BB6C498560A5F36823DF4469 /* Pods_iosApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_iosApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0DE00000000000000000001 /* LocalEnterpriseBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEnterpriseBackendE2ETests.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000002 /* EudiPublicBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiPublicBackendE2ETests.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0DE00000000000000000005 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiOfferFlow.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000006 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EClient.swift; sourceTree = "<group>"; };
 		D6B7A3532FD94CC5009C69E7 /* sharedUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = sharedUI.framework; path = ../sharedUI/build/cocoapods/framework/sharedUI.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -31,6 +54,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				0B7D5EDE2C102E5E022C2BE6 /* Pods_iosApp.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0DE00000000000000000301 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -50,6 +80,7 @@
 			isa = PBXGroup;
 			children = (
 				B33B17E82C2C394F001A32F7 /* iosApp */,
+				C0DE00000000000000000401 /* iosAppUITests */,
 				B33B17E72C2C394F001A32F7 /* Products */,
 				C7F7791DA2DDDF41CE0CB49F /* Pods */,
 				76E29D6CBD9A178AFD844515 /* Frameworks */,
@@ -60,6 +91,7 @@
 			isa = PBXGroup;
 			children = (
 				B33B17E62C2C394F001A32F7 /* iosApp.app */,
+				C0DE00000000000000000004 /* iosAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,6 +114,19 @@
 				81E504906E5C84985CB567E3 /* Pods-iosApp.release.xcconfig */,
 			);
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		C0DE00000000000000000401 /* iosAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				C0DE00000000000000000002 /* EudiPublicBackendE2ETests.swift */,
+				C0DE00000000000000000001 /* LocalEnterpriseBackendE2ETests.swift */,
+				C0DE00000000000000000003 /* WalletE2EHelpers.swift */,
+				C0DE00000000000000000005 /* EudiOfferFlow.swift */,
+				C0DE00000000000000000006 /* TestHelpers.swift */,
+				C0DE00000000000000000007 /* WalletE2EClient.swift */,
+			);
+			path = iosAppUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -107,6 +152,23 @@
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
 			productType = "com.apple.product-type.application";
 		};
+		C0DE00000000000000000501 /* iosAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0DE00000000000000000901 /* Build configuration list for PBXNativeTarget "iosAppUITests" */;
+			buildPhases = (
+				C0DE00000000000000000601 /* Sources */,
+				C0DE00000000000000000301 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C0DE00000000000000000701 /* PBXTargetDependency */,
+			);
+			name = iosAppUITests;
+			productName = iosAppUITests;
+			productReference = C0DE00000000000000000004 /* iosAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -119,6 +181,10 @@
 				TargetAttributes = {
 					B33B17E52C2C394F001A32F7 = {
 						CreatedOnToolsVersion = 15.2;
+					};
+					C0DE00000000000000000501 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = B33B17E52C2C394F001A32F7;
 					};
 				};
 			};
@@ -136,6 +202,7 @@
 			projectRoot = "";
 			targets = (
 				B33B17E52C2C394F001A32F7 /* iosApp */,
+				C0DE00000000000000000501 /* iosAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -220,7 +287,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C0DE00000000000000000601 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C0DE00000000000000000102 /* EudiPublicBackendE2ETests.swift in Sources */,
+				C0DE00000000000000000101 /* LocalEnterpriseBackendE2ETests.swift in Sources */,
+				C0DE00000000000000000103 /* WalletE2EHelpers.swift in Sources */,
+				C0DE00000000000000000104 /* EudiOfferFlow.swift in Sources */,
+				C0DE00000000000000000105 /* TestHelpers.swift in Sources */,
+				C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C0DE00000000000000000701 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B33B17E52C2C394F001A32F7 /* iosApp */;
+			targetProxy = C0DE00000000000000000201 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		B33B17F22C2C3957001A32F7 /* Debug */ = {
@@ -402,6 +490,48 @@
 			};
 			name = Release;
 		};
+		C0DE00000000000000000801 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.walletdemo.compose.iosUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = iosApp;
+			};
+			name = Debug;
+		};
+		C0DE00000000000000000802 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.walletdemo.compose.iosUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = iosApp;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -419,6 +549,15 @@
 			buildConfigurations = (
 				B33B17F52C2C3957001A32F7 /* Debug */,
 				B33B17F62C2C3957001A32F7 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0DE00000000000000000901 /* Build configuration list for PBXNativeTarget "iosAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0DE00000000000000000801 /* Debug */,
+				C0DE00000000000000000802 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
