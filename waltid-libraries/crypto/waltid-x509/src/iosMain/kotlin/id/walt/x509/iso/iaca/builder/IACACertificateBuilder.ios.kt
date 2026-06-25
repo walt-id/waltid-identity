@@ -8,5 +8,6 @@ internal actual suspend fun platformSignIACACertificate(
     profileData: IACACertificateProfileData,
     signingKey: Key,
 ): IACACertificateBundle {
+    // TODO(iOS): Implement ISO IACA certificate building, then remove the guarded ISO X.509 tests.
     TODO("Not yet implemented")
 }
