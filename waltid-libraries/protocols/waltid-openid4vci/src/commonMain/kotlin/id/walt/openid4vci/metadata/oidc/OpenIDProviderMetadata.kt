@@ -208,6 +208,7 @@ data class OpenIDProviderMetadata(
             grantTypesSupported: Set<String>? = setOf(
                 GrantType.AuthorizationCode.value,
                 GrantType.PreAuthorizedCode.value,
+                GrantType.RefreshToken.value,
             ),
             subjectTypesSupported: Set<String> = setOf("public"),
             idTokenSigningAlgValuesSupported: Set<String> = setOf("RS256"),

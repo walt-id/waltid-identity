@@ -14,8 +14,11 @@ import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenVerifier
+import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
@@ -33,6 +36,7 @@ data class OpenId4VciModule(
             authorizationCodeRepository: AuthorizationCodeRepository,
             preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
             parRepository: PARRepository,
+            refreshTokenRepository: RefreshTokenRepository,
         ): OpenId4VciModule {
             val signingKeyResolver = JwtSigningKeyResolver {
                 KeyManager.resolveSerializedKey(config.ciTokenKey)
@@ -45,24 +49,32 @@ data class OpenId4VciModule(
             val accessTokenVerifier = JwtAccessTokenVerifier(verificationKeyResolver)
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
-                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+
                     authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
+                    tokenEndpointHandlers = TokenEndpointHandlers(),
+                    credentialEndpointHandlers = CredentialEndpointHandlers(),
+
+                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+                    accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+                    credentialRequestValidator = DefaultCredentialRequestValidator(),
+
                     authorizationCodeRepository = authorizationCodeRepository,
+                    preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+                    refreshTokenRepository = refreshTokenRepository,
+
                     pushedAuthorizationConfig = PushedAuthorizationConfig(
                         repository = parRepository,
                         enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
                     ),
 
-                    accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
-                    tokenEndpointHandlers = TokenEndpointHandlers(),
-                    accessTokenService = JwtAccessTokenIssuer(signingKeyResolver),
+
+                    accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),
                     accessTokenVerifier = accessTokenVerifier,
 
-                    preAuthorizedCodeRepository = preAuthorizedCodeRepository,
-                    preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
+                    refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver),
+                    refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver),
 
-                    credentialRequestValidator = DefaultCredentialRequestValidator(),
-                    credentialEndpointHandlers = CredentialEndpointHandlers(),
+                    preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 )
             )
 

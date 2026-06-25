@@ -5,6 +5,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.AuthenticationMethod
@@ -28,8 +29,10 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
 import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
+import io.ktor.http.formUrlEncode
 import io.ktor.http.parseQueryString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -210,6 +213,23 @@ class Issuer2WalletFlowDriver(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             code = code,
         )
+
+    suspend fun refreshAccessToken(
+        resolvedOffer: ResolvedCredentialOffer,
+        refreshToken: String,
+    ): TokenRequestBuilder.TokenResponse {
+        val response = client.post(requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint)) {
+            contentType(ContentType.Application.FormUrlEncoded)
+            setBody(
+                Parameters.build {
+                    append("grant_type", GrantType.RefreshToken.value)
+                    append("refresh_token", refreshToken)
+                }.formUrlEncode()
+            )
+        }
+        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
+        return response.body()
+    }
 
     suspend fun requestCredential(
         resolvedOffer: ResolvedCredentialOffer,

@@ -111,6 +111,7 @@ class OpenId4VciController(
 
             post("token", OpenId4VciRoutesDocs.token()) {
                 val response = protocolService.processTokenRequest(call.receiveParameters().toMap())
+                response.headers.forEach { (name, value) -> call.response.headers.append(name, value) }
                 call.respond(HttpStatusCode.fromValue(response.status), response.payload)
             }
 
