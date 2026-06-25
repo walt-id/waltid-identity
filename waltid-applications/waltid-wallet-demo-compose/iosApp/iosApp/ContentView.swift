@@ -3,6 +3,7 @@ import UIKit
 import sharedUI
 
 struct ContentView: UIViewControllerRepresentable {
+    let walletId: String
     let attestationBaseUrl: String
     let attestationAttesterPath: String
     let attestationBearerToken: String
@@ -10,6 +11,7 @@ struct ContentView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> UIViewController {
         sharedUI.WalletDemoIosKt.walletDemoViewController(
+            walletId: walletId,
             attestationBaseUrl: attestationBaseUrl,
             attestationAttesterPath: attestationAttesterPath,
             attestationBearerToken: attestationBearerToken,
@@ -23,6 +25,7 @@ struct ContentView: UIViewControllerRepresentable {
 
 #Preview {
     ContentView(
+        walletId: "default",
         attestationBaseUrl: "",
         attestationAttesterPath: "",
         attestationBearerToken: "",

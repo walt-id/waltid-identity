@@ -95,12 +95,16 @@ final class WalletE2EUI {
         self.app = app
     }
 
-    func launch(attestation: [String: String] = [:]) {
-        for (key, value) in attestation {
+    func launch(environment: [String: String] = [:]) {
+        for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
         app.launch()
         unlockWallet()
+    }
+
+    func launch(attestation: [String: String]) {
+        launch(environment: attestation)
     }
 
     func textInput(identifier: String, fallbackLabel: String) -> XCUIElement {

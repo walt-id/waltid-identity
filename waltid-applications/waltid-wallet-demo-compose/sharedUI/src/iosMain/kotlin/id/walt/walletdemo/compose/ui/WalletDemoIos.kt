@@ -9,6 +9,7 @@ import platform.UIKit.UIViewController
 private var iosController: WalletDemoController? = null
 
 fun walletDemoViewController(
+    walletId: String = "default",
     attestationBaseUrl: String = "",
     attestationAttesterPath: String = "",
     attestationBearerToken: String = "",
@@ -17,6 +18,7 @@ fun walletDemoViewController(
     val controller = WalletDemoController(
         createIosWalletDemoClient(
             WalletDemoClientConfig(
+                walletId = walletId,
                 attestationBaseUrl = attestationBaseUrl,
                 attestationAttesterPath = attestationAttesterPath,
                 attestationBearerToken = attestationBearerToken,

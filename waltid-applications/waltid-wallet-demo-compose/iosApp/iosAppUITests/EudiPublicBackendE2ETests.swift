@@ -62,6 +62,50 @@ final class EudiPublicBackendE2ETests: XCTestCase {
         try await waitForVerifierSuccess(transactionID: verifier.transactionID, timeoutSeconds: verifierPollingTimeout)
     }
 
+    func testCredentialPersistsAcrossAppRestart() async throws {
+        let config = EudiPublicConfig.fromEnvironment()
+        let offerURL: String
+        if let configuredOffer = config.offerURL, !configuredOffer.isEmpty {
+            offerURL = configuredOffer
+        } else {
+            offerURL = try await generatePreAuthorizedOffer(credentialID: config.credentialID)
+        }
+
+        let app = XCUIApplication()
+        let ui = await WalletE2EUI(app: app)
+        let walletId = "compose-ios-eudi-\(UUID().uuidString)"
+        let environment = ["WALLET_ID": walletId]
+
+        await ui.launch(environment: environment)
+        let readyStatus = await ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        await ui.replaceText(in: offerInput, value: offerURL)
+        await ui.button(identifier: "wallet.receiveButton", fallbackLabel: "Receive").tap()
+
+        let receiveStatus = await ui.waitForStatus(
+            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
+        XCTAssertFalse(app.staticTexts["No credentials"].exists)
+
+        app.terminate()
+        try await Task.sleep(nanoseconds: 2_000_000_000)
+
+        await ui.launch(environment: environment)
+        let readyAfterRestart = await ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyAfterRestart, "Wallet ready", "Wallet did not become ready after restart, status: \(readyAfterRestart ?? "nil")")
+        XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
+    }
+
     private func generatePreAuthorizedOffer(credentialID: String) async throws -> String {
         let flow = EudiOfferFlow(client: client)
         return try await flow.generate(credentialID: credentialID)
