@@ -16,4 +16,12 @@ class WalletDemoAppIosTest {
     @Test
     fun presentFlowUpdatesStatus() =
         scenarios.presentFlowUpdatesStatus()
+
+    @Test
+    fun deepLinkReceiveAndPresentFlowUpdatesStatus() =
+        scenarios.deepLinkReceiveAndPresentFlowUpdatesStatus()
+
+    @Test
+    fun credentialsPersistAcrossControllerRecreation() =
+        scenarios.credentialsPersistAcrossControllerRecreation()
 }
