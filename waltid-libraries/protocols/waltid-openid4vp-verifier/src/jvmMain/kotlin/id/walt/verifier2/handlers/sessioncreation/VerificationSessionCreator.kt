@@ -188,7 +188,7 @@ object VerificationSessionCreator {
         val isSiop = responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
         require(!isSiop || isCrossDevice) { "SIOPv2 combined responses require an OpenID4VP cross-device flow" }
         val origins =
-            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) listOf(setup.origin) else null
+            if (setup is DcApiAnnexDFlowSetup) setup.expectedOrigins else if (setup is DcApiAnnexCFlowSetup) setup.expectedOrigins else null
 
         var ephemeralKey: JWKKey? = null
         var crypto2EphemeralKey: SoftwareKey? = null
@@ -477,6 +477,10 @@ object VerificationSessionCreator {
 
         val customData = when {
             isAnnexC -> {
+                val annexCSetup = setup
+                val annexCRequestedElements = requireNotNull(annexCSetup.coreFlow.requestedElements) {
+                    "core_flow.requestedElements is required for ISO 18013-7 DC API"
+                }
 
                 val encryptionInfoObj = DCAPIEncryptionInfo(
                     nonce = nonce.toByteArray(),
@@ -498,11 +502,11 @@ object VerificationSessionCreator {
                     // Build the DC API Session Transcript
                     val sessionTranscript = AnnexCTranscriptBuilder.buildSessionTranscript(
                         encryptionInfoB64 = encryptionInfoB64,
-                        origin = setup.origin
+                        origin = annexCSetup.origin
                     )
 
                     // Prepare the base request without signatures
-                    val initialDeviceRequest = DeviceRequest(setup.requestedElements)
+                    val initialDeviceRequest = DeviceRequest(annexCRequestedElements)
 
                     // Create the DeviceRequestInfo (Use Cases)
                     // By grouping all indices into a single documentSet, we make ALL requested documents mandatory.
@@ -569,7 +573,7 @@ object VerificationSessionCreator {
                         readerAuthAll = listOf(readerAuthAllSignature)
                     )
                 } else {
-                    DeviceRequest(setup.requestedElements).copy(version = DeviceRequest.VERSION)
+                    DeviceRequest(annexCRequestedElements).copy(version = DeviceRequest.VERSION)
                 }
 
                 AnnexCRequestResponse(
