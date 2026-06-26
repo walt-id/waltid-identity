@@ -6,9 +6,6 @@ plugins {
 group = "id.walt.did"
 
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
 
     js(IR) {
@@ -77,9 +74,6 @@ kotlin {
 
             implementation(npm("canonicalize", "2.0.0"))
             implementation(npm("uuid", "9.0.1"))
-        }
-        if (enableIosBuild) {
-            iosMain.dependencies { }
         }
     }
 }

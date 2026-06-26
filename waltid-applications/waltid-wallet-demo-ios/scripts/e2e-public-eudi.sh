@@ -37,4 +37,4 @@ env \
     test \
     -only-testing:iosAppUITests/EudiPublicBackendE2ETests/testReceiveAndPresentAgainstEudiPublicBackends
 
-log "DONE" "iOS public EUDI instrumented E2E completed"
+log "DONE" "iOS public EUDI UI E2E completed"

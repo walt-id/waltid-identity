@@ -21,8 +21,6 @@ import org.junit.runner.RunWith
  *
  * Tests the full user flow: launch app → receive credential → present credential
  * Uses UIAutomator for UI interaction and shared EudiTestBackend for backend operations.
- *
- * This is an E2E test (slow, requires UI automation) - runs nightly or on-demand.
  */
 @RunWith(AndroidJUnit4::class)
 class EudiPublicBackendE2ETest {

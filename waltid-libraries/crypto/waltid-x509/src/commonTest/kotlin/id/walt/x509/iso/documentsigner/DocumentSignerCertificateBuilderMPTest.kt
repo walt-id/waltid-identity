@@ -4,6 +4,7 @@ import id.walt.crypto.keys.KeyGenerationRequest
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
+import id.walt.x509.iso.supportsIsoX509PlatformOperations
 import id.walt.x509.iso.documentsigner.builder.IACASignerSpecification
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -17,6 +18,8 @@ class DocumentSignerCertificateBuilderMPTest {
 
     @Test
     fun `build should succeed when Document signer public key is of valid keyType`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
+
         IsoSharedTestHarnessValidResources
             .dsKeyMap()
             .values
@@ -36,6 +39,8 @@ class DocumentSignerCertificateBuilderMPTest {
 
     @Test
     fun `build should be safe when called concurrently`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
+
         val iacaSignerSpec = IACASignerSpecification(
             profileData = IsoSharedTestHarnessValidResources.iacaProfileData,
             signingKey = IsoSharedTestHarnessValidResources.iacaSecp256r1SigningKey(),
@@ -63,6 +68,7 @@ class DocumentSignerCertificateBuilderMPTest {
 
     @Test
     fun `build should throw when Document signer public key is of invalid keyType`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
 
         listOf(
             KeyType.RSA,

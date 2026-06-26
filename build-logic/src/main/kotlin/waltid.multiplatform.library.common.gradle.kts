@@ -20,5 +20,5 @@ kotlin {
 
 powerAssert {
     includedSourceSets = listOf("commonTest")
-    functions = WaltidBuildConstants.POWER_ASSERT_FUNCTIONS
+    functions = BuildConstants.POWER_ASSERT_FUNCTIONS
 }

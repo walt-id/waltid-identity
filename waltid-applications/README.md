@@ -87,17 +87,15 @@ Android wallet application. Native Android application demonstrating wallet func
 
 **Use when:** You need a reference Android wallet implementation, want to understand Android integration patterns, or need a mobile wallet for testing.
 
-### Test Applications
+### [🟢 waltid-wallet-demo-android](./waltid-wallet-demo-android)
+Native Android demo app for the mobile Wallet SDK. Demonstrates credential issuance, credential presentation, Android Keystore-backed keys, and SQLDelight-backed wallet persistence.
 
-### [🟡 waltid-crypto-ios-testApp](./waltid-crypto-ios-testApp)
-iOS test application for crypto library. Demonstrates cryptographic operations and key management on iOS.
+**Use when:** You need to validate mobile wallet SDK flows on Android or run Android mobile integration tests.
 
-**Use when:** You need to test iOS cryptographic functionality or understand iOS crypto integration.
+### [🟢 waltid-wallet-demo-ios](./waltid-wallet-demo-ios)
+Native iOS demo app for the mobile Wallet SDK. Demonstrates credential issuance, credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
 
-### [🟡 waltid-openid4vc-ios-testApp](./waltid-openid4vc-ios-testApp)
-iOS test application for OpenID4VC library. Demonstrates OpenID4VC flows and credential operations on iOS.
-
-**Use when:** You need to test OpenID4VC functionality on iOS or understand iOS protocol integration.
+**Use when:** You need to validate mobile wallet SDK flows on iOS or run iOS mobile integration tests.
 
 ### [🟢 waltid-digital-credentials](./waltid-digital-credentials)
 Standalone web test app for validating the Digital Credentials API flow directly against verifier endpoints. Provides a user-friendly interface for testing and debugging DC API verification flows.
@@ -117,4 +115,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-

@@ -1,8 +1,8 @@
 package id.walt.walletdemo.ios
 
-import id.walt.wallet2.client.MobileWalletClientFactory
-import id.walt.wallet2.client.MobileWalletConfig
-import id.walt.wallet2.client.WalletAttestationConfig
+import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.WalletAttestationConfig
 
 data class BridgeCredential(
     val id: String,
@@ -24,19 +24,25 @@ class WalletDemoBridgeController(
     attestationBearerToken: String? = null,
     attestationHostHeader: String? = null,
 ) {
-    private val client = MobileWalletClientFactory().create(
-        MobileWalletConfig(
-            walletId = walletId,
-            attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
-                WalletAttestationConfig(
-                    enterpriseBaseUrl = it,
-                    attesterPath = attestationAttesterPath ?: "",
-                    bearerToken = attestationBearerToken ?: "",
-                    enterpriseHostHeader = attestationHostHeader ?: "",
-                )
-            },
+    private val clientResult = runCatching {
+        MobileWalletFactory().create(
+            MobileWalletConfig(
+                walletId = walletId,
+                attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
+                    WalletAttestationConfig(
+                        enterpriseBaseUrl = it,
+                        attesterPath = attestationAttesterPath ?: "",
+                        bearerToken = attestationBearerToken ?: "",
+                        enterpriseHostHeader = attestationHostHeader ?: "",
+                    )
+                },
+            )
         )
-    )
+    }
+
+    private val client: id.walt.wallet2.mobile.MobileWallet
+        get() = clientResult.getOrThrow()
+
     private var did = ""
 
     constructor(
@@ -87,7 +93,8 @@ class WalletDemoBridgeController(
                 )
             }
         } catch (e: Throwable) {
-            emptyList() // TODO: log error for debugging
+            println("WalletDemoBridgeController.listCredentials failed: ${e.message ?: e::class.simpleName}")
+            emptyList()
         }
 
     suspend fun presentCredential(requestUrl: String, did: String? = null): BridgeOperationResult {

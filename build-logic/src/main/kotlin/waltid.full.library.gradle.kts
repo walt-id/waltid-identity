@@ -1,44 +1,14 @@
 @file:OptIn(org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("waltid.multiplatform.library.common")
-    id("com.android.kotlin.multiplatform.library")
     id("love.forte.plugin.suspend-transform")
 }
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
     jvm()
-
-    androidLibrary {
-        namespace = project.group.toString()
-        compileSdk = WaltidBuildConstants.COMPILE_SDK
-        minSdk = WaltidBuildConstants.MIN_SDK
-
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }
-        withHostTestBuilder { }
-
-        compilations.all {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
-                }
-            }
-        }
-
-        packaging {
-            resources {
-                excludes += WaltidBuildConstants.META_INF_EXCLUDES
-            }
-        }
-    }
 
     js(IR) {
         useCommonJs()
@@ -66,13 +36,19 @@ kotlin {
             dependsOn(commonMain.get())
         }
         jvmMain.get().dependsOn(jvmAndroidMain)
-        androidMain.get().dependsOn(jvmAndroidMain)
+        if (enableAndroidBuild) {
+            androidMain.get().dependsOn(jvmAndroidMain)
+        }
 
         val jvmAndroidTest by creating {
             dependsOn(commonTest.get())
         }
         jvmTest.get().dependsOn(jvmAndroidTest)
     }
+}
+
+if (enableAndroidBuild) {
+    pluginManager.apply("waltid.full.android")
 }
 
 suspendTransformPlugin {

@@ -2,8 +2,6 @@
 
 package id.walt.cose
 
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -13,10 +11,6 @@ import kotlin.test.fail
 
 class CoseSerializationTests {
 
-    val key by lazy {
-        suspend { JWKKey.Companion.generate(KeyType.secp256r1) }
-    }
-
     @Test
     fun `Check serialization to JSON`() = runTest {
         val payload = "abc 123".encodeToByteArray()
@@ -25,7 +19,7 @@ class CoseSerializationTests {
             protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.RS256),
             unprotectedHeaders = CoseHeaders(),
             payload = payload,
-            signer = key().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Signed COSE: $cose")
 
@@ -48,7 +42,7 @@ class CoseSerializationTests {
                 protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.RS256),
                 unprotectedHeaders = CoseHeaders(),
                 payload = payload,
-                signer = key().toCoseSigner()
+                signer = CoseTestFixtures.signer
             )
             println("Signed COSE: $cose")
 
@@ -75,7 +69,7 @@ class CoseSerializationTests {
             protectedHeaders = CoseHeaders(algorithm = Cose.Algorithm.RS256),
             unprotectedHeaders = CoseHeaders(),
             payload = payload,
-            signer = key().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Signed COSE: $cose")
 

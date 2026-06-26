@@ -36,7 +36,7 @@ fi
 log() { echo -e "\n\033[1;36m[$1]\033[0m $2"; }
 err() { echo -e "\033[1;31m[ERROR]\033[0m $1" >&2; exit 1; }
 
-[ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e/e2e.env or env"
+[ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e.env or env"
 [ -f "$IOSAPP_DIR/iosApp.xcworkspace/contents.xcworkspacedata" ] || err "iosApp workspace not found"
 
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
@@ -140,4 +140,4 @@ env \
     test \
     -only-testing:iosAppUITests/LocalEnterpriseBackendE2ETests
 
-log "DONE" "iOS local instrumented E2E completed (attested=$ATTESTED)"
+log "DONE" "iOS local UI E2E completed (attested=$ATTESTED)"

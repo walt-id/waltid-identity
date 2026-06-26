@@ -1,5 +1,25 @@
 import Foundation
 
+enum EudiOfferFlowError: LocalizedError {
+    case missingPayload
+    case missingFormAction(String)
+    case missingUserID
+    case invalidActionURL(action: String, base: URL)
+
+    var errorDescription: String? {
+        switch self {
+        case .missingPayload:
+            return "Hidden payload input not found"
+        case .missingFormAction(let formID):
+            return "Form action not found for id=\(formID)"
+        case .missingUserID:
+            return "user_id not found on authorization page"
+        case .invalidActionURL(let action, let base):
+            return "Cannot resolve action=\(action) relative to base=\(base)"
+        }
+    }
+}
+
 /// Generates credential offers from EUDI test backend.
 /// Handles multi-step form submission flow for pre-authorized offers.
 public final class EudiOfferFlow {
@@ -16,8 +36,8 @@ public final class EudiOfferFlow {
 
         // Step 1: Entry page redirect
         let entry = try await client.textRequest(url: entrypoint, allow3xx: true)
-        let redirectAction = resolveURL(base: entry.finalURL, action: extractFormAction(page: entry.body, formID: "redirect_form"))
-        let redirectPayload = extractPayload(page: entry.body)
+        let redirectAction = try resolveURL(base: entry.finalURL, action: try extractFormAction(page: entry.body, formID: "redirect_form"))
+        let redirectPayload = try extractPayload(page: entry.body)
         _ = try await client.formRequest(url: redirectAction, fields: ["payload": redirectPayload])
 
         // Step 2: Generate pre-authorized offer
@@ -29,12 +49,12 @@ public final class EudiOfferFlow {
         ])
 
         // Step 3: Display page redirect
-        let displayAction = resolveURL(base: preauthRedirect.finalURL, action: extractFormAction(page: preauthRedirect.body, formID: "redirect_form"))
-        let displayPayload = extractPayload(page: preauthRedirect.body)
+        let displayAction = try resolveURL(base: preauthRedirect.finalURL, action: try extractFormAction(page: preauthRedirect.body, formID: "redirect_form"))
+        let displayPayload = try extractPayload(page: preauthRedirect.body)
         let displayPage = try await client.formRequest(url: displayAction, fields: ["payload": displayPayload])
 
         // Step 4: Country/user data submission
-        let countryAction = resolveURL(base: displayPage.finalURL, action: extractFormAction(page: displayPage.body, formID: "selectCountryForm"))
+        let countryAction = try resolveURL(base: displayPage.finalURL, action: try extractFormAction(page: displayPage.body, formID: "selectCountryForm"))
         let authorizeRedirect = try await client.formRequest(url: countryAction, fields: [
             "birthdate": "1990-01-01",
             "family_name": "Tester",
@@ -47,19 +67,19 @@ public final class EudiOfferFlow {
         ])
 
         // Step 5: Authorization page redirect
-        let authAction = resolveURL(base: authorizeRedirect.finalURL, action: extractFormAction(page: authorizeRedirect.body, formID: "redirect_form"))
-        let authPayload = extractPayload(page: authorizeRedirect.body)
+        let authAction = try resolveURL(base: authorizeRedirect.finalURL, action: try extractFormAction(page: authorizeRedirect.body, formID: "redirect_form"))
+        let authPayload = try extractPayload(page: authorizeRedirect.body)
         let authPage = try await client.formRequest(url: authAction, fields: ["payload": authPayload])
 
         // Step 6: Final authorization with user_id
-        let userID = extractUserID(page: authPage.body)
+        let userID = try extractUserID(page: authPage.body)
         let offerRedirect = try await client.formRequest(url: backendAuthorize, fields: [
             "user_id": userID,
             "proceed": "Authorize",
         ])
 
         // Step 7: Extract and inject tx_code into offer
-        let payloadRaw = extractPayload(page: offerRedirect.body)
+        let payloadRaw = try extractPayload(page: offerRedirect.body)
         guard let payloadData = payloadRaw.data(using: .utf8),
               let payloadJSON = try JSONSerialization.jsonObject(with: payloadData) as? [String: Any] else {
             throw NSError(domain: "WalletE2E", code: 210, userInfo: [NSLocalizedDescriptionKey: "Invalid final payload"])
@@ -102,29 +122,29 @@ public final class EudiOfferFlow {
         return finalURL
     }
 
-    private func extractPayload(page: String) -> String {
+    private func extractPayload(page: String) throws -> String {
         guard let raw = firstMatch(page, pattern: "name=\\\"payload\\\"\\s+value='(.*?)'\\s*>") else {
-            fatalError("Hidden payload input not found")
+            throw EudiOfferFlowError.missingPayload
         }
         return unescapedHTML(raw)
     }
 
-    private func extractFormAction(page: String, formID: String) -> String {
+    private func extractFormAction(page: String, formID: String) throws -> String {
         let pattern = "<form\\s+id=\\\"\(NSRegularExpression.escapedPattern(for: formID))\\\"[^>]*action=\\\"([^\\\"]+)\\\""
         guard let raw = firstMatch(page, pattern: pattern) else {
-            fatalError("Form action not found for id=\(formID)")
+            throw EudiOfferFlowError.missingFormAction(formID)
         }
         return unescapedHTML(raw)
     }
 
-    private func extractUserID(page: String) -> String {
+    private func extractUserID(page: String) throws -> String {
         if let v = firstMatch(page, pattern: "name=\\\"user_id\\\"\\s+value=\\\"([^\\\"]+)\\\"") {
             return v
         }
         if let v = firstMatch(page, pattern: "value=\\\"([a-f0-9\\-]{36})\\\"\\s+name=\\\"user_id\\\"") {
             return v
         }
-        fatalError("user_id not found on authorization page")
+        throw EudiOfferFlowError.missingUserID
     }
 
     private func jsonString(_ object: Any) throws -> String {
@@ -151,9 +171,9 @@ public final class EudiOfferFlow {
         return String(text[range])
     }
 
-    private func resolveURL(base: URL, action: String) -> URL {
+    private func resolveURL(base: URL, action: String) throws -> URL {
         guard let resolved = URL(string: action, relativeTo: base)?.absoluteURL else {
-            fatalError("Cannot resolve action=\(action) relative to base=\(base)")
+            throw EudiOfferFlowError.invalidActionURL(action: action, base: base)
         }
         return resolved
     }

@@ -52,14 +52,6 @@ kotlin {
             // Logging
             implementation(identityLibs.slf4j.simple)
         }
-
-        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
-            val iosArm64Main by getting
-            val iosSimulatorArm64Main by getting
-            iosMain.get().dependsOn(commonMain.get())
-            iosArm64Main.dependsOn(iosMain.get())
-            iosSimulatorArm64Main.dependsOn(iosMain.get())
-        }
     }
 }
 

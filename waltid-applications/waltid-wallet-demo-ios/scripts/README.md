@@ -35,7 +35,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 
 ### Setup for Local Tests
 
-1. Start enterprise stack (see `scripts/demo/`)
+1. Start enterprise stack
 2. Create `e2e.env`:
    ```bash
    cp e2e.env.example e2e.env

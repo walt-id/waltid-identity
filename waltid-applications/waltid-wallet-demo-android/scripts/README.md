@@ -35,7 +35,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 
 ### Setup for Local Tests
 
-1. Start enterprise stack (see `scripts/demo/`)
+1. Start enterprise stack
 2. Set up port forwarding:
    ```bash
    adb reverse tcp:7500 tcp:7500
@@ -49,7 +49,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 
 ## What Gets Tested
 
-- **Device tests** (`waltid-openid4vc-wallet-client`): Wallet client library tests with hardware keys
+- **Device tests** (`waltid-openid4vc-wallet-mobile`): Mobile wallet library tests with hardware keys
 - **UI tests** (`waltid-wallet-demo-android`): Full app E2E flows with UIAutomator
   - `EudiPublicBackendE2ETest`: Receive + present against EUDI backend
   - `LocalEnterpriseBackendE2ETest`: Receive + present against local enterprise
@@ -57,7 +57,7 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 ## CI Configuration
 
 The CI runs:
-- ✅ Wallet client device tests (`:waltid-openid4vc-wallet-client:connectedAndroidDeviceTest`)
+- ✅ Mobile wallet device tests (`:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest`)
 - ✅ EUDI UI tests (`EudiPublicBackendE2ETest`)
 - ❌ Local enterprise UI tests (excluded - needs infrastructure)
 

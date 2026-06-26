@@ -30,9 +30,9 @@ All of our apis are hosted at demo.walt.id. Depending on the service you are int
 - **Issuer API** - ([Portal (coming soon)]| [Swagger](https://issuer2.demo.walt.id/swagger)| [Docs](https://docs.walt.id/community-stack/issuer2/getting-started)  | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-issuer-api2)) - enable apps to issue credentials (W3C JWTs, SD-JWTs, mdoc) via OID4VCI 1.0.
 - **Verifier API** - ([Portal (coming soon)] | [Swagger](https://verifier2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/verifier2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-verifier-api2)) - enable apps to verify credentials (W3C JWTs, SD-JWTs, mdoc) via OID4VP/SIOPv2 1.0.
 - **Wallet API** - ([Portal (coming soon)] | [Swagger](https://wallet2.demo.walt.id/swagger) | [Docs](https://docs.walt.id/community-stack/wallet2/getting-started) | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-services/waltid-wallet-api2)) - extend apps with wallet capabilities to collect, store, manage and share identity credentials and tokens.
-- **Wallet SDK** - ([Docs (coming soon)] | [GitHub (coming soon)]) - a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
-    - **Android Wallet** - ([apk (coming soon)] | [source code (coming soon)])
-    - **iOS Wallet** - ([testflight (coming soon)] | [source code (coming soon)])
+- **Wallet SDK** - ([Docs (coming soon)] | [GitHub](https://github.com/walt-id/waltid-identity/tree/main/waltid-libraries/protocols/waltid-openid4vc-wallet)) - a complete wallet library supporting both OpenID4VCI 1.0 and OpenID4VP 1.0.
+    - **Android Wallet** - ([apk (coming soon)] | [source code](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-android))
+    - **iOS Wallet** - ([testflight (coming soon)] | [source code](https://github.com/walt-id/waltid-identity/tree/main/waltid-applications/waltid-wallet-demo-ios))
 
 We are still in the process of building new open source portals to allow you to quickly test out the products!
 

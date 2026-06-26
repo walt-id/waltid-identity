@@ -1,6 +1,3 @@
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 plugins {
     id("waltid.full.library")
     id("waltid.publish.maven")
@@ -11,10 +8,6 @@ group = "id.walt.crypto"
 kotlin {
     js(IR) {
         outputModuleName = "crypto"
-    }
-
-    androidLibrary {
-        namespace = "id.walt.crypto"
     }
 
     sourceSets {
@@ -57,12 +50,14 @@ kotlin {
                 implementation(identityLibs.kotlinx.coroutines.jdk8)
             }
         }
-        androidMain {
-            dependencies {
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.indispensable.josef)
-                implementation(identityLibs.signum.supreme)
-                implementation(identityLibs.kotlinx.coroutines.android)
+        if (enableAndroidBuild) {
+            named("androidMain") {
+                dependencies {
+                    implementation(identityLibs.signum.indispensable)
+                    implementation(identityLibs.signum.indispensable.josef)
+                    implementation(identityLibs.signum.supreme)
+                    implementation(identityLibs.kotlinx.coroutines.android)
+                }
             }
             // Exclude signum's jdk18on BouncyCastle — we use lts8on from jvmAndroidMain
             configurations.all {
@@ -70,14 +65,15 @@ kotlin {
                 exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
                 exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
             }
-        }
-        val androidDeviceTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-                implementation(identityLibs.kotlinx.coroutines.test)
-                implementation("androidx.test.ext:junit:1.2.1")
-                implementation("androidx.test:runner:1.6.1")
-                implementation("androidx.test:rules:1.6.1")
+
+            named("androidDeviceTest") {
+                dependencies {
+                    implementation(kotlin("test"))
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation("androidx.test.ext:junit:1.2.1")
+                    implementation("androidx.test:runner:1.6.1")
+                    implementation("androidx.test:rules:1.6.1")
+                }
             }
         }
         jvmTest.dependencies {

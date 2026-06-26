@@ -58,7 +58,7 @@ class EudiIntegrationTest {
         // Generate offer from EUDI backend
         val offer = EudiTestBackend.generateOffer()
         
-        // Use with wallet client
+        // Use with the mobile wallet
         val result = walletClient.receive(offer.offerUrl)
         assertTrue(result.isNotEmpty())
         
@@ -167,11 +167,11 @@ To ensure this module isn't leaking into production:
 
 ```bash
 # Should return nothing - mobile-test-utils should NOT appear in runtime classpath
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:dependencies \
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dependencies \
   --configuration runtimeClasspath | grep mobile-test-utils
 
 # Should show mobile-test-utils - OK in test classpath
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-client:dependencies \
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dependencies \
   --configuration testRuntimeClasspath | grep mobile-test-utils
 ```
 
@@ -185,7 +185,7 @@ When adding new test utilities:
 
 ## Related Modules
 
-- `waltid-openid4vc-wallet-client` - Mobile wallet client (uses this for tests)
-- `waltid-openid4vc-wallet-persistence-client` - Wallet persistence layer
+- `waltid-openid4vc-wallet-mobile` - Mobile wallet library (uses this for tests)
+- `waltid-openid4vc-wallet-persistence-mobile` - Wallet persistence layer
 - `waltid-wallet-demo-android` - Android demo app
 - `waltid-wallet-demo-ios` - iOS demo app

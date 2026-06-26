@@ -29,8 +29,10 @@ kotlin {
             implementation(identityLibs.ktor.client.okhttp)
         }
 
-        iosMain.dependencies {
-            implementation(identityLibs.ktor.client.darwin)
+        if (enableIosBuild) {
+            iosMain.dependencies {
+                implementation(identityLibs.ktor.client.darwin)
+            }
         }
 
         commonTest.dependencies {

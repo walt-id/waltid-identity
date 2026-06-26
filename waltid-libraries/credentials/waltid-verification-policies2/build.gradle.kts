@@ -63,13 +63,10 @@ kotlin {
             implementation(identityLibs.ktor.server.netty)
             implementation(identityLibs.mockk)
         }
-
-        if (providers.gradleProperty("enableIosBuild").orNull.toBoolean()) {
-            val iosArm64Main by getting
-            val iosSimulatorArm64Main by getting
-            iosMain.get().dependsOn(commonMain.get())
-            iosArm64Main.dependsOn(iosMain.get())
-            iosSimulatorArm64Main.dependsOn(iosMain.get())
+        if (enableIosBuild) {
+            iosTest.dependencies {
+                implementation(identityLibs.ktor.client.darwin)
+            }
         }
     }
 }
