@@ -147,6 +147,45 @@ final class WalletE2EUI {
         return nil
     }
 
+    func openDeepLink(_ value: String) {
+        guard let url = URL(string: value) else {
+            XCTFail("Invalid deep link URL: \(value)")
+            return
+        }
+
+        app.open(url)
+        app.activate()
+
+        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        if pinInput.waitForExistence(timeout: 2) {
+            unlockWallet()
+            _ = waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: 60)
+        }
+    }
+
+    func waitForTextInputValue(identifier: String, fallbackLabel: String, value: String, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let input = textInput(identifier: identifier, fallbackLabel: fallbackLabel)
+            if input.exists, input.value as? String == value {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        }
+        return false
+    }
+
+    func tapButton(identifier: String, fallbackLabel: String) {
+        let button = firstExisting([
+            app.buttons[identifier],
+            app.buttons[fallbackLabel],
+        ])
+        XCTAssertTrue(button.waitForExistence(timeout: 20), "Button not found: \(identifier)")
+        makeHittable(button)
+        XCTAssertTrue(button.isHittable, "Button is not hittable: \(identifier)")
+        button.tap()
+    }
+
     func replaceText(in element: XCUIElement, value: String) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
         makeHittable(element)

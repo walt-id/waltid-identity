@@ -43,9 +43,15 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
-        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        await ui.replaceText(in: offerInput, value: offerURL)
-        await ui.button(identifier: "wallet.receiveButton", fallbackLabel: "Receive").tap()
+        await ui.openDeepLink(offerURL)
+        let offerURLApplied = await ui.waitForTextInputValue(
+            identifier: "wallet.offerInput",
+            fallbackLabel: "Credential offer URL",
+            value: offerURL,
+            timeout: 10
+        )
+        XCTAssertTrue(offerURLApplied, "Offer URL did not appear in UI after deep link")
+        await ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
         let receiveStatus = await ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -56,9 +62,15 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
 
         let verifier = try await createVerifierSession(config: config, token: token)
-        let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
-        await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
-        await ui.button(identifier: "wallet.presentButton", fallbackLabel: "Present").tap()
+        await ui.openDeepLink(verifier.bootstrapAuthorizationRequestURL)
+        let presentationURLApplied = await ui.waitForTextInputValue(
+            identifier: "wallet.presentationInput",
+            fallbackLabel: "OpenID4VP request URL",
+            value: verifier.bootstrapAuthorizationRequestURL,
+            timeout: 10
+        )
+        XCTAssertTrue(presentationURLApplied, "Presentation request URL did not appear in UI after deep link")
+        await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
         let presentStatus = await ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
@@ -98,9 +110,15 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         let readyStatus = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet not ready: \(readyStatus ?? "nil")")
 
-        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        await ui.replaceText(in: offerInput, value: offerURL)
-        await ui.button(identifier: "wallet.receiveButton", fallbackLabel: "Receive").tap()
+        await ui.openDeepLink(offerURL)
+        let offerURLApplied = await ui.waitForTextInputValue(
+            identifier: "wallet.offerInput",
+            fallbackLabel: "Credential offer URL",
+            value: offerURL,
+            timeout: 10
+        )
+        XCTAssertTrue(offerURLApplied, "Offer URL did not appear in UI after deep link")
+        await ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
         let receiveStatus = await ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -132,9 +150,15 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
 
         // Phase 4: Present from persisted credential
         let verifier = try await createVerifierSession(config: config, token: token)
-        let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
-        await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
-        await ui.button(identifier: "wallet.presentButton", fallbackLabel: "Present").tap()
+        await ui.openDeepLink(verifier.bootstrapAuthorizationRequestURL)
+        let presentationURLApplied = await ui.waitForTextInputValue(
+            identifier: "wallet.presentationInput",
+            fallbackLabel: "OpenID4VP request URL",
+            value: verifier.bootstrapAuthorizationRequestURL,
+            timeout: 10
+        )
+        XCTAssertTrue(presentationURLApplied, "Presentation request URL did not appear in UI after deep link")
+        await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
         let presentStatus = await ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],

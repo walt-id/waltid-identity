@@ -7,6 +7,7 @@ import id.walt.walletdemo.compose.logic.createIosWalletDemoClient
 import platform.UIKit.UIViewController
 
 private var iosController: WalletDemoController? = null
+private var pendingDeepLink: String? = null
 
 fun walletDemoViewController(
     walletId: String = "default",
@@ -27,11 +28,18 @@ fun walletDemoViewController(
         )
     )
     iosController = controller
+    pendingDeepLink?.let(controller::handleDeepLink)
+    pendingDeepLink = null
     return ComposeUIViewController {
         WalletDemoApp(controller)
     }
 }
 
 fun handleWalletDemoDeepLink(url: String) {
-    iosController?.handleDeepLink(url)
+    val controller = iosController
+    if (controller == null) {
+        pendingDeepLink = url
+    } else {
+        controller.handleDeepLink(url)
+    }
 }
