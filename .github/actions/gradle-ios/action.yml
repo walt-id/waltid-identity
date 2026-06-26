@@ -27,12 +27,12 @@ runs:
     - name: Install CocoaPods dependencies for iOS libraries
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew podInstall
+      run: ./gradlew podInstall --info
 
     - name: Build iOS simulator frameworks (ARM64)
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew linkPodDebugFrameworkIosSimulatorArm64
+      run: ./gradlew linkPodDebugFrameworkIosSimulatorArm64 --info
 
     - name: Select Xcode toolchain
       shell: bash
@@ -77,7 +77,8 @@ runs:
         ./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:syncFramework \
           -Pkotlin.native.cocoapods.platform=iphonesimulator \
           -Pkotlin.native.cocoapods.archs="arm64" \
-          -Pkotlin.native.cocoapods.configuration=Debug
+          -Pkotlin.native.cocoapods.configuration=Debug \
+          --info
 
     - name: Install CocoaPods for iOS app
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
@@ -140,7 +141,8 @@ runs:
           ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:syncFramework \
           -Pkotlin.native.cocoapods.platform=iphonesimulator \
           -Pkotlin.native.cocoapods.archs="arm64" \
-          -Pkotlin.native.cocoapods.configuration=Debug
+          -Pkotlin.native.cocoapods.configuration=Debug \
+          --info
 
     - name: Install CocoaPods for Compose iOS app
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
