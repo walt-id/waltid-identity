@@ -6,9 +6,8 @@ import TestHelpers
 /// iOS integration tests for the mobile wallet library.
 ///
 /// Tests the WalletDemoBridgeController (iOS bridge to the KMP mobile wallet).
-/// Uses real iOS Keychain crypto and SQLDelight persistence. Public EUDI
-/// backend flows are available as opt-in tests because they depend on external
-/// network services.
+/// Uses real iOS Keychain crypto, SQLDelight persistence, and OID4VCI/VP protocol
+/// against the public EUDI test backend.
 ///
 /// These are integration tests (not E2E UI tests) - they test the library directly
 /// without UI automation.
@@ -61,12 +60,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
-    private func requireEudiPublicBackend() throws {
-        guard ProcessInfo.processInfo.environment["RUN_EUDI_PUBLIC_TESTS"] == "true" else {
-            throw XCTSkip("Set RUN_EUDI_PUBLIC_TESTS=true to run public EUDI backend integration tests")
-        }
-    }
-
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
     func testBootstrapCreatesKeyAndDid() async throws {
@@ -79,8 +72,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveCredentialFromEudi() async throws {
-        try requireEudiPublicBackend()
-
         let controller = makeController()
         _ = try await controller.bootstrap()
 
@@ -92,8 +83,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testReceiveAndPresentFullFlow() async throws {
-        try requireEudiPublicBackend()
-
         let controller = makeController()
 
         let bootstrapResult = try await controller.bootstrap()
@@ -125,8 +114,6 @@ final class MobileWalletIntegrationTests: XCTestCase {
     }
 
     func testCredentialPersistsAcrossControllerRecreation() async throws {
-        try requireEudiPublicBackend()
-
         let controller1 = makeController()
 
         let bootstrapResult = try await controller1.bootstrap()
