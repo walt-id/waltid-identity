@@ -9,8 +9,10 @@ group = "id.walt.walletdemo.compose"
 val enableMobileWallet = enableAndroidBuild || enableIosBuild
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = "id.walt.walletdemo.compose.logic"
+
+        withHostTestBuilder {}
     }
 
     if (enableWalletDemoComposeWeb) {
