@@ -18,7 +18,7 @@ jobs:
 
       - name: Build and test iOS
         timeout-minutes: 60
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@178af2241c9d542dc1d1878b9cf386acf1e11cdc
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@2526b69aa6e073a86fe48b0b1fcfe9e7ca3c27ba
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: '/Applications/Xcode_26.5.app/Contents/Developer'
