@@ -9,7 +9,7 @@ import TestHelpers
 /// This is an E2E test (slow, requires UI automation + local infrastructure) - runs locally only.
 /// Requires: enterprise stack running + ngrok tunnel
 final class LocalEnterpriseBackendE2ETests: XCTestCase {
-    private let client = WalletE2EClient()
+    private let backend = LocalEnterpriseBackend()
 
     // Timeouts (aligned with Android for cross-platform consistency)
     private let walletReadyTimeout: TimeInterval = 60         // 1 min - wallet bootstrap
@@ -17,11 +17,11 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
     private let verifierPollingTimeout: TimeInterval = 30     // 30 sec - backend verification
 
     func testReceiveAndPresentAgainstLocalEnterpriseBackend() async throws {
-        let config = LocalEnterpriseConfig.fromEnvironment()
-        let attested = (ProcessInfo.processInfo.environment["E2E_ATTESTED"] ?? "false").lowercased() == "true"
+        let config = LocalEnterpriseBackendConfig.fromEnvironment()
+        let attested = LocalEnterpriseBackendConfig.isAttested()
 
-        let token = try await getAdminToken(config: config)
-        let offerURL = try await createOffer(config: config, token: token)
+        let token = try await backend.getAdminToken(config: config)
+        let offerURL = try await backend.createPreAuthorizedOffer(config: config, token: token)
 
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
@@ -56,7 +56,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
 
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
 
-        let verifier = try await createVerifierSession(config: config, token: token)
+        let verifier = try await backend.createVerifierSession(config: config, token: token)
         let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
         await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
@@ -69,16 +69,16 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed: \(presentStatus!)")
         XCTAssertFalse(presentStatus!.starts(with: "Receive failed"), "Receive failed after present: \(presentStatus!)")
 
-        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
+        let verifierStatus = try await backend.waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status was \(verifierStatus)")
     }
 
     func testCredentialsPersistAcrossAppRestart() async throws {
-        let config = LocalEnterpriseConfig.fromEnvironment()
-        let attested = (ProcessInfo.processInfo.environment["E2E_ATTESTED"] ?? "false").lowercased() == "true"
+        let config = LocalEnterpriseBackendConfig.fromEnvironment()
+        let attested = LocalEnterpriseBackendConfig.isAttested()
 
-        let token = try await getAdminToken(config: config)
-        let offerURL = try await createOffer(config: config, token: token)
+        let token = try await backend.getAdminToken(config: config)
+        let offerURL = try await backend.createPreAuthorizedOffer(config: config, token: token)
 
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
@@ -132,7 +132,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials not persisted — 'No credentials' shown after restart")
 
         // Phase 4: Present from persisted credential
-        let verifier = try await createVerifierSession(config: config, token: token)
+        let verifier = try await backend.createVerifierSession(config: config, token: token)
         let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
         await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
@@ -144,112 +144,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertNotNil(presentStatus)
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed after restart: \(presentStatus!)")
 
-        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
+        let verifierStatus = try await backend.waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status after restart: \(verifierStatus)")
-    }
-
-    private func getAdminToken(config: LocalEnterpriseConfig) async throws -> String {
-        let body = try jsonString([
-            "email": config.adminEmail,
-            "password": config.adminPassword,
-        ])
-        let headers = ["Content-Type": "application/json", "ngrok-skip-browser-warning": "true"]
-        let response = try await client.jsonRequest(
-            url: config.apiBaseURL.appending(path: "/auth/account/emailpass"),
-            method: "POST",
-            headers: headers,
-            body: Data(body.utf8)
-        )
-        guard let token = response["token"] as? String, !token.isEmpty else {
-            throw NSError(domain: "WalletE2E", code: 100, userInfo: [NSLocalizedDescriptionKey: "Missing token in auth response: \(response)"])
-        }
-        return token
-    }
-
-    private func createOffer(config: LocalEnterpriseConfig, token: String) async throws -> String {
-        let endpoint = config.ngrokBaseURL.appending(path: "/v2/\(config.tenantPath).\(config.issuerProfile)/issuer-service-api/credentials/offers")
-        let body = try jsonString(["authMethod": "PRE_AUTHORIZED"])
-        let response = try await client.jsonRequest(
-            url: endpoint,
-            method: "POST",
-            headers: [
-                "Authorization": "Bearer \(token)",
-                "Content-Type": "application/json",
-                "ngrok-skip-browser-warning": "true",
-            ],
-            body: Data(body.utf8)
-        )
-
-        guard let offer = response["credentialOffer"] as? String, !offer.isEmpty else {
-            throw NSError(domain: "WalletE2E", code: 101, userInfo: [NSLocalizedDescriptionKey: "Missing credentialOffer in response: \(response)"])
-        }
-        return offer
-    }
-
-    private func createVerifierSession(config: LocalEnterpriseConfig, token: String) async throws -> (sessionID: String, bootstrapAuthorizationRequestURL: String) {
-        let payload: [String: Any] = [
-            "flow_type": "cross_device",
-            "core_flow": [
-                "dcql_query": [
-                    "credentials": [[
-                        "id": "my_mdl",
-                        "format": "mso_mdoc",
-                        "meta": ["doctype_value": "org.iso.18013.5.1.mDL"],
-                        "claims": [
-                            ["path": ["org.iso.18013.5.1", "family_name"]],
-                            ["path": ["org.iso.18013.5.1", "given_name"]],
-                        ],
-                    ]],
-                ],
-            ],
-        ]
-
-        let endpoint = config.ngrokBaseURL.appending(path: "/v1/\(config.tenantPath).\(config.verifier)/verifier2-service-api/verification-session/create")
-        let response = try await client.jsonRequest(
-            url: endpoint,
-            method: "POST",
-            headers: [
-                "Authorization": "Bearer \(token)",
-                "Content-Type": "application/json",
-                "ngrok-skip-browser-warning": "true",
-            ],
-            body: Data(try jsonString(payload).utf8)
-        )
-
-        guard let sessionID = response["sessionId"] as? String, !sessionID.isEmpty,
-              let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String, !requestURL.isEmpty else {
-            throw NSError(domain: "WalletE2E", code: 102, userInfo: [NSLocalizedDescriptionKey: "Invalid verifier session response: \(response)"])
-        }
-
-        return (sessionID, requestURL)
-    }
-
-    private func waitForVerifierStatus(config: LocalEnterpriseConfig, sessionID: String, timeoutSeconds: TimeInterval) async throws -> String {
-        let deadline = Date().addingTimeInterval(timeoutSeconds)
-        var lastStatus = "UNKNOWN"
-
-        while Date() < deadline {
-            let token = try await getAdminToken(config: config)
-            let endpoint = config.apiBaseURL.appending(path: "/v1/\(config.tenantPath).\(config.verifier).\(sessionID)/verifier2-service-api/verification-session/info")
-
-            let response = try await client.jsonRequest(
-                url: endpoint,
-                headers: [
-                    "Authorization": "Bearer \(token)",
-                    "ngrok-skip-browser-warning": "true",
-                ]
-            )
-
-            if let session = response["session"] as? [String: Any], let status = session["status"] as? String {
-                lastStatus = status
-                if status == "SUCCESSFUL" || status == "FAILED" || status == "EXPIRED" {
-                    return status
-                }
-            }
-
-            try await Task.sleep(nanoseconds: 2_000_000_000)
-        }
-
-        return lastStatus
     }
 }

@@ -38,6 +38,9 @@ Tests against local enterprise stack (requires docker-compose + ngrok):
 
 **Runs in CI**: No (requires local infrastructure)
 
+Non-attested issuer/profile setup is shared with the Android runner through
+`../../../mobile-e2e-fixtures/local-enterprise-fixtures.sh`.
+
 ### Setup for Local Tests
 
 1. Start enterprise stack.

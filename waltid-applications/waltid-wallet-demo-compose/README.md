@@ -42,6 +42,12 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 Android E2E scripts live in [androidApp/scripts](androidApp/scripts/README.md).
 Compose iOS E2E scripts live in [iosApp/scripts](iosApp/scripts/README.md).
 
+Backend E2E fixtures are intentionally shared:
+
+- Android tests use `waltid-mobile-test-utils` for public EUDI and local Enterprise backend operations.
+- iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `waltid-wallet-demo-ios/iosApp/TestHelpers`.
+- Android and iOS local Enterprise scripts source the common setup helpers in [mobile-e2e-fixtures](../mobile-e2e-fixtures/).
+
 ## Related modules
 
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)

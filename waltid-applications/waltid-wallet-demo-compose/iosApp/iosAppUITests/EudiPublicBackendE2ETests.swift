@@ -7,7 +7,7 @@ import XCTest
 ///
 /// This is an E2E test (slow, requires UI automation) - runs nightly or on-demand.
 final class EudiPublicBackendE2ETests: XCTestCase {
-    private let client = WalletE2EClient()
+    private let backend = EudiPublicBackend()
 
     // Timeouts (aligned with Android for cross-platform consistency)
     private let walletReadyTimeout: TimeInterval = 60         // 1 min - wallet bootstrap
@@ -31,12 +31,12 @@ final class EudiPublicBackendE2ETests: XCTestCase {
     }
 
     func testReceiveAndPresentAgainstEudiPublicBackends() async throws {
-        let config = EudiPublicConfig.fromEnvironment()
+        let config = EudiPublicBackendConfig.fromEnvironment()
         let offerURL: String
         if let configuredOffer = config.offerURL, !configuredOffer.isEmpty {
             offerURL = configuredOffer
         } else {
-            offerURL = try await generatePreAuthorizedOffer(credentialID: config.credentialID)
+            offerURL = try await backend.generatePreAuthorizedOffer(credentialID: config.credentialID)
         }
 
         let app = XCUIApplication()
@@ -65,7 +65,7 @@ final class EudiPublicBackendE2ETests: XCTestCase {
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
-        let verifier = try await createVerifierTransaction(credentialID: config.credentialID)
+        let verifier = try await backend.createVerifierTransaction(credentialID: config.credentialID)
         await ui.openDeepLink(verifier.authorizationRequestURI)
         let presentationURLApplied = await ui.waitForTextInputValue(
             identifier: "wallet.presentationInput",
@@ -87,16 +87,16 @@ final class EudiPublicBackendE2ETests: XCTestCase {
             "Presentation finished without verifier confirmation: \(presentStatus!)"
         )
 
-        try await waitForVerifierSuccess(transactionID: verifier.transactionID, timeoutSeconds: verifierPollingTimeout)
+        try await backend.waitForVerifierSuccess(transactionID: verifier.transactionID, timeoutSeconds: verifierPollingTimeout)
     }
 
     func testCredentialPersistsAcrossAppRestart() async throws {
-        let config = EudiPublicConfig.fromEnvironment()
+        let config = EudiPublicBackendConfig.fromEnvironment()
         let offerURL: String
         if let configuredOffer = config.offerURL, !configuredOffer.isEmpty {
             offerURL = configuredOffer
         } else {
-            offerURL = try await generatePreAuthorizedOffer(credentialID: config.credentialID)
+            offerURL = try await backend.generatePreAuthorizedOffer(credentialID: config.credentialID)
         }
 
         let app = XCUIApplication()
@@ -139,39 +139,7 @@ final class EudiPublicBackendE2ETests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
     }
 
-    private func generatePreAuthorizedOffer(credentialID: String) async throws -> String {
-        let flow = EudiOfferFlow(client: client)
-        return try await flow.generate(credentialID: credentialID)
-    }
-
     private func isolatedWalletEnvironment() -> [String: String] {
         ["WALLET_ID": "compose-ios-eudi-\(UUID().uuidString)"]
     }
-
-    private func createVerifierTransaction(credentialID: String) async throws -> (transactionID: String, authorizationRequestURI: String) {
-        let payload: [String: Any] = [
-            "dcql_query": buildDcqlQuery(credentialID: credentialID),
-            "nonce": UUID().uuidString,
-            "request_uri_method": "post",
-            "profile": "openid4vp",
-            "authorization_request_uri": "openid4vp://",
-        ]
-
-        let response = try await client.jsonRequest(
-            url: URL(string: "https://verifier-backend.eudiw.dev/ui/presentations/v2")!,
-            method: "POST",
-            headers: ["Content-Type": "application/json"],
-            body: Data(try jsonString(payload).utf8)
-        )
-
-        guard let tx = response["transaction_id"] as? String,
-              let request = response["authorization_request_uri"] as? String,
-              !tx.isEmpty,
-              !request.isEmpty else {
-            throw NSError(domain: "WalletE2E", code: 200, userInfo: [NSLocalizedDescriptionKey: "Invalid verifier response: \(response)"])
-        }
-
-        return (tx, request)
-    }
-
 }

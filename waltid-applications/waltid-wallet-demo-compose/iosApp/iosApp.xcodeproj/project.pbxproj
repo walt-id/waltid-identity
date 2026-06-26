@@ -17,6 +17,8 @@
 		C0DE00000000000000000104 /* EudiOfferFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000005 /* EudiOfferFlow.swift */; };
 		C0DE00000000000000000105 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000006 /* TestHelpers.swift */; };
 		C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000007 /* WalletE2EClient.swift */; };
+		C0DE00000000000000000107 /* EudiPublicBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000008 /* EudiPublicBackend.swift */; };
+		C0DE00000000000000000108 /* LocalEnterpriseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000009 /* LocalEnterpriseBackend.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,6 +47,8 @@
 		C0DE00000000000000000005 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EudiOfferFlow.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/EudiOfferFlow.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000006 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TestHelpers.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/TestHelpers.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletE2EClient.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/WalletE2EClient.swift"; sourceTree = "<group>"; };
+		C0DE00000000000000000008 /* EudiPublicBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EudiPublicBackend.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/EudiPublicBackend.swift"; sourceTree = "<group>"; };
+		C0DE00000000000000000009 /* LocalEnterpriseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LocalEnterpriseBackend.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/LocalEnterpriseBackend.swift"; sourceTree = "<group>"; };
 		D6B7A3532FD94CC5009C69E7 /* sharedUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = sharedUI.framework; path = ../sharedUI/build/cocoapods/framework/sharedUI.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -125,6 +129,8 @@
 				C0DE00000000000000000005 /* EudiOfferFlow.swift */,
 				C0DE00000000000000000006 /* TestHelpers.swift */,
 				C0DE00000000000000000007 /* WalletE2EClient.swift */,
+				C0DE00000000000000000008 /* EudiPublicBackend.swift */,
+				C0DE00000000000000000009 /* LocalEnterpriseBackend.swift */,
 			);
 			path = iosAppUITests;
 			sourceTree = "<group>";
@@ -297,6 +303,8 @@
 				C0DE00000000000000000104 /* EudiOfferFlow.swift in Sources */,
 				C0DE00000000000000000105 /* TestHelpers.swift in Sources */,
 				C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */,
+				C0DE00000000000000000107 /* EudiPublicBackend.swift in Sources */,
+				C0DE00000000000000000108 /* LocalEnterpriseBackend.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

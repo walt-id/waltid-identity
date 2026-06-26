@@ -1,6 +1,7 @@
 # Mobile Test Utilities
 
-Shared test infrastructure for iOS and Android mobile wallet tests.
+Shared Kotlin test infrastructure for Android mobile wallet tests, paired with the
+Swift `TestHelpers` backend fixtures used by iOS XCTest targets.
 
 ## Overview
 
@@ -8,7 +9,7 @@ This module provides:
 - **EudiTestBackend** - EUDI public backend integration (offer generation, verifier transactions)
 - **LocalEnterpriseTestBackend** - Walt.ID Enterprise backend integration (authentication, offers, verification)
 - **Test utilities** - Common mobile testing helpers
-- **KMP test infrastructure** - Accessible from both Android (Kotlin) and iOS (via Swift TestHelpers)
+- **KMP test infrastructure** - Used directly from Android tests; iOS mirrors the same fixture API through Swift `TestHelpers`
 
 ## Module Structure
 
@@ -111,16 +112,21 @@ class EnterpriseIntegrationTest {
 
 ### iOS (Swift)
 
-**Note:** iOS cannot directly import from Kotlin `commonMain` in KMP for test utilities. iOS uses the **TestHelpers framework** located in `waltid-applications/waltid-wallet-demo-ios/iosApp/TestHelpers/` which provides equivalent Swift implementations.
+**Note:** iOS XCTest targets do not import this Kotlin module directly. They use
+the **TestHelpers** fixtures located in
+`waltid-applications/waltid-wallet-demo-ios/iosApp/TestHelpers/`. Keep backend
+payloads and method semantics aligned between this module and `TestHelpers`
+when adding WAL-1097-style E2E flows.
 
 ```swift
 import TestHelpers
 
 class EudiIntegrationTests: XCTestCase {
     func testReceiveCredential() async throws {
-        // Generate offer via EudiOfferFlow
-        let flow = EudiOfferFlow(client: WalletE2EClient())
-        let offerURL = try await flow.generate(credentialID: "eu.europa.ec.eudi.pid_vc_sd_jwt")
+        let backend = EudiPublicBackend()
+        let offerURL = try await backend.generatePreAuthorizedOffer(
+            credentialID: "eu.europa.ec.eudi.pid_vc_sd_jwt"
+        )
         
         // Use with wallet controller
         let result = try await controller.receive(offerURL)
@@ -129,7 +135,8 @@ class EudiIntegrationTests: XCTestCase {
 }
 ```
 
-See `TestHelpers/` framework documentation for full Swift API.
+See `TestHelpers/` for the full Swift API, including local Enterprise
+authentication, offer creation, verifier sessions, and verifier polling.
 
 ## Test Backends
 
@@ -156,7 +163,7 @@ Tests using local enterprise backend should be marked as local-only and excluded
 ## Design Principles
 
 1. **Test-only module** - This module should NEVER be added to `commonMain` or production dependencies
-2. **iOS/Android parity** - Test utilities work on both platforms (via appropriate bridges)
+2. **iOS/Android parity** - Keep Kotlin `waltid-mobile-test-utils` and Swift `TestHelpers` fixture APIs semantically aligned
 3. **No production code** - Only test helpers and backend utilities
 4. **CI-compatible** - Tests using public backends should run in CI
 5. **Clear separation** - Local-only tests clearly marked and excluded from CI
