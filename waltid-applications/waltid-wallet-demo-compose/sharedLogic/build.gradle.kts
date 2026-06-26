@@ -21,13 +21,26 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
         }
 
+        val mobileMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+            }
+        }
+
+        androidMain {
+            dependsOn(mobileMain)
+        }
+
         androidMain.dependencies {
-            implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
             implementation(identityLibs.ktor.client.android)
         }
 
+        iosMain {
+            dependsOn(mobileMain)
+        }
+
         iosMain.dependencies {
-            implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
             implementation(identityLibs.ktor.client.darwin)
         }
 
