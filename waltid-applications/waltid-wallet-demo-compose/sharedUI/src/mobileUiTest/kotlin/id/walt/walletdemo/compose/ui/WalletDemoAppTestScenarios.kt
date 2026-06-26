@@ -15,7 +15,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
-import id.walt.walletdemo.compose.logic.WalletDemoClient
+import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
@@ -25,8 +25,8 @@ import kotlin.test.assertEquals
 class WalletDemoAppTestScenarios {
 
     fun pinSetupBootstrapsWalletAndShowsCredentials() = runComposeUiTest {
-        val client = FakeWalletDemoClient(credentials = listOf(sampleCredential))
-        val controller = WalletDemoController(client)
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet)
 
         setContent { WalletDemoApp(controller) }
 
@@ -35,33 +35,33 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.isReady }
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
-        assertEquals(1, client.bootstrapCalls)
+        assertEquals(1, wallet.bootstrapCalls)
     }
 
     fun receiveFlowUpdatesStatusAndCredentialList() = runComposeUiTest {
-        val client = FakeWalletDemoClient(receivedCredentialIds = listOf("cred-1", "cred-2"))
-        val controller = WalletDemoController(client)
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
+        val controller = WalletDemoController(wallet)
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.isReady }
 
-        client.credentials = listOf(sampleCredential)
+        wallet.credentials = listOf(sampleCredential)
         onNodeWithTag("wallet.offerInput").performScrollTo().performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.status.startsWith("Received") }
         onNodeWithTag("wallet.status").assertTextContains("Received 2 credential(s)")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
-        assertEquals("openid-credential-offer://example", client.receivedOfferUrl)
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
     }
 
     fun presentFlowUpdatesStatus() = runComposeUiTest {
-        val client = FakeWalletDemoClient(
+        val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
             presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
         )
-        val controller = WalletDemoController(client)
+        val controller = WalletDemoController(wallet)
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -72,17 +72,17 @@ class WalletDemoAppTestScenarios {
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.status == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
-        assertEquals("openid4vp://example", client.presentedRequestUrl)
+        assertEquals("openid4vp://example", wallet.presentedRequestUrl)
     }
 
     fun deepLinkReceiveAndPresentFlowUpdatesStatus() = runComposeUiTest {
         val offerUrl = "openid-credential-offer://example"
         val requestUrl = "openid4vp://example"
-        val client = FakeWalletDemoClient(
+        val wallet = FakeDemoWallet(
             credentialsAfterReceive = listOf(sampleCredential),
             presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
         )
-        val controller = WalletDemoController(client)
+        val controller = WalletDemoController(wallet)
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -104,13 +104,13 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.status == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
-        assertEquals(offerUrl, client.receivedOfferUrl)
-        assertEquals(requestUrl, client.presentedRequestUrl)
+        assertEquals(offerUrl, wallet.receivedOfferUrl)
+        assertEquals(requestUrl, wallet.presentedRequestUrl)
     }
 
     fun credentialsPersistAcrossControllerRecreation() = runComposeUiTest {
-        val client = FakeWalletDemoClient(credentialsAfterReceive = listOf(sampleCredential))
-        val firstController = WalletDemoController(client)
+        val wallet = FakeDemoWallet(credentialsAfterReceive = listOf(sampleCredential))
+        val firstController = WalletDemoController(wallet)
         var activeController by mutableStateOf(firstController)
 
         setContent { WalletDemoApp(activeController) }
@@ -122,14 +122,14 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.status.startsWith("Received") }
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
 
-        val recreatedController = WalletDemoController(client)
+        val recreatedController = WalletDemoController(wallet)
         activeController = recreatedController
         waitForIdle()
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { recreatedController.state.value.isReady }
 
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
-        assertEquals(2, client.bootstrapCalls)
+        assertEquals(2, wallet.bootstrapCalls)
     }
 
     private fun androidx.compose.ui.test.ComposeUiTest.unlockWithPin() {
@@ -151,12 +151,12 @@ class WalletDemoAppTestScenarios {
     }
 }
 
-private class FakeWalletDemoClient(
+private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val credentialsAfterReceive: List<WalletDemoCredential>? = null,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
-) : WalletDemoClient {
+) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
     var presentedRequestUrl: String? = null

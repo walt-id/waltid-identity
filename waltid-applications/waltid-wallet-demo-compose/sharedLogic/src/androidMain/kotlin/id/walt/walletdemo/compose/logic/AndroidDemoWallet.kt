@@ -1,5 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
+import android.content.Context
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
@@ -8,26 +9,27 @@ import id.walt.webdatafetching.WebDataFetcherManager
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
 
-fun createIosWalletDemoClient(
-    config: WalletDemoClientConfig = WalletDemoClientConfig(),
-): WalletDemoClient {
-    WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.Native)
+fun createAndroidDemoWallet(
+    context: Context,
+    config: DemoWalletConfig = DemoWalletConfig(),
+): DemoWallet {
+    WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
 
-    return NativeWalletDemoClient(
-        MobileWalletFactory().create(
+    return MobileDemoWallet(
+        MobileWalletFactory(context).create(
             MobileWalletConfig(
                 walletId = config.walletId,
-                attestationConfig = config.toNativeAttestationConfig(),
+                attestationConfig = config.toWalletAttestationConfig(),
             )
         )
     )
 }
 
-private class NativeWalletDemoClient(
-    private val client: MobileWallet,
-) : WalletDemoClient {
+private class MobileDemoWallet(
+    private val mobileWallet: MobileWallet,
+) : DemoWallet {
     override suspend fun bootstrap(): WalletDemoBootstrapResult =
-        client.bootstrap().let { result ->
+        mobileWallet.bootstrap().let { result ->
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
@@ -35,7 +37,7 @@ private class NativeWalletDemoClient(
         }
 
     override suspend fun listCredentials(): List<WalletDemoCredential> =
-        client.credentials().map { credential ->
+        mobileWallet.credentials().map { credential ->
             WalletDemoCredential(
                 id = credential.id,
                 format = credential.format,
@@ -45,10 +47,10 @@ private class NativeWalletDemoClient(
             )
         }
 
-    override suspend fun receive(offerUrl: String): List<String> = client.receive(offerUrl)
+    override suspend fun receive(offerUrl: String): List<String> = mobileWallet.receive(offerUrl)
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        client.present(requestUrl = requestUrl, did = did).let { result ->
+        mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
             WalletDemoOperationResult(
                 success = result.success,
                 message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",
@@ -56,7 +58,7 @@ private class NativeWalletDemoClient(
         }
 }
 
-private fun WalletDemoClientConfig.toNativeAttestationConfig(): WalletAttestationConfig? =
+private fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {
         WalletAttestationConfig(
             enterpriseBaseUrl = it,

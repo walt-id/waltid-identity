@@ -1,9 +1,9 @@
 package id.walt.walletdemo.compose.ui
 
 import androidx.compose.ui.window.ComposeUIViewController
-import id.walt.walletdemo.compose.logic.WalletDemoClientConfig
+import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
-import id.walt.walletdemo.compose.logic.createIosWalletDemoClient
+import id.walt.walletdemo.compose.logic.createIosDemoWallet
 import platform.UIKit.UIViewController
 
 private var iosController: WalletDemoController? = null
@@ -17,8 +17,8 @@ fun walletDemoViewController(
     attestationHostHeader: String = "",
 ): UIViewController {
     val controller = WalletDemoController(
-        createIosWalletDemoClient(
-            WalletDemoClientConfig(
+        createIosDemoWallet(
+            DemoWalletConfig(
                 walletId = walletId,
                 attestationBaseUrl = attestationBaseUrl,
                 attestationAttesterPath = attestationAttesterPath,

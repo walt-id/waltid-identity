@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class WalletDemoController(
-    private val client: WalletDemoClient,
+    private val wallet: DemoWallet,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
@@ -77,8 +77,8 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             _state.update { it.copy(isBusy = true, isError = false, status = "Receiving credential...") }
             runCatching {
-                val ids = client.receive(offerUrl)
-                val credentials = client.listCredentials()
+                val ids = wallet.receive(offerUrl)
+                val credentials = wallet.listCredentials()
                 ids to credentials
             }.onSuccess { (ids, credentials) ->
                 _state.update {
@@ -102,7 +102,7 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             _state.update { it.copy(isBusy = true, isError = false, status = "Presenting credential...") }
             runCatching {
-                client.present(requestUrl, _state.value.did.takeIf { it.isNotBlank() })
+                wallet.present(requestUrl, _state.value.did.takeIf { it.isNotBlank() })
             }.onSuccess { result ->
                 _state.update {
                     it.copy(
@@ -159,8 +159,8 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             _state.update { it.copy(isBusy = true, isError = false, status = "Bootstrapping wallet...") }
             runCatching {
-                val result = client.bootstrap()
-                val credentials = client.listCredentials()
+                val result = wallet.bootstrap()
+                val credentials = wallet.listCredentials()
                 result to credentials
             }.onSuccess { (result, credentials) ->
                 _state.update {

@@ -1,6 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
-data class WalletDemoClientConfig(
+data class DemoWalletConfig(
     val walletId: String = "default",
     val attestationBaseUrl: String = "",
     val attestationAttesterPath: String = "",
@@ -47,7 +47,7 @@ data class WalletDemoUiState(
     val credentials: List<WalletDemoCredential> = emptyList(),
 )
 
-interface WalletDemoClient {
+interface DemoWallet {
     suspend fun bootstrap(): WalletDemoBootstrapResult
     suspend fun listCredentials(): List<WalletDemoCredential>
     suspend fun receive(offerUrl: String): List<String>

@@ -1,8 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
-fun createMockWalletDemoClient(): WalletDemoClient = MockWalletDemoClient()
+fun createMockDemoWallet(): DemoWallet = MockDemoWallet()
 
-private class MockWalletDemoClient : WalletDemoClient {
+private class MockDemoWallet : DemoWallet {
     private var credentials = emptyList<WalletDemoCredential>()
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult =

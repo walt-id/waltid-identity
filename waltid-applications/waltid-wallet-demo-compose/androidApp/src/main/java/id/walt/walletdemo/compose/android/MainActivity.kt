@@ -5,9 +5,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import id.walt.walletdemo.compose.logic.WalletDemoClientConfig
+import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
-import id.walt.walletdemo.compose.logic.createAndroidWalletDemoClient
+import id.walt.walletdemo.compose.logic.createAndroidDemoWallet
 import id.walt.walletdemo.compose.ui.WalletDemoApp
 
 class MainActivity : ComponentActivity() {
@@ -18,9 +18,9 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         controller = WalletDemoController(
-            createAndroidWalletDemoClient(
+            createAndroidDemoWallet(
                 context = applicationContext,
-                config = WalletDemoClientConfig(
+                config = DemoWalletConfig(
                     attestationBaseUrl = BuildConfig.ATTESTATION_BASE_URL,
                     attestationAttesterPath = BuildConfig.ATTESTATION_ATTESTER_PATH,
                     attestationBearerToken = BuildConfig.ATTESTATION_BEARER_TOKEN,

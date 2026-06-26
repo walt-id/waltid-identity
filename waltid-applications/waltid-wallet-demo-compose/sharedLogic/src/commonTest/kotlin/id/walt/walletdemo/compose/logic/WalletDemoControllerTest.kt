@@ -14,7 +14,7 @@ class WalletDemoControllerTest {
 
     @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
-        val controller = controllerWith(FakeWalletDemoClient(), this)
+        val controller = controllerWith(FakeDemoWallet(), this)
 
         controller.updatePin("12a4")
         controller.updatePinConfirmation("12a4")
@@ -26,7 +26,7 @@ class WalletDemoControllerTest {
 
     @Test
     fun setupPinRejectsMismatchedConfirmation() = runTest {
-        val controller = controllerWith(FakeWalletDemoClient(), this)
+        val controller = controllerWith(FakeDemoWallet(), this)
 
         controller.updatePin("1234")
         controller.updatePinConfirmation("4321")
@@ -38,8 +38,8 @@ class WalletDemoControllerTest {
 
     @Test
     fun setupPinUnlocksAndBootstrapsWallet() = runTest {
-        val client = FakeWalletDemoClient(credentials = listOf(sampleCredential))
-        val controller = controllerWith(client, this)
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = controllerWith(wallet, this)
 
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
@@ -52,12 +52,12 @@ class WalletDemoControllerTest {
         assertEquals("Wallet ready", state.status)
         assertEquals("did:key:test", state.did)
         assertEquals(listOf(sampleCredential), state.credentials)
-        assertEquals(1, client.bootstrapCalls)
+        assertEquals(1, wallet.bootstrapCalls)
     }
 
     @Test
     fun wrongLoginPinKeepsWalletLocked() = runTest {
-        val controller = unlockedControllerWith(FakeWalletDemoClient(), this)
+        val controller = unlockedControllerWith(FakeDemoWallet(), this)
 
         controller.lock()
         controller.updatePin("9999")
@@ -69,9 +69,9 @@ class WalletDemoControllerTest {
 
     @Test
     fun correctLoginPinUnlocksWithoutRepeatingBootstrapWhenReady() = runTest {
-        val client = FakeWalletDemoClient()
-        val controller = unlockedControllerWith(client, this)
-        assertEquals(1, client.bootstrapCalls)
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+        assertEquals(1, wallet.bootstrapCalls)
 
         controller.lock()
         controller.updatePin("1234")
@@ -80,66 +80,66 @@ class WalletDemoControllerTest {
 
         assertTrue(controller.state.value.isUnlocked)
         assertTrue(controller.state.value.isReady)
-        assertEquals(1, client.bootstrapCalls)
+        assertEquals(1, wallet.bootstrapCalls)
     }
 
     @Test
     fun receiveRefreshesCredentialsAndStatus() = runTest {
-        val client = FakeWalletDemoClient(receivedCredentialIds = listOf("cred-1", "cred-2"))
-        val controller = unlockedControllerWith(client, this)
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
+        val controller = unlockedControllerWith(wallet, this)
 
-        client.credentials = listOf(sampleCredential)
+        wallet.credentials = listOf(sampleCredential)
         controller.updateOfferUrl("openid-credential-offer://example")
         controller.receive()
         runCurrent()
 
-        assertEquals("openid-credential-offer://example", client.receivedOfferUrl)
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
         assertEquals("Received 2 credential(s)", controller.state.value.status)
         assertEquals(listOf(sampleCredential), controller.state.value.credentials)
     }
 
     @Test
     fun receiveIgnoresBlankOfferUrl() = runTest {
-        val client = FakeWalletDemoClient()
-        val controller = unlockedControllerWith(client, this)
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("   ")
         controller.receive()
         runCurrent()
 
-        assertEquals(null, client.receivedOfferUrl)
+        assertEquals(null, wallet.receivedOfferUrl)
         assertEquals("Wallet ready", controller.state.value.status)
     }
 
     @Test
     fun presentUpdatesStatusOnSuccess() = runTest {
-        val client = FakeWalletDemoClient(presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"))
-        val controller = unlockedControllerWith(client, this)
+        val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"))
+        val controller = unlockedControllerWith(wallet, this)
 
         controller.updatePresentationRequestUrl("openid4vp://example")
         controller.present()
         runCurrent()
 
-        assertEquals("openid4vp://example", client.presentedRequestUrl)
+        assertEquals("openid4vp://example", wallet.presentedRequestUrl)
         assertEquals("Presentation sent", controller.state.value.status)
     }
 
     @Test
     fun presentIgnoresBlankRequestUrl() = runTest {
-        val client = FakeWalletDemoClient()
-        val controller = unlockedControllerWith(client, this)
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
 
         controller.updatePresentationRequestUrl("   ")
         controller.present()
         runCurrent()
 
-        assertEquals(null, client.presentedRequestUrl)
+        assertEquals(null, wallet.presentedRequestUrl)
         assertEquals("Wallet ready", controller.state.value.status)
     }
 
     @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
-        val controller = controllerWith(FakeWalletDemoClient(), this)
+        val controller = controllerWith(FakeDemoWallet(), this)
         val offerUrl = "openid-credential-offer://example"
         val presentationUrl = "openid4vp://example"
 
@@ -151,15 +151,15 @@ class WalletDemoControllerTest {
         assertEquals(presentationUrl, controller.state.value.presentationRequestUrl)
     }
 
-    private fun controllerWith(client: WalletDemoClient, scope: TestScope): WalletDemoController =
+    private fun controllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController =
         WalletDemoController(
-            client = client,
+            wallet = wallet,
             scope = scope.backgroundScope,
             dispatcher = StandardTestDispatcher(scope.testScheduler),
         )
 
-    private fun unlockedControllerWith(client: WalletDemoClient, scope: TestScope): WalletDemoController {
-        val controller = controllerWith(client, scope)
+    private fun unlockedControllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController {
+        val controller = controllerWith(wallet, scope)
         controller.updatePin("1234")
         controller.updatePinConfirmation("1234")
         controller.submitPin()
@@ -178,11 +178,11 @@ class WalletDemoControllerTest {
     }
 }
 
-private class FakeWalletDemoClient(
+private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
-) : WalletDemoClient {
+) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
     var presentedRequestUrl: String? = null
