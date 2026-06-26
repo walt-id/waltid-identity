@@ -102,7 +102,10 @@ final class WalletE2EUI {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")
-        element.tap()
+        guard focusTextInput(element) else {
+            XCTFail("Input element did not accept keyboard focus")
+            return
+        }
 
         if let currentValue = element.value as? String {
             let placeholder = element.placeholderValue ?? ""
@@ -112,6 +115,62 @@ final class WalletE2EUI {
         }
 
         element.typeText(value)
+    }
+
+    private func focusTextInput(_ element: XCUIElement, timeout: TimeInterval = 8) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var useCoordinateTap = false
+
+        repeat {
+            makeHittable(element)
+            guard element.isHittable else {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                continue
+            }
+
+            if useCoordinateTap {
+                element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            } else {
+                element.tap()
+                useCoordinateTap = true
+            }
+
+            if waitForKeyboardFocus(in: element, timeout: 1) {
+                return true
+            }
+
+            app.activate()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        return false
+    }
+
+    private func waitForKeyboardFocus(in element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+
+        repeat {
+            if hasKeyboardFocus(in: element) {
+                return true
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        return false
+    }
+
+    private func hasKeyboardFocus(in element: XCUIElement) -> Bool {
+        let predicate = NSPredicate(format: "hasKeyboardFocus == true")
+        if element.descendants(matching: .any).matching(predicate).firstMatch.exists {
+            return true
+        }
+
+        return app.descendants(matching: .any)
+            .matching(predicate)
+            .matching(identifier: element.identifier)
+            .firstMatch
+            .exists
     }
 
     private func makeHittable(_ element: XCUIElement) {
