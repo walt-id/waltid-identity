@@ -15,8 +15,8 @@ class DcApiTest {
     {
       "id": "610965bb-3b17-4e70-90c7-45bd4c26b282",
       "setup": {
-        "flow_type": "dc_api",
-        "core": {
+        "flow_type": "dc_api_openid4vp",
+        "core_flow": {
           "dcql_query": {
             "credentials": [
               {
