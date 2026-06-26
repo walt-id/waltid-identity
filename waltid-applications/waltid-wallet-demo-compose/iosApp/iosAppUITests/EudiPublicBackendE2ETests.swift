@@ -17,7 +17,7 @@ final class EudiPublicBackendE2ETests: XCTestCase {
     func testBootstrapCreatesDid() async throws {
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
-        await ui.launch()
+        await ui.launch(environment: isolatedWalletEnvironment())
 
         let readyStatus = await ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -41,7 +41,7 @@ final class EudiPublicBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
-        await ui.launch()
+        await ui.launch(environment: isolatedWalletEnvironment())
 
         let readyStatus = await ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -101,8 +101,7 @@ final class EudiPublicBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
-        let walletId = "compose-ios-eudi-\(UUID().uuidString)"
-        let environment = ["WALLET_ID": walletId]
+        let environment = isolatedWalletEnvironment()
 
         await ui.launch(environment: environment)
         let readyStatus = await ui.waitForStatus(
@@ -143,6 +142,10 @@ final class EudiPublicBackendE2ETests: XCTestCase {
     private func generatePreAuthorizedOffer(credentialID: String) async throws -> String {
         let flow = EudiOfferFlow(client: client)
         return try await flow.generate(credentialID: credentialID)
+    }
+
+    private func isolatedWalletEnvironment() -> [String: String] {
+        ["WALLET_ID": "compose-ios-eudi-\(UUID().uuidString)"]
     }
 
     private func createVerifierTransaction(credentialID: String) async throws -> (transactionID: String, authorizationRequestURI: String) {
