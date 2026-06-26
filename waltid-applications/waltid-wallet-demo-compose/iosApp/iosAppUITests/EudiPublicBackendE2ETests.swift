@@ -14,6 +14,22 @@ final class EudiPublicBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90 // 1.5 min - receive/present
     private let verifierPollingTimeout: TimeInterval = 30     // 30 sec - backend verification
 
+    func testBootstrapCreatesDid() async throws {
+        let app = XCUIApplication()
+        let ui = await WalletE2EUI(app: app)
+        await ui.launch()
+
+        let readyStatus = await ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        let didLabel = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "did:")).firstMatch
+        XCTAssertTrue(didLabel.waitForExistence(timeout: 10), "Bootstrapped DID label was not exposed")
+        XCTAssertTrue(didLabel.label.starts(with: "did:"), "DID should start with 'did:', got: \(didLabel.label)")
+    }
+
     func testReceiveAndPresentAgainstEudiPublicBackends() async throws {
         let config = EudiPublicConfig.fromEnvironment()
         let offerURL: String

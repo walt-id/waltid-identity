@@ -147,7 +147,12 @@ private fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiSt
             Column {
                 Text("walt.id Wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 if (state.did.isNotBlank()) {
-                    Text(state.did, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        state.did,
+                        modifier = Modifier.testTag("wallet.did"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             OutlinedButton(onClick = controller::lock) {
