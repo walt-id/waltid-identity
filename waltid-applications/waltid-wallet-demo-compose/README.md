@@ -33,6 +33,7 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 ```
 
 Android E2E scripts live in [androidApp/scripts](androidApp/scripts/README.md).
+Compose iOS E2E tests live in [iosApp/iosAppUITests](iosApp/iosAppUITests).
 
 ## Related modules
 
