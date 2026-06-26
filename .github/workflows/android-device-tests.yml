@@ -45,8 +45,18 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
           script: |
+            set +e
             ./waltid-identity/gradlew -p waltid-identity :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest --info
+            wallet_mobile_status=$?
+
             ./waltid-identity/gradlew -p waltid-identity :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest --info -Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.EudiPublicBackendE2ETest
+            compose_demo_status=$?
+            set -e
+
+            if [ "$wallet_mobile_status" -ne 0 ] || [ "$compose_demo_status" -ne 0 ]; then
+              echo "::error::Android device test failures: wallet-mobile=$wallet_mobile_status compose-demo=$compose_demo_status"
+              exit 1
+            fi
 
       - name: Publish Android device test report
         if: always()
