@@ -82,10 +82,20 @@ Web3 login application. Nuxt.js application demonstrating Web3 wallet-based auth
 
 ### Mobile Applications
 
-### [🟢 waltid-android](./waltid-android)
-Android wallet application. Native Android application demonstrating wallet functionality, credential management, and cryptographic operations on Android.
+### [🟢 waltid-wallet-demo-compose](./waltid-wallet-demo-compose)
+Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates credential issuance, presentation, platform-backed keys, and persistence on Android and iOS. The Web/Wasm module is currently a mock UI preview only.
 
-**Use when:** You need a reference Android wallet implementation, want to understand Android integration patterns, or need a mobile wallet for testing.
+**Use when:** You need the current cross-platform mobile wallet demo, Android or iOS E2E scripts, or a reference for wallet SDK integration in a mobile app.
+
+### [🟢 waltid-wallet-demo-ios](./waltid-wallet-demo-ios)
+Native iOS wallet demo app. SwiftUI application backed by Kotlin Multiplatform wallet SDK components, with iOS Keychain / Secure Enclave-backed keys and E2E scripts for public EUDI and local Enterprise flows.
+
+**Use when:** You need a native iOS wallet SDK reference implementation, iOS-specific integration patterns, or iOS wallet E2E coverage.
+
+### [🟢 waltid-android](./waltid-android)
+Android sample project for key generation, DID creation, signing, and verification. This app is planned for deprecation; use `waltid-wallet-demo-compose` for the current Android wallet issuance/presentation demo.
+
+**Use when:** You need the legacy Android crypto/sample app while it is still available, or you are migrating existing Android sample usage to the Compose wallet demo.
 
 ### Test Applications
 
@@ -117,4 +127,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-

@@ -19,6 +19,8 @@ Use Android Studio for Android application and Android Gradle Plugin work. Intel
 
 Use Xcode for the iOS app and simulator work. Use the command line for CI-like checks.
 
+The Compose demo app's Android and iOS targets are the supported mobile demo targets. Its Web/Wasm module is a mock UI preview only; it does not run the mobile wallet SDK, platform-backed keys, persistence, EUDI flows, or Enterprise flows.
+
 ## Local setup
 
 Start from the repository root:
