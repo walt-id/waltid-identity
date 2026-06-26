@@ -6,14 +6,18 @@ plugins {
 
 group = "id.walt.walletdemo.compose"
 
+val enableMobileWallet = enableAndroidBuild || enableIosBuild
+
 kotlin {
     androidLibrary {
         namespace = "id.walt.walletdemo.compose.logic"
     }
 
-    wasmJs {
-        browser()
-        binaries.executable()
+    if (enableWalletDemoComposeWeb) {
+        wasmJs {
+            browser()
+            binaries.executable()
+        }
     }
 
     sourceSets {
@@ -21,27 +25,31 @@ kotlin {
             implementation(identityLibs.kotlinx.coroutines.core)
         }
 
-        val mobileMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+        if (enableMobileWallet) {
+            val mobileMain by creating {
+                dependsOn(commonMain.get())
+                dependencies {
+                    implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+                }
             }
-        }
 
-        androidMain {
-            dependsOn(mobileMain)
-        }
+            androidMain {
+                dependsOn(mobileMain)
+            }
 
-        androidMain.dependencies {
-            implementation(identityLibs.ktor.client.android)
-        }
+            androidMain.dependencies {
+                implementation(identityLibs.ktor.client.android)
+            }
 
-        iosMain {
-            dependsOn(mobileMain)
-        }
+            if (enableIosBuild) {
+                iosMain {
+                    dependsOn(mobileMain)
+                }
 
-        iosMain.dependencies {
-            implementation(identityLibs.ktor.client.darwin)
+                iosMain.dependencies {
+                    implementation(identityLibs.ktor.client.darwin)
+                }
+            }
         }
 
         commonTest.dependencies {

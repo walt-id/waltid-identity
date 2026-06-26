@@ -14,7 +14,6 @@ plugins {
 
 group = "id.walt.walletdemo.compose"
 
-val enableIosBuild = providers.gradleProperty("enableIosBuild").orNull.toBoolean()
 val isCocoaPodsBuild = providers.gradleProperty("kotlin.native.cocoapods.platform").isPresent
 val enableCocoaPods = enableIosBuild || isCocoaPodsBuild
 
@@ -31,9 +30,11 @@ kotlin {
         }
     }
 
-    wasmJs {
-        browser()
-        binaries.executable()
+    if (enableWalletDemoComposeWeb) {
+        wasmJs {
+            browser()
+            binaries.executable()
+        }
     }
 
     sourceSets {

@@ -29,3 +29,6 @@ val Project.enableAndroidBuild: Boolean
 
 val Project.enableIosBuild: Boolean
     get() = getBooleanProperty("enableIosBuild")
+
+val Project.enableWalletDemoComposeWeb: Boolean
+    get() = getBooleanProperty("enableWalletDemoComposeWeb")

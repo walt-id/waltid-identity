@@ -36,6 +36,7 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installDebug
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:allTests
+./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
 ```
 
 Android E2E scripts live in [androidApp/scripts](androidApp/scripts/README.md).
