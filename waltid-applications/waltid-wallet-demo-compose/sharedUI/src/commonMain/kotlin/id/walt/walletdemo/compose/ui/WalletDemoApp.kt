@@ -9,7 +9,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
 
@@ -29,10 +31,15 @@ fun WalletDemoApp(controller: WalletDemoController) {
                     .fillMaxSize()
                     .safeDrawingPadding(),
             ) {
-                if (state.isUnlocked) {
-                    WalletScreen(controller, state)
-                } else {
-                    PinScreen(controller, state)
+                when (val auth = state.auth) {
+                    is WalletAuthState.Setup,
+                    is WalletAuthState.Login,
+                    -> PinScreen(
+                        controller = controller,
+                        auth = auth,
+                        isBusy = state.isBusy,
+                    )
+                    WalletAuthState.Unlocked -> WalletScreen(controller, state)
                 }
             }
         }

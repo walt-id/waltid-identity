@@ -29,10 +29,11 @@ internal class MobileDemoWallet(
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
-            WalletDemoOperationResult(
-                success = result.success,
-                message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",
-            )
+            if (result.success) {
+                WalletDemoOperationResult.Success("Presentation sent")
+            } else {
+                WalletDemoOperationResult.Failure("Presentation finished without verifier confirmation")
+            }
         }
 }
 

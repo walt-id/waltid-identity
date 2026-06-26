@@ -19,12 +19,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
-import id.walt.walletdemo.compose.logic.WalletDemoPinMode
-import id.walt.walletdemo.compose.logic.WalletDemoUiState
 
 @Composable
-internal fun PinScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+internal fun PinScreen(
+    controller: WalletDemoController,
+    auth: WalletAuthState,
+    isBusy: Boolean,
+) {
+    val setup = auth as? WalletAuthState.Setup
+    val pin = when (auth) {
+        is WalletAuthState.Setup -> auth.pin
+        is WalletAuthState.Login -> auth.pin
+        WalletAuthState.Unlocked -> ""
+    }
+    val error = when (auth) {
+        is WalletAuthState.Setup -> auth.error
+        is WalletAuthState.Login -> auth.error
+        WalletAuthState.Unlocked -> null
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -34,11 +49,11 @@ internal fun PinScreen(controller: WalletDemoController, state: WalletDemoUiStat
         Spacer(Modifier.height(12.dp))
         Text("walt.id Wallet", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Text(
-            if (state.pinMode == WalletDemoPinMode.Setup) "Create a PIN" else "Enter your PIN",
+            if (setup != null) "Create a PIN" else "Enter your PIN",
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            if (state.pinMode == WalletDemoPinMode.Setup) {
+            if (setup != null) {
                 "Use 4 to 8 digits for this local demo unlock flow."
             } else {
                 "Unlock the local demo wallet."
@@ -48,26 +63,26 @@ internal fun PinScreen(controller: WalletDemoController, state: WalletDemoUiStat
         )
 
         OutlinedTextField(
-            value = state.pin,
+            value = pin,
             onValueChange = controller::updatePin,
             label = { Text("PIN") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-            isError = state.pinError != null,
+            isError = error != null,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("wallet.pinInput"),
             singleLine = true,
         )
 
-        if (state.pinMode == WalletDemoPinMode.Setup) {
+        if (setup != null) {
             OutlinedTextField(
-                value = state.pinConfirmation,
+                value = setup.confirmation,
                 onValueChange = controller::updatePinConfirmation,
                 label = { Text("Confirm PIN") },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-                isError = state.pinError != null,
+                isError = error != null,
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("wallet.pinConfirmationInput"),
@@ -75,18 +90,18 @@ internal fun PinScreen(controller: WalletDemoController, state: WalletDemoUiStat
             )
         }
 
-        state.pinError?.let { error ->
+        error?.let { error ->
             Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
 
         Button(
             onClick = controller::submitPin,
-            enabled = !state.isBusy,
+            enabled = !isBusy,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("wallet.pinSubmitButton"),
         ) {
-            Text(if (state.pinMode == WalletDemoPinMode.Setup) "Set PIN" else "Unlock")
+            Text(if (setup != null) "Set PIN" else "Unlock")
         }
     }
 }

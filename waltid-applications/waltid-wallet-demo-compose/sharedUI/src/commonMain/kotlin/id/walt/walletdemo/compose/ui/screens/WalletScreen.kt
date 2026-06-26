@@ -19,12 +19,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.components.CredentialCard
 import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+    val ready = state.session as? WalletSessionState.Ready
+    val requestDrafts = state.requestDrafts
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -38,9 +43,9 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         ) {
             Column {
                 Text("walt.id Wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (state.did.isNotBlank()) {
+                if (ready != null && ready.did.isNotBlank()) {
                     Text(
-                        state.did,
+                        ready.did,
                         modifier = Modifier.testTag("wallet.did"),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -57,12 +62,12 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         HorizontalDivider()
         UrlActionSection(
             title = "Receive",
-            value = state.offerUrl,
+            value = requestDrafts.offerUrl,
             onValueChange = controller::updateOfferUrl,
             label = "Credential offer URL",
             buttonText = "Receive",
-            enabled = state.isReady &&
-                state.offerUrl.isNotBlank() &&
+            enabled = ready != null &&
+                requestDrafts.offerUrl.isNotBlank() &&
                 !state.isBusy,
             inputTestTag = "wallet.offerInput",
             buttonTestTag = "wallet.receiveButton",
@@ -72,13 +77,13 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         HorizontalDivider()
         UrlActionSection(
             title = "Present",
-            value = state.presentationRequestUrl,
+            value = requestDrafts.presentationRequestUrl,
             onValueChange = controller::updatePresentationRequestUrl,
             label = "OpenID4VP request URL",
             buttonText = "Present",
-            enabled = state.isReady &&
-                state.presentationRequestUrl.isNotBlank() &&
-                state.credentials.isNotEmpty() &&
+            enabled = ready != null &&
+                requestDrafts.presentationRequestUrl.isNotBlank() &&
+                ready.credentials.isNotEmpty() &&
                 !state.isBusy,
             inputTestTag = "wallet.presentationInput",
             buttonTestTag = "wallet.presentButton",
@@ -87,10 +92,11 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
 
         HorizontalDivider()
         Text("Credentials", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        if (state.credentials.isEmpty()) {
+        val credentials = ready?.credentials.orEmpty()
+        if (credentials.isEmpty()) {
             Text("No credentials", color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
-            state.credentials.forEach { credential ->
+            credentials.forEach { credential ->
                 CredentialCard(credential)
             }
         }

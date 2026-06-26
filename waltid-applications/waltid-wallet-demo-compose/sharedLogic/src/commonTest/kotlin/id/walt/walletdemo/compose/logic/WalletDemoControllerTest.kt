@@ -6,7 +6,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -20,8 +19,9 @@ class WalletDemoControllerTest {
         controller.updatePinConfirmation("12a4")
         controller.submitPin()
 
-        assertFalse(controller.state.value.isUnlocked)
-        assertEquals("PIN must contain 4 to 8 digits", controller.state.value.pinError)
+        val auth = controller.state.value.auth as WalletAuthState.Setup
+        assertEquals("PIN must contain 4 to 8 digits", auth.error)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
     @Test
@@ -32,8 +32,9 @@ class WalletDemoControllerTest {
         controller.updatePinConfirmation("4321")
         controller.submitPin()
 
-        assertFalse(controller.state.value.isUnlocked)
-        assertEquals("PIN confirmation does not match", controller.state.value.pinError)
+        val auth = controller.state.value.auth as WalletAuthState.Setup
+        assertEquals("PIN confirmation does not match", auth.error)
+        assertTrue(controller.state.value.session is WalletSessionState.NotBootstrapped)
     }
 
     @Test
@@ -47,11 +48,11 @@ class WalletDemoControllerTest {
         runCurrent()
 
         val state = controller.state.value
-        assertTrue(state.isUnlocked)
-        assertTrue(state.isReady)
-        assertEquals("Wallet ready", state.status)
-        assertEquals("did:key:test", state.did)
-        assertEquals(listOf(sampleCredential), state.credentials)
+        assertTrue(state.auth is WalletAuthState.Unlocked)
+        val session = state.session as WalletSessionState.Ready
+        assertEquals("Wallet ready", state.statusText)
+        assertEquals("did:key:test", session.did)
+        assertEquals(listOf(sampleCredential), session.credentials)
         assertEquals(1, wallet.bootstrapCalls)
     }
 
@@ -63,8 +64,9 @@ class WalletDemoControllerTest {
         controller.updatePin("9999")
         controller.submitPin()
 
-        assertFalse(controller.state.value.isUnlocked)
-        assertEquals("Wrong PIN", controller.state.value.pinError)
+        val auth = controller.state.value.auth as WalletAuthState.Login
+        assertEquals("Wrong PIN", auth.error)
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
     }
 
     @Test
@@ -78,8 +80,8 @@ class WalletDemoControllerTest {
         controller.submitPin()
         runCurrent()
 
-        assertTrue(controller.state.value.isUnlocked)
-        assertTrue(controller.state.value.isReady)
+        assertTrue(controller.state.value.auth is WalletAuthState.Unlocked)
+        assertTrue(controller.state.value.session is WalletSessionState.Ready)
         assertEquals(1, wallet.bootstrapCalls)
     }
 
@@ -94,8 +96,10 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
-        assertEquals("Received 2 credential(s)", controller.state.value.status)
-        assertEquals(listOf(sampleCredential), controller.state.value.credentials)
+        assertEquals(WalletOperationState.Succeeded("Received 2 credential(s)"), controller.state.value.operation)
+        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
+        val session = controller.state.value.session as WalletSessionState.Ready
+        assertEquals(listOf(sampleCredential), session.credentials)
     }
 
     @Test
@@ -108,12 +112,12 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals(null, wallet.receivedOfferUrl)
-        assertEquals("Wallet ready", controller.state.value.status)
+        assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
     @Test
     fun presentUpdatesStatusOnSuccess() = runTest {
-        val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"))
+        val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult.Success("Presentation sent"))
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updatePresentationRequestUrl("openid4vp://example")
@@ -121,7 +125,8 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals("openid4vp://example", wallet.presentedRequestUrl)
-        assertEquals("Presentation sent", controller.state.value.status)
+        assertEquals(WalletOperationState.Succeeded("Presentation sent"), controller.state.value.operation)
+        assertEquals("Presentation sent", controller.state.value.statusText)
     }
 
     @Test
@@ -134,7 +139,7 @@ class WalletDemoControllerTest {
         runCurrent()
 
         assertEquals(null, wallet.presentedRequestUrl)
-        assertEquals("Wallet ready", controller.state.value.status)
+        assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
     @Test
@@ -147,8 +152,8 @@ class WalletDemoControllerTest {
         controller.handleDeepLink(presentationUrl)
         controller.handleDeepLink("https://example.com/ignored")
 
-        assertEquals(offerUrl, controller.state.value.offerUrl)
-        assertEquals(presentationUrl, controller.state.value.presentationRequestUrl)
+        assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
+        assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
     }
 
     private fun controllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController =
@@ -181,7 +186,7 @@ class WalletDemoControllerTest {
 private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
-    private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
+    private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null

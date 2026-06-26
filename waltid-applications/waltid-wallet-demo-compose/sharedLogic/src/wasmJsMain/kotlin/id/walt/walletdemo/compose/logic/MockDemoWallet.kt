@@ -27,5 +27,5 @@ private class MockDemoWallet : DemoWallet {
     }
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
-        WalletDemoOperationResult(success = true, message = "Mock presentation sent")
+        WalletDemoOperationResult.Success("Mock presentation sent")
 }

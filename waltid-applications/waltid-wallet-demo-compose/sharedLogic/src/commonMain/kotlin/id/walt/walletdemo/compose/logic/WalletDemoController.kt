@@ -20,47 +20,53 @@ class WalletDemoController(
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
 
     fun updatePin(value: String) {
-        _state.update { it.copy(pin = value, pinError = null) }
+        _state.update { state ->
+            when (val auth = state.auth) {
+                is WalletAuthState.Setup -> state.copy(auth = auth.copy(pin = value, error = null))
+                is WalletAuthState.Login -> state.copy(auth = auth.copy(pin = value, error = null))
+                WalletAuthState.Unlocked -> state
+            }
+        }
     }
 
     fun updatePinConfirmation(value: String) {
-        _state.update { it.copy(pinConfirmation = value, pinError = null) }
+        _state.update { state ->
+            when (val auth = state.auth) {
+                is WalletAuthState.Setup -> state.copy(auth = auth.copy(confirmation = value, error = null))
+                is WalletAuthState.Login,
+                WalletAuthState.Unlocked,
+                -> state
+            }
+        }
     }
 
     fun submitPin() {
-        val current = _state.value
-        val pin = current.pin
-
-        if (!pin.matches(Regex("\\d{4,8}"))) {
-            _state.update { it.copy(pinError = "PIN must contain 4 to 8 digits") }
-            return
-        }
-
-        when (current.pinMode) {
-            WalletDemoPinMode.Setup -> setupPin(pin, current.pinConfirmation)
-            WalletDemoPinMode.Login -> unlockWithPin(pin)
+        when (val auth = _state.value.auth) {
+            is WalletAuthState.Setup -> submitSetupPin(auth)
+            is WalletAuthState.Login -> submitLoginPin(auth)
+            WalletAuthState.Unlocked -> Unit
         }
     }
 
     fun lock() {
         _state.update {
             it.copy(
-                pinMode = WalletDemoPinMode.Login,
-                isUnlocked = false,
-                pin = "",
-                pinConfirmation = "",
-                pinError = null,
-                status = "Enter PIN to unlock the wallet",
+                auth = WalletAuthState.Login(),
+                operation = WalletOperationState.Idle,
             )
         }
     }
 
     fun updateOfferUrl(value: String) {
-        _state.update { it.copy(offerUrl = value) }
+        _state.update {
+            it.copy(requestDrafts = it.requestDrafts.copy(offerUrl = value))
+        }
     }
 
     fun updatePresentationRequestUrl(value: String) {
-        _state.update { it.copy(presentationRequestUrl = value) }
+        _state.update {
+            it.copy(requestDrafts = it.requestDrafts.copy(presentationRequestUrl = value))
+        }
     }
 
     fun handleDeepLink(url: String) {
@@ -71,11 +77,13 @@ class WalletDemoController(
     }
 
     fun receive() {
-        val offerUrl = _state.value.offerUrl.trim()
+        val current = _state.value
+        val ready = current.session as? WalletSessionState.Ready ?: return
+        val offerUrl = current.requestDrafts.offerUrl.trim()
         if (offerUrl.isBlank()) return
 
         scope.launch(dispatcher) {
-            _state.update { it.copy(isBusy = true, isError = false, status = "Receiving credential...") }
+            _state.update { it.copy(operation = WalletOperationState.Receiving) }
             runCatching {
                 val ids = wallet.receive(offerUrl)
                 val credentials = wallet.listCredentials()
@@ -83,81 +91,88 @@ class WalletDemoController(
             }.onSuccess { (ids, credentials) ->
                 _state.update {
                     it.copy(
-                        isBusy = false,
-                        isError = false,
-                        status = "Received ${ids.size} credential(s)",
-                        credentials = credentials,
+                        session = ready.copy(credentials = credentials),
+                        operation = WalletOperationState.Succeeded("Received ${ids.size} credential(s)"),
                     )
                 }
             }.onFailure { error ->
-                setError("Receive failed", error)
+                setOperationError("Receive failed", error)
             }
         }
     }
 
     fun present() {
-        val requestUrl = _state.value.presentationRequestUrl.trim()
+        val current = _state.value
+        val ready = current.session as? WalletSessionState.Ready ?: return
+        val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
         if (requestUrl.isBlank()) return
 
         scope.launch(dispatcher) {
-            _state.update { it.copy(isBusy = true, isError = false, status = "Presenting credential...") }
+            _state.update { it.copy(operation = WalletOperationState.Presenting) }
             runCatching {
-                wallet.present(requestUrl, _state.value.did.takeIf { it.isNotBlank() })
+                wallet.present(requestUrl, ready.did)
             }.onSuccess { result ->
                 _state.update {
                     it.copy(
-                        isBusy = false,
-                        isError = !result.success,
-                        status = result.message,
+                        operation = when (result) {
+                            is WalletDemoOperationResult.Success -> WalletOperationState.Succeeded(result.message)
+                            is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(result.message)
+                        },
                     )
                 }
             }.onFailure { error ->
-                setError("Present failed", error)
+                setOperationError("Present failed", error)
             }
         }
     }
 
-    private fun setupPin(pin: String, confirmation: String) {
-        if (pin != confirmation) {
-            _state.update { it.copy(pinError = "PIN confirmation does not match") }
+    private fun submitSetupPin(auth: WalletAuthState.Setup) {
+        val pin = auth.pin
+        if (!isValidPin(pin)) {
+            setSetupPinError("PIN must contain 4 to 8 digits")
+            return
+        }
+
+        if (pin != auth.confirmation) {
+            setSetupPinError("PIN confirmation does not match")
             return
         }
 
         configuredPin = pin
-        _state.update {
-            it.copy(
-                pinMode = WalletDemoPinMode.Login,
-                isUnlocked = true,
-                pin = "",
-                pinConfirmation = "",
-                pinError = null,
-            )
-        }
+        _state.update { it.copy(auth = WalletAuthState.Unlocked) }
         bootstrapIfNeeded()
     }
 
-    private fun unlockWithPin(pin: String) {
-        if (configuredPin != pin) {
-            _state.update { it.copy(pinError = "Wrong PIN") }
+    private fun submitLoginPin(auth: WalletAuthState.Login) {
+        val pin = auth.pin
+        if (!isValidPin(pin)) {
+            setLoginPinError("PIN must contain 4 to 8 digits")
             return
         }
 
-        _state.update {
-            it.copy(
-                isUnlocked = true,
-                pin = "",
-                pinConfirmation = "",
-                pinError = null,
-            )
+        if (configuredPin != pin) {
+            setLoginPinError("Wrong PIN")
+            return
         }
+
+        _state.update { it.copy(auth = WalletAuthState.Unlocked) }
         bootstrapIfNeeded()
     }
 
     private fun bootstrapIfNeeded() {
-        if (_state.value.isReady) return
+        if (_state.value.session is WalletSessionState.Ready ||
+            _state.value.session is WalletSessionState.Bootstrapping
+        ) {
+            return
+        }
 
         scope.launch(dispatcher) {
-            _state.update { it.copy(isBusy = true, isError = false, status = "Bootstrapping wallet...") }
+            _state.update {
+                it.copy(
+                    session = WalletSessionState.Bootstrapping,
+                    operation = WalletOperationState.Idle,
+                )
+            }
             runCatching {
                 val result = wallet.bootstrap()
                 val credentials = wallet.listCredentials()
@@ -165,27 +180,50 @@ class WalletDemoController(
             }.onSuccess { (result, credentials) ->
                 _state.update {
                     it.copy(
-                        isReady = true,
-                        isBusy = false,
-                        isError = false,
-                        status = "Wallet ready",
-                        did = result.did,
-                        credentials = credentials,
+                        session = WalletSessionState.Ready(
+                            did = result.did,
+                            credentials = credentials,
+                        ),
+                        operation = WalletOperationState.Idle,
                     )
                 }
             }.onFailure { error ->
-                setError("Bootstrap failed", error)
+                _state.update {
+                    it.copy(
+                        session = WalletSessionState.Failed(errorMessage("Bootstrap failed", error)),
+                        operation = WalletOperationState.Idle,
+                    )
+                }
             }
         }
     }
 
-    private fun setError(prefix: String, error: Throwable) {
-        _state.update {
-            it.copy(
-                isBusy = false,
-                isError = true,
-                status = "$prefix: ${error.message ?: error::class.simpleName ?: "Unexpected error"}",
-            )
+    private fun setSetupPinError(message: String) {
+        _state.update { state ->
+            val auth = state.auth as? WalletAuthState.Setup ?: return@update state
+            state.copy(auth = auth.copy(error = message))
         }
+    }
+
+    private fun setLoginPinError(message: String) {
+        _state.update { state ->
+            val auth = state.auth as? WalletAuthState.Login ?: return@update state
+            state.copy(auth = auth.copy(error = message))
+        }
+    }
+
+    private fun setOperationError(prefix: String, error: Throwable) {
+        _state.update {
+            it.copy(operation = WalletOperationState.Failed(errorMessage(prefix, error)))
+        }
+    }
+
+    private fun errorMessage(prefix: String, error: Throwable): String =
+        "$prefix: ${error.message ?: error::class.simpleName ?: "Unexpected error"}"
+
+    private companion object {
+        val pinPattern = Regex("\\d{4,8}")
+
+        fun isValidPin(pin: String): Boolean = pin.matches(pinPattern)
     }
 }

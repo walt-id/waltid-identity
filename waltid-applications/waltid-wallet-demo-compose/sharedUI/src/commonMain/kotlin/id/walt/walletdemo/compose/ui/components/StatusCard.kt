@@ -12,6 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.isError
+import id.walt.walletdemo.compose.logic.statusText
 
 @Composable
 internal fun StatusCard(state: WalletDemoUiState) {
@@ -30,7 +33,7 @@ internal fun StatusCard(state: WalletDemoUiState) {
         colors = CardDefaults.cardColors(containerColor = containerColor, contentColor = contentColor),
     ) {
         Text(
-            text = state.status,
+            text = state.statusText,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)

@@ -19,6 +19,8 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.logic.statusText
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
@@ -32,7 +34,7 @@ class WalletDemoAppTestScenarios {
 
         unlockWithPin()
 
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.isReady }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
@@ -44,13 +46,13 @@ class WalletDemoAppTestScenarios {
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.isReady }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         wallet.credentials = listOf(sampleCredential)
         onNodeWithTag("wallet.offerInput").performScrollTo().performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.status.startsWith("Received") }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.status").assertTextContains("Received 2 credential(s)")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
         assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
@@ -59,18 +61,18 @@ class WalletDemoAppTestScenarios {
     fun presentFlowUpdatesStatus() = runComposeUiTest {
         val wallet = FakeDemoWallet(
             credentials = listOf(sampleCredential),
-            presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
+            presentationResult = WalletDemoOperationResult.Success("Presentation sent"),
         )
         val controller = WalletDemoController(wallet)
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.isReady }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag("wallet.presentationInput").performScrollTo().performTextInput("openid4vp://example")
         onNodeWithTag("wallet.presentButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.status == "Presentation sent" }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
         assertEquals("openid4vp://example", wallet.presentedRequestUrl)
     }
@@ -80,20 +82,20 @@ class WalletDemoAppTestScenarios {
         val requestUrl = "openid4vp://example"
         val wallet = FakeDemoWallet(
             credentialsAfterReceive = listOf(sampleCredential),
-            presentationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
+            presentationResult = WalletDemoOperationResult.Success("Presentation sent"),
         )
         val controller = WalletDemoController(wallet)
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.isReady }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         controller.handleDeepLink(offerUrl)
         waitForIdle()
         onNodeWithTag("wallet.offerInput").performScrollTo().assertTextContains(offerUrl)
 
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.status.startsWith("Received") }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
 
@@ -102,7 +104,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentationInput").performScrollTo().assertTextContains(requestUrl)
 
         onNodeWithTag("wallet.presentButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.status == "Presentation sent" }
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
         assertEquals(offerUrl, wallet.receivedOfferUrl)
         assertEquals(requestUrl, wallet.presentedRequestUrl)
@@ -115,18 +117,18 @@ class WalletDemoAppTestScenarios {
 
         setContent { WalletDemoApp(activeController) }
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { firstController.state.value.isReady }
+        waitUntil(timeoutMillis = 5_000) { firstController.state.value.session is WalletSessionState.Ready }
 
         firstController.handleDeepLink("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { firstController.state.value.status.startsWith("Received") }
+        waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
 
         val recreatedController = WalletDemoController(wallet)
         activeController = recreatedController
         waitForIdle()
         unlockWithPin()
-        waitUntil(timeoutMillis = 5_000) { recreatedController.state.value.isReady }
+        waitUntil(timeoutMillis = 5_000) { recreatedController.state.value.session is WalletSessionState.Ready }
 
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
         assertEquals(2, wallet.bootstrapCalls)
@@ -155,7 +157,7 @@ private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val credentialsAfterReceive: List<WalletDemoCredential>? = null,
-    private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult(success = true, message = "Presentation sent"),
+    private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
