@@ -28,6 +28,9 @@ struct LocalEnterpriseConfig {
             fatalError("Invalid HOST_ALIAS_DOMAIN: \(hostAliasDomain)")
         }
 
+        let attested = (env["E2E_ATTESTED"] ?? "false").lowercased() == "true"
+        let defaultIssuerProfile = attested ? "issuer2.mdl-profile" : "issuer2-noattest.mdl-profile"
+
         return LocalEnterpriseConfig(
             hostAliasDomain: hostAliasDomain,
             apiBaseURL: apiBaseURL,
@@ -36,7 +39,7 @@ struct LocalEnterpriseConfig {
             adminPassword: env["E2E_ADMIN_PASSWORD"] ?? "admin123456",
             organization: env["E2E_ORGANIZATION"] ?? "waltid",
             tenant: env["E2E_TENANT"] ?? "waltid-tenant01",
-            issuerProfile: env["E2E_ISSUER_PROFILE"] ?? "issuer2.mdl-profile",
+            issuerProfile: env["E2E_ISSUER_PROFILE"] ?? defaultIssuerProfile,
             verifier: env["E2E_VERIFIER"] ?? "verifier2"
         )
     }

@@ -62,13 +62,8 @@ Public EUDI and local Enterprise E2E scripts live under:
 
 ```text
 waltid-applications/waltid-wallet-demo-compose/androidApp/scripts/
+waltid-applications/waltid-wallet-demo-compose/iosApp/scripts/
 waltid-applications/waltid-wallet-demo-ios/scripts/
-```
-
-Compose iOS app E2E tests live under:
-
-```text
-waltid-applications/waltid-wallet-demo-compose/iosApp/iosAppUITests/
 ```
 
 Local Enterprise E2E requires a running Enterprise stack and `HOST_ALIAS_DOMAIN` in each platform's `scripts/e2e.env`. Android emulator verifier callbacks also require:
