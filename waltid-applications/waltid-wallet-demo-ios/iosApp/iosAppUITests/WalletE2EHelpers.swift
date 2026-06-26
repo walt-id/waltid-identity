@@ -124,8 +124,32 @@ final class WalletE2EUI {
         return nil
     }
 
+    func textInput(identifier: String, fallbackLabel: String) -> XCUIElement {
+        firstExisting([
+            app.textFields[identifier],
+            app.secureTextFields[identifier],
+            app.textViews[identifier],
+            app.textFields[fallbackLabel],
+            app.secureTextFields[fallbackLabel],
+            app.textViews[fallbackLabel],
+        ])
+    }
+
+    func tapButton(identifier: String, fallbackLabel: String) {
+        let button = firstExisting([
+            app.buttons[identifier],
+            app.buttons[fallbackLabel],
+        ])
+        XCTAssertTrue(button.waitForExistence(timeout: 20), "Button not found: \(identifier)")
+        makeHittable(button)
+        XCTAssertTrue(button.isHittable, "Button is not hittable: \(identifier)")
+        button.tap()
+    }
+
     func replaceText(in element: XCUIElement, value: String) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
+        makeHittable(element)
+        XCTAssertTrue(element.isHittable, "Input element is not hittable")
         element.tap()
 
         if let currentValue = element.value as? String {
@@ -136,5 +160,23 @@ final class WalletE2EUI {
         }
 
         element.typeText(value)
+    }
+
+    private func makeHittable(_ element: XCUIElement) {
+        guard element.exists, !element.isHittable else {
+            return
+        }
+
+        for _ in 0..<8 where !element.isHittable {
+            app.swipeUp()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+    }
+
+    private func firstExisting(_ elements: [XCUIElement]) -> XCUIElement {
+        for element in elements where element.exists {
+            return element
+        }
+        return elements[0]
     }
 }

@@ -34,9 +34,9 @@ final class EudiPublicBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
-        let offerInput = app.textFields["wallet.offerInput"]
+        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         await ui.replaceText(in: offerInput, value: offerURL)
-        app.buttons["wallet.receiveButton"].tap()
+        await ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
         let receiveStatus = await ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
@@ -45,9 +45,9 @@ final class EudiPublicBackendE2ETests: XCTestCase {
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
         let verifier = try await createVerifierTransaction(credentialID: config.credentialID)
-        let presentInput = app.textFields["wallet.presentationInput"]
+        let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         await ui.replaceText(in: presentInput, value: verifier.authorizationRequestURI)
-        app.buttons["wallet.presentButton"].tap()
+        await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
         let presentStatus = await ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
