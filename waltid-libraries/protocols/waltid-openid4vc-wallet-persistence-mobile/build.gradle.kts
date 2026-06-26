@@ -6,14 +6,6 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    android {
-        namespace = "id.walt.wallet2.persistence"
-
-        if (enableAndroidBuild) {
-            withHostTestBuilder {}
-        }
-    }
-
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))

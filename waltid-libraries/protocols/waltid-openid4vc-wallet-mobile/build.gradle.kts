@@ -5,23 +5,6 @@ plugins {
 group = "id.walt.protocols"
 
 kotlin {
-    android {
-        namespace = "id.walt.wallet2.mobile"
-
-        withHostTestBuilder {}
-
-        withDeviceTestBuilder {
-            sourceSetTreeName = "androidDeviceTest"
-        }.configure {
-            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-            packaging {
-                resources.excludes.add("META-INF/DEPENDENCIES")
-                resources.excludes.add("META-INF/LICENSE.md")
-                resources.excludes.add("META-INF/NOTICE.md")
-            }
-        }
-    }
-
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
