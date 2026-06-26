@@ -2,6 +2,7 @@
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandler
+import id.walt.openid4vci.DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.ResponseType
@@ -28,7 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  */
 class AuthorizationCodeAuthorizationEndpoint(
     private val codeRepository: AuthorizationCodeRepository,
-    private val codeLifetimeSeconds: Long = 300,
+    private val codeLifetimeSeconds: Long = DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS,
     private val maxGenerateAttempts: Int = 3,
 ) : AuthorizationEndpointHandler {
 

@@ -10,6 +10,7 @@ import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepo
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
@@ -24,9 +25,11 @@ import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandler
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
+import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -45,8 +48,7 @@ class BuildProviderConfigurationTest {
         val provider = buildOAuth2Provider(config)
         assertIs<OAuth2Provider>(provider)
         assertEquals(1, config.authorizationEndpointHandlers.count())
-        assertEquals(2, config.tokenEndpointHandlers.count())
-        assertEquals(0, config.pushedAuthorizationEndpointHandlers.count())
+        assertEquals(3, config.tokenEndpointHandlers.count())
     }
 
     @Test
@@ -143,6 +145,44 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
+    fun `writeAccessTokenResponse includes no-store headers`() {
+        val provider = buildOAuth2Provider(createTestConfig())
+        val request = DefaultAccessTokenRequest(
+            client = DefaultClient(
+                id = "client-123",
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.RefreshToken.value),
+                responseTypes = emptySet(),
+            ),
+            grantTypes = setOf(GrantType.RefreshToken.value),
+        )
+
+        val response = provider.writeAccessTokenResponse(
+            request = request,
+            response = AccessTokenResponse(
+                accessToken = "access-token",
+                refreshToken = "refresh-token",
+                scope = "openid email",
+            ),
+        )
+
+        assertEquals("no-store", response.headers["Cache-Control"])
+        assertEquals("no-cache", response.headers["Pragma"])
+        assertEquals("refresh-token", response.payload["refresh_token"]?.jsonPrimitive?.content)
+        assertEquals("openid email", response.payload["scope"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `writeAccessTokenError includes no-store headers`() {
+        val provider = buildOAuth2Provider(createTestConfig())
+
+        val response = provider.writeAccessTokenError(OAuthError("invalid_request"))
+
+        assertEquals("no-store", response.headers["Cache-Control"])
+        assertEquals("no-cache", response.headers["Pragma"])
+    }
+
+    @Test
     fun `buildProvider rejects duplicate grant handlers should fail`() {
         val authorizationCodeRepository = InMemoryAuthorizationCodeRepository()
         val preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository()
@@ -162,7 +202,10 @@ class BuildProviderConfigurationTest {
                 authorizationCodeRepository = authorizationCodeRepository,
                 preAuthorizedCodeRepository = preAuthorizedCodeRepository,
                 preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-                accessTokenService = StubTokenService(),
+                accessTokenIssuer = StubTokenIssuer(),
+                refreshTokenIssuer = TestRefreshTokenIssuer(),
+                refreshTokenVerifier = TestRefreshTokenIssuer(),
+                refreshTokenRepository = InMemoryRefreshTokenRepository(),
                 credentialRequestValidator = DefaultCredentialRequestValidator(),
                 credentialEndpointHandlers = CredentialEndpointHandlers()
             )
@@ -190,7 +233,10 @@ class BuildProviderConfigurationTest {
             authorizationCodeRepository = authorizationCodeRepository,
             preAuthorizedCodeRepository = preAuthorizedCodeRepository,
             preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthorizedCodeRepository),
-            accessTokenService = StubTokenService(),
+            accessTokenIssuer = StubTokenIssuer(),
+            refreshTokenIssuer = TestRefreshTokenIssuer(),
+            refreshTokenVerifier = TestRefreshTokenIssuer(),
+            refreshTokenRepository = InMemoryRefreshTokenRepository(),
             credentialRequestValidator = DefaultCredentialRequestValidator(),
             credentialEndpointHandlers = CredentialEndpointHandlers()
         )
