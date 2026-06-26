@@ -114,7 +114,7 @@ class EnterpriseIntegrationTest {
 
 **Note:** iOS XCTest targets do not import this Kotlin module directly. They use
 the **TestHelpers** fixtures located in
-`waltid-applications/waltid-wallet-demo-ios/iosApp/TestHelpers/`. Keep backend
+`waltid-applications/mobile-e2e-fixtures/ios/TestHelpers/`. Keep backend
 payloads and method semantics aligned between this module and `TestHelpers`
 when adding WAL-1097-style E2E flows.
 
