@@ -127,6 +127,7 @@ runs:
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
+          -parallel-testing-enabled NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
     - name: Build shared framework for Compose iOS app (CocoaPods location)
@@ -161,6 +162,7 @@ runs:
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
+          -parallel-testing-enabled NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
     - name: Collect iOS test reports
