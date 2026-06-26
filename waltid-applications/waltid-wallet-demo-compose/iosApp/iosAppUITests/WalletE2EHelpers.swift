@@ -91,17 +91,14 @@ final class WalletE2EUI {
     }
 
     func tapButton(identifier: String, fallbackLabel: String) {
-        let button = firstExisting([
-            app.buttons[identifier],
-            app.buttons[fallbackLabel],
-        ])
-        XCTAssertTrue(button.waitForExistence(timeout: 20), "Button not found: \(identifier)")
-        makeHittable(button)
-        XCTAssertTrue(button.isHittable, "Button is not hittable: \(identifier)")
-        button.tap()
+        let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
+        XCTAssertTrue(targetButton.waitForExistence(timeout: 20), "Button not found: \(identifier)")
+        makeHittable(targetButton)
+        XCTAssertTrue(targetButton.isHittable, "Button is not hittable: \(identifier)")
+        targetButton.tap()
     }
 
-    func replaceText(in element: XCUIElement, value: String) {
+    private func replaceText(in element: XCUIElement, value: String) {
         XCTAssertTrue(element.waitForExistence(timeout: 20), "Input element not found")
         makeHittable(element)
         XCTAssertTrue(element.isHittable, "Input element is not hittable")

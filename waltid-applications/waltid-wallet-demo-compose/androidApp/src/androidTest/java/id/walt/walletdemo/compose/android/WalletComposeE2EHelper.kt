@@ -70,12 +70,6 @@ internal object WalletComposeE2EHelper {
         context.startActivity(intent)
     }
 
-    fun setText(device: UiDevice, tag: String, value: String) {
-        val field = waitForResource(device, tag, UI_ELEMENT_TIMEOUT)
-        assertNotNull("$tag not found", field)
-        field!!.setText(value)
-    }
-
     fun clickByTag(device: UiDevice, tag: String) {
         val node = waitForResource(device, tag, UI_ELEMENT_TIMEOUT)
         assertNotNull("$tag not found", node)
