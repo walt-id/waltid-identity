@@ -42,9 +42,9 @@
 		C0DE00000000000000000002 /* EudiPublicBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiPublicBackendE2ETests.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000004 /* iosAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		C0DE00000000000000000005 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiOfferFlow.swift; sourceTree = "<group>"; };
-		C0DE00000000000000000006 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestHelpers.swift; sourceTree = "<group>"; };
-		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EClient.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000005 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EudiOfferFlow.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/EudiOfferFlow.swift"; sourceTree = "<group>"; };
+		C0DE00000000000000000006 /* TestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = TestHelpers.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/TestHelpers.swift"; sourceTree = "<group>"; };
+		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletE2EClient.swift; path = "../../../waltid-wallet-demo-ios/iosApp/TestHelpers/WalletE2EClient.swift"; sourceTree = "<group>"; };
 		D6B7A3532FD94CC5009C69E7 /* sharedUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = sharedUI.framework; path = ../sharedUI/build/cocoapods/framework/sharedUI.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
