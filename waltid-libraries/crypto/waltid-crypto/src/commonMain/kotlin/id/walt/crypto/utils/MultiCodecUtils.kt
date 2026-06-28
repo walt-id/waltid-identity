@@ -25,7 +25,7 @@ object MultiCodecUtils {
         KeyType.secp256r1 -> 0x1200u
         KeyType.secp384r1 -> 0x1201u
         KeyType.secp521r1 -> 0x1202u
-        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 -> 0x1205u
+        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096, KeyType.RSA6144 -> 0x1205u
     }
 
     fun getKeyTypeFromKeyCode(code: UInt): KeyType = when (code) {

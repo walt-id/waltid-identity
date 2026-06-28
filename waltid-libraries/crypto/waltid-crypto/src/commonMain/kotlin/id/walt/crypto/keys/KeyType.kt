@@ -51,22 +51,31 @@ enum class KeyType(val jwsAlg: String, val jwkKty: String, val jwkCurve: String?
     // WARNING: do not remove this enum name. There might be old keys existing with it.
     RSA(jwsAlg = "RS256", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.11"),
     RSA3072(jwsAlg = "RS384", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.12"),
-    RSA4096(jwsAlg = "RS512", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.13")
+    RSA4096(jwsAlg = "RS512", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.13"),
+    RSA6144(jwsAlg = "RS512", jwkKty = "RSA", jwkCurve = null, oid = "1.2.840.113549.1.1.13") // RSA 6144 estimate strength is 176bits, SHA512 ~256bits
 
     // TODO: Ed448(jwsAlg = "Ed448", oid = null)
     // TODO: X25519(jwsAlg = "X25519", oid = null)
     // TODO: X448(jwsAlg = "X448", oid = null)
 }
 
+
 object KeyTypes {
     val EC_KEYS = KeyType.entries.filter { it.jwkKty == "EC" }
     val RSA_KEYS = KeyType.entries.filter { it.jwkKty == "RSA" }
 
-    /** kty -> crv mapping */
-    val JWK_MAPPING = KeyType.entries.associateBy { it.jwkKty to it.jwkCurve }
+    /** (kty, crv) mapping for key types that are uniquely identifiable via JWK metadata. */
+    val JWK_MAPPING = KeyType.entries
+        .filterNot { it.jwkKty == "RSA" }
+        .associateBy { it.jwkKty to it.jwkCurve }
 
+    /**
+     * Resolves key type from JWK kty/crv metadata only.
+     * RSA sizes cannot be distinguished this way, so RSA defaults to KeyType.RSA.
+     */
     fun getKeyTypeByJwkId(jwkKty: String, jwkCrv: String?): KeyType =
         when (jwkKty) {
+            "RSA" -> KeyType.RSA
             "EC" if jwkCrv == "P-256K" -> KeyType.secp256k1
             else -> JWK_MAPPING[jwkKty to jwkCrv]
                 ?: throw IllegalArgumentException("Unknown JWK combination: kty=$jwkKty, crv=$jwkCrv")
