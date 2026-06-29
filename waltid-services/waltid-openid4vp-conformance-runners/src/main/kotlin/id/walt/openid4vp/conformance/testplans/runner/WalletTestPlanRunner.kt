@@ -81,19 +81,21 @@ class WalletTestPlanRunner(
      * Create test plan on conformance suite
      */
     private suspend fun createTestPlan(): String {
-        val variantJson = Json.encodeToJsonElement(testPlan.variant)
-
+        // Conformance suite API expects planName as query parameter
         val response = httpClient.post("https://$conformanceHost:$conformancePort/api/plan") {
+            url {
+                parameters.append("planName", testPlan.planName)
+            }
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
-                put("planName", testPlan.planName)
-                put("variant", variantJson)
+                put("variant", Json.encodeToJsonElement(testPlan.variant))
                 put("configuration", testPlan.configuration)
             })
         }
 
         if (!response.status.isSuccess()) {
-            error("Failed to create test plan: ${response.status}")
+            val errorBody = response.body<String>()
+            error("Failed to create test plan: ${response.status}\nError: $errorBody")
         }
 
         val responseBody = response.body<JsonObject>()
