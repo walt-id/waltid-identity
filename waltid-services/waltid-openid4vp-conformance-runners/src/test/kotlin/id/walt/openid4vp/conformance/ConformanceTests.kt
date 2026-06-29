@@ -12,12 +12,10 @@ import kotlin.time.Duration.Companion.minutes
 class ConformanceTests {
 
     companion object {
-        // Conformance suite runs in Docker and needs to reach the host
-        // Use the host's actual IP address (not localhost or 127.0.0.1 which are Docker-internal)
         val verifier2UrlPrefix: String =
-            "http://10.0.0.79:7003/verification-session"
-        val conformanceHost: String = "localhost.emobix.co.uk"
-        val conformancePort: Int = 8443
+            "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
+        val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud" // conformance-v5-1-43.waltid.cloud
+        val conformancePort: Int = 8443 // 443
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
