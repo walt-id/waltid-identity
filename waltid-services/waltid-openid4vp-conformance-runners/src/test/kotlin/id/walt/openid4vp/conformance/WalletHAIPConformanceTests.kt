@@ -43,7 +43,7 @@ import kotlin.time.Duration.Companion.minutes
 class WalletHAIPConformanceTests {
 
     companion object {
-        val walletApiUrl: String = "http://localhost:7002"
+        val walletApiUrl: String = "http://127.0.0.1:7005"
         val conformanceHost: String = "localhost.emobix.co.uk"
         val conformancePort: Int = 8443
 
