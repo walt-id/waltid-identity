@@ -1,3 +1,4 @@
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -5,21 +6,13 @@ plugins {
     id("com.android.kotlin.multiplatform.library")
 }
 
-val moduleNamespace = when (project.path) {
-    ":waltid-applications:waltid-wallet-demo-compose:sharedLogic" -> "id.walt.walletdemo.compose.logic"
-    ":waltid-applications:waltid-wallet-demo-compose:sharedUI" -> "id.walt.walletdemo.compose.ui"
-    ":waltid-libraries:protocols:waltid-mobile-test-utils" -> "id.walt.mobile.test"
-    ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile" -> "id.walt.wallet2.mobile"
-    ":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile" -> "id.walt.wallet2.persistence"
-    else -> project.group.toString()
-}
+val waltidMobile = extensions.getByType<WaltidMobileLibraryExtension>()
 
 val hasAndroidHostTests = layout.projectDirectory.dir("src/androidHostTest").asFile.isDirectory
 val hasAndroidDeviceTests = layout.projectDirectory.dir("src/androidDeviceTest").asFile.isDirectory
 
 kotlin {
     android {
-        namespace = moduleNamespace
         compileSdk = BuildConstants.COMPILE_SDK
         minSdk = BuildConstants.MIN_SDK
         withHostTestBuilder {}.configure {
@@ -51,5 +44,12 @@ kotlin {
                 excludes += BuildConstants.META_INF_EXCLUDES
             }
         }
+    }
+}
+
+extensions.configure<KotlinMultiplatformAndroidComponentsExtension>("androidComponents") {
+    finalizeDsl {
+        it.namespace = waltidMobile.androidNamespace.orNull
+            ?: error("waltidMobile.androidNamespace must be configured for ${project.path}")
     }
 }
