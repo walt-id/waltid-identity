@@ -47,4 +47,12 @@ class OrderedCertificateChainTest {
             actual = X509TestCertificates.leafCertificate.authorityKeyIdentifier,
         )
     }
+
+    @Test
+    fun extractsSubjectAlternativeDnsNamesFromCertificateDer() {
+        assertContentEquals(
+            expected = listOf("verifier.example.com"),
+            actual = X509TestCertificates.sanDnsCertificate.subjectAlternativeDnsNames,
+        )
+    }
 }

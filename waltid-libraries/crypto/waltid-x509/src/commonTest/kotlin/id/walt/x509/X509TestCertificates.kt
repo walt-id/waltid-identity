@@ -18,6 +18,12 @@ internal object X509TestCertificates {
         )
     )
 
+    val sanDnsCertificate = CertificateDer(
+        Base64.decode(
+            "MIIBVjCB/aADAgECAgg9JU9yqLTSlDAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNTM2MTZaFw0yNjEwMTQwNTM2MTZaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEy+ytwhEa31/os6dz9B5ZDLkJpnigeh2FEhpoRO/aPwB8WPKE6HkRQGlVq4Fuer7MA1WGgoZlsOYDQPw9vro61KMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSAAwRQIhAJicm/egD5feJgUuca6FsbMIqUxP6baOALkrEKew1G34AiB0shCYfQtfSg1ks5SFo90669eACA6snm20HjRlHc2XPg=="
+        )
+    )
+
     val tamperedLeafCertificate = CertificateDer(
         leafCertificate.bytes.toByteArray().copyOf().also {
             it[it.lastIndex] = (it[it.lastIndex].toInt() xor 0x01).toByte()

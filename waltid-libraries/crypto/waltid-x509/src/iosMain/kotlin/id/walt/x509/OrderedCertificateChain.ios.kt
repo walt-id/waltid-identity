@@ -20,6 +20,9 @@ internal actual class PlatformX509Certificate private constructor(
     actual val authorityKeyIdentifier: ByteArray?
         get() = certificate.authorityKeyIdentifier()
 
+    actual val subjectAlternativeDnsNames: List<String>
+        get() = certificate.tbsCertificate.subjectAlternativeNames?.dnsNames.orEmpty()
+
     actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean =
         certificate.tbsCertificate.issuerName == issuer.certificate.tbsCertificate.subjectName
 

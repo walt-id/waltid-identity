@@ -9,6 +9,9 @@ internal actual class PlatformX509Certificate private constructor() {
     actual val authorityKeyIdentifier: ByteArray?
         get() = unsupported()
 
+    actual val subjectAlternativeDnsNames: List<String>
+        get() = unsupported()
+
     actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean = unsupported()
 
     actual fun verifySignedBy(issuer: PlatformX509Certificate): Unit = unsupported()

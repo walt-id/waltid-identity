@@ -66,9 +66,16 @@ val CertificateDer.subjectKeyIdentifier: ByteArray?
 val CertificateDer.authorityKeyIdentifier: ByteArray?
     get() = PlatformX509Certificate.parse(this).authorityKeyIdentifier
 
+/**
+ * Parsed dNSName entries from the Subject Alternative Name extension.
+ */
+val CertificateDer.subjectAlternativeDnsNames: List<String>
+    get() = PlatformX509Certificate.parse(this).subjectAlternativeDnsNames
+
 internal expect class PlatformX509Certificate {
     val subjectKeyIdentifier: ByteArray?
     val authorityKeyIdentifier: ByteArray?
+    val subjectAlternativeDnsNames: List<String>
 
     fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean
     fun verifySignedBy(issuer: PlatformX509Certificate)

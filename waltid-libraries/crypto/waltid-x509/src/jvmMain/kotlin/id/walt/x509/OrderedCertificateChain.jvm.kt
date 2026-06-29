@@ -14,6 +14,11 @@ internal actual class PlatformX509Certificate private constructor(
     actual val authorityKeyIdentifier: ByteArray?
         get() = certificate.authorityKeyIdentifier?.toByteArray()
 
+    actual val subjectAlternativeDnsNames: List<String>
+        get() = certificate.subjectAlternativeNames.orEmpty()
+            .filter { san -> san.size == 2 && san[0] == 2 }
+            .map { san -> san[1].toString() }
+
     actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean =
         certificate.issuerX500Principal == issuer.certificate.subjectX500Principal
 
