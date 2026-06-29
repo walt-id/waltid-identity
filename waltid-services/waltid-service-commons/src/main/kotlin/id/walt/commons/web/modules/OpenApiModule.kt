@@ -31,7 +31,6 @@ import kotlinx.serialization.SealedSerializationApi
 import kotlinx.serialization.descriptors.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlin.reflect.KType
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.Instant
 
@@ -50,11 +49,86 @@ object OpenApiModule {
         install(OpenApi) {
 
             schemas {
-                generator = createOpenApiGenerator()
+                val kotlinxGenerator = SchemaGenerator.kotlinx {
+                    explicitNullTypes = false
+                    customAnalyzer(ContextualSerializationTypeAnalyzerModule)
+                    customAnalyzer(FixSealedClassInheritanceModule)
+                    customGenerator(FixSealedClassInheritanceModule)
+                    customGenerator(FixJsonCustomParameters)
+                    overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
+                    overwrite(SchemaGenerator.TypeOverwrites.File())
+                    overwrite(SchemaGenerator.TypeOverwrites.Instant())
+                    overwrite(CustomTypeOverrides.KotlinxInstant())
+                    overwrite(CustomTypeOverrides.JsonArray())
+                    overwrite(CustomTypeOverrides.JsonObject())
+                    overwrite(CustomTypeOverrides.JsonElement())
+                    overwrite(CustomTypeOverrides.SdMap())
+                    overwrite(CustomTypeOverrides.QuickFixPolymorphic())
+                }
+                val reflectionGenerator = SchemaGenerator.reflection {
+                    explicitNullTypes = false
+                    customGenerator(FixJsonCustomParameters)
+                    overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
+                    overwrite(SchemaGenerator.TypeOverwrites.File())
+                    overwrite(SchemaGenerator.TypeOverwrites.Instant())
+                    overwrite(CustomTypeOverrides.KotlinxInstant())
+                    overwrite(CustomTypeOverrides.JsonArray())
+                    overwrite(CustomTypeOverrides.JsonObject())
+                    overwrite(CustomTypeOverrides.JsonElement())
+                    overwrite(CustomTypeOverrides.SdMap())
+                }
+
+                fun InitialTypeData.schemaName() =
+                    when (this) {
+                        is InitialKTypeData -> "${this.type} (KType)"
+                        is InitialSerialDescriptorTypeData -> "${this.type.serialName} (Serialname)"
+                        else -> error("Unknown data type $this")
+                    }
+
+                generator = { type ->
+                    runCatching {
+                        kotlinxGenerator.invoke(type)
+                    }.recoverCatching {
+                        logger.debug { "Failed kotlinx schema generation, trying reflection schema generation for: \"${type.schemaName()}\", due to: \"${it.message}\"." }
+                        reflectionGenerator.invoke(type)
+                    }.getOrThrow()
+                }
             }
 
             examples {
-                exampleEncoder = createOpenApiExampleEncoder()
+                val kotlinxEncoder = ExampleEncoder.kotlinx()
+                val reflectionEncoder = ExampleEncoder.internal()
+
+                fun TypeDescriptor.typeName(): String = when (this) {
+                    is SwaggerTypeDescriptor -> "${schema.name} ${schema.type} (SwaggerType)"
+                    is KTypeDescriptor -> type.simpleName + "<" + type.arguments.joinToString { it.type?.simpleName.toString() } + "> (KType)"
+                    is SerialTypeDescriptor -> "${descriptor.serialName} (SerialType)"
+                    is AnyOfTypeDescriptor -> "Any of ${this.types.map { it.typeName() }} (AnyOfType)"
+                    is ArrayTypeDescriptor -> "Array of ${this.type.typeName()} (ArrayType)"
+                    is EmptyTypeDescriptor -> "Empty Type (EmptyType)"
+                    is RefTypeDescriptor -> "$schemaId (RefType)"
+                }
+
+                exampleEncoder = { type, example ->
+                    val isStringType = when (type) {
+                        is KTypeDescriptor -> type.type.classifier == String::class
+                        is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
+                        else -> false
+                    }
+
+                    if (example is String && isStringType) {
+                        example
+                    } else if (example is JsonElement) {
+                        Json.encodeToString(example).toStructuredJsonObject()
+                    } else {
+                        runCatching {
+                            kotlinxEncoder.invoke(type, example)
+                        }.recoverCatching {
+                            logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\". Example in question: $example" }
+                            reflectionEncoder.invoke(type, example)
+                        }.getOrThrow()
+                    }
+                }
             }
 
             info {
@@ -115,88 +189,6 @@ object OpenApiModule {
                 summary = "Redirect to swagger interface for API documentation"
             }) {
                 call.respondRedirect("swagger")
-            }
-        }
-    }
-
-    fun createOpenApiGenerator(): GenericSchemaGenerator {
-        val kotlinxGenerator = SchemaGenerator.kotlinx {
-            explicitNullTypes = false
-            customAnalyzer(ContextualSerializationTypeAnalyzerModule)
-            customAnalyzer(FixSealedClassInheritanceModule)
-            customGenerator(FixSealedClassInheritanceModule)
-            customGenerator(FixJsonCustomParameters)
-            overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
-            overwrite(SchemaGenerator.TypeOverwrites.File())
-            overwrite(SchemaGenerator.TypeOverwrites.Instant())
-            overwrite(CustomTypeOverrides.KotlinxInstant())
-            overwrite(CustomTypeOverrides.JsonArray())
-            overwrite(CustomTypeOverrides.JsonObject())
-            overwrite(CustomTypeOverrides.JsonElement())
-            overwrite(CustomTypeOverrides.SdMap())
-            overwrite(CustomTypeOverrides.QuickFixPolymorphic())
-        }
-        val reflectionGenerator = SchemaGenerator.reflection {
-            explicitNullTypes = false
-            customGenerator(FixJsonCustomParameters)
-            overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
-            overwrite(SchemaGenerator.TypeOverwrites.File())
-            overwrite(SchemaGenerator.TypeOverwrites.Instant())
-            overwrite(CustomTypeOverrides.KotlinxInstant())
-            overwrite(CustomTypeOverrides.JsonArray())
-            overwrite(CustomTypeOverrides.JsonObject())
-            overwrite(CustomTypeOverrides.JsonElement())
-            overwrite(CustomTypeOverrides.SdMap())
-        }
-
-        fun InitialTypeData.schemaName() =
-            when (this) {
-                is InitialKTypeData -> "${this.type} (KType)"
-                is InitialSerialDescriptorTypeData -> "${this.type.serialName} (Serialname)"
-                else -> error("Unknown data type $this")
-            }
-        return { type ->
-            runCatching {
-                kotlinxGenerator.invoke(type)
-            }.recoverCatching {
-                logger.debug { "Failed kotlinx schema generation, trying reflection schema generation for: \"${type.schemaName()}\", due to: \"${it.message}\"." }
-                reflectionGenerator.invoke(type)
-            }.getOrThrow()
-        }
-    }
-
-    fun createOpenApiExampleEncoder(): GenericExampleEncoder {
-        val kotlinxEncoder = ExampleEncoder.kotlinx()
-        val reflectionEncoder = ExampleEncoder.internal()
-
-        fun TypeDescriptor.typeName(): String = when (this) {
-            is SwaggerTypeDescriptor -> "${schema.name} ${schema.type} (SwaggerType)"
-            is KTypeDescriptor -> type.simpleName + "<" + type.arguments.joinToString { it.type?.simpleName.toString() } + "> (KType)"
-            is SerialTypeDescriptor -> "${descriptor.serialName} (SerialType)"
-            is AnyOfTypeDescriptor -> "Any of ${this.types.map { it.typeName() }} (AnyOfType)"
-            is ArrayTypeDescriptor -> "Array of ${this.type.typeName()} (ArrayType)"
-            is EmptyTypeDescriptor -> "Empty Type (EmptyType)"
-            is RefTypeDescriptor -> "$schemaId (RefType)"
-        }
-
-        return { type, example ->
-            val isStringType = when (type) {
-                is KTypeDescriptor -> type.type.classifier == String::class
-                is SerialTypeDescriptor -> type.descriptor.serialName == "kotlin.String"
-                else -> false
-            }
-
-            if (example is String && isStringType) {
-                example
-            } else if (example is JsonElement) {
-                Json.encodeToString(example).toStructuredJsonObject()
-            } else {
-                runCatching {
-                    kotlinxEncoder.invoke(type, example)
-                }.recoverCatching {
-                    logger.debug { "Failed kotlinx example encoding, trying internal example encoder for: \"${type?.typeName()}\", due to: \"${it.message}\". Example in question: $example" }
-                    reflectionEncoder.invoke(type, example)
-                }.getOrThrow()
             }
         }
     }
@@ -432,24 +424,3 @@ object CustomTypeOverrides {
         }
     }
 }
-
-class WrappedSchemeGenerator(
-    private val schemaGenerator: GenericSchemaGenerator,
-    private val exampleEncoder: GenericExampleEncoder,
-) {
-    fun generateSchema(type: KType): Unit {
-        val initialKType = InitialKTypeData(type, emptyList())
-        schemaGenerator.invoke(initialKType)
-    }
-
-    fun generateExample(type: KType, example: Any?): Unit {
-        exampleEncoder.invoke(KTypeDescriptor(type), example)
-    }
-
-}
-
-fun createOpenApiGenerator(): WrappedSchemeGenerator =
-    WrappedSchemeGenerator(
-        OpenApiModule.createOpenApiGenerator(),
-        OpenApiModule.createOpenApiExampleEncoder()
-    )
