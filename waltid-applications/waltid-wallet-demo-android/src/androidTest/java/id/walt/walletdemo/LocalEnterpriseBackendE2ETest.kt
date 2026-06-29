@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
  * Uses UIAutomator for UI interaction and shared LocalEnterpriseTestBackend for backend operations.
  *
  * This is an E2E test (slow, requires UI automation + local infrastructure) - runs locally only.
- * Requires: enterprise stack running + ngrok tunnel + adb reverse tcp:7500
+ * Requires: enterprise stack running + ngrok tunnel
  */
 @RunWith(AndroidJUnit4::class)
 class LocalEnterpriseBackendE2ETest {
@@ -50,27 +50,14 @@ class LocalEnterpriseBackendE2ETest {
     @Test
     fun receiveAndPresentAgainstLocalEnterpriseBackend() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
-        val ngrokDomain = args.getString("e2e_host_alias_domain")
-            ?: error("Missing required instrumentation arg: e2e_host_alias_domain")
-
-        val config = LocalEnterpriseTestBackend.BackendConfig(
-            apiBaseUrl = args.getString("e2e_api_base_url") ?: "https://$ngrokDomain",
-            ngrokBaseUrl = "https://$ngrokDomain",
-            apiHostHeader = args.getString("e2e_api_host_header"),
-            adminEmail = args.getString("e2e_admin_email") ?: DEFAULT_ADMIN_EMAIL,
-            adminPassword = args.getString("e2e_admin_password") ?: DEFAULT_ADMIN_PASSWORD,
-            org = args.getString("e2e_org") ?: DEFAULT_ORG,
-            tenant = args.getString("e2e_tenant") ?: DEFAULT_TENANT,
-            issuerProfile = args.getString("e2e_issuer_profile") ?: DEFAULT_ISSUER_PROFILE,
-            verifier = args.getString("e2e_verifier") ?: DEFAULT_VERIFIER,
-        )
+        requireExplicitLocalEnterpriseRun(args)
+        val config = loadLocalEnterpriseConfig(args)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
 
-        val token = LocalEnterpriseTestBackend.getAdminToken(config, httpClient)
-        val offerUrl = LocalEnterpriseTestBackend.createPreAuthorizedOffer(config, token, httpClient)
+        val backend = prepareBackend(config)
 
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
@@ -87,7 +74,7 @@ class LocalEnterpriseBackendE2ETest {
             )
         )
 
-        val offerIntent = Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl)).apply {
+        val offerIntent = Intent(Intent.ACTION_VIEW, Uri.parse(backend.offerUrl)).apply {
             `package` = context.packageName
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -111,8 +98,7 @@ class LocalEnterpriseBackendE2ETest {
         assertTrue("Receive did not complete. Latest status: ${latestStatus(device)}", receiveSuccess)
         assertTrue("No credentials were shown in UI", device.findObject(By.text("No credentials")) == null)
 
-        val verifierSession = LocalEnterpriseTestBackend.createVerifierSession(config, token, httpClient)
-        val presentIntent = Intent(Intent.ACTION_VIEW, Uri.parse(verifierSession.bootstrapAuthorizationRequestUrl)).apply {
+        val presentIntent = Intent(Intent.ACTION_VIEW, Uri.parse(backend.verifierSession.bootstrapAuthorizationRequestUrl)).apply {
             `package` = context.packageName
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -149,7 +135,7 @@ class LocalEnterpriseBackendE2ETest {
 
         val verifierStatus = LocalEnterpriseTestBackend.waitForVerifierSuccess(
             config,
-            verifierSession.sessionId,
+            backend.verifierSession.sessionId,
             httpClient,
             timeoutMs = VERIFIER_POLLING_TIMEOUT
         )
@@ -162,27 +148,14 @@ class LocalEnterpriseBackendE2ETest {
     @Test
     fun credentialsPersistAcrossAppRestart() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
-        val ngrokDomain = args.getString("e2e_host_alias_domain")
-            ?: error("Missing required instrumentation arg: e2e_host_alias_domain")
-
-        val config = LocalEnterpriseTestBackend.BackendConfig(
-            apiBaseUrl = args.getString("e2e_api_base_url") ?: "https://$ngrokDomain",
-            ngrokBaseUrl = "https://$ngrokDomain",
-            apiHostHeader = args.getString("e2e_api_host_header"),
-            adminEmail = args.getString("e2e_admin_email") ?: DEFAULT_ADMIN_EMAIL,
-            adminPassword = args.getString("e2e_admin_password") ?: DEFAULT_ADMIN_PASSWORD,
-            org = args.getString("e2e_org") ?: DEFAULT_ORG,
-            tenant = args.getString("e2e_tenant") ?: DEFAULT_TENANT,
-            issuerProfile = args.getString("e2e_issuer_profile") ?: DEFAULT_ISSUER_PROFILE,
-            verifier = args.getString("e2e_verifier") ?: DEFAULT_VERIFIER,
-        )
+        requireExplicitLocalEnterpriseRun(args)
+        val config = loadLocalEnterpriseConfig(args)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         val device = UiDevice.getInstance(instrumentation)
 
-        val token = LocalEnterpriseTestBackend.getAdminToken(config, httpClient)
-        val offerUrl = LocalEnterpriseTestBackend.createPreAuthorizedOffer(config, token, httpClient)
+        val backend = prepareBackend(config)
 
         // --- Phase 1: Launch, bootstrap, receive credential ---
         val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
@@ -195,7 +168,7 @@ class LocalEnterpriseBackendE2ETest {
             waitForStatus(device, WALLET_READY_TIMEOUT, { it == "Wallet ready" }, listOf("Bootstrap failed"))
         )
 
-        val offerIntent = Intent(Intent.ACTION_VIEW, Uri.parse(offerUrl)).apply {
+        val offerIntent = Intent(Intent.ACTION_VIEW, Uri.parse(backend.offerUrl)).apply {
             `package` = context.packageName
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -234,8 +207,7 @@ class LocalEnterpriseBackendE2ETest {
         )
 
         // --- Phase 4: Present from persisted credential ---
-        val verifierSession = LocalEnterpriseTestBackend.createVerifierSession(config, token, httpClient)
-        val presentIntent = Intent(Intent.ACTION_VIEW, Uri.parse(verifierSession.bootstrapAuthorizationRequestUrl)).apply {
+        val presentIntent = Intent(Intent.ACTION_VIEW, Uri.parse(backend.verifierSession.bootstrapAuthorizationRequestUrl)).apply {
             `package` = context.packageName
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -263,7 +235,7 @@ class LocalEnterpriseBackendE2ETest {
 
         val verifierStatus = LocalEnterpriseTestBackend.waitForVerifierSuccess(
             config,
-            verifierSession.sessionId,
+            backend.verifierSession.sessionId,
             httpClient,
             timeoutMs = VERIFIER_POLLING_TIMEOUT
         )
@@ -273,6 +245,61 @@ class LocalEnterpriseBackendE2ETest {
         )
     }
 
+    private data class PreparedBackend(
+        val offerUrl: String,
+        val verifierSession: LocalEnterpriseTestBackend.VerifierSession,
+    )
+
+    private fun requireExplicitLocalEnterpriseRun(args: android.os.Bundle) {
+        check(args.getString("e2e_local_enterprise") == "true") {
+            """
+            LocalEnterpriseBackendE2ETest is local-only and requires a provisioned Enterprise stack.
+            Run it through waltid-wallet-demo-android/scripts/e2e-local-enterprise.sh.
+            The script passes e2e_local_enterprise=true, validates quickstart resources, and configures emulator networking.
+            """.trimIndent()
+        }
+    }
+
+    private fun loadLocalEnterpriseConfig(args: android.os.Bundle): LocalEnterpriseTestBackend.BackendConfig {
+        val ngrokDomain = args.getString("e2e_host_alias_domain")
+            ?: error("Missing required instrumentation arg: e2e_host_alias_domain. Set HOST_ALIAS_DOMAIN in scripts/e2e.env.")
+
+        return LocalEnterpriseTestBackend.BackendConfig(
+            apiBaseUrl = args.getString("e2e_api_base_url") ?: "https://$ngrokDomain",
+            ngrokBaseUrl = "https://$ngrokDomain",
+            apiHostHeader = args.getString("e2e_api_host_header"),
+            adminEmail = args.getString("e2e_admin_email") ?: DEFAULT_ADMIN_EMAIL,
+            adminPassword = args.getString("e2e_admin_password") ?: DEFAULT_ADMIN_PASSWORD,
+            org = args.getString("e2e_org") ?: DEFAULT_ORG,
+            tenant = args.getString("e2e_tenant") ?: DEFAULT_TENANT,
+            issuerProfile = args.getString("e2e_issuer_profile") ?: DEFAULT_ISSUER_PROFILE,
+            verifier = args.getString("e2e_verifier") ?: DEFAULT_VERIFIER,
+        )
+    }
+
+    private suspend fun prepareBackend(config: LocalEnterpriseTestBackend.BackendConfig): PreparedBackend {
+        try {
+            val token = LocalEnterpriseTestBackend.getAdminToken(config, httpClient)
+            val offerUrl = LocalEnterpriseTestBackend.createPreAuthorizedOffer(config, token, httpClient)
+            val verifierSession = LocalEnterpriseTestBackend.createVerifierSession(config, token, httpClient)
+            return PreparedBackend(offerUrl, verifierSession)
+        } catch (e: Throwable) {
+            throw AssertionError(
+                """
+                Local Enterprise E2E environment is not ready.
+                Expected quickstart baseline: org=${config.org}, tenant=${config.tenant}, issuerProfile=${config.issuerProfile}, verifier=${config.verifier}.
+                From waltid-enterprise-quickstart run docker compose up, then cd cli && npm install.
+                Provision with HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --init-system,
+                then HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --setup-all.
+                For an existing database, rerun the --setup-all command.
+                Create mobile helper resources explicitly with scripts/e2e-local-enterprise.sh --prepare-only.
+                Then rerun this test through scripts/e2e-local-enterprise.sh so ngrok, issuer2-noattest, and verifier2-mobile are checked first.
+                Original error: ${e.message}
+                """.trimIndent(),
+                e
+            )
+        }
+    }
 
     private fun waitForClickableButton(device: UiDevice, text: String, timeoutMs: Long): UiObject2? {
         val end = System.currentTimeMillis() + timeoutMs

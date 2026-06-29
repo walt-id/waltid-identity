@@ -17,21 +17,21 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
     private let verifierPollingTimeout: TimeInterval = 30     // 30 sec - backend verification
 
     func testReceiveAndPresentAgainstLocalEnterpriseBackend() async throws {
-        let config = LocalEnterpriseConfig.fromEnvironment()
-        let attested = (ProcessInfo.processInfo.environment["E2E_ATTESTED"] ?? "false").lowercased() == "true"
+        try LocalEnterpriseConfig.requireExplicitLocalEnterpriseRun()
+        let config = try LocalEnterpriseConfig.fromEnvironment()
+        let attested = LocalEnterpriseConfig.isAttested()
 
-        let token = try await getAdminToken(config: config)
-        let offerURL = try await createOffer(config: config, token: token)
+        let backend = try await prepareBackend(config: config)
 
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
 
         if attested {
-            let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+            let attestationBaseURL = LocalEnterpriseConfig.attestationBaseURL()
             await ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
-                "ATTESTATION_BEARER_TOKEN": token,
+                "ATTESTATION_BEARER_TOKEN": backend.token,
                 "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
             ])
         } else {
@@ -45,7 +45,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         let offerInput = app.textFields["wallet.offerInput"]
-        await ui.replaceText(in: offerInput, value: offerURL)
+        await ui.replaceText(in: offerInput, value: backend.offerURL)
         app.buttons["wallet.receiveButton"].tap()
 
         let receiveStatus = await ui.waitForStatus(
@@ -56,9 +56,8 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
 
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
 
-        let verifier = try await createVerifierSession(config: config, token: token)
         let presentInput = app.textFields["wallet.presentationInput"]
-        await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
+        await ui.replaceText(in: presentInput, value: backend.verifier.bootstrapAuthorizationRequestURL)
         app.buttons["wallet.presentButton"].tap()
 
         let presentStatus = await ui.waitForStatus(
@@ -69,26 +68,26 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed: \(presentStatus!)")
         XCTAssertFalse(presentStatus!.starts(with: "Receive failed"), "Receive failed after present: \(presentStatus!)")
 
-        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
+        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: backend.verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status was \(verifierStatus)")
     }
 
     func testCredentialsPersistAcrossAppRestart() async throws {
-        let config = LocalEnterpriseConfig.fromEnvironment()
-        let attested = (ProcessInfo.processInfo.environment["E2E_ATTESTED"] ?? "false").lowercased() == "true"
+        try LocalEnterpriseConfig.requireExplicitLocalEnterpriseRun()
+        let config = try LocalEnterpriseConfig.fromEnvironment()
+        let attested = LocalEnterpriseConfig.isAttested()
 
-        let token = try await getAdminToken(config: config)
-        let offerURL = try await createOffer(config: config, token: token)
+        let backend = try await prepareBackend(config: config)
 
         let app = XCUIApplication()
         let ui = await WalletE2EUI(app: app)
 
         if attested {
-            let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+            let attestationBaseURL = LocalEnterpriseConfig.attestationBaseURL()
             await ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
-                "ATTESTATION_BEARER_TOKEN": token,
+                "ATTESTATION_BEARER_TOKEN": backend.token,
                 "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
             ])
         } else {
@@ -100,7 +99,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet not ready: \(readyStatus ?? "nil")")
 
         let offerInput = app.textFields["wallet.offerInput"]
-        await ui.replaceText(in: offerInput, value: offerURL)
+        await ui.replaceText(in: offerInput, value: backend.offerURL)
         app.buttons["wallet.receiveButton"].tap()
 
         let receiveStatus = await ui.waitForStatus(
@@ -116,11 +115,11 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
 
         // Phase 3: Relaunch and verify credentials survived
         if attested {
-            let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+            let attestationBaseURL = LocalEnterpriseConfig.attestationBaseURL()
             await ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
-                "ATTESTATION_BEARER_TOKEN": token,
+                "ATTESTATION_BEARER_TOKEN": backend.token,
                 "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
             ])
         } else {
@@ -132,9 +131,8 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials not persisted — 'No credentials' shown after restart")
 
         // Phase 4: Present from persisted credential
-        let verifier = try await createVerifierSession(config: config, token: token)
         let presentInput = app.textFields["wallet.presentationInput"]
-        await ui.replaceText(in: presentInput, value: verifier.bootstrapAuthorizationRequestURL)
+        await ui.replaceText(in: presentInput, value: backend.verifier.bootstrapAuthorizationRequestURL)
         app.buttons["wallet.presentButton"].tap()
 
         let presentStatus = await ui.waitForStatus(
@@ -144,8 +142,35 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         XCTAssertNotNil(presentStatus)
         XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed after restart: \(presentStatus!)")
 
-        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
+        let verifierStatus = try await waitForVerifierStatus(config: config, sessionID: backend.verifier.sessionID, timeoutSeconds: verifierPollingTimeout)
         XCTAssertEqual(verifierStatus, "SUCCESSFUL", "Verifier status after restart: \(verifierStatus)")
+    }
+
+    private struct PreparedBackend {
+        let token: String
+        let offerURL: String
+        let verifier: (sessionID: String, bootstrapAuthorizationRequestURL: String)
+    }
+
+    private func prepareBackend(config: LocalEnterpriseConfig) async throws -> PreparedBackend {
+        do {
+            let token = try await getAdminToken(config: config)
+            let offerURL = try await createOffer(config: config, token: token)
+            let verifier = try await createVerifierSession(config: config, token: token)
+            return PreparedBackend(token: token, offerURL: offerURL, verifier: verifier)
+        } catch {
+            throw WalletE2ESetupError(message: """
+            Local Enterprise E2E environment is not ready.
+            Expected quickstart baseline: org=\(config.organization), tenant=\(config.tenant), issuerProfile=\(config.issuerProfile), verifier=\(config.verifier).
+            From waltid-enterprise-quickstart run docker compose up, then cd cli && npm install.
+            Provision with HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --init-system,
+            then HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --setup-all.
+            For an existing database, rerun the --setup-all command.
+            Create mobile helper resources explicitly with scripts/e2e-local-enterprise.sh --prepare-only.
+            Then rerun this test through scripts/e2e-local-enterprise.sh so ngrok, issuer2-noattest, and verifier2-mobile are checked first.
+            Original error: \(error.localizedDescription)
+            """)
+        }
     }
 
     private func getAdminToken(config: LocalEnterpriseConfig) async throws -> String {

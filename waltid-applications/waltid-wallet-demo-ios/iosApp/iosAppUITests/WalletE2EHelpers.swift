@@ -2,6 +2,14 @@ import Foundation
 import XCTest
 import TestHelpers
 
+struct WalletE2ESetupError: LocalizedError {
+    let message: String
+
+    var errorDescription: String? {
+        message
+    }
+}
+
 struct LocalEnterpriseConfig {
     let hostAliasDomain: String
     let apiBaseURL: URL
@@ -15,31 +23,58 @@ struct LocalEnterpriseConfig {
 
     var tenantPath: String { "\(organization).\(tenant)" }
 
-    static func fromEnvironment() -> LocalEnterpriseConfig {
+    static func requireExplicitLocalEnterpriseRun() throws {
         let env = ProcessInfo.processInfo.environment
-        let hostAliasDomain = env["HOST_ALIAS_DOMAIN"] ?? env["E2E_HOST_ALIAS_DOMAIN"] ?? ""
-        precondition(!hostAliasDomain.isEmpty, "HOST_ALIAS_DOMAIN (or E2E_HOST_ALIAS_DOMAIN) is required")
+        guard envValue("E2E_LOCAL_ENTERPRISE", from: env) == "true" else {
+            throw WalletE2ESetupError(message: """
+            LocalEnterpriseBackendE2ETests are local-only and require a provisioned Enterprise stack.
+            Run them through waltid-wallet-demo-ios/scripts/e2e-local-enterprise.sh.
+            The script passes E2E_LOCAL_ENTERPRISE=true, validates local Enterprise resources, and configures the local ngrok-backed test environment.
+            """)
+        }
+    }
 
-        let apiBase = env["E2E_API_BASE_URL"] ?? "https://\(hostAliasDomain)"
+    static func fromEnvironment() throws -> LocalEnterpriseConfig {
+        let env = ProcessInfo.processInfo.environment
+        let hostAliasDomain = envValue("HOST_ALIAS_DOMAIN", from: env)
+            ?? envValue("E2E_HOST_ALIAS_DOMAIN", from: env)
+            ?? ""
+        guard !hostAliasDomain.isEmpty else {
+            throw WalletE2ESetupError(message: "HOST_ALIAS_DOMAIN (or E2E_HOST_ALIAS_DOMAIN) is required. Set it in scripts/e2e.env and rerun scripts/e2e-local-enterprise.sh.")
+        }
+
+        let apiBase = envValue("E2E_API_BASE_URL", from: env) ?? "https://\(hostAliasDomain)"
         guard let apiBaseURL = URL(string: apiBase) else {
-            fatalError("Invalid E2E_API_BASE_URL: \(apiBase)")
+            throw WalletE2ESetupError(message: "Invalid E2E_API_BASE_URL: \(apiBase)")
         }
 
         guard let ngrokBaseURL = URL(string: "https://\(hostAliasDomain)") else {
-            fatalError("Invalid HOST_ALIAS_DOMAIN: \(hostAliasDomain)")
+            throw WalletE2ESetupError(message: "Invalid HOST_ALIAS_DOMAIN: \(hostAliasDomain)")
         }
 
         return LocalEnterpriseConfig(
             hostAliasDomain: hostAliasDomain,
             apiBaseURL: apiBaseURL,
             ngrokBaseURL: ngrokBaseURL,
-            adminEmail: env["E2E_ADMIN_EMAIL"] ?? "admin@walt.id",
-            adminPassword: env["E2E_ADMIN_PASSWORD"] ?? "admin123456",
-            organization: env["E2E_ORGANIZATION"] ?? "waltid",
-            tenant: env["E2E_TENANT"] ?? "waltid-tenant01",
-            issuerProfile: env["E2E_ISSUER_PROFILE"] ?? "issuer2.mdl-profile",
-            verifier: env["E2E_VERIFIER"] ?? "verifier2"
+            adminEmail: envValue("E2E_ADMIN_EMAIL", from: env) ?? "admin@walt.id",
+            adminPassword: envValue("E2E_ADMIN_PASSWORD", from: env) ?? "admin123456",
+            organization: envValue("E2E_ORGANIZATION", from: env) ?? "waltid",
+            tenant: envValue("E2E_TENANT", from: env) ?? "waltid-tenant01",
+            issuerProfile: envValue("E2E_ISSUER_PROFILE", from: env) ?? "issuer2.mdl-profile",
+            verifier: envValue("E2E_VERIFIER", from: env) ?? "verifier2"
         )
+    }
+
+    static func isAttested() -> Bool {
+        (envValue("E2E_ATTESTED", from: ProcessInfo.processInfo.environment) ?? "false").lowercased() == "true"
+    }
+
+    static func attestationBaseURL() -> String {
+        envValue("E2E_ATTESTATION_BASE_URL", from: ProcessInfo.processInfo.environment) ?? "http://localhost:7500"
+    }
+
+    private static func envValue(_ name: String, from env: [String: String]) -> String? {
+        env[name] ?? env["TEST_RUNNER_\(name)"]
     }
 }
 
