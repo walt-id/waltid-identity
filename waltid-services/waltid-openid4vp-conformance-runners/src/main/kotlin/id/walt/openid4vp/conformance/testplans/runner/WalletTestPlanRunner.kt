@@ -80,15 +80,18 @@ class WalletTestPlanRunner(
     /**
      * Create test plan on conformance suite
      */
-    private suspend fun createTestPlan(): String {
+    private suspend fun createTestPlan(): String {        
         // Conformance suite API expects planName AND variant as URL-encoded query parameters
         val variantJson = Json.encodeToString(testPlan.variant)
+        
+        println("DEBUG: Creating test plan...")
+        println("DEBUG: Plan name: ${testPlan.planName}")
+        println("DEBUG: Variant JSON: $variantJson")
         
         val response = httpClient.post("https://$conformanceHost:$conformancePort/api/plan") {
             url {
                 parameters.append("planName", testPlan.planName)
-                // Variant must be URL-encoded JSON
-                parameters.append("variant", variantJson)
+                parameters.append("variant", variantJson)  // Ktor auto-encodes
             }
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
