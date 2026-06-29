@@ -1,11 +1,11 @@
 package id.walt.x509
 
-import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.requireSupported
 import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.verifierFor
 import id.walt.crypto.keys.Key
+import id.walt.x509.iso.toSignumPublicKey
 
 internal data class SignumX509CertificateHandle(
     private val certificate: X509Certificate,
@@ -19,9 +19,7 @@ internal data class SignumX509CertificateHandle(
             "Verification key must be a public key, input key hasPrivateKey: ${verificationKey.hasPrivateKey}"
         }
 
-        val publicKey = CryptoPublicKey.decodeFromDer(
-            verificationKey.getPublicKeyRepresentation()
-        )
+        val publicKey = verificationKey.toSignumPublicKey()
         val signatureAlgorithm = certificate.signatureAlgorithm
         signatureAlgorithm.requireSupported()
         val verifier = signatureAlgorithm.algorithm

@@ -23,6 +23,18 @@ kotlin {
     }
 
     sourceSets {
+        val jvmIosMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
+            }
+        }
+        jvmMain.get().dependsOn(jvmIosMain)
+        if (enableIosBuild) {
+            iosMain.get().dependsOn(jvmIosMain)
+        }
+
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
@@ -41,12 +53,6 @@ kotlin {
             implementation(identityLibs.bouncycastle.pkix)
             implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.kotlinx.coroutines.core)
-        }
-        if (enableIosBuild) {
-            iosMain.dependencies {
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.supreme)
-            }
         }
         jvmTest.dependencies {
             // Logging

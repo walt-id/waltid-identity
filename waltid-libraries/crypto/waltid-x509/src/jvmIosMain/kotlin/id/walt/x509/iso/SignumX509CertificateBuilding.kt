@@ -21,7 +21,9 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.ShaUtils
 import id.walt.x509.CertificateDer
+import id.walt.x509.X509DistinguishedName
 import id.walt.x509.X509KeyUsage
+import id.walt.x509.X509SubjectAlternativeNames
 import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerPrincipalName
 import id.walt.x509.iso.iaca.certificate.IACAPrincipalName
@@ -60,8 +62,9 @@ internal suspend fun buildSignumIsoCertificateDer(
     )
 }
 
-internal suspend fun Key.toSignumPublicKey(): CryptoPublicKey =
-    CryptoPublicKey.decodeFromDer(getPublicKeyRepresentation())
+internal expect suspend fun Key.signSignumX509Raw(data: ByteArray): CryptoSignature
+
+internal expect suspend fun Key.toSignumPublicKey(): CryptoPublicKey
 
 internal fun IACAPrincipalName.toSignumName(): List<RelativeDistinguishedName> =
     buildSignumName(
@@ -78,6 +81,16 @@ internal fun DocumentSignerPrincipalName.toSignumName(): List<RelativeDistinguis
         stateOrProvinceName = stateOrProvinceName,
         organizationName = organizationName,
         localityName = localityName,
+    )
+
+internal fun X509DistinguishedName.toSignumName(): List<RelativeDistinguishedName> =
+    buildSignumName(
+        country = country,
+        commonName = commonName,
+        stateOrProvinceName = stateOrProvinceName,
+        organizationName = organizationName,
+        localityName = localityName,
+        organizationalUnitName = organizationalUnitName,
     )
 
 internal fun subjectKeyIdentifierExtension(publicKey: CryptoPublicKey): X509CertificateExtension =
@@ -132,10 +145,35 @@ internal fun issuerAlternativeNameExtension(
         },
     )
 
-internal fun extendedKeyUsageExtension(oids: Set<String>): X509CertificateExtension =
+internal fun subjectAlternativeNamesExtension(
+    subjectAlternativeNames: X509SubjectAlternativeNames,
+): X509CertificateExtension =
+    extension(
+        oid = "2.5.29.17",
+        critical = false,
+        value = Asn1.Sequence {
+            subjectAlternativeNames.emails.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.rfc822Name, it.encodeToByteArray())
+            }
+            subjectAlternativeNames.dnsNames.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.dNSName, it.encodeToByteArray())
+            }
+            subjectAlternativeNames.uris.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.uniformResourceIdentifier, it.encodeToByteArray())
+            }
+            subjectAlternativeNames.ipAddresses.forEach {
+                +Asn1Primitive(SubjectAltNameImplicitTags.iPAddress, it.toIpAddressBytes())
+            }
+        },
+    )
+
+internal fun extendedKeyUsageExtension(
+    oids: Set<String>,
+    critical: Boolean = true,
+): X509CertificateExtension =
     extension(
         oid = "2.5.29.37",
-        critical = true,
+        critical = critical,
         value = Asn1.Sequence {
             oids.forEach { +ObjectIdentifier(it) }
         },
@@ -172,21 +210,10 @@ private fun extension(
         },
     )
 
-private suspend fun Key.signX509Raw(
-    tbsCertificate: TbsCertificate,
-): CryptoSignature {
-    val signatureBytes = signRaw(tbsCertificate.encodeToDer()) as? ByteArray
-        ?: error("X.509 signing returned a non-ByteArray signature")
-    return when (keyType) {
-        KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 ->
-            CryptoSignature.EC.fromRawBytes(keyType.toSignumCurve(), signatureBytes)
-        KeyType.RSA, KeyType.RSA3072, KeyType.RSA4096 ->
-            CryptoSignature.RSA(signatureBytes)
-        else -> error("Unsupported X.509 signing key type: $keyType")
-    }
-}
+private suspend fun Key.signX509Raw(tbsCertificate: TbsCertificate): CryptoSignature =
+    signSignumX509Raw(tbsCertificate.encodeToDer())
 
-private fun KeyType.toSignumSignatureAlgorithm(): SignatureAlgorithm =
+internal fun KeyType.toSignumSignatureAlgorithm(): SignatureAlgorithm =
     when (this) {
         KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
         KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
@@ -197,7 +224,7 @@ private fun KeyType.toSignumSignatureAlgorithm(): SignatureAlgorithm =
         else -> error("Unsupported X.509 signing key type: $this")
     }
 
-private fun KeyType.toSignumCurve(): ECCurve =
+internal fun KeyType.toSignumCurve(): ECCurve =
     when (this) {
         KeyType.secp256r1 -> ECCurve.SECP_256_R_1
         KeyType.secp384r1 -> ECCurve.SECP_384_R_1
@@ -211,6 +238,7 @@ private fun buildSignumName(
     stateOrProvinceName: String? = null,
     organizationName: String? = null,
     localityName: String? = null,
+    organizationalUnitName: String? = null,
 ): List<RelativeDistinguishedName> = buildList {
     country?.let {
         add(RelativeDistinguishedName(AttributeTypeAndValue.Country(Asn1String.Printable(it))))
@@ -226,6 +254,9 @@ private fun buildSignumName(
     }
     localityName?.let {
         add(RelativeDistinguishedName(AttributeTypeAndValue.Other(ObjectIdentifier("2.5.4.7"), Asn1String.UTF8(it))))
+    }
+    organizationalUnitName?.let {
+        add(RelativeDistinguishedName(AttributeTypeAndValue.OrganizationalUnit(Asn1String.UTF8(it))))
     }
 }
 
@@ -254,3 +285,73 @@ private fun X509KeyUsage.keyUsageBitIndex(): Int =
         X509KeyUsage.EncipherOnly -> 7
         X509KeyUsage.DecipherOnly -> 8
     }
+
+private fun String.toIpAddressBytes(): ByteArray =
+    if (":" in this) toIpv6Bytes() else toIpv4Bytes()
+
+private fun String.toIpv4Bytes(): ByteArray {
+    val octets = split(".")
+    require(octets.size == 4) {
+        "Invalid IPv4 subject alternative name: $this"
+    }
+    return ByteArray(4) { index ->
+        octets[index].toUByteStrict("IPv4", this).toByte()
+    }
+}
+
+private fun String.toIpv6Bytes(): ByteArray {
+    require(countOccurrences("::") <= 1) {
+        "Invalid IPv6 subject alternative name: $this"
+    }
+    val parts = split("::", limit = 2)
+    val head = parts[0].toIpv6Groups()
+    val tail = parts.getOrNull(1)?.toIpv6Groups().orEmpty()
+    val groups = if (parts.size == 2) {
+        val zeroGroupCount = 8 - head.size - tail.size
+        require(zeroGroupCount >= 1) {
+            "Invalid IPv6 subject alternative name: $this"
+        }
+        head + List(zeroGroupCount) { 0 } + tail
+    } else {
+        head
+    }
+    require(groups.size == 8) {
+        "Invalid IPv6 subject alternative name: $this"
+    }
+    return ByteArray(16) { index ->
+        val group = groups[index / 2]
+        if (index % 2 == 0) (group ushr 8).toByte() else group.toByte()
+    }
+}
+
+private fun String.toIpv6Groups(): List<Int> {
+    if (isEmpty()) return emptyList()
+    return split(":").flatMap { group ->
+        if ("." in group) {
+            val ipv4 = group.toIpv4Bytes()
+            listOf(
+                ((ipv4[0].toInt() and 0xff) shl 8) or (ipv4[1].toInt() and 0xff),
+                ((ipv4[2].toInt() and 0xff) shl 8) or (ipv4[3].toInt() and 0xff),
+            )
+        } else {
+            require(group.length in 1..4) {
+                "Invalid IPv6 subject alternative name group: $group"
+            }
+            listOf(group.toInt(16))
+        }
+    }
+}
+
+private fun String.toUByteStrict(addressType: String, address: String): UByte {
+    require(isNotEmpty() && all { it.isDigit() }) {
+        "Invalid $addressType subject alternative name: $address"
+    }
+    val value = toInt()
+    require(value in 0..255) {
+        "Invalid $addressType subject alternative name: $address"
+    }
+    return value.toUByte()
+}
+
+private fun String.countOccurrences(needle: String): Int =
+    windowed(needle.length).count { it == needle }
