@@ -4,19 +4,17 @@ import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.representations.X5CCertificateString
 import id.walt.credentials.signatures.CoseCredentialSignature
 import id.walt.credentials.signatures.JwtBasedSignature
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlCredential
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.dcql.models.TrustedAuthorityType
+import id.walt.x509.CertificateDer
 import id.walt.x509.authorityKeyIdentifier
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
-import java.io.ByteArrayInputStream
-import java.security.cert.CertificateFactory
-import java.security.cert.X509Certificate
-import java.util.Base64
 
 /**
  * DCQL trusted authorities checker for the `aki` type (Authority Key Identifier).
@@ -26,12 +24,11 @@ import java.util.Base64
  * certificate in the credential's certificate chain.
  *
  * Returns a [DcqlMatcher-compatible callback][checker] that can be passed to
- * [DcqlMatcher.match] as the `trustedAuthoritiesChecker` parameter.
+ * [id.walt.dcql.DcqlMatcher.match] as the `trustedAuthoritiesChecker` parameter.
  */
 object DcqlTrustedAuthoritiesChecker {
 
     private val log = KotlinLogging.logger {}
-    private val certFactory = CertificateFactory.getInstance("X.509")
 
     /**
      * Returns a checker function suitable for [id.walt.dcql.DcqlMatcher.match].
@@ -48,20 +45,19 @@ object DcqlTrustedAuthoritiesChecker {
     private fun matchesTrustedAuthorities(
         credential: DcqlCredential,
         authoritiesQuery: List<TrustedAuthoritiesQuery>,
-    ): Boolean {
-        // A credential matches if it satisfies at least one entry in the trusted_authorities array.
-        return authoritiesQuery.any { query -> matchesOneAuthority(credential, query) }
-    }
+    ): Boolean =
+        authoritiesQuery.any { query -> matchesOneAuthority(credential, query) }
 
     private fun matchesOneAuthority(credential: DcqlCredential, query: TrustedAuthoritiesQuery): Boolean =
         when (query.type) {
             TrustedAuthorityType.AKI -> matchesAki(credential, query.values)
             TrustedAuthorityType.ETSI_TL -> {
-                log.warn { "trusted_authorities type 'etsi_tl' is not yet implemented — credential ${credential.id} will not match" }
+                log.warn { "trusted_authorities type 'etsi_tl' is not yet implemented - credential ${credential.id} will not match" }
                 false
             }
+
             TrustedAuthorityType.OPENID_FEDERATION -> {
-                log.warn { "trusted_authorities type 'openid_federation' is not yet implemented — credential ${credential.id} will not match" }
+                log.warn { "trusted_authorities type 'openid_federation' is not yet implemented - credential ${credential.id} will not match" }
                 false
             }
         }
@@ -74,13 +70,18 @@ object DcqlTrustedAuthoritiesChecker {
     private fun matchesAki(credential: DcqlCredential, akiValues: List<String>): Boolean {
         val certChain = extractCertChain(credential)
         if (certChain.isEmpty()) {
-            log.debug { "No certificate chain found for credential ${credential.id} — AKI check fails" }
+            log.debug { "No certificate chain found for credential ${credential.id} - AKI check fails" }
             return false
         }
 
         return certChain.any { cert ->
-            val aki = cert.authorityKeyIdentifier ?: return@any false
-            val akiBase64Url = aki.toByteArray().encodeToBase64Url()
+            val aki = runCatching { cert.authorityKeyIdentifier }
+                .getOrElse { e ->
+                    log.debug { "Failed to read certificate AKI: ${e.message}" }
+                    null
+                }
+                ?: return@any false
+            val akiBase64Url = aki.encodeToBase64Url()
             akiValues.any { queryValue -> queryValue == akiBase64Url }.also { matched ->
                 if (matched) log.debug { "AKI match for credential ${credential.id}: $akiBase64Url" }
             }
@@ -91,10 +92,10 @@ object DcqlTrustedAuthoritiesChecker {
      * Extract the X.509 certificate chain from a credential.
      *
      * Sources (in priority order):
-     * 1. [CoseCredentialSignature.x5cList] — mdoc / COSE-signed credentials
-     * 2. JWS `x5c` header — JWT / SD-JWT credentials
+     * 1. [CoseCredentialSignature.x5cList] - mdoc / COSE-signed credentials
+     * 2. JWS `x5c` header - JWT / SD-JWT credentials
      */
-    private fun extractCertChain(credential: DcqlCredential): List<X509Certificate> {
+    private fun extractCertChain(credential: DcqlCredential): List<CertificateDer> {
         val originalCredential = (credential as? RawDcqlCredential)?.originalCredential as? DigitalCredential
             ?: return emptyList()
 
@@ -110,9 +111,8 @@ object DcqlTrustedAuthoritiesChecker {
         }
     }
 
-    private fun parseCert(certString: X5CCertificateString): X509Certificate? = runCatching {
-        val derBytes = Base64.getDecoder().decode(certString.base64Der)
-        certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
+    private fun parseCert(certString: X5CCertificateString): CertificateDer? = runCatching {
+        CertificateDer(certString.base64Der.decodeFromBase64())
     }.getOrElse { e ->
         log.debug { "Failed to parse certificate: ${e.message}" }
         null

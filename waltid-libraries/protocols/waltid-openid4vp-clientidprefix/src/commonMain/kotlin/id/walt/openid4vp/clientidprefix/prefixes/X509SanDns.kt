@@ -1,6 +1,5 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
-import id.walt.credentials.trustedauthorities.X5CChainValidatorHelper
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JwsUtils.decodeJws
@@ -8,6 +7,8 @@ import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
+import id.walt.x509.CertificateDer
+import id.walt.x509.verifyOrderedCertificateChainSignatures
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
@@ -44,7 +45,9 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         // 1. Validate the certificate chain when more than one cert is present.
         if (x5cHeader.size > 1) {
             runCatching {
-                X5CChainValidatorHelper.verifyChain(x5cHeader.map { it.jsonPrimitive.content.decodeFromBase64() })
+                verifyOrderedCertificateChainSignatures(
+                    x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
+                )
             }.getOrElse {
                 return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
             }
@@ -91,4 +94,3 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
             )
     }
 }
-

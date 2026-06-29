@@ -42,6 +42,12 @@ kotlin {
             implementation(identityLibs.nimbus.jose.jwt)
             implementation(identityLibs.kotlinx.coroutines.core)
         }
+        if (enableIosBuild) {
+            iosMain.dependencies {
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
+            }
+        }
         jvmTest.dependencies {
             // Logging
             implementation(identityLibs.slf4j.simple)
