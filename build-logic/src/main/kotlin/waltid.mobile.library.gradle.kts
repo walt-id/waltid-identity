@@ -10,6 +10,8 @@ plugins {
     kotlin("plugin.power-assert")
 }
 
+extensions.create<WaltidMobileLibraryExtension>("waltidMobile")
+
 kotlin {
     applyDefaultHierarchyTemplate()
     jvmToolchain(project.javaLibraryVersion)
