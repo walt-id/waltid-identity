@@ -7,6 +7,7 @@ import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCod
 import id.walt.openid4vci.handlers.granttypes.authorizationcode.AuthorizationCodeTokenEndpoint
 import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCodeTokenEndpoint
 import id.walt.openid4vci.handlers.par.PushedAuthorizationRequestEndpointHandler
+import id.walt.openid4vci.handlers.granttypes.refreshtoken.RefreshTokenTokenEndpoint
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
@@ -48,6 +49,7 @@ fun buildOAuth2Provider(
     config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean = true,
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
+    includeRefreshTokenDefaultHandlers: Boolean = true,
     includePushedAuthorizationDefaultHandlers: Boolean = true,
     includeCredentialDefaultHandlers: Boolean = true,
 ): OAuth2Provider {
@@ -56,6 +58,7 @@ fun buildOAuth2Provider(
         config = resolvedConfig,
         includeAuthorizationCodeDefaultHandlers = includeAuthorizationCodeDefaultHandlers,
         includePreAuthorizedCodeDefaultHandlers = includePreAuthorizedCodeDefaultHandlers,
+        includeRefreshTokenDefaultHandlers = includeRefreshTokenDefaultHandlers,
     )
     registerDefaultPushedAuthorizationHandlers(
         config = resolvedConfig,
@@ -86,6 +89,7 @@ private fun registerDefaultGrantTypeHandlers(
     config: OAuth2ProviderConfig,
     includeAuthorizationCodeDefaultHandlers: Boolean,
     includePreAuthorizedCodeDefaultHandlers: Boolean,
+    includeRefreshTokenDefaultHandlers: Boolean,
 ) {
     if (includeAuthorizationCodeDefaultHandlers) {
         val authorizationCodeAuthorizationEndpointHandler = AuthorizationCodeAuthorizationEndpoint(
@@ -95,7 +99,9 @@ private fun registerDefaultGrantTypeHandlers(
 
         val authorizationCodeTokenEndpointHandler = AuthorizationCodeTokenEndpoint(
             codeRepository = config.authorizationCodeRepository,
-            tokenService = config.accessTokenService,
+            accessTokenIssuer = config.accessTokenIssuer,
+            refreshTokenRepository = config.refreshTokenRepository,
+            refreshTokenIssuer = config.refreshTokenIssuer,
         )
 
         config.tokenEndpointHandlers.appendForGrant(
@@ -107,11 +113,26 @@ private fun registerDefaultGrantTypeHandlers(
     if (includePreAuthorizedCodeDefaultHandlers) {
         val preAuthorizedTokenHandler = PreAuthorizedCodeTokenEndpoint(
             codeRepository = config.preAuthorizedCodeRepository,
-            tokenService = config.accessTokenService,
+            accessTokenIssuer = config.accessTokenIssuer,
+            refreshTokenRepository = config.refreshTokenRepository,
+            refreshTokenIssuer = config.refreshTokenIssuer,
         )
         config.tokenEndpointHandlers.appendForGrant(
             grantType = GrantType.PreAuthorizedCode,
             handler = preAuthorizedTokenHandler,
+        )
+    }
+
+    if (includeRefreshTokenDefaultHandlers) {
+        val refreshTokenHandler = RefreshTokenTokenEndpoint(
+            refreshTokenRepository = config.refreshTokenRepository,
+            accessTokenIssuer = config.accessTokenIssuer,
+            refreshTokenIssuer = config.refreshTokenIssuer,
+            refreshTokenVerifier = config.refreshTokenVerifier,
+        )
+        config.tokenEndpointHandlers.appendForGrant(
+            grantType = GrantType.RefreshToken,
+            handler = refreshTokenHandler,
         )
     }
 }

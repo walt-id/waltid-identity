@@ -18,6 +18,7 @@ import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.forms.FormDataContent
@@ -92,6 +93,40 @@ class Issuer2PARRouteTest {
         assertEquals("90", payload["expires_in"]?.jsonPrimitive?.content)
     }
 
+    @Test
+    fun `token route returns no-store headers on errors`() = testApplication {
+        application {
+            install(ServerContentNegotiation) {
+                json(json)
+            }
+            install(Authentication) {
+                bearer("auth-oauth") {}
+            }
+            routing {
+                testController().register(this)
+            }
+        }
+        val client = createClient {
+            install(ClientContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val response = client.post("/openid4vci/token") {
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("grant_type", "unsupported")
+                    }
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+        assertEquals("no-cache", response.headers[HttpHeaders.Pragma])
+    }
+
     private fun testController(): OpenId4VciController {
         val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
         val metadataConfig = Issuer2MetadataConfig()
@@ -106,6 +141,7 @@ class Issuer2PARRouteTest {
             authorizationCodeRepository = NoopAuthorizationCodeRepository,
             preAuthorizedCodeRepository = NoopPreAuthorizedCodeRepository,
             parRepository = InMemoryPARRepository(),
+            refreshTokenRepository = InMemoryRefreshTokenRepository(),
         )
         val metadataService = MetadataService(
             serviceConfig = serviceConfig,

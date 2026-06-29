@@ -8,6 +8,7 @@ import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
+import id.walt.issuer2.testsupport.assertRefreshToken
 import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
@@ -84,10 +85,19 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                val refreshToken = assertRefreshToken(tokenResponse)
+
+                val refreshedTokenResponse = walletFlow.refreshAccessToken(
+                    resolvedOffer = resolvedOffer,
+                    refreshToken = refreshToken,
+                )
+                assertBearerAccessToken(refreshedTokenResponse)
+                val rotatedRefreshToken = assertRefreshToken(refreshedTokenResponse)
+                assertNotEquals(refreshToken, rotatedRefreshToken)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
-                    accessToken = tokenResponse.access_token,
+                    accessToken = refreshedTokenResponse.access_token,
                 )
                 assertJwtVcJsonCredentialPayload(credentialPayload)
                 assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
@@ -141,6 +151,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
@@ -207,6 +218,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,

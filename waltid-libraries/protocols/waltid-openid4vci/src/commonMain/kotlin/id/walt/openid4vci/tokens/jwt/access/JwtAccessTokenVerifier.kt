@@ -1,7 +1,9 @@
-package id.walt.openid4vci.tokens.jwt
+package id.walt.openid4vci.tokens.jwt.access
 
-import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.openid4vci.tokens.AccessTokenVerifier
+import id.walt.openid4vci.tokens.access.AccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
+import id.walt.openid4vci.tokens.jwt.JwtTokenVerifier
+import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -14,8 +16,9 @@ import kotlin.time.Clock
  * JWT access-token verifier. Validates signature and optional standard claims.
  */
 class JwtAccessTokenVerifier(
-    private val resolver: JwtVerificationKeyResolver,
+    resolver: JwtVerificationKeyResolver,
 ) : AccessTokenVerifier {
+    private val verifier = JwtTokenVerifier(resolver)
 
     override suspend fun verify(
         token: String,
@@ -23,15 +26,7 @@ class JwtAccessTokenVerifier(
         expectedAudience: String?,
     ): JsonObject {
         require(!expectedIssuer.isNullOrBlank()) { "expectedIssuer is required for access token verification" }
-        val decoded = token.decodeJws()
-        val verificationKey = resolver.resolveVerificationKey(decoded.header)
-
-        val verifiedPayload = verificationKey.verifyJws(token).getOrElse { cause ->
-            throw IllegalArgumentException("Invalid access token signature", cause)
-        }
-
-        val payload = verifiedPayload as? JsonObject
-            ?: throw IllegalArgumentException("Access token payload must be a JSON object")
+        val payload = verifier.verify(token, "Access token")
 
         val issuer = payload[JwtPayloadClaims.ISSUER]?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("Access token is missing issuer claim")

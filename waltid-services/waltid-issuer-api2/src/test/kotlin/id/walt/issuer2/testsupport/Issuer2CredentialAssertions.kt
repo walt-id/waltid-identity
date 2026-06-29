@@ -31,6 +31,11 @@ fun assertBearerAccessToken(tokenResponse: TokenRequestBuilder.TokenResponse) {
     assertTrue(tokenResponse.access_token.isNotBlank())
 }
 
+fun assertRefreshToken(tokenResponse: TokenRequestBuilder.TokenResponse): String =
+    assertNotNull(tokenResponse.refresh_token).also { refreshToken ->
+        assertTrue(refreshToken.isNotBlank())
+    }
+
 suspend fun assertSessionStatus(
     client: HttpClient,
     sessionId: String,
