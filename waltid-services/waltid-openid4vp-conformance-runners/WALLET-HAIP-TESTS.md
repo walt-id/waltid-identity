@@ -2,67 +2,87 @@
 
 ## Overview
 
-This directory contains wallet-side OpenID4VP conformance tests, focusing on **HAIP (High Assurance Interoperability Profile)** compliance.
+This document describes the wallet-side OpenID4VP HAIP (High Assurance Interoperability Profile) conformance tests for the walt.id wallet implementation.
 
-These tests validate that the walt.id wallet implementation correctly:
-- Authenticates signed authorization requests
-- Generates encrypted presentation responses
+These tests validate that the walt.id wallet correctly:
+- Authenticates signed authorization requests (JAR)
+- Generates encrypted presentation responses (JWE)
 - Enforces cryptographic requirements (P-256, SHA-256)
-- Implements holder binding (KB-JWT for SD-JWT, DeviceAuth for mdocs)
-- Handles all supported client authentication schemes
+- Implements holder binding (KB-JWT for SD-JWT, DeviceAuth for mdoc)
+- Handles X.509 certificate-based verifier authentication
 
 ## Architecture
 
 ```
-[OpenID Conformance Suite]    ←→    [walt.id Wallet]
-       (Verifier)                        (Presenter)
+[OpenID Conformance Suite]    <->    [Adapter]    <->    [walt.id Wallet API]
+       (Verifier)                    (7006)              (7005)
        
-  Generates requests                 Processes requests
-  Validates responses                Generates encrypted responses
+  Generates requests         Bridges HTTP to         Processes requests
+  Validates responses        Wallet API             Generates responses
 ```
 
 Unlike verifier conformance tests (where the suite acts as a wallet), wallet conformance tests **reverse the roles**:
 - The conformance suite acts as the **verifier**
 - The local wallet instance acts as the **presenter**
 
+### Wallet Conformance Adapter
+
+The adapter (`WalletConformanceAdapter.kt`) bridges the conformance suite with the wallet API:
+
+1. **Receives** authorization requests from conformance suite
+2. **Fetches** the signed JAR from `request_uri`
+3. **Calls** wallet API programmatically (resolve -> match -> present)
+4. **POSTs** VP response to conformance suite's `response_uri`
+
+This is **test infrastructure only** - production wallets use mobile URL schemes, deep links, or Digital Credentials API.
+
 ## Prerequisites
 
-### 1. Install OpenID Conformance Suite
-
-```bash
-# Clone conformance suite
-git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
-cd ~/dev/openid/conformance-suite
-
-# Start with Docker
-docker compose -f docker-compose-local.yml up -d
-
-# Wait ~30 seconds for startup
-```
-
-### 2. Configure /etc/hosts
+### 1. Setup /etc/hosts
 
 ```bash
 echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
 ```
 
-### 3. Verify Conformance Suite
+### 2. Clone and Setup Conformance Suite
 
 ```bash
+git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+
+# Copy walt.id configuration
+cp ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml ~/dev/openid/conformance-suite/
+
+cp -r ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/nginx ~/dev/openid/conformance-suite/
+```
+
+### 3. Start Conformance Suite
+
+```bash
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-walt.yml up -d
+
+# Wait ~30 seconds, then verify:
 curl -k https://localhost.emobix.co.uk:8443/
 ```
 
-You should see the conformance suite web interface.
+### 4. Wallet API Running
+
+The wallet API must be running on port 7005:
+
+```bash
+# Check wallet status
+curl http://127.0.0.1:7005/health
+```
 
 ## Running Tests
 
 ### Run All HAIP Tests
 
 ```bash
-cd ~/dev/walt-id/waltid-unified-build
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*.WalletHAIPConformanceTests"
+    --tests "WalletHAIPConformanceTests"
 ```
 
 ### Run Specific Test Plan
@@ -70,235 +90,291 @@ cd ~/dev/walt-id/waltid-unified-build
 ```bash
 # Plan 1: SD-JWT VC Baseline
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*.WalletHAIPConformanceTests.HAIP Plan 1*"
+    --tests "WalletHAIPConformanceTests.HAIP Plan 1*"
 
 # Plan 2: mDL Baseline
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*.WalletHAIPConformanceTests.HAIP Plan 2*"
+    --tests "WalletHAIPConformanceTests.HAIP Plan 2*"
 
 # Plan 7: Negative Tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*.WalletHAIPConformanceTests.HAIP Plan 7*"
+    --tests "WalletHAIPConformanceTests.HAIP Plan 7*"
 ```
 
-### Run All Plans (Comprehensive Suite)
+### Run Complete Suite
 
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*.WalletHAIPConformanceTests.runAllHAIPConformanceTests"
+    --tests "WalletHAIPConformanceTests.runAllHAIPConformanceTests"
 ```
-
-This runs all 10+ test plans (expect ~60-90 minutes).
 
 ## Test Plans
 
-### Phase 1: Core HAIP (MVP)
+### Currently Implemented
 
 | Plan | Format | Client ID | Response Mode | Status |
 |------|--------|-----------|---------------|--------|
-| **1** | SD-JWT VC | x509_san_dns | direct_post.jwt | 🔴 MVP |
-| **2** | mDL | x509_san_dns | direct_post.jwt | 🔴 MVP |
-| **7** | SD-JWT VC | x509_san_dns | direct_post.jwt | 🔴 MVP (Negative) |
+| **1** | SD-JWT VC | x509_san_dns | direct_post.jwt | Infrastructure ready |
+| **2** | mDL | x509_san_dns | direct_post.jwt | Infrastructure ready |
+| **7** | SD-JWT VC | x509_san_dns | direct_post.jwt | Infrastructure ready (Negative) |
 
-### Phase 2: Extended HAIP
+### Planned Extensions
 
-| Plan | Format | Client ID | Response Mode | Status |
-|------|--------|-----------|---------------|--------|
-| **3** | PhotoID | x509_san_dns | direct_post.jwt | 🟡 Phase 2 |
-| **4** | SD-JWT + mdoc | x509_san_dns | direct_post.jwt | 🟡 Phase 2 |
-| **5** | mdoc | x509_hash | dc_api.jwt | 🟡 Phase 2 |
+| Plan | Format | Client ID | Response Mode | Description |
+|------|--------|-----------|---------------|-------------|
+| **3** | PhotoID | x509_san_dns | direct_post.jwt | ISO 23220 PhotoID |
+| **4** | SD-JWT + mdoc | x509_san_dns | direct_post.jwt | Multi-format presentation |
+| **5** | mdoc | x509_hash | dc_api.jwt | Digital Credentials API |
+| **6.1** | SD-JWT VC | x509_san_uri | direct_post.jwt | Alternative client ID scheme |
+| **6.2** | SD-JWT VC | x509_hash | direct_post.jwt | Certificate hash scheme |
+| **6.3** | SD-JWT VC | did | direct_post.jwt | DID-based authentication |
+| **6.4** | SD-JWT VC | verifier_attestation | direct_post.jwt | Attestation-based |
 
-### Phase 3: Alternative Schemes
+## Test Plan Details
 
-| Plan | Format | Client ID | Response Mode | Status |
-|------|--------|-----------|---------------|--------|
-| **6.1** | SD-JWT VC | x509_san_uri | direct_post.jwt | 🟢 Phase 3 |
-| **6.2** | SD-JWT VC | x509_hash | direct_post.jwt | 🟢 Phase 3 |
-| **6.3** | SD-JWT VC | did | direct_post.jwt | 🟢 Phase 3 (Optional) |
-| **6.4** | SD-JWT VC | verifier_attestation | direct_post.jwt | 🟢 Phase 3 |
+### Plan 1: SD-JWT VC Baseline
+
+**Class:** `WalletHAIPPlan1`
+
+Tests wallet's ability to process SD-JWT VC presentations with HAIP requirements.
+
+| Property | Value |
+|----------|-------|
+| **Credential Format** | `sd_jwt_vc` (dc+sd-jwt) |
+| **Client ID Scheme** | `x509_san_dns` |
+| **Request Method** | `request_uri_signed` (JAR) |
+| **Response Mode** | `direct_post.jwt` (encrypted) |
+
+**Expected Test Modules (14 actual from conformance suite):**
+
+| Module | Type | Description |
+|--------|------|-------------|
+| `oid4vp-1final-wallet-happy-flow` | Positive | Standard successful presentation flow |
+| `oid4vp-1final-wallet-request-uri-method-post` | Positive | Request URI fetched via POST |
+| `oid4vp-1final-wallet-minimal-cnf-jwk` | Positive | Minimal confirmation key |
+| `oid4vp-1final-wallet-verify-kb-jwt-signature` | Negative | Verify KB-JWT signature validation |
+| `oid4vp-1final-wallet-verify-credential-signature` | Negative | Verify credential signature validation |
+| `oid4vp-1final-wallet-verify-sd-hash` | Negative | Verify SD hash validation |
+| `oid4vp-1final-wallet-verify-kb-jwt-nonce` | Negative | Verify nonce validation |
+| `oid4vp-1final-wallet-verify-kb-jwt-aud` | Negative | Verify audience validation |
+| `oid4vp-1final-wallet-verify-kb-jwt-iat-past` | Negative | Verify issued-at (past) validation |
+| `oid4vp-1final-wallet-verify-kb-jwt-iat-future` | Negative | Verify issued-at (future) validation |
+| `oid4vp-1final-wallet-dcql-happy-flow` | Positive | DCQL query handling |
+| `oid4vp-1final-wallet-transaction-data` | Positive | Transaction data validation |
+| `oid4vp-1final-wallet-wrong-alg-response` | Negative | Wrong encryption algorithm |
+| `oid4vp-1final-wallet-no-enc-response` | Negative | Missing encryption |
+
+### Plan 2: mDL (Mobile Driving License) Baseline
+
+**Class:** `WalletHAIPPlan2`
+
+Tests wallet's ability to present ISO mDL (mso_mdoc) credentials.
+
+| Property | Value |
+|----------|-------|
+| **Credential Format** | `iso_mdl` (mso_mdoc) |
+| **Client ID Scheme** | `x509_san_dns` |
+| **Request Method** | `request_uri_signed` (JAR) |
+| **Response Mode** | `direct_post.jwt` (encrypted) |
+
+**Expected Test Modules:**
+
+| Module | Type | Description |
+|--------|------|-------------|
+| `oid4vp-1final-wallet-mdl-happy-flow` | Positive | Standard mDL presentation |
+| `oid4vp-1final-wallet-mdl-device-auth` | Positive | DeviceAuth holder binding |
+| `oid4vp-1final-wallet-mdl-session-transcript` | Positive | Session transcript validation (ISO 18013-7 Annex C) |
+| `oid4vp-1final-wallet-mdl-invalid-mso` | Negative | Invalid MSO signature detection |
+| `oid4vp-1final-wallet-mdl-invalid-device-sig` | Negative | Invalid device signature detection |
+| `oid4vp-1final-wallet-mdl-replay` | Negative | Replay attack prevention |
+
+### Plan 7: Negative Tests (Security Validation)
+
+**Class:** `WalletHAIPPlan7`
+
+Tests that wallet correctly **rejects** non-HAIP-compliant requests.
+
+| Property | Value |
+|----------|-------|
+| **Credential Format** | `sd_jwt_vc` |
+| **Response Mode** | `direct_post.jwt` |
+| **Expected Behavior** | Wallet must reject |
+
+**Expected Test Modules:**
+
+| Module | Description |
+|--------|-------------|
+| `oid4vp-1final-wallet-reject-unsigned-request` | Must reject unsigned authorization requests |
+| `oid4vp-1final-wallet-reject-cleartext-response` | Must reject requests not requiring encryption |
+| `oid4vp-1final-wallet-reject-weak-curve` | Must reject non-P-256 curves |
+| `oid4vp-1final-wallet-reject-weak-hash` | Must reject non-SHA-256 hashes |
+| `oid4vp-1final-wallet-reject-missing-holder-binding` | Must reject credentials without holder binding |
+| `oid4vp-1final-wallet-reject-expired-certificate` | Must reject expired verifier certificates |
+| `oid4vp-1final-wallet-reject-untrusted-ca` | Must reject untrusted certificate chains |
+| `oid4vp-1final-wallet-reject-wallet-nonce-mismatch` | Must reject wallet_nonce mismatches |
+| `oid4vp-1final-wallet-reject-insecure-origin` | Must reject non-HTTPS origins |
 
 ## HAIP Requirements
 
-All test plans validate these HAIP mandates:
+All test plans validate these HAIP mandatory requirements:
 
-- ✅ **Signed Request:** `request_uri_signed` with `wallet_nonce` replay protection
-- ✅ **Encrypted Response:** `direct_post.jwt` (JWE encryption)
-- ✅ **P-256 Keys:** secp256r1 curve enforcement
-- ✅ **SHA-256:** Hash algorithm enforcement
-- ✅ **Holder Binding:** KB-JWT (SD-JWT) or DeviceAuth (mdoc)
+| Requirement | Implementation | Spec Reference |
+|-------------|----------------|----------------|
+| Signed Request | `request_uri_signed` with JAR | HAIP 4.2 |
+| Encrypted Response | `direct_post.jwt` (JWE) | HAIP 4.3 |
+| Response Encryption Alg | ECDH-ES | HAIP 4.3.1 |
+| Response Encryption Enc | A256GCM | HAIP 4.3.1 |
+| P-256 Keys | secp256r1 curve enforcement | HAIP 5.1 |
+| SHA-256 | Hash algorithm enforcement | HAIP 5.2 |
+| Holder Binding | KB-JWT (SD-JWT) or DeviceAuth (mdoc) | HAIP 4.4 |
+| Replay Protection | wallet_nonce validation | HAIP 4.5 |
 
-## Test Modules per Plan
+## Configuration
 
-### Plan 1: SD-JWT VC Baseline (11 modules)
+### Test Configuration
 
-- `oid4vp-1final-wallet-haip-happy-flow`
-- `oid4vp-1final-wallet-haip-minimal-cnf-jwk`
-- `oid4vp-1final-wallet-haip-request-uri-method-post`
-- `oid4vp-1final-wallet-haip-invalid-kb-jwt-signature`
-- `oid4vp-1final-wallet-haip-invalid-credential-signature`
-- `oid4vp-1final-wallet-haip-invalid-sd-hash`
-- `oid4vp-1final-wallet-haip-invalid-kb-jwt-nonce`
-- `oid4vp-1final-wallet-haip-invalid-kb-jwt-aud`
-- `oid4vp-1final-wallet-haip-kb-jwt-iat-in-past`
-- `oid4vp-1final-wallet-haip-kb-jwt-iat-in-future`
-- `oid4vp-1final-wallet-haip-transaction-data-validation`
+```kotlin
+// ConformanceConfig.kt
+object ConformanceConfig {
+    const val CONFORMANCE_HOST = "localhost.emobix.co.uk"
+    const val CONFORMANCE_PORT = 8443
+    const val WALLET_API_URL = "http://127.0.0.1:7005"
+    const val WALLET_ADAPTER_PORT = 7006
+}
+```
 
-### Plan 2: mDL Baseline (6 modules)
+### Test Plan Configuration
 
-- `oid4vp-1final-wallet-haip-mdl-happy-flow`
-- `oid4vp-1final-wallet-haip-mdl-device-auth`
-- `oid4vp-1final-wallet-haip-mdl-session-transcript`
-- `oid4vp-1final-wallet-haip-mdl-invalid-mso-signature`
-- `oid4vp-1final-wallet-haip-mdl-invalid-device-signature`
-- `oid4vp-1final-wallet-haip-mdl-replay-protection`
+Each test plan specifies:
 
-### Plan 7: Negative Tests (9 modules)
-
-- `oid4vp-1final-wallet-haip-reject-unsigned-request`
-- `oid4vp-1final-wallet-haip-reject-cleartext-response`
-- `oid4vp-1final-wallet-haip-reject-weak-curve`
-- `oid4vp-1final-wallet-haip-reject-weak-hash`
-- `oid4vp-1final-wallet-haip-reject-missing-holder-binding`
-- `oid4vp-1final-wallet-haip-reject-expired-certificate`
-- `oid4vp-1final-wallet-haip-reject-untrusted-ca`
-- `oid4vp-1final-wallet-haip-reject-wallet-nonce-mismatch`
-- `oid4vp-1final-wallet-haip-reject-insecure-origin`
+```kotlin
+class WalletHAIPPlan1(...) : WalletTestPlan {
+    override val planName = "oid4vp-1final-wallet-haip-test-plan"
+    override val variant = mapOf(
+        "credential_format" to "sd_jwt_vc",
+        "response_mode" to "direct_post.jwt"
+    )
+    override val configuration = JsonObject {
+        // JWE encryption parameters
+        "client" to {
+            "authorization_encrypted_response_alg" to "ECDH-ES"
+            "authorization_encrypted_response_enc" to "A256GCM"
+        }
+    }
+}
+```
 
 ## Expected Output
 
+When tests execute successfully:
+
 ```
 ================================================================================
-Test Plan: oid4vp-1final-wallet-haip-test-plan [credential_format=sd_jwt_vc, client_id_prefix=x509_san_dns, request_method=request_uri_signed, vp_profile=haip, response_mode=direct_post.jwt] (HAIP)
+HAIP Wallet Conformance Tests
 ================================================================================
-✅ Test plan created: abc123
-📋 Test modules: 11
-   - oid4vp-1final-wallet-haip-happy-flow
-   - oid4vp-1final-wallet-haip-minimal-cnf-jwk
-   ...
 
-[1/11] Running module: oid4vp-1final-wallet-haip-happy-flow
-   ✅ Result: PASSED
+Conformance suite available: 5.2.0
 
-[2/11] Running module: oid4vp-1final-wallet-haip-minimal-cnf-jwk
-   ✅ Result: PASSED
+Test plans:
+  - HAIP Plan 1: SD-JWT VC Baseline (x509_hash + direct_post.jwt)
+  - HAIP Plan 2: mDL Baseline (x509_hash + direct_post.jwt)
+  - HAIP Plan 7: Negative Tests (Security Validation)
+
+================================================================================
+
+[Adapter] Starting Wallet Conformance Adapter on port 7006
+[Adapter] Wallet API URL: http://127.0.0.1:7005
+[Adapter] Started successfully
+
+================================================================================
+Running: HAIP Plan 1: SD-JWT VC Baseline (x509_hash + direct_post.jwt)
+================================================================================
+
+Plan created: abc123xyz
+Modules: 14
+
+[1/14] oid4vp-1final-wallet-happy-flow
+       Conformance: PASSED
+       Wallet:      SUCCESS
+
+[2/14] oid4vp-1final-wallet-verify-kb-jwt-signature
+       Conformance: PASSED
+       Wallet:      REJECTED (expected)
 
 ...
 
-Test Results:
---------------------------------------------------------------------------------
-  Total modules: 11
-  ✅ Passed:  11
-  
-  [0] ✅ oid4vp-1final-wallet-haip-happy-flow
-       Conformance: PASSED
-       Wallet:      PASSED
-  [1] ✅ oid4vp-1final-wallet-haip-minimal-cnf-jwk
-       Conformance: PASSED
-       Wallet:      PASSED
-  ...
 ================================================================================
 ```
 
+## Current Status
+
+Tests will **skip** until WAL-896 wallet HAIP features are implemented:
+
+- Signed request authentication (JAR parsing and validation)
+- Encrypted response generation (JWE with ECDH-ES + A256GCM)
+- HAIP policy enforcement
+- X.509 certificate chain validation
+
+Once implemented, tests will execute and validate compliance.
+
 ## Troubleshooting
 
-### Conformance Suite Not Available
+### Tests Skip
 
-```
-⚠️  Error getting server version: ...
-💡 Make sure conformance suite is running:
-   cd ~/dev/openid/conformance-suite
-   docker compose -f docker-compose-local.yml up -d
-```
+- Conformance suite not running
+- Check: `curl -k https://localhost.emobix.co.uk:8443/`
 
-**Solution:**
-1. Check Docker containers: `docker ps | grep conformance`
-2. Check /etc/hosts: `grep localhost.emobix.co.uk /etc/hosts`
-3. Test HTTPS: `curl -k https://localhost.emobix.co.uk:8443/`
+### Connection Refused to Wallet API
+
+- Wallet API not running on port 7005
+- Check: `curl http://127.0.0.1:7005/health`
+
+### Adapter Fails to Start
+
+- Port 7006 already in use
+- Check: `sudo lsof -i :7006`
 
 ### SSL Certificate Errors
 
-If you see certificate validation errors, ensure the trust store is configured:
+Re-extract and import certificate:
 
 ```bash
-# The project includes a pre-configured trust store
-ls waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
+
+openssl s_client -connect localhost.emobix.co.uk:8443 </dev/null 2>/dev/null | \
+  openssl x509 -outform PEM > conformance-test.pem
+
+keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks \
+  -storepass changeit 2>/dev/null || true
+keytool -importcert -trustcacerts -alias conformance-test-localhost \
+  -file conformance-test.pem -keystore conformance-truststore.jks \
+  -storepass changeit -noprompt
 ```
-
-The Gradle build automatically configures this trust store.
-
-### Wallet Endpoint Not Reachable
-
-If the conformance suite cannot reach the wallet endpoint:
-
-1. Check wallet-api2 is running: `curl http://localhost:7002/health`
-2. Check firewall allows localhost:7002
-3. For Docker networking, use host network mode
 
 ### Test Timeouts
 
-If tests timeout after 30 seconds:
+- Increase timeout in test class (default 10 minutes per plan)
+- Check wallet logs for processing errors
+- Check conformance suite logs: `docker logs conformance-suite-server-1`
 
-1. Check wallet logs for errors
-2. Increase timeout in `WalletTestPlanRunner.kt` (`maxAttempts`)
-3. Check conformance suite logs: `docker logs conformance-suite`
+## Test Results
 
-## Command-Line Execution
-
-You can also run individual test plans from the command line:
-
-```bash
-# SD-JWT VC + x509_san_dns + HAIP
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run \
-    --args="haip sd_jwt_vc x509_san_dns"
-
-# mDL + x509_san_dns + HAIP
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run \
-    --args="haip iso_mdl x509_san_dns"
-
-# PhotoID + x509_san_uri + HAIP
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run \
-    --args="haip iso_photoid x509_san_uri"
+Results are saved to:
 ```
-
-## Test Results Location
-
-Test results are saved to:
-
+waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
 ```
-waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/
-```
-
-Open `index.html` in a browser to view the full report.
-
-## Certification
-
-Once all HAIP tests pass, you can submit for official OpenID Foundation certification:
-
-1. Generate test execution logs
-2. Export conformance test results (JSON)
-3. Document certificate chain used
-4. Submit to: https://openid.net/certification/
 
 ## Related Documentation
 
-- **Test Plans:** `../../../wal-896-haip-test-plans.md` — Detailed test specifications
-- **Analysis:** `../../../wal-896-analysis.md` — Implementation analysis
-- **OpenID4VP Spec:** https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
-- **HAIP Spec:** https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html
-- **Conformance Suite:** https://gitlab.com/openid/conformance-suite
-
-## Contributing
-
-When adding new test plans:
-
-1. Add test method in `WalletHAIPConformanceTests.kt`
-2. Document test modules in `wal-896-haip-test-plans.md`
-3. Update this README with new test plan details
-4. Run locally before submitting PR
+- [README.md](README.md) - General setup and configuration
+- [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
+- [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier conformance tests
+- [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
+- [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
+- [Conformance Suite](https://gitlab.com/openid/conformance-suite)
 
 ## Support
 
-For issues:
-- Check existing conformance suite documentation
-- Review walt.id wallet implementation in `waltid-openid4vp-wallet`
-- Open issue in walt.id GitHub repository
+- [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+- [walt.id Discord](https://discord.gg/AW8AgqJthZ)
+- [Documentation](https://docs.walt.id)
