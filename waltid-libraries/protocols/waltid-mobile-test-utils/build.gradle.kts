@@ -4,6 +4,10 @@ plugins {
 
 group = "id.walt.protocols"
 
+waltidMobile {
+    androidNamespace.set("id.walt.mobile.test")
+}
+
 kotlin {
     sourceSets {
         commonMain.dependencies {
