@@ -77,6 +77,16 @@ kotlin {
 
         }
     }
+
+    if (enableAndroidBuild) {
+        // Signum's Android artifacts bring jdk18on Bouncy Castle; this project
+        // already uses lts8on via the shared JVM/Android crypto stack.
+        configurations.all {
+            exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+            exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+            exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+        }
+    }
 }
 
 mavenPublishing {
