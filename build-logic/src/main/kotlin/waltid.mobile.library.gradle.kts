@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalKotlinGradlePluginApi::class)
 
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 
@@ -9,29 +8,11 @@ plugins {
     id("waltid.base.library")
     kotlin("multiplatform")
     kotlin("plugin.power-assert")
-    id("com.android.kotlin.multiplatform.library")
 }
 
 kotlin {
     applyDefaultHierarchyTemplate()
     jvmToolchain(project.javaLibraryVersion)
-
-    android {
-        compileSdk = BuildConstants.COMPILE_SDK
-        minSdk = BuildConstants.MIN_SDK
-        compilations.all {
-            compileTaskProvider.configure {
-                compilerOptions {
-                    jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
-                }
-            }
-        }
-        packaging {
-            resources {
-                excludes += BuildConstants.META_INF_EXCLUDES
-            }
-        }
-    }
 
     if (enableIosBuild) {
         iosArm64()
@@ -41,6 +22,10 @@ kotlin {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
+}
+
+if (enableAndroidBuild) {
+    pluginManager.apply("waltid.mobile.android")
 }
 
 if (project.file("src/commonTest").exists()) {
