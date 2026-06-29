@@ -12,13 +12,15 @@ val moduleNamespace = when (project.path) {
     else -> project.group.toString()
 }
 
+val hasAndroidDeviceTests = layout.projectDirectory.dir("src/androidDeviceTest").asFile.isDirectory
+
 kotlin {
     android {
         namespace = moduleNamespace
         compileSdk = BuildConstants.COMPILE_SDK
         minSdk = BuildConstants.MIN_SDK
         withHostTestBuilder {}
-        if (project.path == ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile") {
+        if (hasAndroidDeviceTests) {
             withDeviceTestBuilder {
                 sourceSetTreeName = "androidDeviceTest"
             }.configure {
