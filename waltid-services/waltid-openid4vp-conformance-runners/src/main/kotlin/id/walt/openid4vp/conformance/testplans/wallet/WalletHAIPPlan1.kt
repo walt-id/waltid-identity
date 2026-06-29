@@ -46,15 +46,16 @@ class WalletHAIPPlan1(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
+            "alias": "HAIP Plan 1 - SD-JWT VC",
             "description": "Wallet HAIP - SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt",
-            "wallet": {
-                "authorization_endpoint": "$walletApiUrl",
-                "credential_format": "sd_jwt_vc"
-            },
             "server": {
-                "authorization_endpoint": "https://$conformanceHost:$conformancePort"
+                "authorization_endpoint": "$walletApiUrl"
             },
-            "publish": "everything"
+            "client": {
+                "authorization_encrypted_response_alg": "ECDH-ES",
+                "authorization_encrypted_response_enc": "A256GCM"
+            },
+            "publish": "no"
         }
         """.trimIndent()
     )

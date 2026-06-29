@@ -45,16 +45,16 @@ class WalletHAIPPlan7(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
+            "alias": "HAIP Plan 7 - Negative Tests",
             "description": "Wallet HAIP - Negative Tests (Security Validation)",
-            "wallet": {
-                "authorization_endpoint": "$walletApiUrl",
-                "credential_format": "sd_jwt_vc",
-                "security_policy": "haip"
-            },
             "server": {
-                "authorization_endpoint": "https://$conformanceHost:$conformancePort"
+                "authorization_endpoint": "$walletApiUrl"
             },
-            "publish": "everything"
+            "client": {
+                "authorization_encrypted_response_alg": "ECDH-ES",
+                "authorization_encrypted_response_enc": "A256GCM"
+            },
+            "publish": "no"
         }
         """.trimIndent()
     )

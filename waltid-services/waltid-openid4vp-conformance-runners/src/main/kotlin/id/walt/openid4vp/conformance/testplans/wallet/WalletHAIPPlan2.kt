@@ -41,15 +41,16 @@ class WalletHAIPPlan2(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
+            "alias": "HAIP Plan 2 - mDL",
             "description": "Wallet HAIP - mDL + x509_san_dns + request_uri_signed + direct_post.jwt",
-            "wallet": {
-                "authorization_endpoint": "$walletApiUrl",
-                "credential_format": "iso_mdl"
-            },
             "server": {
-                "authorization_endpoint": "https://$conformanceHost:$conformancePort"
+                "authorization_endpoint": "$walletApiUrl"
             },
-            "publish": "everything"
+            "client": {
+                "authorization_encrypted_response_alg": "ECDH-ES",
+                "authorization_encrypted_response_enc": "A256GCM"
+            },
+            "publish": "no"
         }
         """.trimIndent()
     )
