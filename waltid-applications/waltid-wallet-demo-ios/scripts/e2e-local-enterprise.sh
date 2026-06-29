@@ -16,13 +16,16 @@ ORG="${ORGANIZATION:-waltid}"
 TENANT="${TENANT:-waltid-tenant01}"
 TENANT_PATH="${ORG}.${TENANT}"
 ISSUER_PROFILE="${ISSUER_PROFILE:-}"
-VERIFIER="${VERIFIER:-verifier2}"
+VERIFIER="${VERIFIER:-verifier2-mobile}"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
+SKIP_IOS_APP_SETUP="${SKIP_IOS_APP_SETUP:-false}"
 
 ATTESTED=false
+PREPARE_ONLY=false
 for arg in "$@"; do
   case "$arg" in
     --attested) ATTESTED=true ;;
+    --prepare-only) PREPARE_ONLY=true ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
@@ -39,6 +42,31 @@ log() { echo -e "\n\033[1;36m[$1]\033[0m $2"; }
 err() { echo -e "\033[1;31m[ERROR]\033[0m $1" >&2; exit 1; }
 
 [ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e.env or env"
+require_e2e_command curl
+require_e2e_command python3
+
+TOKEN="$(get_enterprise_admin_token "$API_URL" "$ADMIN_EMAIL" "$ADMIN_PASSWORD")"
+
+check_ngrok_domain "$HOST_ALIAS_DOMAIN"
+
+if [ "$PREPARE_ONLY" = true ]; then
+  if [ "$ATTESTED" = false ] && [ "$ISSUER_PROFILE" = "issuer2-noattest.mdl-profile" ]; then
+    ensure_non_attested_issuer2 "$TOKEN" "${ORG}.enterprise.localhost"
+  fi
+  ensure_mobile_verifier2 "$TOKEN" "https://$HOST_ALIAS_DOMAIN" "$VERIFIER" "${ORG}.enterprise.localhost"
+else
+  log "CHECK" "Resource creation disabled; validating existing issuer/verifier resources only"
+fi
+
+preflight_local_enterprise_resources "$API_URL" "https://$HOST_ALIAS_DOMAIN" "$TOKEN" "$ISSUER_PROFILE" "$VERIFIER" "${ORG}.enterprise.localhost"
+
+if [ "$PREPARE_ONLY" = true ]; then
+  log "DONE" "Local Enterprise mobile resources are ready (attested=$ATTESTED)"
+  exit 0
+fi
+
+require_e2e_command xcrun
+require_e2e_command xcodebuild
 [ -f "$IOSAPP_DIR/iosApp.xcworkspace/contents.xcworkspacedata" ] || err "iosApp workspace not found"
 
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
@@ -57,27 +85,32 @@ fi
 
 log "CHECK" "Simulator: $SIMULATOR_ID"
 
-curl -sf "$API_URL/auth/account/emailpass" -X POST -H "Content-Type: application/json" \
-  -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" > /dev/null \
-  || err "Enterprise API auth failed at $API_URL"
-
-curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS_DOMAIN" \
-  || err "ngrok domain not reachable: https://$HOST_ALIAS_DOMAIN"
+if [ "$SKIP_IOS_APP_SETUP" != "true" ]; then
+  require_e2e_command pod
+  log "SETUP" "Installing CocoaPods dependencies"
+  (cd "$IOSAPP_DIR" && pod install)
+fi
 
 PLIST_DEBUG="$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Info-Debug.plist"
 grep -q "NSAppTransportSecurity" "$PLIST_DEBUG" \
   || err "Missing NSAppTransportSecurity in Info-Debug.plist (needed for local-enterprise E2E over HTTP)"
 
-if [ "$ATTESTED" = false ] && [ "$ISSUER_PROFILE" = "issuer2-noattest.mdl-profile" ]; then
-  TOKEN="$(curl -sf "$API_URL/auth/account/emailpass" -X POST -H "Content-Type: application/json" \
-    -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")"
-  ensure_non_attested_issuer2 "$TOKEN" "${ORG}.enterprise.localhost"
-fi
-
 log "TEST" "Running LocalEnterpriseBackendUITests (attested=$ATTESTED)"
 
 env \
-  TEST_RUNNER_HOST_ALIAS_DOMAIN="$HOST_ALIAS_DOMAIN" \
+  E2E_HOST_ALIAS_DOMAIN="$HOST_ALIAS_DOMAIN" \
+  E2E_API_BASE_URL="https://$HOST_ALIAS_DOMAIN" \
+  E2E_ADMIN_EMAIL="$ADMIN_EMAIL" \
+  E2E_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+  E2E_ORGANIZATION="$ORG" \
+  E2E_TENANT="$TENANT" \
+  E2E_ISSUER_PROFILE="$ISSUER_PROFILE" \
+  E2E_VERIFIER="$VERIFIER" \
+  E2E_ATTESTED="$ATTESTED" \
+  E2E_LOCAL_ENTERPRISE=true \
+  E2E_ATTESTATION_BASE_URL="http://localhost:$PORT" \
+  E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
+  TEST_RUNNER_E2E_HOST_ALIAS_DOMAIN="$HOST_ALIAS_DOMAIN" \
   TEST_RUNNER_E2E_API_BASE_URL="https://$HOST_ALIAS_DOMAIN" \
   TEST_RUNNER_E2E_ADMIN_EMAIL="$ADMIN_EMAIL" \
   TEST_RUNNER_E2E_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
@@ -86,6 +119,7 @@ env \
   TEST_RUNNER_E2E_ISSUER_PROFILE="$ISSUER_PROFILE" \
   TEST_RUNNER_E2E_VERIFIER="$VERIFIER" \
   TEST_RUNNER_E2E_ATTESTED="$ATTESTED" \
+  TEST_RUNNER_E2E_LOCAL_ENTERPRISE=true \
   TEST_RUNNER_E2E_ATTESTATION_BASE_URL="http://localhost:$PORT" \
   TEST_RUNNER_E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
   xcodebuild \

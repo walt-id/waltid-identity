@@ -16,7 +16,8 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
     private let verifierPollingTimeout: TimeInterval = 30     // 30 sec - backend verification
 
     func testReceiveAndPresentAgainstLocalEnterpriseBackend() async throws {
-        let config = LocalEnterpriseBackendConfig.fromEnvironment()
+        try LocalEnterpriseBackendConfig.requireExplicitLocalEnterpriseRun()
+        let config = try LocalEnterpriseBackendConfig.fromEnvironment()
         let attested = LocalEnterpriseBackendConfig.isAttested()
 
         let token = try await backend.getAdminToken(config: config)
@@ -26,7 +27,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         let ui = await WalletE2EUI(app: app)
 
         if attested {
-            let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+            let attestationBaseURL = LocalEnterpriseBackendConfig.attestationBaseURL()
             await ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
@@ -85,7 +86,8 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
     }
 
     func testCredentialsPersistAcrossAppRestart() async throws {
-        let config = LocalEnterpriseBackendConfig.fromEnvironment()
+        try LocalEnterpriseBackendConfig.requireExplicitLocalEnterpriseRun()
+        let config = try LocalEnterpriseBackendConfig.fromEnvironment()
         let attested = LocalEnterpriseBackendConfig.isAttested()
 
         let token = try await backend.getAdminToken(config: config)
@@ -95,7 +97,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         let ui = await WalletE2EUI(app: app)
 
         if attested {
-            let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+            let attestationBaseURL = LocalEnterpriseBackendConfig.attestationBaseURL()
             await ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
@@ -133,7 +135,7 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
 
         // Phase 3: Relaunch and verify credentials survived
         if attested {
-            let attestationBaseURL = ProcessInfo.processInfo.environment["E2E_ATTESTATION_BASE_URL"] ?? "http://localhost:7500"
+            let attestationBaseURL = LocalEnterpriseBackendConfig.attestationBaseURL()
             await ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
