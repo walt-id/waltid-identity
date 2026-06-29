@@ -1,110 +1,99 @@
 package id.walt.openid4vp.conformance.testplans.wallet
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Wallet Test Plan Configuration
+ * Base interface for wallet-side conformance test plans
  * 
- * Defines a wallet-side conformance test plan for OpenID4VP.
+ * Unlike verifier test plans, wallet test plans define:
+ * - How the wallet should be configured/initialized
+ * - What test plan to create on the conformance suite
+ * - Expected outcomes for wallet behavior
  * 
- * Unlike verifier test plans (where the conformance suite acts as the wallet),
- * wallet test plans reverse the roles:
- * - Conformance suite = Verifier (generates authorization requests)
- * - Local wallet = Presenter (responds to requests)
- * 
- * @param planName OpenID4VP test plan name (e.g., "oid4vp-1final-wallet-haip-test-plan")
- * @param variant Test plan variant parameters
- * @param walletApiUrl Base URL of local wallet API instance
- * @param conformanceHost Conformance suite hostname
- * @param conformancePort Conformance suite port
- * @param haipMode Enable HAIP compliance mode
- * @param expectRejection For negative tests - expect wallet to reject request
+ * The conformance suite acts as the verifier and sends
+ * authorization requests to the wallet endpoint.
  */
-@Serializable
-data class WalletTestPlan(
-    val planName: String,
-    val variant: Map<String, String>,
-    val walletApiUrl: String,
-    val conformanceHost: String,
-    val conformancePort: Int,
-    val haipMode: Boolean = false,
-    val expectRejection: Boolean = false
-) {
+interface WalletTestPlan {
     /**
-     * Get credential format from variant
+     * Human-readable description of this test plan
+     */
+    val description: String
+
+    /**
+     * OpenID4VP test plan name on conformance suite
+     * Example: "oid4vp-1final-wallet-haip-test-plan"
+     */
+    val planName: String
+
+    /**
+     * Test plan variant parameters
+     * Example: {"credential_format": "sd_jwt_vc", "client_id_prefix": "x509_san_dns"}
+     */
+    val variant: Map<String, String>
+
+    /**
+     * Test plan configuration JSON for conformance suite
+     * Defines wallet endpoint, credentials, etc.
+     */
+    val configuration: JsonObject
+
+    /**
+     * Whether this test plan expects the wallet to reject requests
+     * (for negative security tests)
+     */
+    val expectRejection: Boolean
+        get() = false
+
+    /**
+     * Whether this is an optional test plan
+     */
+    val optional: Boolean
+        get() = false
+
+    /**
+     * Wallet API base URL
+     */
+    val walletApiUrl: String
+
+    /**
+     * Extract credential format from variant
      */
     val credentialFormat: String
         get() = variant["credential_format"] ?: "sd_jwt_vc"
 
     /**
-     * Get client ID prefix (authentication scheme) from variant
+     * Extract client ID scheme from variant
      */
-    val clientIdPrefix: String
+    val clientIdScheme: String
         get() = variant["client_id_prefix"] ?: "x509_san_dns"
 
     /**
-     * Get request method from variant
+     * Check if this is a HAIP test plan
      */
-    val requestMethod: String
-        get() = variant["request_method"] ?: "request_uri_signed"
+    val isHAIP: Boolean
+        get() = variant["vp_profile"] == "haip"
 
     /**
-     * Get VP profile from variant
-     */
-    val vpProfile: String
-        get() = variant["vp_profile"] ?: "plain_vp"
-
-    /**
-     * Get response mode from variant
-     */
-    val responseMode: String
-        get() = variant["response_mode"] ?: if (haipMode) "direct_post.jwt" else "direct_post"
-
-    /**
-     * Is this an ISO mdoc credential format?
-     */
-    val isMdoc: Boolean
-        get() = credentialFormat in listOf("iso_mdl", "iso_mdoc", "iso_photoid", "mso_mdoc")
-
-    /**
-     * Is this an SD-JWT VC credential format?
-     */
-    val isSdJwtVc: Boolean
-        get() = credentialFormat in listOf("sd_jwt_vc", "dc_sd_jwt")
-
-    /**
-     * Is encrypted response required?
+     * Check if encrypted response is required
      */
     val requiresEncryptedResponse: Boolean
-        get() = haipMode || responseMode.endsWith(".jwt")
+        get() = variant["response_mode"] == "direct_post.jwt" || isHAIP
 
     /**
-     * Is signed request required?
+     * Check if signed request is required
      */
     val requiresSignedRequest: Boolean
-        get() = haipMode || requestMethod.contains("signed")
+        get() = variant["request_method"] == "request_uri_signed" || isHAIP
 
     /**
-     * Build variant JSON for conformance suite API
+     * Check if this is an mdoc credential format
      */
-    fun toVariantJson(): JsonObject {
-        return kotlinx.serialization.json.buildJsonObject {
-            variant.forEach { (key, value) ->
-                put(key, kotlinx.serialization.json.JsonPrimitive(value))
-            }
-        }
-    }
+    val isMdoc: Boolean
+        get() = credentialFormat.startsWith("iso_")
 
     /**
-     * Build test plan description for logging
+     * Check if this is an SD-JWT VC format
      */
-    fun describe(): String = buildString {
-        append(planName)
-        append(" [")
-        append(variant.entries.joinToString(", ") { "${it.key}=${it.value}" })
-        append("]")
-        if (haipMode) append(" (HAIP)")
-        if (expectRejection) append(" (Negative)")
-    }
+    val isSdJwtVc: Boolean
+        get() = credentialFormat == "sd_jwt_vc"
 }
