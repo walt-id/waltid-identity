@@ -33,7 +33,7 @@ class WalletHAIPPlan1(
 
     override val description = "HAIP Plan 1: SD-JWT VC Baseline (x509_san_dns + direct_post.jwt)"
 
-    override val planName = "oid4vp-1final-wallet-haip-test-plan"
+    override val planName = "oid4vp-1final-wallet-test-plan"
 
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
