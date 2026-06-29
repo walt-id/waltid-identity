@@ -4,6 +4,10 @@ plugins {
     id("waltid.mobile.library")
 }
 
+waltidMobile {
+    androidNamespace.set("id.walt.walletdemo.compose.logic")
+}
+
 group = "id.walt.walletdemo.compose"
 
 val enableMobileWallet = enableAndroidBuild || enableIosBuild

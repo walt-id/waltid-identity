@@ -12,6 +12,10 @@ plugins {
     kotlin("plugin.compose")
 }
 
+waltidMobile {
+    androidNamespace.set("id.walt.walletdemo.compose.ui")
+}
+
 group = "id.walt.walletdemo.compose"
 
 val isCocoaPodsBuild = providers.gradleProperty("kotlin.native.cocoapods.platform").isPresent
