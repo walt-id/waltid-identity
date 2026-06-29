@@ -1,7 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.runner.req
 
 import io.ktor.http.*
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -10,7 +9,6 @@ import kotlinx.serialization.json.JsonObject
  * Used to configure the conformance suite to test an Issuer implementation.
  * The conformance suite acts as a wallet testing the issuer.
  */
-@Serializable
 data class IssuerTestPlanConfiguration(
     /**
      * Parameters to append to the test plan creation URL.
@@ -27,5 +25,17 @@ data class IssuerTestPlanConfiguration(
     /**
      * The URL of the issuer being tested.
      */
-    val issuerUrl: String
+    val issuerUrl: String,
+
+    /**
+     * Variant JSON string for module creation.
+     * If null, uses empty variant (issuer tests often don't need per-module variant).
+     */
+    val moduleVariant: String = "{}",
+
+    /**
+     * Modules that may legitimately return SKIPPED or INTERRUPTED instead of PASSED.
+     * Used for optional suite checks like signed metadata.
+     */
+    val skippableModules: Set<String>? = null
 )

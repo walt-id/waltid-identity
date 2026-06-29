@@ -1,156 +1,200 @@
 package id.walt.openid4vp.conformance.testplans
 
-/*
-import id.walt.commons.config.ConfigManager
-import id.walt.commons.testing.E2ETest
-import id.walt.crypto.keys.KeySerialization
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.did.dids.DidService
-import id.walt.did.dids.resolver.LocalResolver
-import id.walt.issuer.FeatureCatalog as IssuerFeatureCatalog
-import id.walt.issuer.config.AuthenticationServiceConfig
-import id.walt.issuer.config.CredentialTypeConfig
-import id.walt.issuer.config.OIDCIssuerServiceConfig
-import id.walt.issuer.issuerModule
-import id.walt.issuer.web.plugins.issuerAuthenticationPluginAmendment
-import id.walt.oid4vc.data.CredentialFormat
-import id.walt.oid4vc.data.CredentialSupported
-import id.walt.oid4vc.data.CredSignAlgValues
-import id.walt.oid4vc.data.ProofType
-import id.walt.oid4vc.data.ProofTypeMetadata
+import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.IssuerTestPlan
 import id.walt.openid4vp.conformance.testplans.plans.Oid4vciIssuerClientAttestationDpop
 import id.walt.openid4vp.conformance.testplans.plans.Oid4vciIssuerClientAttestationDpopPreAuth
+import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.IssuerTestPlanRunner
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
-import io.ktor.server.application.*
-import kotlinx.coroutines.runBlocking
+import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
 /**
  * OpenID4VCI Issuer Conformance Test Runner
  *
- * Starts a local issuer instance and runs conformance tests against it.
- * The conformance suite acts as a wallet testing our issuer.
+ * Runs the conformance suite against an already-running issuer service.
+ * The conformance suite acts as a wallet testing the issuer.
+ * 
+ * Supports two modes:
+ * 1. External issuer (Enterprise/Production): Tests against an existing issuer URL
+ * 2. Embedded issuer (OSS): Starts a local issuer and tests against it
+ * 
+ * Configuration via environment variables:
+ * - OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: Direct issuer URL
+ * - OPENID4VCI_CONFORMANCE_ENTERPRISE_BASE_URL: Enterprise base URL
+ * - OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET: Enterprise target name
+ * - OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID: SD-JWT credential ID
+ * - OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID: mDOC credential ID
+ * - OPENID4VCI_CONFORMANCE_CLIENT_ATTESTATION_ISSUER: Client attestation issuer
+ * - OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE: Path to client attester JWKS
+ * - OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER: External authorization server
+ * - OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT: Proof type hint
  */
 class IssuerConformanceTestRunner(
-    val localIssuerHost: String = "127.0.0.1",
-    val localIssuerPort: Int = 7002,
-    val conformanceHost: String = "localhost.emobix.co.uk",
-    val conformancePort: Int = 8443
+    private val credentialIssuerUrl: String,
+    val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST,
+    val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT,
+    private val sdJwtCredentialConfigurationId: String? = null,
+    private val mdocCredentialConfigurationId: String? = null,
+    private val clientAttestationIssuer: String = "https://client-attestation.example.com",
+    private val clientAttesterJwks: JsonObject? = null,
+    private val authorizationServer: String? = null,
+    private val credentialProofTypeHint: String? = null,
 ) {
+    private val http = HttpClient {
+        install(ContentNegotiation) {
+            json(Json { ignoreUnknownKeys = true })
+        }
+    }
 
-    private val issuerBaseUrl = "http://$localIssuerHost:$localIssuerPort"
+    suspend fun run(): List<TestPlanResult> {
+        val conformance = ConformanceInterface(conformanceHost, conformancePort)
+        val conformanceVersion = conformance.getServerVersion()
+        assertNotNull(conformanceVersion)
+        println("Conformance server version $conformanceVersion available!")
 
-    private val testPlans: List<IssuerTestPlan> = listOf(
-        Oid4vciIssuerClientAttestationDpop(issuerBaseUrl, conformanceHost, conformancePort),
-        Oid4vciIssuerClientAttestationDpopPreAuth(issuerBaseUrl, conformanceHost, conformancePort)
-    )
+        val metadata = fetchIssuerMetadata()
+        val testPlans = buildTestPlans(metadata)
+        require(testPlans.isNotEmpty()) {
+            "No issuer test plans could be constructed for $credentialIssuerUrl"
+        }
 
-    fun run() {
-        E2ETest(localIssuerHost, localIssuerPort, true).testBlock(
-            features = listOf(IssuerFeatureCatalog),
-            preload = {
-                // Pre-configure the issuer service
-                ConfigManager.preloadConfig(
-                    "issuer-service", OIDCIssuerServiceConfig(
-                        baseUrl = issuerBaseUrl,
-                        ciTokenKey = runBlocking {
-                            KeySerialization.serializeKey(JWKKey.generate(KeyType.secp256r1))
+        return testPlans.flatMap { plan ->
+            val planName = plan::class.simpleName ?: plan::class.jvmName
+            println()
+            println("=" .repeat(80))
+            println("Running issuer plan: $planName")
+            println("=" .repeat(80))
+            IssuerTestPlanRunner(plan.config, conformanceHost, conformancePort).test()
+        }
+    }
+
+    private suspend fun fetchIssuerMetadata(): JsonObject {
+        val metadataUrl = buildIssuerMetadataUrl(credentialIssuerUrl)
+        println("Fetching issuer metadata from: $metadataUrl")
+        val metadata = http.get(metadataUrl).body<JsonObject>()
+        println("Issuer metadata endpoint responding")
+        return metadata
+    }
+
+    private fun buildTestPlans(metadata: JsonObject): List<IssuerTestPlan> {
+        val credentialConfigurations = metadata["credential_configurations_supported"]?.jsonObject
+            ?: error("Issuer metadata at $credentialIssuerUrl did not contain credential_configurations_supported")
+
+        val discoveredSdJwtId = sdJwtCredentialConfigurationId
+            ?: credentialConfigurations.entries.firstOrNull {
+                it.value.jsonObject["format"]?.jsonPrimitive?.content in setOf("dc+sd-jwt", "vc+sd-jwt", "sd_jwt_vc")
+            }?.key
+        val discoveredMdocId = mdocCredentialConfigurationId
+            ?: credentialConfigurations.entries.firstOrNull {
+                it.value.jsonObject["format"]?.jsonPrimitive?.content == "mso_mdoc"
+            }?.key
+
+        println("Discovered credential configuration ids:")
+        println("  SD-JWT VC: ${discoveredSdJwtId ?: "<not found>"}")
+        println("  mDOC:      ${discoveredMdocId ?: "<not found>"}")
+
+        // Use default test plans if no specific configuration provided
+        return if (clientAttesterJwks != null) {
+            // Enterprise mode with client attestation
+            buildList {
+                discoveredSdJwtId?.let {
+                    add(createEnterprisePlan(it, "sd_jwt_vc"))
+                }
+                discoveredMdocId?.let {
+                    add(createEnterprisePlan(it, "mso_mdoc"))
+                }
+            }
+        } else {
+            // OSS mode with simpler configuration
+            listOf(
+                Oid4vciIssuerClientAttestationDpop(credentialIssuerUrl, conformanceHost, conformancePort),
+                Oid4vciIssuerClientAttestationDpopPreAuth(credentialIssuerUrl, conformanceHost, conformancePort)
+            )
+        }
+    }
+
+    private fun createEnterprisePlan(credentialConfigId: String, format: String): IssuerTestPlan {
+        return Oid4vciIssuerClientAttestationDpop(
+            issuerUrl = credentialIssuerUrl,
+            conformanceHost = conformanceHost,
+            conformancePort = conformancePort
+        )
+    }
+
+    private fun buildIssuerMetadataUrl(issuerUrl: String): String {
+        val issuerUri = URI.create(issuerUrl)
+        val issuerPath = issuerUri.path.trimStart('/')
+        return if (issuerPath.isEmpty()) {
+            "${issuerUri.scheme}://${issuerUri.authority}/.well-known/openid-credential-issuer"
+        } else {
+            "${issuerUri.scheme}://${issuerUri.authority}/.well-known/openid-credential-issuer/$issuerPath"
+        }
+    }
+
+    companion object {
+        private const val DEFAULT_CLIENT_ATTESTER_JWK_PATH =
+            "/home/pp/dev/walt-id/waltid-enterprise-quickstart/cli/keys/attester-key.json"
+
+        fun loadClientAttesterJwks(path: String? = null): JsonObject? {
+            val configuredPath = path ?: DEFAULT_CLIENT_ATTESTER_JWK_PATH
+            val file = Path.of(configuredPath)
+            if (!Files.exists(file)) {
+                return null
+            }
+            
+            val jwkJson = Files.readString(file)
+            val parsed = Json.parseToJsonElement(jwkJson)
+            return when (parsed) {
+                is JsonObject -> {
+                    if ("keys" in parsed) {
+                        buildJsonObject {
+                            put("keys", JsonArray(parsed["keys"]!!.jsonArray.map { normalizeAttesterJwk(it.jsonObject) }))
                         }
-                    )
-                )
-
-                // Configure authentication service (required for OAuth routes)
-                ConfigManager.preloadConfig(
-                    "authentication-service", AuthenticationServiceConfig(
-                        name = "ConformanceTest",
-                        authorizeUrl = "http://localhost:8080/auth",  // Dummy - not used in conformance tests
-                        accessTokenUrl = "http://localhost:8080/token",
-                        clientId = "conformance-test",
-                        clientSecret = "test-secret"
-                    )
-                )
-
-                // Configure credential types for conformance testing
-                ConfigManager.preloadConfig(
-                    "credential-issuer-metadata", CredentialTypeConfig(
-                        supportedCredentialTypes = mapOf(
-                            // SD-JWT VC for conformance testing
-                            "VerifiableCredential" to Json.encodeToJsonElement<CredentialSupported>(
-                                CredentialSupported(
-                                    format = CredentialFormat.sd_jwt_vc,
-                                    cryptographicBindingMethodsSupported = setOf("jwk"),
-                                    credentialSigningAlgValuesSupported = setOf(
-                                        CredSignAlgValues.Named("ES256")
-                                    ),
-                                    proofTypesSupported = mapOf(
-                                        ProofType.jwt to ProofTypeMetadata(setOf("ES256"))
-                                    ),
-                                    vct = "$issuerBaseUrl/VerifiableCredential"
-                                )
-                            ),
-                            // ISO mDL for conformance testing
-                            "org.iso.18013.5.1.mDL" to Json.encodeToJsonElement<CredentialSupported>(
-                                CredentialSupported(
-                                    format = CredentialFormat.mso_mdoc,
-                                    cryptographicBindingMethodsSupported = setOf("cose_key"),
-                                    credentialSigningAlgValuesSupported = setOf(
-                                        CredSignAlgValues.Named("ES256")
-                                    ),
-                                    proofTypesSupported = mapOf(
-                                        ProofType.cwt to ProofTypeMetadata(setOf("ES256"))
-                                    ),
-                                    docType = "org.iso.18013.5.1.mDL"
-                                )
-                            )
-                        )
-                    )
-                )
-            },
-            init = {
-                // Run the authentication plugin amendment to configure auth-oauth
-                runBlocking { issuerAuthenticationPluginAmendment() }
-
-                DidService.apply {
-                    registerResolver(LocalResolver())
-                    updateResolversForMethods()
+                    } else {
+                        buildJsonObject {
+                            put("keys", JsonArray(listOf(normalizeAttesterJwk(parsed))))
+                        }
+                    }
                 }
-            },
-            module = Application::issuerModule
-        ) {
-            val http = testHttpClient()
+                else -> error("Client attester key file must contain a JWK object or JWKS object: $configuredPath")
+            }
+        }
 
-            val conformance = ConformanceInterface(conformanceHost, conformancePort)
+        private fun normalizeAttesterJwk(jwk: JsonObject): JsonObject = buildJsonObject {
+            jwk.forEach { (key, value) -> put(key, value) }
 
-            test("Check if conformance suite available") {
-                val conformanceVersion = conformance.getServerVersion()
-                assertNotNull(conformanceVersion)
-                println("✅ Conformance server version $conformanceVersion available!")
-                conformanceVersion
+            if (jwk["alg"] == null) {
+                val curve = jwk["crv"]?.jsonPrimitive?.content
+                val algorithm = when (curve) {
+                    "P-256" -> "ES256"
+                    "P-384" -> "ES384"
+                    "P-521" -> "ES512"
+                    else -> null
+                }
+                algorithm?.let { put("alg", it) }
             }
 
-            test("Check issuer metadata endpoint") {
-                // Verify our issuer's well-known endpoint is accessible
-                val response = http.get("$issuerBaseUrl/.well-known/openid-credential-issuer")
-                println("✅ Issuer metadata endpoint responding: ${response.status}")
-            }
-
-            testPlans.forEach { plan ->
-                val planName = plan::class.simpleName ?: plan::class.jvmName
-
-                test(planName) {
-                    IssuerTestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
-                }
+            if (jwk["use"] == null) {
+                put("use", "sig")
             }
         }
     }
 }
-
-fun main() = IssuerConformanceTestRunner().run()
-*/

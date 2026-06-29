@@ -1,6 +1,6 @@
 # Quick Setup Guide
 
-This guide walks you through running OpenID4VP conformance tests locally.
+This guide walks you through running OpenID4VP/VCI conformance tests locally.
 
 ## Prerequisites
 
@@ -33,7 +33,7 @@ cp ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-ope
 cp -r ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/nginx ~/dev/openid/conformance-suite/
 ```
 
-### 4. Install ngrok
+### 4. Install ngrok (for Verifier2 tests)
 
 Download from https://ngrok.com/download or:
 
@@ -89,6 +89,45 @@ Open in browser:
 waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
 ```
 
+## Run Issuer Conformance Tests
+
+### 1. Start Issuer Service
+
+**Option A: OSS Issuer**
+```bash
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+./gradlew :waltid-services:waltid-issuer-api:run
+# Issuer runs on port 7002
+```
+
+**Option B: Enterprise Issuer**
+```bash
+cd ~/dev/walt-id/waltid-enterprise-quickstart
+docker compose up -d
+```
+
+### 2. Configure Issuer URL
+
+```bash
+# Option 1: Direct URL
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://localhost:7002"
+
+# Option 2: Enterprise target
+export OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET="my-org"
+```
+
+### 3. Run Tests
+
+```bash
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "IssuerConformanceTests"
+```
+
+**Note:** Authorization code flow tests require manual interaction in the conformance suite UI.
+For fully automated tests, ensure your issuer supports pre-authorized code flow.
+
 ## Run Wallet HAIP Conformance Tests
 
 ```bash
@@ -132,11 +171,28 @@ Plan 2 (SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt):
   [9] oid4vp-1final-verifier-kb-jwt-iat-in-future: conformance=PASSED, verifier=FAILED
 ```
 
-Note: For negative tests, `verifier=FAILED` is the expected correct behavior (verifier correctly rejected invalid input).
+Note: For negative tests, `verifier=FAILED` is the expected correct behavior.
+
+### Issuer Tests
+
+```
+================================================================================
+Running issuer plan: Oid4vciIssuerClientAttestationDpop
+================================================================================
+[1/6] Running module: oid4vci-1_0-issuer-metadata-test
+  Status: FINISHED, Result: PASSED
+
+[2/6] Running module: oid4vci-1_0-issuer-happy-flow
+  Status: FINISHED, Result: PASSED
+...
+
+Total: 6 modules
+Passed: 6
+```
 
 ### Wallet Tests
 
-Currently skip because WAL-896 HAIP features are in development. Once implemented, tests will execute and validate wallet compliance.
+Currently skip because WAL-896 HAIP features are in development.
 
 ## Troubleshooting
 
@@ -159,12 +215,23 @@ Common issues:
 
 - Conformance suite not running
 - ngrok URL not set (Verifier2 tests)
+- Issuer URL not set (Issuer tests)
 
 Verify:
 ```bash
 curl -k https://localhost.emobix.co.uk:8443/
 echo $VERIFIER_NGROK_URL
+echo $OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
 ```
+
+### Issuer Test Stuck in WAITING
+
+Authorization code flow requires user interaction:
+1. Open https://localhost.emobix.co.uk:8443
+2. Find the running test
+3. Complete OAuth login in the popup
+
+Use pre-authorized code flow for automated tests.
 
 ### Connection Refused
 
@@ -200,4 +267,5 @@ kill <PID>
 
 - [README.md](README.md) - Full documentation
 - [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier2 test details
+- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer test details
 - [WALLET-HAIP-TESTS.md](WALLET-HAIP-TESTS.md) - Wallet HAIP test details
