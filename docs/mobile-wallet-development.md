@@ -65,11 +65,32 @@ waltid-applications/waltid-wallet-demo-android/scripts/
 waltid-applications/waltid-wallet-demo-ios/scripts/
 ```
 
-Local Enterprise E2E requires a running Enterprise stack and `HOST_ALIAS_DOMAIN` in each platform's `scripts/e2e.env`. Android emulator verifier callbacks also require:
+Local Enterprise E2E is local-only for now and is not self-contained. It requires a provisioned `waltid-enterprise-quickstart` stack. From a clean quickstart checkout, configure `config/enterprise.conf` for public mobile redirects before starting the stack:
+
+```hocon
+baseDomain = "enterprise.localhost"
+baseSsl = true
+# basePort = 7500
+```
+
+Start Docker Desktop or another Docker daemon, run `docker compose up`, start `ngrok http 7500`, then provision the baseline resources without running the quickstart's built-in primary use case:
 
 ```bash
-adb reverse tcp:7500 tcp:7500
+cd cli
+npm install
+HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --init-system
+HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --setup-all
 ```
+
+Set the same `HOST_ALIAS_DOMAIN` in each platform's `scripts/e2e.env`. The mobile scripts validate that generated credential-offer and verifier URLs use the public ngrok HTTPS origin before launching the app tests. They fail fast if the quickstart baseline resources or the mobile-only helper resources are missing.
+
+From either platform scripts directory, create the mobile-only helper resources once:
+
+```bash
+./e2e-local-enterprise.sh --prepare-only
+```
+
+This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart. The iOS local Enterprise script runs `pod install` by default so the CocoaPods sandbox is in sync before Xcode starts.
 
 ## Troubleshooting
 
@@ -78,4 +99,4 @@ adb reverse tcp:7500 tcp:7500
 - **Android SDK not found:** check `sdk.dir` in `local.properties`.
 - **CocoaPods not found:** check `kotlin.apple.cocoapods.bin` in `local.properties`.
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
-- **Local Enterprise E2E cannot reach services:** check `HOST_ALIAS_DOMAIN`, the running Enterprise stack, and `adb reverse tcp:7500 tcp:7500` for Android emulator flows.
+- **Local Enterprise E2E cannot reach services:** check `HOST_ALIAS_DOMAIN`, the running Enterprise stack, `baseSsl=true`, and omitted `basePort`.

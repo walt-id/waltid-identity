@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/e2e.env" 2>/dev/null || true
+source "$SCRIPT_DIR/../../mobile-e2e-fixtures/local-enterprise-fixtures.sh"
 
 IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../../.." && pwd)}"
 PORT="${PORT:-7500}"
@@ -15,15 +16,17 @@ ORG="${ORGANIZATION:-waltid}"
 TENANT="${TENANT:-waltid-tenant01}"
 TENANT_PATH="${ORG}.${TENANT}"
 ISSUER_PROFILE="${ISSUER_PROFILE:-}"
-VERIFIER="${VERIFIER:-verifier2}"
+VERIFIER="${VERIFIER:-verifier2-mobile}"
 ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 HOST_ALIAS_DOMAIN="${HOST_ALIAS_DOMAIN:-}"
 TEST_CLASS="id.walt.walletdemo.LocalEnterpriseBackendE2ETest"
 
 ATTESTED=false
+PREPARE_ONLY=false
 for arg in "$@"; do
   case "$arg" in
     --attested) ATTESTED=true ;;
+    --prepare-only) PREPARE_ONLY=true ;;
     *) echo "Unknown arg: $arg" >&2; exit 1 ;;
   esac
 done
@@ -38,15 +41,37 @@ fi
 
 log() { echo -e "\n\033[1;36m[$1]\033[0m $2"; }
 err() { echo -e "\033[1;31m[ERROR]\033[0m $1" >&2; exit 1; }
-
-get_token() {
-  curl -sf "$API_URL/auth/account/emailpass" \
-    -X POST -H "Content-Type: application/json" \
-    -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])"
-}
+get_token() { get_enterprise_admin_token "$API_URL" "$ADMIN_EMAIL" "$ADMIN_PASSWORD"; }
 
 [ -n "$HOST_ALIAS_DOMAIN" ] || err "HOST_ALIAS_DOMAIN must be set in scripts/e2e.env or env"
+require_e2e_command curl
+require_e2e_command python3
+
+[ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
+[ -f "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" ] || err "AndroidManifest.xml not found"
+
+log "CHECK" "Verifying local Enterprise backend prerequisites"
+TOKEN="$(get_token)"
+curl -sf -o /dev/null "$API_URL/health" 2>/dev/null || true
+check_ngrok_domain "$HOST_ALIAS_DOMAIN"
+
+if [ "$PREPARE_ONLY" = true ]; then
+  if [ "$ATTESTED" = false ] && [ "$ISSUER_PROFILE" = "issuer2-noattest.mdl-profile" ]; then
+    ensure_non_attested_issuer2 "$TOKEN" "${ORG}.enterprise.localhost"
+  fi
+  ensure_mobile_verifier2 "$TOKEN" "https://$HOST_ALIAS_DOMAIN" "$VERIFIER" "${ORG}.enterprise.localhost"
+else
+  log "CHECK" "Resource creation disabled; validating existing issuer/verifier resources only"
+fi
+
+preflight_local_enterprise_resources "$API_URL" "https://$HOST_ALIAS_DOMAIN" "$TOKEN" "$ISSUER_PROFILE" "$VERIFIER" "${ORG}.enterprise.localhost"
+
+if [ "$PREPARE_ONLY" = true ]; then
+  log "DONE" "Local Enterprise mobile resources are ready (attested=$ATTESTED)"
+  exit 0
+fi
+
+require_e2e_command adb
 
 # Detect emulator vs physical device
 if adb devices -l | grep -q "emulator-"; then
@@ -65,17 +90,9 @@ fi
 if [ -z "$ANDROID_API_HOST_HEADER" ] && echo "$ANDROID_API_URL" | grep -Eq '10\.0\.2\.2|localhost'; then
   ANDROID_API_HOST_HEADER="${ORG}.enterprise.localhost"
 fi
-[ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
-[ -f "$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-android/src/main/AndroidManifest.xml" ] || err "AndroidManifest.xml not found"
 
-log "CHECK" "Verifying Android + backend prerequisites (emulator=$IS_EMULATOR)"
+log "CHECK" "Verifying Android prerequisites (emulator=$IS_EMULATOR)"
 adb devices | grep -q "device$" || err "No Android emulator/device connected"
-curl -sf "$API_URL/auth/account/emailpass" -X POST -H "Content-Type: application/json" \
-  -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}" > /dev/null \
-  || err "Enterprise auth failed at $API_URL"
-curl -sf -o /dev/null "$API_URL/health" 2>/dev/null || true
-curl -sf -o /dev/null -H "ngrok-skip-browser-warning: true" "https://$HOST_ALIAS_DOMAIN" \
-  || err "ngrok domain not reachable: https://$HOST_ALIAS_DOMAIN"
 
 if [ "$IS_EMULATOR" = true ]; then
   grep -q 'cleartextTrafficPermitted=\"true\"' \
@@ -83,64 +100,10 @@ if [ "$IS_EMULATOR" = true ]; then
     || err "Missing cleartext permission in debug network_security_config.xml (needed for emulator local-enterprise E2E)"
 fi
 
-# Verifier response_uri resolves to localhost:7500 for the emulator path.
-adb reverse --list | grep -q 'tcp:7500 tcp:7500' \
-  || err "Missing adb reverse for verifier callback. Run: adb reverse tcp:7500 tcp:7500"
-
-if [ "$ATTESTED" = false ] && [ "$ISSUER_PROFILE" = "issuer2-noattest.mdl-profile" ]; then
-  log "SETUP" "Ensuring non-attested issuer exists (issuer2-noattest)"
-  TOKEN="$(get_token)"
-  HOST_HDR="${ORG}.enterprise.localhost"
-  # Create issuer2-noattest service (no clientAuthenticationConfig)
-  curl -sf "http://localhost:$PORT/v1/$TENANT_PATH.issuer2-noattest/resource-api/services/create" \
-    -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "Host: $HOST_HDR" \
-    -d "{\"type\":\"issuer2\",\"_id\":\"$TENANT_PATH.issuer2-noattest\",\"tokenKeyId\":\"$TENANT_PATH.kms.issuer-signing-key\",\"kms\":\"$TENANT_PATH.kms\",\"credentialConfigurations\":{\"org.iso.18013.5.1.mDL\":{\"format\":\"mso_mdoc\",\"doctype\":\"org.iso.18013.5.1.mDL\",\"scope\":\"org.iso.18013.5.1.mDL\",\"credential_signing_alg_values_supported\":[-7,-9],\"cryptographic_binding_methods_supported\":[\"cose_key\"],\"proof_types_supported\":{\"jwt\":{\"proof_signing_alg_values_supported\":[\"ES256\"]}}}}}" \
-    > /dev/null 2>&1 || true
-  # mDoc issuance requires the profile to include the doc signer + IACA cert chain.
-  curl -sf "http://localhost:$PORT/v1/$TENANT_PATH.x509-store.vical-doc-signer-cert/x509-store-api/certificates" \
-    -H "Authorization: Bearer $TOKEN" -H "Host: $HOST_HDR" > /tmp/doc_cert.json
-  curl -sf "http://localhost:$PORT/v1/$TENANT_PATH.x509-store.vical-iaca-cert/x509-store-api/certificates" \
-    -H "Authorization: Bearer $TOKEN" -H "Host: $HOST_HDR" > /tmp/iaca_cert.json
-  python3 - <<PY
-import json
-with open('/tmp/doc_cert.json') as f:
-    doc_pem = json.load(f)['data']['pem']
-with open('/tmp/iaca_cert.json') as f:
-    iaca_pem = json.load(f)['data']['pem']
-payload = {
-    'name': 'mdl-profile',
-    'credentialConfigurationId': 'org.iso.18013.5.1.mDL',
-    'issuerKeyId': '$TENANT_PATH.kms.issuer-signing-key',
-    'x5Chain': [
-        {'type': 'pem-encoded-x509-certificate-descriptor', 'pemEncodedCertificate': doc_pem},
-        {'type': 'pem-encoded-x509-certificate-descriptor', 'pemEncodedCertificate': iaca_pem},
-    ],
-    'credentialData': {
-        'org.iso.18013.5.1': {
-            'family_name': 'Doe',
-            'given_name': 'John',
-            'birth_date': '1990-01-01',
-            'issue_date': '2024-01-01',
-            'expiry_date': '2029-01-01',
-            'issuing_country': 'US',
-            'issuing_authority': 'Test DMV',
-            'document_number': 'DL123456789',
-            'un_distinguishing_sign': 'USA',
-        }
-    }
-}
-with open('/tmp/mdl-profile-payload.json', 'w') as f:
-    json.dump(payload, f)
-PY
-  curl -sf "http://localhost:$PORT/v2/$TENANT_PATH.issuer2-noattest.mdl-profile/issuer-service-api/credentials/profiles" \
-    -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -H "Host: $HOST_HDR" \
-    -d @/tmp/mdl-profile-payload.json > /dev/null 2>&1 || true
-  log "SETUP" "issuer2-noattest ready"
-fi
-
 GRADLE_ARGS=(
   :waltid-applications:waltid-wallet-demo-android:connectedDebugAndroidTest
   --no-configuration-cache
+  -PenableAndroidBuild=true
   -Pandroid.testInstrumentationRunnerArguments.class="$TEST_CLASS"
   -Pandroid.testInstrumentationRunnerArguments.e2e_host_alias_domain="$HOST_ALIAS_DOMAIN"
   -Pandroid.testInstrumentationRunnerArguments.e2e_api_base_url="$ANDROID_API_URL"
@@ -151,11 +114,11 @@ GRADLE_ARGS=(
   -Pandroid.testInstrumentationRunnerArguments.e2e_tenant="$TENANT"
   -Pandroid.testInstrumentationRunnerArguments.e2e_issuer_profile="$ISSUER_PROFILE"
   -Pandroid.testInstrumentationRunnerArguments.e2e_verifier="$VERIFIER"
+  -Pandroid.testInstrumentationRunnerArguments.e2e_local_enterprise=true
 )
 
 if [ "$ATTESTED" = true ]; then
   log "BUILD" "Attested mode enabled: injecting client-attester build config"
-  TOKEN="$(get_token)"
   if [ "$IS_EMULATOR" = true ]; then
     ATTESTATION_BASE_URL="http://10.0.2.2:$PORT"
     ATTESTATION_HOST_HEADER="${ORG}.enterprise.localhost"
@@ -183,6 +146,7 @@ log "TEST" "Running $TEST_CLASS"
 # Android 16+ (targetSdk 37) requires ACCESS_LOCAL_NETWORK for emulator 10.0.2.2 connections.
 # Pre-install the APK so we can grant the runtime permission before connectedAndroidTest runs.
 "$IDENTITY_DIR/gradlew" -p "$IDENTITY_DIR" :waltid-applications:waltid-wallet-demo-android:installDebug --no-configuration-cache \
+  -PenableAndroidBuild=true \
   -Pattestation.baseUrl="${ATTESTATION_BASE_URL:-}" \
   -Pattestation.attesterPath="${ATTESTER_PATH:-}" \
   -Pattestation.bearerToken="${TOKEN:-}" \
