@@ -81,14 +81,17 @@ class WalletTestPlanRunner(
      * Create test plan on conformance suite
      */
     private suspend fun createTestPlan(): String {
-        // Conformance suite API expects planName as query parameter
+        // Conformance suite API expects planName AND variant as URL-encoded query parameters
+        val variantJson = Json.encodeToString(testPlan.variant)
+        
         val response = httpClient.post("https://$conformanceHost:$conformancePort/api/plan") {
             url {
                 parameters.append("planName", testPlan.planName)
+                // Variant must be URL-encoded JSON
+                parameters.append("variant", variantJson)
             }
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
-                put("variant", Json.encodeToJsonElement(testPlan.variant))
                 put("configuration", testPlan.configuration)
             })
         }
@@ -99,8 +102,11 @@ class WalletTestPlanRunner(
         }
 
         val responseBody = response.body<JsonObject>()
-        return responseBody["id"]?.jsonPrimitive?.content
+        val planId = responseBody["id"]?.jsonPrimitive?.content
             ?: error("No test plan ID in response")
+            
+        println("Created test plan: $planId")
+        return planId
     }
 
     /**
