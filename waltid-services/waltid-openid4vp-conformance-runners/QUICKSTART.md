@@ -1,187 +1,203 @@
-# Quick Setup Guide - Running Wallet HAIP Conformance Tests Locally
+# Quick Setup Guide
 
-This guide walks you through running wallet HAIP conformance tests against the local OpenID conformance suite.
+This guide walks you through running OpenID4VP conformance tests locally.
 
 ## Prerequisites
 
-- Docker and Docker Compose installed
-- Java 21+ installed
+- Docker and Docker Compose
+- Java 21+
+- ngrok (for Verifier2 tests)
 - Ubuntu/Linux environment
 
-## Step 1: Setup /etc/hosts
+## Initial Setup (One-Time)
 
-Add the conformance suite hostname:
+### 1. Add Hosts Entry
 
 ```bash
 echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
 ```
 
-## Step 2: Clone and Setup Conformance Suite
+### 2. Clone Conformance Suite
 
 ```bash
-# Clone the OpenID conformance suite repository
 git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+```
 
-# Copy walt.id specific docker compose file
+### 3. Copy Configuration Files
+
+```bash
+# Copy Docker Compose
 cp ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml ~/dev/openid/conformance-suite/
 
 # Copy nginx configuration
 cp -r ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/nginx ~/dev/openid/conformance-suite/
 ```
 
-## Step 3: Start Conformance Suite
+### 4. Install ngrok
+
+Download from https://ngrok.com/download or:
+
+```bash
+# Snap (Linux)
+sudo snap install ngrok
+
+# Homebrew (macOS)
+brew install ngrok
+```
+
+## Start Conformance Suite
 
 ```bash
 cd ~/dev/openid/conformance-suite
 docker compose -f docker-compose-walt.yml up -d
-```
 
-Wait approximately 30 seconds for initialization.
-
-## Step 4: Verify Conformance Suite is Running
-
-```bash
+# Wait ~30 seconds, then verify:
 curl -k https://localhost.emobix.co.uk:8443/
 ```
 
-You should see HTML output from the conformance suite web interface.
+You should see HTML output. The web interface is available at https://localhost.emobix.co.uk:8443/
 
-You can also open in browser: https://localhost.emobix.co.uk:8443/
-(Accept the self-signed certificate warning)
+## Run Verifier2 Conformance Tests
 
-## Step 5: Run Wallet HAIP Tests
+### 1. Start ngrok Tunnel
+
+In a separate terminal:
+
+```bash
+ngrok http 7003
+```
+
+Note the HTTPS URL (e.g., `https://abc123.ngrok-free.app`).
+
+### 2. Run Tests
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
-# Run all wallet HAIP tests
+# Set ngrok URL
+export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
+
+# Run tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*WalletHAIPConformanceTests"
+    --tests "Verifier2ConformanceTests"
 ```
 
-### Run Specific Test Plans
+### 3. View Results
+
+Open in browser:
+```
+waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
+```
+
+## Run Wallet HAIP Conformance Tests
 
 ```bash
-# Run only Plan 1 (SD-JWT VC baseline)
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*WalletHAIPConformanceTests.HAIP Plan 1*"
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
-# Run only Plan 2 (mDL baseline)
+# Run all wallet tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*WalletHAIPConformanceTests.HAIP Plan 2*"
+    --tests "WalletHAIPConformanceTests"
 
-# Run only Plan 7 (negative tests)
+# Or run specific plan
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "*WalletHAIPConformanceTests.HAIP Plan 7*"
+    --tests "WalletHAIPConformanceTests.HAIP Plan 1*"
 ```
 
-## Step 6: View Test Results
+Note: Wallet tests require WAL-896 HAIP features to be implemented.
 
-Test results are generated at:
-```
-waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
-```
-
-Open in browser to see detailed test results.
-
-## Step 7: Stop Conformance Suite
-
-When done testing:
+## Stop Conformance Suite
 
 ```bash
 cd ~/dev/openid/conformance-suite
 docker compose -f docker-compose-walt.yml down
+
+# Stop ngrok: Ctrl+C in ngrok terminal
 ```
 
 ## Expected Results
 
-Currently, the wallet tests will SKIP because:
-- Wallet HAIP features are not yet fully implemented (WAL-896 in progress)
-- Tests check for conformance suite availability and skip gracefully
+### Verifier2 Tests
 
-Once WAL-896 wallet implementation is complete, tests will execute and validate:
-- Signed request authentication
-- Encrypted response generation
-- KB-JWT holder binding (SD-JWT VC)
-- DeviceAuth holder binding (mDL)
-- P-256 key curve enforcement
-- SHA-256 hash algorithm enforcement
+When working correctly, you should see:
+
+```
+Plan 1 (MdlX509SanDnsRequestUriSignedDirectPost):
+  [0] oid4vp-1final-verifier-happy-flow: conformance=PASSED, verifier=SUCCESSFUL
+  [1] oid4vp-1final-verifier-request-uri-method-post: conformance=PASSED, verifier=SUCCESSFUL
+  [2] oid4vp-1final-verifier-invalid-session-transcript: conformance=PASSED, verifier=FAILED
+
+Plan 2 (SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt):
+  [0] oid4vp-1final-verifier-happy-flow: conformance=PASSED, verifier=SUCCESSFUL
+  ...
+  [9] oid4vp-1final-verifier-kb-jwt-iat-in-future: conformance=PASSED, verifier=FAILED
+```
+
+Note: For negative tests, `verifier=FAILED` is the expected correct behavior (verifier correctly rejected invalid input).
+
+### Wallet Tests
+
+Currently skip because WAL-896 HAIP features are in development. Once implemented, tests will execute and validate wallet compliance.
 
 ## Troubleshooting
 
-### Conformance Suite Won't Start
+### Conformance Suite Not Starting
 
-**Check Docker containers:**
 ```bash
-docker ps
+# Check containers
+docker ps | grep conformance
+
+# Check logs
 docker logs conformance-suite-server-1
 docker logs conformance-suite-nginx-1
 ```
 
-**Common issues:**
-- Port 8443 already in use (check with `sudo lsof -i :8443`)
-- MongoDB initialization slow (wait 60 seconds)
-- Docker daemon not running
+Common issues:
+- Port 8443 in use: `sudo lsof -i :8443`
+- MongoDB slow to start: wait 60 seconds
+
+### Tests Skip
+
+- Conformance suite not running
+- ngrok URL not set (Verifier2 tests)
+
+Verify:
+```bash
+curl -k https://localhost.emobix.co.uk:8443/
+echo $VERIFIER_NGROK_URL
+```
+
+### Connection Refused
+
+For Verifier2 tests, the conformance suite (Docker) cannot reach host `localhost`.
+Use ngrok to expose the local verifier.
 
 ### SSL Certificate Errors
 
-If you see `SSLHandshakeException`:
-
-1. Verify truststore exists:
-```bash
-ls -la ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
-```
-
-2. Re-extract certificate from running server:
+Re-extract certificate:
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
 
-openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk </dev/null 2>/dev/null | \
+openssl s_client -connect localhost.emobix.co.uk:8443 </dev/null 2>/dev/null | \
   openssl x509 -outform PEM > conformance-test.pem
 
-keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks -storepass changeit 2>/dev/null || true
+keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks \
+  -storepass changeit 2>/dev/null || true
 keytool -importcert -trustcacerts -alias conformance-test-localhost \
   -file conformance-test.pem -keystore conformance-truststore.jks \
   -storepass changeit -noprompt
 ```
 
-### Tests Fail (Not Skip)
+### Address Already in Use (Port 7003)
 
-If tests execute but FAIL:
-- Wallet implementation incomplete (expected during WAL-896 development)
-- Check wallet logs for errors
-- Verify wallet endpoint is accessible
-- Check security policy configuration
+The test starts its own embedded verifier. Kill any existing process:
 
-### Can't Access Web Interface
-
-If browser can't reach https://localhost.emobix.co.uk:8443/:
-- Check `/etc/hosts` has entry: `127.0.0.1 localhost.emobix.co.uk`
-- Check nginx container is running: `docker ps | grep nginx`
-- Check nginx logs: `docker logs conformance-suite-nginx-1`
-- Try rebuilding nginx: `docker compose -f docker-compose-walt.yml build nginx`
-
-## Next Steps
-
-Once conformance suite is running:
-
-1. **Implement WAL-896 wallet features** (signed request auth, encrypted response)
-2. **Configure wallet security policies** (HAIP mode)
-3. **Re-run tests** - they should execute and validate compliance
-4. **Fix any failures** iteratively
-5. **Submit for OpenID certification** when all tests PASS
+```bash
+sudo lsof -i :7003
+kill <PID>
+```
 
 ## Additional Resources
 
-- **Full README:** `waltid-services/waltid-openid4vp-conformance-runners/README.md`
-- **Wallet HAIP Tests:** `waltid-services/waltid-openid4vp-conformance-runners/WALLET-HAIP-TESTS.md`
-- **OpenID4VP Spec:** https://openid.net/specs/openid-4-verifiable-presentations-1_0.html
-- **HAIP Spec:** https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html
-- **Conformance Suite:** https://gitlab.com/openid/conformance-suite
-
-## Support
-
-For issues or questions:
-- Check existing documentation first
-- Open issue in walt.id GitHub repository
-- Join walt.id Discord community
+- [README.md](README.md) - Full documentation
+- [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier2 test details
+- [WALLET-HAIP-TESTS.md](WALLET-HAIP-TESTS.md) - Wallet HAIP test details
