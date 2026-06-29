@@ -22,14 +22,6 @@ if (enableCocoaPods) {
 }
 
 kotlin {
-    android {
-        namespace = "id.walt.walletdemo.compose.ui"
-
-        withHostTestBuilder {}.configure {
-            isIncludeAndroidResources = true
-        }
-    }
-
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
@@ -50,27 +42,31 @@ kotlin {
             implementation(kotlin("test"))
         }
 
-        val mobileUiTest by creating {
-            dependsOn(commonTest.get())
+        if (enableAndroidBuild || enableIosBuild) {
+            val mobileUiTest by creating {
+                dependsOn(commonTest.get())
 
-            dependencies {
-                implementation(identityLibs.kotlinx.coroutines.test)
-                implementation(identityLibs.compose.ui.test)
+                dependencies {
+                    implementation(identityLibs.kotlinx.coroutines.test)
+                    implementation(identityLibs.compose.ui.test)
+                }
             }
-        }
 
-        if (enableIosBuild) {
-            val iosTest by getting {
-                dependsOn(mobileUiTest)
+            if (enableIosBuild) {
+                val iosTest by getting {
+                    dependsOn(mobileUiTest)
+                }
             }
-        }
 
-        val androidHostTest by getting {
-            dependsOn(mobileUiTest)
+            if (enableAndroidBuild) {
+                val androidHostTest by getting {
+                    dependsOn(mobileUiTest)
 
-            dependencies {
-                implementation(identityLibs.junit)
-                implementation(identityLibs.robolectric)
+                    dependencies {
+                        implementation(identityLibs.junit)
+                        implementation(identityLibs.robolectric)
+                    }
+                }
             }
         }
     }

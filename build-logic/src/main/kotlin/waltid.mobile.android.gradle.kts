@@ -6,12 +6,15 @@ plugins {
 }
 
 val moduleNamespace = when (project.path) {
+    ":waltid-applications:waltid-wallet-demo-compose:sharedLogic" -> "id.walt.walletdemo.compose.logic"
+    ":waltid-applications:waltid-wallet-demo-compose:sharedUI" -> "id.walt.walletdemo.compose.ui"
     ":waltid-libraries:protocols:waltid-mobile-test-utils" -> "id.walt.mobile.test"
     ":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile" -> "id.walt.wallet2.mobile"
     ":waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile" -> "id.walt.wallet2.persistence"
     else -> project.group.toString()
 }
 
+val hasAndroidHostTests = layout.projectDirectory.dir("src/androidHostTest").asFile.isDirectory
 val hasAndroidDeviceTests = layout.projectDirectory.dir("src/androidDeviceTest").asFile.isDirectory
 
 kotlin {
@@ -19,7 +22,11 @@ kotlin {
         namespace = moduleNamespace
         compileSdk = BuildConstants.COMPILE_SDK
         minSdk = BuildConstants.MIN_SDK
-        withHostTestBuilder {}
+        withHostTestBuilder {}.configure {
+            if (hasAndroidHostTests) {
+                isIncludeAndroidResources = true
+            }
+        }
         if (hasAndroidDeviceTests) {
             withDeviceTestBuilder {
                 sourceSetTreeName = "androidDeviceTest"

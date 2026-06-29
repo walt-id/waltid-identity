@@ -9,12 +9,6 @@ group = "id.walt.walletdemo.compose"
 val enableMobileWallet = enableAndroidBuild || enableIosBuild
 
 kotlin {
-    android {
-        namespace = "id.walt.walletdemo.compose.logic"
-
-        withHostTestBuilder {}
-    }
-
     if (enableWalletDemoComposeWeb) {
         wasmJs {
             browser()
@@ -35,12 +29,14 @@ kotlin {
                 }
             }
 
-            androidMain {
-                dependsOn(mobileMain)
-            }
+            if (enableAndroidBuild) {
+                androidMain {
+                    dependsOn(mobileMain)
+                }
 
-            androidMain.dependencies {
-                implementation(identityLibs.ktor.client.android)
+                androidMain.dependencies {
+                    implementation(identityLibs.ktor.client.android)
+                }
             }
 
             if (enableIosBuild) {
