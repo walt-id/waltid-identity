@@ -6,6 +6,7 @@ import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
+import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.KeyManager
@@ -19,8 +20,11 @@ import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.ListElement
 import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
@@ -42,7 +46,6 @@ import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
-import id.walt.oid4vc.util.COSESign1Utils
 import id.walt.oid4vc.util.JwtUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -394,7 +397,7 @@ open class CIProvider(
         when (proof.proofType) {
             ProofType.cwt -> {
                 return proof.cwt?.base64UrlDecode()?.let {
-                    COSESign1Utils.extractHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
+                    extractCwtHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
                 }
             }
 
@@ -416,6 +419,31 @@ open class CIProvider(
                     }
                 }
             }
+        }
+    }
+
+    private fun extractCwtHolderKey(coseSign1: COSESign1): COSECryptoProviderKeyInfo {
+        val tokenHeader = coseSign1.decodeProtectedHeader()
+        val coseKeyLabel = MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)
+        return if (tokenHeader.value.containsKey(coseKeyLabel)) {
+            val rawKey = (tokenHeader.value[coseKeyLabel] as ByteStringElement).value
+            COSECryptoProviderKeyInfo(
+                keyID = "pub-key",
+                algorithmID = AlgorithmID.ECDSA_256,
+                publicKey = OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
+            )
+        } else {
+            val x5c = tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)]
+            val x5Chain = when (x5c) {
+                is ListElement -> x5c.value.map { X509CertUtils.parse((it as ByteStringElement).value) }
+                else -> listOf(X509CertUtils.parse((x5c as ByteStringElement).value))
+            }
+            COSECryptoProviderKeyInfo(
+                keyID = "pub-key",
+                algorithmID = AlgorithmID.ECDSA_256,
+                publicKey = x5Chain.first().publicKey,
+                x5Chain = x5Chain
+            )
         }
     }
 
