@@ -140,13 +140,9 @@ class IssuerConformanceTestRunner(
     }
 
     private fun buildIssuerMetadataUrl(issuerUrl: String): String {
-        val issuerUri = URI.create(issuerUrl)
-        val issuerPath = issuerUri.path.trimStart('/')
-        return if (issuerPath.isEmpty()) {
-            "${issuerUri.scheme}://${issuerUri.authority}/.well-known/openid-credential-issuer"
-        } else {
-            "${issuerUri.scheme}://${issuerUri.authority}/.well-known/openid-credential-issuer/$issuerPath"
-        }
+        // OID4VCI metadata URL: <issuer>/.well-known/openid-credential-issuer
+        // If issuer has a path (e.g., /draft13), the .well-known goes at the end
+        return issuerUrl.trimEnd('/') + "/.well-known/openid-credential-issuer"
     }
 
     companion object {
