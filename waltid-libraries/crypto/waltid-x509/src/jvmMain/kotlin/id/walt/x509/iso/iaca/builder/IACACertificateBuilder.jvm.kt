@@ -1,14 +1,14 @@
 package id.walt.x509.iso.iaca.builder
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
-import id.walt.x509.*
+import id.walt.x509.CertificateDer
+import id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.IACACertificateBundle
 import id.walt.x509.iso.iaca.certificate.IACACertificateProfileData
-import id.walt.x509.iso.iaca.certificate.IACADecodedCertificate
 import id.walt.x509.iso.iaca.certificate.toJcaX500Name
+import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
 import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.x509.*
@@ -114,25 +114,6 @@ internal actual suspend fun platformSignIACACertificate(
 
     return IACACertificateBundle(
         certificateDer = certificateDer,
-        decodedCertificate = IACADecodedCertificate(
-            principalName = profileData.principalName,
-            validityPeriod = X509ValidityPeriod(
-                notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
-                notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
-            ),
-            issuerAlternativeName = profileData.issuerAlternativeName,
-            serialNumber = ByteString(serialNo.toByteArray()),
-            basicConstraints = certificate.x509BasicConstraints,
-            keyUsage = setOf(
-                X509KeyUsage.KeyCertSign,
-                X509KeyUsage.CRLSign,
-            ),
-            skiHex = skiExt.keyIdentifier.toHexString(),
-            crlDistributionPointUri = profileData.crlDistributionPointUri,
-            publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
-            criticalExtensionOIDs = certificate.criticalX509V3ExtensionOIDs,
-            nonCriticalExtensionOIDs = certificate.nonCriticalX509V3ExtensionOIDs,
-            certificate = JcaX509CertificateHandle(certificate),
-        )
+        decodedCertificate = IACACertificateParser().parse(certificateDer),
     )
 }

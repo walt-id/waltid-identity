@@ -7,6 +7,6 @@ actual suspend fun platformBuildGenericX509Certificate(
     subjectPublicKey: Key,
     signingKey: Key,
 ): GenericX509CertificateBundle {
-    // TODO(iOS): Implement generic X.509 certificate creation, then remove the guarded iOS X.509 tests.
+    // TODO(iOS): Implement generic X.509 certificate creation.
     TODO("Generic X.509 certificate creation is not implemented for iOS")
 }

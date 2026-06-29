@@ -1,14 +1,14 @@
 package id.walt.x509.iso.documentsigner.builder
 
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.parsePEMEncodedJcaPublicKey
-import id.walt.x509.*
+import id.walt.x509.CertificateDer
+import id.walt.x509.KeyContentSignerWrapper
 import id.walt.x509.iso.DocumentSignerEkuOID
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateBundle
 import id.walt.x509.iso.documentsigner.certificate.DocumentSignerCertificateProfileData
-import id.walt.x509.iso.documentsigner.certificate.DocumentSignerDecodedCertificate
 import id.walt.x509.iso.documentsigner.certificate.toJcaX500Name
+import id.walt.x509.iso.documentsigner.parser.DocumentSignerCertificateParser
 import id.walt.x509.iso.generateIsoCompliantX509CertificateSerialNo
 import id.walt.x509.iso.iaca.certificate.toJcaX500Name
 import id.walt.x509.iso.issuerAlternativeNameToGeneralNameArray
@@ -120,32 +120,11 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
     val certificateHolder = certBuilder.build(keySignerBuilder)
     val certificate = JcaX509CertificateConverter().getCertificate(certificateHolder)
     val certificateDer = CertificateDer(
-        bytes = ByteString( certificate.encoded),
+        bytes = ByteString(certificate.encoded),
     )
 
     return DocumentSignerCertificateBundle(
         certificateDer = certificateDer,
-        decodedCertificate = DocumentSignerDecodedCertificate(
-            issuerPrincipalName = iacaSignerSpec.profileData.principalName,
-            principalName = profileData.principalName,
-            validityPeriod = X509ValidityPeriod(
-                notBefore = Instant.fromEpochSeconds(certNotBeforeDate.toInstant().epochSecond),
-                notAfter = Instant.fromEpochSeconds(certNotAfterDate.toInstant().epochSecond),
-            ),
-            issuerAlternativeName = iacaSignerSpec.profileData.issuerAlternativeName,
-            crlDistributionPointUri = profileData.crlDistributionPointUri,
-            serialNumber = serialNo,
-            keyUsage = setOf(
-                X509KeyUsage.DigitalSignature
-            ),
-            extendedKeyUsage = setOf(DocumentSignerEkuOID),
-            akiHex = akiExt.keyIdentifierOctets.toHexString(),
-            skiHex = skiExt.keyIdentifier.toHexString(),
-            basicConstraints = certificate.x509BasicConstraints,
-            publicKey = JWKKey.importFromDerCertificate(certificate.encoded).getOrThrow(),
-            criticalExtensionOIDs = certificate.criticalX509V3ExtensionOIDs,
-            nonCriticalExtensionOIDs = certificate.nonCriticalX509V3ExtensionOIDs,
-            certificate = JcaX509CertificateHandle(certificate),
-        ),
+        decodedCertificate = DocumentSignerCertificateParser().parse(certificateDer),
     )
 }

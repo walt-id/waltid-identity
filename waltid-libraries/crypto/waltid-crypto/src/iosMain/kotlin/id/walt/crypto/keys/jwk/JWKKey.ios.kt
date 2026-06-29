@@ -292,7 +292,6 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null || this::class != other::class) return false
-        if (!super.equals(other)) return false
 
         other as JWKKey
 

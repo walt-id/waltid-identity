@@ -6,6 +6,7 @@ import id.walt.x509.CertificateDer
 import id.walt.x509.SignumX509CertificateHandle
 import id.walt.x509.X509ValidityPeriod
 import id.walt.x509.iso.signumBasicConstraints
+import id.walt.x509.iso.signumCrlDistributionPointUriOrNull
 import id.walt.x509.iso.signumCriticalExtensionOids
 import id.walt.x509.iso.signumIssuerAlternativeName
 import id.walt.x509.iso.signumKeyUsages
@@ -50,7 +51,7 @@ internal actual suspend fun platformParseIACACertificate(
         basicConstraints = cert.signumBasicConstraints(),
         keyUsage = certificateKeyUsages,
         skiHex = cert.signumSubjectKeyIdentifierHex(),
-        crlDistributionPointUri = null,
+        crlDistributionPointUri = cert.signumCrlDistributionPointUriOrNull(),
         publicKey = JWKKey.importFromDerCertificate(certificate.bytes.toByteArray()).getOrThrow(),
         criticalExtensionOIDs = cert.signumCriticalExtensionOids(),
         nonCriticalExtensionOIDs = cert.signumNonCriticalExtensionOids(),

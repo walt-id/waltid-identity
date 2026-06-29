@@ -119,14 +119,15 @@ internal fun X509Certificate.signumExtendedKeyUsageOids(): Set<String> {
 }
 
 internal fun X509Certificate.signumCrlDistributionPointUri(): String =
-    requireNotNull(
-        extensionAsSequence("2.5.29.31")
-            ?.findContextSpecificPrimitive(6uL)
-            ?.content
-            ?.decodeToString()
-    ) {
+    requireNotNull(signumCrlDistributionPointUriOrNull()) {
         "CRL distribution point URI must exist as part of the X509 certificate, but was found missing"
     }
+
+internal fun X509Certificate.signumCrlDistributionPointUriOrNull(): String? =
+    extensionAsSequence("2.5.29.31")
+        ?.findContextSpecificPrimitive(6uL)
+        ?.content
+        ?.decodeToString()
 
 internal fun List<RelativeDistinguishedName>.signumAttributeValue(oid: String): String? =
     asSequence()
