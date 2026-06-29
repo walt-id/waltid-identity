@@ -32,12 +32,11 @@ class WalletHAIPPlan7(
 
     override val description = "HAIP Plan 7: Negative Tests (Security Validation)"
 
-    override val planName = "oid4vp-1final-wallet-test-plan"
+    override val planName = "oid4vp-1final-wallet-haip-test-plan"
 
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
-        "client_id_prefix" to "x509_san_dns",
-        "vp_profile" to "haip"
+        "response_mode" to "direct_post.jwt"
     )
 
     override val expectRejection = true
