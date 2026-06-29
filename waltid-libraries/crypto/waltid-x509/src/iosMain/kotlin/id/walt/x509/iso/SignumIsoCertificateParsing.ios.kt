@@ -1,12 +1,16 @@
 package id.walt.x509.iso
 
 import at.asitplus.signum.indispensable.asn1.Asn1Element
+import at.asitplus.signum.indispensable.asn1.Asn1Primitive
+import at.asitplus.signum.indispensable.asn1.Asn1Structure
 import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
+import at.asitplus.signum.indispensable.asn1.TagClass
 import at.asitplus.signum.indispensable.asn1.encoding.Asn1
 import at.asitplus.signum.indispensable.asn1.encoding.decodeToBoolean
 import at.asitplus.signum.indispensable.asn1.encoding.decodeToInt
 import at.asitplus.signum.indispensable.asn1.encoding.decodeToString
 import at.asitplus.signum.indispensable.asn1.encoding.parse
+import at.asitplus.signum.indispensable.asn1.readOid
 import at.asitplus.signum.indispensable.pki.AttributeTypeAndValue
 import at.asitplus.signum.indispensable.pki.RelativeDistinguishedName
 import at.asitplus.signum.indispensable.pki.X509Certificate
@@ -66,6 +70,17 @@ internal fun X509Certificate.signumSubjectKeyIdentifierHex(): String =
         "Subject key identifier must exist as part of the X509 certificate, but was found missing"
     }.let { ByteString(it).toHexString() }
 
+internal fun X509Certificate.signumAuthorityKeyIdentifierHex(): String =
+    requireNotNull(
+        extensionAsSequence("2.5.29.35")
+            ?.children
+            ?.filterIsInstance<Asn1Primitive>()
+            ?.firstOrNull { it.tag.isContextSpecific(0uL) }
+            ?.content
+    ) {
+        "Authority key identifier must exist as part of the X509 certificate, but was found missing"
+    }.let { ByteString(it).toHexString() }
+
 internal fun X509Certificate.signumIssuerAlternativeName(): IssuerAlternativeName {
     val issuerAlternativeNames = requireNotNull(tbsCertificate.issuerAlternativeNames) {
         "Issuer alternative name X509 certificate extension must exist, but was found missing from input certificate"
@@ -91,6 +106,27 @@ internal fun X509Certificate.signumNonCriticalExtensionOids(): Set<X509V3Extensi
         .filterNot { it.critical }
         .mapNotNull { X509V3ExtensionOID.fromOID(it.oid.toString()) }
         .toSet()
+
+internal fun X509Certificate.signumExtendedKeyUsageOids(): Set<String> {
+    val sequence = requireNotNull(extensionAsSequence("2.5.29.37")) {
+        "Extended key usage must exist as part of the X509 certificate, but was found missing"
+    }
+    val usages = sequence.children.map { it.asPrimitive().readOid().toString() }.toSet()
+    require(usages.isNotEmpty()) {
+        "Extended key usage must exist as part of the X509 certificate, but was found empty"
+    }
+    return usages
+}
+
+internal fun X509Certificate.signumCrlDistributionPointUri(): String =
+    requireNotNull(
+        extensionAsSequence("2.5.29.31")
+            ?.findContextSpecificPrimitive(6uL)
+            ?.content
+            ?.decodeToString()
+    ) {
+        "CRL distribution point URI must exist as part of the X509 certificate, but was found missing"
+    }
 
 internal fun List<RelativeDistinguishedName>.signumAttributeValue(oid: String): String? =
     asSequence()
@@ -132,3 +168,17 @@ private fun X509Certificate.extensionElement(oid: String): Asn1Element? =
 
 private fun X509Certificate.extensionAsSequence(oid: String) =
     extensionElement(oid)?.asSequence()
+
+private fun Asn1Element.findContextSpecificPrimitive(tagValue: ULong): Asn1Primitive? {
+    if (this is Asn1Primitive && tag.isContextSpecific(tagValue)) return this
+
+    val children = when (this) {
+        is Asn1Structure -> children
+        else -> return null
+    }
+
+    return children.firstNotNullOfOrNull { it.findContextSpecificPrimitive(tagValue) }
+}
+
+private fun Asn1Element.Tag.isContextSpecific(tagValue: ULong): Boolean =
+    tagClass == TagClass.CONTEXT_SPECIFIC && this.tagValue == tagValue
