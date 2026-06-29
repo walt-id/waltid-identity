@@ -71,16 +71,33 @@ curl -k https://localhost.emobix.co.uk:8443/
 
 ### 4. Issuer Service Running
 
-The issuer service must be running and accessible. Options:
+The issuer service must be running and accessible **from Docker**.
 
-**Option A: OSS Issuer (local)**
+**IMPORTANT:** The conformance suite runs in Docker. It cannot reach `localhost` on the host machine.
+Use one of these options:
+
+**Option A: OSS Issuer with host IP**
 ```bash
 # Start issuer on port 7002
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 ./gradlew :waltid-services:waltid-issuer-api:run
+
+# Use host IP instead of localhost (find with: hostname -I)
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://YOUR_HOST_IP:7002/openid4vci"
 ```
 
-**Option B: Enterprise Issuer**
+**Option B: OSS Issuer with ngrok**
+```bash
+# Terminal 1: Start issuer
+./gradlew :waltid-services:waltid-issuer-api:run
+
+# Terminal 2: Start ngrok
+ngrok http 7002
+# Use ngrok URL:
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://xxx.ngrok-free.app/openid4vci"
+```
+
+**Option C: Enterprise Issuer**
 ```bash
 # Start enterprise stack
 cd ~/dev/walt-id/waltid-enterprise-quickstart
@@ -91,11 +108,11 @@ docker compose up -d
 
 ### Configure Issuer URL
 
-Set the issuer URL via environment variable:
+Set the issuer URL via environment variable. **Must include the OpenID4VCI path:**
 
 ```bash
-# Option 1: Direct issuer URL
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://localhost:7002"
+# Option 1: Direct issuer URL with host IP
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://10.0.0.79:7002/openid4vci"
 
 # Option 2: Enterprise issuer (constructs URL from base + target)
 export OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET="my-org"
@@ -120,7 +137,7 @@ waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/in
 
 ## Test Plans
 
-### Plan 1: Authorization Code Flow with DPoP
+### Plan 1: Authorization Code Flow (Wallet Initiated)
 
 **Class:** `Oid4vciIssuerClientAttestationDpop`
 
@@ -128,17 +145,18 @@ Tests the standard wallet-initiated authorization code flow.
 
 | Property | Value |
 |----------|-------|
-| **FAPI Profile** | `plain_fapi` |
+| **FAPI Profile** | `vci` |
 | **Sender Constraint** | `dpop` |
-| **Client Authentication** | `client_attestation` |
+| **Client Authentication** | `mtls` |
 | **Flow Variant** | `wallet_initiated` |
 | **Grant Type** | `authorization_code` |
+| **Credential Format** | `sd_jwt_vc` |
 | **Metadata Discovery** | `discovery` |
 
 **Test Flow:**
 1. Wallet fetches issuer metadata
 2. Wallet initiates authorization request
-3. User authenticates (manual step in conformance UI)
+3. **User authenticates** (manual step in conformance UI)
 4. Wallet exchanges authorization code for tokens
 5. Wallet requests credential with DPoP proof
 6. Issuer issues credential
