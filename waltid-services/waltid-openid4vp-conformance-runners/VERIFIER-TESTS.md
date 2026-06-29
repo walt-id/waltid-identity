@@ -1,8 +1,8 @@
-# Verifier2 Conformance Tests
+# Verifier Conformance Tests
 
 ## Overview
 
-This document describes the OpenID4VP verifier conformance tests for the walt.id Verifier2 implementation.
+This document describes the OpenID4VP verifier conformance tests for the walt.id Verifier implementation.
 
 These tests validate that the walt.id verifier correctly:
 - Generates signed authorization requests (JAR - JWT-Secured Authorization Request)
@@ -11,10 +11,21 @@ These tests validate that the walt.id verifier correctly:
 - Enforces cryptographic requirements per HAIP profile
 - Handles X.509 certificate-based client authentication
 
+## HAIP Compliance
+
+The verifier conformance tests include HAIP (High Assurance Interoperability Profile) validation for eIDAS 2.0 compliance.
+
+**HAIP Requirements for Verifier:**
+- Signed authorization requests (MANDATORY)
+- Encrypted VP responses supported (MANDATORY)
+- P-256 key curve enforcement (MANDATORY)
+- SHA-256 hash algorithm (MANDATORY)
+- X.509 certificate-based client authentication
+
 ## Architecture
 
 ```
-[OpenID Conformance Suite]    <->    [walt.id Verifier2]
+[OpenID Conformance Suite]    <->    [walt.id Verifier]
        (Wallet)                           (Verifier)
        
   Simulates wallet behavior          Generates requests
@@ -31,7 +42,7 @@ Since the conformance suite runs in Docker, it cannot directly reach `localhost`
 The solution is to use ngrok to expose the local verifier:
 
 ```
-[Conformance Suite (Docker)]  -->  [ngrok tunnel]  -->  [Verifier2 (localhost:7003)]
+[Conformance Suite (Docker)]  -->  [ngrok tunnel]  -->  [Verifier (localhost:7003)]
 ```
 
 ## Prerequisites
@@ -99,7 +110,7 @@ export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
 
 # Run all verifier tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "Verifier2ConformanceTests"
+    --tests "VerifierConformanceTests"
 ```
 
 ### Step 3: View Results
@@ -220,7 +231,7 @@ Summary:
 **Important:** For negative tests, `Verifier: FAILED` is the **correct** result.
 The verifier correctly rejected an invalid presentation.
 
-## HAIP Requirements
+## HAIP Requirements Validated
 
 The HAIP test plan validates these mandatory requirements:
 
@@ -317,7 +328,7 @@ TestPlanConfiguration(
 
 Example:
 ```kotlin
-class NewTestPlan(verifier2UrlPrefix: String, ...) : TestPlan {
+class NewTestPlan(verifierUrlPrefix: String, ...) : TestPlan {
     override val config = TestPlanConfiguration(
         testPlanCreationUrl = {
             append("planName", "oid4vp-1final-verifier-test-plan")
@@ -330,9 +341,10 @@ class NewTestPlan(verifier2UrlPrefix: String, ...) : TestPlan {
 
 ## Related Documentation
 
-- **README.md** - General setup and configuration
-- **QUICKSTART.md** - Quick setup guide
-- **WALLET-HAIP-TESTS.md** - Wallet-side HAIP conformance tests
+- [README.md](README.md) - General setup and configuration
+- [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
+- [WALLET-TESTS.md](WALLET-TESTS.md) - Wallet conformance tests
+- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer conformance tests
 - [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
 - [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
 - [Conformance Suite GitLab](https://gitlab.com/openid/conformance-suite)

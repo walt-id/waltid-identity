@@ -1,8 +1,8 @@
-# Wallet HAIP Conformance Tests
+# Wallet Conformance Tests
 
 ## Overview
 
-This document describes the wallet-side OpenID4VP HAIP (High Assurance Interoperability Profile) conformance tests for the walt.id wallet implementation.
+This document describes the wallet-side OpenID4VP conformance tests for the walt.id wallet implementation.
 
 These tests validate that the walt.id wallet correctly:
 - Authenticates signed authorization requests (JAR)
@@ -10,6 +10,17 @@ These tests validate that the walt.id wallet correctly:
 - Enforces cryptographic requirements (P-256, SHA-256)
 - Implements holder binding (KB-JWT for SD-JWT, DeviceAuth for mdoc)
 - Handles X.509 certificate-based verifier authentication
+
+## HAIP Compliance
+
+The wallet conformance tests include HAIP (High Assurance Interoperability Profile) validation for eIDAS 2.0 compliance.
+
+**HAIP Requirements for Wallet:**
+- Signed request authentication (MANDATORY)
+- Encrypted response generation (MANDATORY)
+- P-256 key curve enforcement (MANDATORY)
+- SHA-256 hash algorithm (MANDATORY)
+- Holder binding (KB-JWT or DeviceAuth)
 
 ## Architecture
 
@@ -76,47 +87,47 @@ curl http://127.0.0.1:7005/health
 
 ## Running Tests
 
-### Run All HAIP Tests
+### Run All Wallet Tests
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests"
+    --tests "WalletConformanceTests"
 ```
 
 ### Run Specific Test Plan
 
 ```bash
-# Plan 1: SD-JWT VC Baseline
+# Plan 1: SD-JWT VC Baseline (HAIP)
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests.HAIP Plan 1*"
+    --tests "WalletConformanceTests.Plan 1*"
 
-# Plan 2: mDL Baseline
+# Plan 2: mDL Baseline (HAIP)
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests.HAIP Plan 2*"
+    --tests "WalletConformanceTests.Plan 2*"
 
 # Plan 7: Negative Tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests.HAIP Plan 7*"
+    --tests "WalletConformanceTests.Plan 7*"
 ```
 
 ### Run Complete Suite
 
 ```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests.runAllHAIPConformanceTests"
+    --tests "WalletConformanceTests.runAllWalletConformanceTests"
 ```
 
 ## Test Plans
 
 ### Currently Implemented
 
-| Plan | Format | Client ID | Response Mode | Status |
-|------|--------|-----------|---------------|--------|
-| **1** | SD-JWT VC | x509_san_dns | direct_post.jwt | Infrastructure ready |
-| **2** | mDL | x509_san_dns | direct_post.jwt | Infrastructure ready |
-| **7** | SD-JWT VC | x509_san_dns | direct_post.jwt | Infrastructure ready (Negative) |
+| Plan | Format | Client ID | Response Mode | HAIP | Status |
+|------|--------|-----------|---------------|------|--------|
+| **1** | SD-JWT VC | x509_san_dns | direct_post.jwt | Yes | Infrastructure ready |
+| **2** | mDL | x509_san_dns | direct_post.jwt | Yes | Infrastructure ready |
+| **7** | SD-JWT VC | x509_san_dns | direct_post.jwt | Yes | Infrastructure ready (Negative) |
 
 ### Planned Extensions
 
@@ -132,9 +143,9 @@ cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
 ## Test Plan Details
 
-### Plan 1: SD-JWT VC Baseline
+### Plan 1: SD-JWT VC Baseline (HAIP)
 
-**Class:** `WalletHAIPPlan1`
+**Class:** `WalletPlan1`
 
 Tests wallet's ability to process SD-JWT VC presentations with HAIP requirements.
 
@@ -164,9 +175,9 @@ Tests wallet's ability to process SD-JWT VC presentations with HAIP requirements
 | `oid4vp-1final-wallet-wrong-alg-response` | Negative | Wrong encryption algorithm |
 | `oid4vp-1final-wallet-no-enc-response` | Negative | Missing encryption |
 
-### Plan 2: mDL (Mobile Driving License) Baseline
+### Plan 2: mDL (Mobile Driving License) Baseline (HAIP)
 
-**Class:** `WalletHAIPPlan2`
+**Class:** `WalletPlan2`
 
 Tests wallet's ability to present ISO mDL (mso_mdoc) credentials.
 
@@ -188,9 +199,9 @@ Tests wallet's ability to present ISO mDL (mso_mdoc) credentials.
 | `oid4vp-1final-wallet-mdl-invalid-device-sig` | Negative | Invalid device signature detection |
 | `oid4vp-1final-wallet-mdl-replay` | Negative | Replay attack prevention |
 
-### Plan 7: Negative Tests (Security Validation)
+### Plan 7: Negative Tests (Security Validation) (HAIP)
 
-**Class:** `WalletHAIPPlan7`
+**Class:** `WalletPlan7`
 
 Tests that wallet correctly **rejects** non-HAIP-compliant requests.
 
@@ -214,7 +225,7 @@ Tests that wallet correctly **rejects** non-HAIP-compliant requests.
 | `oid4vp-1final-wallet-reject-wallet-nonce-mismatch` | Must reject wallet_nonce mismatches |
 | `oid4vp-1final-wallet-reject-insecure-origin` | Must reject non-HTTPS origins |
 
-## HAIP Requirements
+## HAIP Requirements Validated
 
 All test plans validate these HAIP mandatory requirements:
 
@@ -248,7 +259,7 @@ object ConformanceConfig {
 Each test plan specifies:
 
 ```kotlin
-class WalletHAIPPlan1(...) : WalletTestPlan {
+class WalletPlan1(...) : WalletTestPlan {
     override val planName = "oid4vp-1final-wallet-haip-test-plan"
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
@@ -270,15 +281,15 @@ When tests execute successfully:
 
 ```
 ================================================================================
-HAIP Wallet Conformance Tests
+Wallet Conformance Tests (HAIP)
 ================================================================================
 
 Conformance suite available: 5.2.0
 
 Test plans:
-  - HAIP Plan 1: SD-JWT VC Baseline (x509_hash + direct_post.jwt)
-  - HAIP Plan 2: mDL Baseline (x509_hash + direct_post.jwt)
-  - HAIP Plan 7: Negative Tests (Security Validation)
+  - Wallet Plan 1: SD-JWT VC Baseline (HAIP - x509_hash + direct_post.jwt)
+  - Wallet Plan 2: mDL Baseline (HAIP - x509_hash + direct_post.jwt)
+  - Wallet Plan 7: Negative Tests - Security Validation (HAIP)
 
 ================================================================================
 
@@ -287,7 +298,7 @@ Test plans:
 [Adapter] Started successfully
 
 ================================================================================
-Running: HAIP Plan 1: SD-JWT VC Baseline (x509_hash + direct_post.jwt)
+Running: Wallet Plan 1: SD-JWT VC Baseline (HAIP - x509_hash + direct_post.jwt)
 ================================================================================
 
 Plan created: abc123xyz
@@ -368,7 +379,8 @@ waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/in
 
 - [README.md](README.md) - General setup and configuration
 - [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
-- [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier conformance tests
+- [VERIFIER-TESTS.md](VERIFIER-TESTS.md) - Verifier conformance tests
+- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer conformance tests
 - [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
 - [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
 - [Conformance Suite](https://gitlab.com/openid/conformance-suite)

@@ -12,6 +12,16 @@ These tests validate that the walt.id issuer correctly:
 - Issues SD-JWT VC and mDOC credentials
 - Validates credential request proofs
 
+## HAIP Compliance
+
+The issuer conformance tests include HAIP (High Assurance Interoperability Profile) validation for eIDAS 2.0 compliance.
+
+**HAIP Requirements for Issuer:**
+- DPoP sender constraint (MANDATORY)
+- Client attestation authentication (MANDATORY)
+- Credential proof validation (MANDATORY)
+- SD-JWT VC and mDOC format support
+
 ## Architecture
 
 ```

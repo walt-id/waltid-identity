@@ -10,9 +10,10 @@ import kotlin.test.Test
 import kotlin.time.Duration.Companion.minutes
 
 /**
- * Verifier2 Conformance Tests
+ * Verifier Conformance Tests
  *
  * Tests OpenID4VP verifier compliance against the OpenID Foundation conformance suite.
+ * Includes HAIP (High Assurance Interoperability Profile) test plans for eIDAS 2.0 compliance.
  *
  * Prerequisites:
  * 1. Conformance suite running (local Docker or cloud)
@@ -33,10 +34,10 @@ import kotlin.time.Duration.Companion.minutes
  *
  * Run:
  * ```bash
- * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "Verifier2ConformanceTests"
+ * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
  * ```
  */
-open class Verifier2ConformanceTests {
+open class VerifierConformanceTests {
 
     companion object {
         /**
@@ -71,7 +72,7 @@ open class Verifier2ConformanceTests {
         init {
             println()
             println("=" .repeat(80))
-            println("Verifier2 Conformance Tests")
+            println("Verifier Conformance Tests")
             println("=" .repeat(80))
             println()
             println("Conformance suite: $conformanceHost:$conformancePort")
@@ -103,7 +104,7 @@ open class Verifier2ConformanceTests {
 
     @Test
     @EnabledIf("canRunTests")
-    fun runVerifier2ConformanceTests() = runTest(timeout = 5.minutes) {
+    fun runVerifierConformanceTests() = runTest(timeout = 5.minutes) {
         ConformanceTestRunner(
             verifierUrlPrefix, conformanceHost, conformancePort
         ).run()

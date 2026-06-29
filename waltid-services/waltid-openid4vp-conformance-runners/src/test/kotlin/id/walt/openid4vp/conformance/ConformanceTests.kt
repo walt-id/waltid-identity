@@ -1,13 +1,12 @@
-@file:Suppress("DEPRECATION")
-
 package id.walt.openid4vp.conformance
 
 /**
- * @deprecated Use [Verifier2ConformanceTests] instead.
- * This class is kept for backward compatibility with CI scripts.
+ * Deprecated alias for [VerifierConformanceTests].
+ * 
+ * @deprecated Use [VerifierConformanceTests] instead.
  */
 @Deprecated(
-    message = "Use Verifier2ConformanceTests instead",
-    replaceWith = ReplaceWith("Verifier2ConformanceTests")
+    message = "Use VerifierConformanceTests instead",
+    replaceWith = ReplaceWith("VerifierConformanceTests")
 )
-class ConformanceTests : Verifier2ConformanceTests()
+class ConformanceTests : VerifierConformanceTests()

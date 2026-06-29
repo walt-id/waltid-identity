@@ -2,12 +2,23 @@
 
 Conformance test infrastructure for validating walt.id services against the OpenID Foundation conformance suite.
 
+## HAIP Compliance
+
+All test suites include HAIP (High Assurance Interoperability Profile) validation for eIDAS 2.0 compliance.
+
+HAIP requirements validated across all components:
+- Signed authorization requests (MANDATORY)
+- Encrypted responses (MANDATORY)
+- P-256 key curve enforcement (MANDATORY)
+- SHA-256 hash algorithm (MANDATORY)
+- Holder binding validation
+
 ## Supported Tests
 
 | Test Suite | Description | Status | Documentation |
 |------------|-------------|--------|---------------|
-| **Verifier2** | OpenID4VP verifier compliance | Working | [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) |
-| **Wallet HAIP** | HAIP wallet compliance | Infrastructure ready | [WALLET-HAIP-TESTS.md](WALLET-HAIP-TESTS.md) |
+| **Verifier** | OpenID4VP verifier compliance | Working | [VERIFIER-TESTS.md](VERIFIER-TESTS.md) |
+| **Wallet** | OpenID4VP wallet compliance | Infrastructure ready | [WALLET-TESTS.md](WALLET-TESTS.md) |
 | **Issuer** | OID4VCI issuer compliance | Working | [ISSUER-TESTS.md](ISSUER-TESTS.md) |
 
 ## Quick Start
@@ -18,10 +29,10 @@ See [QUICKSTART.md](QUICKSTART.md) for step-by-step setup instructions.
 
 - Docker and Docker Compose
 - Java 21+
-- ngrok (for Verifier2 tests)
+- ngrok (for Verifier tests)
 - `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
 
-### Run Verifier2 Tests
+### Run Verifier Tests
 
 ```bash
 # 1. Start conformance suite
@@ -35,7 +46,7 @@ ngrok http 7003
 # 3. Run tests
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 export VERIFIER_NGROK_URL="https://your-ngrok-url.ngrok-free.app"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "Verifier2ConformanceTests"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
 ```
 
 ### Run Issuer Tests
@@ -55,42 +66,42 @@ export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://localhost:7002"
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
 ```
 
-### Run Wallet HAIP Tests
+### Run Wallet Tests
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "WalletHAIPConformanceTests"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "WalletConformanceTests"
 ```
 
 ## Test Plans Overview
 
-### Verifier2 Test Plans
+### Verifier Test Plans
 
-| Plan | Format | Client ID | Response Mode | Modules |
-|------|--------|-----------|---------------|---------|
-| Plan 1 | ISO mDL | x509_san_dns | direct_post | 3 |
-| Plan 2 | SD-JWT VC | x509_hash | direct_post.jwt | 10 |
+| Plan | Format | Client ID | Response Mode | HAIP |
+|------|--------|-----------|---------------|------|
+| Plan 1 | ISO mDL | x509_san_dns | direct_post | No |
+| Plan 2 | SD-JWT VC | x509_hash | direct_post.jwt | Yes |
 
-See [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) for detailed test module descriptions.
+See [VERIFIER-TESTS.md](VERIFIER-TESTS.md) for detailed test module descriptions.
 
 ### Issuer Test Plans
 
-| Plan | Grant Type | Client Auth | Sender Constraint |
-|------|------------|-------------|-------------------|
-| Plan 1 | authorization_code | client_attestation | DPoP |
-| Plan 2 | pre_authorization_code | client_attestation | DPoP |
+| Plan | Grant Type | Client Auth | Sender Constraint | HAIP |
+|------|------------|-------------|-------------------|------|
+| Plan 1 | authorization_code | client_attestation | DPoP | Yes |
+| Plan 2 | pre_authorization_code | client_attestation | DPoP | Yes |
 
 See [ISSUER-TESTS.md](ISSUER-TESTS.md) for detailed test module descriptions.
 
-### Wallet HAIP Test Plans
+### Wallet Test Plans
 
-| Plan | Format | Description | Modules |
-|------|--------|-------------|---------|
-| Plan 1 | SD-JWT VC | Baseline HAIP validation | 14 |
-| Plan 2 | mDL | Mobile driving license HAIP | 6 |
-| Plan 7 | SD-JWT VC | Negative security tests | 9 |
+| Plan | Format | Description | HAIP | Modules |
+|------|--------|-------------|------|---------|
+| Plan 1 | SD-JWT VC | Baseline validation | Yes | 14 |
+| Plan 2 | mDL | Mobile driving license | Yes | 6 |
+| Plan 7 | SD-JWT VC | Negative security tests | Yes | 9 |
 
-See [WALLET-HAIP-TESTS.md](WALLET-HAIP-TESTS.md) for detailed test module descriptions.
+See [WALLET-TESTS.md](WALLET-TESTS.md) for detailed test module descriptions.
 
 ## Project Structure
 
@@ -110,23 +121,24 @@ src/
         TestKeyMaterial.kt          # Test certificates/keys
       http/
         ConformanceInterface.kt     # Conformance suite API client
+        VerifierInterface.kt        # Verifier API client
       plans/
         IssuerTestPlan.kt           # Issuer test plan interface
         Oid4vciIssuer...kt          # Issuer test plans
         MdlX509SanDns...kt          # Verifier test plan: mDL
         SdJwtVcX509...kt            # Verifier test plan: SD-JWT VC
       wallet/
-        WalletHAIPPlan1.kt          # Wallet test plans
-        WalletHAIPPlan2.kt
-        WalletHAIPPlan7.kt
+        WalletPlan1.kt              # Wallet test plans
+        WalletPlan2.kt
+        WalletPlan7.kt
       runner/
         TestPlanRunner.kt           # Verifier test execution
         IssuerTestPlanRunner.kt     # Issuer test execution
         WalletTestPlanRunner.kt     # Wallet test execution
   test/kotlin/id/walt/openid4vp/conformance/
-    Verifier2ConformanceTests.kt    # Main verifier tests
+    VerifierConformanceTests.kt     # Main verifier tests
     IssuerConformanceTests.kt       # Issuer conformance tests
-    WalletHAIPConformanceTests.kt   # Wallet HAIP tests
+    WalletConformanceTests.kt       # Wallet tests
     ConformanceTests.kt             # Deprecated alias
 ```
 
@@ -136,7 +148,7 @@ src/
 
 | Variable | Description | Required For |
 |----------|-------------|--------------|
-| `VERIFIER_NGROK_URL` | ngrok tunnel URL for verifier | Verifier2 tests |
+| `VERIFIER_NGROK_URL` | ngrok tunnel URL for verifier | Verifier tests |
 | `OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL` | Issuer URL | Issuer tests |
 | `OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET` | Enterprise target | Issuer tests (Enterprise) |
 
@@ -186,12 +198,12 @@ keytool -importcert -trustcacerts -alias conformance-test-localhost \
 ### Tests Skip
 
 - Conformance suite not running: `curl -k https://localhost.emobix.co.uk:8443/`
-- ngrok URL not set (Verifier2): `export VERIFIER_NGROK_URL="https://..."`
+- ngrok URL not set (Verifier tests): `export VERIFIER_NGROK_URL="https://..."`
 - Issuer URL not set: `export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://..."`
 
 ### Connection Refused
 
-- Use ngrok for Verifier2 tests (Docker cannot reach host localhost)
+- Use ngrok for Verifier tests (Docker cannot reach host localhost)
 - Verify port: ngrok must tunnel to port 7003
 
 ### SSL Errors
@@ -207,9 +219,9 @@ keytool -importcert -trustcacerts -alias conformance-test-localhost \
 ## Documentation
 
 - [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
-- [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier2 test plan details
+- [VERIFIER-TESTS.md](VERIFIER-TESTS.md) - Verifier test plan details
 - [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer test plan details
-- [WALLET-HAIP-TESTS.md](WALLET-HAIP-TESTS.md) - Wallet HAIP test plan details
+- [WALLET-TESTS.md](WALLET-TESTS.md) - Wallet test plan details
 
 ## External Resources
 

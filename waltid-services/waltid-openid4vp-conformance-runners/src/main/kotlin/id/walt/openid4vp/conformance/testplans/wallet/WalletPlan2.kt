@@ -4,7 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
 /**
- * HAIP Plan 2: mDL (Mobile Driving License) Baseline
+ * Wallet Plan 2: mDL (Mobile Driving License) Baseline (HAIP)
  * 
  * Tests wallet's ability to:
  * - Authenticate signed authorization requests (x509_san_dns)
@@ -12,21 +12,27 @@ import kotlinx.serialization.json.JsonObject
  * - Include DeviceAuth holder binding (MSO + DeviceSignature)
  * - Validate session transcript per ISO 18013-7 Annex C
  * 
+ * HAIP Requirements:
+ * - Signed request authentication (MANDATORY)
+ * - Encrypted response generation (MANDATORY)
+ * - DeviceAuth holder binding (MANDATORY for mdoc)
+ * - Session transcript validation (MANDATORY for mdoc)
+ * 
  * Expected test modules (6):
- * - oid4vp-1final-wallet-haip-mdl-happy-flow
- * - oid4vp-1final-wallet-haip-mdl-device-auth
- * - oid4vp-1final-wallet-haip-mdl-session-transcript
- * - oid4vp-1final-wallet-haip-mdl-invalid-mso-signature
- * - oid4vp-1final-wallet-haip-mdl-invalid-device-signature
- * - oid4vp-1final-wallet-haip-mdl-replay-protection
+ * - oid4vp-1final-wallet-mdl-happy-flow
+ * - oid4vp-1final-wallet-mdl-device-auth
+ * - oid4vp-1final-wallet-mdl-session-transcript
+ * - oid4vp-1final-wallet-mdl-invalid-mso-signature
+ * - oid4vp-1final-wallet-mdl-invalid-device-signature
+ * - oid4vp-1final-wallet-mdl-replay-protection
  */
-class WalletHAIPPlan2(
+class WalletPlan2(
     override val walletApiUrl: String,
     val conformanceHost: String,
     val conformancePort: Int
 ) : WalletTestPlan {
 
-    override val description = "HAIP Plan 2: mDL Baseline (x509_hash + direct_post.jwt)"
+    override val description = "Wallet Plan 2: mDL Baseline (HAIP - x509_hash + direct_post.jwt)"
 
     override val planName = "oid4vp-1final-wallet-haip-test-plan"
 
@@ -38,7 +44,7 @@ class WalletHAIPPlan2(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "HAIP Plan 2 - mDL",
+            "alias": "Wallet Plan 2 - mDL (HAIP)",
             "description": "Wallet HAIP - mDL + x509_san_dns + request_uri_signed + direct_post.jwt",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"

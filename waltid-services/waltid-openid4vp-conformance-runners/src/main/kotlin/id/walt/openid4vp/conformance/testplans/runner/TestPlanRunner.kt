@@ -1,7 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import id.walt.openid4vp.conformance.testplans.http.Verifier2Interface
+import id.walt.openid4vp.conformance.testplans.http.VerifierInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.req.ExpectedVerifierOutcome
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
@@ -47,7 +47,7 @@ class TestPlanRunner(
     }
 
     val conformance = ConformanceInterface(conformanceHost, conformancePort)
-    val verifier2 = Verifier2Interface(http)
+    val verifier = VerifierInterface(http)
 
     suspend fun test(): List<TestPlanResult> {
         println("-- Conformance -- -> Setup")
@@ -98,7 +98,7 @@ class TestPlanRunner(
         println("Use authorization endpoint: $authorizationEndpointToUse")
 
         // Create verification session
-        val verificationSessionResponse = verifier2.createVerificationSession(
+        val verificationSessionResponse = verifier.createVerificationSession(
             authorizationEndpointToUse,
             config.verificationSessionSetup
         )
@@ -116,8 +116,8 @@ class TestPlanRunner(
         val testRunInfo = conformance.getTestRunInfo(testId)
         println("Conformance result: status=${testRunInfo.status}, result=${testRunInfo.result}")
 
-        val verifier2Session = verifier2.getVerificationSessionInfo(verificationSessionId)
-        println("Verifier2 session status: ${verifier2Session.status}")
+        val verifierSession = verifier.getVerificationSessionInfo(verificationSessionId)
+        println("Verifier session status: ${verifierSession.status}")
 
         assertEquals("FINISHED", testRunInfo.status, "Conformance test $testModule did not finish")
 
@@ -125,16 +125,16 @@ class TestPlanRunner(
             ExpectedVerifierOutcome.ACCEPT -> {
                 assertEquals("PASSED", testRunInfo.result, "Conformance test $testModule expected PASSED")
                 assertEquals(
-                    VerificationSessionStatus.SUCCESSFUL, verifier2Session.status,
-                    "Verifier2 session for $testModule expected SUCCESSFUL"
+                    VerificationSessionStatus.SUCCESSFUL, verifierSession.status,
+                    "Verifier session for $testModule expected SUCCESSFUL"
                 )
             }
 
             ExpectedVerifierOutcome.REJECT -> {
                 assertEquals("PASSED", testRunInfo.result, "Conformance test $testModule expected PASSED")
                 assertEquals(
-                    VerificationSessionStatus.FAILED, verifier2Session.status,
-                    "Verifier2 session for $testModule expected FAILED (verifier should have rejected)"
+                    VerificationSessionStatus.FAILED, verifierSession.status,
+                    "Verifier session for $testModule expected FAILED (verifier should have rejected)"
                 )
             }
 
@@ -146,8 +146,8 @@ class TestPlanRunner(
                 }
                 if (testRunInfo.result == "PASSED") {
                     assertEquals(
-                        VerificationSessionStatus.SUCCESSFUL, verifier2Session.status,
-                        "Verifier2 session for $testModule expected SUCCESSFUL"
+                        VerificationSessionStatus.SUCCESSFUL, verifierSession.status,
+                        "Verifier session for $testModule expected SUCCESSFUL"
                     )
                 }
             }
@@ -157,7 +157,7 @@ class TestPlanRunner(
             conformanceTestId = testId,
             conformanceStatus = testRunInfo.status,
             conformanceResult = testRunInfo.result,
-            verifierStatus = verifier2Session.status,
+            verifierStatus = verifierSession.status,
         )
     }
 }

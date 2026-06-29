@@ -8,11 +8,16 @@ import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 
-class Verifier2Interface(
+/**
+ * Interface to the walt.id Verifier service for conformance testing.
+ * 
+ * Used by conformance test runners to create and query verification sessions.
+ */
+class VerifierInterface(
     val http: HttpClient
 ) {
 
-    /** Create verification session at Verifier2 */
+    /** Create verification session at Verifier */
     suspend fun createVerificationSession(
         authorizationEndpointToUse: String,
         verificationSessionSetup: VerificationSessionSetup
@@ -29,10 +34,8 @@ class Verifier2Interface(
             )
         }.body<VerificationSessionCreationResponse>()
 
-    /** Create verification session information from Verifier2 */
+    /** Get verification session information from Verifier */
     suspend fun getVerificationSessionInfo(sessionId: String) =
         http.get("/verification-session/$sessionId/info")
             .body<Verification2Session>()
-
-
 }

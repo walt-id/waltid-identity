@@ -6,7 +6,7 @@ This guide walks you through running OpenID4VP/VCI conformance tests locally.
 
 - Docker and Docker Compose
 - Java 21+
-- ngrok (for Verifier2 tests)
+- ngrok (for Verifier tests)
 - Ubuntu/Linux environment
 
 ## Initial Setup (One-Time)
@@ -33,7 +33,7 @@ cp ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-ope
 cp -r ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/nginx ~/dev/openid/conformance-suite/
 ```
 
-### 4. Install ngrok (for Verifier2 tests)
+### 4. Install ngrok (for Verifier tests)
 
 Download from https://ngrok.com/download or:
 
@@ -57,7 +57,7 @@ curl -k https://localhost.emobix.co.uk:8443/
 
 You should see HTML output. The web interface is available at https://localhost.emobix.co.uk:8443/
 
-## Run Verifier2 Conformance Tests
+## Run Verifier Conformance Tests
 
 ### 1. Start ngrok Tunnel
 
@@ -79,7 +79,7 @@ export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
 
 # Run tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "Verifier2ConformanceTests"
+    --tests "VerifierConformanceTests"
 ```
 
 ### 3. View Results
@@ -128,18 +128,18 @@ cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 **Note:** Authorization code flow tests require manual interaction in the conformance suite UI.
 For fully automated tests, ensure your issuer supports pre-authorized code flow.
 
-## Run Wallet HAIP Conformance Tests
+## Run Wallet Conformance Tests
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
 # Run all wallet tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests"
+    --tests "WalletConformanceTests"
 
 # Or run specific plan
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletHAIPConformanceTests.HAIP Plan 1*"
+    --tests "WalletConformanceTests.Plan 1*"
 ```
 
 Note: Wallet tests require WAL-896 HAIP features to be implemented.
@@ -155,7 +155,7 @@ docker compose -f docker-compose-walt.yml down
 
 ## Expected Results
 
-### Verifier2 Tests
+### Verifier Tests
 
 When working correctly, you should see:
 
@@ -214,7 +214,7 @@ Common issues:
 ### Tests Skip
 
 - Conformance suite not running
-- ngrok URL not set (Verifier2 tests)
+- ngrok URL not set (Verifier tests)
 - Issuer URL not set (Issuer tests)
 
 Verify:
@@ -235,7 +235,7 @@ Use pre-authorized code flow for automated tests.
 
 ### Connection Refused
 
-For Verifier2 tests, the conformance suite (Docker) cannot reach host `localhost`.
+For Verifier tests, the conformance suite (Docker) cannot reach host `localhost`.
 Use ngrok to expose the local verifier.
 
 ### SSL Certificate Errors
@@ -266,6 +266,6 @@ kill <PID>
 ## Additional Resources
 
 - [README.md](README.md) - Full documentation
-- [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier2 test details
+- [VERIFIER-TESTS.md](VERIFIER-TESTS.md) - Verifier test details
 - [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer test details
-- [WALLET-HAIP-TESTS.md](WALLET-HAIP-TESTS.md) - Wallet HAIP test details
+- [WALLET-TESTS.md](WALLET-TESTS.md) - Wallet test details
