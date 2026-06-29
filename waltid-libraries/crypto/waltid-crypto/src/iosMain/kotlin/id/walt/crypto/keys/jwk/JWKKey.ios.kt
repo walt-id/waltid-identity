@@ -39,7 +39,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         Json.parseToJsonElement(requireNotNull(jwk) { "jwk is null" }).jsonObject
 
     private val privateParameters = when (keyType) {
-        KeyType.secp256r1, KeyType.Ed25519 -> listOf("d")
+        KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.Ed25519 -> listOf("d")
         KeyType.RSA -> listOf("d", "p", "q", "dp", "dq", "qi", "oth")
         else -> error("unknown key type")
     }
@@ -47,6 +47,8 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     actual override val keyType: KeyType
         get() = when {
             _jwkObj["crv"]?.jsonPrimitive?.content == "P-256" -> KeyType.secp256r1
+            _jwkObj["crv"]?.jsonPrimitive?.content == "P-384" -> KeyType.secp384r1
+            _jwkObj["crv"]?.jsonPrimitive?.content == "P-521" -> KeyType.secp521r1
             _jwkObj["kty"]?.jsonPrimitive?.content == "RSA" -> KeyType.RSA
             _jwkObj["crv"]?.jsonPrimitive?.content == "Ed25519" -> KeyType.Ed25519
             else -> error("Unknown key type in jwk $jwk")
@@ -89,6 +91,8 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
 
         val jwsAlgorithm = when (keyType) {
             KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
+            KeyType.secp384r1 -> JwsAlgorithm.Signature.EC.ES384
+            KeyType.secp521r1 -> JwsAlgorithm.Signature.EC.ES512
             KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
             KeyType.Ed25519 -> error("Ed25519 JWS signing is not yet supported on iOS")
             else -> error("Unsupported key type: $keyType")
@@ -126,6 +130,8 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
 
         val sigAlg = when (keyType) {
             KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
+            KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
+            KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
             KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
             else -> error("Unsupported key type for verification: $keyType")
         }
@@ -148,6 +154,8 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
 
         val sigAlg = when (keyType) {
             KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
+            KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
+            KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
             KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
             KeyType.Ed25519 -> error("Ed25519 JWS verification is not yet supported on iOS")
             else -> error("Unsupported key type for verification: $keyType")

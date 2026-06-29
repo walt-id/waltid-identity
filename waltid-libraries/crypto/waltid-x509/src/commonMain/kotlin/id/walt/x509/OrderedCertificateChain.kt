@@ -1,5 +1,7 @@
 package id.walt.x509
 
+import kotlin.time.Instant
+
 /**
  * Verifies an ordered X.509 certificate chain.
  *
@@ -70,6 +72,8 @@ internal expect class PlatformX509Certificate {
 
     fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean
     fun verifySignedBy(issuer: PlatformX509Certificate)
+    fun isSelfSigned(): Boolean
+    fun checkValidityAt(instant: Instant)
 
     companion object {
         fun parse(der: CertificateDer): PlatformX509Certificate

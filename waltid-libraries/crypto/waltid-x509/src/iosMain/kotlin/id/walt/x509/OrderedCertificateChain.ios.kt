@@ -9,6 +9,7 @@ import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.requireSupported
 import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.verifierFor
+import kotlin.time.Instant
 
 internal actual class PlatformX509Certificate private constructor(
     private val certificate: X509Certificate,
@@ -33,6 +34,18 @@ internal actual class PlatformX509Certificate private constructor(
             data = SignatureInput(certificate.rawTbsCertificate.derEncoded),
             sig = certificate.decodedSignature.getOrThrow(),
         ).getOrThrow()
+    }
+
+    actual fun isSelfSigned(): Boolean =
+        certificate.tbsCertificate.issuerName == certificate.tbsCertificate.subjectName &&
+                runCatching { verifySignedBy(this) }.isSuccess
+
+    actual fun checkValidityAt(instant: Instant) {
+        val validFrom = certificate.tbsCertificate.validFrom.instant
+        val validUntil = certificate.tbsCertificate.validUntil.instant
+        if (instant !in validFrom..validUntil) {
+            throw IllegalArgumentException("certificate validity is $validFrom to $validUntil")
+        }
     }
 
     actual companion object {

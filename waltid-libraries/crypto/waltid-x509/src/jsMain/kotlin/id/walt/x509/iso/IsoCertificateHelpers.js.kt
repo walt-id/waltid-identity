@@ -1,7 +1,4 @@
 package id.walt.x509.iso
 
-import kotlinx.io.bytestring.ByteString
-
-internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
-    TODO("Not yet implemented")
-}
+internal actual fun secureRandomBytes(size: Int): ByteArray =
+    TODO("Secure random byte generation is not implemented for JavaScript")
