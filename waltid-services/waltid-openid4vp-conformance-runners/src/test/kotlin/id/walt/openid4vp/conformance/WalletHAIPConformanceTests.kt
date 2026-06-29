@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance
 
+import id.walt.openid4vp.conformance.adapter.WalletConformanceAdapter
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.wallet.WalletHAIPPlan1
 import id.walt.openid4vp.conformance.testplans.wallet.WalletHAIPPlan2
@@ -44,13 +45,15 @@ class WalletHAIPConformanceTests {
 
     companion object {
         val walletApiUrl: String = "http://127.0.0.1:7005"
+        val adapterPort: Int = 7006
+        val adapterUrl: String = "http://127.0.0.1:$adapterPort/openid4vp/authorize"
         val conformanceHost: String = "localhost.emobix.co.uk"
         val conformancePort: Int = 8443
 
         private val testPlans: List<WalletTestPlan> = listOf(
-            WalletHAIPPlan1(walletApiUrl, conformanceHost, conformancePort),
-            WalletHAIPPlan2(walletApiUrl, conformanceHost, conformancePort),
-            WalletHAIPPlan7(walletApiUrl, conformanceHost, conformancePort)
+            WalletHAIPPlan1(adapterUrl, conformanceHost, conformancePort),
+            WalletHAIPPlan2(adapterUrl, conformanceHost, conformancePort),
+            WalletHAIPPlan7(adapterUrl, conformanceHost, conformancePort)
         )
 
         val conformanceServerVersionResult = runBlocking {
@@ -126,11 +129,20 @@ class WalletHAIPConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun `HAIP Plan 1 - SD-JWT VC + x509_san_dns + direct_post_jwt`() = runTest(timeout = 10.minutes) {
         val httpClient = createHttpClient()
+        val adapter = WalletConformanceAdapter(
+            walletApiUrl = walletApiUrl,
+            adapterPort = adapterPort
+        )
         
         try {
-            val plan = WalletHAIPPlan1(walletApiUrl, conformanceHost, conformancePort)
+            // Start adapter
+            adapter.start(httpClient)
+            
+            // Run test
+            val plan = WalletHAIPPlan1(adapterUrl, conformanceHost, conformancePort)
             WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
         } finally {
+            adapter.stop()
             httpClient.close()
         }
     }
@@ -148,11 +160,20 @@ class WalletHAIPConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun `HAIP Plan 2 - mDL + x509_san_dns + direct_post_jwt`() = runTest(timeout = 10.minutes) {
         val httpClient = createHttpClient()
+        val adapter = WalletConformanceAdapter(
+            walletApiUrl = walletApiUrl,
+            adapterPort = adapterPort
+        )
         
         try {
-            val plan = WalletHAIPPlan2(walletApiUrl, conformanceHost, conformancePort)
+            // Start adapter
+            adapter.start(httpClient)
+            
+            // Run test
+            val plan = WalletHAIPPlan2(adapterUrl, conformanceHost, conformancePort)
             WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
         } finally {
+            adapter.stop()
             httpClient.close()
         }
     }
@@ -166,11 +187,20 @@ class WalletHAIPConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun `HAIP Plan 7 - Negative Tests (Security Validation)`() = runTest(timeout = 10.minutes) {
         val httpClient = createHttpClient()
+        val adapter = WalletConformanceAdapter(
+            walletApiUrl = walletApiUrl,
+            adapterPort = adapterPort
+        )
         
         try {
-            val plan = WalletHAIPPlan7(walletApiUrl, conformanceHost, conformancePort)
+            // Start adapter
+            adapter.start(httpClient)
+            
+            // Run test
+            val plan = WalletHAIPPlan7(adapterUrl, conformanceHost, conformancePort)
             WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
         } finally {
+            adapter.stop()
             httpClient.close()
         }
     }
@@ -184,8 +214,15 @@ class WalletHAIPConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun runAllHAIPConformanceTests() = runTest(timeout = 60.minutes) {
         val httpClient = createHttpClient()
+        val adapter = WalletConformanceAdapter(
+            walletApiUrl = walletApiUrl,
+            adapterPort = adapterPort
+        )
         
         try {
+            // Start adapter once for all tests
+            adapter.start(httpClient)
+            
             testPlans.forEach { plan ->
                 println()
                 println("=" .repeat(80))
@@ -195,6 +232,7 @@ class WalletHAIPConformanceTests {
                 WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
             }
         } finally {
+            adapter.stop()
             httpClient.close()
         }
     }

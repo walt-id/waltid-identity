@@ -43,7 +43,7 @@ class WalletHAIPPlan2(
         {
             "description": "Wallet HAIP - mDL + x509_san_dns + request_uri_signed + direct_post.jwt",
             "wallet": {
-                "endpoint": "$walletApiUrl/wallet/present",
+                "authorization_endpoint": "$walletApiUrl",
                 "credential_format": "iso_mdl"
             },
             "server": {

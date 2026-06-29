@@ -47,7 +47,7 @@ class WalletHAIPPlan7(
         {
             "description": "Wallet HAIP - Negative Tests (Security Validation)",
             "wallet": {
-                "endpoint": "$walletApiUrl/wallet/present",
+                "authorization_endpoint": "$walletApiUrl",
                 "credential_format": "sd_jwt_vc",
                 "security_policy": "haip"
             },

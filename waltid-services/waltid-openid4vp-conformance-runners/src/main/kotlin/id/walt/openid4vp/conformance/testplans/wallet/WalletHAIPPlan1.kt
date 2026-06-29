@@ -48,7 +48,7 @@ class WalletHAIPPlan1(
         {
             "description": "Wallet HAIP - SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt",
             "wallet": {
-                "endpoint": "$walletApiUrl/wallet/present",
+                "authorization_endpoint": "$walletApiUrl",
                 "credential_format": "sd_jwt_vc"
             },
             "server": {
