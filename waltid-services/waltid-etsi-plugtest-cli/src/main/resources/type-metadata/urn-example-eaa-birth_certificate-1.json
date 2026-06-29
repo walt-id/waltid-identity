@@ -1,0 +1,6 @@
+{
+  "vct": "urn:example:eaa:birth_certificate:1",
+  "name": "Birth Certificate (PuB-EAA)",
+  "description": "Birth Certificate public-body EAA (SD-JWT VC).",
+  "schema_url": "https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main/schemas/birth-certificate-pub-eaa-v1.schema.json"
+}

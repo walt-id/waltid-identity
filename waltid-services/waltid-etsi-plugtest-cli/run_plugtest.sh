@@ -35,12 +35,16 @@ TEST_CASES="$MODULE_DIR/testcases"
 DATA_DIR=""
 OUTPUT_DIR=""
 VENDOR_ZIP=""
+SCHEMA_DIR=""
+METADATA_DIR=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --data-dir)   DATA_DIR="$(cd "$2" && pwd)";   shift 2 ;;
         --output-dir) OUTPUT_DIR="$(cd "$2" && pwd)"; shift 2 ;;
         --vendor-zip) VENDOR_ZIP="$2";                shift 2 ;;
+        --schema-dir)   SCHEMA_DIR="$(cd "$2" && pwd)";   shift 2 ;;
+        --metadata-dir) METADATA_DIR="$(cd "$2" && pwd)"; shift 2 ;;
         *) echo "ERROR: Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
@@ -63,6 +67,32 @@ UPLOAD_ZIP="$OUTPUT_DIR/waltid-upload.zip"
 
 # Stable issuer identity — key/cert must match what is hosted at the x5u URL
 ISSUER_URL="https://raw.githubusercontent.com/walt-id/etsi-plugtest-static-files/refs/heads/main"
+
+# ── Schema validation (optional) ──────────────────────────────────────────────
+# Resolve the JSON Schema + Type Metadata dirs for the schema verification policy
+# (vct -> Type Metadata schema_url -> local schema file). Auto-detect the hosted
+# etsi-plugtest-static-files checkout next to the repo if not given explicitly.
+if [[ -z "$SCHEMA_DIR" || -z "$METADATA_DIR" ]]; then
+    for cand in \
+        "$OUTPUT_DIR/../etsi-plugtest-static-files" \
+        "$MODULE_DIR/../../../../../etsi-plugtest-static-files"; do
+        if [[ -d "$cand/schemas" && -d "$cand/type-metadata" ]]; then
+            SCHEMA_DIR="${SCHEMA_DIR:-$(cd "$cand/schemas" && pwd)}"
+            METADATA_DIR="${METADATA_DIR:-$(cd "$cand/type-metadata" && pwd)}"
+            break
+        fi
+    done
+fi
+
+SCHEMA_ARGS=()
+if [[ -n "$SCHEMA_DIR" && -n "$METADATA_DIR" ]]; then
+    SCHEMA_ARGS=(--schema-dir "$SCHEMA_DIR" --metadata-dir "$METADATA_DIR")
+    echo "Schema validation enabled:"
+    echo "  schema-dir   : $SCHEMA_DIR"
+    echo "  metadata-dir : $METADATA_DIR"
+else
+    echo "Schema validation disabled (no --schema-dir/--metadata-dir and none auto-detected)."
+fi
 
 # ── Resolve vendor zip ────────────────────────────────────────────────────────
 if [[ -z "$VENDOR_ZIP" ]]; then
@@ -104,7 +134,8 @@ echo "==> Step 2: Generating credentials..."
     --output      "$CREDS_DIR" \
     --issuer-key  "$ISSUER_KEY" \
     --issuer-cert "$ISSUER_CERT" \
-    --issuer-url  "$ISSUER_URL"
+    --issuer-url  "$ISSUER_URL" \
+    "${SCHEMA_ARGS[@]}"
 
 CRED_COUNT=$(ls "$CREDS_DIR" | wc -l)
 echo "    Generated $CRED_COUNT credentials"
@@ -125,7 +156,8 @@ mkdir -p "$SELF_REPORTS_DIR"
 "$CLI" validate \
     --zip        "$SELF_ZIP" \
     --test-cases "$TEST_CASES" \
-    --output     "$SELF_REPORTS_DIR"
+    --output     "$SELF_REPORTS_DIR" \
+    "${SCHEMA_ARGS[@]}"
 rm -f "$SELF_ZIP"
 
 SELF_VALID=$(grep -rl '<VALID>'   "$SELF_REPORTS_DIR" 2>/dev/null | wc -l || true)
@@ -145,7 +177,8 @@ mkdir -p "$VENDOR_REPORTS_DIR"
 "$CLI" validate \
     --zip        "$VENDOR_ZIP" \
     --test-cases "$TEST_CASES" \
-    --output     "$VENDOR_REPORTS_DIR"
+    --output     "$VENDOR_REPORTS_DIR" \
+    "${SCHEMA_ARGS[@]}"
 
 TOTAL=$(ls "$VENDOR_REPORTS_DIR" | wc -l)
 VALID=$(grep -rl '<VALID>'         "$VENDOR_REPORTS_DIR" 2>/dev/null | wc -l || true)

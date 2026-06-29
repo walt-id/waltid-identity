@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.toList
 /**
  * Represents a wallet instance composed of its storage backends.
  *
- * Supports the same flexibility as the Enterprise wallet:
+ * Supports:
  * - Multiple key stores (e.g. software key store + HSM)
  * - Multiple credential stores (e.g. separate stores per credential type)
  * - One optional DID store
@@ -68,8 +68,17 @@ data class Wallet(
         keyStores.firstNotNullOfOrNull { it.getDefaultKey() } ?: staticKey
 
     /** Lists all keys across all key stores, in store order. */
-    suspend fun listAllKeys(): List<WalletKeyInfo> =
-        keyStores.flatMap { it.listKeys().toList() }
+    suspend fun listAllKeys(): List<WalletKeyInfo> {
+        val storeKeys = keyStores.flatMap { it.listKeys().toList() }
+        // Include the static key if present and not already represented in a store.
+        val staticKeyInfo = staticKey?.let {
+            val keyId = it.getKeyId()
+            if (storeKeys.none { k -> k.keyId == keyId })
+                WalletKeyInfo(keyId = keyId, keyType = it.keyType.name)
+            else null
+        }
+        return if (staticKeyInfo != null) storeKeys + staticKeyInfo else storeKeys
+    }
 
     /** Streams all credentials across all credential stores, in store order. */
     suspend fun streamAllCredentials(): Flow<StoredCredential> =

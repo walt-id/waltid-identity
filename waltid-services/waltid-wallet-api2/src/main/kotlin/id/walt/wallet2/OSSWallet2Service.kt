@@ -67,6 +67,19 @@ object OSSWallet2Service {
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) { namedDidStores[storeId] = store }
         override fun listDidStoreIds() = namedDidStores.keys.asFlow()
 
+        /**
+         * Reverse lookup: maps a registered store instance back to its store ID.
+         *
+         * Required so [storeWallet] can serialize a [Wallet] into a [WalletDescriptor] that
+         * actually records its attached stores. Without this override (the default returns null),
+         * persisted wallets would have no attached stores. Matches by reference identity since
+         * store instances are registered (named or auto-created) via the store* methods above.
+         */
+        override suspend fun resolveStoreId(store: Any): String? =
+            namedKeyStores.entries.firstOrNull { it.value === store }?.key
+                ?: namedCredentialStores.entries.firstOrNull { it.value === store }?.key
+                ?: namedDidStores.entries.firstOrNull { it.value === store }?.key
+
         // When auth is enabled, account↔wallet mappings are owned by OSSWallet2AccountStore
         // so that GET /auth/account/wallets and wallet ownership enforcement stay in sync.
         override suspend fun linkWalletToAccount(accountId: String, walletId: String) {

@@ -27,7 +27,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
 
             implementation(identityLibs.optimumcode.jsonschemavalidator)
-            implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+            implementation(identityLibs.jsonpathkt)
 
             // CBOR
             implementation(identityLibs.kotlinx.serialization.cbor)
@@ -55,7 +55,7 @@ kotlin {
         }
 
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.ktor.server.test.host)
         }
     }

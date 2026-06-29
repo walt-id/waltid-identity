@@ -2,12 +2,18 @@ package id.walt.openid4vci.core
 
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
+import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
+import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.tokens.AccessTokenVerifier
+import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.tokens.access.AccessTokenIssuer
+import id.walt.openid4vci.tokens.access.AccessTokenVerifier
+import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
+import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
@@ -32,10 +38,16 @@ data class OAuth2ProviderConfig(
     val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
     val authorizationCodeRepository: AuthorizationCodeRepository,
 
+    val pushedAuthorizationEndpointHandlers: PushedAuthorizationEndpointHandlers = PushedAuthorizationEndpointHandlers(),
+    val pushedAuthorizationConfig: PushedAuthorizationConfig? = null,
+
     val accessTokenRequestValidator: AccessTokenRequestValidator,
     val tokenEndpointHandlers: TokenEndpointHandlers,
-    val accessTokenService: AccessTokenService,
+    val accessTokenIssuer: AccessTokenIssuer,
     val accessTokenVerifier: AccessTokenVerifier? = null,
+    val refreshTokenIssuer: RefreshTokenIssuer,
+    val refreshTokenVerifier: RefreshTokenVerifier,
+    val refreshTokenRepository: RefreshTokenRepository,
 
     val preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
@@ -43,3 +55,15 @@ data class OAuth2ProviderConfig(
     val credentialRequestValidator: CredentialRequestValidator,
     val credentialEndpointHandlers: CredentialEndpointHandlers,
 )
+
+data class PushedAuthorizationConfig(
+    val repository: PARRepository,
+    val requestUriPrefix: String = PushedAuthorizationResponse.DEFAULT_REQUEST_URI_PREFIX,
+    val lifetimeSeconds: Int = 90,
+    val enforcePushedAuthorizationRequests: Boolean = false,
+) {
+    init {
+        require(requestUriPrefix.isNotBlank()) { "PAR requestUriPrefix must not be blank" }
+        require(lifetimeSeconds > 0) { "PAR lifetimeSeconds must be positive" }
+    }
+}

@@ -12,6 +12,7 @@ import id.walt.dcql.models.meta.MsoMdocMeta
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.ktornotifications.core.KtorSessionNotifications
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.verifier.openid.models.authorization.VerifierInfoItem
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
 import id.walt.verifier2.utils.UrlUtils
 import io.ktor.http.Url
@@ -19,6 +20,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -52,7 +54,9 @@ data class GeneralFlowConfig(
     /** request signing key */
     val key: DirectSerializedKey? = null,
     /** certificate chain for signed request */
-    val x5c: List<String>? = null
+    val x5c: List<String>? = null,
+
+    @SerialName("verifier_info") val verifierInfo: List<VerifierInfoItem>? = null
 ) {
     init {
         // Verify if DCQL Query is correct
@@ -86,8 +90,7 @@ sealed interface UrlBearingDeviceFlowSetup : VerificationSessionSetup {
 
 @Serializable
 data class OpenId4VPConfig(
-    // List of base64url encoded JSON strings
-    val transactionData: List<String>? = null
+    val transactionData: List<JsonObject>? = null
 )
 
 /** Allow exposing certain OpenID4VP specific options */
@@ -133,9 +136,9 @@ data class CrossDeviceFlowSetup(
             )
         )
 
-        val EXAMPLE_ISO_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
+        val EXAMPLE_EUDI_PID: VerificationSessionSetup = BASE_EXAMPLE.copy(
             core = BASE_EXAMPLE.core.copy(
-                dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_ISO_PID
+                dcqlQuery = DcqlQuery.DcqlQueryExamples.EXAMPLE_EUDI_PID
             )
         )
     }

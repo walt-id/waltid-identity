@@ -10,17 +10,17 @@ dependencies {
     api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
 
     // Exposed — SQL framework (api so Database is visible to consumers)
-    api("org.jetbrains.exposed:exposed-core:1.3.0")
-    api("org.jetbrains.exposed:exposed-jdbc:1.3.0")
-    implementation("org.jetbrains.exposed:exposed-java-time:1.3.0")
-    implementation("org.jetbrains.exposed:exposed-json:1.3.0")
+    api(identityLibs.exposed.core)
+    api(identityLibs.exposed.jdbc)
+    implementation(identityLibs.exposed.java.time)
+    implementation(identityLibs.exposed.json)
 
     // JDBC drivers — SQLite (default) and Postgres (optional)
-    implementation("org.xerial:sqlite-jdbc:3.47.0.0")
-    compileOnly("org.postgresql:postgresql:42.7.3")
+    implementation(identityLibs.sqlite.jdbc)
+    compileOnly(identityLibs.postgresql)
 
     // Connection pooling
-    implementation("com.zaxxer:HikariCP:5.1.0")
+    implementation(identityLibs.hikaricp)
 
     // Serialization
     implementation(identityLibs.kotlinx.serialization.json)
@@ -34,7 +34,7 @@ dependencies {
     // Tests
     testImplementation(kotlin("test"))
     testImplementation(identityLibs.kotlinx.coroutines.test)
-    testImplementation("org.xerial:sqlite-jdbc:3.47.0.0")
+    testImplementation(identityLibs.sqlite.jdbc)
 }
 
 mavenPublishing {

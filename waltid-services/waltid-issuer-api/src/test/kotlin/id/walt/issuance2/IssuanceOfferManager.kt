@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.issuance2
 
@@ -8,7 +7,6 @@ import id.walt.oid4vc.data.CredentialOffer
 import id.walt.oid4vc.data.GrantType
 import kotlinx.serialization.json.Json
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 object IssuanceOfferManager {

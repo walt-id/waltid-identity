@@ -139,6 +139,14 @@ data class TestCase(
                  description.contains("_sd", ignoreCase = true)) &&
                 !description.contains("without selective disclosure", ignoreCase = true)
 
+    /** True if the SD profile includes array-element selective disclosure (RFC 9901 §4.2.2). */
+    val hasArrayElementSd: Boolean
+        get() = hasSelectiveDisclosure && description.contains("Array", ignoreCase = false)
+
+    /** True if the SD profile includes recursive (nested) selective disclosure. */
+    val hasRecursiveSd: Boolean
+        get() = hasSelectiveDisclosure && description.contains("recursive", ignoreCase = true)
+
     val isPseudonym: Boolean
         get() = id.contains("pseudonym", ignoreCase = true) || description.contains("pseudonym", ignoreCase = true)
 

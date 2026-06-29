@@ -12,12 +12,10 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toJavaUuid
 import kotlin.uuid.toKotlinUuid
 
-@OptIn(ExperimentalUuidApi::class)
 object DidsService {
     fun get(wallet: Uuid, did: String): WalletDid? = transaction {
         WalletDids.selectAll().where { (WalletDids.wallet eq wallet.toJavaUuid()) and (WalletDids.did eq did.replace("%3A", ":")) }

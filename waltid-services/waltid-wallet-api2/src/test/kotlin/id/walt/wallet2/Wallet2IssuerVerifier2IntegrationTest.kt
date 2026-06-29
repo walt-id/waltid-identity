@@ -30,11 +30,15 @@ import id.walt.openid4vci.repository.authorization.DuplicateCodeException
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRecord
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
@@ -76,7 +80,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
 
@@ -93,7 +96,7 @@ import id.walt.openid4vci.CredentialFormat as VciCredentialFormat
  *
  * Out of scope: mso_mdoc — the waltid-openid4vci library has no mdoc credential handler.
  */
-@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 class Wallet2IssuerVerifier2IntegrationTest {
 
     // Each test gets its own pair of ports to avoid Address-already-in-use when
@@ -267,7 +270,11 @@ class Wallet2IssuerVerifier2IntegrationTest {
                 authorizationCodeRepository = authCodeRepo,
                 preAuthorizedCodeRepository = preAuthRepo,
                 preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(preAuthRepo),
-                accessTokenService = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
+                accessTokenIssuer = JwtAccessTokenIssuer(resolver = { accessTokenKey }),
+                accessTokenVerifier = JwtAccessTokenVerifier(resolver = { _ -> accessTokenKey }),
+                refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver = { accessTokenKey }),
+                refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver = { _ -> accessTokenKey }),
+                refreshTokenRepository = InMemoryRefreshTokenRepository(),
                 accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                 credentialRequestValidator = DefaultCredentialRequestValidator(),
                 credentialEndpointHandlers = CredentialEndpointHandlers()

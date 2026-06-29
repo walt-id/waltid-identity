@@ -111,7 +111,7 @@ The provider is configured via `OAuth2ProviderConfig`:
 - **Request Validators** - Parse and validate authorization/token requests
 - **Endpoint Handlers** - Handle grant type-specific logic
 - **Repositories** - Store authorization codes and pre-authorized codes
-- **Token Service** - Generate and sign access tokens
+- **Token Issuer** - Issue and sign access tokens
 
 ### JWT Access Tokens
 
@@ -154,9 +154,9 @@ Build an OAuth2 provider with default handlers:
 
 ```kotlin
 import id.walt.openid4vci.core.*
-import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRepository
-import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenService
+import id.walt.openid4vci.repository.authorization.InMemoryAuthorizationCodeRepository
+import id.walt.openid4vci.repository.preauthorized.InMemoryPreAuthorizedCodeRepository
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
 
 // Create configuration
 val config = OAuth2ProviderConfig(
@@ -164,10 +164,10 @@ val config = OAuth2ProviderConfig(
     accessRequestValidator = DefaultAccessRequestValidator(),
     authorizeEndpointHandlers = AuthorizeEndpointHandlers(),
     tokenEndpointHandlers = TokenEndpointHandlers(),
-    authorizationCodeRepository = DefaultAuthorizationCodeRepository(),
-    preAuthorizedCodeRepository = DefaultPreAuthorizedCodeRepository(),
+    authorizationCodeRepository = InMemoryAuthorizationCodeRepository(),
+    preAuthorizedCodeRepository = InMemoryPreAuthorizedCodeRepository(),
     preAuthorizedCodeIssuer = PreAuthorizedCodeIssuer(),
-    tokenService = JwtAccessTokenService(signingKey, issuer)
+    accessTokenIssuer = JwtAccessTokenIssuer(signingKey, issuer)
 )
 
 // Build provider
@@ -220,18 +220,14 @@ class DatabaseAuthorizationCodeRepository : AuthorizationCodeRepository {
 }
 ```
 
-### Custom Token Service
+### Custom Token Issuer
 
-Implement custom access token generation:
+Implement custom access token issuance:
 
 ```kotlin
-class CustomAccessTokenService : AccessTokenService {
-    override suspend fun generateAccessToken(
-        clientId: String,
-        scopes: Set<String>,
-        session: Session
-    ): String {
-        // Custom token generation logic
+class CustomAccessTokenIssuer : AccessTokenIssuer {
+    override suspend fun issue(claims: Map<String, Any?>): String {
+        // Custom token issuance logic
     }
 }
 ```
@@ -242,7 +238,7 @@ class CustomAccessTokenService : AccessTokenService {
 - `core/Builder.kt` - Provider builder and configuration
 - `core/Config.kt` - Configuration data classes
 - `granttypehandlers/` - Grant type-specific handlers
-- `tokens/jwt/JwtAccessTokenService.kt` - JWT token generation
+- `tokens/jwt/access/JwtAccessTokenIssuer.kt` - JWT access token issuance
 - `validation/` - Request validation logic
 - `repository/` - Storage interfaces and default implementations
 

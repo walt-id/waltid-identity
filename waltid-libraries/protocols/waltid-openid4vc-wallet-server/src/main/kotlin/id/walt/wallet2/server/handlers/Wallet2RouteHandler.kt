@@ -37,6 +37,7 @@ import id.walt.wallet2.handlers.SignProofResult
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.walt.wallet2.server.WalletResolver
+import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
@@ -55,7 +56,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
@@ -140,7 +140,6 @@ data class ImportCredentialRequest(
  * Both the OSS service and the Enterprise service call [registerWallet2Routes],
  * providing their own [WalletResolver]. All HTTP logic lives here.
  */
-@OptIn(ExperimentalUuidApi::class)
 object Wallet2RouteHandler {
 
     private val noopOnEvent: suspend (WalletSessionEvent) -> Unit = {}
@@ -171,27 +170,23 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)?
     ) {
 
-        post("", {
-            summary = "Create a new wallet"
-            description =
-                "Creates a wallet with optional named stores. " +
-                "Omitting store IDs auto-creates one in-memory store of each type."
-            request { body<CreateWalletRequest> { required = false } }
-            response {
-                HttpStatusCode.Created to { body<WalletCreatedResponse>() }
-            }
-        }) {
+        post("", Wallet2OpenApiDocs.createWallet()) {
             val req = runCatching { call.receive<CreateWalletRequest>() }
                 .getOrElse { CreateWalletRequest() }
             val id = Uuid.random().toString()
 
+            // Auto-created stores are registered under a generated store ID so that:
+            //  - resolveStoreId() can map the store instance back to an ID when storeWallet()
+            //    serializes the Wallet to a WalletDescriptor (otherwise the descriptor would be
+            //    persisted with no attached stores — see resolveStoreId default), and
+            //  - the same store instance is resolvable later via resolveKeyStore()/etc.
             val keyStores: List<WalletKeyStore> = when {
                 req.keyStoreIds != null ->
                     req.keyStoreIds.map {
                         resolver.resolveKeyStore(it) ?: error("Key store '$it' not found")
                     }
                 req.staticKey != null -> emptyList()
-                else -> listOf(InMemoryKeyStore())
+                else -> listOf(InMemoryKeyStore().also { resolver.storeKeyStore("$id-keys", it) })
             }
 
             val credentialStores: List<WalletCredentialStore> = when {
@@ -199,7 +194,7 @@ object Wallet2RouteHandler {
                     req.credentialStoreIds.map {
                         resolver.resolveCredentialStore(it) ?: error("Credential store '$it' not found")
                     }
-                else -> listOf(InMemoryCredentialStore())
+                else -> listOf(InMemoryCredentialStore().also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
             val didStore: WalletDidStore? = when {
@@ -207,7 +202,7 @@ object Wallet2RouteHandler {
                 req.didStoreId != null ->
                     resolver.resolveDidStore(req.didStoreId) ?: error("DID store '${req.didStoreId}' not found")
                 req.staticDid != null -> null
-                else -> InMemoryDidStore()
+                else -> InMemoryDidStore().also { resolver.storeDidStore("$id-dids", it) }
             }
 
             val staticKey = req.staticKey?.let { KeyManager.resolveSerializedKey(it.toString()) }
@@ -237,12 +232,12 @@ object Wallet2RouteHandler {
             description = "When auth is enabled, returns only wallets owned by the authenticated account."
             response { HttpStatusCode.OK to { body<List<String>>() } }
         }) {
-            val ids = if (getAccountId != null) {
+            val ids: List<String> = if (getAccountId != null) {
                 val accountId = call.getAccountId()
-                if (accountId != null) resolver.getWalletIdsForAccount(accountId) ?: resolver.listWalletIds()
-                else resolver.listWalletIds()
+                if (accountId != null) resolver.getWalletIdsForAccount(accountId) ?: resolver.listWalletIds().toList()
+                else resolver.listWalletIds().toList()
             } else {
-                resolver.listWalletIds()
+                resolver.listWalletIds().toList()
             }
             call.respond(ids)
         }
@@ -289,11 +284,7 @@ object Wallet2RouteHandler {
                     call.respond(wallet.listAllKeys())
                 }
 
-                post("/generate", {
-                    summary = "Generate a new key"
-                    request { pathParameter<String>("walletId"); body<GenerateKeyRequest>() }
-                    response { HttpStatusCode.Created to { body<WalletKeyInfo>() } }
-                }) {
+                post("/generate", Wallet2OpenApiDocs.generateKey()) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<GenerateKeyRequest>()
                     val keyType = KeyType.valueOf(req.keyType)
@@ -364,11 +355,7 @@ object Wallet2RouteHandler {
                     call.respond(wallet.didStore?.listDids()?.toList() ?: emptyList<WalletDidEntry>())
                 }
 
-                post("/create", {
-                    summary = "Create a DID"
-                    request { pathParameter<String>("walletId"); body<CreateDidRequest>() }
-                    response { HttpStatusCode.Created to { body<WalletDidEntry>() } }
-                }) {
+                post("/create", Wallet2OpenApiDocs.createDid()) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<CreateDidRequest>()
                     val didStore = wallet.didStore
@@ -673,7 +660,7 @@ object Wallet2RouteHandler {
                 summary = "List named key store IDs"
                 response { HttpStatusCode.OK to { body<List<String>>() } }
             }) {
-                call.respond(resolver.listKeyStoreIds())
+                call.respond(resolver.listKeyStoreIds().toList())
             }
             post("/{storeId}", {
                 summary = "Create a named key store"
@@ -691,7 +678,7 @@ object Wallet2RouteHandler {
                 summary = "List named credential store IDs"
                 response { HttpStatusCode.OK to { body<List<String>>() } }
             }) {
-                call.respond(resolver.listCredentialStoreIds())
+                call.respond(resolver.listCredentialStoreIds().toList())
             }
             post("/{storeId}", {
                 summary = "Create a named credential store"
@@ -709,7 +696,7 @@ object Wallet2RouteHandler {
                 summary = "List named DID store IDs"
                 response { HttpStatusCode.OK to { body<List<String>>() } }
             }) {
-                call.respond(resolver.listDidStoreIds())
+                call.respond(resolver.listDidStoreIds().toList())
             }
             post("/{storeId}", {
                 summary = "Create a named DID store"

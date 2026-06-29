@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.config.ConfigManager
@@ -40,7 +39,6 @@ import kotlin.test.assertContains
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class WaltidServicesE2ETests {
@@ -118,8 +116,7 @@ class WaltidServicesE2ETests {
 
     val e2e = E2ETest()
 
-    @OptIn(ExperimentalUuidApi::class)
-    @Disabled("Temporarily disabled: cohort 2.9.4 shutdown issue causes test to hang")
+        @Disabled("Temporarily disabled: cohort 2.9.4 shutdown issue causes test to hang")
     @Test
     fun e2e() = e2e.testBlock(
         config = ServiceConfiguration("e2e-test", version = "test"),

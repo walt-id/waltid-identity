@@ -4,6 +4,7 @@ import io.github.reactivecircus.cache4k.Cache
 import kotlin.time.Duration
 
 class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Duration) : Persistence<V>(discriminator, defaultExpiration) {
+    private val lock = Any()
 
     private val store = Cache.Builder<String, V>()
         .expireAfterWrite(defaultExpiration)
@@ -46,6 +47,12 @@ class InMemoryPersistence<V : Any>(discriminator: String, defaultExpiration: Dur
 
     override fun remove(id: String) {
         store.invalidate(id)
+    }
+
+    override fun getAndRemove(id: String): V? = synchronized(lock) {
+        val value = store.get(id) ?: return@synchronized null
+        store.invalidate(id)
+        value
     }
 
     override fun contains(id: String): Boolean = store.get(id) != null

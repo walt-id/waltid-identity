@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.db.models
 
@@ -19,7 +18,6 @@ import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.javatime.timestamp
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toKotlinUuid
 
@@ -41,7 +39,7 @@ object WalletCredentials : Table("credentials") {
 }
 
 @Serializable
-data class WalletCredential @OptIn(ExperimentalUuidApi::class) constructor(
+data class WalletCredential constructor(
     @Contextual
     val wallet: Uuid,
     val id: String,

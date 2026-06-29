@@ -77,8 +77,9 @@ const props = defineProps<{
     credential: {
         id: string;
         document: string;
-        parsedDocument?: string;
+        parsedDocument?: Record<string, unknown>;
         disclosures?: string;
+        format?: string;
     };
     disclosures: Record<string, Array<Array<string>>>;
     selection: Record<string, boolean>;
@@ -89,9 +90,39 @@ const props = defineProps<{
 }>();
 
 const type = computed(() => {
-    const parsed = props.credential.parsedDocument ?? parseJwt(props.credential.document).vc ?? parseJwt(props.credential.document);
-    return parsed?.type?.at(-1) ?? parsed.vct.split('/').pop() ?? "Unknown";
+    const parsed = resolveCredentialPayload(props.credential);
+    const parsedType = parsed?.type;
+    if (Array.isArray(parsedType) && parsedType.length > 0) {
+        return parsedType.at(-1) ?? "Unknown";
+    }
+    if (typeof parsedType === "string") {
+        return parsedType;
+    }
+    if (typeof parsed?.vct === "string") {
+        return parsed.vct.split('/').pop() ?? "Unknown";
+    }
+    if (typeof parsed?.docType === "string") {
+        return parsed.docType;
+    }
+    return "Unknown";
 });
 const displayType = computed(() => type.value.replace(/([a-z0-9])([A-Z])/g, "$1 $2"));
 const disclosureList = computed(() => parseDisclosures(props.credential.disclosures || ""));
+
+function resolveCredentialPayload(credential: {
+    document: string;
+    parsedDocument?: Record<string, unknown>;
+}) {
+    if (credential.parsedDocument) {
+        const parsed = credential.parsedDocument as Record<string, any>;
+        return (parsed.vc ?? parsed.verifiableCredential ?? parsed) as Record<string, any>;
+    }
+
+    if (!credential.document.includes(".")) {
+        return null;
+    }
+
+    const parsed = parseJwt(credential.document);
+    return (parsed?.vc ?? parsed?.verifiableCredential ?? parsed) as Record<string, any>;
+}
 </script>

@@ -66,9 +66,21 @@ class GenerateCommand : CliktCommand(name = "generate") {
 
     private val vct by option("--vct", help = "Verifiable Credential Type for SD-JWT-VC (overrides config)")
 
+    private val schemaDir by option("--schema-dir", help = "Directory containing JSON Schema files (e.g. plugtest SCHEMA/). When set with --metadata-dir, generated SD-JWT VCs are validated against their vct schema (issuer-side schema check).")
+        .file(mustExist = true)
+
+    private val metadataDir by option("--metadata-dir", help = "Directory containing vct Type Metadata files (e.g. plugtest META-DATA/), used to resolve vct -> schema_url -> schema file for the issuer-side schema check.")
+        .file(mustExist = true)
+
     override fun run() = runBlocking {
         val config = ConfigManager.loadConfig(configFile)
         echo("Configuration loaded")
+
+        // Issuer-side schema check (offline): when schema/metadata dirs are supplied, validate each
+        // generated SD-JWT VC against the JSON Schema resolved from its vct (via Type Metadata).
+        val schemaResolver = if (schemaDir != null || metadataDir != null) {
+            id.walt.etsi.validator.SchemaResolver(schemaDir = schemaDir, metadataDir = metadataDir)
+        } else null
 
         echo("Loading test cases from: ${testCasesFile.absolutePath}")
 
@@ -99,7 +111,10 @@ class GenerateCommand : CliktCommand(name = "generate") {
         )
 
         val effectiveIssuerUrl = issuerUrl ?: config.issuer.url
-        val effectiveVct = vct ?: config.sdjwt.vct
+        // vct is chosen PER TIER by the generator (PID/medical_license/birth_certificate) unless an
+        // explicit override is given. The legacy generic config default ("urn:etsi:eaa:credential")
+        // is treated as "no override" so per-tier vcts apply.
+        val vctOverride = vct ?: config.sdjwt.vct.takeIf { it.isNotBlank() && it != "urn:etsi:eaa:credential" }
         // x5u: explicit CLI/config override takes priority; generator auto-derives for QEAA/PuBEAA if absent
         val effectiveX5u = config.issuer.x5u
 
@@ -127,7 +142,7 @@ class GenerateCommand : CliktCommand(name = "generate") {
                                     issuerCertificatePem = issuerCert,
                                     holderKey = if (testCase.hasKeyBinding) holderKey else null,
                                     issuerUrl = effectiveIssuerUrl,
-                                    vct = effectiveVct,
+                                    vct = vctOverride,
                                     x5u = effectiveX5u
                                 )
 
@@ -140,6 +155,27 @@ class GenerateCommand : CliktCommand(name = "generate") {
                                 outputFile.writeText(result.sdJwtVc)
                                 echo("    Generated: ${outputFile.name}")
                                 generatedCount++
+
+                                // Issuer-side schema check (offline, optional): validate the issued
+                                // credential against the JSON Schema resolved from its vct.
+                                if (schemaResolver != null) {
+                                    runCatching {
+                                        val (_, parsedCred) = id.walt.credentials.CredentialParser.detectAndParse(result.sdJwtVc)
+                                        val credVct = parsedCred.credentialData["vct"]?.let {
+                                            (it as? kotlinx.serialization.json.JsonPrimitive)?.content
+                                        }
+                                        val schema = schemaResolver.resolveSchemaForVct(credVct)
+                                        if (schema != null) {
+                                            val schemaResult = id.walt.policies2.vc.policies.JsonSchemaPolicy(schema = schema)
+                                                .verify(parsedCred, id.walt.policies2.vc.policies.PolicyExecutionContext.Empty)
+                                            if (schemaResult.isSuccess) {
+                                                echo("      Schema check: PASS (vct=$credVct)")
+                                            } else {
+                                                echo("      Schema check: FAIL (vct=$credVct): ${schemaResult.exceptionOrNull()?.message}")
+                                            }
+                                        }
+                                    }.onFailure { echo("      Schema check skipped: ${it.message}") }
+                                }
                             }
 
                             "mdoc" -> {
@@ -320,8 +356,21 @@ class ValidateCommand : CliktCommand(name = "validate") {
     private val summary by option("--summary", "-s", help = "Print summary only, don't generate reports")
         .flag(default = false)
 
+    private val schemaDir by option("--schema-dir", help = "Directory containing JSON Schema files (e.g. the plugtest SCHEMA/ dir). Enables the schema verification policy.")
+        .file(mustExist = true)
+
+    private val metadataDir by option("--metadata-dir", help = "Directory containing vct Type Metadata files (e.g. the plugtest META-DATA/ dir). Used to resolve a credential's vct -> schema_url -> schema file.")
+        .file(mustExist = true)
+
     override fun run() = runBlocking {
         echo("Parsing zip file: ${zipFile.absolutePath}")
+
+        // Schema verification policy (offline): resolve a credential's vct -> Type Metadata
+        // schema_url -> local schema file, then validate via the shared JsonSchemaPolicy.
+        val schemaResolver = if (schemaDir != null || metadataDir != null) {
+            echo("Schema validation enabled (schemaDir=${schemaDir?.absolutePath}, metadataDir=${metadataDir?.absolutePath})")
+            id.walt.etsi.validator.SchemaResolver(schemaDir = schemaDir, metadataDir = metadataDir)
+        } else null
 
         // Load test cases if provided
         val scrapedData = testCasesFile?.let { file ->
@@ -370,7 +419,7 @@ class ValidateCommand : CliktCommand(name = "validate") {
 
             try {
                 // Signature validation
-                var result = CredentialValidator.validate(file)
+                var result = CredentialValidator.validate(file, schemaResolver)
 
                 // Content validation if test cases are provided
                 if (scrapedData != null) {

@@ -13,15 +13,19 @@ import id.walt.openid4vci.requests.credential.CredentialRequestResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseHttp
+import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import id.walt.openid4vci.responses.token.AccessTokenResponseHttp
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
+import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.responses.credential.CredentialResponseResult
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.openid4vci.responses.credential.CredentialResponseHttp
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenContext
 import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
@@ -36,19 +40,21 @@ import kotlin.time.Instant
  *   DTOs instead of writing to HTTP primitives.
  * - `writeAuthorizationError`/`writeAuthorizationResponse` encapsulate response-mode formatting for tests
  *   and framework integration.
- * - `createAccessTokenRequest`/`createAccessResponse` cover the token endpoint, and the `write*` variants
+ * - `createAccessTokenRequest`/`createAccessTokenResponse` cover the token endpoint, and the `write*` variants
  *   produce RFC6749-compliant bodies.
  *
  * Parameters will be changed. However, we have to keep the implementation framework-agnostic (Ktor, Spring).
  */
 interface OAuth2Provider {
     // OAuth2.0 - Authorization Endpoint
-    fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+    suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
 
     suspend fun createAuthorizationResponse(
         authorizationRequest: AuthorizationRequest,
         session: Session
     ): AuthorizationResponseResult
+
+    fun writeAuthorizationError(error: OAuthError): AuthorizationResponseHttp
 
     fun writeAuthorizationError(
         authorizationRequest: AuthorizationRequest,
@@ -60,13 +66,38 @@ interface OAuth2Provider {
         response: AuthorizationResponse
     ): AuthorizationResponseHttp
 
+    // OAuth2.0 - Pushed Authorization Request Endpoint
+    suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult
+
+    suspend fun createPushedAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        clientAuthentication: Map<String, String> = emptyMap(),
+    ): PushedAuthorizationResponseResult
+
+    fun writePushedAuthorizationError(error: OAuthError): PushedAuthorizationResponseHttp
+
+    fun writePushedAuthorizationError(
+        authorizationRequest: AuthorizationRequest,
+        error: OAuthError,
+    ): PushedAuthorizationResponseHttp
+
+    fun writePushedAuthorizationResponse(
+        authorizationRequest: AuthorizationRequest,
+        response: PushedAuthorizationResponse,
+    ): PushedAuthorizationResponseHttp
+
     // OAuth2.0 - Token Endpoint
     fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
         session: Session? = null
     ): AccessTokenRequestResult
 
-    suspend fun createAccessTokenResponse(request: AccessTokenRequest): AccessTokenResponseResult
+    suspend fun createAccessTokenResponse(
+        request: AccessTokenRequest,
+        options: TokenResponseOptions = TokenResponseOptions(),
+    ): AccessTokenResponseResult
+
+    fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp
 
     fun writeAccessTokenError(request: AccessTokenRequest, error: OAuthError): AccessTokenResponseHttp
 
@@ -95,6 +126,8 @@ interface OAuth2Provider {
         validFrom: Instant? = null,
         validUntil: Instant? = null,
     ): CredentialResponseResult
+
+    fun writeCredentialError(error: OAuthError): CredentialResponseHttp
 
     fun writeCredentialError(request: CredentialRequest, error: OAuthError): CredentialResponseHttp
 

@@ -8,11 +8,17 @@ import id.walt.openid4vci.core.TOKEN_TYPE_BEARER
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssueRequest
 import id.walt.openid4vci.requests.token.AccessTokenRequest
 import id.walt.openid4vci.requests.authorization.AuthorizationRequest
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
+import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
+import id.walt.openid4vci.responses.token.TokenResponseOptions
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.time.Duration.Companion.seconds
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +37,7 @@ class ProviderCombinedFlowTest {
         val provider = buildOAuth2Provider(config)
 
         // Authorization code flow
-        val AuthorizationRequestResult = provider.createAuthorizationRequest(
+        val authorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
@@ -40,8 +46,8 @@ class ProviderCombinedFlowTest {
                 "state" to listOf("abc"),
             ),
         )
-        assertTrue(AuthorizationRequestResult.isSuccess())
-        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request.withIssuer(issClaim)
+        assertTrue(authorizationRequestResult.isSuccess())
+        val authorizeRequest = (authorizationRequestResult as AuthorizationRequestResult.Success).request.withIssuer(issClaim)
 
         val session = DefaultSession(subject = "demo-subject")
         val authorizeResponse = provider.createAuthorizationResponse(authorizeRequest, session)
@@ -85,10 +91,33 @@ class ProviderCombinedFlowTest {
         )
         assertTrue(preAccessResult.isSuccess())
         val preAccessRequest = (preAccessResult as AccessTokenRequestResult.Success).request.withIssuer(issClaim)
-        val preAccessResponse = provider.createAccessTokenResponse(preAccessRequest)
+        val preAccessResponse = provider.createAccessTokenResponse(
+            preAccessRequest,
+            TokenResponseOptions(
+                authorizationDetails = listOf(
+                    AuthorizationDetail(
+                        type = OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE,
+                        credentialConfigurationId = "identity_credential",
+                        credentialIdentifiers = listOf("credential-123"),
+                    ),
+                ),
+            ),
+        )
         assertTrue(preAccessResponse.isSuccess())
         val preTokenResponse = (preAccessResponse as AccessTokenResponseResult.Success).response
         assertEquals("nonce-pre", preTokenResponse.extra["c_nonce"])
+        val preAuthorizationDetail = (preTokenResponse.extra["authorization_details"] as JsonArray)
+            .single()
+            .jsonObject
+        assertEquals("identity_credential", preAuthorizationDetail["credential_configuration_id"]?.jsonPrimitive?.content)
+        assertEquals(
+            "credential-123",
+            preAuthorizationDetail["credential_identifiers"]
+                ?.let { it as JsonArray }
+                ?.single()
+                ?.jsonPrimitive
+                ?.content,
+        )
         assertNull(config.preAuthorizedCodeRepository.get(preCode))
     }
 
@@ -170,9 +199,8 @@ class ProviderCombinedFlowTest {
 
             val accessResponse = provider.createAccessTokenResponse(accessRequest)
             assertTrue(accessResponse is AccessTokenResponseResult.Success, "access response failed for $clientId")
-            val success = accessResponse as AccessTokenResponseResult.Success
-            val tokenResponse = success.response
-            val updatedRequest = success.request
+            val tokenResponse = accessResponse.response
+            val updatedRequest = accessResponse.request
 
             assertEquals(subject, updatedRequest.session?.subject, "session subject must survive round trip for $clientId")
             assertEquals(clientId, updatedRequest.client.id, "client must be preserved for $clientId")
@@ -180,7 +208,7 @@ class ProviderCombinedFlowTest {
 
             assertEquals(TOKEN_TYPE_BEARER, tokenResponse.tokenType)
             assertTrue((tokenResponse.expiresIn ?: -1) >= 0)
-            assertTrue(tokenResponse.extra.isEmpty())
+            assertTrue(tokenResponse.refreshToken?.isNotBlank() == true)
             return tokenResponse to accessRequest
         }
 
