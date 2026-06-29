@@ -1,26 +1,10 @@
-<div align="center">
-<h1>walt.id OpenID4VP Conformance Runners</h1>
- <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services</p>
+# walt.id OpenID4VP Conformance Runners
 
-<a href="https://walt.id/community">
-<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
-</a>
-<a href="https://www.linkedin.com/company/walt-id/">
-<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
-</a>
-  
-  <h2>Status</h2>
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-    <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
-  </p>
-</div>
+Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services.
 
 ## Quick Start (Docker)
 
-The fastest way to run conformance tests locally:
+The fastest way to run conformance tests locally.
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -28,47 +12,66 @@ The fastest way to run conformance tests locally:
 - `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
 
 Add the hosts entry:
-```shell
+```bash
 echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
 ```
 
 ### 1. Clone and Start the Conformance Suite
 
-```shell
+```bash
 # Clone the conformance suite (if not already done)
 git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
 
+# Copy walt.id specific docker compose
+cp docker-compose-walt.yml ~/dev/openid/conformance-suite/
+
 # Start with Docker
 cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml up -d
+docker compose -f docker-compose-walt.yml up -d
 ```
 
-Wait ~30 seconds for the server to start, then verify:
-```shell
+Wait approximately 30 seconds for the server to start, then verify:
+```bash
 curl -k https://localhost.emobix.co.uk:8443/
 ```
 
-### 2. Run the Conformance Tests
+You should see the conformance suite web interface.
 
-```shell
+### 2. Run Verifier Conformance Tests
+
+```bash
 # From the waltid-unified-build directory
-cd ~/dev/walt-id/waltid-unified-build
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
-# Run tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "id.walt.openid4vp.conformance.ConformanceTests"
+# Run verifier tests
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "id.walt.openid4vp.conformance.ConformanceTests"
 ```
 
 Or run the main application:
-```shell
+```bash
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run
 ```
 
-### 3. Stop the Conformance Suite
+### 3. Run Wallet HAIP Conformance Tests
 
-```shell
-cp ./docker-compose-walt.yml cd ~/dev/openid/conformance-suite
+```bash
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+
+# Run all wallet HAIP tests
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "*WalletHAIPConformanceTests"
+
+# Run specific plan
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "*WalletHAIPConformanceTests.HAIP Plan 1*"
+```
+
+### 4. Stop the Conformance Suite
+
+```bash
 cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml down
+docker compose -f docker-compose-walt.yml down
 ```
 
 ## SSL Certificate (Already Configured)
@@ -79,7 +82,7 @@ This project includes a bundled truststore (`conformance-truststore.jks`) with t
 
 If you rebuild the conformance suite's nginx container, extract and import the new certificate:
 
-```shell
+```bash
 # Extract certificate from running server
 openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk </dev/null 2>/dev/null | \
   openssl x509 -outform PEM > conformance-test.pem
@@ -95,11 +98,94 @@ keytool -importcert -trustcacerts -alias conformance-test-localhost \
 
 Add these VM options to your run configuration:
 ```
--Djavax.net.ssl.trustStore=/home/pp/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
+-Djavax.net.ssl.trustStore=/absolute/path/to/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
 -Djavax.net.ssl.trustStorePassword=changeit
 ```
 
----
+## Test Plans
+
+### Verifier Tests (Implemented)
+
+OpenID4VP 1.0 verifier conformance:
+- `MdlX509SanDnsRequestUriSignedDirectPost` - ISO mDL with signed request
+- `SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt` - SD-JWT VC with signed request and encrypted response
+
+### Wallet HAIP Tests (Implemented)
+
+High Assurance Interoperability Profile wallet conformance:
+
+| Plan | Format | Client ID | Response Mode | Modules | Status |
+|------|--------|-----------|---------------|---------|--------|
+| Plan 1 | SD-JWT VC | x509_san_dns | direct_post.jwt | 11 | MVP |
+| Plan 2 | mDL | x509_san_dns | direct_post.jwt | 6 | MVP |
+| Plan 7 | SD-JWT VC | x509_san_dns | direct_post.jwt | 9 | MVP (Negative) |
+
+All HAIP tests validate:
+- Signed request authentication (MANDATORY)
+- Encrypted response generation (MANDATORY)
+- P-256 key curve (MANDATORY)
+- SHA-256 hash algorithm (MANDATORY)
+- Holder binding (KB-JWT for SD-JWT, DeviceAuth for mdoc)
+
+### Test Coverage
+
+**Implemented:**
+- Verifier-side: SD-JWT VC, ISO mDL
+- Wallet-side: HAIP Plans 1, 2, 7
+
+**Pending:**
+- Wallet HAIP Plans 3-6 (PhotoID, multi-credential, DC API, alternative client ID schemes)
+
+## Configuration Files
+
+- `conformance-config1.json` - Example verifier test plan configuration
+- `conformance-verifier-config1.conf` - Example verifier configuration
+- `conformance-truststore.jks` - SSL truststore for conformance suite
+- `docker-compose-walt.yml` - Docker compose with custom nginx for proper SSL
+- `nginx/` - Custom nginx configuration directory
+
+## Troubleshooting
+
+### SSL Handshake Errors
+If you see `SSLHandshakeException` or certificate errors:
+1. Ensure `docker-compose-walt.yml` was used (builds nginx with proper cert)
+2. Verify truststore is being used (check Gradle output for JVM args)
+3. Try rebuilding: `docker compose -f docker-compose-walt.yml build nginx`
+4. Re-extract and import the certificate (see SSL Certificate section above)
+
+### Conformance Suite Not Starting
+Check container logs:
+```bash
+docker logs conformance-suite-server-1
+docker logs conformance-suite-nginx-1
+```
+
+Common issues:
+- Port 8443 already in use
+- MongoDB initialization taking longer than expected
+- Docker network issues
+
+### Tests Skip or Fail
+
+**Tests are skipped:**
+- Conformance suite not available (check with `curl -k https://localhost.emobix.co.uk:8443/`)
+- Conformance suite version check failed
+
+**Wallet tests fail:**
+- Wallet HAIP features not yet fully implemented (WAL-896 in progress)
+- Wallet endpoint not responding at expected URL
+- Security policies not configured
+
+### Wallet Test Requirements
+
+For wallet tests to PASS, you need:
+1. Conformance suite running (`docker-compose-walt.yml up`)
+2. Wallet implementation with HAIP support:
+   - Signed request authentication
+   - Encrypted response generation
+   - Security policy configuration
+   - KB-JWT/DeviceAuth holder binding
+3. Wallet HTTP endpoint responding at configured URL
 
 ## Alternative: Setup with Devenv (Nix)
 
@@ -107,7 +193,7 @@ For the full nix/devenv setup (creates CA, manages hosts file automatically):
 
 ### Install Nix
 
-```shell
+```bash
 # Option 1: Native package manager (if available)
 sudo pacman -S nix  # Arch
 # or
@@ -118,77 +204,45 @@ sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
 ```
 
 Enable and start the nix daemon:
-```shell
+```bash
 sudo systemctl enable --now nix-daemon.service
 ```
 
 ### Install Devenv
 
-```shell
+```bash
 nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixpkgs-unstable
 ```
 
 ### Run Conformance Suite with Devenv
 
-```shell
+```bash
 cd ~/dev/openid/conformance-suite
 devenv up
 ```
 
 In another terminal:
-```shell
+```bash
 cd ~/dev/openid/conformance-suite
 mvn spring-boot:run
 ```
 
 Visit: https://localhost.emobix.co.uk:8443/
 
----
+## Documentation
 
-## Test Plans
+- **WALLET-HAIP-TESTS.md** - Detailed wallet HAIP test documentation
+- **README.md** - This file (general setup and usage)
+- [OpenID4VP Spec](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
+- [HAIP Spec](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
+- [Conformance Suite GitLab](https://gitlab.com/openid/conformance-suite)
 
-OpenID4VP 1.0 test coverage:
+## Join the Community
 
-**Verifier Tests**
-- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
-- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
-- iso_mdl + x509_san_dns + request_uri_signed + direct_post
-- iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
-
-**Wallet Tests** (unsigned/signed + direct_post/direct_post.jwt)
-- sd_jwt_vc: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-- iso_mdl: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-
-See `config/` for example configuration files.
-
----
-
-## Troubleshooting
-
-### SSL Handshake Errors
-If you see `SSLHandshakeException` or certificate errors:
-1. Ensure `docker-compose-walt.yml` was used (builds nginx with proper cert)
-2. Verify truststore is being used (check Gradle output for JVM args)
-3. Try rebuilding: `docker compose -f docker-compose-walt.yml build nginx`
-
-### Conformance Suite Not Starting
-Check container logs:
-```shell
-docker logs conformance-suite-server-1
-docker logs conformance-suite-nginx-1
-```
-
----
-
-## Join the community
-
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-* Find more indepth documentation on our [docs site](https://docs.walt.id)
+- Connect: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
+- Support: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
+- Docs: [docs.walt.id](https://docs.walt.id)
 
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-<div align="center">
-<img src="../../assets/walt-banner.png" alt="walt.id banner" />
-</div>
