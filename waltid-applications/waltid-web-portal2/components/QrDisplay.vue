@@ -31,7 +31,7 @@ async function copyToClipboard() {
     </div>
 
     <div class="flex gap-2">
-      <a :href="webWalletHref" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+      <a :href="webWalletHref" class="hidden btn btn-primary" target="_blank" rel="noopener noreferrer">
         Open in Wallet
       </a>
       <button class="btn btn-secondary" @click="copyToClipboard">
