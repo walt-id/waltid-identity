@@ -1,7 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.httpdata
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class CreateTestPlanResponse(
@@ -13,6 +12,9 @@ data class CreateTestPlanResponse(
     data class Module(
         val testModule: String, // oid4vp-1final-verifier-happy-flow
         val instances: List<String?> = listOf(),
-        val variant: JsonObject? = null // Dynamic variant fields differ per plan
-    )
+        val variant: Variant? = null
+    ) {
+        @Serializable
+        class Variant
+    }
 }

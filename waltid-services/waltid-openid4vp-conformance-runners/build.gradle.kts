@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
 import io.ktor.plugin.features.*
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
@@ -78,12 +80,7 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
-    implementation(project(":waltid-services:waltid-verifier-api2")) {
-        exclude(group = "id.walt.crypto", module = "waltid-crypto-azure")
-    }
-    implementation(project(":waltid-services:waltid-issuer-api")) {
-        exclude(group = "id.walt.crypto", module = "waltid-crypto-azure")
-    }
+    implementation(project(":waltid-services:waltid-verifier-api2"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
@@ -98,18 +95,6 @@ application {
     mainClass.set("id.walt.openid4vp.conformance.MainKt")
 }
 
-tasks.withType<Test> {
-    val trustStorePath = projectDir.resolve("conformance-truststore.jks").absolutePath
-    systemProperty("javax.net.ssl.trustStore", trustStorePath)
-    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
-}
-
-tasks.withType<JavaExec> {
-    val trustStorePath = projectDir.resolve("conformance-truststore.jks").absolutePath
-    systemProperty("javax.net.ssl.trustStore", trustStorePath)
-    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
-}
-
 ktor {
     docker {
         portMappings.set(
@@ -118,4 +103,11 @@ ktor {
             )
         )
     }
+}
+
+tasks.test {
+    // Configure SSL truststore for conformance suite tests
+    val truststorePath = file("conformance-truststore.jks").absolutePath
+    systemProperty("javax.net.ssl.trustStore", truststorePath)
+    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
 }

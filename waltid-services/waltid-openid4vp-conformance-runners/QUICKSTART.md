@@ -1,271 +1,163 @@
-# Quick Setup Guide
-
-This guide walks you through running OpenID4VP/VCI conformance tests locally.
+# OpenID4VCI Issuer Conformance Tests - Quick Start
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Java 21+
-- ngrok (for Verifier tests)
-- Ubuntu/Linux environment
+1. **Conformance Suite**: https://localhost.emobix.co.uk:8443
+2. **Cloudflare Tunnel**: Free, no account needed
+3. **Issuer running**: OSS or Enterprise on port 7002
 
-## Initial Setup (One-Time)
+## Setup (5 minutes)
 
-### 1. Add Hosts Entry
-
-```bash
-echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
-```
-
-### 2. Clone Conformance Suite
+### 1. Install Cloudflare Tunnel
 
 ```bash
-git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+# Download and install
+wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i cloudflared-linux-amd64.deb
 ```
 
-### 3. Copy Configuration Files
+### 2. Start Your Issuer
 
 ```bash
-# Copy Docker Compose
-cp ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml ~/dev/openid/conformance-suite/
+cd ~/dev/walt-id/waltid-unified-build
 
-# Copy nginx configuration
-cp -r ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/nginx ~/dev/openid/conformance-suite/
+# Start OSS issuer on port 7002
+./gradlew :waltid-services:waltid-issuer-api2:run
+
+# OR start Enterprise issuer on port 7002 (for client attestation tests)
 ```
 
-### 4. Install ngrok (for Verifier tests)
-
-Download from https://ngrok.com/download or:
+### 3. Start Cloudflare Tunnel
 
 ```bash
-# Snap (Linux)
-sudo snap install ngrok
-
-# Homebrew (macOS)
-brew install ngrok
+cloudflared tunnel --url http://localhost:7002
 ```
 
-## Start Conformance Suite
+Copy the `https://...trycloudflare.com` URL from the output.
+
+### 4. Update Issuer Config
+
+Edit `waltid-issuer-api2/config/issuer-service.conf`:
+
+```hocon
+issuer {
+  baseUrl = "https://YOUR-TUNNEL-URL.trycloudflare.com"
+  # ... rest stays the same
+}
+```
+
+Restart the issuer.
+
+### 5. Run Tests
 
 ```bash
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-walt.yml up -d
+cd ~/dev/walt-id/waltid-unified-build
 
-# Wait ~30 seconds, then verify:
-curl -k https://localhost.emobix.co.uk:8443/
-```
-
-You should see HTML output. The web interface is available at https://localhost.emobix.co.uk:8443/
-
-## Run Verifier Conformance Tests
-
-### 1. Start ngrok Tunnel
-
-In a separate terminal:
-
-```bash
-ngrok http 7003
-```
-
-Note the HTTPS URL (e.g., `https://abc123.ngrok-free.app`).
-
-### 2. Run Tests
-
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-
-# Set ngrok URL
-export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
-
-# Run tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "VerifierConformanceTests"
-```
-
-### 3. View Results
-
-Open in browser:
-```
-waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
-```
-
-## Run Issuer Conformance Tests
-
-### 1. Start Issuer Service
-
-**Option A: OSS Issuer**
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-./gradlew :waltid-services:waltid-issuer-api:run
-# Issuer runs on port 7002
-```
-
-**Option B: Enterprise Issuer**
-```bash
-cd ~/dev/walt-id/waltid-enterprise-quickstart
-docker compose up -d
-```
-
-### 2. Configure Issuer URL
-
-```bash
-# Option 1: Direct URL
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://localhost:7002"
-
-# Option 2: Enterprise target
-export OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET="my-org"
-```
-
-### 3. Run Tests
-
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-TUNNEL-URL.trycloudflare.com/openid4vci"
+export OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID="photoID_credential_dc+sd-jwt"
+export OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER="https://YOUR-TUNNEL-URL.trycloudflare.com/openid4vci"
 
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "IssuerConformanceTests"
+  --tests "IssuerConformanceTests" \
+  --no-daemon
 ```
 
-**Note:** Authorization code flow tests require manual interaction in the conformance suite UI.
-For fully automated tests, ensure your issuer supports pre-authorized code flow.
+Results: `build/reports/tests/test/index.html`
 
-## Run Wallet Conformance Tests
+---
 
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+## Test Configuration
 
-# Run all wallet tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletConformanceTests"
+### OSS Issuer (No Client Attestation)
 
-# Or run specific plan
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletConformanceTests.Plan 1*"
+Edit: `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/Oid4vciIssuerClientAttestationDpop.kt`
+
+```kotlin
+private val moduleVariant = """
+    {
+      "fapi_profile": "vci",
+      "sender_constrain": "dpop",
+      "client_auth_type": "private_key_jwt",
+      "vci_grant_type": "authorization_code",
+      "vci_authorization_code_flow_variant": "wallet_initiated",
+      "authorization_request_type": "simple",
+      "fapi_request_method": "unsigned",
+      "fapi_response_mode": "plain_response",
+      "credential_format": "${credentialFormat.variantValue}"
+    }
+""".trimIndent()
 ```
 
-Note: Wallet tests require WAL-896 HAIP features to be implemented.
+### Enterprise Issuer (With Client Attestation)
 
-## Stop Conformance Suite
-
-```bash
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-walt.yml down
-
-# Stop ngrok: Ctrl+C in ngrok terminal
+```kotlin
+private val moduleVariant = """
+    {
+      "fapi_profile": "vci",
+      "sender_constrain": "dpop",
+      "client_auth_type": "client_attestation",
+      "vci_grant_type": "authorization_code",
+      "vci_authorization_code_flow_variant": "wallet_initiated",
+      "authorization_request_type": "simple",
+      "fapi_request_method": "unsigned",
+      "fapi_response_mode": "plain_response",
+      "credential_format": "${credentialFormat.variantValue}"
+    }
+""".trimIndent()
 ```
 
-## Expected Results
+---
 
-### Verifier Tests
+## OAuth Interaction Required
 
-When working correctly, you should see:
+When using `authorization_code` flow:
 
-```
-Plan 1 (MdlX509SanDnsRequestUriSignedDirectPost):
-  [0] oid4vp-1final-verifier-happy-flow: conformance=PASSED, verifier=SUCCESSFUL
-  [1] oid4vp-1final-verifier-request-uri-method-post: conformance=PASSED, verifier=SUCCESSFUL
-  [2] oid4vp-1final-verifier-invalid-session-transcript: conformance=PASSED, verifier=FAILED
+1. Test will show: `Current conformance test status: WAITING`
+2. Open the log URL (shown in output): `https://localhost.emobix.co.uk:8443/log-detail.html?log=...`
+3. Click the **interaction button** in the conformance UI
+4. Complete the authorization within 60 seconds (PAR request_uri expires quickly)
 
-Plan 2 (SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt):
-  [0] oid4vp-1final-verifier-happy-flow: conformance=PASSED, verifier=SUCCESSFUL
-  ...
-  [9] oid4vp-1final-verifier-kb-jwt-iat-in-future: conformance=PASSED, verifier=FAILED
-```
-
-Note: For negative tests, `verifier=FAILED` is the expected correct behavior.
-
-### Issuer Tests
-
-```
-================================================================================
-Running issuer plan: Oid4vciIssuerClientAttestationDpop
-================================================================================
-[1/6] Running module: oid4vci-1_0-issuer-metadata-test
-  Status: FINISHED, Result: PASSED
-
-[2/6] Running module: oid4vci-1_0-issuer-happy-flow
-  Status: FINISHED, Result: PASSED
-...
-
-Total: 6 modules
-Passed: 6
-```
-
-### Wallet Tests
-
-Currently skip because WAL-896 HAIP features are in development.
+---
 
 ## Troubleshooting
 
-### Conformance Suite Not Starting
+**Test stuck at WAITING?**
+- Authorization code flow needs manual OAuth approval in conformance UI
 
-```bash
-# Check containers
-docker ps | grep conformance
+**PAR request_uri expired?**
+- Click interaction button faster (< 60 seconds from test start)
 
-# Check logs
-docker logs conformance-suite-server-1
-docker logs conformance-suite-nginx-1
+**Client attestation errors?**
+- Use Enterprise issuer or switch to `"client_auth_type": "private_key_jwt"`
+
+**406 Not Acceptable?**
+- Use Cloudflare Tunnel, not ngrok (free ngrok shows browser warnings)
+
+## OAuth Authorization Code Flow - Manual Testing
+
+**Important:** Tests using OAuth authorization code flow with Keycloak **cannot run as automated JUnit tests** because they require user interaction (browser login).
+
+### Symptoms
+```
+java.lang.IllegalStateException: Test xyz is stuck in WAITING status
+This typically means the test requires user interaction (OAuth login)
 ```
 
-Common issues:
-- Port 8443 in use: `sudo lsof -i :8443`
-- MongoDB slow to start: wait 60 seconds
+### Solution: Manual Testing
 
-### Tests Skip
+1. **Start the issuer service** with public HTTPS URL (Cloudflare Tunnel)
+2. **Open the conformance suite** at https://localhost.emobix.co.uk:8443
+3. **Create a test plan** manually:
+   - Plan: `oid4vci-1_0-issuer-happy-flow-dpop-private_key_jwt`
+   - Configure issuer URL and OAuth settings
+4. **Complete the test** - Browser will redirect to Keycloak for login
+5. **Review results** - Test will complete after OAuth callback
 
-- Conformance suite not running
-- ngrok URL not set (Verifier tests)
-- Issuer URL not set (Issuer tests)
+### Automated Testing
 
-Verify:
-```bash
-curl -k https://localhost.emobix.co.uk:8443/
-echo $VERIFIER_NGROK_URL
-echo $OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL
-```
+For automated/headless testing, use one of:
+- **Pre-authorized code flow** (`vci_grant_type: "urn:ietf:params:oauth:grant-type:pre-authorized_code"`)
+- **Client credentials** (no user interaction)
+- **Mock OAuth** (stub the OAuth flow)
 
-### Issuer Test Stuck in WAITING
-
-Authorization code flow requires user interaction:
-1. Open https://localhost.emobix.co.uk:8443
-2. Find the running test
-3. Complete OAuth login in the popup
-
-Use pre-authorized code flow for automated tests.
-
-### Connection Refused
-
-For Verifier tests, the conformance suite (Docker) cannot reach host `localhost`.
-Use ngrok to expose the local verifier.
-
-### SSL Certificate Errors
-
-Re-extract certificate:
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
-
-openssl s_client -connect localhost.emobix.co.uk:8443 </dev/null 2>/dev/null | \
-  openssl x509 -outform PEM > conformance-test.pem
-
-keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks \
-  -storepass changeit 2>/dev/null || true
-keytool -importcert -trustcacerts -alias conformance-test-localhost \
-  -file conformance-test.pem -keystore conformance-truststore.jks \
-  -storepass changeit -noprompt
-```
-
-### Address Already in Use (Port 7003)
-
-The test starts its own embedded verifier. Kill any existing process:
-
-```bash
-sudo lsof -i :7003
-kill <PID>
-```
-
-## Additional Resources
-
-- [README.md](README.md) - Full documentation
-- [VERIFIER-TESTS.md](VERIFIER-TESTS.md) - Verifier test details
-- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer test details
-- [WALLET-TESTS.md](WALLET-TESTS.md) - Wallet test details
+OAuth tests are designed for **manual validation** in the conformance suite UI, not automated CI/CD pipelines.
