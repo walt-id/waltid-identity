@@ -78,9 +78,9 @@ kotlin {
                     dependencies {
                         implementation(kotlin("test"))
                         implementation(identityLibs.kotlinx.coroutines.test)
-                        implementation("androidx.test.ext:junit:1.2.1")
-                        implementation("androidx.test:runner:1.6.1")
-                        implementation("androidx.test:rules:1.6.1")
+                        implementation(identityLibs.androidx.test.ext.junit)
+                        implementation(identityLibs.androidx.test.runner)
+                        implementation(identityLibs.androidx.test.rules)
                     }
                 }
             }
