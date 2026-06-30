@@ -14,7 +14,7 @@
    <p align="center">
    <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
    <br/>
-   <em>This project is planned for deprecation. Please use <code>waltid-wallet-demo-android</code> instead.</em>
+   <em>This project is planned for deprecation. Please use <code>waltid-wallet-demo-compose</code> instead.</em>
    </p>
 
 </div>
@@ -40,7 +40,7 @@
 3. Set your `sdk.dir` in `local.properties`.
 4. Run the application on your device or emulator.
 
-For the current Android wallet issuance/presentation demo and E2E scripts, see [waltid-wallet-demo-android](../waltid-wallet-demo-android/README.md). For broader mobile setup, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+For the current wallet issuance/presentation demo and Android E2E scripts, see [waltid-wallet-demo-compose](../waltid-wallet-demo-compose/README.md). For broader mobile setup, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
 ## Join the community
 

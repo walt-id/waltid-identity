@@ -34,5 +34,5 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Demo apps
 
-- [Android Wallet Demo](../../../waltid-applications/waltid-wallet-demo-android/README.md)
+- [Compose Wallet Demo](../../../waltid-applications/waltid-wallet-demo-compose/README.md)
 - [iOS Wallet Demo](../../../waltid-applications/waltid-wallet-demo-ios/README.md)

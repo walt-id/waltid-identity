@@ -59,9 +59,11 @@ runs:
         xcrun simctl list devices | grep "iPhone"
 
     - name: Execute iOS simulator tests
+      id: ios_simulator_tests
+      continue-on-error: true
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
-      run: ./gradlew iosSimulatorArm64Test --info
+      run: ./gradlew iosSimulatorArm64Test
 
     - name: Compile wallet modules for iOS
       working-directory: ${{ inputs.waltid-directory }}
@@ -108,6 +110,8 @@ runs:
         echo "destination=$RESOLVED_DESTINATION" >> $GITHUB_OUTPUT
 
     - name: Execute iOS demo app integration tests
+      id: ios_demo_app_tests
+      continue-on-error: true
       working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
       run: |
@@ -120,6 +124,43 @@ runs:
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
+          -parallel-testing-enabled NO \
+          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+
+    - name: Build shared framework for Compose iOS app (CocoaPods location)
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        PLATFORM_NAME=iphonesimulator \
+        SDK_NAME=iphonesimulator \
+        ARCHS="arm64" \
+        CONFIGURATION=Debug \
+          ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:syncFramework \
+          -Pkotlin.native.cocoapods.platform=iphonesimulator \
+          -Pkotlin.native.cocoapods.archs="arm64" \
+          -Pkotlin.native.cocoapods.configuration=Debug
+
+    - name: Install CocoaPods for Compose iOS app
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
+      shell: bash
+      run: pod install
+
+    - name: Execute Compose iOS demo app tests
+      id: compose_ios_demo_app_tests
+      continue-on-error: true
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
+      shell: bash
+      run: |
+        xcodebuild test \
+          -workspace iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          -skip-testing:iosAppUITests/EudiPublicBackendE2ETests \
+          -skip-testing:iosAppUITests/LocalEnterpriseBackendE2ETests \
+          -resultBundlePath TestResults \
+          -derivedDataPath /tmp/xcode-derived-compose \
+          -enableCodeCoverage NO \
+          -parallel-testing-enabled NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
     - name: Collect iOS test reports
@@ -214,7 +255,7 @@ runs:
         xcrun simctl shutdown all || true
 
     - name: Upload iOS test results
-      if: failure()
+      if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
       uses: actions/upload-artifact@v4
       with:
         name: ios-integration-test-results
@@ -224,3 +265,24 @@ runs:
           /tmp/xcode-derived/Logs/Test/**/*.xcresult
           ${{ inputs.waltid-directory }}/**/build/test-results/**
         retention-days: 7
+
+    - name: Fail if iOS tests failed
+      if: always()
+      shell: bash
+      run: |
+        failed=()
+
+        if [[ "${{ steps.ios_simulator_tests.outcome }}" == "failure" ]]; then
+          failed+=("iosSimulatorArm64Test")
+        fi
+        if [[ "${{ steps.ios_demo_app_tests.outcome }}" == "failure" ]]; then
+          failed+=("native iOS demo app tests")
+        fi
+        if [[ "${{ steps.compose_ios_demo_app_tests.outcome }}" == "failure" ]]; then
+          failed+=("Compose iOS demo app tests")
+        fi
+
+        if (( ${#failed[@]} > 0 )); then
+          printf '::error::iOS test step(s) failed: %s\n' "${failed[*]}"
+          exit 1
+        fi
