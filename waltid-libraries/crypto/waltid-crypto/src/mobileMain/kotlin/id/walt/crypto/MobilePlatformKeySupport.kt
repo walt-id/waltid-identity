@@ -12,6 +12,7 @@ import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.verifierFor
+import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -39,6 +40,12 @@ internal fun KeyType.toPlatformSignatureAlgorithm(): SignatureAlgorithm = when (
     KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
     KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
     else -> error("Unsupported key type for verification: $this")
+}
+
+// Mobile EC verification expects raw R||S signatures; callers may pass DER-encoded signatures.
+internal fun KeyType.toCryptoSignature(signatureBytes: ByteArray): CryptoSignature = when (this) {
+    KeyType.RSA -> CryptoSignature.RSA(signatureBytes)
+    else -> CryptoSignature.EC.fromRawBytes(EccUtils.convertDERtoIEEEP1363(signatureBytes))
 }
 
 internal suspend fun signJwsWithPlatformSigner(
@@ -91,9 +98,4 @@ internal fun verifyJwsWithPlatformSigner(
     val verifier = keyType.toPlatformSignatureAlgorithm().verifierFor(publicKey).getOrThrow()
     verifier.verify(SignatureInput(parsed.signatureInput), keyType.toCryptoSignature(parsed.plainSignature)).getOrThrow()
     Json.parseToJsonElement(parsed.plainPayload.decodeToString())
-}
-
-private fun KeyType.toCryptoSignature(signatureBytes: ByteArray): CryptoSignature = when (this) {
-    KeyType.RSA -> CryptoSignature.RSA(signatureBytes)
-    else -> CryptoSignature.EC.fromRawBytes(signatureBytes)
 }

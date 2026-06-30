@@ -1,7 +1,6 @@
 package id.walt.crypto.keys.jwk
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
-import at.asitplus.signum.indispensable.CryptoSignature
 import at.asitplus.signum.indispensable.ECCurve
 import at.asitplus.signum.indispensable.SignatureAlgorithm
 import at.asitplus.signum.indispensable.josef.JsonWebKey
@@ -19,11 +18,10 @@ import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.Signer
 import at.asitplus.signum.supreme.sign.verifierFor
 import at.asitplus.signum.supreme.symmetric.decrypt
-import id.walt.crypto.keys.EccUtils
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyTypes
+import id.walt.crypto.toCryptoSignature
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JweEncryptionHelper
 import id.walt.crypto.utils.keyFromIntermediate
@@ -139,13 +137,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         }
 
         val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
-        val signature = when (keyType) {
-            KeyType.RSA -> CryptoSignature.RSA(signed)
-            in KeyTypes.EC_KEYS -> CryptoSignature.EC.fromRawBytes(
-                EccUtils.convertDERtoIEEEP1363(signed)
-            )
-            else -> error("Unsupported key type for verification: $keyType")
-        }
+        val signature = keyType.toCryptoSignature(signed)
         val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required for verifyRaw" }
         verifier.verify(SignatureInput(plaintext), signature).getOrThrow()
         plaintext
@@ -167,10 +159,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
         }
 
         val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
-        val signature = when (keyType) {
-            KeyType.RSA -> CryptoSignature.RSA(parsed.plainSignature)
-            else -> CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
-        }
+        val signature = keyType.toCryptoSignature(parsed.plainSignature)
         verifier.verify(SignatureInput(parsed.signatureInput), signature).getOrThrow()
 
         Json.parseToJsonElement(parsed.plainPayload.decodeToString())
