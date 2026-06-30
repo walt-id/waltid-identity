@@ -11,8 +11,8 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      issuerBase: process.env.NUXT_PUBLIC_ISSUER_BASE || 'http://localhost:7002',
-      verifierBase: process.env.NUXT_PUBLIC_VERIFIER_BASE || 'http://localhost:7003',
+      issuerBase: process.env.NUXT_PUBLIC_ISSUER_BASE || 'http://localhost:7005',
+      verifierBase: process.env.NUXT_PUBLIC_VERIFIER_BASE || 'http://localhost:7004',
       walletUrl: process.env.NUXT_PUBLIC_WALLET_URL || 'http://localhost:7101',
     },
   },

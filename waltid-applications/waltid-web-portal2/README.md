@@ -23,8 +23,8 @@
 
 This portal integrates two core walt.id services to provide an interactive credential lifecycle demo:
 
-- **Issuer API** (`NUXT_PUBLIC_ISSUER_BASE`): Issues verifiable credentials to wallets (OpenID4VCI)
-- **Verifier API** (`NUXT_PUBLIC_VERIFIER_BASE`): Requests and verifies credentials from wallets (OpenID4VP)
+- **Issuer API2** (`NUXT_PUBLIC_ISSUER_BASE`): Issues verifiable credentials to wallets (OpenID4VCI)
+- **Verifier API2** (`NUXT_PUBLIC_VERIFIER_BASE`): Requests and verifies credentials from wallets (OpenID4VP)
 - **Wallet** (`NUXT_PUBLIC_WALLET_URL`): End-user wallet for receiving and presenting credentials
 
 The portal acts as a frontend that orchestrates these services to demonstrate credential issuance and verification flows, with real-time event streaming via SSE.
@@ -70,8 +70,8 @@ This portal enables users to:
 Create a `.env` file to connect to dependency services:
 
 ```text
-NUXT_PUBLIC_ISSUER_BASE=http://localhost:7002
-NUXT_PUBLIC_VERIFIER_BASE=http://localhost:7003
+NUXT_PUBLIC_ISSUER_BASE=http://localhost:7005
+NUXT_PUBLIC_VERIFIER_BASE=http://localhost:7004
 NUXT_PUBLIC_WALLET_URL=http://localhost:7101
 ```
 
@@ -106,8 +106,8 @@ npm start
 Build and run using Docker:
 
 ```bash
-docker build -t waltid/portal -f waltid-applications/waltid-web-portal2/Dockerfile .
-docker run -p 3000:3000 -i -t waltid/portal
+docker build -t waltid/portal2 -f waltid-applications/waltid-web-portal2/Dockerfile .
+docker run -p 3000:3000 -i -t waltid/portal2
 ```
 
 **Note**: When using Docker, ensure environment variables are set via `-e` flags or an `.env` file.
