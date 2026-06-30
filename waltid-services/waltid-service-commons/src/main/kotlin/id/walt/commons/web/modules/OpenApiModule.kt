@@ -49,50 +49,8 @@ object OpenApiModule {
         install(OpenApi) {
 
             schemas {
-                val kotlinxGenerator = SchemaGenerator.kotlinx {
-                    explicitNullTypes = false
-                    customAnalyzer(ContextualSerializationTypeAnalyzerModule)
-                    customAnalyzer(FixSealedClassInheritanceModule)
-                    customGenerator(FixSealedClassInheritanceModule)
-                    customGenerator(FixJsonCustomParameters)
-                    overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
-                    overwrite(SchemaGenerator.TypeOverwrites.File())
-                    overwrite(SchemaGenerator.TypeOverwrites.Instant())
-                    overwrite(CustomTypeOverrides.KotlinxInstant())
-                    overwrite(CustomTypeOverrides.JsonArray())
-                    overwrite(CustomTypeOverrides.JsonObject())
-                    overwrite(CustomTypeOverrides.JsonElement())
-                    overwrite(CustomTypeOverrides.SdMap())
-                    overwrite(CustomTypeOverrides.QuickFixPolymorphic())
-                }
-                val reflectionGenerator = SchemaGenerator.reflection {
-                    explicitNullTypes = false
-                    customGenerator(FixJsonCustomParameters)
-                    overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
-                    overwrite(SchemaGenerator.TypeOverwrites.File())
-                    overwrite(SchemaGenerator.TypeOverwrites.Instant())
-                    overwrite(CustomTypeOverrides.KotlinxInstant())
-                    overwrite(CustomTypeOverrides.JsonArray())
-                    overwrite(CustomTypeOverrides.JsonObject())
-                    overwrite(CustomTypeOverrides.JsonElement())
-                    overwrite(CustomTypeOverrides.SdMap())
-                }
+                generator = createGenerator()
 
-                fun InitialTypeData.schemaName() =
-                    when (this) {
-                        is InitialKTypeData -> "${this.type} (KType)"
-                        is InitialSerialDescriptorTypeData -> "${this.type.serialName} (Serialname)"
-                        else -> error("Unknown data type $this")
-                    }
-
-                generator = { type ->
-                    runCatching {
-                        kotlinxGenerator.invoke(type)
-                    }.recoverCatching {
-                        logger.debug { "Failed kotlinx schema generation, trying reflection schema generation for: \"${type.schemaName()}\", due to: \"${it.message}\"." }
-                        reflectionGenerator.invoke(type)
-                    }.getOrThrow()
-                }
             }
 
             examples {
@@ -119,6 +77,7 @@ object OpenApiModule {
                     if (example is String && isStringType) {
                         example
                     } else if (example is JsonElement) {
+                        // support example encoding of JsonElement so examples can be created with buildJsonObject
                         Json.encodeToString(example).toStructuredJsonObject()
                     } else {
                         runCatching {
@@ -190,6 +149,54 @@ object OpenApiModule {
             }) {
                 call.respondRedirect("swagger")
             }
+        }
+    }
+
+    fun createGenerator(): GenericSchemaGenerator {
+        val kotlinxGenerator = SchemaGenerator.kotlinx {
+            explicitNullTypes = false
+            customAnalyzer(StripeNotAllowedCharactersAnalyzerModule)
+            customAnalyzer(ContextualSerializationTypeAnalyzerModule)
+            customAnalyzer(FixSealedClassInheritanceModule)
+            customGenerator(FixSealedClassInheritanceModule)
+            customGenerator(FixJsonCustomParameters)
+            overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
+            overwrite(SchemaGenerator.TypeOverwrites.File())
+            overwrite(SchemaGenerator.TypeOverwrites.Instant())
+            overwrite(CustomTypeOverrides.KotlinxInstant())
+            overwrite(CustomTypeOverrides.JsonArray())
+            overwrite(CustomTypeOverrides.JsonObject())
+            overwrite(CustomTypeOverrides.JsonElement())
+            overwrite(CustomTypeOverrides.SdMap())
+            overwrite(CustomTypeOverrides.QuickFixPolymorphic())
+        }
+        val reflectionGenerator = SchemaGenerator.reflection {
+            explicitNullTypes = false
+            customGenerator(FixJsonCustomParameters)
+            overwrite(SchemaGenerator.TypeOverwrites.KotlinUuid())
+            overwrite(SchemaGenerator.TypeOverwrites.File())
+            overwrite(SchemaGenerator.TypeOverwrites.Instant())
+            overwrite(CustomTypeOverrides.KotlinxInstant())
+            overwrite(CustomTypeOverrides.JsonArray())
+            overwrite(CustomTypeOverrides.JsonObject())
+            overwrite(CustomTypeOverrides.JsonElement())
+            overwrite(CustomTypeOverrides.SdMap())
+        }
+
+        fun InitialTypeData.schemaName() =
+            when (this) {
+                is InitialKTypeData -> "${this.type} (KType)"
+                is InitialSerialDescriptorTypeData -> "${this.type.serialName} (Serialname)"
+                else -> error("Unknown data type $this")
+            }
+
+        return { type ->
+            runCatching {
+                kotlinxGenerator.invoke(type)
+            }.recoverCatching {
+                logger.debug { "Failed kotlinx schema generation, trying reflection schema generation for: \"${type.schemaName()}\", due to: \"${it.message}\"." }
+                reflectionGenerator.invoke(type)
+            }.getOrThrow()
         }
     }
 }
@@ -292,6 +299,44 @@ private object FixJsonCustomParameters : SwaggerSchemaGenerationModule {
         generated.required?.removeIf { it.equals("customParameters") }
         return generated
     }
+}
+
+
+private object StripeNotAllowedCharactersAnalyzerModule : SerializationTypeAnalyzerModule {
+
+    val notAllowedChars = Regex("/")
+
+    override fun applies(descriptor: SerialDescriptor): Boolean =
+        notAllowedChars.find(descriptor.serialName) != null
+
+    override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
+        val newSerialName = context.descriptor.serialName.replace(notAllowedChars, "#")
+        val result = context.analyze(object : SerialDescriptor {
+            override val serialName: String
+                get() = newSerialName
+            override val kind: SerialKind
+                get() = context.descriptor.kind
+            override val elementsCount: Int
+                get() = context.descriptor.elementsCount
+
+            override fun getElementName(index: Int): String =
+                context.descriptor.getElementName(index)
+
+            override fun getElementIndex(name: String): Int =
+                context.descriptor.getElementIndex(name)
+
+            override fun getElementAnnotations(index: Int): List<Annotation> =
+                context.descriptor.getElementAnnotations(index)
+
+            override fun getElementDescriptor(index: Int): SerialDescriptor =
+                context.descriptor.getElementDescriptor(index)
+
+            override fun isElementOptional(index: Int): Boolean =
+                context.descriptor.isElementOptional(index)
+        })
+        return result
+    }
+
 }
 
 
