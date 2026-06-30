@@ -631,6 +631,10 @@ object WalletIssuanceHandler {
         val authBuilder = id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder(clientConfig)
         val credentialConfigurationId = offer.credentialConfigurationIds.first()
 
+        // Get scope from credential configuration if available
+        val credentialConfig = issuerMetadata.credentialConfigurationsSupported[credentialConfigurationId]
+        val credentialScope = credentialConfig?.scope
+
         // Check if PAR (Pushed Authorization Request) is required
         val requirePar = asMetadata.requirePushedAuthorizationRequests == true
         val parEndpoint = asMetadata.pushedAuthorizationRequestEndpoint
@@ -640,7 +644,7 @@ object WalletIssuanceHandler {
             val (parParams, pkceData) = authBuilder.buildPushedAuthorizationRequest(
                 credentialConfigurationId = credentialConfigurationId,
                 issuerState = offer.grants?.authorizationCode?.issuerState,
-                scope = "openid",  // Required by conformance suite
+                scope = credentialScope,  // Use scope from credential config if available
                 usePKCE = request.usePkce,
                 metadata = asMetadata
             )
@@ -721,6 +725,7 @@ object WalletIssuanceHandler {
                 authorizationEndpoint = authorizationEndpoint,
                 credentialConfigurationId = credentialConfigurationId,
                 issuerState = offer.grants?.authorizationCode?.issuerState,
+                scope = credentialScope,  // Use scope from credential config if available
                 usePKCE = request.usePkce,
                 metadata = asMetadata,
                 redirectUri = request.redirectUri.toString()
