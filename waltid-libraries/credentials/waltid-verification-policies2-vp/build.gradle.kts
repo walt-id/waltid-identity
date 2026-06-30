@@ -42,7 +42,7 @@ kotlin {
         }
         jvmMain.dependencies {
             // BouncyCastle for X.509 certificate chain validation
-            implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
+            implementation("org.bouncycastle:bcpkix-jdk18on:1.84")
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
