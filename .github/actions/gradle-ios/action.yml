@@ -19,16 +19,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
-      with:
-        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
-
-    - name: Compile iOS targets
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
-
     - name: Select Xcode toolchain
       shell: bash
       run: |
@@ -49,6 +39,16 @@ runs:
         fi
 
         xcodebuild -version
+
+    - name: Configure iOS build environment
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
+      with:
+        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
+
+    - name: Compile iOS targets
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
 
     - name: Cleanup simulators before tests
       shell: bash
@@ -116,6 +116,7 @@ runs:
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
           -only-testing:iosAppTests \
+          -skip-testing:iosAppUITests \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived \
           -enableCodeCoverage NO \
