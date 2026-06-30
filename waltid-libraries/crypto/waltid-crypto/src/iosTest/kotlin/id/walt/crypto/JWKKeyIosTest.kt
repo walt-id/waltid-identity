@@ -1,6 +1,7 @@
 package id.walt.crypto
 
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -98,5 +99,13 @@ class JWKKeyIosTest {
             val result = imported.verifyRaw(sig, plaintext)
             assertTrue(result.isSuccess, "imported key sign/verify failed for $type")
         }
+    }
+
+    @Test
+    fun keySerializationInitializes() = runTest {
+        val key = JWKKey.generate(KeyType.Ed25519)
+        val serialized = KeySerialization.serializeKey(key)
+
+        assertTrue(serialized.contains("\"jwk\""), "serialized key should use JWK polymorphic type")
     }
 }
