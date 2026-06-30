@@ -116,8 +116,8 @@ clikt = "5.1.0"
 smiley4-schema-kenerator = "2.7.2"
 
 # a-sit-plus signum (mobile crypto)
-signum = "3.23.0"
-supreme = "0.13.0"
+signum = "3.24.0"
+supreme = "0.15.0"
 
 [libraries]
 
