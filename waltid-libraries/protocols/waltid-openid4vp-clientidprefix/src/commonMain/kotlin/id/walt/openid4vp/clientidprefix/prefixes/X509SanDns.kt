@@ -10,6 +10,7 @@ import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import id.walt.x509.CertificateDer
 import id.walt.x509.verifyOrderedCertificateChainSignatures
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.http.Url
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -74,7 +75,7 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         val responseUri = context.responseUri ?: context.redirectUri
         if (responseUri != null) {
             val responseUriHost = runCatching {
-                io.ktor.http.Url(responseUri).host
+                Url(responseUri).host
             }.getOrNull()
             if (responseUriHost != null && !responseUriHost.endsWith(clientId.dnsName) && responseUriHost != clientId.dnsName) {
                 log.warn {

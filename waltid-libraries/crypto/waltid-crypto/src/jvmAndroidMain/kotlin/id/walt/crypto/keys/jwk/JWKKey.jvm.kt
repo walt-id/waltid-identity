@@ -5,6 +5,7 @@ import com.nimbusds.jose.*
 import com.nimbusds.jose.crypto.*
 import com.nimbusds.jose.crypto.bc.BouncyCastleProviderSingleton
 import com.nimbusds.jose.jwk.*
+import com.nimbusds.jose.jwk.KeyType as NimbusKeyType
 import com.nimbusds.jose.util.Base64URL
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.Key
@@ -407,7 +408,7 @@ actual class JWKKey actual constructor(
 
     actual override val keyType: KeyType by lazy {
         when (_internalJwk.keyType) {
-            com.nimbusds.jose.jwk.KeyType.RSA -> {
+            NimbusKeyType.RSA -> {
                 when (val bitLength = _internalJwk.toRSAKey().modulus.decodeToBigInteger().bitLength()) {
                     1024, 2048 -> KeyType.RSA
                     3072 -> KeyType.RSA3072
@@ -416,7 +417,7 @@ actual class JWKKey actual constructor(
                 }
             }
 
-            com.nimbusds.jose.jwk.KeyType.EC -> {
+            NimbusKeyType.EC -> {
                 when (val curve = _internalJwk.toECKey().curve) {
                     Curve.P_256 -> KeyType.secp256r1
                     Curve.P_384 -> KeyType.secp384r1
@@ -426,7 +427,7 @@ actual class JWKKey actual constructor(
                 }
             }
 
-            com.nimbusds.jose.jwk.KeyType.OKP -> {
+            NimbusKeyType.OKP -> {
                 when (val curve = _internalJwk.toOctetKeyPair().curve) {
                     Curve.Ed25519 -> KeyType.Ed25519
                     else -> throw IllegalArgumentException("OKP key with curve ${curve} not supported")

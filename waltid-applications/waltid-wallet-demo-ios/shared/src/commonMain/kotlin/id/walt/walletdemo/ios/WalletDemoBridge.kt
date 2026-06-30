@@ -2,6 +2,7 @@ package id.walt.walletdemo.ios
 
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
 data class BridgeCredential(
@@ -40,7 +41,7 @@ class WalletDemoBridgeController(
         )
     }
 
-    private val client: id.walt.wallet2.mobile.MobileWallet
+    private val client: MobileWallet
         get() = clientResult.getOrThrow()
 
     private var did = ""

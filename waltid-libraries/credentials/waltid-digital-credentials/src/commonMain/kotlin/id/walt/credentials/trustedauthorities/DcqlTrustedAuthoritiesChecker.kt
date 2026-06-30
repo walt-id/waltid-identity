@@ -7,6 +7,7 @@ import id.walt.credentials.signatures.JwtBasedSignature
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlCredential
+import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.TrustedAuthoritiesQuery
 import id.walt.dcql.models.TrustedAuthorityType
@@ -24,14 +25,14 @@ import kotlinx.serialization.json.jsonPrimitive
  * certificate in the credential's certificate chain.
  *
  * Returns a [DcqlMatcher-compatible callback][checker] that can be passed to
- * [id.walt.dcql.DcqlMatcher.match] as the `trustedAuthoritiesChecker` parameter.
+ * [DcqlMatcher.match] as the `trustedAuthoritiesChecker` parameter.
  */
 object DcqlTrustedAuthoritiesChecker {
 
     private val log = KotlinLogging.logger {}
 
     /**
-     * Returns a checker function suitable for [id.walt.dcql.DcqlMatcher.match].
+     * Returns a checker function suitable for [DcqlMatcher.match].
      *
      * Only [TrustedAuthorityType.AKI] is currently implemented.
      * [TrustedAuthorityType.ETSI_TL] and [TrustedAuthorityType.OPENID_FEDERATION] log a

@@ -13,6 +13,7 @@ import id.walt.x509.iso.subjectAlternativeNamesExtension
 import id.walt.x509.iso.subjectKeyIdentifierExtension
 import id.walt.x509.iso.toSignumName
 import id.walt.x509.iso.toSignumPublicKey
+import kotlin.time.Instant
 
 actual suspend fun platformBuildGenericX509Certificate(
     profileData: GenericX509CertificateProfileData,
@@ -72,6 +73,6 @@ actual suspend fun platformBuildGenericX509Certificate(
 
 private fun X509ValidityPeriod.truncatedToSeconds(): X509ValidityPeriod =
     X509ValidityPeriod(
-        notBefore = kotlin.time.Instant.fromEpochSeconds(notBefore.epochSeconds),
-        notAfter = kotlin.time.Instant.fromEpochSeconds(notAfter.epochSeconds),
+        notBefore = Instant.fromEpochSeconds(notBefore.epochSeconds),
+        notAfter = Instant.fromEpochSeconds(notAfter.epochSeconds),
     )
