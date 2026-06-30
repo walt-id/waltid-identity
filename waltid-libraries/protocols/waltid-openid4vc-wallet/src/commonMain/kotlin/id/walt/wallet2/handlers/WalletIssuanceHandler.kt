@@ -23,6 +23,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
@@ -208,6 +209,16 @@ data class PollDeferredRequest(
     val transactionId: String,
     /** Access token from the original token response. */
     val accessToken: String
+)
+
+// PAR (Pushed Authorization Request) response
+
+@Serializable
+data class PushedAuthorizationResponse(
+    @kotlinx.serialization.SerialName("request_uri")
+    val requestUri: String? = null,
+    @kotlinx.serialization.SerialName("expires_in")
+    val expiresIn: Int? = null
 )
 
 // Auth-code grant isolated steps
@@ -618,19 +629,69 @@ object WalletIssuanceHandler {
         val authBuilder = id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder(clientConfig)
         val credentialConfigurationId = offer.credentialConfigurationIds.first()
 
-        val authRequest = authBuilder.buildAuthorizationRequest(
-            authorizationEndpoint = authorizationEndpoint,
-            credentialConfigurationId = credentialConfigurationId,
-            issuerState = offer.grants?.authorizationCode?.issuerState,
-            usePKCE = request.usePkce,
-            metadata = asMetadata
-        )
-        return GenerateAuthorizationUrlResult(
-            authorizationUrl = Url(authRequest.url),
-            state = authRequest.state,
-            codeVerifier = authRequest.pkceData?.codeVerifier,
-            credentialConfigurationId = credentialConfigurationId
-        )
+        // Check if PAR (Pushed Authorization Request) is required
+        val requirePar = asMetadata.requirePushedAuthorizationRequests == true
+        val parEndpoint = asMetadata.pushedAuthorizationRequestEndpoint
+
+        if (requirePar && parEndpoint != null) {
+            // Use PAR flow: POST params to PAR endpoint, get request_uri, then redirect
+            val (parParams, pkceData) = authBuilder.buildPushedAuthorizationRequest(
+                credentialConfigurationId = credentialConfigurationId,
+                issuerState = offer.grants?.authorizationCode?.issuerState,
+                usePKCE = request.usePkce,
+                metadata = asMetadata
+            )
+
+            // POST to PAR endpoint
+            val parResponse = httpClient.submitForm(
+                url = parEndpoint,
+                formParameters = Parameters.build {
+                    parParams.forEach { (key, value) -> append(key, value) }
+                    // Override redirect_uri if custom one provided
+                    if (request.redirectUri.toString() != clientConfig.primaryRedirectUri) {
+                        set("redirect_uri", request.redirectUri.toString())
+                    }
+                }
+            )
+
+            if (!parResponse.status.isSuccess()) {
+                val errorBody = parResponse.bodyAsText()
+                error("PAR request failed with ${parResponse.status}: $errorBody")
+            }
+
+            val parResult = parResponse.body<PushedAuthorizationResponse>()
+            val requestUri = parResult.requestUri
+                ?: error("PAR response missing request_uri")
+
+            // Build authorization URL with request_uri
+            val authUrl = URLBuilder(authorizationEndpoint).apply {
+                parameters.append("client_id", request.clientId)
+                parameters.append("request_uri", requestUri)
+            }.buildString()
+
+            return GenerateAuthorizationUrlResult(
+                authorizationUrl = Url(authUrl),
+                state = parParams["state"] ?: error("PAR params missing state"),
+                codeVerifier = pkceData?.codeVerifier,
+                credentialConfigurationId = credentialConfigurationId
+            )
+        } else {
+            // Standard authorization request (no PAR)
+            val authRequest = authBuilder.buildAuthorizationRequest(
+                authorizationEndpoint = authorizationEndpoint,
+                credentialConfigurationId = credentialConfigurationId,
+                issuerState = offer.grants?.authorizationCode?.issuerState,
+                usePKCE = request.usePkce,
+                metadata = asMetadata,
+                redirectUri = request.redirectUri.toString()
+            )
+            return GenerateAuthorizationUrlResult(
+                authorizationUrl = Url(authRequest.url),
+                state = authRequest.state,
+                codeVerifier = authRequest.pkceData?.codeVerifier,
+                credentialConfigurationId = credentialConfigurationId
+            )
+        }
     }
 
     /**
