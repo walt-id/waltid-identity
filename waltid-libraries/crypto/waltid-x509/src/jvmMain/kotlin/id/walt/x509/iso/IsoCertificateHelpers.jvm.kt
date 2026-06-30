@@ -8,12 +8,7 @@ import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
-import java.security.SecureRandom
 import java.security.cert.X509Certificate
-
-
-internal actual fun secureRandomBytes(size: Int): ByteArray =
-    ByteArray(size).also { SecureRandom().nextBytes(it) }
 
 internal fun getJcaSigningAlgorithmNameFromKeyType(
     keyType: KeyType,
@@ -29,7 +24,6 @@ internal fun getJcaSigningAlgorithmNameFromKeyType(
     }
 }
 
-
 internal fun issuerAlternativeNameToGeneralNameArray(
     issuerAlternativeName: IssuerAlternativeName,
 ) = listOfNotNull(
@@ -40,7 +34,6 @@ internal fun issuerAlternativeNameToGeneralNameArray(
         GeneralName(GeneralName.rfc822Name, it)
     }
 ).toTypedArray()
-
 
 internal fun parseCrlDistributionPointUriFromCert(
     cert: X509Certificate,
