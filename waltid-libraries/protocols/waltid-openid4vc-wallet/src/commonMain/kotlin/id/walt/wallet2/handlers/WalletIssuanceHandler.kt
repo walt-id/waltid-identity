@@ -760,20 +760,23 @@ object WalletIssuanceHandler {
             redirectUris = listOf(request.redirectUri.toString())
         )
         
-        // Generate DPoP proof if key is provided
-        val dpopProof = request.dpopKey?.let { key ->
-            generateDpopProof(
-                key = key,
-                httpMethod = "POST",
-                httpUri = request.tokenEndpoint.toString()
-            )
+        // Create DPoP proof generator if key is provided (supports nonce retry)
+        val dpopProofGenerator: (suspend (nonce: String?) -> String)? = request.dpopKey?.let { key ->
+            { nonce: String? ->
+                generateDpopProof(
+                    key = key,
+                    httpMethod = "POST",
+                    httpUri = request.tokenEndpoint.toString(),
+                    nonce = nonce
+                )
+            }
         }
         
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
             code = request.code,
             codeVerifier = request.codeVerifier,
-            dpopProof = dpopProof
+            dpopProofGenerator = dpopProofGenerator
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,

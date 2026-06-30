@@ -47,7 +47,7 @@ class TokenRequestBuilder(
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param code The authorization code received from authorization endpoint
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
-     * @param dpopProof Optional DPoP proof JWT for proof-of-possession (RFC 9449)
+     * @param dpopProofGenerator Optional function to generate DPoP proof (for nonce retry support)
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -55,7 +55,7 @@ class TokenRequestBuilder(
         tokenEndpoint: String,
         code: String,
         codeVerifier: String? = null,
-        dpopProof: String? = null,
+        dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -63,7 +63,7 @@ class TokenRequestBuilder(
         log.info { "Exchanging authorization code for access token" }
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
-        log.trace { "DPoP proof present: ${dpopProof != null}" }
+        log.trace { "DPoP proof generator present: ${dpopProofGenerator != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
@@ -76,7 +76,7 @@ class TokenRequestBuilder(
             }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters, dpopProof)
+        return executeTokenRequest(tokenEndpoint, parameters, dpopProofGenerator)
     }
 
     /**
@@ -117,21 +117,25 @@ class TokenRequestBuilder(
     }
 
     /**
-     * Executes a token request and parses the response
+     * Executes a token request and parses the response.
+     * Handles DPoP nonce retry per RFC 9449 §5.
      * 
      * @param tokenEndpoint The token endpoint URL
      * @param parameters The form parameters for the request
-     * @param dpopProof Optional DPoP proof JWT to include in DPoP header
+     * @param dpopProofGenerator Optional function to generate DPoP proof with optional nonce
      */
     private suspend fun executeTokenRequest(
         tokenEndpoint: String,
         parameters: Parameters,
-        dpopProof: String? = null,
+        dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
     ): TokenResponse {
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
+        
+        // First attempt (without nonce)
+        val dpopProof = dpopProofGenerator?.invoke(null)
         if (dpopProof != null) {
-            log.debug { "Including DPoP proof header" }
+            log.debug { "Including DPoP proof header (initial request without nonce)" }
         }
         
         val response: HttpResponse = try {
@@ -145,6 +149,20 @@ class TokenRequestBuilder(
         } catch (e: Exception) {
             log.error(e) { "Network error sending token request to: $tokenEndpoint" }
             throw Exception("Failed to send token request", e)
+        }
+        
+        // Check for DPoP nonce requirement (RFC 9449 §5)
+        if (response.status == HttpStatusCode.BadRequest && dpopProofGenerator != null) {
+            val errorBody = response.bodyAsText()
+            if (errorBody.contains("use_dpop_nonce")) {
+                val dpopNonce = response.headers["DPoP-Nonce"]
+                if (dpopNonce != null) {
+                    log.info { "Server requires DPoP nonce, retrying with nonce: $dpopNonce" }
+                    return executeTokenRequestWithNonce(tokenEndpoint, parameters, dpopProofGenerator, dpopNonce)
+                } else {
+                    log.error { "Server requires DPoP nonce but didn't provide DPoP-Nonce header" }
+                }
+            }
         }
 
         if (!response.status.isSuccess()) {
@@ -176,5 +194,39 @@ class TokenRequestBuilder(
             }
             throw Exception("Failed to parse token response", e)
         }
+    }
+    
+    /**
+     * Retry token request with DPoP nonce (RFC 9449 §5)
+     */
+    private suspend fun executeTokenRequestWithNonce(
+        tokenEndpoint: String,
+        parameters: Parameters,
+        dpopProofGenerator: suspend (nonce: String?) -> String,
+        nonce: String
+    ): TokenResponse {
+        val dpopProof = dpopProofGenerator(nonce)
+        log.debug { "Retrying with DPoP proof containing nonce" }
+        
+        val response: HttpResponse = try {
+            httpClient.post(tokenEndpoint) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(parameters.formUrlEncode())
+                header("DPoP", dpopProof)
+            }
+        } catch (e: Exception) {
+            log.error(e) { "Network error on DPoP nonce retry to: $tokenEndpoint" }
+            throw Exception("Failed to send token request with nonce", e)
+        }
+        
+        if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
+            log.error {
+                "Token request failed after nonce retry - Status: ${response.status.value}, Body: $errorBody"
+            }
+            throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
+        }
+        
+        return response.body<TokenResponse>()
     }
 }
