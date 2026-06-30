@@ -7,6 +7,8 @@ on:
 jobs:
   gradle:
     runs-on: macos-26
+    env:
+      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
@@ -18,8 +20,8 @@ jobs:
 
       - name: Build and test iOS
         timeout-minutes: 60
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@a406c94001148a12e7073aff8e7770d32f7c0c96
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@d4d30c0c14dee2ea10f36079bc45d822faa5093d
         with:
           waltid-directory: 'waltid-identity'
-          xcode-developer-dir: '/Applications/Xcode_26.5.app/Contents/Developer'
+          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
           simulator-destination: 'platform=iOS Simulator,name=iPhone 17,OS=latest'
