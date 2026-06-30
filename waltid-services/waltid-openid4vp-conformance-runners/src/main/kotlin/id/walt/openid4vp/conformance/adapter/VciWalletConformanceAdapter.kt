@@ -406,7 +406,6 @@ class VciWalletConformanceAdapter(
             }
             put("clientId", "wallet-conformance-test")
             put("redirectUri", getRedirectUri())
-            put("tokenRequestHeaders", buildJsonObject { })
             if (includeAuthParams) {
                 put("usePkce", true)
             }
