@@ -12,16 +12,18 @@ api:
       tag: latest
       imagePullPolicy: Always
 
-webConfig:
-  featuresConf: |-
+configFiles:
+  _features.conf: |-
     enabledFeatures = [
         entra
     ]
-  webConf: |-
+  web.conf: |-
     webHost = "0.0.0.0"
     webPort = 3000
-  verifierServiceConf: baseUrl = "https://verifier.portal.waltid.cloud"
-  entraConf:  callbackUrl = "https://verifier.portal.waltid.cloud/entra/verification-callback/"
+  verifier-service.conf: |-
+    baseUrl = "https://{{ .Values.ingress.host }}"
+  entra.conf: |-
+    callbackUrl = "https://{{ .Values.ingress.host }}/entra/verification-callback/"
 
 ingress:
   ingressClassName: "traefik"

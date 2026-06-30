@@ -36,9 +36,12 @@ spec:
           - name: http-api
             containerPort: 3000
         volumeMounts:
-        - mountPath: /waltid-issuer-api/config/
+        {{- range $name, $content := .Values.configFiles }}
+        - mountPath: /waltid-issuer-api/config/{{ $name }}
           name: issuer-web-config
+          subPath: {{ $name }}
           readOnly: true
+        {{- end }}
       volumes:
       - configMap:
           name: {{ include "issuer.fullname" . }}-web-config

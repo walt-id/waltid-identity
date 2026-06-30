@@ -12,19 +12,16 @@ api:
       tag: latest
       imagePullPolicy: Always
 
-featConf: |-
-  enabledFeatures = [
-      entra
-  ]
-webConfig:
-  webConf: |-
+configFiles:
+  _features.conf: |-
+    enabledFeatures = [
+        entra
+    ]
+  web.conf: |-
     webHost = "0.0.0.0"
     webPort = 3000
-authServiceConf: |-
-  name = "keycloak"
-  authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
-  accessTokenUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token"
-  clientId = "issuer_api"
+  issuer-service.conf: |-
+    baseUrl = "https://{{ .Values.ingress.host }}"
 
 ingress:
   ingressClassName: traefik # nginx

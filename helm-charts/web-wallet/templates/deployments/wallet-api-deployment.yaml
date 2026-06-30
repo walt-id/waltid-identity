@@ -35,22 +35,12 @@ spec:
         - containerPort: 4545
           name: http-api
         volumeMounts:
+          {{- range $name, $content := .Values.configFiles }}
           - name: wallet-config
-            mountPath: /waltid-wallet-api/config/_features.conf
+            mountPath: /waltid-wallet-api/config/{{ $name }}
             readOnly: true
-            subPath: _features.conf
-          - name: wallet-config
-            mountPath: /waltid-wallet-api/config/db.conf
-            readOnly: true
-            subPath: db.conf
-          - name: wallet-config
-            mountPath: /waltid-wallet-api/config/web.conf
-            readOnly: true
-            subPath: web.conf
-          - name: wallet-config
-            mountPath: /waltid-wallet-api/config/oidc.conf
-            readOnly: true
-            subPath: oidc.conf
+            subPath: {{ $name }}
+          {{- end }}
           - name: wallet-auth-secret
             mountPath: /waltid-wallet-api/config/auth.conf
             readOnly: true

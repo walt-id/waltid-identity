@@ -36,9 +36,12 @@ spec:
           - name: http-api
             containerPort: 3000
         volumeMounts:
-        - mountPath: /waltid-verifier-api/config/
+        {{- range $name, $content := .Values.configFiles }}
+        - mountPath: /waltid-verifier-api/config/{{ $name }}
           name: verifier-web-config
+          subPath: {{ $name }}
           readOnly: true
+        {{- end }}
       volumes:
       - configMap:
           name: {{ include "verifier.fullname" . }}-web-config
