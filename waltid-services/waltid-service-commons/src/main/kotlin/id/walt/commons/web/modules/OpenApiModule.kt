@@ -155,7 +155,7 @@ object OpenApiModule {
     fun createGenerator(): GenericSchemaGenerator {
         val kotlinxGenerator = SchemaGenerator.kotlinx {
             explicitNullTypes = false
-            customAnalyzer(StripeNotAllowedCharactersAnalyzerModule)
+            customAnalyzer(StripNotAllowedCharactersAnalyzerModule)
             customAnalyzer(ContextualSerializationTypeAnalyzerModule)
             customAnalyzer(FixSealedClassInheritanceModule)
             customGenerator(FixSealedClassInheritanceModule)
@@ -302,7 +302,7 @@ private object FixJsonCustomParameters : SwaggerSchemaGenerationModule {
 }
 
 
-private object StripeNotAllowedCharactersAnalyzerModule : SerializationTypeAnalyzerModule {
+private object StripNotAllowedCharactersAnalyzerModule : SerializationTypeAnalyzerModule {
 
     val notAllowedChars = Regex("/")
 
@@ -310,7 +310,7 @@ private object StripeNotAllowedCharactersAnalyzerModule : SerializationTypeAnaly
         notAllowedChars.find(descriptor.serialName) != null
 
     override fun analyze(context: SerializationTypeAnalyzerModule.Context): WrappedTypeData {
-        val newSerialName = context.descriptor.serialName.replace(notAllowedChars, "#")
+        val newSerialName = context.descriptor.serialName.replace(notAllowedChars, ".")
         val result = context.analyze(object : SerialDescriptor {
             override val serialName: String
                 get() = newSerialName
