@@ -10,23 +10,40 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlin.time.Clock
 
+/**
+ * Wallet key store that persists key references in SQLDelight and key material in the platform store.
+ *
+ * @param keyProvider Platform key provider used to load and delete keys.
+ * @param queries SQLDelight queries for wallet persistence tables.
+ */
 class HardwareKeyStore(
     private val keyProvider: PlatformKeyProvider,
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {
 
+    /**
+     * Loads a wallet key by its wallet-local key identifier.
+     */
     override suspend fun getKey(keyId: String): Key? {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         val keyType = KeyType.valueOf(ref.key_type)
         return keyProvider.loadKey(keyId, keyType)
     }
 
+    /**
+     * Streams all persisted key references.
+     */
     override suspend fun listKeys(): Flow<WalletKeyInfo> = flow {
         queries.selectAll().executeAsList().forEach { ref ->
             emit(WalletKeyInfo(keyId = ref.key_id, keyType = ref.key_type))
         }
     }
 
+    /**
+     * Persists a platform key reference for [key].
+     *
+     * The key material itself remains in the platform key store.
+     */
     override suspend fun addKey(key: Key): String {
         val keyId = key.getKeyId()
         queries.insert(
@@ -38,6 +55,9 @@ class HardwareKeyStore(
         return keyId
     }
 
+    /**
+     * Removes the platform key and its SQLDelight key reference.
+     */
     override suspend fun removeKey(keyId: String): Boolean {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return false
         val keyType = KeyType.valueOf(ref.key_type)
