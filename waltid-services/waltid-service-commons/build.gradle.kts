@@ -49,11 +49,7 @@ dependencies {
     api("io.github.smiley4:ktor-openapi:5.6.0")
     implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
     implementation("io.github.smiley4:ktor-redoc:5.6.0")
-
-    implementation("io.github.smiley4:schema-kenerator-core:2.6.0")
-    implementation("io.github.smiley4:schema-kenerator-swagger:2.6.0")
-    implementation("io.github.smiley4:schema-kenerator-serialization:2.6.0")
-    implementation("io.github.smiley4:schema-kenerator-reflection:2.6.0")
+    implementation(libs.bundles.smiley4.schema.kenerator)
 
     // Persistence
     api("io.github.reactivecircus.cache4k:cache4k:0.14.0")

@@ -112,6 +112,7 @@ okio = "3.17.0"
 
 # Misc
 clikt = "5.1.0"
+smiley4-schema-kenerator = "2.7.2"
 
 [libraries]
 
@@ -270,6 +271,11 @@ sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", versi
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
 
+smiley4-schema-kenerator-core = { group = "io.github.smiley4", name = "schema-kenerator-core", version.ref = "smiley4-schema-kenerator" }
+smiley4-schema-kenerator-swagger = { group = "io.github.smiley4", name = "schema-kenerator-swagger", version.ref = "smiley4-schema-kenerator" }
+smiley4-schema-kenerator-serialization = { group = "io.github.smiley4", name = "schema-kenerator-serialization", version.ref = "smiley4-schema-kenerator" }
+smiley4-schema-kenerator-reflection = { group = "io.github.smiley4", name = "schema-kenerator-reflection", version.ref = "smiley4-schema-kenerator" }
+
 ## Testing
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
@@ -341,6 +347,13 @@ waltid-ktortesting = [
     "kotlinx-coroutines-test",
     "ktor-client-mock",
     "ktor-server-test-host"
+]
+
+smiley4-schema-kenerator = [
+    "smiley4-schema-kenerator-core",
+    "smiley4-schema-kenerator-swagger",
+    "smiley4-schema-kenerator-serialization",
+    "smiley4-schema-kenerator-reflection"
 ]
 
 [plugins]
