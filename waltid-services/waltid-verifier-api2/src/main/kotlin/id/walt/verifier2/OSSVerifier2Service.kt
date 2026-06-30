@@ -34,6 +34,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.serializer
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 
 
 private val log = logger("Verifier2Service")
@@ -43,7 +44,21 @@ private const val ENVELOPE_QUERY_PARAM = "envelope"
 
 object Verifier2Service {
 
-    val sessions = ConcurrentHashMap<String, Verification2Session>()
+    /**
+     * Session storage backing the VP verification flow.
+     *
+     * Defaults to an in-memory [ConcurrentHashMap].
+     * For HA deployments (e.g. Kubernetes multi-replica) replace this with a
+     * MongoDB-backed implementation before the server starts:
+     *
+     * ```kotlin
+     * Verifier2Service.sessions = MongoVerificationSessionMap(database)
+     * ```
+     *
+     * The replacement must be a [ConcurrentMap] whose `get`/`put`/`remove` are
+     * thread-safe and durable across JVM restarts.
+     */
+    var sessions: ConcurrentMap<String, Verification2Session> = ConcurrentHashMap()
 
     /**
      * Update data for this session and send session update notifications
