@@ -640,6 +640,7 @@ object WalletIssuanceHandler {
             val (parParams, pkceData) = authBuilder.buildPushedAuthorizationRequest(
                 credentialConfigurationId = credentialConfigurationId,
                 issuerState = offer.grants?.authorizationCode?.issuerState,
+                scope = "openid",  // Required by conformance suite
                 usePKCE = request.usePkce,
                 metadata = asMetadata
             )
