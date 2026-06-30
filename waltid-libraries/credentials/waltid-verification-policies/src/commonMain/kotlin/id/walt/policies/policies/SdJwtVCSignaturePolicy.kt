@@ -8,8 +8,9 @@ import id.walt.crypto.utils.UuidUtils.randomUUIDString
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import id.walt.policies.JwtVerificationPolicy
-import id.walt.sdjwt.JWTCryptoProvider
+import id.walt.sdjwt.AsyncJWTCryptoProvider
 import id.walt.sdjwt.SDJwtVC
+import id.walt.sdjwt.WaltIdAsyncJWTCryptoProvider
 import id.walt.w3c.utils.VCFormat
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
@@ -20,8 +21,8 @@ import love.forte.plugin.suspendtrans.annotation.JvmBlocking
 import kotlin.js.ExperimentalJsExport
 import kotlin.js.JsExport
 
-expect object JWTCryptoProviderManager {
-    fun getDefaultJWTCryptoProvider(keys: Map<String, Key>): JWTCryptoProvider
+object JWTCryptoProviderManager {
+    fun getDefaultAsyncJWTCryptoProvider(keys: Map<String, Key>): AsyncJWTCryptoProvider = WaltIdAsyncJWTCryptoProvider(keys)
 }
 
 class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
@@ -87,8 +88,8 @@ class SdJwtVCSignaturePolicy() : JwtVerificationPolicy() {
                 // Add the holder key
                 keyMap[holderKey.getKeyId()] = holderKey
 
-                val verificationResult = sdJwtVC.verifyVC(
-                    JWTCryptoProviderManager.getDefaultJWTCryptoProvider(keyMap),
+                val verificationResult = sdJwtVC.verifyVCAsync(
+                    JWTCryptoProviderManager.getDefaultAsyncJWTCryptoProvider(keyMap),
                     requiresHolderKeyBinding = true,
                     context["clientId"]?.toString(),
                     context["challenge"]?.toString()

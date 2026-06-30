@@ -23,13 +23,13 @@ kotlin {
             implementation(identityLibs.kotlincrypto.random)
             implementation(identityLibs.korlibs.encoding)
             implementation(identityLibs.oshai.kotlinlogging)
+            api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
             implementation(identityLibs.nimbus.jose.jwt)
-            api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)

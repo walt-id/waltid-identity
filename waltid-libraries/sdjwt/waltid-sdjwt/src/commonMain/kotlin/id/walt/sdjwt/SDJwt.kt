@@ -299,6 +299,8 @@ open class SDJwt internal constructor(
          * @param sdPayload Payload with selective disclosures to be signed
          * @param jwtCryptoProvider JWT Crypto Provider implementation that supports JWT creation on the target platform
          * @param keyID Optional key ID, if the crypto provider implementation requires it
+         * @param typ JWT `typ` header value to include in the protected header
+         * @param additionalHeaders Additional protected header values to include in the signed JWT
          * @return  The signed SDJwt object
          */
         fun sign(
@@ -318,11 +320,10 @@ open class SDJwt internal constructor(
         )
 
         /**
-         * Sign the given payload as SD-JWT token, using the given JWT crypto provider, optionally with the specified key ID and holder binding
+         * Sign the given payload as SD-JWT token, using the given JWT crypto provider, optionally with the specified key ID
          * @param sdPayload Payload with selective disclosures to be signed
          * @param jwtCryptoProvider JWT Crypto Provider implementation that supports JWT creation on the target platform
          * @param keyID Optional key ID, if the crypto provider implementation requires it
-         * @param withKBJwt Optionally, append the given holder binding JWT to the signed SD-JWT token
          * @return  The signed SDJwt object
          */
         @JsExport.Ignore

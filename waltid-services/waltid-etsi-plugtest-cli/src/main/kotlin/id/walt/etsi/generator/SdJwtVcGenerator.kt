@@ -130,8 +130,8 @@ object SdJwtVcGenerator {
             additionalHeaders["x5u"] = effectiveX5u
         }
 
-        val cryptoProvider = WaltIdJWTCryptoProvider(issuerKey)
         val keyId = issuerKey.getKeyId()
+        val cryptoProvider = WaltIdJWTCryptoProvider(mapOf(keyId to issuerKey))
 
         val sdJwt = SDJwt.sign(
             sdPayload = sdPayload,
