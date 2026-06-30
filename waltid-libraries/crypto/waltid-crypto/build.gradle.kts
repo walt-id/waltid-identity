@@ -50,29 +50,49 @@ kotlin {
                 implementation(identityLibs.kotlinx.coroutines.jdk8)
             }
         }
-        if (enableAndroidBuild) {
-            named("androidMain") {
+        if (enableAndroidBuild || enableIosBuild) {
+            val mobilePlatformKeyMain by creating {
+                dependsOn(commonMain.get())
                 dependencies {
                     implementation(identityLibs.signum.indispensable)
                     implementation(identityLibs.signum.indispensable.josef)
                     implementation(identityLibs.signum.supreme)
-                    implementation(identityLibs.kotlinx.coroutines.android)
                 }
             }
-            // Exclude signum's jdk18on BouncyCastle — we use lts8on from jvmAndroidMain
-            configurations.all {
-                exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
-                exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
-                exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+
+            if (enableAndroidBuild) {
+                named("androidMain") {
+                    dependsOn(mobilePlatformKeyMain)
+                    dependencies {
+                        implementation(identityLibs.kotlinx.coroutines.android)
+                    }
+                }
+                // Exclude signum's jdk18on BouncyCastle — we use lts8on from jvmAndroidMain
+                configurations.all {
+                    exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+                    exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+                    exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
+                }
+
+                named("androidDeviceTest") {
+                    dependencies {
+                        implementation(kotlin("test"))
+                        implementation(identityLibs.kotlinx.coroutines.test)
+                        implementation("androidx.test.ext:junit:1.2.1")
+                        implementation("androidx.test:runner:1.6.1")
+                        implementation("androidx.test:rules:1.6.1")
+                    }
+                }
             }
 
-            named("androidDeviceTest") {
-                dependencies {
+            if (enableIosBuild) {
+                iosMain.get().dependsOn(mobilePlatformKeyMain)
+                iosTest.dependencies {
                     implementation(kotlin("test"))
+                    implementation(identityLibs.signum.indispensable)
+                    implementation(identityLibs.signum.indispensable.josef)
+                    implementation(identityLibs.signum.supreme)
                     implementation(identityLibs.kotlinx.coroutines.test)
-                    implementation("androidx.test.ext:junit:1.2.1")
-                    implementation("androidx.test:runner:1.6.1")
-                    implementation("androidx.test:rules:1.6.1")
                 }
             }
         }
@@ -92,20 +112,6 @@ kotlin {
             implementation(kotlin("test-js"))
         }
 
-        if (enableIosBuild) {
-            iosMain.dependencies {
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.indispensable.josef)
-                implementation(identityLibs.signum.supreme)
-            }
-            iosTest.dependencies {
-                implementation(kotlin("test"))
-                implementation(identityLibs.signum.indispensable)
-                implementation(identityLibs.signum.indispensable.josef)
-                implementation(identityLibs.signum.supreme)
-                implementation(identityLibs.kotlinx.coroutines.test)
-            }
-        }
     }
 }
 

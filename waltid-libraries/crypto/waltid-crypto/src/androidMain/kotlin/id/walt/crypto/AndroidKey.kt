@@ -1,18 +1,9 @@
 package id.walt.crypto
 
-import at.asitplus.signum.indispensable.CryptoSignature
-import at.asitplus.signum.indispensable.ECCurve
-import at.asitplus.signum.indispensable.SignatureAlgorithm
-import at.asitplus.signum.indispensable.josef.JsonWebKey
-import at.asitplus.signum.indispensable.josef.JwsAlgorithm
-import at.asitplus.signum.indispensable.josef.JwsCompact
-import at.asitplus.signum.indispensable.josef.JwsHeader
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.AndroidKeyStoreProvider
-import at.asitplus.signum.supreme.sign.SignatureInput
-import at.asitplus.signum.supreme.sign.verifierFor
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
@@ -20,7 +11,6 @@ import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.uuid.Uuid
 
 @Suppress("unused")
@@ -36,7 +26,7 @@ class AndroidKey private constructor(
 
     companion object {
         suspend fun create(options: Options): Key {
-            when (val curve = options.keyType.toAndroidKeyStoreCurve()) {
+            when (val curve = options.keyType.toPlatformKeyStoreCurve()) {
                 null -> AndroidKeyStoreProvider.createSigningKey(options.kid) {
                     rsa { }
                 }.getOrThrow()
@@ -93,60 +83,20 @@ class AndroidKey private constructor(
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "Only private key can do signing." }
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
-
-        val jwsAlgorithm = options.keyType.toSignumJwsAlgorithm()
-
-        val jwkHeader = headers["jwk"]?.let { jwkElement ->
-            runCatching { joseCompliantSerializer.decodeFromString<JsonWebKey>(jwkElement.toString()) }.getOrNull()
-        }
-
-        val header = JwsHeader(
-            algorithm = jwsAlgorithm,
-            keyId = headers["kid"]?.let { (it as? JsonPrimitive)?.content },
-            type = headers["typ"]?.let { (it as? JsonPrimitive)?.content },
-            contentType = headers["cty"]?.let { (it as? JsonPrimitive)?.content },
-            jsonWebKey = jwkHeader,
-        )
-
-        val jws = JwsCompact(
-            protectedHeader = header,
-            payload = plaintext,
-            signer = { data ->
-                val signResult = signer.sign(data)
-                check(signResult is SignatureResult.Success) { "JWS signing failed: $signResult" }
-                signResult.signature.rawByteArray
-            }
-        )
-        return jws.toString()
+        return signJwsWithPlatformSigner(options.keyType, plaintext, headers) { data -> signer.sign(data) }
     }
 
     override suspend fun verifyRaw(
         signed: ByteArray, detachedPlaintext: ByteArray?,
         customSignatureAlgorithm: String?
-    ): Result<ByteArray> = runCatching {
+    ): Result<ByteArray> {
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
-        val sigAlg = options.keyType.toSignatureAlgorithm()
-        val verifier = sigAlg.verifierFor(signer.publicKey).getOrThrow()
-        val signature = when (options.keyType) {
-            KeyType.RSA -> CryptoSignature.RSA(signed)
-            else -> CryptoSignature.EC.fromRawBytes(signed)
-        }
-        val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required" }
-        verifier.verify(SignatureInput(plaintext), signature).getOrThrow()
-        plaintext
+        return verifyRawWithPlatformSigner(options.keyType, signer.publicKey, signed, detachedPlaintext)
     }
 
-    override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
-        val parsed = JwsCompact(signedJws)
+    override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
-        val sigAlg = options.keyType.toSignatureAlgorithm()
-        val verifier = sigAlg.verifierFor(signer.publicKey).getOrThrow()
-        val signature = when (options.keyType) {
-            KeyType.RSA -> CryptoSignature.RSA(parsed.plainSignature)
-            else -> CryptoSignature.EC.fromRawBytes(parsed.plainSignature)
-        }
-        verifier.verify(SignatureInput(parsed.signatureInput), signature).getOrThrow()
-        Json.parseToJsonElement(parsed.plainPayload.decodeToString())
+        return verifyJwsWithPlatformSigner(options.keyType, signer.publicKey, signedJws)
     }
 
     override suspend fun getPublicKey(): Key = AndroidKey(options, false)
@@ -161,28 +111,4 @@ class AndroidKey private constructor(
     override suspend fun deleteKey(): Boolean = runCatching {
         AndroidKeyStoreProvider.deleteSigningKey(options.kid).getOrThrow()
     }.isSuccess
-}
-
-private fun KeyType.toAndroidKeyStoreCurve(): ECCurve? = when (this) {
-    KeyType.secp256r1 -> ECCurve.SECP_256_R_1
-    KeyType.secp384r1 -> ECCurve.SECP_384_R_1
-    KeyType.secp521r1 -> ECCurve.SECP_521_R_1
-    KeyType.RSA -> null
-    else -> error("Unsupported key type for Android KeyStore: $this")
-}
-
-private fun KeyType.toSignumJwsAlgorithm(): JwsAlgorithm.Signature = when (this) {
-    KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
-    KeyType.secp384r1 -> JwsAlgorithm.Signature.EC.ES384
-    KeyType.secp521r1 -> JwsAlgorithm.Signature.EC.ES512
-    KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
-    else -> error("Unsupported key type for JWS: $this")
-}
-
-private fun KeyType.toSignatureAlgorithm(): SignatureAlgorithm = when (this) {
-    KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-    KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
-    KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
-    KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-    else -> error("Unsupported key type for verification: $this")
 }
