@@ -36,14 +36,13 @@ class AndroidKey private constructor(
 
     companion object {
         suspend fun create(options: Options): Key {
-            when (options.keyType) {
-                KeyType.secp256r1 -> AndroidKeyStoreProvider.createSigningKey(options.kid) {
-                    ec { curve = ECCurve.SECP_256_R_1 }
-                }.getOrThrow()
-                KeyType.RSA -> AndroidKeyStoreProvider.createSigningKey(options.kid) {
+            when (val curve = options.keyType.toAndroidKeyStoreCurve()) {
+                null -> AndroidKeyStoreProvider.createSigningKey(options.kid) {
                     rsa { }
                 }.getOrThrow()
-                else -> error("Unsupported key type for Android KeyStore: ${options.keyType}")
+                else -> AndroidKeyStoreProvider.createSigningKey(options.kid) {
+                    ec { this.curve = curve }
+                }.getOrThrow()
             }
             return AndroidKey(options, true)
         }
@@ -95,11 +94,7 @@ class AndroidKey private constructor(
         check(hasPrivateKey) { "Only private key can do signing." }
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
 
-        val jwsAlgorithm = when (options.keyType) {
-            KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
-            KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
-            else -> error("Unsupported key type for JWS: ${options.keyType}")
-        }
+        val jwsAlgorithm = options.keyType.toSignumJwsAlgorithm()
 
         val jwkHeader = headers["jwk"]?.let { jwkElement ->
             runCatching { joseCompliantSerializer.decodeFromString<JsonWebKey>(jwkElement.toString()) }.getOrNull()
@@ -130,11 +125,7 @@ class AndroidKey private constructor(
         customSignatureAlgorithm: String?
     ): Result<ByteArray> = runCatching {
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
-        val sigAlg = when (options.keyType) {
-            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-            else -> error("Unsupported key type for verification: ${options.keyType}")
-        }
+        val sigAlg = options.keyType.toSignatureAlgorithm()
         val verifier = sigAlg.verifierFor(signer.publicKey).getOrThrow()
         val signature = when (options.keyType) {
             KeyType.RSA -> CryptoSignature.RSA(signed)
@@ -148,11 +139,7 @@ class AndroidKey private constructor(
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
         val parsed = JwsCompact(signedJws)
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
-        val sigAlg = when (options.keyType) {
-            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-            else -> error("Unsupported key type for verification: ${options.keyType}")
-        }
+        val sigAlg = options.keyType.toSignatureAlgorithm()
         val verifier = sigAlg.verifierFor(signer.publicKey).getOrThrow()
         val signature = when (options.keyType) {
             KeyType.RSA -> CryptoSignature.RSA(parsed.plainSignature)
@@ -174,4 +161,28 @@ class AndroidKey private constructor(
     override suspend fun deleteKey(): Boolean = runCatching {
         AndroidKeyStoreProvider.deleteSigningKey(options.kid).getOrThrow()
     }.isSuccess
+}
+
+private fun KeyType.toAndroidKeyStoreCurve(): ECCurve? = when (this) {
+    KeyType.secp256r1 -> ECCurve.SECP_256_R_1
+    KeyType.secp384r1 -> ECCurve.SECP_384_R_1
+    KeyType.secp521r1 -> ECCurve.SECP_521_R_1
+    KeyType.RSA -> null
+    else -> error("Unsupported key type for Android KeyStore: $this")
+}
+
+private fun KeyType.toSignumJwsAlgorithm(): JwsAlgorithm.Signature = when (this) {
+    KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
+    KeyType.secp384r1 -> JwsAlgorithm.Signature.EC.ES384
+    KeyType.secp521r1 -> JwsAlgorithm.Signature.EC.ES512
+    KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
+    else -> error("Unsupported key type for JWS: $this")
+}
+
+private fun KeyType.toSignatureAlgorithm(): SignatureAlgorithm = when (this) {
+    KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
+    KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
+    KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
+    KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
+    else -> error("Unsupported key type for verification: $this")
 }

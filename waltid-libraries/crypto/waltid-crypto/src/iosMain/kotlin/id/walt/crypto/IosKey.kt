@@ -43,12 +43,7 @@ class IosKey private constructor(
 
     companion object {
         suspend fun create(options: Options): Key {
-            val curve = when (options.keyType) {
-                KeyType.secp256r1 -> ECCurve.SECP_256_R_1
-                KeyType.Ed25519 -> error("Ed25519 is not yet supported on iOS")
-                KeyType.RSA -> null
-                else -> error("Unsupported key type: ${options.keyType}")
-            }
+            val curve = options.keyType.toIosKeychainCurve()
 
 
             val result = if (curve != null) {
@@ -121,11 +116,7 @@ class IosKey private constructor(
         check(hasPrivateKey) { "Only private key can do signing." }
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
 
-        val jwsAlgorithm = when (options.keyType) {
-            KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
-            KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
-            else -> error("Unsupported key type for JWS: ${options.keyType}")
-        }
+        val jwsAlgorithm = options.keyType.toSignumJwsAlgorithm()
 
         val jwkHeader = headers["jwk"]?.let { jwkElement ->
             runCatching { joseCompliantSerializer.decodeFromString<JsonWebKey>(jwkElement.toString()) }.getOrNull()
@@ -158,11 +149,7 @@ class IosKey private constructor(
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
         val cryptoPubKey = signer.publicKey
 
-        val sigAlg = when (options.keyType) {
-            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-            else -> error("Unsupported key type for verification: ${options.keyType}")
-        }
+        val sigAlg = options.keyType.toSignatureAlgorithm()
 
         val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
         val signature = when (options.keyType) {
@@ -179,11 +166,7 @@ class IosKey private constructor(
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
         val cryptoPubKey = signer.publicKey
 
-        val sigAlg = when (options.keyType) {
-            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-            else -> error("Unsupported key type for verification: ${options.keyType}")
-        }
+        val sigAlg = options.keyType.toSignatureAlgorithm()
 
         val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
         val signature = when (options.keyType) {
@@ -207,4 +190,29 @@ class IosKey private constructor(
     override suspend fun deleteKey(): Boolean = runCatching {
         IosKeychainProvider.deleteSigningKey(options.kid).getOrThrow()
     }.isSuccess
+}
+
+private fun KeyType.toIosKeychainCurve(): ECCurve? = when (this) {
+    KeyType.secp256r1 -> ECCurve.SECP_256_R_1
+    KeyType.secp384r1 -> ECCurve.SECP_384_R_1
+    KeyType.secp521r1 -> ECCurve.SECP_521_R_1
+    KeyType.RSA -> null
+    KeyType.Ed25519 -> error("Ed25519 is not yet supported on iOS")
+    else -> error("Unsupported key type: $this")
+}
+
+private fun KeyType.toSignumJwsAlgorithm(): JwsAlgorithm.Signature = when (this) {
+    KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
+    KeyType.secp384r1 -> JwsAlgorithm.Signature.EC.ES384
+    KeyType.secp521r1 -> JwsAlgorithm.Signature.EC.ES512
+    KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
+    else -> error("Unsupported key type for JWS: $this")
+}
+
+private fun KeyType.toSignatureAlgorithm(): SignatureAlgorithm = when (this) {
+    KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
+    KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
+    KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
+    KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
+    else -> error("Unsupported key type for verification: $this")
 }

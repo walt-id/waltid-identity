@@ -8,7 +8,7 @@ import kotlin.uuid.Uuid
 class AndroidPlatformKeyProvider : PlatformKeyProvider {
 
     override val supportedHardwareKeyTypes: Set<KeyType> =
-        setOf(KeyType.secp256r1, KeyType.RSA)
+        setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA)
 
     override val isHardwareBackingAvailable: Boolean = true
 

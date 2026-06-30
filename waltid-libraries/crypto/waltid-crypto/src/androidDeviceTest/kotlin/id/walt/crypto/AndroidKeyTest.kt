@@ -13,26 +13,29 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 class AndroidKeyTest {
 
+    private val ecKeyTypes = listOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1)
     private val testAliases = mutableListOf<String>()
 
     @After
     fun cleanup() = runTest {
         testAliases.forEach { alias ->
-            runCatching { AndroidKey.delete(alias, KeyType.secp256r1) }
+            ecKeyTypes.forEach { runCatching { AndroidKey.delete(alias, it) } }
             runCatching { AndroidKey.delete(alias, KeyType.RSA) }
         }
     }
 
     @Test
-    fun generateP256Key() = runTest {
-        val alias = "test-p256-${System.currentTimeMillis()}"
-        testAliases.add(alias)
+    fun generateNistEcKeys() = runTest {
+        for (keyType in ecKeyTypes) {
+            val alias = "test-$keyType-${System.currentTimeMillis()}"
+            testAliases.add(alias)
 
-        val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
-        assertNotNull(key)
-        assertEquals(alias, key.getKeyId())
-        assertEquals(KeyType.secp256r1, key.keyType)
-        assertTrue(key.hasPrivateKey)
+            val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = keyType))
+            assertNotNull(key)
+            assertEquals(alias, key.getKeyId())
+            assertEquals(keyType, key.keyType)
+            assertTrue(key.hasPrivateKey)
+        }
     }
 
     @Test
