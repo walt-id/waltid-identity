@@ -111,15 +111,6 @@
 			path = iosApp;
 			sourceTree = "<group>";
 		};
-		C7F7791DA2DDDF41CE0CB49F /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				5E74965B4EAF6C908029258B /* Pods-iosApp.debug.xcconfig */,
-				81E504906E5C84985CB567E3 /* Pods-iosApp.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
 		C0DE00000000000000000401 /* iosAppUITests */ = {
 			isa = PBXGroup;
 			children = (
@@ -133,6 +124,15 @@
 				C0DE00000000000000000009 /* LocalEnterpriseBackend.swift */,
 			);
 			path = iosAppUITests;
+			sourceTree = "<group>";
+		};
+		C7F7791DA2DDDF41CE0CB49F /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				5E74965B4EAF6C908029258B /* Pods-iosApp.debug.xcconfig */,
+				81E504906E5C84985CB567E3 /* Pods-iosApp.release.xcconfig */,
+			);
+			path = Pods;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -278,7 +278,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
