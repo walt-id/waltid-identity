@@ -551,12 +551,32 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
-                            "The caller must redirect to this URL and capture the returned code."
+                            "The caller must redirect to this URL and capture the returned code. " +
+                            "If the wallet has a staticKey and the AS requires private_key_jwt, " +
+                            "the key will be used to sign the client_assertion for PAR."
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<GenerateAuthorizationUrlRequest>()
-                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(req))
+                        
+                        // Get wallet's static key for client_assertion if available
+                        val clientAssertionKey = wallet.staticKey?.exportJWKObject()
+                        
+                        val enrichedReq = if (clientAssertionKey != null && req.clientAssertionKey == null) {
+                            GenerateAuthorizationUrlRequest(
+                                offerUrl = req.offerUrl,
+                                offerJson = req.offerJson,
+                                clientId = req.clientId,
+                                redirectUri = req.redirectUri,
+                                usePkce = req.usePkce,
+                                clientAssertionKey = clientAssertionKey
+                            )
+                        } else {
+                            req
+                        }
+                        
+                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(enrichedReq))
                     }
 
                     post("/exchange-code", {

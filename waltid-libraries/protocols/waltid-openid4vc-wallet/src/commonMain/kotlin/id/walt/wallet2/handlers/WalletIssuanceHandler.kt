@@ -229,7 +229,9 @@ data class GenerateAuthorizationUrlRequest(
     val offerJson: JsonObject? = null,
     val clientId: String = "wallet-client",
     val redirectUri: Url = Url("openid://"),
-    val usePkce: Boolean = true
+    val usePkce: Boolean = true,
+    /** JWK for client_assertion signing (private_key_jwt). Required when PAR with private_key_jwt is used. */
+    val clientAssertionKey: JsonObject? = null
 ) {
     init {
         check(offerUrl != null || offerJson != null) {
@@ -642,11 +644,48 @@ object WalletIssuanceHandler {
                 metadata = asMetadata
             )
 
+            // Check if client authentication via private_key_jwt is required
+            val requiresClientAuth = asMetadata.tokenEndpointAuthMethodsSupported
+                ?.contains("private_key_jwt") == true
+
+            // Build client_assertion if key provided and auth required
+            val clientAssertionParams: Map<String, String> = if (requiresClientAuth && request.clientAssertionKey != null) {
+                val signingKey = id.walt.crypto.keys.jwk.JWKKey.importJWK(request.clientAssertionKey.toString()).getOrThrow()
+                val now = kotlin.time.Clock.System.now().epochSeconds
+                val jti = kotlin.uuid.Uuid.random().toString()
+
+                // Build JWT claims for client_assertion per RFC 7523
+                val claims = buildJsonObject {
+                    put("iss", request.clientId)
+                    put("sub", request.clientId)
+                    put("aud", parEndpoint) // audience is the PAR endpoint
+                    put("iat", now)
+                    put("exp", now + 300) // 5 minutes
+                    put("jti", jti)
+                }
+
+                // Sign the JWT
+                val headers = buildMap<String, JsonElement> {
+                    put("typ", JsonPrimitive("JWT"))
+                    // Include kid if available
+                    request.clientAssertionKey["kid"]?.let { put("kid", it) }
+                }
+                val clientAssertion = signingKey.signJws(claims.toString().encodeToByteArray(), headers)
+
+                mapOf(
+                    "client_assertion_type" to "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    "client_assertion" to clientAssertion
+                )
+            } else {
+                emptyMap()
+            }
+
             // POST to PAR endpoint
             val parResponse = httpClient.submitForm(
                 url = parEndpoint,
                 formParameters = Parameters.build {
                     parParams.forEach { (key, value) -> append(key, value) }
+                    clientAssertionParams.forEach { (key, value) -> append(key, value) }
                     // Override redirect_uri if custom one provided
                     if (request.redirectUri.toString() != clientConfig.primaryRedirectUri) {
                         set("redirect_uri", request.redirectUri.toString())
