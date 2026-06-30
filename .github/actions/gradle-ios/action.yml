@@ -19,21 +19,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
-      with:
-        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
-
-    - name: Install CocoaPods dependencies for iOS libraries
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: ./gradlew podInstall
-
-    - name: Build iOS simulator frameworks (ARM64)
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: ./gradlew linkPodDebugFrameworkIosSimulatorArm64
-
     - name: Select Xcode toolchain
       shell: bash
       run: |
@@ -54,6 +39,21 @@ runs:
         fi
 
         xcodebuild -version
+
+    - name: Configure iOS build environment
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
+      with:
+        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
+
+    - name: Install CocoaPods dependencies for iOS libraries
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew podInstall
+
+    - name: Build iOS simulator frameworks (ARM64)
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew linkPodDebugFrameworkIosSimulatorArm64
 
     - name: Cleanup simulators before tests
       shell: bash
