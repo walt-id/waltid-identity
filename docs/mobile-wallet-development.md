@@ -54,9 +54,17 @@ Android:
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest
 ```
 
-iOS:
-
+iOS (Compose):
 ```bash
+./gradlew :waltid-applications:waltid-wallet-demo-compose:shared:generateDummyFramework
+cd waltid-applications/waltid-wallet-demo-compose/iosApp
+pod install
+open iosApp.xcworkspace
+```
+
+iOS (Native)
+```bash
+./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:generateDummyFramework
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
 pod install
 open iosApp.xcworkspace
