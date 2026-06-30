@@ -542,8 +542,14 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
                         response { HttpStatusCode.OK to { body<FetchCredentialResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
-                        call.respond(WalletIssuanceHandler.fetchCredential(req))
+                        
+                        // Get wallet's static key for DPoP proof
+                        val walletKey = wallet.staticKey as? JWKKey
+                        val enrichedReq = req.copy(dpopKey = walletKey)
+                        
+                        call.respond(WalletIssuanceHandler.fetchCredential(enrichedReq))
                     }
 
                     // Auth-code grant isolated steps
@@ -588,12 +594,15 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
                         
-                        // Get wallet's static key for DPoP proof signing
+                        // Get wallet's static key for DPoP proof signing and client_assertion
                         // staticKey is already a Key object, cast to JWKKey if it's the right type
                         val walletKey = wallet.staticKey as? JWKKey
                         
-                        // Enrich request with DPoP key if available
-                        val enrichedReq = req.copy(dpopKey = walletKey)
+                        // Enrich request with DPoP key and client assertion key if available
+                        val enrichedReq = req.copy(
+                            dpopKey = walletKey,
+                            clientAssertionKey = walletKey  // Same key for both DPoP and client_assertion
+                        )
                         
                         call.respond(WalletIssuanceHandler.exchangeCode(enrichedReq))
                     }

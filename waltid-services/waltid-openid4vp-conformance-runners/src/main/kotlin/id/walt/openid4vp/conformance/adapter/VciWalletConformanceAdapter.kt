@@ -158,7 +158,11 @@ class VciWalletConformanceAdapter(
                             pendingAuthFlows[state] = PendingAuthFlow(
                                 state = state,
                                 codeVerifier = result.codeVerifier,
-                                tokenEndpoint = result.tokenEndpoint ?: error("Missing tokenEndpoint in auth response")
+                                tokenEndpoint = result.tokenEndpoint ?: error("Missing tokenEndpoint in auth response"),
+                                asIssuerUrl = result.asIssuerUrl,
+                                credentialEndpoint = result.credentialEndpoint,
+                                credentialIssuerUrl = result.credentialIssuerUrl,
+                                credentialConfigurationId = result.credentialConfigurationId
                             )
                         }
                         call.respond(HttpStatusCode.OK, buildJsonObject {
@@ -215,10 +219,27 @@ class VciWalletConformanceAdapter(
 
             // Exchange code for token
             val tokenResult = exchangeCodeForToken(client, code, pendingFlow)
-            call.respondText(
-                authCompleteHtml(if (tokenResult.success) "Credential issuance complete" else "Token exchange failed: ${tokenResult.message}"),
-                ContentType.Text.Html
-            )
+            
+            if (tokenResult.success && tokenResult.accessToken != null && pendingFlow.credentialEndpoint != null) {
+                // Now fetch the credential
+                val credResult = fetchCredential(
+                    client = client,
+                    accessToken = tokenResult.accessToken,
+                    cNonce = tokenResult.cNonce,
+                    credentialEndpoint = pendingFlow.credentialEndpoint,
+                    credentialConfigurationId = pendingFlow.credentialConfigurationId ?: "org.iso.18013.5.1.mDL",
+                    credentialIssuerUrl = pendingFlow.credentialIssuerUrl
+                )
+                call.respondText(
+                    authCompleteHtml(if (credResult.success) "Credential received: ${credResult.message}" else "Credential fetch failed: ${credResult.message}"),
+                    ContentType.Text.Html
+                )
+            } else {
+                call.respondText(
+                    authCompleteHtml(if (tokenResult.success) "Token obtained but missing data for credential fetch" else "Token exchange failed: ${tokenResult.message}"),
+                    ContentType.Text.Html
+                )
+            }
 
         } catch (e: Exception) {
             println("[VCI Adapter] ERROR: ${e.message}")
@@ -272,7 +293,11 @@ class VciWalletConformanceAdapter(
                     authorizationUrl = result["authorizationUrl"]?.jsonPrimitive?.content,
                     state = result["state"]?.jsonPrimitive?.content,
                     codeVerifier = result["codeVerifier"]?.jsonPrimitive?.content,
-                    tokenEndpoint = result["tokenEndpoint"]?.jsonPrimitive?.content
+                    tokenEndpoint = result["tokenEndpoint"]?.jsonPrimitive?.content,
+                    asIssuerUrl = result["asIssuerUrl"]?.jsonPrimitive?.content,
+                    credentialEndpoint = result["credentialEndpoint"]?.jsonPrimitive?.content,
+                    credentialIssuerUrl = result["credentialIssuerUrl"]?.jsonPrimitive?.content,
+                    credentialConfigurationId = result["credentialConfigurationId"]?.jsonPrimitive?.content
                 )
             } else {
                 AuthFlowResult(error = "Status ${response.status}: $body")
@@ -293,6 +318,8 @@ class VciWalletConformanceAdapter(
                 flow.codeVerifier?.let { put("codeVerifier", it) }
                 put("clientId", "wallet-conformance-test")
                 put("redirectUri", getRedirectUri())
+                // Include AS issuer URL for client_assertion aud claim
+                flow.asIssuerUrl?.let { put("asIssuerUrl", it) }
             }
 
             val response = client.post(url) {
@@ -302,12 +329,88 @@ class VciWalletConformanceAdapter(
 
             val body = response.bodyAsText()
             if (response.status.isSuccess()) {
-                TokenResult(success = true, message = "Token obtained")
+                val result = Json.parseToJsonElement(body).jsonObject
+                TokenResult(
+                    success = true,
+                    message = "Token obtained",
+                    accessToken = result["accessToken"]?.jsonPrimitive?.content,
+                    cNonce = result["cNonce"]?.jsonPrimitive?.content
+                )
             } else {
                 TokenResult(success = false, message = "Status ${response.status}: $body")
             }
         } catch (e: Exception) {
             TokenResult(success = false, message = "Exception: ${e.message}")
+        }
+    }
+
+    private suspend fun fetchCredential(
+        client: HttpClient,
+        accessToken: String,
+        cNonce: String?,
+        credentialEndpoint: String,
+        credentialConfigurationId: String,
+        credentialIssuerUrl: String?
+    ): ClaimResult {
+        return try {
+            // First sign a proof if we have a nonce
+            val proofJwt = if (cNonce != null) {
+                signKeyProof(client, cNonce, credentialIssuerUrl ?: credentialEndpoint)
+            } else null
+
+            val url = "$walletApiUrl/wallet/$walletId/credentials/receive/fetch-credential"
+            println("[VCI Adapter] POST $url")
+
+            val requestBody = buildJsonObject {
+                put("credentialEndpoint", credentialEndpoint)
+                put("accessToken", accessToken)
+                put("credentialConfigurationId", credentialConfigurationId)
+                proofJwt?.let { put("proofJwt", it) }
+            }
+
+            val response = client.post(url) {
+                contentType(ContentType.Application.Json)
+                setBody(requestBody.toString())
+            }
+
+            val body = response.bodyAsText()
+            println("[VCI Adapter] Fetch response: ${response.status} - ${body.take(200)}")
+            
+            if (response.status.isSuccess()) {
+                ClaimResult(true, "Credential received")
+            } else {
+                ClaimResult(false, "Status ${response.status}: $body")
+            }
+        } catch (e: Exception) {
+            ClaimResult(false, "Exception: ${e.message}")
+        }
+    }
+
+    private suspend fun signKeyProof(client: HttpClient, nonce: String, issuerUrl: String): String? {
+        return try {
+            val url = "$walletApiUrl/wallet/$walletId/credentials/receive/sign-proof"
+            println("[VCI Adapter] POST $url")
+
+            val requestBody = buildJsonObject {
+                put("issuerUrl", issuerUrl)
+                put("nonce", nonce)
+            }
+
+            val response = client.post(url) {
+                contentType(ContentType.Application.Json)
+                setBody(requestBody.toString())
+            }
+
+            if (response.status.isSuccess()) {
+                val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+                result["proofJwt"]?.jsonPrimitive?.content
+            } else {
+                println("[VCI Adapter] Sign proof failed: ${response.status}")
+                null
+            }
+        } catch (e: Exception) {
+            println("[VCI Adapter] Sign proof exception: ${e.message}")
+            null
         }
     }
 
@@ -432,7 +535,11 @@ class VciWalletConformanceAdapter(
     private data class PendingAuthFlow(
         val state: String,
         val codeVerifier: String?,
-        val tokenEndpoint: String
+        val tokenEndpoint: String,
+        val asIssuerUrl: String?,
+        val credentialEndpoint: String?,
+        val credentialIssuerUrl: String?,
+        val credentialConfigurationId: String?
     )
 
     private data class ClaimResult(val success: Boolean, val message: String)
@@ -442,8 +549,17 @@ class VciWalletConformanceAdapter(
         val state: String? = null,
         val codeVerifier: String? = null,
         val tokenEndpoint: String? = null,
+        val asIssuerUrl: String? = null,
+        val credentialEndpoint: String? = null,
+        val credentialIssuerUrl: String? = null,
+        val credentialConfigurationId: String? = null,
         val error: String? = null
     )
 
-    private data class TokenResult(val success: Boolean, val message: String)
+    private data class TokenResult(
+        val success: Boolean,
+        val message: String,
+        val accessToken: String? = null,
+        val cNonce: String? = null
+    )
 }

@@ -56,6 +56,7 @@ class TokenRequestBuilder(
         code: String,
         codeVerifier: String? = null,
         dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
+        clientAssertion: String? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -64,6 +65,7 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
         log.trace { "DPoP proof generator present: ${dpopProofGenerator != null}" }
+        log.trace { "Client assertion present: ${clientAssertion != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
@@ -73,6 +75,11 @@ class TokenRequestBuilder(
             codeVerifier?.let {
                 append("code_verifier", it)
                 log.trace { "Including PKCE code verifier in token request" }
+            }
+            clientAssertion?.let {
+                append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                append("client_assertion", it)
+                log.trace { "Including client_assertion for private_key_jwt auth" }
             }
         }
 

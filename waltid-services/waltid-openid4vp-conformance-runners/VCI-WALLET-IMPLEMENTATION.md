@@ -14,11 +14,11 @@ The wallet acts as a **credential holder** receiving credentials from an issuer 
 │                         OIDF Conformance Suite                              │
 │                    (https://localhost.emobix.co.uk:8443)                    │
 │                                                                             │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │
-│  │ Credential      │  │ Authorization   │  │ Token           │             │
-│  │ Issuer          │  │ Server          │  │ Endpoint        │             │
-│  │ Metadata        │  │ (OAuth 2.0)     │  │ (with DPoP)     │             │
-│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘             │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
+│  │ Credential      │  │ Authorization   │  │ Token           │              │
+│  │ Issuer          │  │ Server          │  │ Endpoint        │              │
+│  │ Metadata        │  │ (OAuth 2.0)     │  │ (with DPoP)     │              │
+│  └────────┬────────┘  └────────┬────────┘  └────────┬────────┘              │
 │           │                    │                    │                       │
 └───────────┼────────────────────┼────────────────────┼───────────────────────┘
             │                    │                    │
@@ -28,50 +28,50 @@ The wallet acts as a **credential holder** receiving credentials from an issuer 
             │                    │                    │ (7) Token exchange
             │                    │                    │     with DPoP + nonce
             │                    │                    │
-┌───────────┼────────────────────┼────────────────────┼───────────────────────┐
-│           ▼                    ▼                    ▼                       │
+┌───────────┼────────────────────┼────────────────────┼──────────────────────┐
+│           ▼                    ▼                    ▼                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    VCI Wallet Conformance Adapter                    │   │
-│  │                         (Port 7007)                                  │   │
-│  │                                                                      │   │
-│  │  Endpoints:                                                          │   │
+│  │                    VCI Wallet Conformance Adapter                   │   │
+│  │                         (Port 7007)                                 │   │
+│  │                                                                     │   │
+│  │  Endpoints:                                                         │   │
 │  │  - POST /credential-offer  ← Receives offer from conformance suite  │   │
 │  │  - GET  /callback          ← OAuth redirect after user login        │   │
 │  └──────────────────────────────────┬──────────────────────────────────┘   │
-│                                     │                                       │
-│                                     │ (2) Parse offer                       │
-│                                     │ (3) Generate auth URL                 │
-│                                     │ (6) Exchange code for token           │
-│                                     │ (8) Fetch credential                  │
-│                                     ▼                                       │
+│                                     │                                      │
+│                                     │ (2) Parse offer                      │
+│                                     │ (3) Generate auth URL                │
+│                                     │ (6) Exchange code for token          │
+│                                     │ (8) Fetch credential                 │
+│                                     ▼                                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         wallet-api2                                  │   │
-│  │                         (Port 7005)                                  │   │
-│  │                                                                      │   │
-│  │  Endpoints:                                                          │   │
+│  │                         wallet-api2                                 │   │
+│  │                         (Port 7005)                                 │   │
+│  │                                                                     │   │
+│  │  Endpoints:                                                         │   │
 │  │  - POST /wallet/{id}/credentials/receive           (pre-auth flow)  │   │
 │  │  - POST /wallet/{id}/credentials/receive/auth-url  (auth-code flow) │   │
 │  │  - POST /wallet/{id}/credentials/receive/exchange-code              │   │
 │  │  - POST /wallet/{id}/credentials/receive/fetch                      │   │
 │  └──────────────────────────────────┬──────────────────────────────────┘   │
-│                                     │                                       │
-│                                     ▼                                       │
+│                                     │                                      │
+│                                     ▼                                      │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Protocol Libraries                                │   │
-│  │                                                                      │   │
+│  │                    Protocol Libraries                               │   │
+│  │                                                                     │   │
 │  │  waltid-openid4vc-wallet (handlers)                                 │   │
 │  │  └── WalletIssuanceHandler                                          │   │
 │  │      ├── generateAuthorizationUrl() - PAR + auth URL generation     │   │
 │  │      ├── exchangeCode()             - Token exchange with DPoP      │   │
 │  │      └── generateDpopProof()        - RFC 9449 DPoP proof           │   │
-│  │                                                                      │   │
+│  │                                                                     │   │
 │  │  waltid-openid4vci-wallet (builders)                                │   │
 │  │  └── TokenRequestBuilder                                            │   │
 │  │      └── exchangeAuthorizationCode() - With DPoP nonce retry        │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                             │
-│                              Host Machine                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
+│                                                                            │
+│                              Host Machine                                  │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Detailed Call Flow (Authorization Code + DPoP + private_key_jwt)

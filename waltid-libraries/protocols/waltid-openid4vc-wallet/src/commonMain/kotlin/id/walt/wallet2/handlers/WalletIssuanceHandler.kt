@@ -192,7 +192,9 @@ data class FetchCredentialRequest(
     val accessToken: String,
     val credentialConfigurationId: String,
     val proofJwt: String? = null,
-    val clientId: String = "wallet-client"
+    val clientId: String = "wallet-client",
+    /** Optional key for DPoP proof on credential endpoint */
+    @Transient val dpopKey: JWKKey? = null
 )
 
 @Serializable
@@ -254,7 +256,13 @@ data class GenerateAuthorizationUrlResult(
     val codeVerifier: String? = null,
     val credentialConfigurationId: String,
     /** Token endpoint URL for code exchange */
-    val tokenEndpoint: Url? = null
+    val tokenEndpoint: Url? = null,
+    /** AS issuer URL for client_assertion aud claim */
+    val asIssuerUrl: String? = null,
+    /** Credential endpoint URL for fetching credentials */
+    val credentialEndpoint: String? = null,
+    /** Credential issuer URL */
+    val credentialIssuerUrl: String? = null
 )
 
 @Serializable
@@ -265,7 +273,11 @@ data class ExchangeCodeRequest(
     val clientId: String = "wallet-client",
     val redirectUri: Url = Url("openid://"),
     /** Optional key for DPoP proof. If provided, a DPoP header will be included. */
-    @Transient val dpopKey: JWKKey? = null
+    @Transient val dpopKey: JWKKey? = null,
+    /** AS issuer URL for client_assertion aud claim (required for private_key_jwt) */
+    val asIssuerUrl: String? = null,
+    /** Optional key for client_assertion (private_key_jwt). If provided with asIssuerUrl, client auth is included. */
+    @Transient val clientAssertionKey: JWKKey? = null
 )
 
 // ---------------------------------------------------------------------------
@@ -554,6 +566,17 @@ object WalletIssuanceHandler {
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult {
         val httpClient = defaultHttpClient()
+        
+        // Generate DPoP proof for credential endpoint if key is provided
+        val dpopProof = request.dpopKey?.let { key ->
+            generateDpopProof(
+                key = key,
+                httpMethod = "POST",
+                httpUri = request.credentialEndpoint.toString(),
+                accessToken = request.accessToken  // Include ath (access token hash)
+            )
+        }
+        
         // Build JSON manually to avoid Proofs serialization issue
         val credentialRequestJson = buildJsonObject {
             put("credential_configuration_id", request.credentialConfigurationId)
@@ -564,7 +587,13 @@ object WalletIssuanceHandler {
             }
         }
         val response = httpClient.post(request.credentialEndpoint.toString()) {
-            header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
+            // Use DPoP token type if DPoP proof is included
+            if (dpopProof != null) {
+                header(HttpHeaders.Authorization, "DPoP ${request.accessToken}")
+                header("DPoP", dpopProof)
+            } else {
+                header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
+            }
             contentType(ContentType.Application.Json)
             setBody(credentialRequestJson.toString())
         }
@@ -723,7 +752,10 @@ object WalletIssuanceHandler {
                 state = parParams["state"] ?: error("PAR params missing state"),
                 codeVerifier = pkceData?.codeVerifier,
                 credentialConfigurationId = credentialConfigurationId,
-                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) }
+                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
+                asIssuerUrl = asMetadata.issuer,
+                credentialEndpoint = issuerMetadata.credentialEndpoint,
+                credentialIssuerUrl = issuerMetadata.credentialIssuer
             )
         } else {
             // Standard authorization request (no PAR)
@@ -741,7 +773,10 @@ object WalletIssuanceHandler {
                 state = authRequest.state,
                 codeVerifier = authRequest.pkceData?.codeVerifier,
                 credentialConfigurationId = credentialConfigurationId,
-                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) }
+                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
+                asIssuerUrl = asMetadata.issuer,
+                credentialEndpoint = issuerMetadata.credentialEndpoint,
+                credentialIssuerUrl = issuerMetadata.credentialIssuer
             )
         }
     }
@@ -752,6 +787,9 @@ object WalletIssuanceHandler {
      * 
      * If [ExchangeCodeRequest.dpopKey] is provided, generates a DPoP proof header
      * per RFC 9449 (OAuth 2.0 Demonstrating Proof of Possession).
+     * 
+     * If [ExchangeCodeRequest.clientAssertionKey] and [ExchangeCodeRequest.asIssuerUrl] are provided,
+     * generates a client_assertion JWT for private_key_jwt authentication.
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
         val httpClient = defaultHttpClient()
@@ -772,17 +810,65 @@ object WalletIssuanceHandler {
             }
         }
         
+        // Generate client_assertion if key and issuer URL provided
+        val clientAssertion: String? = if (request.clientAssertionKey != null && request.asIssuerUrl != null) {
+            generateClientAssertion(
+                key = request.clientAssertionKey,
+                clientId = request.clientId,
+                audience = request.asIssuerUrl  // MUST be AS issuer URL, not token endpoint
+            )
+        } else null
+        
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
             code = request.code,
             codeVerifier = request.codeVerifier,
-            dpopProofGenerator = dpopProofGenerator
+            dpopProofGenerator = dpopProofGenerator,
+            clientAssertion = clientAssertion
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
             cNonce = tokenResponse.c_nonce,
             expiresIn = tokenResponse.expires_in
         )
+    }
+    
+    /**
+     * Generates a client_assertion JWT for private_key_jwt authentication per RFC 7523.
+     * 
+     * @param key The signing key
+     * @param clientId The client ID (used as iss and sub)
+     * @param audience The authorization server issuer URL (NOT the token endpoint)
+     */
+    private suspend fun generateClientAssertion(
+        key: JWKKey,
+        clientId: String,
+        audience: String
+    ): String {
+        val now = Clock.System.now().epochSeconds
+        val jti = Uuid.random().toString()
+        
+        // Build JWT claims per RFC 7523
+        val claims = buildJsonObject {
+            put("iss", clientId)
+            put("sub", clientId)
+            put("aud", audience)
+            put("iat", now)
+            put("exp", now + 300)  // 5 minute expiry
+            put("jti", jti)
+        }
+        
+        // Build header with kid if available
+        val publicJwk = key.getPublicKey().exportJWKObject()
+        val kid = publicJwk["kid"]?.let { (it as? JsonPrimitive)?.content }
+        
+        val headers = mapOf(
+            "typ" to JsonPrimitive("JWT"),
+            "alg" to JsonPrimitive(key.keyType.jwsAlg),
+            "kid" to JsonPrimitive(kid ?: key.getKeyId())  // Use kid from JWK or generate
+        )
+        
+        return key.signJws(claims.toString().encodeToByteArray(), headers)
     }
     
     /**
@@ -807,7 +893,12 @@ object WalletIssuanceHandler {
             put("htm", httpMethod)
             put("htu", httpUri)
             put("iat", now)
-            // Optional: ath (access token hash) for resource requests
+            // ath (access token hash) for resource requests - SHA-256 base64url encoded
+            accessToken?.let { token ->
+                val hash = java.security.MessageDigest.getInstance("SHA-256").digest(token.encodeToByteArray())
+                val ath = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
+                put("ath", ath)
+            }
             // Optional: nonce if server provided one
             nonce?.let { put("nonce", it) }
         }
