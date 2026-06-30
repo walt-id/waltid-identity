@@ -1,11 +1,14 @@
-name: Run gradle build for iOS
+name: iOS build and test
 
 on:
   workflow_dispatch:
+  push:
 
 jobs:
   gradle:
-    runs-on: macos-latest
+    runs-on: macos-26
+    env:
+      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
@@ -15,7 +18,10 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Build iOS Simulator Framework (ARM64)
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
+      - name: Build and test iOS
+        timeout-minutes: 60
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@c4ea53bc19a271e42eaf7070e2660f77338167aa
         with:
           waltid-directory: 'waltid-identity'
+          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+          simulator-destination: 'platform=iOS Simulator,name=iPhone 17,OS=latest'

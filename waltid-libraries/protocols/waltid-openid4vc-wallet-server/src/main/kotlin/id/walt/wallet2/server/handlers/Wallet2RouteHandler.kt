@@ -504,7 +504,7 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ReceiveCredentialRequest>()
-                        val result = WalletIssuanceHandler.receiveCredential(wallet, req, noopOnEvent)
+                        val result = WalletIssuanceHandler.receiveCredential(wallet, req, onEvent = noopOnEvent)
                         call.respond(result)
                     }
 

@@ -2,12 +2,9 @@ package id.walt.w3c.schemes
 
 import id.walt.credentials.keyresolver.JwtKeyResolver
 import id.walt.crypto.exceptions.CryptoArgumentException
-import id.walt.crypto.exceptions.VerificationException
 import id.walt.crypto.keys.Key
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JwsUtils.decodeJws
-import id.walt.sdjwt.JWTCryptoProvider
-import id.walt.sdjwt.SDJwt
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -141,16 +138,4 @@ class JwsSignatureScheme : SignatureScheme {
         return Result.failure(lastException ?: CryptoArgumentException("Verification failed with all available keys"))
     }
 
-    @JvmBlocking
-    @JvmAsync
-    @JsPromise
-    @JsExport.Ignore
-    suspend fun verifySDJwt(data: String, jwtCryptoProvider: JWTCryptoProvider): Result<JsonElement> = runCatching {
-        return SDJwt.verifyAndParse(data, jwtCryptoProvider).let {
-            if (it.verified)
-                Result.success(it.sdJwt.fullPayload)
-            else
-                Result.failure(VerificationException(it.message ?: "Verification failed"))
-        }
-    }
 }

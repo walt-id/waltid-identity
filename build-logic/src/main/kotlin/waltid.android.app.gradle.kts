@@ -1,35 +1,28 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("org.jetbrains.kotlin.android")
     id("com.android.application")
     kotlin("plugin.compose")
 }
+kotlin {
+    android {
+        namespace = project.group.toString()
 
-// Access the version catalog
-val catalogs = extensions.getByType<VersionCatalogsExtension>()
-val identityLibs = catalogs.named("identityLibs")
-val javaVersion = identityLibs.findVersion("java-library").get().requiredVersion.toInt()
-
-// 2. Configure the Android Extension
-android {
-    namespace = project.group.toString()
-
-    compileSdk = 36
-    defaultConfig { minSdk = 30 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.toVersion(javaVersion)
-        targetCompatibility = JavaVersion.toVersion(javaVersion)
-    }
-    packaging {
-        resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        compileSdk = BuildConstants.COMPILE_SDK
+        defaultConfig { minSdk = BuildConstants.MIN_SDK }
+        compileOptions {
+            sourceCompatibility = JavaVersion.toVersion(project.javaLibraryVersion)
+            targetCompatibility = JavaVersion.toVersion(project.javaLibraryVersion)
+        }
+        packaging {
+            resources {
+                excludes += BuildConstants.META_INF_EXCLUDES
+            }
         }
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.fromTarget(javaVersion.toString()))
-        }
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
     }
 }
+

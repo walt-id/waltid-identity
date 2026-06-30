@@ -10,6 +10,8 @@ enum class WalletSessionEvent {
     // --- Issuance (OpenID4VCI) ---
     /** Credential offer has been resolved and metadata fetched. */
     issuance_offer_resolved,
+    /** Wallet attestation has been obtained from the attester. */
+    issuance_attestation_obtained,
     /** Token has been obtained from the authorization server. */
     issuance_token_obtained,
     /** Proof of possession has been signed. */

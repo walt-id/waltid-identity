@@ -69,7 +69,11 @@ configure<JibExtension> {
 
 // Required for hoplite to run correctly with buildFatJar task
 tasks.withType<ShadowJar> {
+    // Keep service descriptor merging, but exclude all other duplicate paths to
+    // avoid building shadow jars with duplicate entries and the associated log flood.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
-
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesMatching("META-INF/services/**") {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
 }

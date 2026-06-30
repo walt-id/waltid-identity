@@ -2,6 +2,7 @@ package id.walt.x509.iso.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
+import id.walt.x509.iso.supportsIsoX509PlatformOperations
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
@@ -46,6 +47,8 @@ class AAMVAVicalDecodeValidateIACAEntriesTest {
 
     @Test
     fun `must be able to decode and validate all qualified AAMVA IACA certificate entries`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
+
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
         }.forEach { derEncodedCertificate ->

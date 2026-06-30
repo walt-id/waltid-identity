@@ -52,9 +52,6 @@ kotlin {
          */
 
 
-        iosMain.dependencies {
-            implementation(identityLibs.ktor.client.darwin)
-        }
         macosMain.dependencies {
             implementation(identityLibs.ktor.client.cio)
             implementation(identityLibs.ktor.client.darwin)
@@ -72,6 +69,12 @@ kotlin {
 
         jsMain.dependencies {
             implementation(identityLibs.ktor.client.js)
+        }
+
+        if (enableIosBuild) {
+            iosMain.dependencies {
+                implementation(identityLibs.ktor.client.darwin)
+            }
         }
     }
 }
