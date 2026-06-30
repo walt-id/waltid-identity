@@ -47,7 +47,12 @@ function extractExamples(spec: unknown, apiPath: string): SwaggerExample[] {
   })
 }
 
-export function useSwaggerExamples(base: string, apiPath: string) {
+export interface SwaggerExamplesOptions {
+  // Examples whose title matches this predicate are dropped after extraction.
+  excludeTitle?: (title: string) => boolean
+}
+
+export function useSwaggerExamples(base: string, apiPath: string, options: SwaggerExamplesOptions = {}) {
   const examples = ref<SwaggerExample[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -63,7 +68,10 @@ export function useSwaggerExamples(base: string, apiPath: string) {
         const res = await fetch(url, { headers: { accept: 'application/json' } })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const spec = await res.json()
-        examples.value = extractExamples(spec, apiPath)
+        const extracted = extractExamples(spec, apiPath)
+        examples.value = options.excludeTitle
+          ? extracted.filter(ex => !options.excludeTitle!(ex.title))
+          : extracted
         loading.value = false
         return
       } catch (e) {

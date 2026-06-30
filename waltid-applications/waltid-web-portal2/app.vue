@@ -5,12 +5,20 @@ const verifierBase = config.public.verifierBase as string
 
 const activeTab = ref<'issue' | 'verify'>('issue')
 
+const ISSUER_DOCS_URL = 'https://docs.walt.id/community-stack/issuer2/getting-started'
+const VERIFIER_DOCS_URL = 'https://docs.walt.id/community-stack/verifier2/getting-started'
+
 const issuerSwagger = useSwaggerExamples(issuerBase, '/issuer2/credential-offers')
 const issuerSession = useIssuerSession(issuerBase)
+const issuerProfiles = useProfiles(issuerBase)
 const issuerJson = ref('')
 const issuerSelectedIndex = ref(0)
 
-const verifierSwagger = useSwaggerExamples(verifierBase, '/verification-session/create')
+// dc_api examples rely on the W3C Digital Credentials API flow, which the current
+// QR-based logic can't handle. Filter them out until that handling is ported.
+const verifierSwagger = useSwaggerExamples(verifierBase, '/verification-session/create', {
+  excludeTitle: (title) => title.toLowerCase().includes('dc_api'),
+})
 const verifierSession = useVerifierSession(verifierBase)
 const verifierJson = ref('')
 const verifierSelectedIndex = ref(0)
@@ -28,8 +36,12 @@ watch(verifierSwagger.examples, (list) => {
 
 onMounted(() => {
   issuerSwagger.load()
+  issuerProfiles.load()
   verifierSwagger.load()
 })
+
+const docsUrl = computed(() => activeTab.value === 'issue' ? ISSUER_DOCS_URL : VERIFIER_DOCS_URL)
+const docsLabel = computed(() => activeTab.value === 'issue' ? 'Issuer API docs' : 'Verifier API docs')
 
 const activeSession = computed(() => activeTab.value === 'issue' ? issuerSession : verifierSession)
 const hasResult = computed(() =>
@@ -51,7 +63,7 @@ const hasResult = computed(() =>
     <div class="flex gap-5 items-stretch mb-5">
       <!-- Left card: editor -->
       <div class="card flex-1 min-w-0 flex flex-col">
-        <div class="flex border-b border-[--color-border]">
+        <div class="flex items-center border-b border-[--color-border]">
           <button
             class="px-5 py-3 font-semibold transition-colors relative"
             :class="activeTab === 'issue'
@@ -70,6 +82,19 @@ const hasResult = computed(() =>
           >
             Verify
           </button>
+
+          <a
+            :href="docsUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="ml-auto mr-4 inline-flex items-center gap-1.5 text-sm font-medium text-[--color-text-muted] hover:text-[--color-accent] transition-colors"
+          >
+            {{ docsLabel }}
+            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+              <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+            </svg>
+          </a>
         </div>
 
         <div class="p-5 flex-1">
@@ -79,6 +104,7 @@ const hasResult = computed(() =>
             v-model:selected-index="issuerSelectedIndex"
             :swagger="issuerSwagger"
             :session="issuerSession"
+            :profiles="issuerProfiles"
           />
           <VerifyEditor
             v-else

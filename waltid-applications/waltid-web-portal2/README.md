@@ -34,16 +34,20 @@ The portal acts as a frontend that orchestrates these services to demonstrate cr
 This portal enables users to:
 
 - **Issue Credentials**: Create credential offers using custom JSON payloads and send them to wallets via OpenID4VCI
+- **Select a Profile**: Choose an issuance profile from a dropdown (loaded from `/issuer2/profiles`). The selection overrides the `profileId` in the payload, and the full profile definition (`/issuer2/profiles/{profileId}`) is available in a collapsible JSON viewer
 - **Verify Credentials**: Request credential presentations from wallets using OpenID4VP
 - **Load Examples**: Auto-populate payloads from OpenAPI/Swagger specs served by the backend
+- **Read the Docs**: Jump to the relevant Issuer/Verifier API docs from each tab
 - **Monitor Events**: Watch real-time protocol events stream in as wallets interact with the portal
 - **Test Flows**: Test end-to-end credential issuance and verification workflows
 
 ## Try It Out
 
-<!-- **Live Demo**: Visit [portal2.demo.walt.id](https://portal2.demo.walt.id) to see it in action. -->
+**Live Demo**: Visit [portal2.demo.walt.id](https://portal2.demo.walt.id) to see it in action.
 
 **Quickstart Guide**: Follow our [5-minute quickstart guide](https://docs.walt.id/community-stack/home/quickstart-5-min) for a walkthrough of the credential flows.
+
+> **Note on `dc_api` examples**: Verifier Swagger examples whose title contains `dc_api` are currently filtered out of the dropdown. They use the W3C Digital Credentials API flow, which the current QR-based logic does not yet support. This filter will be removed once that handling is ported.
 
 ## Key Concepts
 
