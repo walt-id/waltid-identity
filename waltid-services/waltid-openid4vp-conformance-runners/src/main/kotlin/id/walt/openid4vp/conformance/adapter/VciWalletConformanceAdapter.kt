@@ -353,13 +353,14 @@ class VciWalletConformanceAdapter(
         credentialIssuerUrl: String?
     ): ClaimResult {
         return try {
-            // First sign a proof if we have a nonce
-            val proofJwt = if (cNonce != null) {
-                signKeyProof(client, cNonce, credentialIssuerUrl ?: credentialEndpoint)
-            } else null
+            // Always sign a proof - use c_nonce if available, otherwise use access token as nonce
+            // Some conformance tests require a proof even without c_nonce
+            val nonceForProof = cNonce ?: accessToken
+            val proofJwt = signKeyProof(client, nonceForProof, credentialIssuerUrl ?: credentialEndpoint)
 
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive/fetch-credential"
             println("[VCI Adapter] POST $url")
+            println("[VCI Adapter] Using proof with nonce: ${if (cNonce != null) "c_nonce" else "access_token fallback"}")
 
             val requestBody = buildJsonObject {
                 put("credentialEndpoint", credentialEndpoint)
