@@ -1,5 +1,6 @@
 plugins {
     id("waltid.mobile.library")
+    id("waltid.mobile.sdk.documentation")
     alias(identityLibs.plugins.sqldelight)
 }
 

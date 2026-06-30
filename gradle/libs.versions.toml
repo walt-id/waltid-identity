@@ -16,6 +16,7 @@ gradle-shadow = "9.4.2"
 buildconfig = "6.0.10"
 compose-multiplatform = "1.11.1"
 compose-material3 = "1.11.0-alpha07"
+dokka = "2.2.0"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -137,6 +138,7 @@ android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
 mokkery-gradle-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
 buildconfig-plugin = { module="com.github.gmazzo.buildconfig:com.github.gmazzo.buildconfig.gradle.plugin", version.ref="buildconfig" }
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 
 # Libraries
 
@@ -382,6 +384,7 @@ compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-m
 android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle" }
 android-application = { id = "com.android.application", version.ref = "android-gradle" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
 versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }

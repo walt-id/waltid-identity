@@ -28,6 +28,9 @@ dependencies {
     // Buildconfig
     implementation(identityLibs.buildconfig.plugin)
 
+    // Documentation
+    implementation(identityLibs.dokka.gradle.plugin)
+
     // Gradle Shadow
     implementation(identityLibs.gradle.shadow)
 
