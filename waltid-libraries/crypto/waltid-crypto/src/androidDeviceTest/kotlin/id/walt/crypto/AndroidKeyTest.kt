@@ -2,6 +2,7 @@ package id.walt.crypto
 
 import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -85,7 +86,7 @@ class AndroidKeyTest {
         val key = AndroidKey.create(AndroidKey.Options(kid = alias, keyType = KeyType.secp256r1))
         val plaintext = """{"sub":"test","iat":1234567890}""".toByteArray()
 
-        val jws = key.signJws(plaintext, mapOf("kid" to kotlinx.serialization.json.JsonPrimitive(alias)))
+        val jws = key.signJws(plaintext, mapOf("kid" to JsonPrimitive(alias)))
         assertNotNull(jws)
         assertTrue(jws.count { it == '.' } == 2)
 

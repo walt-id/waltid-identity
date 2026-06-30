@@ -1,9 +1,6 @@
-@file:OptIn(ExperimentalEncodingApi::class)
-
 package id.walt.x509
 
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 internal object X509TestCertificates {
     val leafCertificate = CertificateDer(

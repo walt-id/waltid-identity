@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
-
 package id.walt.x509.iso.documentsigner
 
 import id.walt.x509.CertificateDer
@@ -9,7 +7,6 @@ import id.walt.x509.iso.documentsigner.validate.DocumentSignerValidator
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
