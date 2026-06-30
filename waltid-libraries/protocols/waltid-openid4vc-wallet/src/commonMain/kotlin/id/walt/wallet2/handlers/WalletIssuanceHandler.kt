@@ -694,21 +694,26 @@ object WalletIssuanceHandler {
                 val jti = kotlin.uuid.Uuid.random().toString()
 
                 // Build JWT claims for client_assertion per RFC 7523
+                // IMPORTANT: aud MUST be the AS issuer URL, NOT the PAR endpoint
                 val claims = buildJsonObject {
                     put("iss", request.clientId)
                     put("sub", request.clientId)
-                    put("aud", parEndpoint) // audience is the PAR endpoint
+                    put("aud", asMetadata.issuer) // MUST be AS issuer URL per RFC 7523 / FAPI2
                     put("iat", now)
                     put("exp", now + 300) // 5 minutes
                     put("jti", jti)
                 }
 
-                // Sign the JWT
-                val headers = buildMap<String, JsonElement> {
-                    put("typ", JsonPrimitive("JWT"))
-                    // Include kid if available
-                    request.clientAssertionKey["kid"]?.let { put("kid", it) }
-                }
+                // Get public key to extract kid
+                val publicJwk = signingKey.getPublicKey().exportJWKObject()
+                val kid = publicJwk["kid"]?.let { (it as? JsonPrimitive)?.content } ?: signingKey.getKeyId()
+
+                // Sign the JWT with proper headers including alg and kid
+                val headers = mapOf(
+                    "typ" to JsonPrimitive("JWT"),
+                    "alg" to JsonPrimitive(signingKey.keyType.jwsAlg),
+                    "kid" to JsonPrimitive(kid)
+                )
                 val clientAssertion = signingKey.signJws(claims.toString().encodeToByteArray(), headers)
 
                 mapOf(
