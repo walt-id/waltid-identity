@@ -80,7 +80,7 @@ class IosKey private constructor(
     override suspend fun exportJWKObject(): JsonObject {
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
         val jwk = signer.publicKey.toJsonWebKey(options.kid)
-        return kotlinx.serialization.json.Json.parseToJsonElement(
+        return Json.parseToJsonElement(
             joseCompliantSerializer.encodeToString(jwk)
         ).jsonObject
     }
