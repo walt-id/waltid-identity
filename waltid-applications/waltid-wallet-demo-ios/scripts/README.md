@@ -98,7 +98,8 @@ The normal script validates the quickstart-owned resources and the mobile-only h
 
 The CI runs:
 - ✅ Unit tests (`iosAppTests`)
-- ✅ Compose iOS EUDI UI tests (`EudiPublicBackendE2ETests`)
+- ✅ Public EUDI integration tests through `iosAppTests`
+- ❌ Compose iOS EUDI UI tests (excluded - flaky UI automation)
 - ❌ Local enterprise UI tests (excluded - needs infrastructure)
 
 See `.github/actions/gradle-ios/action.yml` for CI configuration.

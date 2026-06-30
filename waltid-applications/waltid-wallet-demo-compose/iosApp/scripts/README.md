@@ -99,7 +99,7 @@ The normal script validates the quickstart-owned resources and the mobile-only h
 The CI runs:
 - Mobile wallet iOS simulator tests
 - Native iOS demo app tests
-- Compose iOS public EUDI UI tests
-- Local enterprise UI tests are excluded because they require local infrastructure
+- Compose iOS app build/setup
+- Compose iOS public EUDI and local Enterprise UI tests are excluded from CI
 
 See `.github/actions/gradle-ios/action.yml` for CI configuration.
