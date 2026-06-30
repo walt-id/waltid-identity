@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
@@ -134,7 +135,7 @@ class WalletDemoAppTestScenarios {
         assertEquals(2, wallet.bootstrapCalls)
     }
 
-    private fun androidx.compose.ui.test.ComposeUiTest.unlockWithPin() {
+    private fun ComposeUiTest.unlockWithPin() {
         onNodeWithTag("wallet.pinInput").performClick().performTextInput("1234")
         onNodeWithTag("wallet.pinConfirmationInput").performClick().performTextInput("1234")
         waitForIdle()
