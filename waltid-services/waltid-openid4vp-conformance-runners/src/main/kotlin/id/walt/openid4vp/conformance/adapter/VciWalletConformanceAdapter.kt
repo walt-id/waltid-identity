@@ -158,7 +158,7 @@ class VciWalletConformanceAdapter(
                             pendingAuthFlows[state] = PendingAuthFlow(
                                 state = state,
                                 codeVerifier = result.codeVerifier,
-                                issuerUrl = result.issuerUrl ?: ""
+                                tokenEndpoint = result.tokenEndpoint ?: error("Missing tokenEndpoint in auth response")
                             )
                         }
                         call.respond(HttpStatusCode.OK, buildJsonObject {
@@ -272,7 +272,7 @@ class VciWalletConformanceAdapter(
                     authorizationUrl = result["authorizationUrl"]?.jsonPrimitive?.content,
                     state = result["state"]?.jsonPrimitive?.content,
                     codeVerifier = result["codeVerifier"]?.jsonPrimitive?.content,
-                    issuerUrl = null
+                    tokenEndpoint = result["tokenEndpoint"]?.jsonPrimitive?.content
                 )
             } else {
                 AuthFlowResult(error = "Status ${response.status}: $body")
@@ -287,9 +287,8 @@ class VciWalletConformanceAdapter(
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive/exchange-code"
             println("[VCI Adapter] POST $url")
 
-            val tokenEndpoint = "${flow.issuerUrl}token"
             val requestBody = buildJsonObject {
-                put("tokenEndpoint", tokenEndpoint)
+                put("tokenEndpoint", flow.tokenEndpoint)
                 put("code", code)
                 flow.codeVerifier?.let { put("codeVerifier", it) }
                 put("clientId", "wallet-conformance-test")
@@ -433,7 +432,7 @@ class VciWalletConformanceAdapter(
     private data class PendingAuthFlow(
         val state: String,
         val codeVerifier: String?,
-        val issuerUrl: String
+        val tokenEndpoint: String
     )
 
     private data class ClaimResult(val success: Boolean, val message: String)
@@ -442,7 +441,7 @@ class VciWalletConformanceAdapter(
         val authorizationUrl: String? = null,
         val state: String? = null,
         val codeVerifier: String? = null,
-        val issuerUrl: String? = null,
+        val tokenEndpoint: String? = null,
         val error: String? = null
     )
 

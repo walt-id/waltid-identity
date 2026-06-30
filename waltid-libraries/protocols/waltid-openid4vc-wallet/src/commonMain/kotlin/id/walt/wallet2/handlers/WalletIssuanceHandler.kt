@@ -251,7 +251,9 @@ data class GenerateAuthorizationUrlResult(
     val authorizationUrl: Url,
     val state: String,
     val codeVerifier: String? = null,
-    val credentialConfigurationId: String
+    val credentialConfigurationId: String,
+    /** Token endpoint URL for code exchange */
+    val tokenEndpoint: Url? = null
 )
 
 @Serializable
@@ -717,7 +719,8 @@ object WalletIssuanceHandler {
                 authorizationUrl = Url(authUrl),
                 state = parParams["state"] ?: error("PAR params missing state"),
                 codeVerifier = pkceData?.codeVerifier,
-                credentialConfigurationId = credentialConfigurationId
+                credentialConfigurationId = credentialConfigurationId,
+                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) }
             )
         } else {
             // Standard authorization request (no PAR)
@@ -734,7 +737,8 @@ object WalletIssuanceHandler {
                 authorizationUrl = Url(authRequest.url),
                 state = authRequest.state,
                 codeVerifier = authRequest.pkceData?.codeVerifier,
-                credentialConfigurationId = credentialConfigurationId
+                credentialConfigurationId = credentialConfigurationId,
+                tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) }
             )
         }
     }
