@@ -2,6 +2,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -262,7 +263,9 @@ data class ExchangeCodeRequest(
     val code: String,
     val codeVerifier: String? = null,
     val clientId: String = "wallet-client",
-    val redirectUri: Url = Url("openid://")
+    val redirectUri: Url = Url("openid://"),
+    /** Optional key for DPoP proof. If provided, a DPoP header will be included. */
+    @Transient val dpopKey: JWKKey? = null
 )
 
 // ---------------------------------------------------------------------------
@@ -746,6 +749,9 @@ object WalletIssuanceHandler {
     /**
      * Step 2 of auth-code grant: exchange the authorization code for a token.
      * Wraps [TokenRequestBuilder.exchangeAuthorizationCode].
+     * 
+     * If [ExchangeCodeRequest.dpopKey] is provided, generates a DPoP proof header
+     * per RFC 9449 (OAuth 2.0 Demonstrating Proof of Possession).
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
         val httpClient = defaultHttpClient()
@@ -753,15 +759,70 @@ object WalletIssuanceHandler {
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
         )
+        
+        // Generate DPoP proof if key is provided
+        val dpopProof = request.dpopKey?.let { key ->
+            generateDpopProof(
+                key = key,
+                httpMethod = "POST",
+                httpUri = request.tokenEndpoint.toString()
+            )
+        }
+        
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
             code = request.code,
-            codeVerifier = request.codeVerifier
+            codeVerifier = request.codeVerifier,
+            dpopProof = dpopProof
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
             cNonce = tokenResponse.c_nonce,
             expiresIn = tokenResponse.expires_in
+        )
+    }
+    
+    /**
+     * Generates a DPoP proof JWT per RFC 9449.
+     * 
+     * The proof contains:
+     * - Header: typ=dpop+jwt, alg from key, jwk (public key)
+     * - Payload: jti (unique id), htm (HTTP method), htu (HTTP URI), iat (issued at)
+     */
+    private suspend fun generateDpopProof(
+        key: JWKKey,
+        httpMethod: String,
+        httpUri: String,
+        accessToken: String? = null,  // For resource server requests, hash of access token
+        nonce: String? = null  // Server-provided nonce if retrying
+    ): String {
+        val now = Clock.System.now().epochSeconds
+        
+        // Build DPoP payload
+        val payload = buildJsonObject {
+            put("jti", Uuid.random().toString())
+            put("htm", httpMethod)
+            put("htu", httpUri)
+            put("iat", now)
+            // Optional: ath (access token hash) for resource requests
+            // Optional: nonce if server provided one
+            nonce?.let { put("nonce", it) }
+        }
+        
+        // Get public JWK for header
+        val publicJwk = key.getPublicKey().exportJWKObject()
+        
+        // Build custom header with typ=dpop+jwt and jwk
+        val header = mapOf(
+            "typ" to JsonPrimitive("dpop+jwt"),
+            "alg" to JsonPrimitive(key.keyType.jwsAlg),
+            "jwk" to publicJwk
+        )
+        
+        // Sign using JWS
+        return key.signJws(
+            plaintext = payload.toString().encodeToByteArray(),
+            headers = header
         )
     }
 

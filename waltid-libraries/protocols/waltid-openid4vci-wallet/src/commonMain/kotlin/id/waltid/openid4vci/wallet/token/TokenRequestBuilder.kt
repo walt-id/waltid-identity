@@ -47,6 +47,7 @@ class TokenRequestBuilder(
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param code The authorization code received from authorization endpoint
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
+     * @param dpopProof Optional DPoP proof JWT for proof-of-possession (RFC 9449)
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -54,6 +55,7 @@ class TokenRequestBuilder(
         tokenEndpoint: String,
         code: String,
         codeVerifier: String? = null,
+        dpopProof: String? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -61,6 +63,7 @@ class TokenRequestBuilder(
         log.info { "Exchanging authorization code for access token" }
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
+        log.trace { "DPoP proof present: ${dpopProof != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
@@ -73,7 +76,7 @@ class TokenRequestBuilder(
             }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters)
+        return executeTokenRequest(tokenEndpoint, parameters, dpopProof)
     }
 
     /**
@@ -115,18 +118,29 @@ class TokenRequestBuilder(
 
     /**
      * Executes a token request and parses the response
+     * 
+     * @param tokenEndpoint The token endpoint URL
+     * @param parameters The form parameters for the request
+     * @param dpopProof Optional DPoP proof JWT to include in DPoP header
      */
     private suspend fun executeTokenRequest(
         tokenEndpoint: String,
         parameters: Parameters,
+        dpopProof: String? = null,
     ): TokenResponse {
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
+        if (dpopProof != null) {
+            log.debug { "Including DPoP proof header" }
+        }
         
         val response: HttpResponse = try {
             httpClient.post(tokenEndpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(parameters.formUrlEncode())
+                dpopProof?.let {
+                    header("DPoP", it)
+                }
             }
         } catch (e: Exception) {
             log.error(e) { "Network error sending token request to: $tokenEndpoint" }

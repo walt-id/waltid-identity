@@ -3,6 +3,7 @@ package id.walt.wallet2.server.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.StoredCredentialMetadata
@@ -584,8 +585,17 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
-                        call.respond(WalletIssuanceHandler.exchangeCode(req))
+                        
+                        // Get wallet's static key for DPoP proof signing
+                        // staticKey is already a Key object, cast to JWKKey if it's the right type
+                        val walletKey = wallet.staticKey as? JWKKey
+                        
+                        // Enrich request with DPoP key if available
+                        val enrichedReq = req.copy(dpopKey = walletKey)
+                        
+                        call.respond(WalletIssuanceHandler.exchangeCode(enrichedReq))
                     }
 
                     post("/deferred", {
