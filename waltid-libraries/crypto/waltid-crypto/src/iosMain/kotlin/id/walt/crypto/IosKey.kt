@@ -13,6 +13,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
 
 class IosKey private constructor(
@@ -87,7 +88,7 @@ class IosKey private constructor(
     override suspend fun exportPEM(): String {
         val signer = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
         val derBytes = signer.publicKey.encodeToTlv().derEncoded
-        val base64 = kotlin.io.encoding.Base64.encode(derBytes).chunked(64).joinToString("\n")
+        val base64 = Base64.encode(derBytes).chunked(64).joinToString("\n")
         return "-----BEGIN PUBLIC KEY-----\n$base64\n-----END PUBLIC KEY-----"
     }
 

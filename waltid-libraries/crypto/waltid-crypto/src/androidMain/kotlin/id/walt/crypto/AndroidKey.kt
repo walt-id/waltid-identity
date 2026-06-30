@@ -11,6 +11,7 @@ import id.walt.crypto.keys.KeyType
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlin.io.encoding.Base64
 import kotlin.uuid.Uuid
 
 @Suppress("unused")
@@ -68,7 +69,7 @@ class AndroidKey private constructor(
     override suspend fun exportPEM(): String {
         val signer = AndroidKeyStoreProvider.getSignerForKey(options.kid).getOrThrow()
         val derBytes = signer.publicKey.encodeToTlv().derEncoded
-        val base64 = kotlin.io.encoding.Base64.Mime.encode(derBytes)
+        val base64 = Base64.Mime.encode(derBytes)
         return "-----BEGIN PUBLIC KEY-----\n$base64\n-----END PUBLIC KEY-----"
     }
 
