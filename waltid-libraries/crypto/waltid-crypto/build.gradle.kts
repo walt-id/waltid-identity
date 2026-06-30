@@ -51,7 +51,7 @@ kotlin {
             }
         }
         if (enableAndroidBuild || enableIosBuild) {
-            val mobilePlatformKeyMain by creating {
+            val mobileMain by creating {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(identityLibs.signum.indispensable)
@@ -62,7 +62,7 @@ kotlin {
 
             if (enableAndroidBuild) {
                 named("androidMain") {
-                    dependsOn(mobilePlatformKeyMain)
+                    dependsOn(mobileMain)
                     dependencies {
                         implementation(identityLibs.kotlinx.coroutines.android)
                     }
@@ -86,7 +86,7 @@ kotlin {
             }
 
             if (enableIosBuild) {
-                iosMain.get().dependsOn(mobilePlatformKeyMain)
+                iosMain.get().dependsOn(mobileMain)
                 iosTest.dependencies {
                     implementation(kotlin("test"))
                     implementation(identityLibs.signum.indispensable)
