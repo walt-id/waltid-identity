@@ -567,16 +567,6 @@ object WalletIssuanceHandler {
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult {
         val httpClient = defaultHttpClient()
         
-        // Generate DPoP proof for credential endpoint if key is provided
-        val dpopProof = request.dpopKey?.let { key ->
-            generateDpopProof(
-                key = key,
-                httpMethod = "POST",
-                httpUri = request.credentialEndpoint.toString(),
-                accessToken = request.accessToken  // Include ath (access token hash)
-            )
-        }
-        
         // Build JSON manually to avoid Proofs serialization issue
         val credentialRequestJson = buildJsonObject {
             put("credential_configuration_id", request.credentialConfigurationId)
@@ -586,17 +576,45 @@ object WalletIssuanceHandler {
                 }
             }
         }
-        val response = httpClient.post(request.credentialEndpoint.toString()) {
-            // Use DPoP token type if DPoP proof is included
-            if (dpopProof != null) {
-                header(HttpHeaders.Authorization, "DPoP ${request.accessToken}")
-                header("DPoP", dpopProof)
-            } else {
-                header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
+        
+        // Helper function to make the request with optional DPoP nonce
+        suspend fun makeRequest(dpopNonce: String?): io.ktor.client.statement.HttpResponse {
+            // Generate DPoP proof for credential endpoint if key is provided
+            val dpopProof = request.dpopKey?.let { key ->
+                generateDpopProof(
+                    key = key,
+                    httpMethod = "POST",
+                    httpUri = request.credentialEndpoint.toString(),
+                    accessToken = request.accessToken,  // Include ath (access token hash)
+                    nonce = dpopNonce
+                )
             }
-            contentType(ContentType.Application.Json)
-            setBody(credentialRequestJson.toString())
+            
+            return httpClient.post(request.credentialEndpoint.toString()) {
+                // Use DPoP token type if DPoP proof is included
+                if (dpopProof != null) {
+                    header(HttpHeaders.Authorization, "DPoP ${request.accessToken}")
+                    header("DPoP", dpopProof)
+                } else {
+                    header(HttpHeaders.Authorization, "Bearer ${request.accessToken}")
+                }
+                contentType(ContentType.Application.Json)
+                setBody(credentialRequestJson.toString())
+            }
         }
+        
+        // First attempt without nonce
+        var response = makeRequest(dpopNonce = null)
+        
+        // Check for use_dpop_nonce error (RFC 9449 §5) - retry with server-provided nonce
+        if (response.status == HttpStatusCode.Unauthorized || response.status == HttpStatusCode.BadRequest) {
+            val serverNonce = response.headers["DPoP-Nonce"]
+            if (serverNonce != null && request.dpopKey != null) {
+                // Server requires DPoP nonce - retry with the provided nonce
+                response = makeRequest(dpopNonce = serverNonce)
+            }
+        }
+        
         if (!response.status.isSuccess()) {
             error("Credential endpoint returned ${response.status}: ${response.bodyAsText()}")
         }
