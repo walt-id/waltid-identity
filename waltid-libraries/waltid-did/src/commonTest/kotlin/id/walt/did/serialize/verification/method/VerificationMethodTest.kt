@@ -5,7 +5,6 @@ import id.walt.did.dids.document.models.verification.method.VerificationMaterial
 import id.walt.did.dids.document.models.verification.method.VerificationMethod
 import id.walt.did.dids.document.models.verification.method.VerificationMethodType
 import id.walt.did.utils.JsonCanonicalization
-import id.walt.did.utils.supportsJsonCanonicalizationTests
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
@@ -18,8 +17,6 @@ class VerificationMethodTest {
 
     @Test
     fun testSerialization() = runTest {
-        if (!supportsJsonCanonicalizationTests) return@runTest
-
         val key = JWKKey.importJWK(keyString).getOrThrow()
         val method = VerificationMethod(
             id = "some-id",

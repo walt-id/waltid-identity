@@ -18,9 +18,16 @@ interface AsyncJWTCryptoProvider {
      * Interface method to create a signed JWT for the given JSON payload object, with an optional keyID.
      * @param payload The JSON payload of the JWT to be signed
      * @param keyID Optional keyID of the signing key to be used, if required by crypto provider
+     * @param typ JWT `typ` header value to include in the protected header
+     * @param headers Additional protected header values to include in the signed JWT
      */
     @JsExport.Ignore
-    suspend fun sign(payload: JsonObject, keyID: String? = null): String
+    suspend fun sign(
+        payload: JsonObject,
+        keyID: String? = null,
+        typ: String = "JWT",
+        headers: Map<String, Any> = mapOf()
+    ): String
 
     /**
      * Interface method for verifying a JWT signature

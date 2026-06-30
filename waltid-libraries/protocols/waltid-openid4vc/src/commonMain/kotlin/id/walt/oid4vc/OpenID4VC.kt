@@ -420,15 +420,14 @@ object OpenID4VC {
         return key.verifyJws(token).also { log.debug { "VERIFICATION IS: $it" } }.isSuccess
     }
 
-    fun verifyCOSESign1Signature(
+    suspend fun verifyCOSESign1Signature(
         target: TokenTarget,
         token: String
     ): Boolean {
         // May not be required anymore (removed from https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html#cwt-proof-type)
-        log.debug { "Verifying JWS: $token" }
-        log.debug { "JWS Verification: target: $target" }
-        // requires currently JVM specific implementation for COSE_Sign1 signature verification
-        return COSESign1Utils.verifyCOSESign1Signature(target, token)
+        log.debug { "Verifying COSE_Sign1: $token" }
+        log.debug { "COSE_Sign1 verification: target: $target" }
+        return COSESign1Utils.verifyCOSESign1Signature(token)
     }
 
     private fun parseTokenPayload(token: String): JsonObject {
