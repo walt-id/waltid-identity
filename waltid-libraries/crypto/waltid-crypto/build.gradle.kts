@@ -65,6 +65,8 @@ kotlin {
                     dependsOn(mobileMain)
                     dependencies {
                         implementation(identityLibs.kotlinx.coroutines.android)
+                        implementation(identityLibs.cryptography.core)
+                        implementation(identityLibs.cryptography.provider.jdk)
                     }
                 }
                 // Exclude signum's jdk18on BouncyCastle — we use lts8on from jvmAndroidMain
@@ -87,6 +89,11 @@ kotlin {
 
             if (enableIosBuild) {
                 iosMain.get().dependsOn(mobileMain)
+                iosMain.dependencies {
+                    implementation(identityLibs.cryptography.core)
+                    implementation(identityLibs.cryptography.provider.optimal)
+                    implementation(identityLibs.cryptography.provider.openssl3.prebuilt)
+                }
                 iosTest.dependencies {
                     implementation(kotlin("test"))
                     implementation(identityLibs.signum.indispensable)
@@ -111,7 +118,6 @@ kotlin {
         jsTest.dependencies {
             implementation(kotlin("test-js"))
         }
-
     }
 }
 

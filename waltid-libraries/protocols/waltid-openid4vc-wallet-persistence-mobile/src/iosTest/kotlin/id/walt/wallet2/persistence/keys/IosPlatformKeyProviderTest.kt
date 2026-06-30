@@ -7,10 +7,10 @@ import kotlin.test.assertEquals
 class IosPlatformKeyProviderTest {
 
     @Test
-    fun supportsAllSignumBackedHardwareKeyTypes() {
+    fun supportsPlatformKeyTypes() {
         assertEquals(
             setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA),
-            IosPlatformKeyProvider().supportedHardwareKeyTypes,
+            IosPlatformKeyProvider().supportedPlatformKeyTypes,
         )
     }
 }

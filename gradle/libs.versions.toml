@@ -123,6 +123,9 @@ smiley4-schema-kenerator = "2.7.2"
 signum = "3.24.0"
 supreme = "0.15.0"
 
+# cryptography-kotlin (Ed25519/secp256k1 on mobile)
+cryptography-kotlin = "0.6.0"
+
 [libraries]
 
 # Plugins
@@ -352,6 +355,12 @@ kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
 signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
 signum-indispensable-josef = { module = "at.asitplus.signum:indispensable-josef", version.ref = "signum" }
 signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "supreme" }
+
+## cryptography-kotlin (Ed25519/secp256k1 on mobile)
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography-kotlin" }
+cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "cryptography-kotlin" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography-kotlin" }
+cryptography-provider-openssl3-prebuilt = { module = "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt", version.ref = "cryptography-kotlin" }
 
 [bundles]
 waltid-ktor-client = [
