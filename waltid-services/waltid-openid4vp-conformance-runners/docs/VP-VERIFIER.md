@@ -1,125 +1,101 @@
 # VP Verifier Conformance Tests
 
+## Status: ⚠️ Partial (1/2 test plans passing)
+
+| Test Plan | Status | Notes |
+|-----------|--------|-------|
+| **mDL Plain VP** | ✅ PASSING | ISO mDL with X.509 SAN DNS |
+| **SD-JWT HAIP** | ❌ Config issue | Needs trust anchor configuration |
+
 ## Overview
 
-This document describes the OpenID4VP verifier conformance tests for the walt.id Verifier implementation.
+Tests the walt.id Verifier implementation against the OpenID Foundation Conformance Suite.
 
-These tests validate that the walt.id verifier correctly:
-- Generates signed authorization requests (JAR - JWT-Secured Authorization Request)
-- Processes verifiable presentation responses
-- Validates credential signatures and holder binding
-- Enforces cryptographic requirements per HAIP profile
-- Handles X.509 certificate-based client authentication
+The verifier tests validate:
+- Signed authorization requests (JAR - JWT-Secured Authorization Request)
+- Verifiable presentation response processing
+- Credential signature and holder binding validation
+- X.509 certificate-based client authentication
+- HAIP (High Assurance Interoperability Profile) requirements
 
 ## Prerequisites
 
-### 1. Install ngrok
-
-Download from https://ngrok.com/download or:
+### 1. Conformance Suite Setup
 
 ```bash
-# Snap (Linux)
-sudo snap install ngrok
-
-# Homebrew (macOS)
-brew install ngrok
-```
-
-### 2. Setup /etc/hosts
-
-```bash
+# Add hosts entry (one-time)
 echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
-```
 
-### 3. Clone and Setup Conformance Suite
-
-```bash
-# Clone the conformance suite
+# Clone conformance suite
 git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
 
-# Copy walt.id specific configuration
-cp ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/docker-compose-walt.yml ~/dev/openid/conformance-suite/
+# Copy walt.id config
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners
+cp docker-compose-walt.yml ~/dev/openid/conformance-suite/
+cp -r nginx ~/dev/openid/conformance-suite/
 
-# Copy nginx configuration
-cp -r ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/nginx ~/dev/openid/conformance-suite/
-```
-
-### 4. Start Conformance Suite
-
-```bash
+# Start conformance suite
 cd ~/dev/openid/conformance-suite
 docker compose -f docker-compose-walt.yml up -d
 
-# Wait ~30 seconds for initialization
-# Verify it's running:
+# Verify (wait ~30s for startup)
 curl -k https://localhost.emobix.co.uk:8443/
+```
+
+### 2. ngrok Setup
+
+```bash
+# Install ngrok
+brew install ngrok      # macOS
+sudo snap install ngrok # Linux
+
+# Start tunnel to verifier port
+ngrok http 7003
+# Note the HTTPS URL (e.g., https://abc123.ngrok-free.app)
 ```
 
 ## Running Tests
 
-### Step 1: Start Conformance Suite
+### Step-by-Step
 
 ```bash
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-walt.yml up -d
-
-# Wait ~30 seconds for initialization
-# Verify it's running:
-curl -k https://localhost.emobix.co.uk:8443/
-```
-
-### Step 2: Start verifier-api2
-
-```bash
+# Terminal 1: Start verifier-api2
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 ./gradlew :waltid-services:waltid-verifier-api2:run
-```
 
-### Step 3: Start ngrok Tunnel
-
-```bash
-# In a separate terminal - tunnel to verifier-api2 port
+# Terminal 2: Start ngrok tunnel
 ngrok http 7003
 
-# Note the HTTPS URL, e.g.: https://abc123.ngrok-free.app
-```
-
-### Step 4: Set Environment Variable and Run Tests
-
-```bash
-# Set the ngrok URL (replace with your actual ngrok URL)
-export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
-
+# Terminal 3: Run tests
+export VERIFIER_NGROK_URL="https://YOUR-NGROK-URL.ngrok-free.app"
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-
-# Run all verifier conformance tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
     --tests "VerifierConformanceTests"
 ```
 
-### Step 5: View Results
+### Force Fresh Run
 
-Test results are saved to:
-```
-waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VerifierConformanceTests" --rerun-tasks
 ```
 
-You can also view detailed logs in the conformance suite web UI at:
-```
-https://localhost.emobix.co.uk:8443/
-```
+### View Results
+
+- **Gradle report**: `build/reports/tests/test/index.html`
+- **Conformance UI**: https://localhost.emobix.co.uk:8443/
 
 ## Test Plans
 
-### Plan 1: mDL with X.509 SAN DNS (Plain VP)
+### Plan 1: mDL with X.509 SAN DNS (Plain VP) ✅
 
-**Class:** `MdlX509SanDnsRequestUriSignedDirectPost`
+**Status: PASSING**
 
 Tests ISO mDL (mobile Driving License) verification with X.509 certificate-based client authentication.
-This is a **non-HAIP** test plan for basic OID4VP compliance.
 
 | Property | Value |
 |----------|-------|
+| **Class** | `MdlX509SanDnsRequestUriSignedDirectPost` |
 | **Conformance Plan** | `oid4vp-1final-verifier-test-plan` |
 | **Credential Format** | `iso_mdl` (mso_mdoc) |
 | **Client ID Scheme** | `x509_san_dns` |
@@ -127,28 +103,23 @@ This is a **non-HAIP** test plan for basic OID4VP compliance.
 | **VP Profile** | `plain_vp` |
 | **Response Mode** | `direct_post` |
 
-**Expected Test Modules:**
+**Test Modules:**
 
-| Module | Expected Outcome | Description |
-|--------|------------------|-------------|
-| `oid4vp-1final-verifier-happy-flow` | ✅ PASS | Standard successful verification flow |
-| `oid4vp-1final-verifier-request-uri-method-post` | ✅ PASS (or skip) | Request URI fetched via POST method |
-| `oid4vp-1final-verifier-invalid-session-transcript` | ✅ PASS (REJECT) | Verifier must reject invalid mDOC session transcript |
+| Module | Status | Description |
+|--------|--------|-------------|
+| `oid4vp-1final-verifier-happy-flow` | ✅ PASS | Standard successful verification |
+| `oid4vp-1final-verifier-request-uri-method-post` | ✅ PASS | Request URI via POST |
+| `oid4vp-1final-verifier-invalid-session-transcript` | ✅ PASS | Rejects invalid mDOC transcript |
 
-**Cryptographic Configuration:**
-- Verifier key: P-256 (secp256r1) EC key
-- Certificate: CN=verifier.example.com, SAN DNS=verifier.example.com
-- Certificate chain: Leaf → Intermediate CA (NOT self-signed leaf)
-- Client ID: `x509_san_dns:verifier.example.com`
+### Plan 2: SD-JWT VC with HAIP ❌
 
-### Plan 2: SD-JWT VC with HAIP (High Assurance)
+**Status: Configuration issue (trust anchor required)**
 
-**Class:** `SdJwtVcX509SanDnsRequestUriSignedDirectPost`
-
-Tests SD-JWT VC (Selective Disclosure JWT Verifiable Credential) verification with **HAIP (High Assurance Interoperability Profile)** requirements for eIDAS 2.0 compliance.
+Tests SD-JWT VC verification with HAIP (High Assurance Interoperability Profile) requirements.
 
 | Property | Value |
 |----------|-------|
+| **Class** | `SdJwtVcX509SanDnsRequestUriSignedDirectPost` |
 | **Conformance Plan** | `oid4vp-1final-verifier-haip-test-plan` |
 | **Credential Format** | `sd_jwt_vc` (dc+sd-jwt) |
 | **Client ID Scheme** | `x509_san_dns` |
@@ -157,100 +128,98 @@ Tests SD-JWT VC (Selective Disclosure JWT Verifiable Credential) verification wi
 | **Response Mode** | `direct_post.jwt` (encrypted JWE) |
 | **Encrypted Response** | Required (HAIP mandate) |
 
-**Expected Test Modules:**
+**Known Issue:**
+```
+EnsureClientRequestObjectTrustAnchorConfigured failure: 
+'Request Object Trust Anchor' field is missing from the 'Client' section
+```
 
-| Module | Expected Outcome | Description |
-|--------|------------------|-------------|
-| `oid4vp-1final-verifier-happy-flow` | ✅ PASS | Standard successful verification |
-| `oid4vp-1final-verifier-minimal-cnf-jwk` | ✅ PASS | Minimal confirmation key in credential |
-| `oid4vp-1final-verifier-request-uri-method-post` | ✅ PASS (or skip) | Request URI via POST |
-| `oid4vp-1final-verifier-invalid-kb-jwt-signature` | ✅ PASS (REJECT) | Invalid key binding JWT signature |
-| `oid4vp-1final-verifier-invalid-credential-signature` | ✅ PASS (REJECT) | Invalid credential signature |
-| `oid4vp-1final-verifier-invalid-sd-hash` | ✅ PASS (REJECT) | Invalid selective disclosure hash |
-| `oid4vp-1final-verifier-invalid-kb-jwt-nonce` | ✅ PASS (REJECT) | Invalid nonce in KB-JWT |
-| `oid4vp-1final-verifier-invalid-kb-jwt-aud` | ✅ PASS (REJECT) | Invalid audience in KB-JWT |
-| `oid4vp-1final-verifier-kb-jwt-iat-in-past` | ✅ PASS (REJECT) | KB-JWT issued too far in past |
-| `oid4vp-1final-verifier-kb-jwt-iat-in-future` | ✅ PASS (REJECT) | KB-JWT issued in future |
-
-**Cryptographic Configuration:**
-- Verifier key: P-256 (secp256r1) EC key
-- Response encryption: Required (HAIP mandate)
-- Certificate chain: Leaf → Intermediate CA (NOT self-signed leaf)
-- Client ID: `x509_san_dns:verifier.example.com`
+The HAIP test plan requires a trust anchor configuration that is not yet implemented.
 
 ## Certificate Chain Requirements
 
-⚠️ **IMPORTANT**: The OpenID conformance suite validates that the leaf certificate is NOT self-signed.
+⚠️ **Important**: The conformance suite validates that leaf certificates are NOT self-signed.
 
-The error `"Leaf certificate in x5c chain must not be self-signed"` means your certificate chain needs:
+The test plans use a proper CA-signed certificate chain:
+1. **Root CA** — `walt.id Verifier Root CA` (self-signed)
+2. **Intermediate CA** — `walt.id Verifier Intermediate CA` (signed by Root)
+3. **Leaf Certificate** — `CN=verifier.example.com` (signed by Intermediate)
 
-1. **Root CA** - Self-signed root certificate (optional in x5c, used as trust anchor)
-2. **Intermediate CA** - Signed by Root CA
-3. **Leaf Certificate** - Signed by Intermediate CA (this is the one used for signing)
-
-The x5c chain in the test plans includes `[leaf, intermediate]` - both signed by their respective parents.
+The x5c chain includes `[leaf, intermediate]` — the leaf cert is NOT self-signed.
 
 ## Troubleshooting
 
-### Test is SKIPPED
+### Tests are SKIPPED
 
-**Cause:** Conformance suite not reachable or ngrok URL not set.
+**Cause**: Missing prerequisites
 
-**Fix:**
-1. Verify conformance suite is running: `curl -k https://localhost.emobix.co.uk:8443/`
-2. Verify `VERIFIER_NGROK_URL` environment variable is set
-3. Check ngrok is running and forwarding to port 7003
+**Fix**:
+1. Verify conformance suite: `curl -k https://localhost.emobix.co.uk:8443/`
+2. Check `VERIFIER_NGROK_URL` is set
+3. Verify ngrok is running: `curl $VERIFIER_NGROK_URL/health` (404 is OK)
+
+### "Connection refused" to ngrok URL
+
+**Cause**: verifier-api2 not running or ngrok down
+
+**Fix**:
+1. Start verifier: `./gradlew :waltid-services:waltid-verifier-api2:run`
+2. Restart ngrok: `ngrok http 7003`
+3. Update `VERIFIER_NGROK_URL` with new URL
+
+### Test stuck at "CREATED" status
+
+**Cause**: HTTP caching or conformance suite state issue
+
+**Fix**:
+1. Restart conformance suite: `docker compose -f docker-compose-walt.yml restart`
+2. Use `--rerun-tasks` flag
+3. The code now uses `Cache-Control: no-cache` to prevent stale responses
 
 ### "Leaf certificate in x5c chain must not be self-signed"
 
-**Cause:** The test plan's certificate chain has a self-signed leaf certificate.
+**Cause**: Using old test plan code with self-signed certificate
 
-**Fix:** This should be fixed in the current version. If you still see this error, ensure you're using the latest test plan code with the CA-signed certificate chain.
-
-### Conformance Suite Shows FAILED but Verifier Shows SUCCESS
-
-**Cause:** The verifier internally verified the presentation, but the conformance suite found an issue with the request or response format.
-
-**Fix:** Check the conformance suite log for specific validation failures. Common issues:
-- Certificate chain validation
-- Response encryption missing (for HAIP)
-- Incorrect response_mode
-
-### Connection Refused to ngrok URL
-
-**Cause:** verifier-api2 is not running or ngrok tunnel is down.
-
-**Fix:**
-1. Start verifier-api2: `./gradlew :waltid-services:waltid-verifier-api2:run`
-2. Restart ngrok: `ngrok http 7003`
-3. Update `VERIFIER_NGROK_URL` with new ngrok URL
-
-## Expected Results Summary
-
-| Test Plan | Expected Pass | Expected Fail | Notes |
-|-----------|--------------|---------------|-------|
-| mDL Plain VP | 3/3 | 0 | All modules should pass |
-| SD-JWT HAIP | 10/10 | 0 | All modules should pass |
+**Fix**: Ensure you have the latest code. The certificate chain was fixed in commit `dc1748781`.
 
 ## Architecture
 
 ```
-[OpenID Conformance Suite]    <->    [walt.id Verifier]
-       (Wallet)                           (Verifier)
-       
-  Simulates wallet behavior          Generates requests
-  Sends VP responses                 Validates presentations
-  Reports conformance result         Returns verification result
+                    ┌─────────────────────────────────────┐
+                    │   OpenID Conformance Suite          │
+                    │   (acts as WALLET)                  │
+                    │   localhost.emobix.co.uk:8443       │
+                    └──────────────┬──────────────────────┘
+                                   │
+                                   │ 1. GET /verification-session/{id}/request
+                                   │ 2. POST /verification-session/{id}/response
+                                   ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                              ngrok                                        │
+│                     (exposes verifier to internet)                        │
+│                     https://xxxx.ngrok-free.app                           │
+└──────────────────────────────────┬───────────────────────────────────────┘
+                                   │
+                                   │ Tunneled to localhost:7003
+                                   ▼
+                    ┌─────────────────────────────────────┐
+                    │     walt.id Verifier-API2           │
+                    │     (acts as VERIFIER)              │
+                    │     localhost:7003                  │
+                    └─────────────────────────────────────┘
 ```
 
-The conformance suite acts as a **wallet** and calls the verifier's authorization endpoint.
-The verifier processes the request and validates the VP response.
+The test creates a verification session, then the conformance suite (acting as a wallet) fetches the authorization request and submits a VP response.
 
-### Network Topology
+## Environment Variables
 
-Since the conformance suite runs in Docker, it cannot directly reach `localhost` on the host machine.
-The solution is to use ngrok to expose the local verifier:
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `VERIFIER_NGROK_URL` | Yes | ngrok HTTPS URL pointing to verifier-api2 (port 7003) |
 
-```
-[Conformance Suite (Docker)]  -->  [ngrok tunnel]  -->  [Verifier (localhost:7003)]
-```
+## Related Documentation
+
+- [README.md](../README.md) — Main conformance test overview
+- [VCI-ISSUER.md](VCI-ISSUER.md) — VCI issuer conformance tests
+- [VCI-WALLET.md](VCI-WALLET.md) — VCI wallet conformance tests
+- [VP-WALLET.md](VP-WALLET.md) — VP wallet conformance tests (blocked)
