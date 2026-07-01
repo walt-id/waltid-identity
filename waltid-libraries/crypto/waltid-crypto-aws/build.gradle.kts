@@ -25,8 +25,10 @@ dependencies {
     implementation(identityLibs.nimbus.jose.jwt)
 
     // Hashing with SHA-2
-
     implementation(identityLibs.kotlincrypto.hash.sha2)
+
+    // Logging
+    implementation(identityLibs.oshai.kotlinlogging)
 }
 
 tasks.withType<Test> {

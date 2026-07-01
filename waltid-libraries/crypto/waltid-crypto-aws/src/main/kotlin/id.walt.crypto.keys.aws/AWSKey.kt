@@ -10,6 +10,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,6 +30,8 @@ class AWSKey(
     private var _publicKey: String? = null,
     private var _keyType: KeyType? = null,
 ) : Key() {
+
+    private val log = KotlinLogging.logger { }
 
     @Transient
     override var keyType: KeyType
@@ -281,7 +284,7 @@ $encodedPk
                 }
             } catch (e: Exception) {
                 // Log but continue - replica may already be deleted or in pending state
-                System.err.println("Warning: Failed to schedule deletion of replica in $replicaRegion: ${e.message}")
+                log.warn { "Failed to schedule deletion of replica in $replicaRegion: ${e.message}" }
             }
         }
 

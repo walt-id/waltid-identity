@@ -2,6 +2,7 @@ package id.walt.crypto.keys.aws
 
 import aws.sdk.kotlin.services.kms.KmsClient
 import aws.sdk.kotlin.services.kms.model.KmsException
+import io.github.oshai.kotlinlogging.KotlinLogging
 
 /**
  * A failover-aware wrapper for AWS KMS operations that automatically retries
@@ -19,6 +20,8 @@ class FailoverKmsClient(
     private val failoverRegions: List<String>,
     private val enableFailover: Boolean = true,
 ) {
+    private val log = KotlinLogging.logger { }
+
     /**
      * Ordered list of regions to try: primary first, then failover regions.
      */
@@ -53,8 +56,7 @@ class FailoverKmsClient(
                 }
                 lastSuccessfulRegion = region
                 if (region != primaryRegion) {
-                    // Log that we used a failover region
-                    System.err.println("AWS KMS: Successfully used failover region $region (primary: $primaryRegion)")
+                    log.info { "AWS KMS: Successfully used failover region $region (primary: $primaryRegion)" }
                 }
                 return result
             } catch (e: Exception) {
@@ -66,8 +68,7 @@ class FailoverKmsClient(
                     throw e
                 }
 
-                // Log the failure and try the next region
-                System.err.println("AWS KMS: Region $region unavailable, trying next region: ${e.message}")
+                log.warn { "AWS KMS: Region $region unavailable, trying next region: ${e.message}" }
             }
         }
 
