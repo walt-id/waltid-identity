@@ -1,9 +1,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "verifier.fullname" . }}-ingress
+  name: {{ include "api-service.fullname" . }}-ingress
   labels:
-  {{- include "verifier.labels" . | nindent 4 }}
+    {{- include "api-service.labels" . | nindent 4 }}
   {{- if .Values.ingress.clusterIssuer }}
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
@@ -11,7 +11,7 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.ingressClassName }}
   {{- if .Values.ingress.tls }}
-  tls: 
+  tls:
     {{- .Values.ingress.tls | toYaml | nindent 4 }}
   {{- end }}
   rules:
@@ -22,6 +22,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: '{{ include "verifier.fullname" . }}-service'
+            name: '{{ include "api-service.fullname" . }}-service'
             port:
               name: http

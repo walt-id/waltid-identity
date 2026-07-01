@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "issuer.fullname" . }}-web-config
+  name: {{ include "api-service.fullname" . }}-web-config
   labels:
-    {{- include "issuer.labels" . | nindent 4 }}
+    {{- include "api-service.labels" . | nindent 4 }}
 data:
   {{- range $name, $content := .Values.configFiles }}
   {{ $name }}: |

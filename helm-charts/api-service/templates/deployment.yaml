@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-service.fullname" . }}
+  labels:
+    {{- include "api-service.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "api-service.name" . }}
+      {{- include "api-service.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "api-service.name" . }}
+        {{- include "api-service.labels" . | nindent 8 }}
+      annotations:
+        deployment/id: _DEFAULT_DEPLOYMENT_
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: {{ include "api-service.name" . }}
+        image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.image.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        ports:
+          - name: http-api
+            containerPort: {{ .Values.api.containerPort }}
+        volumeMounts:
+        {{- range $name, $content := .Values.configFiles }}
+        - mountPath: {{ $.Values.configMountPath }}/{{ $name }}
+          name: web-config
+          subPath: {{ $name }}
+          readOnly: true
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        - mountPath: {{ .Values.persistence.mountPath | quote }}
+          name: data
+        {{- end }}
+      volumes:
+      - name: web-config
+        configMap:
+          name: {{ include "api-service.fullname" . }}-web-config
+      {{- if .Values.persistence.enabled }}
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "api-service.fullname" . }}-data-volume-claim
+      {{- end }}

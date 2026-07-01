@@ -1,10 +1,8 @@
 {
   "issuer": {
     "api": {
-      "issuerApi": {
-        "image": {
-          "tag": "latest"
-        }
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
@@ -22,10 +20,8 @@
   },
   "issuer2": {
     "api": {
-      "issuerApi2": {
-        "image": {
-          "tag": "latest"
-        }
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
@@ -43,10 +39,8 @@
   },
   "verifier": {
     "api": {
-      "verifierApi": {
-        "image": {
-          "tag": "latest"
-        }
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
@@ -64,10 +58,8 @@
   },
   "verifier2": {
     "api": {
-      "verifierApi2": {
-        "image": {
-          "tag": "latest"
-        }
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
@@ -108,10 +100,8 @@
   },
   "wallet-api2": {
     "api": {
-      "walletApi2": {
-        "image": {
-          "tag": "latest"
-        }
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
