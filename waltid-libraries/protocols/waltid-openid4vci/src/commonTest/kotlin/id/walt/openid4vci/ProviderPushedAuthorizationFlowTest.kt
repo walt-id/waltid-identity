@@ -227,6 +227,10 @@ class ProviderPushedAuthorizationFlowTest {
         val provider = buildParProvider(
             clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
                 methods = listOf(AcceptingClientSecretPostAuthenticationMethod),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to
+                        setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                ),
             ),
         )
         val pushedParameters = validPushedParameters(clientId = "auth-param-client") +
@@ -249,8 +253,31 @@ class ProviderPushedAuthorizationFlowTest {
     }
 
     @Test
-    fun `provider rejects unsupported client authentication parameters at PAR endpoint`() = runTest {
+    fun `provider ignores client authentication parameters when PAR client authentication is disabled`() = runTest {
         val provider = buildParProvider()
+
+        val result = assertIs<AuthorizationRequestResult.Success>(
+            provider.createPushedAuthorizationRequest(
+                validPushedParameters(clientId = "ignored-auth-client") +
+                    mapOf(
+                        "client_secret" to listOf("secret-value"),
+                    )
+            )
+        )
+
+        assertEquals(null, result.request.authenticatedClient)
+    }
+
+    @Test
+    fun `provider rejects non-configured client authentication method at PAR endpoint`() = runTest {
+        val provider = buildParProvider(
+            clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to
+                        setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+                ),
+            ),
+        )
 
         val result = assertIs<AuthorizationRequestResult.Failure>(
             provider.createPushedAuthorizationRequest(
@@ -262,22 +289,30 @@ class ProviderPushedAuthorizationFlowTest {
         )
 
         assertEquals(OAuthErrorCodes.INVALID_CLIENT, result.error.error)
-        assertEquals("Unsupported client authentication method", result.error.description)
+        assertEquals(
+            "Client authentication method 'client_secret_post' is not allowed for this endpoint",
+            result.error.description,
+        )
     }
 
     @Test
-    fun `provider allows unauthenticated PAR when client authentication methods are configured`() = runTest {
+    fun `provider rejects unauthenticated PAR when endpoint client authentication methods are configured`() = runTest {
         val provider = buildParProvider(
             clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
                 methods = listOf(AcceptingClientSecretPostAuthenticationMethod),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to
+                        setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                ),
             ),
         )
 
-        val result = assertIs<AuthorizationRequestResult.Success>(
+        val result = assertIs<AuthorizationRequestResult.Failure>(
             provider.createPushedAuthorizationRequest(validPushedParameters(clientId = "auth-param-client"))
         )
 
-        assertEquals(null, result.request.authenticatedClient)
+        assertEquals(OAuthErrorCodes.INVALID_CLIENT, result.error.error)
+        assertEquals("Client authentication is required for this endpoint", result.error.description)
     }
 
     @Test

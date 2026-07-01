@@ -303,11 +303,14 @@ class ProviderAuthorizationOnlyFlowTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `authorization code token request without client authentication continues to grant validation`() = runTest {
+    fun `authorization code token request without client authentication fails when TOKEN methods are configured`() = runTest {
         val provider = buildOAuth2Provider(
             createTestConfig().copy(
                 clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
                     methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
                 ),
             )
         )
@@ -322,13 +325,13 @@ class ProviderAuthorizationOnlyFlowTest {
             )
         )
 
-        assertEquals("invalid_request", result.error.error)
-        assertEquals("Missing code", result.error.description)
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Client authentication is required for this endpoint", result.error.description)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `pre-authorized token request can omit client authentication`() = runTest {
+    fun `pre-authorized token request can omit client authentication when TOKEN methods are not configured`() = runTest {
         val provider = buildOAuth2Provider(
             createTestConfig().copy(
                 clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
@@ -356,6 +359,9 @@ class ProviderAuthorizationOnlyFlowTest {
             createTestConfig().copy(
                 clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
                     methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
                 ),
             )
         )
