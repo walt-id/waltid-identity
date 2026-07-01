@@ -5,8 +5,8 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.did.dids.resolver.LocalResolver
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import id.walt.openid4vp.conformance.testplans.plans.MdlX509SanDnsRequestUriSignedDirectPost
-import id.walt.openid4vp.conformance.testplans.plans.SdJwtVcX509SanDnsRequestUriSignedDirectPost
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.MdlX509SanDnsRequestUriSignedDirectPost
+import id.walt.openid4vp.conformance.testplans.plans.vp.verifier.SdJwtVcX509SanDnsRequestUriSignedDirectPost
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
 import id.walt.verifier.openid.models.authorization.ClientMetadata

@@ -351,7 +351,6 @@ cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
 ## Related Documentation
 
-- [issuer-req.md](../../issuer-req.md) - Conformance requirements
-- [README.md](README.md) - General conformance runner setup
-- [VERIFIER2-TESTS.md](VERIFIER2-TESTS.md) - Verifier conformance tests
+- [VCI-WALLET.md](VCI-WALLET.md) - VCI wallet conformance tests
+- [VP-VERIFIER.md](VP-VERIFIER.md) - VP verifier conformance tests
 - [OpenID4VCI 1.0 Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)

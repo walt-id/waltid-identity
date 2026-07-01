@@ -2,8 +2,8 @@ package id.walt.openid4vp.conformance.testplans
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
-import id.walt.openid4vp.conformance.testplans.plans.IssuerTestPlan
-import id.walt.openid4vp.conformance.testplans.plans.Oid4vciIssuerClientAttestationDpop
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.IssuerTestPlan
+import id.walt.openid4vp.conformance.testplans.plans.vci.issuer.Oid4vciIssuerClientAttestationDpop
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.IssuerTestPlanRunner
 import io.ktor.client.*

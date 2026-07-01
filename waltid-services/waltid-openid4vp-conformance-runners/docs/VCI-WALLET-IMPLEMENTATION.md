@@ -197,7 +197,7 @@ if (nonce != null && request.proofKey != null) {
 
 ## Related Documentation
 
-- [VCI-WALLET-TESTS.md](VCI-WALLET-TESTS.md) - Test setup and quick start
+- [VCI-WALLET.md](VCI-WALLET.md) - Test setup and quick start
 - [VCI-WALLET-BACKLOG.md](VCI-WALLET-BACKLOG.md) - Implementation status
 - [RFC 9449 - DPoP](https://datatracker.ietf.org/doc/html/rfc9449)
 - [RFC 7523 - JWT Bearer Client Authentication](https://datatracker.ietf.org/doc/html/rfc7523)

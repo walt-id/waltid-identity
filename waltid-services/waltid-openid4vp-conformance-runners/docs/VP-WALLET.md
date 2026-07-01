@@ -377,10 +377,9 @@ waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/in
 
 ## Related Documentation
 
-- [README.md](README.md) - General setup and configuration
-- [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
-- [VERIFIER-TESTS.md](VERIFIER-TESTS.md) - Verifier conformance tests
-- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer conformance tests
+- [VCI-WALLET.md](VCI-WALLET.md) - VCI wallet conformance tests
+- [VCI-ISSUER.md](VCI-ISSUER.md) - VCI issuer conformance tests
+- [VP-VERIFIER.md](VP-VERIFIER.md) - VP verifier conformance tests
 - [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
 - [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
 - [Conformance Suite](https://gitlab.com/openid/conformance-suite)

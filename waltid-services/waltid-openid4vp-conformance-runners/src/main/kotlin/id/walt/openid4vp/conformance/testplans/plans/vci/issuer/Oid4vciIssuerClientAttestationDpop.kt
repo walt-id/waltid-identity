@@ -1,4 +1,4 @@
-package id.walt.openid4vp.conformance.testplans.plans
+package id.walt.openid4vp.conformance.testplans.plans.vci.issuer
 
 import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfiguration
 import kotlinx.serialization.json.Json

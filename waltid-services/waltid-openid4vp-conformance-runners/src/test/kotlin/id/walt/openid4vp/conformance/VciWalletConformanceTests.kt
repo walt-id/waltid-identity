@@ -4,7 +4,7 @@ import id.walt.openid4vp.conformance.adapter.VciWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.runner.VciWalletTestPlanRunner
-import id.walt.openid4vp.conformance.testplans.vci.wallet.VciWalletSdJwtDpop
+import id.walt.openid4vp.conformance.testplans.plans.vci.wallet.VciWalletSdJwtDpop
 import io.ktor.client.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*

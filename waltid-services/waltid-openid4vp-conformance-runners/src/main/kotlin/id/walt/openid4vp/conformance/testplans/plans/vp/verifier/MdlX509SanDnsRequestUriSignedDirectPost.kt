@@ -1,6 +1,7 @@
-package id.walt.openid4vp.conformance.testplans.plans
+package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier2.data.CrossDeviceFlowSetup
@@ -12,7 +13,7 @@ import io.ktor.http.Url
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
-class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
+class MdlX509SanDnsRequestUriSignedDirectPost(
     verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session",
 
     conformanceHost: String = "localhost.emobix.co.uk",
@@ -25,28 +26,6 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
     val verifierCertificateChain =
         listOf("MIIBVzCB/aADAgECAggNKZAvUrtimzAKBggqhkjOPQQDAjAfMR0wGwYDVQQDDBR2ZXJpZmllci5leGFtcGxlLmNvbTAeFw0yNTEwMTQwNjI0MjBaFw0yNjEwMTQwNjI0MjBaMB8xHTAbBgNVBAMMFHZlcmlmaWVyLmV4YW1wbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG/TgBc0BkmMipiQ/6gkamIn3mmp7hcTrZuyrLTmknP1WRExl1dhdIx9/kAkuuceI3THkxXq7/y+sBzK0ZR7jPqMjMCEwHwYDVR0RBBgwFoIUdmVyaWZpZXIuZXhhbXBsZS5jb20wCgYIKoZIzj0EAwIDSQAwRgIhAOu0RGM6BjVQUepeLBogw+ZD3MQ9vFppbPIGMPjtn/qdAiEAttfdfyXHfzJ2tr+Pczyckzv3NlM43461cvP96sIzOQA=")
 
-    // Wallet
-    val signerCertificateChain = Json.encodeToString(
-        listOf("MIIBeTCCAR8CFHrWgrGl5KdefSvRQhR+aoqdf48+MAoGCCqGSM49BAMCMBcxFTATBgNVBAMMDE1ET0MgUk9PVCBDQTAgFw0yNTA1MTQxNDA4MDlaGA8yMDc1MDUwMjE0MDgwOVowZTELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMRAwDgYDVQQKDAd3YWx0LmlkMRAwDgYDVQQLDAd3YWx0LmlkMRAwDgYDVQQDDAd3YWx0LmlzMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEG0RINBiF+oQUD3d5DGnegQuXenI29JDaMGoMvioKRBN53d4UazakS2unu8BnsEtxutS2kqRhYBPYk9RAriU3gTAKBggqhkjOPQQDAgNIADBFAiAOMwM7hH7q9Di+mT6qCi4LvB+kH8OxMheIrZ2eRPxtDQIhALHzTxwvN8Udt0Z2Cpo8JBihqacfeXkIxVAO8XkxmXhB")
-    )
-
-    // language=JSON
-    private val signerJwk = """
-        {
-            "kty": "EC",
-            "crv": "P-256",
-            "alg": "ES256",
-            
-            
-            "d": "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ",
-                    
-            "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
-            "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E",
-            
-            "x5c": $signerCertificateChain
-        }
-    """.trimIndent()
-
     // DCQL
 
     // language=JSON
@@ -54,16 +33,29 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
         {
             "credentials": [
                 {
-                    "id": "pid",
-                    "format": "dc+sd-jwt",
+                    "id": "my_photoid",
+                    "format": "mso_mdoc",
                     "meta": {
-                        "vct_values": ["https://credentials.example.com/identity_credential"]
+                        "doctype_value": "org.iso.23220.photoid.1"
                     },
                     "claims": [
-                        {"path": ["given_name"]},
-                        {"path": ["family_name"]},
-                        {"path": ["birthdate"]},
-                        {"path": ["age_in_years"]}
+                        { "path": [ "org.iso.18013.5.1", "family_name_unicode" ] },
+                        { "path": [ "org.iso.18013.5.1", "given_name_unicode" ] },
+                        { "path": [ "org.iso.18013.5.1", "issuing_authority_unicode" ] },
+                        {
+                            "path": [ "org.iso.18013.5.1", "resident_postal_code" ],
+                            "values": [ 1180, 1190, 1200, 1210 ]
+                        },
+                        {
+                            "path": [ "org.iso.18013.5.1", "issuing_country" ],
+                            "values": [ "AT" ]
+                        },
+                        { "path": [ "org.iso.23220.photoid.1", "person_id" ] },
+                        { "path": [ "org.iso.23220.photoid.1", "resident_street" ] },
+                        { "path": [ "org.iso.23220.photoid.1", "administrative_number" ] },
+                        { "path": [ "org.iso.23220.photoid.1", "travel_document_number" ] },
+                        { "path": [ "org.iso.23220.dtc.1", "dtc_version" ] },
+                        { "path": [ "org.iso.23220.dtc.1", "dtc_dg1" ] }
                     ]
                 }
             ]
@@ -77,7 +69,7 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
             append(
                 "variant", /* language=json*/
                 """{
-                           "credential_format": "sd_jwt_vc",
+                           "credential_format": "iso_mdl",
                            "client_id_prefix": "x509_san_dns",
                            "request_method": "request_uri_signed",
                            "response_mode": "direct_post"
@@ -88,15 +80,13 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
         testPlanCreationConfiguration = Json.decodeFromString<JsonObject>(
             """
             {
-                "credential": {
-                    "signing_jwk": $signerJwk
-                },
+                
                 "client": {
                     "client_id": "test123"
                 },
-                "description": "Verifier - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post",
+                "description": "Verifier - iso_mdl + x509_san_dns + request_uri_signed + direct_post",
                 "server": {
-                  "authorization_endpoint": "https://$conformanceHost:$conformancePort"
+                    "authorization_endpoint": "https://$conformanceHost:$conformancePort"
                 }
             }
         """.trimIndent()
@@ -117,7 +107,7 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
             ),
             urlConfig = UrlConfig(
                 urlPrefix = verifier2UrlPrefix,
-                //urlHost, // <-- set by TestPlanRunner
+                //urlHost // <-- set by TestPlanRunner
             ),
             redirects = VerificationSessionRedirects(
                 successRedirectUri = Url("https://example.org/veriifcation-success")

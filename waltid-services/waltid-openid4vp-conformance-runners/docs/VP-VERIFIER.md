@@ -341,10 +341,9 @@ class NewTestPlan(verifierUrlPrefix: String, ...) : TestPlan {
 
 ## Related Documentation
 
-- [README.md](README.md) - General setup and configuration
-- [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
-- [WALLET-TESTS.md](WALLET-TESTS.md) - Wallet conformance tests
-- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer conformance tests
+- [VCI-WALLET.md](VCI-WALLET.md) - VCI wallet conformance tests
+- [VCI-ISSUER.md](VCI-ISSUER.md) - VCI issuer conformance tests
+- [VP-WALLET.md](VP-WALLET.md) - VP wallet conformance tests
 - [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
 - [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
 - [Conformance Suite GitLab](https://gitlab.com/openid/conformance-suite)

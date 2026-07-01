@@ -221,7 +221,7 @@ suite UI and complete the authorization.
 
 ## Related Documentation
 
-- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer conformance tests
+- [VCI-ISSUER.md](VCI-ISSUER.md) - Issuer conformance tests
 - [VCI-WALLET-IMPLEMENTATION.md](VCI-WALLET-IMPLEMENTATION.md) - Implementation details
 - [OpenID4VCI 1.0 Spec](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
 - [RFC 9449 - DPoP](https://datatracker.ietf.org/doc/html/rfc9449)

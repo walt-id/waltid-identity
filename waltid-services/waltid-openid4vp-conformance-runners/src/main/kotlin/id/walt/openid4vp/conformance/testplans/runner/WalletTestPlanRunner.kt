@@ -2,7 +2,7 @@ package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
-import id.walt.openid4vp.conformance.testplans.wallet.WalletTestPlan
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*

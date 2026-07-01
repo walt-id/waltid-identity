@@ -1,7 +1,6 @@
 package id.walt.openid4vp.conformance
 
-import id.walt.openid4vp.conformance.ConformanceTests.Companion.conformanceHost
-import id.walt.openid4vp.conformance.ConformanceTests.Companion.conformancePort
+import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import org.junit.jupiter.api.Assumptions.assumeTrue
@@ -118,7 +117,7 @@ class IssuerConformanceTests {
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
-                ConformanceInterface(conformanceHost, conformancePort).getServerVersion()
+                ConformanceInterface(ConformanceConfig.CONFORMANCE_HOST, ConformanceConfig.CONFORMANCE_PORT).getServerVersion()
             }.onFailure {
                 println("Error getting server version: $it")
             }
@@ -138,8 +137,8 @@ class IssuerConformanceTests {
 
         IssuerConformanceTestRunner(
             credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
-            conformanceHost = conformanceHost,
-            conformancePort = conformancePort,
+            conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
+            conformancePort = ConformanceConfig.CONFORMANCE_PORT,
             sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
             mdocCredentialConfigurationId = mdocCredentialConfigurationId,
             clientAttestationIssuer = clientAttestationIssuer,
