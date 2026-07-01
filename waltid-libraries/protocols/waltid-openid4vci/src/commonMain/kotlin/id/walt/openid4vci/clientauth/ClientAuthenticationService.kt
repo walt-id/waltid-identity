@@ -14,6 +14,11 @@ class ClientAuthenticationService(
         headers: Map<String, List<String>>,
         context: ClientAuthenticationContext = ClientAuthenticationContext(),
     ): ClientAuthenticationResult {
+        val endpointMethods = config.methodsForEndpoint(endpoint)
+        if (endpointMethods.isEmpty()) {
+            return ClientAuthenticationResult.Unauthenticated
+        }
+
         val requestedMethods = ClientAuthenticationMethodDetector.detectRequestedMethods(parameters, headers)
 
         if (requestedMethods.size > 1) {
@@ -23,9 +28,11 @@ class ClientAuthenticationService(
         }
 
         val requestedMethod = requestedMethods.singleOrNull()
-            ?: return ClientAuthenticationResult.Unauthenticated
+            ?: return ClientAuthenticationResult.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_CLIENT, "Client authentication is required for this endpoint"),
+            )
 
-        if (!config.allowsMethod(endpoint, requestedMethod)) {
+        if (requestedMethod !in endpointMethods) {
             return ClientAuthenticationResult.Failure(
                 OAuthError(
                     OAuthErrorCodes.INVALID_CLIENT,

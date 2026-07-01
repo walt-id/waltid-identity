@@ -23,8 +23,63 @@ class ClientAuthenticationServiceTest {
     }
 
     @Test
+    fun `ignores client authentication input when endpoint has no configured methods`() = runTest {
+        val method = RecordingClientAuthenticationMethod(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
+        val service = ClientAuthenticationService(
+            ClientAuthenticationServiceConfig(methods = listOf(method)),
+        )
+
+        val result = service.authenticate(
+            endpoint = ClientAuthenticationEndpoint.TOKEN,
+            parameters = mapOf("client_assertion" to listOf("jwt")),
+            headers = mapOf(
+                ClientAttestationHeaders.CLIENT_ATTESTATION to listOf("jwt"),
+            ),
+        )
+
+        assertEquals(ClientAuthenticationResult.Unauthenticated, result)
+        assertEquals(0, method.calls)
+    }
+
+    @Test
+    fun `rejects missing client authentication when endpoint has configured methods`() = runTest {
+        val method = RecordingClientAuthenticationMethod(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
+        val service = ClientAuthenticationService(
+            ClientAuthenticationServiceConfig(
+                methods = listOf(method),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+                ),
+            ),
+        )
+
+        val result = service.authenticate(
+            endpoint = ClientAuthenticationEndpoint.TOKEN,
+            parameters = emptyMap(),
+            headers = emptyMap(),
+        )
+
+        val failure = assertIs<ClientAuthenticationResult.Failure>(result)
+        assertEquals("invalid_client", failure.error.error)
+        assertEquals("Client authentication is required for this endpoint", failure.error.description)
+    }
+
+    @Test
     fun `rejects multiple client authentication methods`() = runTest {
-        val service = ClientAuthenticationService()
+        val service = ClientAuthenticationService(
+            ClientAuthenticationServiceConfig(
+                methods = listOf(
+                    RecordingClientAuthenticationMethod(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+                    RecordingClientAuthenticationMethod(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                ),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.TOKEN to setOf(
+                        ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH,
+                        ClientAuthenticationMethods.CLIENT_SECRET_POST,
+                    ),
+                ),
+            ),
+        )
 
         val result = service.authenticate(
             endpoint = ClientAuthenticationEndpoint.TOKEN,
@@ -44,7 +99,13 @@ class ClientAuthenticationServiceTest {
 
     @Test
     fun `rejects detected but unconfigured client authentication method`() = runTest {
-        val service = ClientAuthenticationService()
+        val service = ClientAuthenticationService(
+            ClientAuthenticationServiceConfig(
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.PRIVATE_KEY_JWT),
+                ),
+            ),
+        )
 
         val result = service.authenticate(
             endpoint = ClientAuthenticationEndpoint.TOKEN,
@@ -61,7 +122,13 @@ class ClientAuthenticationServiceTest {
     fun `dispatches to configured selected method`() = runTest {
         val method = RecordingClientAuthenticationMethod(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH)
         val service = ClientAuthenticationService(
-            ClientAuthenticationServiceConfig(methods = listOf(method)),
+            ClientAuthenticationServiceConfig(
+                methods = listOf(method),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to
+                        setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+                ),
+            ),
         )
 
         val result = service.authenticate(
@@ -85,6 +152,12 @@ class ClientAuthenticationServiceTest {
         val service = ClientAuthenticationService(
             ClientAuthenticationServiceConfig(
                 methods = listOf(attestationMethod, clientSecretPostMethod),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.TOKEN to setOf(
+                        ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH,
+                        ClientAuthenticationMethods.CLIENT_SECRET_POST,
+                    ),
+                ),
             ),
         )
 
@@ -114,16 +187,27 @@ class ClientAuthenticationServiceTest {
     }
 
     @Test
-    fun `allows endpoint allowed methods to be configured before methods are registered`() {
+    fun `rejects blank endpoint client authentication method names`() {
+        assertFailsWith<IllegalArgumentException> {
+            ClientAuthenticationServiceConfig(
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.TOKEN to setOf(""),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `allows endpoint methods to be configured before methods are registered`() {
         val config = ClientAuthenticationServiceConfig(
-            allowedMethodsByEndpoint = mapOf(
+            methodsByEndpoint = mapOf(
                 ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.PRIVATE_KEY_JWT),
             ),
         )
 
         assertEquals(
-            true,
-            config.allowsMethod(ClientAuthenticationEndpoint.TOKEN, ClientAuthenticationMethods.PRIVATE_KEY_JWT),
+            setOf(ClientAuthenticationMethods.PRIVATE_KEY_JWT),
+            config.methodsForEndpoint(ClientAuthenticationEndpoint.TOKEN),
         )
     }
 
