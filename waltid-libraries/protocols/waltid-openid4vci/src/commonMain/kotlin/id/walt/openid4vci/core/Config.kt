@@ -1,5 +1,7 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
@@ -30,6 +32,8 @@ import id.walt.openid4vci.validation.IssuerStateValidator
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
 data class OAuth2ProviderConfig(
+    val authorizationServerIssuer: String? = null,
+
     val authorizationRequestValidator: AuthorizationRequestValidator,
     val issuerStateValidator: IssuerStateValidator? = null,
     val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
@@ -37,6 +41,9 @@ data class OAuth2ProviderConfig(
 
     val pushedAuthorizationEndpointHandlers: PushedAuthorizationEndpointHandlers = PushedAuthorizationEndpointHandlers(),
     val pushedAuthorizationConfig: PushedAuthorizationConfig? = null,
+
+    val clientAuthenticationServiceConfig: ClientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(),
+    val clientAttestationConfig: ClientAttestationConfig? = null,
 
     val accessTokenRequestValidator: AccessTokenRequestValidator,
     val tokenEndpointHandlers: TokenEndpointHandlers,

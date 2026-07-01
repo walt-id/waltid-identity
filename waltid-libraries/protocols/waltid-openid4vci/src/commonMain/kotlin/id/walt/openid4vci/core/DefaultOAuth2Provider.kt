@@ -3,6 +3,11 @@ package id.walt.openid4vci.core
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.clientauth.ClientAuthenticationContext
+import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
@@ -60,6 +65,7 @@ import kotlin.time.Instant
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
+    private val clientAuthenticationService = ClientAuthenticationService(config.clientAuthenticationServiceConfig)
 
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
@@ -138,7 +144,7 @@ class DefaultOAuth2Provider(
         val params = buildMap {
             put("code", response.code)
             response.state?.let { put("state", it) }
-            response.scope?.let { put("scope", it) }
+            authorizationRequest.issClaim?.let { put("iss", it) }
             putAll(response.extraParameters)
         }
 
@@ -156,7 +162,10 @@ class DefaultOAuth2Provider(
         )
     }
 
-    override suspend fun createPushedAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult {
+    override suspend fun createPushedAuthorizationRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): AuthorizationRequestResult {
         if (parameters["request_uri"].orEmpty().any { it.isNotBlank() }) {
             return AuthorizationRequestResult.Failure(
                 OAuthError(
@@ -165,7 +174,32 @@ class DefaultOAuth2Provider(
                 )
             )
         }
-        return config.authorizationRequestValidator.validate(parameters)
+
+        val authenticatedClient = when (
+            val authResult = authenticateClient(
+                endpoint = ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION,
+                parameters = parameters,
+                headers = headers,
+            )
+        ) {
+            is ClientAuthenticationResult.Authenticated -> authResult.client
+            is ClientAuthenticationResult.Failure -> return AuthorizationRequestResult.Failure(authResult.error)
+            ClientAuthenticationResult.Unauthenticated -> null
+        }
+
+        val effectiveParameters = when (
+            val resolution = parameters.withAuthenticatedClientId(authenticatedClient)
+        ) {
+            is ClientIdParameterResolution.Success -> resolution.parameters
+            is ClientIdParameterResolution.Failure -> return AuthorizationRequestResult.Failure(resolution.error)
+        }
+
+        return when (val result = config.authorizationRequestValidator.validate(effectiveParameters)) {
+            is AuthorizationRequestResult.Success ->
+                AuthorizationRequestResult.Success(result.request.withAuthenticatedClient(authenticatedClient))
+
+            is AuthorizationRequestResult.Failure -> result
+        }
     }
 
     override suspend fun createPushedAuthorizationResponse(
@@ -187,7 +221,9 @@ class DefaultOAuth2Provider(
             when (
                 val result = handler.handlePushedAuthorizationEndpointRequest(
                     authorizationRequest = authorizationRequest,
-                    clientAuthentication = clientAuthentication,
+                    clientAuthentication = clientAuthentication.ifEmpty {
+                        authorizationRequest.authenticatedClient?.toMetadataMap().orEmpty()
+                    },
                 )
             ) {
                 is PushedAuthorizationResponseResult.Success -> return result
@@ -229,15 +265,65 @@ class DefaultOAuth2Provider(
             headers = noStoreHeaders(),
         )
 
-    override fun createAccessTokenRequest(
+    override suspend fun createAccessTokenRequest(
         parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
         session: Session?
     ): AccessTokenRequestResult {
-        return config.accessTokenRequestValidator.validate(
+        val authResult = authenticateClient(
+            endpoint = ClientAuthenticationEndpoint.TOKEN,
+            parameters = parameters,
+            headers = headers,
+        )
+
+        val authenticatedClient = when (authResult) {
+            is ClientAuthenticationResult.Authenticated -> authResult.client
+            is ClientAuthenticationResult.Failure -> return AccessTokenRequestResult.Failure(authResult.error)
+            ClientAuthenticationResult.Unauthenticated -> null
+        }
+
+        val validationResult = validateAccessTokenRequest(
+            parameters = when (
+                val resolution = parameters.withAuthenticatedClientId(authenticatedClient)
+            ) {
+                is ClientIdParameterResolution.Success -> resolution.parameters
+                is ClientIdParameterResolution.Failure -> return AccessTokenRequestResult.Failure(resolution.error)
+            },
+            session = session,
+            authenticatedClient = authenticatedClient,
+        )
+
+        return validationResult
+    }
+
+    private fun validateAccessTokenRequest(
+        parameters: Map<String, List<String>>,
+        session: Session?,
+        authenticatedClient: AuthenticatedClient?,
+    ): AccessTokenRequestResult =
+        when (val result = config.accessTokenRequestValidator.validate(
             parameters = parameters,
             session = session ?: DefaultSession()
+        )) {
+            is AccessTokenRequestResult.Success ->
+                AccessTokenRequestResult.Success(result.request.withAuthenticatedClient(authenticatedClient))
+
+            is AccessTokenRequestResult.Failure -> result
+        }
+
+    private suspend fun authenticateClient(
+        endpoint: ClientAuthenticationEndpoint,
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): ClientAuthenticationResult =
+        clientAuthenticationService.authenticate(
+            endpoint = endpoint,
+            parameters = parameters,
+            headers = headers,
+            context = ClientAuthenticationContext(
+                authorizationServerIssuer = config.authorizationServerIssuer,
+            ),
         )
-    }
 
     override suspend fun createAccessTokenResponse(
         request: AccessTokenRequest,
@@ -528,8 +614,50 @@ class DefaultOAuth2Provider(
             "Pragma" to "no-cache",
         )
 
+    private fun Map<String, List<String>>.withAuthenticatedClientId(
+        authenticatedClient: AuthenticatedClient?,
+    ): ClientIdParameterResolution {
+        if (authenticatedClient == null) {
+            return ClientIdParameterResolution.Success(this)
+        }
+
+        val clientIdValues = this["client_id"].orEmpty().filter { it.isNotBlank() }
+        if (clientIdValues.size > 1) {
+            return ClientIdParameterResolution.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_REQUEST, "Multiple values for client_id not allowed"),
+            )
+        }
+
+        val providedClientId = clientIdValues.firstOrNull()
+        if (providedClientId != null && providedClientId != authenticatedClient.id) {
+            return ClientIdParameterResolution.Failure(
+                OAuthError(
+                    error = OAuthErrorCodes.INVALID_CLIENT,
+                    description = "client_id does not match authenticated client",
+                ),
+            )
+        }
+
+        return if (providedClientId == null) {
+            ClientIdParameterResolution.Success(this + ("client_id" to listOf(authenticatedClient.id)))
+        } else {
+            ClientIdParameterResolution.Success(this)
+        }
+    }
+
+    private fun AuthenticatedClient.toMetadataMap(): Map<String, String> =
+        mapOf(
+            "client_id" to id,
+            "client_authentication_method" to authenticationMethod,
+        )
+
     private sealed class AuthorizationParameterResolution {
         data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
         data class Failure(val error: OAuthError) : AuthorizationParameterResolution()
+    }
+
+    private sealed class ClientIdParameterResolution {
+        data class Success(val parameters: Map<String, List<String>>) : ClientIdParameterResolution()
+        data class Failure(val error: OAuthError) : ClientIdParameterResolution()
     }
 }

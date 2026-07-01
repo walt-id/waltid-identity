@@ -42,7 +42,8 @@ class DefaultAccessTokenRequestValidator : AccessTokenRequestValidator {
         session: Session,
     ): AccessTokenRequestResult {
         // RFC6749 §4.1.3: client_id is optional; required only if client auth is not used.
-        val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() } ?: ""
+        val clientId = parameters.optionalSingle("client_id")?.takeIf { it.isNotBlank() }
+            ?: ""
 
         // RFC6749 §4.1.3: redirect_uri is required only if it was in the authorize request; if supplied, it must be single-valued.
         val redirectUri = parameters.optionalSingle("redirect_uri")?.takeIf { it.isNotBlank() }
