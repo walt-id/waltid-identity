@@ -12,6 +12,7 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.json.Json
 import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
@@ -35,9 +36,12 @@ class VerifierConformanceTestRunner(
     private val http = HttpClient {
         defaultRequest {
             url(verifierNgrokUrl)
+            contentType(ContentType.Application.Json)
         }
         install(ContentNegotiation) {
-            json()
+            json(Json {
+                ignoreUnknownKeys = true
+            })
         }
     }
 
