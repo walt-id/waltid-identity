@@ -195,9 +195,9 @@ The x5c chain includes `[leaf, intermediate]` — the leaf cert is NOT self-sign
                                    │ 2. POST /verification-session/{id}/response
                                    ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                              ngrok                                        │
-│                     (exposes verifier to internet)                        │
-│                     https://xxxx.ngrok-free.app                           │
+│                              ngrok                                       │
+│                     (exposes verifier to internet)                       │
+│                     https://xxxx.ngrok-free.app                          │
 └──────────────────────────────────┬───────────────────────────────────────┘
                                    │
                                    │ Tunneled to localhost:7003
