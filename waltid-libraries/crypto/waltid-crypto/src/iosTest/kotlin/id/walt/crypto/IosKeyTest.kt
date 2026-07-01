@@ -80,6 +80,11 @@ class IosKeyTest {
             assertNotNull(key, "create failed for $type")
             assertEquals(type, key.keyType, "keyType mismatch for $type")
             assertTrue(key.hasPrivateKey, "hasPrivateKey false for $type")
+
+            val publicKey = key.getPublicKey()
+            assertEquals(type, publicKey.keyType, "public keyType mismatch for $type")
+            assertTrue(!publicKey.hasPrivateKey, "public software key should not expose private access for $type")
+            assertTrue(!publicKey.exportJWK().contains("\"d\""), "public software JWK contains private material for $type")
         }
     }
 

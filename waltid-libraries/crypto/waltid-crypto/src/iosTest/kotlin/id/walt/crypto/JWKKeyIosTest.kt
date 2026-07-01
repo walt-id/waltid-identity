@@ -79,6 +79,7 @@ class JWKKeyIosTest {
             val key = JWKKey.generate(type)
             val pubKey = key.getPublicKey()
             assertEquals(type, pubKey.keyType, "public key type mismatch for $type")
+            assertEquals(key.getKeyId(), pubKey.getKeyId(), "public key id mismatch for $type")
             assertTrue(!pubKey.hasPrivateKey, "public key has private for $type")
             assertTrue(!pubKey.exportJWK().contains("\"d\""), "public JWK contains 'd' for $type")
         }

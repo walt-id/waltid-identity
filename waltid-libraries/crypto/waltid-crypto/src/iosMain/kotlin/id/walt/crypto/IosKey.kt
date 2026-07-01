@@ -16,6 +16,7 @@ import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeyUtils
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonCanonicalizationUtils
@@ -43,7 +44,10 @@ sealed class IosKey : Key() {
         }
     }
 
-    class Platform internal constructor(private val options: Options) : IosKey() {
+    class Platform internal constructor(
+        private val options: Options,
+        override val hasPrivateKey: Boolean = true,
+    ) : IosKey() {
 
         companion object {
             suspend fun create(options: Options): Platform {
@@ -72,7 +76,6 @@ sealed class IosKey : Key() {
         }
 
         override val keyType get() = options.keyType
-        override val hasPrivateKey = true
 
         private suspend fun signer() = IosKeychainProvider.getSignerForKey(options.kid).getOrThrow()
 
@@ -95,12 +98,14 @@ sealed class IosKey : Key() {
         }
 
         override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any {
+            check(hasPrivateKey) { "Only private key can do signing." }
             val result = signer().sign(plaintext)
             check(result is SignatureResult.Success) { "Signing failed: $result" }
             return result.signature.rawByteArray
         }
 
         override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
+            check(hasPrivateKey) { "Only private key can do signing." }
             val signer = signer()
             return signJwsWithPlatformSigner(options.keyType, plaintext, headers) { data -> signer.sign(data) }
         }
@@ -117,7 +122,7 @@ sealed class IosKey : Key() {
             return verifyJwsWithPlatformSigner(options.keyType, signer.publicKey, signedJws)
         }
 
-        override suspend fun getPublicKey(): Key = Platform(options)
+        override suspend fun getPublicKey(): Key = Platform(options, hasPrivateKey = false)
         override suspend fun getPublicKeyRepresentation(): ByteArray = signer().publicKey.encodeToTlv().derEncoded
         override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
         override suspend fun deleteKey(): Boolean = runCatching {
@@ -249,7 +254,7 @@ sealed class IosKey : Key() {
             Json.parseToJsonElement(parts.payload.decodeFromBase64Url().decodeToString())
         }
 
-        override suspend fun getPublicKey(): Key = Software(options, edKeyPair, ecKeyPair)
+        override suspend fun getPublicKey(): Key = JWKKey(exportJWK(), options.kid)
         override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
             KeyType.Ed25519 -> edKeyPair!!.publicKey.encodeToByteArray(EdDSA.PublicKey.Format.RAW)
             KeyType.secp256k1 -> ecKeyPair!!.publicKey.encodeToByteArray(EC.PublicKey.Format.RAW)

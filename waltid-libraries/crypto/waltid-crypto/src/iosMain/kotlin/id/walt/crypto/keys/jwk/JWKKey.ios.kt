@@ -164,7 +164,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun getPublicKey(): JWKKey = _jwkObj.toMap().filterKeys {
         it !in privateParameters
-    }.toJsonObject().toString().let { JWKKey(it) }
+    }.toJsonObject().toString().let { JWKKey(it, _keyId) }
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
         if (isSoftwareKey) {

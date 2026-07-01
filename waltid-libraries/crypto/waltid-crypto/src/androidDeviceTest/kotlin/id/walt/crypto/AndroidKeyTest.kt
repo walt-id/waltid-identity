@@ -7,6 +7,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -38,6 +39,12 @@ class AndroidKeyTest {
             assertEquals(alias, key.getKeyId())
             assertEquals(type, key.keyType, "keyType mismatch for $type")
             assertTrue(key.hasPrivateKey, "hasPrivateKey false for $type")
+
+            val publicKey = key.getPublicKey()
+            assertTrue(!publicKey.hasPrivateKey, "public platform key should not expose private access for $type")
+            assertFailsWith<IllegalStateException>("public platform key should not sign for $type") {
+                publicKey.signRaw("nope".encodeToByteArray())
+            }
         }
     }
 
@@ -108,6 +115,11 @@ class AndroidKeyTest {
             assertNotNull(key, "create failed for $type")
             assertEquals(type, key.keyType, "keyType mismatch for $type")
             assertTrue(key.hasPrivateKey, "hasPrivateKey false for $type")
+
+            val publicKey = key.getPublicKey()
+            assertEquals(type, publicKey.keyType, "public keyType mismatch for $type")
+            assertTrue(!publicKey.hasPrivateKey, "public software key should not expose private access for $type")
+            assertTrue(!publicKey.exportJWK().contains("\"d\""), "public software JWK contains private material for $type")
         }
     }
 
