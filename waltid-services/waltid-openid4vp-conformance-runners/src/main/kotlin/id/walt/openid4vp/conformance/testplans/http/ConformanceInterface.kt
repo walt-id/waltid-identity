@@ -67,6 +67,7 @@ class ConformanceInterface(
         createTestPlanUrl: Url,
         testPlanCreationConfiguration: JsonObject
     ): CreateTestPlanResponse {
+        println("POST body: $testPlanCreationConfiguration")
         val response = conformanceHttp.post(createTestPlanUrl) {
             contentType(ContentType.Application.Json)
             setBody(testPlanCreationConfiguration)
@@ -84,13 +85,13 @@ class ConformanceInterface(
      * To create a test, some parameters already have to be put into the URL
      * This method allows for creation of said URL to create a test.
      */
-    fun buildCreateTestUrl(testPlanId: String, testModule: String) =
+    fun buildCreateTestUrl(testPlanId: String, testModule: String, variant: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap())) =
         URLBuilder("/api/runner").apply {
             baseUrlBuilderSetup(conformanceHost, conformancePort)
             parameters.apply {
                 append("test", testModule)
                 append("plan", testPlanId)
-                append("variant", "{}")
+                append("variant", variant.toString())
             }
         }.build()
 
@@ -105,8 +106,12 @@ class ConformanceInterface(
         conformanceHttp.get("/api/runner/$testId").body<TestRunResult>()
 
     /** Get [TestRunInfo] for a test referenced by [testId] */
-    suspend fun getTestRunInfo(testId: String): TestRunInfo =
-        conformanceHttp.get("/api/info/$testId").body<TestRunInfo>()
+    suspend fun getTestRunInfo(testId: String): TestRunInfo {
+        val response = conformanceHttp.get("/api/info/$testId") {
+            header(HttpHeaders.CacheControl, "no-cache")
+        }
+        return response.body<TestRunInfo>()
+    }
 
 
     /**

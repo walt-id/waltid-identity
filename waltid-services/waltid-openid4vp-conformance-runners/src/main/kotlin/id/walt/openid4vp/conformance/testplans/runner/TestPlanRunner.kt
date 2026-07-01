@@ -64,11 +64,11 @@ class TestPlanRunner(
         }
 
         val testPlanId = createTestPlanResponse.id
-        val testModule = createTestPlanResponse.modules.first().testModule
+        val testModule = createTestPlanResponse.modules.first()
         println("Created test plan: $testPlanId")
 
-        // Create test
-        val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule)
+        // Create test - pass the variant from the module definition
+        val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule.testModule, testModule.variant)
         println("Creating test... ($createTestUrl)")
         val createTestResponse = conformance.createTest(createTestUrl)
         println()
