@@ -5,7 +5,7 @@ issuer:
     tls:
       - hosts:
           - issuer.portal.test.waltid.cloud
-        secretName: issuer-portal-tls
+        secretName: issuer-tls-secret
     host: issuer.portal.test.waltid.cloud
 
 issuer2:
@@ -15,7 +15,7 @@ issuer2:
     tls:
       - hosts:
           - issuer2.portal.test.waltid.cloud
-        secretName: issuer2-portal-tls
+        secretName: issuer2-tls-secret
     host: issuer2.portal.test.waltid.cloud
 
 verifier:
@@ -25,7 +25,7 @@ verifier:
     tls:
       - hosts:
           - verifier.portal.test.waltid.cloud
-        secretName: verifier-portal-tls
+        secretName: verifier-tls-secret
     host: verifier.portal.test.waltid.cloud
 
 verifier2:
@@ -35,7 +35,7 @@ verifier2:
     tls:
       - hosts:
           - verifier2.portal.test.waltid.cloud
-        secretName: verifier2-portal-tls
+        secretName: verifier2-tls-secret
     host: verifier2.portal.test.waltid.cloud
 
 portal:
@@ -50,7 +50,7 @@ portal:
     tls:
       - hosts:
           - portal.test.waltid.cloud
-        secretName: portal-tls
+        secretName: portal-tls-secret
     host: portal.test.waltid.cloud
 
 web-wallet:
@@ -101,7 +101,7 @@ web-wallet:
       - hosts:
           - wallet-dev.test.waltid.cloud
           - wallet.test.waltid.cloud
-        secretName: web-wallet-tls
+        secretName: wallet-tls-secret
 
 wallet-api2:
   ingress:
@@ -110,5 +110,5 @@ wallet-api2:
     tls:
       - hosts:
           - wallet-api2.portal.test.waltid.cloud
-        secretName: wallet-api2-portal-tls
+        secretName: wallet-api2-tls-secret
     host: wallet-api2.portal.test.waltid.cloud
