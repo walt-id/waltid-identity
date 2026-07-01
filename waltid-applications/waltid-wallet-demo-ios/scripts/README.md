@@ -17,6 +17,10 @@ Tests against the public EUDI backend at `issuer.eudiw.dev`:
 
 **Runs in CI**: ✅ Yes (via `.github/actions/gradle-ios/action.yml`)
 
+The native iOS workflow runs the `iosAppTests` integration target in CI. Full UI
+E2E coverage for the public backend is mirrored in the Compose iOS demo app and
+runs there in CI.
+
 ## Local Enterprise Backend (Requires Infrastructure)
 
 Tests against a local Enterprise stack. These tests are local-only for now and are not self-contained: the quickstart stack must provision the baseline organization, tenant, issuer2, verifier2, KMS, X509 store/certificates, VICAL, client attester, and mDL issuer profile before the mobile scripts run. The normal test command validates the environment and fails before Xcode if required resources are missing; it does not create resources unless an explicit preparation flag is used.
@@ -35,6 +39,9 @@ Tests against a local Enterprise stack. These tests are local-only for now and a
 ```
 
 **Runs in CI**: ❌ No (requires local infrastructure)
+
+Non-attested issuer/profile setup is shared with the Compose app runners through
+`../../mobile-e2e-fixtures/local-enterprise-fixtures.sh`.
 
 ### Setup for Local Tests
 
@@ -91,7 +98,8 @@ The normal script validates the quickstart-owned resources and the mobile-only h
 
 The CI runs:
 - ✅ Unit tests (`iosAppTests`)
-- ✅ EUDI UI tests (`EudiPublicBackendE2ETests`)
+- ✅ Public EUDI integration tests through `iosAppTests`
+- ❌ Compose iOS EUDI UI tests (excluded - flaky UI automation)
 - ❌ Local enterprise UI tests (excluded - needs infrastructure)
 
 See `.github/actions/gradle-ios/action.yml` for CI configuration.

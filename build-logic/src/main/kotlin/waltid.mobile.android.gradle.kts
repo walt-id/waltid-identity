@@ -8,13 +8,18 @@ plugins {
 
 val waltidMobile = extensions.getByType<WaltidMobileLibraryExtension>()
 
+val hasAndroidHostTests = layout.projectDirectory.dir("src/androidHostTest").asFile.isDirectory
 val hasAndroidDeviceTests = layout.projectDirectory.dir("src/androidDeviceTest").asFile.isDirectory
 
 kotlin {
     android {
         compileSdk = BuildConstants.COMPILE_SDK
         minSdk = BuildConstants.MIN_SDK
-        withHostTestBuilder {}
+        withHostTestBuilder {}.configure {
+            if (hasAndroidHostTests) {
+                isIncludeAndroidResources = true
+            }
+        }
         if (hasAndroidDeviceTests) {
             withDeviceTestBuilder {
                 sourceSetTreeName = "androidDeviceTest"

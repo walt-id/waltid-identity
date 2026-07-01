@@ -24,7 +24,7 @@ From a clean waltid-enterprise-quickstart checkout, run:
   HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --init-system
   HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --setup-all
   Then create the mobile helper resources explicitly:
-    waltid-wallet-demo-android/scripts/e2e-local-enterprise.sh --prepare-only
+    waltid-wallet-demo-compose/androidApp/scripts/e2e-local-enterprise.sh --prepare-only
     # or
     waltid-wallet-demo-ios/scripts/e2e-local-enterprise.sh --prepare-only
 

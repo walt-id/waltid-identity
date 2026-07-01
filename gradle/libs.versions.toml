@@ -14,6 +14,8 @@ jib = "3.5.3"
 android-gradle = "9.2.1"
 gradle-shadow = "9.4.2"
 buildconfig = "6.0.10"
+compose-multiplatform = "1.11.1"
+compose-material3 = "1.11.0-alpha07"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -95,8 +97,10 @@ tink = "1.21.0"
 sqldelight = "2.3.2"
 
 # Testing
+junit = "4.13.2"
 junit-jupiter = "6.1.0"
 mokkery = "3.4.1"
+robolectric = "4.16"
 
 # AndroidX
 androidx-core-ktx = "1.19.0"
@@ -138,6 +142,7 @@ buildconfig-plugin = { module="com.github.gmazzo.buildconfig:com.github.gmazzo.b
 
 ## Kotlin Test
 kotlintest = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 ## Ktor Client
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -238,9 +243,19 @@ androidx-compose-ui = { module = "androidx.compose.ui:ui" }
 androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
 androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+
+# Compose Multiplatform
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-multiplatform" }
+compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
 androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-test-uiautomator" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 ## HTTP
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" } # should be replaced with kotlinx-io
@@ -363,6 +378,7 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 kotlin-power-assert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-cocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle" }
 android-application = { id = "com.android.application", version.ref = "android-gradle" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }

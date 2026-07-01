@@ -1,5 +1,3 @@
-@file:OptIn(ExperimentalEncodingApi::class)
-
 package id.walt.openid4vci.tokens.jwt.refresh
 
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
@@ -10,7 +8,6 @@ import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import org.kotlincrypto.random.CryptoRand
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 const val KEYCLOAK_REFRESH_TOKEN_TYPE = "Refresh"
 

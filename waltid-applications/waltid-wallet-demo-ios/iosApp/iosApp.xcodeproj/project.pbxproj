@@ -101,7 +101,8 @@
 			};
 			explicitFolders = (
 			);
-			path = TestHelpers;
+			name = TestHelpers;
+			path = "../../mobile-e2e-fixtures/ios/TestHelpers";
 			sourceTree = "<group>";
 		};
 		D6B7A34B2FD94CC3009C69E7 /* iosAppTests */ = {
