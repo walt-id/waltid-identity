@@ -215,9 +215,9 @@ data class AuthorizationServerMetadata(
             tokenEndpointAuthMethodsSupported: Set<String>? = setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
             tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
             clientAttestationSigningAlgValuesSupported: Set<String>? =
-                setOf(ClientAttestationSigningAlgorithms.ES256),
+                ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
             clientAttestationPopSigningAlgValuesSupported: Set<String>? =
-                setOf(ClientAttestationSigningAlgorithms.ES256),
+                ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
             dpopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = false,

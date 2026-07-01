@@ -12,4 +12,22 @@ object ClientAttestationJwtTypes {
 
 object ClientAttestationSigningAlgorithms {
     const val ES256 = "ES256"
+    const val ES384 = "ES384"
+    const val ES512 = "ES512"
+    const val ES256K = "ES256K"
+    const val RS256 = "RS256"
+    const val RS384 = "RS384"
+    const val RS512 = "RS512"
+    const val ED_DSA = "EdDSA"
+
+    val SUPPORTED_JWS_ALGORITHMS = setOf(
+        ES256,
+        ES384,
+        ES512,
+        ES256K,
+        RS256,
+        RS384,
+        RS512,
+        ED_DSA,
+    )
 }

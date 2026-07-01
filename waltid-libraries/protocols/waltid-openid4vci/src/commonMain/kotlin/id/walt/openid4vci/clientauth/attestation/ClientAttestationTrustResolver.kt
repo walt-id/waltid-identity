@@ -11,6 +11,14 @@ interface ClientAttestationTrustResolver {
     ): List<Key>
 }
 
+fun interface ClientAttestationKeyReferenceResolver {
+    suspend fun resolveTrustedAttesterKeys(
+        reference: String,
+        header: JsonObject,
+        payload: JsonObject,
+    ): List<Key>
+}
+
 class StaticJwkClientAttestationTrustResolver(
     private val verificationKey: Key,
 ) : ClientAttestationTrustResolver {
@@ -38,4 +46,18 @@ class StaticJwkSetClientAttestationTrustResolver(
         header: JsonObject,
         payload: JsonObject,
     ): List<Key> = verificationKeys
+}
+
+class KeyReferenceClientAttestationTrustResolver(
+    private val reference: String,
+    private val keyReferenceResolver: ClientAttestationKeyReferenceResolver,
+) : ClientAttestationTrustResolver {
+    init {
+        require(reference.isNotBlank()) { "reference must not be blank" }
+    }
+
+    override suspend fun resolveTrustedAttesterKeys(
+        header: JsonObject,
+        payload: JsonObject,
+    ): List<Key> = keyReferenceResolver.resolveTrustedAttesterKeys(reference, header, payload)
 }

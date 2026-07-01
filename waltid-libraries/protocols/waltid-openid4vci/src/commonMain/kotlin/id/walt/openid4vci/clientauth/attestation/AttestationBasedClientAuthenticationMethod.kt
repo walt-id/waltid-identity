@@ -25,16 +25,20 @@ import kotlin.time.Instant
 
 class ClientAttestationConfig(
     private val attestationVerifier: ClientAttestationVerifier,
-    private val acceptedAttestationSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
-    private val acceptedPopSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
+    private val acceptedAttestationSigningAlgorithms: Set<String> =
+        ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+    private val acceptedPopSigningAlgorithms: Set<String> =
+        ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
     private val clock: () -> Instant = { Clock.System.now() },
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
 ) {
     constructor(
         trustResolver: ClientAttestationTrustResolver,
-        acceptedAttestationSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
-        acceptedPopSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
+        acceptedAttestationSigningAlgorithms: Set<String> =
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+        acceptedPopSigningAlgorithms: Set<String> =
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
         clock: () -> Instant = { Clock.System.now() },
         clockSkewSeconds: Long = 60,
         popMaxAgeSeconds: Long = 300,
@@ -60,8 +64,10 @@ class ClientAttestationConfig(
 
 class AttestationBasedClientAuthenticationMethod(
     private val attestationVerifier: ClientAttestationVerifier,
-    private val acceptedAttestationSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
-    private val acceptedPopSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
+    private val acceptedAttestationSigningAlgorithms: Set<String> =
+        ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+    private val acceptedPopSigningAlgorithms: Set<String> =
+        ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
     private val clock: () -> Instant = { Clock.System.now() },
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
@@ -69,8 +75,10 @@ class AttestationBasedClientAuthenticationMethod(
 
     constructor(
         trustResolver: ClientAttestationTrustResolver,
-        acceptedAttestationSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
-        acceptedPopSigningAlgorithms: Set<String> = setOf(ClientAttestationSigningAlgorithms.ES256),
+        acceptedAttestationSigningAlgorithms: Set<String> =
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+        acceptedPopSigningAlgorithms: Set<String> =
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
         clock: () -> Instant = { Clock.System.now() },
         clockSkewSeconds: Long = 60,
         popMaxAgeSeconds: Long = 300,
@@ -118,6 +126,15 @@ class AttestationBasedClientAuthenticationMethod(
 
         val clientId = attestation.payload.stringClaim(JwtPayloadClaims.SUBJECT)
             ?: return failure("Client attestation ${JwtPayloadClaims.SUBJECT} claim is required")
+
+        val requestedClientIds = parameters["client_id"].orEmpty()
+        if (requestedClientIds.size > 1) {
+            return failure("Exactly one client_id parameter is allowed for client attestation authentication")
+        }
+        val requestedClientId = requestedClientIds.singleOrNull()
+        if (requestedClientId != null && requestedClientId != clientId) {
+            return failure("client_id does not match client attestation subject")
+        }
 
         val verification = attestationVerifier.verifyAttestationJwt(
             jwt = attestationJwt,
@@ -219,8 +236,8 @@ class AttestationBasedClientAuthenticationMethod(
         if (alg !in acceptedPopSigningAlgorithms) {
             return "Client attestation PoP ${JwtHeaderParams.ALGORITHM} is not supported"
         }
-        if (!jwt.payload.audienceContains(expectedAudience)) {
-            return "Client attestation PoP ${JwtPayloadClaims.AUDIENCE} claim must contain " +
+        if (!jwt.payload.hasSingleAudience(expectedAudience)) {
+            return "Client attestation PoP ${JwtPayloadClaims.AUDIENCE} claim must identify only " +
                 "the authorization server issuer"
         }
         if (
@@ -268,10 +285,10 @@ class AttestationBasedClientAuthenticationMethod(
     private fun JsonObject.longClaim(name: String): Long? =
         (this[name] as? JsonPrimitive)?.longOrNull
 
-    private fun JsonObject.audienceContains(expectedAudience: String): Boolean {
+    private fun JsonObject.hasSingleAudience(expectedAudience: String): Boolean {
         val aud = this[JwtPayloadClaims.AUDIENCE] ?: return false
         return when (aud) {
-            is JsonArray -> aud.any { it.stringValue() == expectedAudience }
+            is JsonArray -> aud.size == 1 && aud.firstOrNull()?.stringValue() == expectedAudience
             is JsonPrimitive -> aud.contentOrNull == expectedAudience
             else -> false
         }
