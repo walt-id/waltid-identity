@@ -22,8 +22,7 @@ import kotlin.time.Duration.Companion.minutes
 class IssuerConformanceTests {
 
     companion object {
-        private const val defaultClientAttesterJwkPath =
-            "/home/pp/dev/walt-id/waltid-enterprise-quickstart/cli/keys/attester-key.json"
+        private const val defaultClientAttesterJwkResource = "/keys/attester-key.json"
         private const val credentialIssuerUrlProperty = "openid4vci.conformance.credential-issuer-url"
         private const val credentialIssuerUrlEnv = "OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL"
         private const val enterpriseBaseUrlProperty = "openid4vci.conformance.enterprise-base-url"
@@ -67,9 +66,19 @@ class IssuerConformanceTests {
 
         private fun loadClientAttesterJwks(): JsonObject {
             val configuredPath = propertyOrEnv(clientAttesterJwksFileProperty, clientAttesterJwksFileEnv)
-                ?: defaultClientAttesterJwkPath
-            val jwkJson = Files.readString(Path.of(configuredPath))
+            
+            val jwkJson = if (configuredPath != null) {
+                // Load from file path if explicitly configured
+                Files.readString(Path.of(configuredPath))
+            } else {
+                // Load from classpath resource
+                IssuerConformanceTests::class.java.getResourceAsStream(defaultClientAttesterJwkResource)
+                    ?.bufferedReader()?.readText()
+                    ?: error("Default client attester key not found in classpath: $defaultClientAttesterJwkResource")
+            }
+            
             val parsed = Json.parseToJsonElement(jwkJson)
+            val source = configuredPath ?: "classpath:$defaultClientAttesterJwkResource"
             return when (parsed) {
                 is JsonObject -> {
                     if ("keys" in parsed) {
@@ -83,7 +92,7 @@ class IssuerConformanceTests {
                     }
                 }
 
-                else -> error("Client attester key file must contain a JWK object or JWKS object: $configuredPath")
+                else -> error("Client attester key file must contain a JWK object or JWKS object: $source")
             }
         }
 

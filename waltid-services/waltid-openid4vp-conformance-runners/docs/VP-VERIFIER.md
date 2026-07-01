@@ -1,4 +1,4 @@
-# Verifier Conformance Tests
+# VP Verifier Conformance Tests
 
 ## Overview
 
@@ -10,40 +10,6 @@ These tests validate that the walt.id verifier correctly:
 - Validates credential signatures and holder binding
 - Enforces cryptographic requirements per HAIP profile
 - Handles X.509 certificate-based client authentication
-
-## HAIP Compliance
-
-The verifier conformance tests include HAIP (High Assurance Interoperability Profile) validation for eIDAS 2.0 compliance.
-
-**HAIP Requirements for Verifier:**
-- Signed authorization requests (MANDATORY)
-- Encrypted VP responses supported (MANDATORY)
-- P-256 key curve enforcement (MANDATORY)
-- SHA-256 hash algorithm (MANDATORY)
-- X.509 certificate-based client authentication
-
-## Architecture
-
-```
-[OpenID Conformance Suite]    <->    [walt.id Verifier]
-       (Wallet)                           (Verifier)
-       
-  Simulates wallet behavior          Generates requests
-  Sends VP responses                 Validates presentations
-  Reports conformance result         Returns verification result
-```
-
-The conformance suite acts as a **wallet** and calls the verifier's authorization endpoint.
-The verifier processes the request and validates the VP response.
-
-### Network Topology
-
-Since the conformance suite runs in Docker, it cannot directly reach `localhost` on the host machine.
-The solution is to use ngrok to expose the local verifier:
-
-```
-[Conformance Suite (Docker)]  -->  [ngrok tunnel]  -->  [Verifier (localhost:7003)]
-```
 
 ## Prerequisites
 
@@ -94,30 +60,48 @@ curl -k https://localhost.emobix.co.uk:8443/
 ### Step 1: Start ngrok Tunnel
 
 ```bash
-# In a separate terminal
+# In a separate terminal - tunnel to verifier-api2 port
 ngrok http 7003
 
 # Note the HTTPS URL, e.g.: https://abc123.ngrok-free.app
 ```
 
-### Step 2: Run Tests
+### Step 2: Set Environment Variable
+
+```bash
+# Set the ngrok URL (replace with your actual ngrok URL)
+export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
+```
+
+### Step 3: Start verifier-api2
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
-# Set the ngrok URL
-export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
+# Start verifier-api2 service
+./gradlew :waltid-services:waltid-verifier-api2:run
+```
 
-# Run all verifier tests
+### Step 4: Run Verifier Conformance Tests
+
+```bash
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+
+# Run all verifier conformance tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
     --tests "VerifierConformanceTests"
 ```
 
-### Step 3: View Results
+### Step 5: View Results
 
 Test results are saved to:
 ```
 waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
+```
+
+You can also view detailed logs in the conformance suite web UI at:
+```
+https://localhost.emobix.co.uk:8443/
 ```
 
 ## Test Plans
@@ -127,229 +111,141 @@ waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/in
 **Class:** `MdlX509SanDnsRequestUriSignedDirectPost`
 
 Tests ISO mDL (mobile Driving License) verification with X.509 certificate-based client authentication.
+This is a **non-HAIP** test plan for basic OID4VP compliance.
 
 | Property | Value |
 |----------|-------|
+| **Conformance Plan** | `oid4vp-1final-verifier-test-plan` |
 | **Credential Format** | `iso_mdl` (mso_mdoc) |
 | **Client ID Scheme** | `x509_san_dns` |
 | **Request Method** | `request_uri_signed` (JAR) |
 | **VP Profile** | `plain_vp` |
 | **Response Mode** | `direct_post` |
 
-**Test Modules:**
+**Expected Test Modules:**
 
 | Module | Expected Outcome | Description |
 |--------|------------------|-------------|
-| `oid4vp-1final-verifier-happy-flow` | ACCEPT | Standard successful verification flow |
-| `oid4vp-1final-verifier-request-uri-method-post` | ACCEPT (or skip) | Request URI fetched via POST method |
-| `oid4vp-1final-verifier-invalid-session-transcript` | REJECT | Invalid mDOC session transcript |
+| `oid4vp-1final-verifier-happy-flow` | ✅ PASS | Standard successful verification flow |
+| `oid4vp-1final-verifier-request-uri-method-post` | ✅ PASS (or skip) | Request URI fetched via POST method |
+| `oid4vp-1final-verifier-invalid-session-transcript` | ✅ PASS (REJECT) | Verifier must reject invalid mDOC session transcript |
 
 **Cryptographic Configuration:**
 - Verifier key: P-256 (secp256r1) EC key
 - Certificate: CN=verifier.example.com, SAN DNS=verifier.example.com
-- Issuer: walt.id Verifier CA
+- Certificate chain: Leaf → Intermediate CA (NOT self-signed leaf)
 - Client ID: `x509_san_dns:verifier.example.com`
 
-### Plan 2: SD-JWT VC with X.509 Hash (HAIP)
+### Plan 2: SD-JWT VC with HAIP (High Assurance)
 
-**Class:** `SdJwtVcX509SanDnsRequestUriSignedDirectPostJwt`
+**Class:** `SdJwtVcX509SanDnsRequestUriSignedDirectPost`
 
-Tests SD-JWT VC (Selective Disclosure JWT Verifiable Credential) verification with HAIP (High Assurance Interoperability Profile) requirements.
+Tests SD-JWT VC (Selective Disclosure JWT Verifiable Credential) verification with **HAIP (High Assurance Interoperability Profile)** requirements for eIDAS 2.0 compliance.
 
 | Property | Value |
 |----------|-------|
+| **Conformance Plan** | `oid4vp-1final-verifier-haip-test-plan` |
 | **Credential Format** | `sd_jwt_vc` (dc+sd-jwt) |
-| **Client ID Scheme** | `x509_hash` |
+| **Client ID Scheme** | `x509_san_dns` |
 | **Request Method** | `request_uri_signed` (JAR) |
 | **VP Profile** | `haip` |
-| **Response Mode** | `direct_post.jwt` (encrypted) |
+| **Response Mode** | `direct_post.jwt` (encrypted JWE) |
+| **Encrypted Response** | Required (HAIP mandate) |
 
-**Test Modules:**
+**Expected Test Modules:**
 
 | Module | Expected Outcome | Description |
 |--------|------------------|-------------|
-| `oid4vp-1final-verifier-happy-flow` | ACCEPT | Standard successful verification |
-| `oid4vp-1final-verifier-minimal-cnf-jwk` | ACCEPT | Minimal confirmation key in credential |
-| `oid4vp-1final-verifier-request-uri-method-post` | ACCEPT (or skip) | Request URI via POST |
-| `oid4vp-1final-verifier-invalid-kb-jwt-signature` | REJECT | Invalid key binding JWT signature |
-| `oid4vp-1final-verifier-invalid-credential-signature` | REJECT | Invalid credential signature |
-| `oid4vp-1final-verifier-invalid-sd-hash` | REJECT | Invalid selective disclosure hash |
-| `oid4vp-1final-verifier-invalid-kb-jwt-nonce` | REJECT | Invalid nonce in KB-JWT |
-| `oid4vp-1final-verifier-invalid-kb-jwt-aud` | REJECT | Invalid audience in KB-JWT |
-| `oid4vp-1final-verifier-kb-jwt-iat-in-past` | REJECT | KB-JWT issued too far in past |
-| `oid4vp-1final-verifier-kb-jwt-iat-in-future` | REJECT | KB-JWT issued in future |
+| `oid4vp-1final-verifier-happy-flow` | ✅ PASS | Standard successful verification |
+| `oid4vp-1final-verifier-minimal-cnf-jwk` | ✅ PASS | Minimal confirmation key in credential |
+| `oid4vp-1final-verifier-request-uri-method-post` | ✅ PASS (or skip) | Request URI via POST |
+| `oid4vp-1final-verifier-invalid-kb-jwt-signature` | ✅ PASS (REJECT) | Invalid key binding JWT signature |
+| `oid4vp-1final-verifier-invalid-credential-signature` | ✅ PASS (REJECT) | Invalid credential signature |
+| `oid4vp-1final-verifier-invalid-sd-hash` | ✅ PASS (REJECT) | Invalid selective disclosure hash |
+| `oid4vp-1final-verifier-invalid-kb-jwt-nonce` | ✅ PASS (REJECT) | Invalid nonce in KB-JWT |
+| `oid4vp-1final-verifier-invalid-kb-jwt-aud` | ✅ PASS (REJECT) | Invalid audience in KB-JWT |
+| `oid4vp-1final-verifier-kb-jwt-iat-in-past` | ✅ PASS (REJECT) | KB-JWT issued too far in past |
+| `oid4vp-1final-verifier-kb-jwt-iat-in-future` | ✅ PASS (REJECT) | KB-JWT issued in future |
 
 **Cryptographic Configuration:**
 - Verifier key: P-256 (secp256r1) EC key
 - Response encryption: Required (HAIP mandate)
-- Client ID: `x509_hash:<certificate-hash>`
-- Trust anchor: walt.id Verifier CA
+- Certificate chain: Leaf → Intermediate CA (NOT self-signed leaf)
+- Client ID: `x509_san_dns:verifier.example.com`
 
-## Interpreting Test Results
+## Certificate Chain Requirements
 
-### Conformance Result vs Verifier Result
+⚠️ **IMPORTANT**: The OpenID conformance suite validates that the leaf certificate is NOT self-signed.
 
-Each test module reports two results:
+The error `"Leaf certificate in x5c chain must not be self-signed"` means your certificate chain needs:
 
-1. **Conformance Result**: Whether the test execution completed successfully
-2. **Verifier Result**: Whether the verifier accepted or rejected the presentation
+1. **Root CA** - Self-signed root certificate (optional in x5c, used as trust anchor)
+2. **Intermediate CA** - Signed by Root CA
+3. **Leaf Certificate** - Signed by Intermediate CA (this is the one used for signing)
 
-### Expected Outcomes
-
-| Outcome | Meaning |
-|---------|---------|
-| `ACCEPT` | Verifier must accept the presentation (positive test) |
-| `REJECT` | Verifier must reject the presentation (negative test) |
-| `ACCEPT_OR_SKIP` | Verifier may accept or skip (optional feature) |
-
-### Example Output
-
-```
-================================================================================
-Test Plan: oid4vp-1final-verifier-haip-test-plan
-Variant: sd_jwt_vc + x509_hash + request_uri_signed + haip + direct_post.jwt
-================================================================================
-Plan created: abc123xyz
-Modules: 10
-
-[1/10] oid4vp-1final-verifier-happy-flow
-       Conformance: PASSED
-       Verifier:    SUCCESSFUL
-       
-[2/10] oid4vp-1final-verifier-invalid-kb-jwt-signature
-       Conformance: PASSED  
-       Verifier:    FAILED (correctly rejected invalid signature)
-
-...
-
-Summary:
-  Total:  10
-  Passed: 10 (verifier behavior matched expected outcome)
-================================================================================
-```
-
-**Important:** For negative tests, `Verifier: FAILED` is the **correct** result.
-The verifier correctly rejected an invalid presentation.
-
-## HAIP Requirements Validated
-
-The HAIP test plan validates these mandatory requirements:
-
-| Requirement | Implementation |
-|-------------|----------------|
-| Signed Request | `request_uri_signed` with JAR |
-| Encrypted Response | `direct_post.jwt` (JWE) |
-| P-256 Keys | secp256r1 curve for all keys |
-| SHA-256 | Hash algorithm for certificate hash |
-| Holder Binding | KB-JWT for SD-JWT credentials |
+The x5c chain in the test plans includes `[leaf, intermediate]` - both signed by their respective parents.
 
 ## Troubleshooting
 
-### Tests Skip Immediately
+### Test is SKIPPED
 
-**Cause:** Conformance suite not available or ngrok URL not set.
+**Cause:** Conformance suite not reachable or ngrok URL not set.
 
-**Solution:**
-1. Verify conformance suite: `curl -k https://localhost.emobix.co.uk:8443/`
-2. Verify ngrok is running: `curl https://your-ngrok-url.ngrok-free.app`
-3. Set environment variable: `export VERIFIER_NGROK_URL="https://..."`
+**Fix:**
+1. Verify conformance suite is running: `curl -k https://localhost.emobix.co.uk:8443/`
+2. Verify `VERIFIER_NGROK_URL` environment variable is set
+3. Check ngrok is running and forwarding to port 7003
 
-### Connection Refused in Conformance Suite Logs
+### "Leaf certificate in x5c chain must not be self-signed"
 
-**Cause:** Docker cannot reach the verifier.
+**Cause:** The test plan's certificate chain has a self-signed leaf certificate.
 
-**Solution:**
-- Use ngrok (recommended)
-- Or use host IP instead of localhost
+**Fix:** This should be fixed in the current version. If you still see this error, ensure you're using the latest test plan code with the CA-signed certificate chain.
 
-### SSL Certificate Errors
+### Conformance Suite Shows FAILED but Verifier Shows SUCCESS
 
-**Cause:** Truststore not configured or certificate changed.
+**Cause:** The verifier internally verified the presentation, but the conformance suite found an issue with the request or response format.
 
-**Solution:**
-```bash
-# Re-extract and import certificate
-openssl s_client -connect localhost.emobix.co.uk:8443 </dev/null 2>/dev/null | \
-  openssl x509 -outform PEM > conformance-test.pem
+**Fix:** Check the conformance suite log for specific validation failures. Common issues:
+- Certificate chain validation
+- Response encryption missing (for HAIP)
+- Incorrect response_mode
 
-keytool -delete -alias conformance-test-localhost \
-  -keystore conformance-truststore.jks -storepass changeit 2>/dev/null || true
-keytool -importcert -trustcacerts -alias conformance-test-localhost \
-  -file conformance-test.pem -keystore conformance-truststore.jks \
-  -storepass changeit -noprompt
+### Connection Refused to ngrok URL
+
+**Cause:** verifier-api2 is not running or ngrok tunnel is down.
+
+**Fix:**
+1. Start verifier-api2: `./gradlew :waltid-services:waltid-verifier-api2:run`
+2. Restart ngrok: `ngrok http 7003`
+3. Update `VERIFIER_NGROK_URL` with new ngrok URL
+
+## Expected Results Summary
+
+| Test Plan | Expected Pass | Expected Fail | Notes |
+|-----------|--------------|---------------|-------|
+| mDL Plain VP | 3/3 | 0 | All modules should pass |
+| SD-JWT HAIP | 10/10 | 0 | All modules should pass |
+
+## Architecture
+
+```
+[OpenID Conformance Suite]    <->    [walt.id Verifier]
+       (Wallet)                           (Verifier)
+       
+  Simulates wallet behavior          Generates requests
+  Sends VP responses                 Validates presentations
+  Reports conformance result         Returns verification result
 ```
 
-### Address Already in Use
+The conformance suite acts as a **wallet** and calls the verifier's authorization endpoint.
+The verifier processes the request and validates the VP response.
 
-**Cause:** Another process is using port 7003.
+### Network Topology
 
-**Solution:**
-```bash
-# Find and kill the process
-sudo lsof -i :7003
-kill <PID>
+Since the conformance suite runs in Docker, it cannot directly reach `localhost` on the host machine.
+The solution is to use ngrok to expose the local verifier:
+
 ```
-
-The conformance test starts its own embedded verifier - do not run a manual verifier instance.
-
-## Test Plan Configuration
-
-### Variant Parameters
-
-Each test plan specifies variants that determine the test configuration:
-
-| Parameter | Options | Description |
-|-----------|---------|-------------|
-| `credential_format` | `iso_mdl`, `sd_jwt_vc`, `iso_photoid` | Credential type |
-| `client_id_prefix` | `x509_san_dns`, `x509_hash`, `did`, `verifier_attestation` | Client authentication |
-| `request_method` | `request_uri_signed`, `request_uri`, `request` | How request is transmitted |
-| `vp_profile` | `plain_vp`, `haip` | Security profile |
-| `response_mode` | `direct_post`, `direct_post.jwt` | Response delivery |
-
-### Configuration Structure
-
-```kotlin
-TestPlanConfiguration(
-    testPlanCreationUrl = { /* URL parameters */ },
-    testPlanCreationConfiguration = JsonObject { /* Configuration JSON */ },
-    moduleVariant = "...",  // Module-specific variant
-    moduleOutcomes = mapOf( /* Expected outcomes per module */ ),
-    verificationSessionSetup = CrossDeviceFlowSetup(...)
-)
+[Conformance Suite (Docker)]  -->  [ngrok tunnel]  -->  [Verifier (localhost:7003)]
 ```
-
-## Adding New Test Plans
-
-1. Create a new class implementing `TestPlan` interface
-2. Define the test plan variant and configuration
-3. Specify expected outcomes for each module
-4. Add to `ConformanceTestRunner.testPlans` list
-5. Document in this file
-
-Example:
-```kotlin
-class NewTestPlan(verifierUrlPrefix: String, ...) : TestPlan {
-    override val config = TestPlanConfiguration(
-        testPlanCreationUrl = {
-            append("planName", "oid4vp-1final-verifier-test-plan")
-            append("variant", """{"credential_format":"..."}""")
-        },
-        ...
-    )
-}
-```
-
-## Related Documentation
-
-- [VCI-WALLET.md](VCI-WALLET.md) - VCI wallet conformance tests
-- [VCI-ISSUER.md](VCI-ISSUER.md) - VCI issuer conformance tests
-- [VP-WALLET.md](VP-WALLET.md) - VP wallet conformance tests
-- [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
-- [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
-- [Conformance Suite GitLab](https://gitlab.com/openid/conformance-suite)
-
-## Support
-
-- [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-- [walt.id Discord](https://discord.gg/AW8AgqJthZ)
-- [Documentation](https://docs.walt.id)
