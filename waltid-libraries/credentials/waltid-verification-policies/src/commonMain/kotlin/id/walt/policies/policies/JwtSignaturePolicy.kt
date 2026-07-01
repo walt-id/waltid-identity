@@ -1,6 +1,8 @@
 package id.walt.policies.policies
 
+import id.walt.crypto.exceptions.VerificationException
 import id.walt.policies.JwtVerificationPolicy
+import id.walt.sdjwt.AsyncJWTCryptoProvider
 import id.walt.sdjwt.SDJwt
 import id.walt.w3c.schemes.JwsSignatureScheme
 import id.walt.w3c.utils.VCFormat
@@ -43,14 +45,23 @@ class JwtSignaturePolicy : JwtVerificationPolicy(
             val keyMap = mutableMapOf(keysInfo.keyId to key)
             runCatching { key.getKeyId() }.getOrNull()?.let { keyId -> keyMap[keyId] = key }
 
-            val result = verifySDJwt(
-                credential,
-                JWTCryptoProviderManager.getDefaultJWTCryptoProvider(keyMap),
-            )
+            val result = verifySdJwt(credential, JWTCryptoProviderManager.getDefaultAsyncJWTCryptoProvider(keyMap))
             if (result.isSuccess) return result
             lastFailure = result.exceptionOrNull()
         }
 
         return Result.failure(lastFailure ?: IllegalArgumentException("No issuer keys found in the DID document"))
+    }
+
+    private suspend fun verifySdJwt(
+        credential: String,
+        cryptoProvider: AsyncJWTCryptoProvider
+    ): Result<JsonElement> = runCatching {
+        val verification = SDJwt.verifyAndParseAsync(credential, cryptoProvider)
+        if (verification.verified) {
+            verification.sdJwt.fullPayload
+        } else {
+            throw VerificationException(verification.message ?: "Verification failed")
+        }
     }
 }

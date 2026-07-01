@@ -24,7 +24,6 @@ import id.walt.openid4vci.validation.CredentialRequestValidator
 import id.walt.openid4vci.validation.DefaultCredentialRequestValidator
 import id.walt.openid4vci.validation.IssuerStateValidator
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
 import kotlin.time.Clock
 
@@ -68,7 +67,6 @@ internal class StubTokenIssuer : AccessTokenIssuer {
     }
 }
 
-@OptIn(ExperimentalEncodingApi::class)
 internal class TestRefreshTokenIssuer : RefreshTokenIssuer, RefreshTokenVerifier {
 
     override suspend fun issue(request: RefreshTokenGenerationRequest): String {

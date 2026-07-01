@@ -11,6 +11,7 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
+
     js(IR) {
         outputModuleName = "x509"
         nodejs {
@@ -72,5 +73,3 @@ mavenPublishing {
         description.set("walt.id Kotlin/Java library X.509")
     }
 }
-
-

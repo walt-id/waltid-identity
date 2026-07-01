@@ -5,6 +5,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.assertIACABuilderDataEqualsCertificateData
+import id.walt.x509.iso.supportsIsoX509PlatformOperations
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -18,6 +19,8 @@ class IACACertificateBuilderMPTest {
 
     @Test
     fun `build should succeed when IACA signing key is of valid keyType`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
+
         IsoSharedTestHarnessValidResources
             .iacaSigningKeyMap()
             .values
@@ -37,6 +40,8 @@ class IACACertificateBuilderMPTest {
 
     @Test
     fun `build should be safe when called concurrently`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
+
         val bundles = List(20) {
             async {
                 IsoSharedTestHarnessValidResources.iacaBuilder.build(
@@ -58,6 +63,8 @@ class IACACertificateBuilderMPTest {
 
     @Test
     fun `builder should throw when IACA signing key is of invalid keyType`() = runTest {
+        if (!supportsIsoX509PlatformOperations) return@runTest
+
         listOf(
             KeyType.Ed25519,
             KeyType.RSA,

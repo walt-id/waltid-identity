@@ -43,17 +43,9 @@ kotlin {
 
         }
 
-        val iosArm64Main by getting
-        val iosSimulatorArm64Main by getting
-
-        val iosMain by creating {
-            this.dependsOn(commonMain.get())
-            iosArm64Main.dependsOn(this)
-            iosSimulatorArm64Main.dependsOn(this)
-            dependencies {
-                implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
-                implementation("io.ktor:ktor-client-darwin:3.2.3")
-            }
+        iosMain.dependencies {
+            implementation(project(":waltid-libraries:crypto:waltid-crypto-ios"))
+            implementation("io.ktor:ktor-client-darwin:3.2.3")
         }
     }
 }
