@@ -3,6 +3,8 @@ package id.walt.openid4vci.metadata.oauth
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import io.ktor.http.Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KeepGeneratedSerializer
@@ -210,10 +212,12 @@ data class AuthorizationServerMetadata(
                 GrantType.AuthorizationCode.value,
                 GrantType.PreAuthorizedCode.value,
             ),
-            tokenEndpointAuthMethodsSupported: Set<String>? = setOf("attest_jwt_client_auth"),
+            tokenEndpointAuthMethodsSupported: Set<String>? = setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
             tokenEndpointAuthSigningAlgValuesSupported: Set<String>? = null,
-            clientAttestationSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
-            clientAttestationPopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
+            clientAttestationSigningAlgValuesSupported: Set<String>? =
+                setOf(ClientAttestationSigningAlgorithms.ES256),
+            clientAttestationPopSigningAlgValuesSupported: Set<String>? =
+                setOf(ClientAttestationSigningAlgorithms.ES256),
             dpopSigningAlgValuesSupported: Set<String>? = setOf("ES256"),
             codeChallengeMethodsSupported: List<String>? = null,
             requirePushedAuthorizationRequests: Boolean? = false,
