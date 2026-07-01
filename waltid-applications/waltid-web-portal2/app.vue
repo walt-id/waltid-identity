@@ -4,6 +4,7 @@ const issuerBase = config.public.issuerBase as string
 const verifierBase = config.public.verifierBase as string
 
 const activeTab = ref<'issue' | 'verify'>('issue')
+const mode = ref<'simple' | 'advanced'>('simple')
 
 const ISSUER_DOCS_URL = 'https://docs.walt.id/community-stack/issuer2/getting-started'
 const VERIFIER_DOCS_URL = 'https://docs.walt.id/community-stack/verifier2/getting-started'
@@ -52,9 +53,30 @@ const hasResult = computed(() =>
 
 <template>
   <main class="max-w-[1100px] mx-auto px-5 pt-8 pb-12">
-    <header class="flex items-center gap-4 flex-wrap mb-2">
-      <img src="/waltid-logo.svg" alt="walt.id" class="h-[60px] w-auto" />
-      <h1 class="text-3xl font-bold m-0">Demo Portal</h1>
+    <header class="flex items-center justify-between gap-4 flex-wrap mb-2">
+      <div class="flex items-center gap-4">
+        <img src="/waltid-logo.svg" alt="walt.id" class="h-[60px] w-auto" />
+        <h1 class="text-3xl font-bold m-0">Demo Portal</h1>
+      </div>
+
+      <div class="inline-flex rounded-lg border border-[--color-border-strong] bg-white p-1">
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+          :class="mode === 'simple' ? 'bg-slate-900 text-white' : 'text-[--color-text-muted] hover:text-[--color-text]'"
+          @click="mode = 'simple'"
+        >
+          Simple
+        </button>
+        <button
+          type="button"
+          class="px-3 py-1.5 text-sm font-medium rounded-md transition-colors"
+          :class="mode === 'advanced' ? 'bg-slate-900 text-white' : 'text-[--color-text-muted] hover:text-[--color-text]'"
+          @click="mode = 'advanced'"
+        >
+          Advanced
+        </button>
+      </div>
     </header>
 
     <p class="text-[--color-text-secondary] mb-6">
@@ -112,8 +134,16 @@ const hasResult = computed(() =>
         </div>
 
         <div class="p-5 flex-1">
+          <SimpleIssueEditor
+            v-if="mode === 'simple' && activeTab === 'issue'"
+            :session="issuerSession"
+          />
+          <SimpleVerifyEditor
+            v-else-if="mode === 'simple'"
+            :session="verifierSession"
+          />
           <IssueEditor
-            v-if="activeTab === 'issue'"
+            v-else-if="activeTab === 'issue'"
             v-model:json="issuerJson"
             v-model:selected-index="issuerSelectedIndex"
             :swagger="issuerSwagger"
