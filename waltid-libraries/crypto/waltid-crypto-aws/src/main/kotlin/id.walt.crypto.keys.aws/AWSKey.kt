@@ -401,6 +401,10 @@ $encodedPk
          * Create replica keys in the specified regions for a multi-region primary key.
          * Replicas share the same key material and key ID as the primary.
          *
+         * Note: AWS KMS multi-region keys have eventual consistency. The primary key
+         * may not be immediately visible in other regions for replication. This method
+         * includes retry logic to handle this propagation delay.
+         *
          * @param primaryKeyId The key ID of the primary multi-region key
          * @param primaryRegion The region of the primary key (skipped in replica creation)
          * @param replicaRegions List of regions where replicas should be created
@@ -410,21 +414,48 @@ $encodedPk
             primaryRegion: String,
             replicaRegions: List<String>
         ) {
+            val log = KotlinLogging.logger {}
+            
             for (targetRegion in replicaRegions) {
                 if (targetRegion == primaryRegion) continue // Skip primary region
 
-                try {
-                    KmsClient { region = targetRegion }.use { kms ->
-                        kms.replicateKey(ReplicateKeyRequest {
-                            keyId = primaryKeyId
-                            replicaRegion = targetRegion
-                        })
+                // Retry with exponential backoff for eventual consistency
+                var lastException: Exception? = null
+                repeat(5) { attempt ->
+                    try {
+                        KmsClient { region = targetRegion }.use { kms ->
+                            kms.replicateKey(ReplicateKeyRequest {
+                                keyId = primaryKeyId
+                                replicaRegion = targetRegion
+                            })
+                        }
+                        log.info { "Created replica key in $targetRegion for primary $primaryKeyId" }
+                        return@repeat // Success, exit retry loop
+                    } catch (e: Exception) {
+                        lastException = e
+                        val message = e.message ?: ""
+                        // Check if this is a "key not found" error due to eventual consistency
+                        if (message.contains("does not exist", ignoreCase = true) ||
+                            message.contains("not found", ignoreCase = true)) {
+                            if (attempt < 4) {
+                                val delayMs = 1000L * (attempt + 1) // 1s, 2s, 3s, 4s
+                                log.debug { "Key not yet visible in $targetRegion, retrying in ${delayMs}ms (attempt ${attempt + 1}/5)" }
+                                delay(delayMs)
+                                return@repeat // Continue to next retry
+                            }
+                        }
+                        // Non-retryable error or max retries reached
+                        throw IllegalStateException(
+                            "Failed to create replica in region $targetRegion for key $primaryKeyId: ${e.message}",
+                            e
+                        )
                     }
-                } catch (e: Exception) {
-                    // Wrap with context about which region failed
+                }
+                // If we exit the repeat loop without success and lastException is set, throw it
+                lastException?.let {
                     throw IllegalStateException(
-                        "Failed to create replica in region $targetRegion for key $primaryKeyId: ${e.message}",
-                        e
+                        "Failed to create replica in region $targetRegion for key $primaryKeyId after retries: ${it.message}",
+                        it
                     )
                 }
             }

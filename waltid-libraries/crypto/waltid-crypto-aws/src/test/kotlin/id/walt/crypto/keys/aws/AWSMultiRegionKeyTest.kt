@@ -2,6 +2,7 @@ package id.walt.crypto.keys.aws
 
 import aws.sdk.kotlin.services.kms.KmsClient
 import aws.sdk.kotlin.services.kms.model.KmsException
+import id.walt.crypto.keys.KeyType
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -158,7 +159,7 @@ class AWSMultiRegionKeyTest {
     // Note: These tests are disabled by default as they require AWS credentials.
     // Uncomment and run manually for integration testing.
 
-    /*
+
     @Test
     fun `generate multi-region key with replicas`() = runTest {
         val config = AWSKeyMetadataSDK(
@@ -201,5 +202,5 @@ class AWSMultiRegionKeyTest {
         // This test would require mocking network failures
         // or using a test account with intentionally unavailable regions
     }
-    */
+
 }
