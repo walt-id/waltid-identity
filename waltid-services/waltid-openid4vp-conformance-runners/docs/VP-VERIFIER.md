@@ -57,7 +57,25 @@ curl -k https://localhost.emobix.co.uk:8443/
 
 ## Running Tests
 
-### Step 1: Start ngrok Tunnel
+### Step 1: Start Conformance Suite
+
+```bash
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-walt.yml up -d
+
+# Wait ~30 seconds for initialization
+# Verify it's running:
+curl -k https://localhost.emobix.co.uk:8443/
+```
+
+### Step 2: Start verifier-api2
+
+```bash
+cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+./gradlew :waltid-services:waltid-verifier-api2:run
+```
+
+### Step 3: Start ngrok Tunnel
 
 ```bash
 # In a separate terminal - tunnel to verifier-api2 port
@@ -66,25 +84,12 @@ ngrok http 7003
 # Note the HTTPS URL, e.g.: https://abc123.ngrok-free.app
 ```
 
-### Step 2: Set Environment Variable
+### Step 4: Set Environment Variable and Run Tests
 
 ```bash
 # Set the ngrok URL (replace with your actual ngrok URL)
 export VERIFIER_NGROK_URL="https://abc123.ngrok-free.app"
-```
 
-### Step 3: Start verifier-api2
-
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-
-# Start verifier-api2 service
-./gradlew :waltid-services:waltid-verifier-api2:run
-```
-
-### Step 4: Run Verifier Conformance Tests
-
-```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
 # Run all verifier conformance tests

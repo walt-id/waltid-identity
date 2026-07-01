@@ -17,9 +17,9 @@ import kotlin.test.assertEquals
 class TestPlanRunner(
     val config: TestPlanConfiguration,
     http: HttpClient,
-
     val conformanceHost: String,
-    val conformancePort: Int
+    val conformancePort: Int,
+    val testPlanName: String = "unknown"
 ) {
     companion object {
         val baseUrlBuilderSetup: URLBuilder.(host: String, port: Int) -> Unit = { cHost, cPort ->
@@ -116,6 +116,7 @@ class TestPlanRunner(
         assertEquals(VerificationSessionStatus.SUCCESSFUL, verifier2Info.status)
 
         return TestPlanResult(
+            testName = testPlanName,
             conformanceTestId = testId,
             conformanceStatus = testRunInfo.status,
             conformanceResult = testRunInfo.result,
