@@ -97,15 +97,10 @@ Android sample project for key generation, DID creation, signing, and verificati
 
 **Use when:** You need the legacy Android crypto/sample app while it is still available, or you are migrating existing Android sample usage to the Compose wallet demo.
 
-### [🟢 waltid-wallet-demo-android](./waltid-wallet-demo-android)
-Native Android demo app for the mobile Wallet SDK. Demonstrates credential issuance, credential presentation, Android Keystore-backed keys, and SQLDelight-backed wallet persistence.
+<br />
+<br />
 
-**Use when:** You need to validate mobile wallet SDK flows on Android or run Android mobile integration tests.
-
-### [🟢 waltid-wallet-demo-ios](./waltid-wallet-demo-ios)
-Native iOS demo app for the mobile Wallet SDK. Demonstrates credential issuance, credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
-
-**Use when:** You need to validate mobile wallet SDK flows on iOS or run iOS mobile integration tests.
+### Test Applications
 
 ### [🟢 waltid-digital-credentials](./waltid-digital-credentials)
 Standalone web test app for validating the Digital Credentials API flow directly against verifier endpoints. Provides a user-friendly interface for testing and debugging DC API verification flows.
