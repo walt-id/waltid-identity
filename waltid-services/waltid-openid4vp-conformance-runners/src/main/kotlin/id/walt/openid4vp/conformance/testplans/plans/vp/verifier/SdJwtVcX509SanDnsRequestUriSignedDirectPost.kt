@@ -97,6 +97,7 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
                 "variant", /* language=json*/
                 """{
                     "credential_format": "sd_jwt_vc",
+                    "request_method": "request_uri_signed",
                     "response_mode": "direct_post.jwt"
                 }""".trimIndent()
             )

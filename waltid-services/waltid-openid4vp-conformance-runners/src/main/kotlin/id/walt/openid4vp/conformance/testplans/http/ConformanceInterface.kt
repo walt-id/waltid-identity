@@ -108,6 +108,9 @@ class ConformanceInterface(
      */
     suspend fun waitForTestStatus(testId: String, shouldBeWaiting: Boolean) {
         var counter = 0
+        // Give conformance suite time to initialize the test
+        delay(2.seconds)
+        
         while (true) {
             counter++
 
@@ -126,7 +129,7 @@ class ConformanceInterface(
             }
 
 
-            if (counter > 15) {
+            if (counter > 30) {
                 throw IllegalStateException("Waited for ${counter - 1} tries, but test is still not ready for presentation (waiting for waiting=$shouldBeWaiting)")
             }
 
