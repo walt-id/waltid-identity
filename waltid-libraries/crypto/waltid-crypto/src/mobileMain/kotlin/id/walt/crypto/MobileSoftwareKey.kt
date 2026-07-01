@@ -23,99 +23,60 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 
-internal class MobileSoftwareKey private constructor(
+internal sealed class MobileSoftwareKey(
     private val kid: String,
-    override val keyType: KeyType,
-    private val edPublicKey: EdDSA.PublicKey?,
-    private val edPrivateKey: EdDSA.PrivateKey?,
-    private val ecPublicKey: ECDSA.PublicKey?,
-    private val ecPrivateKey: ECDSA.PrivateKey?,
 ) : Key() {
 
     companion object {
-        suspend fun create(provider: CryptographyProvider, kid: String, keyType: KeyType): MobileSoftwareKey {
-            val edDsa by lazy { provider.get(EdDSA) }
-            val ecdsa by lazy { provider.get(ECDSA) }
-            return when (keyType) {
-                KeyType.Ed25519 -> {
-                    val keyPair = edDsa.keyPairGenerator(EdDSA.Curve.Ed25519).generateKey()
-                    MobileSoftwareKey(
-                        kid = kid,
-                        keyType = keyType,
-                        edPublicKey = keyPair.publicKey,
-                        edPrivateKey = keyPair.privateKey,
-                        ecPublicKey = null,
-                        ecPrivateKey = null,
-                    )
-                }
-                KeyType.secp256k1 -> {
-                    val keyPair = ecdsa.keyPairGenerator(EC.Curve.secp256k1).generateKey()
-                    MobileSoftwareKey(
-                        kid = kid,
-                        keyType = keyType,
-                        edPublicKey = null,
-                        edPrivateKey = null,
-                        ecPublicKey = keyPair.publicKey,
-                        ecPrivateKey = keyPair.privateKey,
-                    )
-                }
+        suspend fun create(provider: CryptographyProvider, kid: String, keyType: KeyType): MobileSoftwareKey =
+            when (keyType) {
+                KeyType.Ed25519 -> provider.get(EdDSA)
+                    .keyPairGenerator(EdDSA.Curve.Ed25519)
+                    .generateKey()
+                    .let { keyPair -> Ed25519(kid, keyPair.publicKey, keyPair.privateKey) }
+                KeyType.secp256k1 -> provider.get(ECDSA)
+                    .keyPairGenerator(EC.Curve.secp256k1)
+                    .generateKey()
+                    .let { keyPair -> Secp256k1(kid, keyPair.publicKey, keyPair.privateKey) }
                 else -> error("Unsupported software key type: $keyType")
             }
-        }
 
         @OptIn(CryptographyProviderApi::class)
         suspend fun load(provider: CryptographyProvider, kid: String, keyType: KeyType, jwkBytes: ByteArray): MobileSoftwareKey {
             val hasPrivateMaterial = Json.parseToJsonElement(jwkBytes.decodeToString()).jsonObject.containsKey("d")
-            val edDsa by lazy { provider.get(EdDSA) }
-            val ecdsa by lazy { provider.get(ECDSA) }
             return when (keyType) {
                 KeyType.Ed25519 -> {
-                    val publicKey = edDsa.publicKeyDecoder(EdDSA.Curve.Ed25519)
-                        .decodeFromByteArray(EdDSA.PublicKey.Format.JWK, jwkBytes)
-                    val privateKey = if (hasPrivateMaterial) {
-                        edDsa.privateKeyDecoder(EdDSA.Curve.Ed25519)
-                            .decodeFromByteArray(EdDSA.PrivateKey.Format.JWK, jwkBytes)
-                    } else {
-                        null
-                    }
-                    MobileSoftwareKey(
+                    val edDsa = provider.get(EdDSA)
+                    Ed25519(
                         kid = kid,
-                        keyType = keyType,
-                        edPublicKey = publicKey,
-                        edPrivateKey = privateKey,
-                        ecPublicKey = null,
-                        ecPrivateKey = null,
+                        publicKey = edDsa.publicKeyDecoder(EdDSA.Curve.Ed25519)
+                            .decodeFromByteArray(EdDSA.PublicKey.Format.JWK, jwkBytes),
+                        privateKey = if (hasPrivateMaterial) {
+                            edDsa.privateKeyDecoder(EdDSA.Curve.Ed25519)
+                                .decodeFromByteArray(EdDSA.PrivateKey.Format.JWK, jwkBytes)
+                        } else {
+                            null
+                        },
                     )
                 }
                 KeyType.secp256k1 -> {
-                    val publicKey = ecdsa.publicKeyDecoder(EC.Curve.secp256k1)
-                        .decodeFromByteArray(EC.PublicKey.Format.JWK, jwkBytes)
-                    val privateKey = if (hasPrivateMaterial) {
-                        ecdsa.privateKeyDecoder(EC.Curve.secp256k1)
-                            .decodeFromByteArray(EC.PrivateKey.Format.JWK, jwkBytes)
-                    } else {
-                        null
-                    }
-                    MobileSoftwareKey(
+                    val ecdsa = provider.get(ECDSA)
+                    Secp256k1(
                         kid = kid,
-                        keyType = keyType,
-                        edPublicKey = null,
-                        edPrivateKey = null,
-                        ecPublicKey = publicKey,
-                        ecPrivateKey = privateKey,
+                        publicKey = ecdsa.publicKeyDecoder(EC.Curve.secp256k1)
+                            .decodeFromByteArray(EC.PublicKey.Format.JWK, jwkBytes),
+                        privateKey = if (hasPrivateMaterial) {
+                            ecdsa.privateKeyDecoder(EC.Curve.secp256k1)
+                                .decodeFromByteArray(EC.PrivateKey.Format.JWK, jwkBytes)
+                        } else {
+                            null
+                        },
                     )
                 }
                 else -> error("Unsupported software key type: $keyType")
             }
         }
     }
-
-    override val hasPrivateKey: Boolean
-        get() = when (keyType) {
-            KeyType.Ed25519 -> edPrivateKey != null
-            KeyType.secp256k1 -> ecPrivateKey != null
-            else -> error("Unexpected key type: $keyType")
-        }
 
     override suspend fun getKeyId(): String = kid
 
@@ -127,42 +88,16 @@ internal class MobileSoftwareKey private constructor(
     override suspend fun exportJWK(): String = exportJWKObject().toString()
 
     override suspend fun exportJWKObject(): JsonObject {
-        val jwkBytes = when (keyType) {
-            KeyType.Ed25519 -> requireNotNull(edPublicKey)
-                .encodeToByteArray(EdDSA.PublicKey.Format.JWK)
-            KeyType.secp256k1 -> requireNotNull(ecPublicKey)
-                .encodeToByteArray(EC.PublicKey.Format.JWK)
-            else -> error("Unexpected key type: $keyType")
-        }
-        val jwk = Json.parseToJsonElement(jwkBytes.decodeToString()).jsonObject.toMutableMap()
+        val jwk = Json.parseToJsonElement(publicKeyJwkBytes().decodeToString()).jsonObject.toMutableMap()
         jwk["kid"] = JsonPrimitive(kid)
         return JsonObject(jwk)
     }
 
-    override suspend fun exportPEM(): String {
-        val pemBytes = when (keyType) {
-            KeyType.Ed25519 -> requireNotNull(edPublicKey)
-                .encodeToByteArray(EdDSA.PublicKey.Format.PEM)
-            KeyType.secp256k1 -> requireNotNull(ecPublicKey)
-                .encodeToByteArray(EC.PublicKey.Format.PEM)
-            else -> error("Unexpected key type: $keyType")
-        }
-        return pemBytes.decodeToString()
-    }
-
-    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray = when (keyType) {
-        KeyType.Ed25519 -> requireNotNull(edPrivateKey) { "Only private key can do signing." }
-            .signatureGenerator()
-            .generateSignature(plaintext)
-        KeyType.secp256k1 -> requireNotNull(ecPrivateKey) { "Only private key can do signing." }
-            .signatureGenerator(SHA256, ECDSA.SignatureFormat.RAW)
-            .generateSignature(plaintext)
-        else -> error("Unexpected key type: $keyType")
-    }
+    override suspend fun exportPEM(): String = publicKeyPemBytes().decodeToString()
 
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val (header, payload, signable) = KeyUtils.rawSignaturePayloadForJws(plaintext, headers, keyType)
-        val signature = signRaw(signable)
+        val signature = signRawBytes(signable)
         return KeyUtils.signJwsWithRawSignature(signature, header, payload)
     }
 
@@ -172,56 +107,97 @@ internal class MobileSoftwareKey private constructor(
         customSignatureAlgorithm: String?,
     ): Result<ByteArray> = runCatching {
         val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required" }
-        when (keyType) {
-            KeyType.Ed25519 -> requireNotNull(edPublicKey)
-                .signatureVerifier()
-                .verifySignature(plaintext, signed)
-            KeyType.secp256k1 -> requireNotNull(ecPublicKey)
-                .signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW)
-                .verifySignature(plaintext, signed)
-            else -> error("Unexpected key type: $keyType")
-        }
+        verifySignature(plaintext, signed)
         plaintext
     }
 
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
         val parts = signedJws.decodeJwsStrings()
         val signedData = parts.getSignable().encodeToByteArray()
-        val signature = parts.signature.decodeFromBase64Url()
-        when (keyType) {
-            KeyType.Ed25519 -> requireNotNull(edPublicKey)
-                .signatureVerifier()
-                .verifySignature(signedData, signature)
-            KeyType.secp256k1 -> requireNotNull(ecPublicKey)
-                .signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW)
-                .verifySignature(signedData, signature)
-            else -> error("Unexpected key type: $keyType")
-        }
+        verifySignature(signedData, parts.signature.decodeFromBase64Url())
         Json.parseToJsonElement(parts.payload.decodeFromBase64Url().decodeToString())
     }
 
     override suspend fun getPublicKey(): Key = JWKKey(exportJWK(), kid)
 
-    override suspend fun getPublicKeyRepresentation(): ByteArray = when (keyType) {
-        KeyType.Ed25519 -> requireNotNull(edPublicKey)
-            .encodeToByteArray(EdDSA.PublicKey.Format.RAW)
-        KeyType.secp256k1 -> requireNotNull(ecPublicKey)
-            .encodeToByteArray(EC.PublicKey.Format.RAW)
-        else -> error("Unexpected key type: $keyType")
-    }
+    override suspend fun getPublicKeyRepresentation(): ByteArray = publicKeyRawBytes()
 
     override suspend fun getMeta(): KeyMeta = JwkKeyMeta(getKeyId())
 
     override suspend fun deleteKey(): Boolean = true
 
-    suspend fun exportPrivateKeyMaterial(): ByteArray {
-        check(hasPrivateKey) { "Only private key material can be exported." }
-        return when (keyType) {
-            KeyType.Ed25519 -> requireNotNull(edPrivateKey)
-                .encodeToByteArray(EdDSA.PrivateKey.Format.JWK)
-            KeyType.secp256k1 -> requireNotNull(ecPrivateKey)
-                .encodeToByteArray(EC.PrivateKey.Format.JWK)
-            else -> error("Unexpected key type: $keyType")
+    abstract suspend fun exportPrivateKeyMaterial(): ByteArray
+    abstract suspend fun signRawBytes(plaintext: ByteArray, customSignatureAlgorithm: String? = null): ByteArray
+
+    override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): Any =
+        signRawBytes(plaintext, customSignatureAlgorithm)
+
+    protected abstract suspend fun publicKeyJwkBytes(): ByteArray
+    protected abstract suspend fun publicKeyPemBytes(): ByteArray
+    protected abstract suspend fun publicKeyRawBytes(): ByteArray
+    protected abstract suspend fun verifySignature(data: ByteArray, signature: ByteArray)
+
+    private class Ed25519(
+        kid: String,
+        private val publicKey: EdDSA.PublicKey,
+        private val privateKey: EdDSA.PrivateKey?,
+    ) : MobileSoftwareKey(kid) {
+        override val keyType: KeyType = KeyType.Ed25519
+        override val hasPrivateKey: Boolean get() = privateKey != null
+
+        override suspend fun publicKeyJwkBytes(): ByteArray =
+            publicKey.encodeToByteArray(EdDSA.PublicKey.Format.JWK)
+
+        override suspend fun publicKeyPemBytes(): ByteArray =
+            publicKey.encodeToByteArray(EdDSA.PublicKey.Format.PEM)
+
+        override suspend fun publicKeyRawBytes(): ByteArray =
+            publicKey.encodeToByteArray(EdDSA.PublicKey.Format.RAW)
+
+        override suspend fun signRawBytes(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray =
+            requireNotNull(privateKey) { "Only private key can do signing." }
+                .signatureGenerator()
+                .generateSignature(plaintext)
+
+        override suspend fun verifySignature(data: ByteArray, signature: ByteArray) {
+            publicKey.signatureVerifier().verifySignature(data, signature)
+        }
+
+        override suspend fun exportPrivateKeyMaterial(): ByteArray {
+            check(hasPrivateKey) { "Only private key material can be exported." }
+            return requireNotNull(privateKey).encodeToByteArray(EdDSA.PrivateKey.Format.JWK)
+        }
+    }
+
+    private class Secp256k1(
+        kid: String,
+        private val publicKey: ECDSA.PublicKey,
+        private val privateKey: ECDSA.PrivateKey?,
+    ) : MobileSoftwareKey(kid) {
+        override val keyType: KeyType = KeyType.secp256k1
+        override val hasPrivateKey: Boolean get() = privateKey != null
+
+        override suspend fun publicKeyJwkBytes(): ByteArray =
+            publicKey.encodeToByteArray(EC.PublicKey.Format.JWK)
+
+        override suspend fun publicKeyPemBytes(): ByteArray =
+            publicKey.encodeToByteArray(EC.PublicKey.Format.PEM)
+
+        override suspend fun publicKeyRawBytes(): ByteArray =
+            publicKey.encodeToByteArray(EC.PublicKey.Format.RAW)
+
+        override suspend fun signRawBytes(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray =
+            requireNotNull(privateKey) { "Only private key can do signing." }
+                .signatureGenerator(SHA256, ECDSA.SignatureFormat.RAW)
+                .generateSignature(plaintext)
+
+        override suspend fun verifySignature(data: ByteArray, signature: ByteArray) {
+            publicKey.signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW).verifySignature(data, signature)
+        }
+
+        override suspend fun exportPrivateKeyMaterial(): ByteArray {
+            check(hasPrivateKey) { "Only private key material can be exported." }
+            return requireNotNull(privateKey).encodeToByteArray(EC.PrivateKey.Format.JWK)
         }
     }
 }

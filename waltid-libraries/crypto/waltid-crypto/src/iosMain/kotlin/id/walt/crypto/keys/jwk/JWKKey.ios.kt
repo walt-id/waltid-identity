@@ -97,7 +97,7 @@ actual class JWKKey actual constructor(
     }
 
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (isSoftwareKey) return softwareKey().signRaw(plaintext, customSignatureAlgorithm)
+        if (isSoftwareKey) return softwareKey().signRawBytes(plaintext, customSignatureAlgorithm)
         val kid = getKeyId()
         val signer = getKeychainSigner(kid)
         val result = signer.sign(plaintext)

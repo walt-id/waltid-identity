@@ -146,7 +146,7 @@ sealed class IosKey : Key() {
         override suspend fun exportPEM(): String = delegate.exportPEM()
 
         override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray =
-            delegate.signRaw(plaintext, customSignatureAlgorithm)
+            delegate.signRawBytes(plaintext, customSignatureAlgorithm)
 
         override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String =
             delegate.signJws(plaintext, headers)
