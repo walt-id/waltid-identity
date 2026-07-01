@@ -2,6 +2,13 @@ package id.walt.openid4vci
 
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
+import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationContext
+import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
 import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION_DETAIL_TYPE
@@ -17,6 +24,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class ProviderAuthorizationOnlyFlowTest {
@@ -292,6 +300,81 @@ class ProviderAuthorizationOnlyFlowTest {
         assertTrue(authorizeResponse is AuthorizationResponseResult.Failure)
         assertEquals("unsupported_response_type", authorizeResponse.error.error)
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `authorization code token request without client authentication continues to grant validation`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Failure>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                    "client_id" to listOf("demo-client"),
+                    "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                )
+            )
+        )
+
+        assertEquals("invalid_request", result.error.error)
+        assertEquals("Missing code", result.error.description)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request can omit client authentication`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Success>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                )
+            )
+        )
+
+        assertEquals(null, result.request.authenticatedClient)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `token request uses authenticated client id when client authentication succeeds`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Success>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                    "client_id" to listOf("demo-client"),
+                    "client_secret" to listOf("secret-value"),
+                    "code" to listOf("authorization-code"),
+                    "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                ),
+            )
+        )
+
+        assertEquals("demo-client", result.request.client.id)
+        assertEquals("demo-client", result.request.authenticatedClient?.id)
+    }
 }
 
 private class CapturingTokenService : AccessTokenService {
@@ -302,4 +385,22 @@ private class CapturingTokenService : AccessTokenService {
         lastClaims = claims
         return "captured-access-token"
     }
+}
+
+private object TokenTestClientSecretPostAuthenticationMethod : ClientAuthenticationServiceMethod {
+    override val name: String = ClientAuthenticationMethods.CLIENT_SECRET_POST
+
+    @Suppress("UNUSED_PARAMETER")
+    override suspend fun authenticate(
+        endpoint: ClientAuthenticationEndpoint,
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+        context: ClientAuthenticationContext,
+    ): ClientAuthenticationResult =
+        ClientAuthenticationResult.Authenticated(
+            AuthenticatedClient(
+                id = "demo-client",
+                authenticationMethod = name,
+            )
+        )
 }

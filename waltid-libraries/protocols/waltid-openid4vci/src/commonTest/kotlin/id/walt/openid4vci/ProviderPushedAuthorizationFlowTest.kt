@@ -3,6 +3,13 @@ package id.walt.openid4vci
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.PushedAuthorizationConfig
 import id.walt.openid4vci.core.buildOAuth2Provider
+import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationContext
+import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
@@ -217,12 +224,14 @@ class ProviderPushedAuthorizationFlowTest {
 
     @Test
     fun `provider strips endpoint-only client authentication parameters before storing PAR`() = runTest {
-        val provider = buildParProvider()
+        val provider = buildParProvider(
+            clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                methods = listOf(AcceptingClientSecretPostAuthenticationMethod),
+            ),
+        )
         val pushedParameters = validPushedParameters(clientId = "auth-param-client") +
             mapOf(
                 "client_secret" to listOf("secret-value"),
-                "client_assertion_type" to listOf("urn:ietf:params:oauth:client-assertion-type:jwt-bearer"),
-                "client_assertion" to listOf("signed-client-assertion"),
             )
 
         val pushedResponse = pushAuthorizationRequest(provider, pushedParameters)
@@ -236,9 +245,39 @@ class ProviderPushedAuthorizationFlowTest {
         ).request
 
         assertEquals(null, authorizeRequest.requestForm["client_secret"])
-        assertEquals(null, authorizeRequest.requestForm["client_assertion_type"])
-        assertEquals(null, authorizeRequest.requestForm["client_assertion"])
         assertEquals("auth-param-client", authorizeRequest.requestForm["client_id"]?.singleOrNull())
+    }
+
+    @Test
+    fun `provider rejects unsupported client authentication parameters at PAR endpoint`() = runTest {
+        val provider = buildParProvider()
+
+        val result = assertIs<AuthorizationRequestResult.Failure>(
+            provider.createPushedAuthorizationRequest(
+                validPushedParameters(clientId = "unsupported-auth-client") +
+                    mapOf(
+                        "client_secret" to listOf("secret-value"),
+                    )
+            )
+        )
+
+        assertEquals(OAuthErrorCodes.INVALID_CLIENT, result.error.error)
+        assertEquals("Unsupported client authentication method", result.error.description)
+    }
+
+    @Test
+    fun `provider allows unauthenticated PAR when client authentication methods are configured`() = runTest {
+        val provider = buildParProvider(
+            clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                methods = listOf(AcceptingClientSecretPostAuthenticationMethod),
+            ),
+        )
+
+        val result = assertIs<AuthorizationRequestResult.Success>(
+            provider.createPushedAuthorizationRequest(validPushedParameters(clientId = "auth-param-client"))
+        )
+
+        assertEquals(null, result.request.authenticatedClient)
     }
 
     @Test
@@ -260,6 +299,7 @@ class ProviderPushedAuthorizationFlowTest {
     private fun buildParProvider(
         repository: InMemoryPARRepository = InMemoryPARRepository(),
         enforcePushedAuthorizationRequests: Boolean = false,
+        clientAuthenticationServiceConfig: ClientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(),
     ) =
         buildOAuth2Provider(
             createTestConfig().copy(
@@ -267,6 +307,7 @@ class ProviderPushedAuthorizationFlowTest {
                     repository = repository,
                     enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
                 ),
+                clientAuthenticationServiceConfig = clientAuthenticationServiceConfig,
             )
         )
 
@@ -278,6 +319,24 @@ class ProviderPushedAuthorizationFlowTest {
             "scope" to listOf("openid credential"),
             "state" to listOf("state-123"),
         )
+
+    private object AcceptingClientSecretPostAuthenticationMethod : ClientAuthenticationServiceMethod {
+        override val name: String = ClientAuthenticationMethods.CLIENT_SECRET_POST
+
+        @Suppress("UNUSED_PARAMETER")
+        override suspend fun authenticate(
+            endpoint: ClientAuthenticationEndpoint,
+            parameters: Map<String, List<String>>,
+            headers: Map<String, List<String>>,
+            context: ClientAuthenticationContext,
+        ): ClientAuthenticationResult =
+            ClientAuthenticationResult.Authenticated(
+                AuthenticatedClient(
+                    id = "auth-param-client",
+                    authenticationMethod = name,
+                )
+            )
+    }
 
     private suspend fun pushAuthorizationRequest(
         provider: OAuth2Provider,

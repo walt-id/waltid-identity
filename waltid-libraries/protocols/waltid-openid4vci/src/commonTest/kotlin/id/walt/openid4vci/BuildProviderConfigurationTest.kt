@@ -1,5 +1,17 @@
 package id.walt.openid4vci
 
+import id.walt.openid4vci.clientauth.AuthenticatedClient
+import id.walt.openid4vci.clientauth.ClientAuthenticationContext
+import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationVerificationResult
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationVerifier
+import id.walt.openid4vci.core.DefaultOAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.errors.OAuthError
@@ -27,6 +39,7 @@ import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.responses.token.AccessTokenResponse
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -132,6 +145,97 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
+    fun `buildProvider uses configured client authentication methods`() = runTest {
+        val clientAuthenticationMethod = RecordingClientAuthenticationMethod(
+            name = ClientAuthenticationMethods.CLIENT_SECRET_POST,
+        )
+        val config = createTestConfig(
+            accessRequestValidator = stubAccessValidator(),
+        ).copy(
+            clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                methods = listOf(clientAuthenticationMethod),
+            ),
+        )
+
+        val provider = buildOAuth2Provider(config)
+        val result = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("client-id"),
+                "client_secret" to listOf("secret"),
+            ),
+        )
+
+        assertIs<AccessTokenRequestResult.Failure>(result)
+        assertEquals(1, clientAuthenticationMethod.calls)
+        assertEquals(ClientAuthenticationEndpoint.TOKEN, clientAuthenticationMethod.lastEndpoint)
+    }
+
+    @Test
+    fun `buildProvider registers default client attestation method when configured`() = runTest {
+        val provider = assertIs<DefaultOAuth2Provider>(
+            buildOAuth2Provider(
+                createTestConfig().copy(
+                    authorizationServerIssuer = "https://issuer.example/openid4vci",
+                    pushedAuthorizationConfig = PushedAuthorizationConfig(
+                        repository = InMemoryPARRepository(),
+                    ),
+                    clientAttestationConfig = ClientAttestationConfig(NoopClientAttestationVerifier),
+                ),
+            )
+        )
+
+        assertEquals(
+            setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+            provider.config.clientAuthenticationServiceConfig
+                .allowedMethodsByEndpoint[ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION],
+        )
+        assertEquals(
+            setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
+            provider.config.clientAuthenticationServiceConfig
+                .allowedMethodsByEndpoint[ClientAuthenticationEndpoint.TOKEN],
+        )
+
+        val result = assertIs<AuthorizationRequestResult.Failure>(
+            provider.createPushedAuthorizationRequest(
+                mapOf(
+                    "response_type" to listOf(ResponseType.CODE.value),
+                    "client_id" to listOf("demo-client"),
+                    "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                ),
+                mapOf(
+                    ClientAttestationHeaders.CLIENT_ATTESTATION to listOf("jwt"),
+                ),
+            )
+        )
+
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Exactly one OAuth-Client-Attestation-PoP header is required", result.error.description)
+    }
+
+    @Test
+    fun `buildProvider respects configured client authentication endpoint methods`() {
+        val configuredAllowedMethods = mapOf(
+            ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.PRIVATE_KEY_JWT),
+        )
+        val provider = assertIs<DefaultOAuth2Provider>(
+            buildOAuth2Provider(
+                createTestConfig().copy(
+                    clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                        allowedMethodsByEndpoint = configuredAllowedMethods,
+                    ),
+                    clientAttestationConfig = ClientAttestationConfig(NoopClientAttestationVerifier),
+                ),
+            )
+        )
+
+        assertEquals(
+            configuredAllowedMethods,
+            provider.config.clientAuthenticationServiceConfig.allowedMethodsByEndpoint,
+        )
+    }
+
+    @Test
     fun `writeAuthorizationError without request returns bad request`() {
         val provider = buildOAuth2Provider(createTestConfig())
 
@@ -218,12 +322,46 @@ class BuildProviderConfigurationTest {
             AccessTokenResponseResult.Success(request, AccessTokenResponse(accessToken = "custom"))
     }
 
+    private class RecordingClientAuthenticationMethod(
+        override val name: String,
+    ) : ClientAuthenticationServiceMethod {
+        var calls: Int = 0
+            private set
+        var lastEndpoint: ClientAuthenticationEndpoint? = null
+            private set
+
+        override suspend fun authenticate(
+            endpoint: ClientAuthenticationEndpoint,
+            parameters: Map<String, List<String>>,
+            headers: Map<String, List<String>>,
+            context: ClientAuthenticationContext,
+        ): ClientAuthenticationResult {
+            calls += 1
+            lastEndpoint = endpoint
+            return ClientAuthenticationResult.Authenticated(
+                AuthenticatedClient(
+                    id = parameters["client_id"]?.singleOrNull().orEmpty(),
+                    authenticationMethod = name,
+                ),
+            )
+        }
+    }
+
     private object NoopPushedAuthorizationHandler : PushedAuthorizationEndpointHandler {
         override suspend fun handlePushedAuthorizationEndpointRequest(
             authorizationRequest: AuthorizationRequest,
             clientAuthentication: Map<String, String>,
         ): PushedAuthorizationResponseResult =
             PushedAuthorizationResponseResult.Failure(OAuthError("server_error"))
+    }
+
+    private object NoopClientAttestationVerifier : ClientAttestationVerifier {
+        override suspend fun verifyAttestationJwt(
+            jwt: String,
+            header: JsonObject,
+            payload: JsonObject,
+        ): ClientAttestationVerificationResult =
+            ClientAttestationVerificationResult.Rejected("not used")
     }
 
     private fun stubAuthorizeValidator(): AuthorizationRequestValidator = AuthorizationRequestValidator {
