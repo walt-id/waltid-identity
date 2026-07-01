@@ -46,8 +46,8 @@ class VerifierConformanceTestRunner(
     }
 
     private val testPlans: List<TestPlan> by lazy {
-        // Use ngrok URL as the verifier prefix
-        val verifier2UrlPrefix = "$verifierNgrokUrl/openid4vc/verify"
+        // Use ngrok URL as the verifier prefix - endpoint is /verification-session
+        val verifier2UrlPrefix = "$verifierNgrokUrl/verification-session"
         listOf(
             MdlX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort),
             SdJwtVcX509SanDnsRequestUriSignedDirectPost(verifier2UrlPrefix, conformanceHost, conformancePort)
@@ -89,7 +89,7 @@ class VerifierConformanceTestRunner(
 
     private suspend fun checkVerifierReachable() {
         try {
-            val response = http.get("$verifierNgrokUrl/openid4vc/verify") {
+            val response = http.get("$verifierNgrokUrl/verification-session") {
                 // Just check if the endpoint responds (404 is fine, means route exists)
             }
             if (response.status == HttpStatusCode.NotFound || response.status.isSuccess()) {
