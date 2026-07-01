@@ -18,6 +18,8 @@
 		ABC00001AAAA000100000001 /* TestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC00001AAAA000000000001 /* TestHelpers.swift */; };
 		ABC00002AAAA000100000002 /* WalletE2EClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC00002AAAA000000000002 /* WalletE2EClient.swift */; };
 		ABC00003AAAA000100000003 /* EudiOfferFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC00003AAAA000000000003 /* EudiOfferFlow.swift */; };
+		ABC00005AAAA000100000005 /* EudiPublicBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC00005AAAA000000000005 /* EudiPublicBackend.swift */; };
+		ABC00006AAAA000100000006 /* LocalEnterpriseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABC00006AAAA000000000006 /* LocalEnterpriseBackend.swift */; };
 		ABD00001AAAA000100000001 /* MobileWalletIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD00001AAAA000000000001 /* MobileWalletIntegrationTests.swift */; };
 		ABD00002AAAA000100000002 /* EudiTestBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABD00002AAAA000000000002 /* EudiTestBackend.swift */; };
 		ABD00003AAAA000100000003 /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ABC00004AAAA000000000004 /* TestHelpers.framework */; };
@@ -75,6 +77,8 @@
 		ABC00002AAAA000000000002 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EClient.swift; sourceTree = "<group>"; };
 		ABC00003AAAA000000000003 /* EudiOfferFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiOfferFlow.swift; sourceTree = "<group>"; };
 		ABC00004AAAA000000000004 /* TestHelpers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TestHelpers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		ABC00005AAAA000000000005 /* EudiPublicBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiPublicBackend.swift; sourceTree = "<group>"; };
+		ABC00006AAAA000000000006 /* LocalEnterpriseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEnterpriseBackend.swift; sourceTree = "<group>"; };
 		ABD00001AAAA000000000001 /* MobileWalletIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileWalletIntegrationTests.swift; sourceTree = "<group>"; };
 		ABD00002AAAA000000000002 /* EudiTestBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiTestBackend.swift; sourceTree = "<group>"; };
 		ABD00003AAAA000000000003 /* iosAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = iosAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -172,10 +176,13 @@
 			isa = PBXGroup;
 			children = (
 				ABC00003AAAA000000000003 /* EudiOfferFlow.swift */,
+				ABC00005AAAA000000000005 /* EudiPublicBackend.swift */,
+				ABC00006AAAA000000000006 /* LocalEnterpriseBackend.swift */,
 				ABC00001AAAA000000000001 /* TestHelpers.swift */,
 				ABC00002AAAA000000000002 /* WalletE2EClient.swift */,
 			);
-			path = TestHelpers;
+			name = TestHelpers;
+			path = "../../mobile-e2e-fixtures/ios/TestHelpers";
 			sourceTree = "<group>";
 		};
 		ABD00010AAAA000000000010 /* iosAppTests */ = {
@@ -407,6 +414,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				ABC00003AAAA000100000003 /* EudiOfferFlow.swift in Sources */,
+				ABC00005AAAA000100000005 /* EudiPublicBackend.swift in Sources */,
+				ABC00006AAAA000100000006 /* LocalEnterpriseBackend.swift in Sources */,
 				ABC00001AAAA000100000001 /* TestHelpers.swift in Sources */,
 				ABC00002AAAA000100000002 /* WalletE2EClient.swift in Sources */,
 			);
@@ -482,7 +491,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
-				PRODUCT_BUNDLE_IDENTIFIER = waltid.TestHelpers;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.TestHelpers;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
@@ -500,7 +509,7 @@
 				DYLIB_CURRENT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.2;
-				PRODUCT_BUNDLE_IDENTIFIER = waltid.TestHelpers;
+				PRODUCT_BUNDLE_IDENTIFIER = id.walt.TestHelpers;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
