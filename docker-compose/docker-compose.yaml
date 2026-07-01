@@ -161,6 +161,27 @@ services:
       NEXT_PUBLIC_WALLET: "http://$SERVICE_HOST:$DEMO_WALLET_FRONTEND_PORT"
       PORT: $WEB_PORTAL_PORT
 
+  web-portal2:
+    image: ${IMAGE_PREFIX}waltid/portal2:${VERSION_TAG:-latest}
+    profiles:
+      - apps
+      - identity
+      - all
+    pull_policy: missing
+    build:
+      context: ../
+      dockerfile: waltid-applications/waltid-web-portal2/Dockerfile
+    depends_on:
+      - issuer-api2
+      - verifier-api2
+      - waltid-demo-wallet
+      - caddy
+    environment:
+      NUXT_PUBLIC_ISSUER_BASE: "http://$PUBLIC_SERVICE_HOST:$ISSUER_API2_PORT"
+      NUXT_PUBLIC_VERIFIER_BASE: "http://$PUBLIC_SERVICE_HOST:$VERIFIER_API2_PORT"
+      NUXT_PUBLIC_WALLET_URL: "http://$PUBLIC_SERVICE_HOST:$DEMO_WALLET_FRONTEND_PORT"
+      PORT: $WEB_PORTAL2_PORT
+
   vc-repo:
     platform: linux/amd64
     image: ${IMAGE_PREFIX}waltid/vc-repository:${VERSION_VC_REPO:-latest}
@@ -314,6 +335,11 @@ services:
 
       - target: "$WEB_PORTAL_PORT"
         published: $WEB_PORTAL_PORT # web-portal
+        protocol: tcp
+        mode: host
+
+      - target: "$WEB_PORTAL2_PORT"
+        published: $WEB_PORTAL2_PORT # web-portal2
         protocol: tcp
         mode: host
 

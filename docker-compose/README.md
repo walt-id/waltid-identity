@@ -134,8 +134,8 @@ will start automatically:
 profiles to start the services for. The services are available with the following profiles:
 
 - **identity** - for all waltid-identity services (includes both `services` and `apps` profiles)
-- **services** - for API services (wallet-api, issuer-api, verifier-api, verifier-api2, vc-repo)
-- **apps** - for web applications (waltid-demo-wallet, waltid-dev-wallet, web-portal)
+- **services** - for API services (wallet-api, issuer-api, issuer-api2, verifier-api, verifier-api2, vc-repo)
+- **apps** - for web applications (waltid-demo-wallet, waltid-dev-wallet, web-portal, web-portal2)
 - **valkey** - for the Valkey/Redis service (required when using valkey for session storage in wallet-api)
 - **tse** - for the Hashicorp vault service, will be initialized with:
     - a transit secrets engine
@@ -176,6 +176,7 @@ $ docker-compose down -v
 
 - Wallet API: [http://localhost:7001](http://localhost:7001)
 - Issuer API: [http://localhost:7002](http://localhost:7002)
+- Issuer API2: [http://localhost:7005](http://localhost:7005)
 - Verifier API: [http://localhost:7003](http://localhost:7003)
 - Verifier API2: [http://localhost:7004](http://localhost:7004)
 - Valkey (Redis-compatible): `localhost:6379` (requires `--profile valkey` or `--profile all`)
@@ -187,6 +188,7 @@ $ docker-compose down -v
 - Demo Web Wallet: [http://localhost:7101](http://localhost:7101)
 - Dev Web Wallet: [http://localhost:7104](http://localhost:7104)
 - Web Portal: [http://localhost:7102](http://localhost:7102)
+- Web Portal2: [http://localhost:7105](http://localhost:7105)
 - Credential Repo: [http://localhost:7103](http://localhost:7103)
 
 ## Configurations
@@ -252,6 +254,13 @@ This value will be used also by compose profile so only the required services ar
 - update the desired port number
 
 This value will be used by reverse proxy (and services configs, if any).
+
+### Update browser-facing host
+
+- browse `.env` file
+- update `PUBLIC_SERVICE_HOST` if browser-facing app URLs should not use `localhost`
+
+This value is used for public frontend configuration such as web-portal2 issuer2, verifier2, and wallet URLs.
 
 ### Select an identity stack version
 
