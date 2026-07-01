@@ -30,7 +30,10 @@ dependencies {
 }
 
 tasks.withType<Test> {
-    enabled = false
+    // AWS integration tests require credentials; enable with RUN_AWS_TESTS=true
+    // Unit tests for config/model classes run regardless
+    enabled = System.getenv("RUN_AWS_TESTS")?.toBoolean() ?: false
+    useJUnitPlatform()
 }
 
 mavenPublishing {
