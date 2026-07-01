@@ -48,10 +48,8 @@ kotlin {
 
         all {
             languageSettings.optIn("kotlinx.cinterop.ExperimentalForeignApi")
-            languageSettings.optIn("kotlin.ExperimentalStdlibApi")
             languageSettings.optIn("kotlinx.serialization.ExperimentalSerializationApi")
             languageSettings.optIn("kotlinx.cinterop.BetaInteropApi")
-            languageSettings.optIn("kotlin.io.encoding.ExperimentalEncodingApi")
         }
 
         iosMain.dependencies {

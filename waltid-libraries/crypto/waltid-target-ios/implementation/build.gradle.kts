@@ -1,4 +1,20 @@
 import org.gradle.kotlin.dsl.register
+import java.util.Properties
+
+val localProperties = rootProject.file("local.properties")
+    .takeIf { it.isFile }
+    ?.inputStream()
+    ?.use { Properties().apply { load(it) } }
+    ?: Properties()
+
+fun stringProperty(name: String): String? =
+    gradle.startParameter.projectProperties[name]
+        ?: localProperties.getProperty(name)
+        ?: providers.gradleProperty(name).orNull
+
+val cocoapodsBinary = stringProperty("kotlin.apple.cocoapods.bin")
+    ?.takeIf { it.isNotBlank() }
+    ?: "pod"
 
 listOf("iosArm64", "iosSimulatorArm64").forEach { target ->
 
@@ -6,7 +22,7 @@ listOf("iosArm64", "iosSimulatorArm64").forEach { target ->
         group = "build"
         workingDir(projectDir)
         commandLine(
-            "env","pod", "install"
+            cocoapodsBinary, "install"
         )
         inputs.files(
             file("$projectDir/Podfile")

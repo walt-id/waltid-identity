@@ -1,6 +1,5 @@
 package id.walt.cose
 
-import id.walt.crypto.keys.KeyManager
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.cbor.Cbor
@@ -10,26 +9,6 @@ import kotlin.test.*
 
 @OptIn(ExperimentalSerializationApi::class)
 class CoseSign1Test {
-
-    private val key by lazy {
-        suspend {
-            KeyManager.resolveSerializedKey(
-                """{"type": "jwk", "jwk": {
-                    "kty": "EC",
-                    "d": "GKZgxuL71bvt-nK9zfNSUKfxPzyqPqBFgBHQYxiRbaI",
-                    "use": "sig",
-                    "crv": "P-256",
-                    "kid": "UNq3iiAPlwafoWkGe3g39w4-slPcKFSKb4q6Z6w11ZU",
-                    "x": "aJrzbXcFoDU1gkVC06luExM4ZCbu-_MvXpImV48_E6E",
-                    "y": "js-Yzh4FEoyG3ZN3CesYF4nNAnSqjZjY9_NafCS48Nw",
-                    "alg": "ES256"
-                }}"""
-            )
-        }
-    }
-
-    private val testSignerKey = key
-    suspend fun testVerifierKey() = key().getPublicKey()
 
     @Test
     fun `1 - CoseHeaders serializer should enforce canonical order`() {
@@ -66,12 +45,12 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
-            signer = testSignerKey().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Created CoseSign1: $coseSign1")
 
         println("Verification should succeed with the correct key and payload")
-        val isValid = coseSign1.verify(testVerifierKey().toCoseVerifier())
+        val isValid = coseSign1.verify(CoseTestFixtures.verifier)
         println("Is valid: $isValid (expected: true)")
         assertTrue(isValid, "Signature verification should succeed.")
 
@@ -87,7 +66,7 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
-            signer = testSignerKey().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Created CoseSign1: $coseSign1")
 
@@ -95,7 +74,7 @@ class CoseSign1Test {
         val tamperedCose = coseSign1.copy(payload = "Tampered payload.".encodeToByteArray())
         println("Tampered CoseSign1: $tamperedCose")
 
-        val isValid = tamperedCose.verify(testVerifierKey().toCoseVerifier())
+        val isValid = tamperedCose.verify(CoseTestFixtures.verifier)
         println("Is valid: $isValid (expected: false)")
         assertFalse(isValid, "Signature verification should fail for a tampered payload.")
 
@@ -111,7 +90,7 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = originalHeaders,
             payload = payload,
-            signer = testSignerKey().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Created CoseSign1: $coseSign1")
 
@@ -123,7 +102,7 @@ class CoseSign1Test {
         val tamperedCose = coseSign1.copy(protected = tamperedProtectedBytes)
         println("Tampered CoseSign1: $tamperedCose")
 
-        val isValid = tamperedCose.verify(testVerifierKey().toCoseVerifier())
+        val isValid = tamperedCose.verify(CoseTestFixtures.verifier)
         println("Is valid: $isValid (expected: false)")
         assertFalse(isValid, "Signature verification should fail for tampered protected headers.")
 
@@ -144,7 +123,7 @@ class CoseSign1Test {
             protectedHeaders = protectedHeaders,
             unprotectedHeaders = unprotectedHeaders,
             payload = payload,
-            signer = testSignerKey().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Original CoseSign1: $originalCose")
 
@@ -153,7 +132,7 @@ class CoseSign1Test {
         println("Decoded CoseSign1: $decodedCose")
 
         // Check if the decoded object is valid
-        assertTrue(decodedCose.verify(testVerifierKey().toCoseVerifier()), "Decoded object should be verifiable.")
+        assertTrue(decodedCose.verify(CoseTestFixtures.verifier), "Decoded object should be verifiable.")
         assertEquals(originalCose, decodedCose)
 
         println("-- End: 5.1 - Should successfully roundtrip (serialize and deserialize) for int content type --")
@@ -173,7 +152,7 @@ class CoseSign1Test {
             protectedHeaders = protectedHeaders,
             unprotectedHeaders = unprotectedHeaders,
             payload = payload,
-            signer = testSignerKey().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Original CoseSign1: $originalCose")
 
@@ -182,7 +161,7 @@ class CoseSign1Test {
         println("Decoded CoseSign1: $decodedCose")
 
         // Check if the decoded object is valid
-        assertTrue(decodedCose.verify(testVerifierKey().toCoseVerifier()), "Decoded object should be verifiable.")
+        assertTrue(decodedCose.verify(CoseTestFixtures.verifier), "Decoded object should be verifiable.")
         assertEquals(originalCose, decodedCose)
 
         println("-- End: 5 - Should successfully roundtrip (serialize and deserialize) for string content type --")
@@ -196,13 +175,13 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = null, // Null payload
-            signer = testSignerKey().toCoseSigner()
+            signer = CoseTestFixtures.signer
         )
         println("Created CoseSign1: $coseSign1")
 
         assertNull(coseSign1.payload, "Payload should be null in the created object.")
 
-        val isValid = coseSign1.verify(testVerifierKey().toCoseVerifier())
+        val isValid = coseSign1.verify(CoseTestFixtures.verifier)
         println("Is valid: $isValid (expected: true)")
         assertTrue(isValid, "Signature with null payload should be verifiable.")
         println("-- End: 6 - Should handle null payload --")
@@ -218,20 +197,20 @@ class CoseSign1Test {
         val coseSign1 = CoseSign1.createAndSign(
             protectedHeaders = protectedHeaders,
             payload = payload,
-            signer = testSignerKey().toCoseSigner(),
+            signer = CoseTestFixtures.signer,
             externalAad = externalAad
         )
         println("Created CoseSign1: $coseSign1")
 
         println("Verification must succeed with the same AAD")
         assertTrue(
-            coseSign1.verify(testVerifierKey().toCoseVerifier(), externalAad = externalAad),
+            coseSign1.verify(CoseTestFixtures.verifier, externalAad = externalAad),
             "Verification should succeed with correct AAD."
         )
 
         println("Verification must fail with different AAD")
         assertFalse(
-            coseSign1.verify(testVerifierKey().toCoseVerifier(), externalAad = "Different AAD".encodeToByteArray()),
+            coseSign1.verify(CoseTestFixtures.verifier, externalAad = "Different AAD".encodeToByteArray()),
             "Verification should fail with incorrect AAD."
         )
 

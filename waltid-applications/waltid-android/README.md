@@ -12,9 +12,9 @@
 
    <h2>Status</h2>
    <p align="center">
-   <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
+   <img src="https://img.shields.io/badge/🟠%20Planned%20Deprecation-orange?style=for-the-badge&logo=clock" alt="Status: Planned Deprecation" />
    <br/>
-   <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
+   <em>This project is planned for deprecation. Please use <code>waltid-wallet-demo-android</code> instead.</em>
    </p>
 
 </div>
@@ -40,6 +40,8 @@
 3. Set your `sdk.dir` in `local.properties` and then enable the Android build
    with `enableAndroidBuild=true` in `gradle.properties`.
 4. Run the application on your device or emulator.
+
+For the current Android wallet issuance/presentation demo and E2E scripts, see [waltid-wallet-demo-android](../waltid-wallet-demo-android/README.md). For broader mobile setup, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
 ## Join the community
 

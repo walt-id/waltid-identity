@@ -10,7 +10,6 @@ import io.ktor.http.*
 import okhttp3.Dns
 import java.net.Inet6Address
 import java.net.InetAddress
-import java.net.URI
 import java.net.UnknownHostException
 
 private val log = KotlinLogging.logger {}
@@ -127,42 +126,21 @@ actual object SourceFetcher {
     }
 
     actual fun detectFormat(contentType: String?, content: String): SourceFormat {
-        contentType?.let {
-            if ("json" in it.lowercase()) return SourceFormat.JSON
-            if ("xml" in it.lowercase()) return SourceFormat.XML
-        }
-        val trimmed = content.trimStart()
-        return when {
-            trimmed.startsWith("{") || trimmed.startsWith("[") -> SourceFormat.JSON
-            trimmed.startsWith("<?xml") || trimmed.startsWith("<") -> SourceFormat.XML
-            else -> SourceFormat.UNKNOWN
-        }
+        return SourceFetcherCommon.detectSourceFormat(contentType, content)
     }
 
     /**
      * Validates a URL for SSRF protection (JVM-only, uses Java's InetAddress).
      */
     internal fun validateUrl(url: String, config: FetcherSecurityConfig = securityConfig): Pair<Boolean, String?> {
-        val uri = try {
-            URI(url)
-        } catch (e: Exception) {
-            return false to "Invalid URL format: ${e.message}"
+        val (validatedUrl, validationError) = SourceFetcherCommon.validateUrlBasic(url, config)
+        if (validatedUrl == null) {
+            return false to validationError
         }
 
-        val scheme = uri.scheme?.lowercase()
-        if (scheme == null || scheme !in config.allowedSchemes) {
-            return false to "Scheme '$scheme' not allowed. Allowed: ${config.allowedSchemes}"
-        }
-
-        val host = uri.host
-        if (host.isNullOrBlank()) {
-            return false to "No host specified in URL"
-        }
+        val host = validatedUrl.normalizedHost
 
         if (config.allowedHosts.isNotEmpty()) {
-            if (host.lowercase() !in config.allowedHosts.map { it.lowercase() }) {
-                return false to "Host '$host' not in allowed hosts list"
-            }
             return true to null
         }
 

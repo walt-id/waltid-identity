@@ -1,6 +1,8 @@
 package id.walt.sdjwt
 
 import kotlinx.serialization.json.*
+import kotlin.js.ExperimentalJsExport
+import kotlin.js.JsExport
 import kotlin.time.Clock
 
 class SDJwtVC(sdJwt: SDJwt) :
@@ -45,9 +47,32 @@ class SDJwtVC(sdJwt: SDJwt) :
             !requiresHolderKeyBinding
     }
 
-    // TODO: issuer DID/key needs to be resolved outside, to initialize the required crypto provider. Needs improvement!
-    // TODO: should resolve issuer key from "iss" property
-    // TODO: make use of Key interface from waltid-crypto lib instead or also?
+    private suspend fun verifyHolderKeyBindingAsync(
+        jwtCryptoProvider: AsyncJWTCryptoProvider,
+        requiresHolderKeyBinding: Boolean,
+        audience: String? = null,
+        nonce: String? = null
+    ): Boolean {
+        return if (!holderDid.isNullOrEmpty()) TODO("Holder DID verification not yet supported")
+        else if (holderKeyJWK != null) {
+            isPresentation && keyBindingJwt != null && !audience.isNullOrEmpty() && !nonce.isNullOrEmpty() &&
+                    keyBindingJwt.verifyKBAsync(
+                        jwtCryptoProvider = jwtCryptoProvider,
+                        reqAudience = audience,
+                        reqNonce = nonce,
+                        sdJwt = this,
+                    )
+        } else
+            !requiresHolderKeyBinding
+    }
+
+    /**
+     * Verify this SD-JWT VC, including the SD-JWT signature, validity timestamps, `vct`, and optional holder binding.
+     * @param jwtCryptoProvider JWT crypto provider that verifies issuer and holder-binding JWT signatures
+     * @param requiresHolderKeyBinding Whether a holder-binding key-binding JWT is required
+     * @param audience Expected key-binding JWT `aud` claim when holder binding is required
+     * @param nonce Expected key-binding JWT `nonce` claim when holder binding is required
+     */
     fun verifyVC(
         jwtCryptoProvider: JWTCryptoProvider,
         requiresHolderKeyBinding: Boolean,
@@ -73,6 +98,43 @@ class SDJwtVC(sdJwt: SDJwt) :
                             if (it) message = "$message, VC has no verifiable credential type property (vct)"
                         } &&
                         verifyHolderKeyBinding(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
+                            if (!it) message = "$message, holder key binding could not be verified"
+                        },
+            vcVerificationMessage = message
+        )
+    }
+
+    /**
+     * Verify this SD-JWT VC, including the SD-JWT signature, validity timestamps, `vct`, and optional holder binding.
+     * @param jwtCryptoProvider Async JWT crypto provider that verifies issuer and holder-binding JWT signatures
+     * @param requiresHolderKeyBinding Whether a holder-binding key-binding JWT is required
+     * @param audience Expected key-binding JWT `aud` claim when holder binding is required
+     * @param nonce Expected key-binding JWT `nonce` claim when holder binding is required
+     */
+    @OptIn(ExperimentalJsExport::class)
+    @JsExport.Ignore
+    suspend fun verifyVCAsync(
+        jwtCryptoProvider: AsyncJWTCryptoProvider,
+        requiresHolderKeyBinding: Boolean,
+        audience: String? = null,
+        nonce: String? = null
+    ): VCVerificationResult {
+        var message = ""
+
+        return VCVerificationResult(
+            sdJwtVC = this,
+            sdJwtVerificationResult = verifyAsync(jwtCryptoProvider),
+            sdJwtVCVerified =
+                (notBefore?.let { Clock.System.now().epochSeconds >= it } ?: true).also {
+                    if (!it) message = "$message, VC is not valid before $notBefore"
+                } &&
+                        (expiration?.let { Clock.System.now().epochSeconds < it } ?: true).also {
+                            if (!it) message = "$message, VC is not valid after $expiration"
+                        } &&
+                        !vct.isNullOrEmpty().also {
+                            if (it) message = "$message, VC has no verifiable credential type property (vct)"
+                        } &&
+                        verifyHolderKeyBindingAsync(jwtCryptoProvider, requiresHolderKeyBinding, audience, nonce).also {
                             if (!it) message = "$message, holder key binding could not be verified"
                         },
             vcVerificationMessage = message
