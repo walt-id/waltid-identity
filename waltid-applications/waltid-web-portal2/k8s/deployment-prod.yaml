@@ -1,0 +1,80 @@
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: web-portal2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web-portal2
+  template:
+    metadata:
+      labels:
+        app: web-portal2
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web-portal2
+          image: waltid/portal2:__DEFAULT_IMAGE_TAG__
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: PORT
+              value: "7105"
+            - name: NUXT_PUBLIC_ISSUER_BASE
+              value: "https://issuer2.demo.walt.id"
+            - name: NUXT_PUBLIC_VERIFIER_BASE
+              value: "https://verifier2.demo.walt.id"
+            - name: NUXT_PUBLIC_WALLET_URL
+              value: "https://wallet.demo.walt.id"
+          ports:
+            - containerPort: 7105
+              name: http-portal2
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: web-portal2
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-portal2
+      protocol: TCP
+  selector:
+    app: web-portal2
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal2-ingress
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - portal2.demo.walt.id
+      secretName: web-portal2-tls-secret
+  rules:
+    - host: portal2.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-portal2
+                port:
+                  name: http

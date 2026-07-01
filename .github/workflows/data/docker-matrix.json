@@ -15,6 +15,11 @@
     "image": "portal"
   },
   {
+    "context": "waltid-identity",
+    "folder": "waltid-identity/waltid-applications/waltid-web-portal2",
+    "image": "portal2"
+  },
+  {
     "context": "waltid-identity/waltid-applications/waltid-credentials",
     "folder": "waltid-identity/waltid-applications/waltid-credentials",
     "image": "vc-repository"
