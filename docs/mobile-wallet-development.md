@@ -109,6 +109,15 @@ From either platform scripts directory, create the mobile-only helper resources 
 
 This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart. The iOS local Enterprise script runs `pod install` by default so the CocoaPods sandbox is in sync before Xcode starts.
 
+## Documentation checks
+
+The SDK-facing mobile modules use KDoc and Dokka for Kotlin API reference docs:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
 ## Troubleshooting
 
 - **Android modules missing:** set `enableAndroidBuild=true` in `local.properties`, or pass `-PenableAndroidBuild=true`, then reload Gradle.
