@@ -66,11 +66,19 @@ class ConformanceInterface(
     suspend fun createTestPlan(
         createTestPlanUrl: Url,
         testPlanCreationConfiguration: JsonObject
-    ): CreateTestPlanResponse =
-        conformanceHttp.post(createTestPlanUrl) {
+    ): CreateTestPlanResponse {
+        val response = conformanceHttp.post(createTestPlanUrl) {
             contentType(ContentType.Application.Json)
             setBody(testPlanCreationConfiguration)
-        }.bodyAsText().also { println(it) }.fromJson<CreateTestPlanResponse>()
+        }.bodyAsText().also { println(it) }
+        
+        // Check if response is an error
+        if (response.contains("\"error\"")) {
+            throw IllegalStateException("Conformance suite error: $response")
+        }
+        
+        return response.fromJson<CreateTestPlanResponse>()
+    }
 
     /**
      * To create a test, some parameters already have to be put into the URL

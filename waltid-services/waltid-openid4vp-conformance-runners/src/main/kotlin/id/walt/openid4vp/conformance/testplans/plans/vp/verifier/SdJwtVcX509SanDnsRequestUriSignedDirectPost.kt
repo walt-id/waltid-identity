@@ -92,12 +92,12 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
     override val config = TestPlanConfiguration(
         testPlanCreationUrl = {
             // Use HAIP test plan for SD-JWT VC
+            // Note: HAIP plan sets request_method automatically, so we don't include it
             append("planName", "oid4vp-1final-verifier-haip-test-plan")
             append(
                 "variant", /* language=json*/
                 """{
                     "credential_format": "sd_jwt_vc",
-                    "request_method": "request_uri_signed",
                     "response_mode": "direct_post.jwt"
                 }""".trimIndent()
             )
