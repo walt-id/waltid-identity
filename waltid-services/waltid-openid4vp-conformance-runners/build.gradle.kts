@@ -111,16 +111,3 @@ tasks.test {
     systemProperty("javax.net.ssl.trustStore", truststorePath)
     systemProperty("javax.net.ssl.trustStorePassword", "changeit")
 }
-
-// Task to run VCI Wallet adapter standalone
-tasks.register<JavaExec>("runVciWalletAdapter") {
-    group = "application"
-    description = "Run VCI Wallet Conformance Adapter standalone (for manual testing)"
-    mainClass.set("id.walt.openid4vp.conformance.adapter.VciWalletAdapterMainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    
-    // SSL truststore for conformance suite
-    val truststorePath = file("conformance-truststore.jks").absolutePath
-    systemProperty("javax.net.ssl.trustStore", truststorePath)
-    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
-}

@@ -131,9 +131,6 @@ cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 # Run all VCI wallet tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
     --tests "VciWalletConformanceTests" -PrunIntegrationTests
-
-# Or run the standalone adapter for manual testing
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:runVciWalletAdapter
 ```
 
 ## Components
