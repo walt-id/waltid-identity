@@ -320,10 +320,12 @@ $encodedPk
             pendingWindowInDays = 7
         }
 
-        val delete = KmsClient { region = config.auth.region }.use { kmsClient ->
+        val response = KmsClient { region = config.auth.region }.use { kmsClient ->
             kmsClient.scheduleKeyDeletion(request)
         }
-        return delete.keyState?.value == "PendingDeletion"
+        // ScheduleKeyDeletion returns the deletion date if successful
+        // keyState may be null in the response, but deletionDate indicates success
+        return response.deletionDate != null || response.keyState?.value == "PendingDeletion"
     }
 
     // =========================================================================
@@ -421,41 +423,45 @@ $encodedPk
 
                 // Retry with exponential backoff for eventual consistency
                 var lastException: Exception? = null
-                repeat(5) { attempt ->
+                var success = false
+                
+                for (attempt in 0 until 8) {
                     try {
-                        KmsClient { region = targetRegion }.use { kms ->
+                        // ReplicateKey must be called from the PRIMARY region's client,
+                        // specifying the target replica region as a parameter
+                        KmsClient { region = primaryRegion }.use { kms ->
                             kms.replicateKey(ReplicateKeyRequest {
                                 keyId = primaryKeyId
                                 replicaRegion = targetRegion
                             })
                         }
                         log.info { "Created replica key in $targetRegion for primary $primaryKeyId" }
-                        return@repeat // Success, exit retry loop
+                        success = true
+                        break // Success, exit retry loop
                     } catch (e: Exception) {
                         lastException = e
                         val message = e.message ?: ""
                         // Check if this is a "key not found" error due to eventual consistency
-                        if (message.contains("does not exist", ignoreCase = true) ||
-                            message.contains("not found", ignoreCase = true)) {
-                            if (attempt < 4) {
-                                val delayMs = 1000L * (attempt + 1) // 1s, 2s, 3s, 4s
-                                log.debug { "Key not yet visible in $targetRegion, retrying in ${delayMs}ms (attempt ${attempt + 1}/5)" }
-                                delay(delayMs)
-                                return@repeat // Continue to next retry
-                            }
+                        val isRetryable = message.contains("does not exist", ignoreCase = true) ||
+                            message.contains("not found", ignoreCase = true)
+                        
+                        if (isRetryable && attempt < 7) {
+                            val delayMs = 3000L * (attempt + 1) // 3s, 6s, 9s, 12s, 15s, 18s, 21s
+                            log.info { "Key not yet visible in $targetRegion, retrying in ${delayMs}ms (attempt ${attempt + 1}/8)" }
+                            delay(delayMs)
+                            continue // Continue to next retry
                         }
-                        // Non-retryable error or max retries reached
-                        throw IllegalStateException(
-                            "Failed to create replica in region $targetRegion for key $primaryKeyId: ${e.message}",
-                            e
-                        )
+                        
+                        // Non-retryable error or max retries reached - will be thrown after loop
+                        break
                     }
                 }
-                // If we exit the repeat loop without success and lastException is set, throw it
-                lastException?.let {
+                
+                // Check if we succeeded
+                if (!success && lastException != null) {
                     throw IllegalStateException(
-                        "Failed to create replica in region $targetRegion for key $primaryKeyId after retries: ${it.message}",
-                        it
+                        "Failed to create replica in region $targetRegion for key $primaryKeyId: ${lastException.message}",
+                        lastException
                     )
                 }
             }
