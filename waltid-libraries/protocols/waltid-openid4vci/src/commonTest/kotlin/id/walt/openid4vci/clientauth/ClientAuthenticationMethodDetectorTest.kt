@@ -72,6 +72,16 @@ class ClientAuthenticationMethodDetectorTest {
     }
 
     @Test
+    fun `treats standalone client secret as client authentication input`() {
+        val hasInput = ClientAuthenticationMethodDetector.hasClientAuthenticationInput(
+            parameters = mapOf("client_secret" to listOf("secret")),
+            headers = emptyMap(),
+        )
+
+        assertEquals(true, hasInput)
+    }
+
+    @Test
     fun `detects multiple requested client authentication methods`() {
         val methods = ClientAuthenticationMethodDetector.detectRequestedMethods(
             parameters = mapOf(

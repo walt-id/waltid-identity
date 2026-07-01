@@ -21,6 +21,13 @@ object ClientAuthenticationMethods {
 }
 
 object ClientAuthenticationMethodDetector {
+    fun hasClientAuthenticationInput(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): Boolean =
+        detectRequestedMethods(parameters, headers).isNotEmpty() ||
+            parameters["client_secret"].orEmpty().any { it.isNotBlank() }
+
     fun detectRequestedMethods(
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
