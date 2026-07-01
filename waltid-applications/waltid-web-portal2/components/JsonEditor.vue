@@ -5,6 +5,7 @@ const props = defineProps<{
   examples: SwaggerExample[]
   loading: boolean
   error: string | null
+  warning?: string | null
 }>()
 
 defineEmits<{ reload: [] }>()
@@ -46,6 +47,9 @@ function onSelectChange(e: Event) {
     </div>
 
     <div>
+      <p v-if="warning" class="mb-2 text-xs text-red-600">
+        {{ warning }}
+      </p>
       <label class="form-label">Payload (editable JSON)</label>
       <textarea
         v-model="json"

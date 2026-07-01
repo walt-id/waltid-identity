@@ -75,6 +75,19 @@ const selectedProfileDetail = computed(() =>
   selectedProfile.value ? props.profiles.details.value[selectedProfile.value] : null,
 )
 
+const showCredentialDataOverrideWarning = computed(() => {
+  const example = props.swagger.examples.value[selectedIndex.value]
+  if (!example) return false
+  const title = example.title.toLowerCase()
+  return title.includes('override') && (title.includes('credentialdata') || title.includes('selective disclosure'))
+})
+
+const credentialDataOverrideWarning = computed(() =>
+  showCredentialDataOverrideWarning.value
+    ? 'The override structure may not match your selected profile. Make sure you update the runtimeOverrides object in the request below accordingly.'
+    : null,
+)
+
 async function submit() {
   await props.session.createOffer(JSON.parse(json.value))
 }
@@ -117,6 +130,7 @@ async function submit() {
       :examples="swagger.examples.value"
       :loading="swagger.loading.value"
       :error="swagger.error.value"
+      :warning="credentialDataOverrideWarning"
       @reload="swagger.load()"
     />
 
