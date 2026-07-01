@@ -1,5 +1,6 @@
 plugins {
     id("waltid.mobile.library")
+    id("waltid.mobile.sdk.documentation")
 }
 
 group = "id.walt.protocols"
