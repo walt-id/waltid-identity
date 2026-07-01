@@ -10,6 +10,7 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.crypto.utils.JsonUtils.toJsonElement
+import kotlinx.coroutines.delay
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -27,8 +28,7 @@ class AWSKey(
     val id: String,
     private var _publicKey: String? = null,
     private var _keyType: KeyType? = null,
-
-    ) : Key() {
+) : Key() {
 
     @Transient
     override var keyType: KeyType
@@ -46,7 +46,6 @@ class AWSKey(
             _keyType = publicKey.keyType
         }
     }
-
 
     override fun toString(): String = "[AWS ${keyType.name} key @AWS ${config.auth.region} - $id]"
 
@@ -75,11 +74,48 @@ class AWSKey(
         }
     }
 
+    // =========================================================================
+    // Failover Support (Phase 3)
+    // =========================================================================
+
+    /**
+     * Lazily initialized failover client for multi-region keys.
+     * Only created when failover is enabled and replica regions are configured.
+     */
+    @Transient
+    private val failoverClient: FailoverKmsClient? by lazy {
+        if (config.enableFailover == true && !config.replicaRegions.isNullOrEmpty()) {
+            FailoverKmsClient(
+                primaryRegion = config.auth.region,
+                failoverRegions = config.failoverOrder ?: config.replicaRegions,
+                enableFailover = true
+            )
+        } else null
+    }
+
+    /**
+     * Execute a KMS operation with automatic failover to replica regions if enabled.
+     * Falls back to single-region execution if failover is not configured.
+     */
+    private suspend fun <T> executeWithFailover(operation: suspend (KmsClient) -> T): T {
+        return if (failoverClient != null) {
+            failoverClient!!.execute(operation)
+        } else {
+            KmsClient { region = config.auth.region }.use { kms ->
+                operation(kms)
+            }
+        }
+    }
+
+    // =========================================================================
+    // Signing & Verification
+    // =========================================================================
+
     override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
         if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
             throw SigningException("failed to sign - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
-        val digestedMessage = AWSKey.sha256(plaintext)
+        val digestedMessage = sha256(plaintext)
 
         val signRequest = SignRequest {
             this.keyId = id
@@ -88,11 +124,10 @@ class AWSKey(
             messageType = MessageType.Digest // Using digest mode to handle payloads larger than 4096 bytes
         }
 
-        return KmsClient { region = config.auth.region }.use { kmsClient ->
+        return executeWithFailover { kmsClient ->
             kmsClient.sign(signRequest).signature ?: throw IllegalStateException("Signature not returned")
         }
     }
-
 
     override suspend fun signJws(
         plaintext: ByteArray,
@@ -119,11 +154,11 @@ class AWSKey(
 
     override suspend fun verifyRaw(signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?): Result<ByteArray> {
         if (!awsSigningAlgorithm.endsWith("_SHA_256")) {
-            throw SigningException("failed to verofy - unsupported hashing algorithm: $awsSigningAlgorithm")
+            throw SigningException("failed to verify - unsupported hashing algorithm: $awsSigningAlgorithm")
         }
         val messageToVerify =
             detachedPlaintext ?: return Result.failure(IllegalArgumentException("Detached plaintext is required for verification"))
-        val digestedMessage = AWSKey.sha256(messageToVerify)
+        val digestedMessage = sha256(messageToVerify)
 
         val verifyRequest = VerifyRequest {
             this.keyId = id
@@ -133,18 +168,21 @@ class AWSKey(
             messageType = MessageType.Digest
         }
 
-        return KmsClient { region = config.auth.region }.use { kmsClient ->
+        return executeWithFailover { kmsClient ->
             val response = kmsClient.verify(verifyRequest)
             Result.success(response.signatureValid.toString().decodeFromBase64())
         }
     }
-
 
     override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
         val publicKey = getPublicKey()
         val verification = publicKey.verifyJws(signedJws)
         return verification
     }
+
+    // =========================================================================
+    // Public Key Retrieval
+    // =========================================================================
 
     @Transient
     private var backedKey: Key? = null
@@ -154,9 +192,20 @@ class AWSKey(
         else -> retrievePublicKey()
     }.also { newBackedKey -> backedKey = newBackedKey }
 
-
     private suspend fun retrievePublicKey(): Key {
-        val publicKey = getAwsPublicKey(config, id)
+        val publicKey = executeWithFailover { kmsClient ->
+            val pk = kmsClient.getPublicKey(GetPublicKeyRequest {
+                this.keyId = id
+            }).publicKey ?: throw IllegalStateException("Public key not returned")
+            val encodedPk = pk.encodeToBase64()
+
+            val pemKey = """
+-----BEGIN PUBLIC KEY-----
+$encodedPk
+-----END PUBLIC KEY-----
+""".trimIndent()
+            JWKKey.importPEM(pemKey).getOrThrow()
+        }
         _publicKey = publicKey.exportJWK()
         return publicKey
     }
@@ -169,7 +218,100 @@ class AWSKey(
         TODO("Not yet implemented")
     }
 
+    // =========================================================================
+    // Key Deletion (Phase 2: Cascade Delete)
+    // =========================================================================
+
+    /**
+     * Delete this key. For multi-region keys, this performs a cascade delete:
+     * 1. Schedule deletion of all replica keys first
+     * 2. Wait for replicas to be in PendingDeletion state
+     * 3. Schedule deletion of the primary key
+     *
+     * AWS requires all replicas to be deleted before the primary can be deleted.
+     */
     override suspend fun deleteKey(): Boolean {
+        val isMultiRegion = checkIsMultiRegionKey()
+
+        return if (isMultiRegion) {
+            deleteMultiRegionKey()
+        } else {
+            deleteSingleRegionKey()
+        }
+    }
+
+    /**
+     * Check if this key is a multi-region key by querying AWS KMS metadata.
+     */
+    private suspend fun checkIsMultiRegionKey(): Boolean {
+        return KmsClient { region = config.auth.region }.use { kms ->
+            val metadata = kms.describeKey(DescribeKeyRequest { keyId = id })
+            metadata.keyMetadata?.multiRegion == true
+        }
+    }
+
+    /**
+     * Get the list of regions where replica keys exist for this multi-region key.
+     */
+    private suspend fun getReplicaRegions(): List<String> {
+        return KmsClient { region = config.auth.region }.use { kms ->
+            val metadata = kms.describeKey(DescribeKeyRequest { keyId = id })
+            metadata.keyMetadata?.multiRegionConfiguration?.replicaKeys
+                ?.mapNotNull { it.region }
+                ?: emptyList()
+        }
+    }
+
+    /**
+     * Delete a multi-region key by first deleting all replicas, then the primary.
+     * Includes retry logic to handle the case where replicas haven't yet reached
+     * PendingDeletion state when we try to delete the primary.
+     */
+    private suspend fun deleteMultiRegionKey(): Boolean {
+        val replicaRegions = getReplicaRegions()
+
+        // Step 1: Schedule deletion of each replica
+        for (replicaRegion in replicaRegions) {
+            try {
+                KmsClient { region = replicaRegion }.use { kms ->
+                    kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
+                        keyId = id
+                        pendingWindowInDays = 7
+                    })
+                }
+            } catch (e: Exception) {
+                // Log but continue - replica may already be deleted or in pending state
+                System.err.println("Warning: Failed to schedule deletion of replica in $replicaRegion: ${e.message}")
+            }
+        }
+
+        // Step 2: Retry primary deletion with backoff
+        // AWS may reject if replicas haven't reached PendingDeletion yet
+        var lastException: Exception? = null
+        repeat(5) { attempt ->
+            try {
+                return deleteSingleRegionKey()
+            } catch (e: Exception) {
+                lastException = e
+                val message = e.message ?: ""
+                // Check if this is a "replica not yet deleted" error
+                if (message.contains("replica", ignoreCase = true) ||
+                    message.contains("multi-region", ignoreCase = true)) {
+                    if (attempt < 4) {
+                        delay(2000L * (attempt + 1)) // 2s, 4s, 6s, 8s backoff
+                        return@repeat
+                    }
+                }
+                throw e
+            }
+        }
+        throw lastException ?: IllegalStateException("Failed to delete multi-region key after retries")
+    }
+
+    /**
+     * Delete a single-region key (or the primary of a multi-region key after replicas are deleted).
+     */
+    private suspend fun deleteSingleRegionKey(): Boolean {
         val request = ScheduleKeyDeletionRequest {
             this.keyId = id
             pendingWindowInDays = 7
@@ -181,10 +323,20 @@ class AWSKey(
         return delete.keyState?.value == "PendingDeletion"
     }
 
+    // =========================================================================
+    // Companion Object: Key Generation & Utilities
+    // =========================================================================
 
     companion object {
 
-
+        /**
+         * Generate a new AWS KMS key. For multi-region keys with replicaRegions specified,
+         * this will also create replica keys in the specified regions.
+         *
+         * @param keyType The cryptographic key type (e.g., secp256r1, RSA)
+         * @param config Configuration including region, multi-region settings, and replica regions
+         * @return The generated AWSKey instance
+         */
         suspend fun generateKey(keyType: KeyType, config: AWSKeyMetadataSDK): AWSKey {
 
             val awsTags = config.tags
@@ -211,6 +363,7 @@ class AWSKey(
             val keyId = response.keyMetadata?.keyId
                 ?: throw IllegalStateException("Key ID not returned by AWS KMS")
 
+            // Create alias if keyName is specified
             config.keyName?.let { keyName ->
                 KmsClient { region = config.auth.region }.use { kms ->
                     kms.createAlias(
@@ -222,22 +375,61 @@ class AWSKey(
                 }
             }
 
+            // Phase 1: Create replicas if multi-region with specified regions
+            if (config.multiRegion == true && !config.replicaRegions.isNullOrEmpty()) {
+                createReplicas(keyId, config.auth.region, config.replicaRegions)
+            }
+
             val publicKey = getAwsPublicKey(config, keyId)
-            val keyType = response.keyMetadata?.keySpec?.value
-            // remove tags from config
+            val resolvedKeyType = response.keyMetadata?.keySpec?.value
+
+            // Remove tags from config (they're stored in AWS, not needed in our metadata)
             val editedConfig = config.copy(tags = null)
-
-
 
             return AWSKey(
                 config = editedConfig,
                 id = keyId,
                 _publicKey = publicKey.exportJWK(),
-                _keyType = awsKeyToKeyTypeMapping(keyType.toString())
+                _keyType = awsKeyToKeyTypeMapping(resolvedKeyType.toString())
             )
         }
 
+        /**
+         * Create replica keys in the specified regions for a multi-region primary key.
+         * Replicas share the same key material and key ID as the primary.
+         *
+         * @param primaryKeyId The key ID of the primary multi-region key
+         * @param primaryRegion The region of the primary key (skipped in replica creation)
+         * @param replicaRegions List of regions where replicas should be created
+         */
+        private suspend fun createReplicas(
+            primaryKeyId: String,
+            primaryRegion: String,
+            replicaRegions: List<String>
+        ) {
+            for (targetRegion in replicaRegions) {
+                if (targetRegion == primaryRegion) continue // Skip primary region
 
+                try {
+                    KmsClient { region = targetRegion }.use { kms ->
+                        kms.replicateKey(ReplicateKeyRequest {
+                            keyId = primaryKeyId
+                            replicaRegion = targetRegion
+                        })
+                    }
+                } catch (e: Exception) {
+                    // Wrap with context about which region failed
+                    throw IllegalStateException(
+                        "Failed to create replica in region $targetRegion for key $primaryKeyId: ${e.message}",
+                        e
+                    )
+                }
+            }
+        }
+
+        /**
+         * Retrieve the public key from AWS KMS for a given key ID.
+         */
         suspend fun getAwsPublicKey(config: AWSKeyMetadataSDK, keyId: String): Key {
             KmsClient { region = config.auth.region }.use { kmsClient ->
                 val pk = kmsClient.getPublicKey(GetPublicKeyRequest {
@@ -281,5 +473,4 @@ $encodedPk
         // Utility to perform SHA-256 digest on binary data
         fun sha256(data: ByteArray): ByteArray = SHA256().digest(data)
     }
-
 }
