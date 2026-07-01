@@ -1,22 +1,22 @@
-# Issuer Conformance Tests (issuer-api2)
+# VCI Issuer Conformance Tests (issuer-api2)
 
 ## Overview
 
 This document describes how to run OpenID4VCI 1.0 conformance tests against `waltid-issuer-api2`.
 
-**Target Conformance Profile** 
+**Target Conformance Profile**
 
 | Property | Value |
 |----------|-------|
 | Test Plan | OpenID4VCI 1.0 Final |
 | FAPI | vci |
 | Sender Constraint | dpop |
-| Client Authentication | client_attestation |
-| Auth code flow variant | Both |
-| Credential Format | Both (SD-JWT VC, mDOC) |
+| Client Authentication | private_key_jwt |
+| Auth code flow variant | wallet_initiated |
+| Credential Format | SD-JWT VC (`dc+sd-jwt`) |
 | Auth Request Type | Simple |
 | Request Method | Unsigned |
-| Grant Type | Both (authorization_code, pre-authorized_code) |
+| Grant Type | authorization_code |
 | Credential Response Encryption | Plain |
 
 ## Architecture
@@ -27,18 +27,11 @@ This document describes how to run OpenID4VCI 1.0 conformance tests against `wal
 │   (Acts as Wallet Client)   │  HTTP   │    (Credential Issuer)      │
 │                             │ ──────► │                             │
 │ - Fetches metadata          │         │ - Exposes metadata          │
-│ - Initiates authorization   │         │ - Handles OAuth (Keycloak)  │
+│ - Initiates authorization   │         │ - Handles OAuth flow        │
 │ - Exchanges tokens          │         │ - Issues credentials        │
 │ - Requests credentials      │         │ - Validates DPoP proofs     │
 └─────────────────────────────┘         └─────────────────────────────┘
          (Docker)                              (Host + ngrok)
-                                                    │
-                                                    ▼
-                                        ┌─────────────────────┐
-                                        │      Keycloak       │
-                                        │  (Authorization     │
-                                        │   Server)           │
-                                        └─────────────────────┘
 ```
 
 The conformance suite runs in Docker and acts as a **wallet client** that calls the issuer's endpoints.
@@ -72,222 +65,119 @@ docker compose -f docker-compose-walt.yml up -d
 curl -k https://localhost.emobix.co.uk:8443/
 ```
 
-### 4. Start Keycloak (for authorization_code flow)
+## Running Tests
 
-The authorization_code flow requires an external OAuth server. Start Keycloak:
+### Step 1: Start issuer-api2
 
-```bash
-docker run -d --name keycloak \
-  -p 8080:8080 \
-  -e KC_HOSTNAME=keycloak.localhost \
-  -e KEYCLOAK_ADMIN=admin \
-  -e KEYCLOAK_ADMIN_PASSWORD=admin \
-  quay.io/keycloak/keycloak:latest start-dev
-```
-
-Or using docker-compose, add to your stack.
-
-**Add hosts entry for Keycloak:**
-```bash
-echo "127.0.0.1 keycloak.localhost" | sudo tee -a /etc/hosts
-```
-
-Access Keycloak admin: http://keycloak.localhost:8080/admin (admin/admin)
-
-### 5. Configure Keycloak
-
-Create a realm and client for issuer-api2:
-
-```bash
-# Get admin token
-TOKEN=$(curl -s -X POST "http://keycloak.localhost:8080/realms/master/protocol/openid-connect/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=admin&grant_type=password&client_id=admin-cli" | jq -r '.access_token')
-
-# Create realm
-curl -X POST "http://keycloak.localhost:8080/admin/realms" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"realm": "issuer", "enabled": true}'
-
-# Create client
-curl -X POST "http://keycloak.localhost:8080/admin/realms/issuer/clients" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "clientId": "issuer-api",
-    "enabled": true,
-    "protocol": "openid-connect",
-    "publicClient": false,
-    "standardFlowEnabled": true,
-    "directAccessGrantsEnabled": true,
-    "redirectUris": ["https://*.ngrok-free.app/*", "http://localhost:7002/*"],
-    "webOrigins": ["*"],
-    "secret": "issuer-api-secret"
-  }'
-
-# Create test user
-curl -X POST "http://keycloak.localhost:8080/admin/realms/issuer/users" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "enabled": true,
-    "emailVerified": true,
-    "credentials": [{"type": "password", "value": "testuser", "temporary": false}]
-  }'
-```
-
-### 6. Configure issuer-api2 for Keycloak
-
-Create/update `waltid-issuer-api2/config/authentication-service.conf`:
-
-```hocon
-name = "keycloak"
-authorizeUrl = "http://keycloak.localhost:8080/realms/issuer/protocol/openid-connect/auth"
-accessTokenUrl = "http://keycloak.localhost:8080/realms/issuer/protocol/openid-connect/token"
-clientId = "issuer-api"
-clientSecret = "issuer-api-secret"
-defaultScopes = ["openid", "profile"]
-forwardIssuerStateToAuthorizationServer = true
-```
-
-### 7. Start issuer-api2 with ngrok
-
-The conformance suite runs in Docker and cannot reach localhost directly. Use ngrok:
-
-**Terminal 1 - Start issuer-api2:**
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 ./gradlew :waltid-services:waltid-issuer-api2:run
 ```
 
-**Terminal 2 - Start ngrok:**
+### Step 2: Start ngrok tunnel
+
+The conformance suite runs in Docker and cannot reach localhost directly:
+
 ```bash
 ngrok http 7002
 ```
 
-Note the ngrok URL (e.g., `https://xxxx.ngrok-free.app`).
+Note the ngrok URL (e.g., `https://xxxx-xxxx.ngrok-free.app`).
 
-**Update Keycloak redirect URIs** if ngrok URL changed:
-```bash
-# Get token and client UUID, then update redirectUris to include your ngrok URL
+### Step 3: Configure issuer baseUrl
+
+Update `waltid-issuer-api2/config/issuer-service.conf`:
+
+```hocon
+baseUrl = "https://YOUR-NGROK-URL.ngrok-free.app"
 ```
 
-## Running Tests
+**Important:** Restart issuer-api2 after changing the baseUrl.
 
-### Set environment variable
-
-```bash
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://61b7-2001-871-26a-9ab5-c5fa-edcc-fb02-7b0c.ngrok-free.app/openid4vci"
-```
-
-**Important:** The path must be `/openid4vci` (not `/draft13`). issuer-api2 uses OpenID4VCI 1.0 paths.
-
-### Run the tests
+### Step 4: Run the tests
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 
+OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK-URL.ngrok-free.app/openid4vci" \
+OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential" \
+OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL" \
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
 ```
 
-### Complete OAuth login (authorization_code flow)
+### Environment Variables
 
-When the test reaches **WAITING** status, you'll see:
-```
-Test <testId> is stuck in WAITING status after 60 seconds.
-Please complete the test manually at https://localhost.emobix.co.uk:8443/test-info/<testId>
-```
-
-**You have ~60 seconds to:**
-
-1. Open the URL in your browser
-2. Click to continue the OAuth flow
-3. Login to Keycloak with: `testuser` / `testuser`
-4. The test continues automatically after login
-
-## Test Plans
-
-### Oid4vciIssuerClientAttestationDpop
-
-The main test plan configured in `Oid4vciIssuerClientAttestationDpop.kt`:
-
-| Property | Value |
-|----------|-------|
-| Plan Name | `oid4vci-1_0-issuer-test-plan` |
-| FAPI Profile | `vci` |
-| Sender Constraint | `dpop` |
-| Client Authentication | `attest_jwt_client_auth` |
-| Flow Variant | `wallet_initiated` |
-| Grant Type | `authorization_code` |
-| Credential Format | `sd_jwt_vc` |
-
-**Test Modules:**
-
-| Module | Description | User Action Required |
-|--------|-------------|---------------------|
-| `oid4vci-1_0-issuer-metadata-test` | Validates metadata endpoint | No |
-| `oid4vci-1_0-issuer-happy-flow` | Complete issuance flow | **Yes - OAuth login** |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL` | Full URL to issuer's OpenID4VCI endpoint | `https://xxxx.ngrok-free.app/openid4vci` |
+| `OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID` | Credential config ID for SD-JWT VC tests | `identity_credential` |
+| `OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID` | Credential config ID for mDOC tests | `org.iso.18013.5.1.mDL` |
 
 ## Credential Configuration IDs
 
-issuer-api2 exposes many credential configurations. The test uses SD-JWT VC format credentials.
+The issuer-api2 exposes multiple credential configurations. Use IDs that exist in your issuer's metadata.
 
-Available SD-JWT VC configurations (sample):
-- `identity_credential_dc+sd-jwt`
-- `photoID_credential_dc+sd-jwt`
-- `my_custom_vct_dc+sd-jwt`
+### Available SD-JWT VC Credentials
 
-Available mDOC configurations:
-- `org.iso.18013.5.1.mDL`
-- `org.iso.23220.photoid.1`
-- `urn:eu.europa.ec.eudi:pid:1`
-
-## Expected Results
-
-Successful test run:
-```
-================================================================================
-OpenID4VCI Issuer Conformance Tests
-================================================================================
-
-Conformance suite: localhost.emobix.co.uk:8443
-Issuer URL: https://xxxx.ngrok-free.app/openid4vci
-
-================================================================================
-Running issuer plan: Oid4vciIssuerClientAttestationDpop
-================================================================================
-
-[1/2] Running module: oid4vci-1_0-issuer-metadata-test
-  Status: FINISHED, Result: PASSED
-
-[2/2] Running module: oid4vci-1_0-issuer-happy-flow
-  Status: WAITING (complete OAuth login in browser)
-  Status: FINISHED, Result: PASSED
-
-================================================================================
-Results: 2/2 PASSED
-================================================================================
-```
-
-## Troubleshooting
-
-### "Invalid parameter: redirect_uri" in Keycloak
-
-The Keycloak client's redirect URIs don't include your ngrok URL. Update the client:
+Check your issuer's metadata for available configurations:
 
 ```bash
-# Add your ngrok URL to redirectUris, including the callback path:
-# https://YOUR-NGROK.ngrok-free.app/openid4vci/external/oauth/callback
+curl -s "https://YOUR-NGROK-URL.ngrok-free.app/.well-known/openid-credential-issuer/openid4vci" | \
+  jq '.credential_configurations_supported | to_entries[] | select(.value.format | test("sd-jwt")) | .key'
 ```
 
-### Test times out in WAITING status
+**Common SD-JWT VC configurations:**
+- `identity_credential` → profile: `identityCredentialSdJwt`
+- `urn:eudi:pid:1` → profile: `eudiPidSdJwt`
+- `urn:eu.europa.ec.eudi:por:1` → profile: `powerOfRepresentationSdJwt`
+- `urn:eu.europa.ec.eudi:cor:1` → profile: `certificateOfResidenceSdJwt`
 
-You have ~60 seconds to complete the OAuth login. If you miss it:
-1. Run the test again
-2. Quickly open the `test-info` URL
-3. Complete the login
+### Available mDOC Credentials
+
+```bash
+curl -s "https://YOUR-NGROK-URL.ngrok-free.app/.well-known/openid-credential-issuer/openid4vci" | \
+  jq '.credential_configurations_supported | to_entries[] | select(.value.format == "mso_mdoc") | .key'
+```
+
+**Common mDOC configurations:**
+- `org.iso.18013.5.1.mDL` → profile: `isoMdl`
+- `eu.europa.ec.eudi.pid.1` → profile: `eudiPidMdoc`
+- `eu.europa.ec.av.1` → profile: `euAgeVerificationMdoc`
+
+### List Available Profiles
+
+```bash
+curl -s "https://YOUR-NGROK-URL.ngrok-free.app/issuer2/profiles" | jq '.[].profileId'
+```
+
+## Test Results
+
+### Expected Output
+
+The test creates a test plan on the conformance suite and runs through the OpenID4VCI issuance flow:
+
+```
+✅ Conformance server version 5.1.44 available!
+✅ Issuer metadata endpoint responding: https://xxxx.ngrok-free.app/.well-known/openid-credential-issuer/openid4vci
+Resolved phase-1 issuer credential configuration ids:
+  sd-jwt-vc -> identity_credential
+  mdoc      -> org.iso.18013.5.1.mDL
+Running issuer plan: Oid4vciIssuerClientAttestationDpop
+```
+
+### Current Test Status (2026-07-01)
+
+| Module | Result | Notes |
+|--------|--------|-------|
+| `oid4vci-1_0-issuer-happy-flow` | 53 SUCCESS, 2 FAILURE | See known issues below |
+
+### Known Issues
+
+1. **"No 'iss' value in authorization response"** - The authorization response is missing the `iss` parameter required by OAuth 2.0 Authorization Server Issuer Identification (RFC 9207).
+
+2. **"Invalid http status"** - An HTTP endpoint returned an unexpected status code.
+
+## Troubleshooting
 
 ### Conformance suite can't reach issuer
 
@@ -295,62 +185,68 @@ You have ~60 seconds to complete the OAuth login. If you miss it:
 - Use ngrok or your host's network IP
 - Verify: `curl https://YOUR-NGROK.ngrok-free.app/.well-known/openid-credential-issuer/openid4vci`
 
-### Metadata endpoint 404
+### "Unknown credential configuration ID" error
 
-issuer-api2 uses the path `/.well-known/openid-credential-issuer/openid4vci` (not just `/.well-known/openid-credential-issuer`).
+The `deriveProfileId()` function in `Oid4vciIssuerClientAttestationDpop.kt` maps credential configuration IDs to issuer-api2 profile IDs. If you get this error, either:
+1. Use a credential configuration ID that has a mapping
+2. Add a new mapping for your credential configuration ID
 
-Verify:
+### "Credential profile not found" error (404)
+
+The profile ID derived from the credential configuration ID doesn't exist in issuer-api2. Check available profiles:
+
 ```bash
-curl https://YOUR-NGROK.ngrok-free.app/.well-known/openid-credential-issuer/openid4vci | jq .
+curl -s "https://YOUR-NGROK-URL.ngrok-free.app/issuer2/profiles" | jq '.[].profileId'
 ```
 
-### OAuth metadata endpoint
+### Metadata endpoint returns wrong URLs
 
-```bash
-curl https://YOUR-NGROK.ngrok-free.app/.well-known/oauth-authorization-server/openid4vci | jq .
+If metadata contains `http://localhost:7002` instead of ngrok URLs:
+1. Update `baseUrl` in `issuer-service.conf`
+2. Restart issuer-api2
+
+### Test report location
+
+After running tests, view the HTML report:
+```
+waltid-services/waltid-openid4vp-conformance-runners/build/reports/tests/test/index.html
 ```
 
 ## Quick Reference
 
-### Full test run commands
+### Full test run (copy-paste)
 
 ```bash
-# Terminal 1: Keycloak (if not already running)
-docker run -d --name keycloak -p 8080:8080 \
-  -e KC_HOSTNAME=keycloak.localhost \
-  -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin \
-  quay.io/keycloak/keycloak:latest start-dev
-
-# Terminal 2: issuer-api2
+# Terminal 1: Start issuer-api2
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
 ./gradlew :waltid-services:waltid-issuer-api2:run
 
-# Terminal 3: ngrok
+# Terminal 2: Start ngrok
 ngrok http 7002
+# Note the URL, e.g., https://xxxx.ngrok-free.app
 
-# Terminal 4: Run tests
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vci"
+# Terminal 3: Run tests (replace YOUR-NGROK-URL)
 cd ~/dev/walt-id/waltid-unified-build/waltid-identity
+
+OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK-URL.ngrok-free.app/openid4vci" \
+OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID="identity_credential" \
+OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID="org.iso.18013.5.1.mDL" \
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
 ```
-
-### Test user credentials
-
-- **Username:** testuser
-- **Password:** testuser
 
 ### Key URLs
 
 | URL | Purpose |
 |-----|---------|
 | `https://localhost.emobix.co.uk:8443/` | Conformance suite UI |
-| `http://keycloak.localhost:8080/admin` | Keycloak admin (admin/admin) |
 | `https://YOUR-NGROK.ngrok-free.app/openid4vci` | Issuer credential issuer URL |
 | `https://YOUR-NGROK.ngrok-free.app/.well-known/openid-credential-issuer/openid4vci` | Issuer metadata |
 | `https://YOUR-NGROK.ngrok-free.app/.well-known/oauth-authorization-server/openid4vci` | OAuth metadata |
+| `https://YOUR-NGROK.ngrok-free.app/issuer2/profiles` | List available profiles |
 
 ## Related Documentation
 
-- [VCI-WALLET.md](VCI-WALLET.md) - VCI wallet conformance tests
+- [VCI-WALLET.md](VCI-WALLET.md) - VCI wallet conformance tests (140/140 passing)
 - [VP-VERIFIER.md](VP-VERIFIER.md) - VP verifier conformance tests
+- [VP-WALLET.md](VP-WALLET.md) - VP wallet conformance tests
 - [OpenID4VCI 1.0 Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)

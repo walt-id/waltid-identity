@@ -106,6 +106,12 @@ class Oid4vciIssuerClientAttestationDpop(
             credentialConfigurationId.contains("photoID_credential") -> "photoIdCredentialSdJwt"
             credentialConfigurationId.contains("org.iso.23220.photoid") -> "isoPhotoId"
             credentialConfigurationId.contains("org.iso.18013.5.1.mDL") -> "isoMdl"
+            credentialConfigurationId.contains("urn:eu.europa.ec.eudi:por:1") -> "powerOfRepresentationSdJwt"
+            credentialConfigurationId.contains("urn:eu.europa.ec.eudi:cor:1") -> "companyRegistrationSdJwt"
+            credentialConfigurationId.contains("urn:eudi:pid:1") -> "eudiPidSdJwt"
+            credentialConfigurationId.contains("eu.europa.ec.eudi.pid.1") -> "eudiPidMdoc"
+            credentialConfigurationId.contains("identity_credential") -> "identityCredentialSdJwt"
+            credentialConfigurationId.contains("eu.europa.ec.av.1") -> "euAgeVerificationMdoc"
             else -> throw IllegalArgumentException("Unknown credential configuration ID: $credentialConfigurationId")
         }
     }
