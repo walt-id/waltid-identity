@@ -4,6 +4,7 @@ import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.StubTokenService
+import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.responses.token.AccessTokenResponseResult
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
@@ -34,7 +35,6 @@ class PreAuthorizedCodeGrantHandlerTest {
         val credentialSession = DefaultSession(subject = "credential-subject")
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
-                clientId = "client-pre",
                 scopes = setOf("openid"),
                 audience = emptySet(),
                 session = credentialSession,
@@ -57,10 +57,73 @@ class PreAuthorizedCodeGrantHandlerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `rejects bound pre-authorized code without client authentication`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = "bound-client",
+                session = DefaultSession(subject = "bound-subject"),
+            ),
+        )
+
+        val result = handler.handleTokenEndpointRequest(createAccessRequestWithGrant(code = issued.code))
+
+        assertTrue(result is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Client authentication is required for this pre-authorized code", result.error.description)
+        assertNotNull(repository.get(issued.code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `rejects bound pre-authorized code for a different authenticated client`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = "bound-client",
+                session = DefaultSession(subject = "bound-subject"),
+            ),
+        )
+
+        val result = handler.handleTokenEndpointRequest(
+            createAccessRequestWithGrant(
+                code = issued.code,
+                clientId = "other-client",
+                authenticatedClient = authenticatedClient("other-client"),
+            ),
+        )
+
+        assertTrue(result is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_grant", result.error.error)
+        assertEquals("Client mismatch for pre-authorized code", result.error.description)
+        assertNotNull(repository.get(issued.code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `handles bound pre-authorized code for matching authenticated client`() = runTest {
+        val issued = issuer.issue(
+            PreAuthorizedCodeIssueRequest(
+                clientId = "bound-client",
+                session = DefaultSession(subject = "bound-subject"),
+            ),
+        )
+
+        val result = handler.handleTokenEndpointRequest(
+            createAccessRequestWithGrant(
+                code = issued.code,
+                clientId = "bound-client",
+                authenticatedClient = authenticatedClient("bound-client"),
+            ),
+        )
+
+        assertTrue(result is AccessTokenResponseResult.Success)
+        assertNull(repository.get(issued.code))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `rejects invalid tx_code and allows retry`() = runTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
-                clientId = "client-pin",
                 txCode = TxCode(length = 4, description = "Enter your transaction code"),
                 txCodeValue = "4321",
                 session = DefaultSession(subject = "pin-subject"),
@@ -85,7 +148,6 @@ class PreAuthorizedCodeGrantHandlerTest {
     fun `rejects code reuse`() = runTest {
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
-                clientId = "client-reuse",
                 session = DefaultSession(subject = "reuse-subject"),
             ),
         )
@@ -124,7 +186,6 @@ class PreAuthorizedCodeGrantHandlerTest {
         val txCode = TxCode(inputMode = "numeric", length = 6, description = "Enter the generated code")
         val issued = issuer.issue(
             PreAuthorizedCodeIssueRequest(
-                clientId = "client-generated-tx",
                 txCode = txCode,
                 session = DefaultSession(subject = "generated-tx-subject"),
             )
@@ -175,10 +236,15 @@ class PreAuthorizedCodeGrantHandlerTest {
         }
     }
 
-    private fun createAccessRequestWithGrant(code: String? = null, txCode: String? = null): AccessTokenRequest =
+    private fun createAccessRequestWithGrant(
+        code: String? = null,
+        txCode: String? = null,
+        clientId: String = "",
+        authenticatedClient: AuthenticatedClient? = null,
+    ): AccessTokenRequest =
         DefaultAccessTokenRequest(
             client = DefaultClient(
-                id = "",
+                id = clientId,
                 redirectUris = emptyList(),
                 grantTypes = setOf(GrantType.PreAuthorizedCode.value),
                 responseTypes = emptySet(),
@@ -189,6 +255,13 @@ class PreAuthorizedCodeGrantHandlerTest {
                 if (txCode != null) put("tx_code", listOf(txCode))
             },
             session = DefaultSession(subject = "access-subject"),
+            authenticatedClient = authenticatedClient,
+        )
+
+    private fun authenticatedClient(id: String): AuthenticatedClient =
+        AuthenticatedClient(
+            id = id,
+            authenticationMethod = "test",
         )
 
     private class InMemoryPreAuthorizedCodeRepository : PreAuthorizedCodeRepository {

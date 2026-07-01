@@ -31,6 +31,13 @@ import kotlin.time.Instant
  * while services cover issuer-facing workflows.
  */
 interface PreAuthorizedCodeIssuer {
+    /**
+     * Controls whether the token endpoint may redeem pre-authorized codes without client_id or client authentication.
+     * It does not prevent issuing unbound pre-authorized code records.
+     */
+    val anonymousAccessSupported: Boolean
+        get() = true
+
     suspend fun issue(request: PreAuthorizedCodeIssueRequest): PreAuthorizedCodeIssueResult
 }
 
@@ -57,6 +64,7 @@ data class PreAuthorizedCodeIssueResult(
 
 class DefaultPreAuthorizedCodeIssuer(
     private val repository: PreAuthorizedCodeRepository,
+    override val anonymousAccessSupported: Boolean = true,
     private val maxGenerateAttempts: Int = 3,
 ) : PreAuthorizedCodeIssuer {
 

@@ -15,6 +15,7 @@ import id.walt.openid4vci.requests.authorization.OPENID_CREDENTIAL_AUTHORIZATION
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
+import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.responses.token.TokenResponseOptions
 import id.walt.openid4vci.tokens.AccessTokenService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -350,6 +351,175 @@ class ProviderAuthorizationOnlyFlowTest {
         )
 
         assertEquals(null, result.request.authenticatedClient)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request can omit client authentication when TOKEN methods are configured and anonymous pre-auth is enabled`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Success>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                )
+            )
+        )
+
+        assertEquals(null, result.request.authenticatedClient)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request without client authentication fails when anonymous pre-auth is disabled`() = runTest {
+        val config = createTestConfig()
+        val provider = buildOAuth2Provider(
+            config.copy(
+                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
+                    repository = config.preAuthorizedCodeRepository,
+                    anonymousAccessSupported = false,
+                ),
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Failure>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                )
+            )
+        )
+
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Anonymous pre-authorized code access is not supported", result.error.description)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request without client authentication fails when anonymous pre-auth is disabled without TOKEN methods`() = runTest {
+        val config = createTestConfig()
+        val provider = buildOAuth2Provider(
+            config.copy(
+                preAuthorizedCodeIssuer = DefaultPreAuthorizedCodeIssuer(
+                    repository = config.preAuthorizedCodeRepository,
+                    anonymousAccessSupported = false,
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Failure>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                )
+            )
+        )
+
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Anonymous pre-authorized code access is not supported", result.error.description)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request with client id requires client authentication when TOKEN methods are configured`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Failure>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                    "client_id" to listOf("demo-client"),
+                )
+            )
+        )
+
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Client authentication is required for this endpoint", result.error.description)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request with malformed client authentication input is not treated as anonymous`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Failure>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                    "client_secret" to listOf("secret-value"),
+                )
+            )
+        )
+
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Client authentication is required for this endpoint", result.error.description)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `pre-authorized token request validates client authentication when auth material is sent`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(TokenTestClientSecretPostAuthenticationMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+            )
+        )
+
+        val result = assertIs<AccessTokenRequestResult.Success>(
+            provider.createAccessTokenRequest(
+                mapOf(
+                    "grant_type" to listOf(GrantType.PreAuthorizedCode.value),
+                    "pre-authorized_code" to listOf("pre-authorized-code"),
+                    "client_id" to listOf("demo-client"),
+                    "client_secret" to listOf("secret-value"),
+                )
+            )
+        )
+
+        assertEquals("demo-client", result.request.client.id)
+        assertEquals("demo-client", result.request.authenticatedClient?.id)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

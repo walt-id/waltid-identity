@@ -1,11 +1,13 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethodDetector
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.errors.OAuthError
@@ -270,11 +272,24 @@ class DefaultOAuth2Provider(
         headers: Map<String, List<String>>,
         session: Session?
     ): AccessTokenRequestResult {
-        val authResult = authenticateClient(
-            endpoint = ClientAuthenticationEndpoint.TOKEN,
-            parameters = parameters,
-            headers = headers,
-        )
+        if (isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
+            !config.preAuthorizedCodeIssuer.anonymousAccessSupported
+        ) {
+            return AccessTokenRequestResult.Failure(
+                OAuthError(OAuthErrorCodes.INVALID_CLIENT, "Anonymous pre-authorized code access is not supported"),
+            )
+        }
+
+        val authResult =
+            if (canSkipTokenClientAuthentication(parameters, headers)) {
+                ClientAuthenticationResult.Unauthenticated
+            } else {
+                authenticateClient(
+                    endpoint = ClientAuthenticationEndpoint.TOKEN,
+                    parameters = parameters,
+                    headers = headers,
+                )
+            }
 
         val authenticatedClient = when (authResult) {
             is ClientAuthenticationResult.Authenticated -> authResult.client
@@ -295,6 +310,13 @@ class DefaultOAuth2Provider(
 
         return validationResult
     }
+
+    private fun canSkipTokenClientAuthentication(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): Boolean =
+        config.preAuthorizedCodeIssuer.anonymousAccessSupported &&
+            isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers)
 
     private fun validateAccessTokenRequest(
         parameters: Map<String, List<String>>,
@@ -650,6 +672,22 @@ class DefaultOAuth2Provider(
             "client_id" to id,
             "client_authentication_method" to authenticationMethod,
         )
+
+    private fun Map<String, List<String>>.singleNonBlankValue(name: String): String? =
+        this[name].orEmpty()
+            .filter { it.isNotBlank() }
+            .singleOrNull()
+
+    private fun isAnonymousPreAuthorizedCodeTokenRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): Boolean =
+        parameters.singleNonBlankValue("grant_type") == GrantType.PreAuthorizedCode.value &&
+            parameters.hasNoClientId() &&
+            !ClientAuthenticationMethodDetector.hasClientAuthenticationInput(parameters, headers)
+
+    private fun Map<String, List<String>>.hasNoClientId(): Boolean =
+        this["client_id"].orEmpty().none { it.isNotBlank() }
 
     private sealed class AuthorizationParameterResolution {
         data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
