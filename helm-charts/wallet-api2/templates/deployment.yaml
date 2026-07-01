@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "wallet-api2.fullname" . }}-api
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: wallet-api2
+      {{- include "wallet-api2.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: wallet-api2
+        {{- include "wallet-api2.selectorLabels" . | nindent 8 }}
+      annotations:
+        deployment/id: _DEFAULT_DEPLOYMENT_
+    spec:
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: wallet-api2
+        image: {{ .Values.api.walletApi2.image.repository }}:{{ .Values.api.walletApi2.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.walletApi2.image.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 10001
+          capabilities:
+            drop:
+              - ALL
+        ports:
+        - containerPort: 7005
+          name: http-api
+        volumeMounts:
+          {{- range $name, $content := .Values.configFiles }}
+          - name: wallet-config
+            mountPath: /waltid-wallet-api2/config/{{ $name }}
+            readOnly: true
+            subPath: {{ $name }}
+          {{- end }}
+          - mountPath: "/waltid-wallet-api2/data/"
+            name: wallet-data
+      volumes:
+        - name: wallet-config
+          configMap:
+            name: {{ include "wallet-api2.fullname" . }}-wallet-config
+        - name: wallet-data
+          persistentVolumeClaim:
+            claimName: {{ include "wallet-api2.fullname" . }}-data-volume-claim

@@ -8,10 +8,17 @@ issuer:
         secretName: issuer-portal-tls
     host: issuer.portal.test.waltid.cloud
 
+issuer2:
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - issuer2.portal.test.waltid.cloud
+        secretName: issuer2-portal-tls
+    host: issuer2.portal.test.waltid.cloud
+
 verifier:
-  webConfig:
-    verifierServiceConf: baseUrl = "https://verifier.portal.test.waltid.cloud"
-    entraConf:  callbackUrl = "https://verifier.portal.test.waltid.cloud/entra/verification-callback/"
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
@@ -20,6 +27,16 @@ verifier:
           - verifier.portal.test.waltid.cloud
         secretName: verifier-portal-tls
     host: verifier.portal.test.waltid.cloud
+
+verifier2:
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - verifier2.portal.test.waltid.cloud
+        secretName: verifier2-portal-tls
+    host: verifier2.portal.test.waltid.cloud
 
 portal:
   env:
@@ -42,8 +59,8 @@ web-wallet:
       accessMode: ReadWriteOnce
       storageClass: gp3-retain
       storageRequest: 1Gi
-  walletConfig:
-    oidcConf: |-
+  configFiles:
+    oidc.conf: |-
       publicBaseUrl = "https://wallet-dev.test.waltid.cloud"
       providerName = keycloak
       oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
@@ -62,6 +79,7 @@ web-wallet:
               refillRateMinutes: 1
           }
       }
+  walletConfig:
     authConf: |-
       encryptionKey = "oshaaddgtwcqvcsg"
       signKey = "gyccmrunkqwnzswl"
@@ -84,3 +102,13 @@ web-wallet:
           - wallet-dev.test.waltid.cloud
           - wallet.test.waltid.cloud
         secretName: web-wallet-tls
+
+wallet-api2:
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - wallet-api2.portal.test.waltid.cloud
+        secretName: wallet-api2-portal-tls
+    host: wallet-api2.portal.test.waltid.cloud

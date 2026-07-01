@@ -1,0 +1,27 @@
+api:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http-api
+  replicas: 1
+  type: ClusterIP
+  verifierApi2:
+    image:
+      repository: waltid/verifier-api2
+      tag: latest
+      imagePullPolicy: Always
+
+configFiles:
+  _features.conf: |-
+    enabledFeatures = [
+        entra
+    ]
+  verifier-service.conf: |-
+    baseUrl = "https://{{ .Values.ingress.host }}"
+  entra.conf: |-
+    callbackUrl = "https://{{ .Values.ingress.host }}/entra/verification-callback/"
+
+ingress:
+  ingressClassName: "traefik"
+  host: verifier2.portal.waltid.cloud
