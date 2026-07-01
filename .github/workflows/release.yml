@@ -47,7 +47,7 @@ jobs:
       tags: '["stable"]'
       publish: true
   deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@f1771c73b0617af49e29e64b5bd148b44ca4c5a9
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@df43b956af2a6e51c764f33142b2586450d2ae81
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
