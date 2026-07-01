@@ -39,7 +39,7 @@ fun defaultAccessTokenClaims(
 }
 
 /**
- * Common JWT claim names for access tokens.
+ * Common JWT claim names.
  */
 object JwtPayloadClaims {
     const val SUBJECT = "sub"
@@ -50,6 +50,8 @@ object JwtPayloadClaims {
     const val SCOPE = "scope"
     const val CLIENT_ID = "client_id"
     const val JWT_ID = "jti"
+    const val CONFIRMATION = "cnf"
+    const val CHALLENGE = "challenge"
 }
 
 /**
@@ -59,4 +61,11 @@ object JwtHeaderParams {
     const val TYPE = "typ"
     const val ALGORITHM = "alg"
     const val KEY_ID = "kid"
+}
+
+/**
+ * Standard JWT confirmation claim member names.
+ */
+object JwtConfirmationClaims {
+    const val JWK = "jwk"
 }
