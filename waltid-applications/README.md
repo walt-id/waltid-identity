@@ -92,7 +92,7 @@ Native iOS wallet demo app. SwiftUI application backed by Kotlin Multiplatform w
 
 **Use when:** You need a native iOS wallet SDK reference implementation, iOS-specific integration patterns, or iOS wallet E2E coverage.
 
-### [🟢 waltid-android](./waltid-android)
+### [🟠 waltid-android](./waltid-android)
 Android sample project for key generation, DID creation, signing, and verification. This app is planned for deprecation; use `waltid-wallet-demo-compose` for the current Android wallet issuance/presentation demo.
 
 **Use when:** You need the legacy Android crypto/sample app while it is still available, or you are migrating existing Android sample usage to the Compose wallet demo.
