@@ -48,6 +48,7 @@ class TokenRequestBuilder(
      * @param code The authorization code received from authorization endpoint
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
      * @param dpopProofGenerator Optional function to generate DPoP proof (for nonce retry support)
+     * @param clientAssertionGenerator Optional function to generate client_assertion JWT (regenerated on retry to avoid jti reuse)
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -56,7 +57,7 @@ class TokenRequestBuilder(
         code: String,
         codeVerifier: String? = null,
         dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
-        clientAssertion: String? = null,
+        clientAssertionGenerator: (suspend () -> String)? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -65,9 +66,10 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
         log.trace { "DPoP proof generator present: ${dpopProofGenerator != null}" }
-        log.trace { "Client assertion present: ${clientAssertion != null}" }
+        log.trace { "Client assertion generator present: ${clientAssertionGenerator != null}" }
 
-        val parameters = Parameters.build {
+        // Build base parameters (without client_assertion - that's added per-request)
+        val baseParameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
             append("code", code)
             append("redirect_uri", clientConfig.primaryRedirectUri)
@@ -76,14 +78,9 @@ class TokenRequestBuilder(
                 append("code_verifier", it)
                 log.trace { "Including PKCE code verifier in token request" }
             }
-            clientAssertion?.let {
-                append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
-                append("client_assertion", it)
-                log.trace { "Including client_assertion for private_key_jwt auth" }
-            }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters, dpopProofGenerator)
+        return executeTokenRequest(tokenEndpoint, baseParameters, dpopProofGenerator, clientAssertionGenerator)
     }
 
     /**
@@ -128,16 +125,31 @@ class TokenRequestBuilder(
      * Handles DPoP nonce retry per RFC 9449 §5.
      * 
      * @param tokenEndpoint The token endpoint URL
-     * @param parameters The form parameters for the request
+     * @param baseParameters The base form parameters for the request (without client_assertion)
      * @param dpopProofGenerator Optional function to generate DPoP proof with optional nonce
+     * @param clientAssertionGenerator Optional function to generate client_assertion (called fresh each attempt)
      */
     private suspend fun executeTokenRequest(
         tokenEndpoint: String,
-        parameters: Parameters,
+        baseParameters: Parameters,
         dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
+        clientAssertionGenerator: (suspend () -> String)? = null,
     ): TokenResponse {
         log.debug { "Sending token request to authorization server" }
-        log.trace { "Request parameters count: ${parameters.names().size}" }
+        log.trace { "Request parameters count: ${baseParameters.names().size}" }
+        
+        // Build full parameters with fresh client_assertion if needed
+        val parameters = if (clientAssertionGenerator != null) {
+            val clientAssertion = clientAssertionGenerator()
+            log.trace { "Generated fresh client_assertion for token request" }
+            Parameters.build {
+                baseParameters.forEach { name, values -> values.forEach { append(name, it) } }
+                append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                append("client_assertion", clientAssertion)
+            }
+        } else {
+            baseParameters
+        }
         
         // First attempt (without nonce)
         val dpopProof = dpopProofGenerator?.invoke(null)
@@ -165,7 +177,7 @@ class TokenRequestBuilder(
                 val dpopNonce = response.headers["DPoP-Nonce"]
                 if (dpopNonce != null) {
                     log.info { "Server requires DPoP nonce, retrying with nonce: $dpopNonce" }
-                    return executeTokenRequestWithNonce(tokenEndpoint, parameters, dpopProofGenerator, dpopNonce)
+                    return executeTokenRequestWithNonce(tokenEndpoint, baseParameters, dpopProofGenerator, dpopNonce, clientAssertionGenerator)
                 } else {
                     log.error { "Server requires DPoP nonce but didn't provide DPoP-Nonce header" }
                 }
@@ -205,15 +217,30 @@ class TokenRequestBuilder(
     
     /**
      * Retry token request with DPoP nonce (RFC 9449 §5)
+     * Also regenerates client_assertion to avoid jti reuse (RFC 7523)
      */
     private suspend fun executeTokenRequestWithNonce(
         tokenEndpoint: String,
-        parameters: Parameters,
+        baseParameters: Parameters,
         dpopProofGenerator: suspend (nonce: String?) -> String,
-        nonce: String
+        nonce: String,
+        clientAssertionGenerator: (suspend () -> String)? = null,
     ): TokenResponse {
         val dpopProof = dpopProofGenerator(nonce)
         log.debug { "Retrying with DPoP proof containing nonce" }
+        
+        // Build full parameters with fresh client_assertion if needed
+        val parameters = if (clientAssertionGenerator != null) {
+            val clientAssertion = clientAssertionGenerator()
+            log.trace { "Generated fresh client_assertion for retry" }
+            Parameters.build {
+                baseParameters.forEach { name, values -> values.forEach { append(name, it) } }
+                append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                append("client_assertion", clientAssertion)
+            }
+        } else {
+            baseParameters
+        }
         
         val response: HttpResponse = try {
             httpClient.post(tokenEndpoint) {

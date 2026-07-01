@@ -2,6 +2,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
@@ -194,7 +195,15 @@ data class FetchCredentialRequest(
     val proofJwt: String? = null,
     val clientId: String = "wallet-client",
     /** Optional key for DPoP proof on credential endpoint */
-    @Transient val dpopKey: JWKKey? = null
+    @Transient val dpopKey: JWKKey? = null,
+    /** Optional nonce endpoint URL - if provided and proofJwt is null, will fetch nonce and sign proof */
+    val nonceEndpoint: Url? = null,
+    /** Optional c_nonce from token response - used if nonceEndpoint not provided and proofJwt is null */
+    val cNonce: String? = null,
+    /** Credential issuer URL for proof audience claim */
+    val credentialIssuerUrl: Url? = null,
+    /** Optional key for signing proof - required if proofJwt is null and nonce is available */
+    @Transient val proofKey: Key? = null
 )
 
 @Serializable
@@ -262,7 +271,9 @@ data class GenerateAuthorizationUrlResult(
     /** Credential endpoint URL for fetching credentials */
     val credentialEndpoint: String? = null,
     /** Credential issuer URL */
-    val credentialIssuerUrl: String? = null
+    val credentialIssuerUrl: String? = null,
+    /** Nonce endpoint URL (if issuer provides one instead of c_nonce in token response) */
+    val nonceEndpoint: String? = null
 )
 
 @Serializable
@@ -566,11 +577,34 @@ object WalletIssuanceHandler {
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult {
         val httpClient = defaultHttpClient()
+        val proofBuilder = JwtProofBuilder()
+        
+        // Determine the proof JWT to use:
+        // 1. Use provided proofJwt if available
+        // 2. Otherwise, fetch nonce from nonceEndpoint (if provided) or use cNonce
+        // 3. Sign proof with proofKey if we have a nonce and key
+        val finalProofJwt = request.proofJwt ?: run {
+            // Try to get nonce: prefer nonceEndpoint, fall back to cNonce
+            val nonce = request.nonceEndpoint?.let { fetchCNonce(httpClient, it.toString()) }
+                ?: request.cNonce
+            
+            // Sign proof if we have both nonce and key
+            if (nonce != null && request.proofKey != null) {
+                val audience = request.credentialIssuerUrl?.toString()
+                    ?: request.credentialEndpoint.toString()
+                proofBuilder.buildJwtProof(
+                    key = request.proofKey,
+                    audience = audience,
+                    nonce = nonce,
+                    includeJwk = true
+                ).jwt?.firstOrNull()
+            } else null
+        }
         
         // Build JSON manually to avoid Proofs serialization issue
         val credentialRequestJson = buildJsonObject {
             put("credential_configuration_id", request.credentialConfigurationId)
-            request.proofJwt?.let { jwt ->
+            finalProofJwt?.let { jwt ->
                 putJsonObject("proofs") {
                     put("jwt", buildJsonArray { add(JsonPrimitive(jwt)) })
                 }
@@ -778,7 +812,8 @@ object WalletIssuanceHandler {
                 tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
                 asIssuerUrl = asMetadata.issuer,
                 credentialEndpoint = issuerMetadata.credentialEndpoint,
-                credentialIssuerUrl = issuerMetadata.credentialIssuer
+                credentialIssuerUrl = issuerMetadata.credentialIssuer,
+                nonceEndpoint = issuerMetadata.nonceEndpoint
             )
         } else {
             // Standard authorization request (no PAR)
@@ -799,7 +834,8 @@ object WalletIssuanceHandler {
                 tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
                 asIssuerUrl = asMetadata.issuer,
                 credentialEndpoint = issuerMetadata.credentialEndpoint,
-                credentialIssuerUrl = issuerMetadata.credentialIssuer
+                credentialIssuerUrl = issuerMetadata.credentialIssuer,
+                nonceEndpoint = issuerMetadata.nonceEndpoint
             )
         }
     }
@@ -833,13 +869,16 @@ object WalletIssuanceHandler {
             }
         }
         
-        // Generate client_assertion if key and issuer URL provided
-        val clientAssertion: String? = if (request.clientAssertionKey != null && request.asIssuerUrl != null) {
-            generateClientAssertion(
-                key = request.clientAssertionKey,
-                clientId = request.clientId,
-                audience = request.asIssuerUrl  // MUST be AS issuer URL, not token endpoint
-            )
+        // Create client_assertion generator if key and issuer URL provided
+        // Using a generator ensures fresh jti on each call (avoids reuse on DPoP nonce retry)
+        val clientAssertionGenerator: (suspend () -> String)? = if (request.clientAssertionKey != null && request.asIssuerUrl != null) {
+            {
+                generateClientAssertion(
+                    key = request.clientAssertionKey,
+                    clientId = request.clientId,
+                    audience = request.asIssuerUrl  // MUST be AS issuer URL, not token endpoint
+                )
+            }
         } else null
         
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
@@ -847,7 +886,7 @@ object WalletIssuanceHandler {
             code = request.code,
             codeVerifier = request.codeVerifier,
             dpopProofGenerator = dpopProofGenerator,
-            clientAssertion = clientAssertion
+            clientAssertionGenerator = clientAssertionGenerator
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,

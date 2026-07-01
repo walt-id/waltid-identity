@@ -545,9 +545,12 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
                         
-                        // Get wallet's static key for DPoP proof
+                        // Get wallet's static key for DPoP proof and proof signing
                         val walletKey = wallet.staticKey as? JWKKey
-                        val enrichedReq = req.copy(dpopKey = walletKey)
+                        val enrichedReq = req.copy(
+                            dpopKey = walletKey,
+                            proofKey = walletKey  // Use same key for proof signing
+                        )
                         
                         call.respond(WalletIssuanceHandler.fetchCredential(enrichedReq))
                     }

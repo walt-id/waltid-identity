@@ -102,11 +102,11 @@ class VciWalletSdJwtDpop(
                         {
                             "kty": "EC",
                             "crv": "P-256",
-                            "x": "G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM",
-                            "y": "ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E",
+                            "x": "d5KVpCdze-46QteHfgAswRurlSYUylJ1JntvcbaZ__Y",
+                            "y": "uqvaPeOm7SGsdXr34frqkJGAz8tHmR0EmpsSbfqgwDA",
                             "use": "sig",
                             "alg": "ES256",
-                            "kid": "wallet-key-1"
+                            "kid": "wallet-static-key"
                         }
                     ]
                 }

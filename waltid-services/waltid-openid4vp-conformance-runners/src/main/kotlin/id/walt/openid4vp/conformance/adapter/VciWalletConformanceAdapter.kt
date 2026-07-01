@@ -162,7 +162,8 @@ class VciWalletConformanceAdapter(
                                 asIssuerUrl = result.asIssuerUrl,
                                 credentialEndpoint = result.credentialEndpoint,
                                 credentialIssuerUrl = result.credentialIssuerUrl,
-                                credentialConfigurationId = result.credentialConfigurationId
+                                credentialConfigurationId = result.credentialConfigurationId,
+                                nonceEndpoint = result.nonceEndpoint
                             )
                         }
                         call.respond(HttpStatusCode.OK, buildJsonObject {
@@ -228,7 +229,8 @@ class VciWalletConformanceAdapter(
                     cNonce = tokenResult.cNonce,
                     credentialEndpoint = pendingFlow.credentialEndpoint,
                     credentialConfigurationId = pendingFlow.credentialConfigurationId ?: "org.iso.18013.5.1.mDL",
-                    credentialIssuerUrl = pendingFlow.credentialIssuerUrl
+                    credentialIssuerUrl = pendingFlow.credentialIssuerUrl,
+                    nonceEndpoint = pendingFlow.nonceEndpoint
                 )
                 call.respondText(
                     authCompleteHtml(if (credResult.success) "Credential received: ${credResult.message}" else "Credential fetch failed: ${credResult.message}"),
@@ -297,7 +299,8 @@ class VciWalletConformanceAdapter(
                     asIssuerUrl = result["asIssuerUrl"]?.jsonPrimitive?.content,
                     credentialEndpoint = result["credentialEndpoint"]?.jsonPrimitive?.content,
                     credentialIssuerUrl = result["credentialIssuerUrl"]?.jsonPrimitive?.content,
-                    credentialConfigurationId = result["credentialConfigurationId"]?.jsonPrimitive?.content
+                    credentialConfigurationId = result["credentialConfigurationId"]?.jsonPrimitive?.content,
+                    nonceEndpoint = result["nonceEndpoint"]?.jsonPrimitive?.content
                 )
             } else {
                 AuthFlowResult(error = "Status ${response.status}: $body")
@@ -328,8 +331,11 @@ class VciWalletConformanceAdapter(
             }
 
             val body = response.bodyAsText()
+            println("[VCI Adapter] Token exchange response: $body")
             if (response.status.isSuccess()) {
                 val result = Json.parseToJsonElement(body).jsonObject
+                println("[VCI Adapter] Parsed token result keys: ${result.keys}")
+                println("[VCI Adapter] cNonce value: ${result["cNonce"]}")
                 TokenResult(
                     success = true,
                     message = "Token obtained",
@@ -350,23 +356,24 @@ class VciWalletConformanceAdapter(
         cNonce: String?,
         credentialEndpoint: String,
         credentialConfigurationId: String,
-        credentialIssuerUrl: String?
+        credentialIssuerUrl: String?,
+        nonceEndpoint: String?
     ): ClaimResult {
         return try {
-            // Always sign a proof - use c_nonce if available, otherwise use access token as nonce
-            // Some conformance tests require a proof even without c_nonce
-            val nonceForProof = cNonce ?: accessToken
-            val proofJwt = signKeyProof(client, nonceForProof, credentialIssuerUrl ?: credentialEndpoint)
-
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive/fetch-credential"
             println("[VCI Adapter] POST $url")
-            println("[VCI Adapter] Using proof with nonce: ${if (cNonce != null) "c_nonce" else "access_token fallback"}")
+            println("[VCI Adapter] cNonce: $cNonce, nonceEndpoint: $nonceEndpoint, credentialIssuerUrl: $credentialIssuerUrl")
 
+            // Let the wallet API handle nonce fetching and proof signing
+            // It will: 1) fetch from nonceEndpoint if provided, 2) fall back to cNonce, 3) sign proof with wallet's key
             val requestBody = buildJsonObject {
                 put("credentialEndpoint", credentialEndpoint)
                 put("accessToken", accessToken)
                 put("credentialConfigurationId", credentialConfigurationId)
-                proofJwt?.let { put("proofJwt", it) }
+                // Pass nonce info for the API to handle
+                cNonce?.let { put("cNonce", it) }
+                nonceEndpoint?.let { put("nonceEndpoint", it) }
+                credentialIssuerUrl?.let { put("credentialIssuerUrl", it) }
             }
 
             val response = client.post(url) {
@@ -391,6 +398,7 @@ class VciWalletConformanceAdapter(
         return try {
             val url = "$walletApiUrl/wallet/$walletId/credentials/receive/sign-proof"
             println("[VCI Adapter] POST $url")
+            println("[VCI Adapter] Sign proof request - nonce: $nonce, issuerUrl: $issuerUrl")
 
             val requestBody = buildJsonObject {
                 put("issuerUrl", issuerUrl)
@@ -402,15 +410,21 @@ class VciWalletConformanceAdapter(
                 setBody(requestBody.toString())
             }
 
+            val body = response.bodyAsText()
+            println("[VCI Adapter] Sign proof response: ${response.status} - $body")
+            
             if (response.status.isSuccess()) {
-                val result = Json.parseToJsonElement(response.bodyAsText()).jsonObject
-                result["proofJwt"]?.jsonPrimitive?.content
+                val result = Json.parseToJsonElement(body).jsonObject
+                val proofJwt = result["proofJwt"]?.jsonPrimitive?.content
+                println("[VCI Adapter] Extracted proofJwt: ${proofJwt?.take(50)}...")
+                proofJwt
             } else {
-                println("[VCI Adapter] Sign proof failed: ${response.status}")
+                println("[VCI Adapter] Sign proof failed: ${response.status} - $body")
                 null
             }
         } catch (e: Exception) {
             println("[VCI Adapter] Sign proof exception: ${e.message}")
+            e.printStackTrace()
             null
         }
     }
@@ -453,7 +467,8 @@ class VciWalletConformanceAdapter(
                         "crv": "P-256",
                         "x": "d5KVpCdze-46QteHfgAswRurlSYUylJ1JntvcbaZ__Y",
                         "y": "uqvaPeOm7SGsdXr34frqkJGAz8tHmR0EmpsSbfqgwDA",
-                        "d": "c6TUFwkoQ8QMiz1wZ-4BqJJzvD56RRlcgn0R-XKqQjk"
+                        "d": "c6TUFwkoQ8QMiz1wZ-4BqJJzvD56RRlcgn0R-XKqQjk",
+                        "kid": "wallet-static-key"
                     }
                 }
             }
@@ -540,7 +555,8 @@ class VciWalletConformanceAdapter(
         val asIssuerUrl: String?,
         val credentialEndpoint: String?,
         val credentialIssuerUrl: String?,
-        val credentialConfigurationId: String?
+        val credentialConfigurationId: String?,
+        val nonceEndpoint: String?
     )
 
     private data class ClaimResult(val success: Boolean, val message: String)
@@ -554,6 +570,7 @@ class VciWalletConformanceAdapter(
         val credentialEndpoint: String? = null,
         val credentialIssuerUrl: String? = null,
         val credentialConfigurationId: String? = null,
+        val nonceEndpoint: String? = null,
         val error: String? = null
     )
 

@@ -14,8 +14,20 @@ and process verifiable credentials.
 | Certificate chain (HAIP 4.5.1) | ✅ Working |
 | Metadata URL resolution | ✅ Fixed (trailing slash) |
 | Pre-authorized code flow | ✅ Supported |
-| Authorization code flow | 🔄 In progress |
+| Authorization code flow | ✅ **PASSING** |
 | SSL trust for conformance suite | ✅ Configured |
+| DPoP support (RFC 9449) | ✅ Complete with nonce retry |
+| private_key_jwt authentication | ✅ Complete |
+| Nonce endpoint support | ✅ Complete |
+| SD-JWT VC format | ✅ Supported |
+
+### Conformance Test Results
+
+**Test Profile:** `oid4vci-1_0-wallet-test-credential-issuance-dpop-private_key_jwt-sd_jwt_vc-issuer_initiated-simple-immediate-unsigned-authorization_code-by_value-plain`
+
+| Date | Passed | Failed | Notes |
+|------|--------|--------|-------|
+| 2026-07-01 | 140 | 0 | All tests passing ✅ |
 
 ## Architecture
 
@@ -52,6 +64,42 @@ Based on `issuer-req.md` requirements (wallet perspective):
 | FAPI Profile | vci |
 | Credential Encryption | plain |
 | Issuance Mode | immediate |
+
+## Implementation Details
+
+### DPoP Support (RFC 9449)
+
+The wallet supports DPoP (Demonstrating Proof of Possession) for both token and credential endpoints:
+
+- **Token endpoint:** DPoP proof with `htm`, `htu`, `iat`, `jti`
+- **Nonce retry:** Automatic retry with server-provided `DPoP-Nonce` on `use_dpop_nonce` error
+- **Credential endpoint:** DPoP proof with `ath` (access token hash) for bound requests
+
+### private_key_jwt Client Authentication (RFC 7523)
+
+Token requests include `client_assertion` JWT:
+
+- `iss` / `sub`: client_id
+- `aud`: Authorization server issuer URL (not token endpoint)
+- `jti`: Unique per-request (regenerated on DPoP nonce retry to avoid reuse)
+- `exp`: 5 minutes from `iat`
+
+**Important:** The `client_assertion` is regenerated for each token request attempt to comply with RFC 7523's requirement for unique `jti` values.
+
+### Nonce Endpoint Support
+
+Some issuers provide a `nonce_endpoint` in metadata instead of returning `c_nonce` in the token response. The wallet supports both:
+
+1. **nonce_endpoint:** If issuer metadata includes `nonce_endpoint`, the wallet fetches the nonce from there
+2. **c_nonce fallback:** If no nonce endpoint, uses `c_nonce` from token response
+3. **Proof signing:** The fetched nonce is included in the key proof JWT for credential requests
+
+### Key Proof JWT
+
+Credential requests include a proof of possession:
+
+- Header: `typ=openid4vci-proof+jwt`, `alg`, `kid` or `jwk`
+- Payload: `iss`, `aud` (credential issuer), `iat`, `nonce`
 
 ## Quick Start
 
@@ -144,15 +192,6 @@ waltid-openid4vp-conformance-runners/conformance-truststore.jks
 | `oid4vci-1_0-wallet-test-credential-issuance-notification` | With notification endpoint |
 | `oid4vci-1_0-wallet-happy-path-with-scopes-...` | Scopes-based authorization |
 
-## Authorization Code Flow
-
-For `authorization_code` grant type, manual OAuth login may be required:
-
-1. Test starts and enters WAITING status
-2. Open conformance suite UI: https://localhost.emobix.co.uk:8443
-3. Find the running test and complete OAuth login
-4. Test continues automatically after authorization
-
 ## Troubleshooting
 
 ### Conformance suite not available
@@ -186,4 +225,7 @@ suite UI and complete the authorization.
 ## Related Documentation
 
 - [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer conformance tests
+- [VCI-WALLET-IMPLEMENTATION.md](VCI-WALLET-IMPLEMENTATION.md) - Implementation details
 - [OpenID4VCI 1.0 Spec](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+- [RFC 9449 - DPoP](https://datatracker.ietf.org/doc/html/rfc9449)
+- [RFC 7523 - JWT Bearer Client Authentication](https://datatracker.ietf.org/doc/html/rfc7523)
