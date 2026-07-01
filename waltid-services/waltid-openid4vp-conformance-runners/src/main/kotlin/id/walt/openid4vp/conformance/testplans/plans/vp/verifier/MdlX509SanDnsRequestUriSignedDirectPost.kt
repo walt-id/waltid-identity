@@ -37,7 +37,7 @@ class MdlX509SanDnsRequestUriSignedDirectPost(
 
     // Verifier key (P-256) - must match the leaf certificate's public key
     val verifierKey = Json.decodeFromString<DirectSerializedKey>(
-        """{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","d":"0piz-la29hD31ITj7uN-U6urITkQRw2Kbia4PKOksag","x":"bvayR9-jroMIILu_i8hTvbZKWLfJlqjs_L04qB29Kq0","y":"D7aI-xpoGqHJLCZshyMBexRB37Aehfb_80ep-REJzJI"}}"""
+        """{"type":"jwk","jwk":{"kty":"EC","crv":"P-256","d":"0piz-la29hD31ITj7uN-U6urITkQR9CKbia4PKOksag","x":"bvayR9-jroMIIAu_i8hTvbZKWLfJlqjs_L04qB29Kq0","y":"D7aI-xpoGqHJLCZshyMBexRB37Aehfb_80ep-REJzJI"}}"""
     )
     
     // Certificate chain: [leaf, intermediate] - leaf signed by intermediate CA, NOT self-signed
