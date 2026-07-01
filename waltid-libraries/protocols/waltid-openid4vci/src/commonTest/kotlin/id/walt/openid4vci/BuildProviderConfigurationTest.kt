@@ -154,6 +154,9 @@ class BuildProviderConfigurationTest {
         ).copy(
             clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
                 methods = listOf(clientAuthenticationMethod),
+                methodsByEndpoint = mapOf(
+                    ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                ),
             ),
         )
 
@@ -188,12 +191,12 @@ class BuildProviderConfigurationTest {
         assertEquals(
             setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
             provider.config.clientAuthenticationServiceConfig
-                .allowedMethodsByEndpoint[ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION],
+                .methodsByEndpoint[ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION],
         )
         assertEquals(
             setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH),
             provider.config.clientAuthenticationServiceConfig
-                .allowedMethodsByEndpoint[ClientAuthenticationEndpoint.TOKEN],
+                .methodsByEndpoint[ClientAuthenticationEndpoint.TOKEN],
         )
 
         val result = assertIs<AuthorizationRequestResult.Failure>(
@@ -214,15 +217,40 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
+    fun `buildProvider requires default client attestation when configured`() = runTest {
+        val provider = buildOAuth2Provider(
+            createTestConfig().copy(
+                pushedAuthorizationConfig = PushedAuthorizationConfig(
+                    repository = InMemoryPARRepository(),
+                ),
+                clientAttestationConfig = ClientAttestationConfig(NoopClientAttestationVerifier),
+            ),
+        )
+
+        val result = assertIs<AuthorizationRequestResult.Failure>(
+            provider.createPushedAuthorizationRequest(
+                mapOf(
+                    "response_type" to listOf(ResponseType.CODE.value),
+                    "client_id" to listOf("demo-client"),
+                    "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                ),
+            )
+        )
+
+        assertEquals("invalid_client", result.error.error)
+        assertEquals("Client authentication is required for this endpoint", result.error.description)
+    }
+
+    @Test
     fun `buildProvider respects configured client authentication endpoint methods`() {
-        val configuredAllowedMethods = mapOf(
+        val configuredMethods = mapOf(
             ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.PRIVATE_KEY_JWT),
         )
         val provider = assertIs<DefaultOAuth2Provider>(
             buildOAuth2Provider(
                 createTestConfig().copy(
                     clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
-                        allowedMethodsByEndpoint = configuredAllowedMethods,
+                        methodsByEndpoint = configuredMethods,
                     ),
                     clientAttestationConfig = ClientAttestationConfig(NoopClientAttestationVerifier),
                 ),
@@ -230,8 +258,8 @@ class BuildProviderConfigurationTest {
         )
 
         assertEquals(
-            configuredAllowedMethods,
-            provider.config.clientAuthenticationServiceConfig.allowedMethodsByEndpoint,
+            configuredMethods,
+            provider.config.clientAuthenticationServiceConfig.methodsByEndpoint,
         )
     }
 

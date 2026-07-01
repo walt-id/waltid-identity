@@ -195,7 +195,7 @@ private fun registerDefaultClientAuthenticationMethods(
         }
 
     val supportedMethods = serviceConfigWithMethod.methods.map { it.name }.toSet()
-    val serviceConfigWithEndpointDefaults = serviceConfigWithMethod.withDefaultAllowedMethodsByEndpoint(
+    val serviceConfigWithEndpointDefaults = serviceConfigWithMethod.withDefaultMethodsByEndpoint(
         mapOf(
             ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to supportedMethods,
             ClientAuthenticationEndpoint.TOKEN to supportedMethods,
