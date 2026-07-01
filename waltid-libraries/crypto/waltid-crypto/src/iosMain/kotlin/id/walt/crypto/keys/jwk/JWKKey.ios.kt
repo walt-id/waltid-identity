@@ -2,29 +2,26 @@ package id.walt.crypto.keys.jwk
 
 import at.asitplus.signum.indispensable.CryptoPublicKey
 import at.asitplus.signum.indispensable.ECCurve
-import at.asitplus.signum.indispensable.SignatureAlgorithm
 import at.asitplus.signum.indispensable.josef.JsonWebKey
 import at.asitplus.signum.indispensable.josef.JweAlgorithm
 import at.asitplus.signum.indispensable.pki.X509Certificate
 import at.asitplus.signum.indispensable.josef.JweEncrypted.Companion.deserialize
-import at.asitplus.signum.indispensable.josef.JwsAlgorithm
-import at.asitplus.signum.indispensable.josef.JwsCompact
-import at.asitplus.signum.indispensable.josef.JwsHeader
 import at.asitplus.signum.indispensable.josef.io.joseCompliantSerializer
 import at.asitplus.signum.indispensable.josef.toJsonWebKey
 import at.asitplus.signum.supreme.SignatureResult
 import at.asitplus.signum.supreme.os.IosKeychainProvider
-import at.asitplus.signum.supreme.sign.SignatureInput
 import at.asitplus.signum.supreme.sign.Signer
-import at.asitplus.signum.supreme.sign.verifierFor
 import at.asitplus.signum.supreme.symmetric.decrypt
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.toCryptoSignature
+import id.walt.crypto.signJwsWithPlatformSigner
+import id.walt.crypto.toPlatformKeyStoreCurve
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JweEncryptionHelper
 import id.walt.crypto.utils.keyFromIntermediate
+import id.walt.crypto.verifyJwsWithPlatformSigner
+import id.walt.crypto.verifyRawWithPlatformSigner
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -88,38 +85,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     ): String {
         val kid = getKeyId()
         val signer = IosKeychainProvider.getSignerForKey(kid).getOrThrow()
-
-        val jwsAlgorithm = when (keyType) {
-            KeyType.secp256r1 -> JwsAlgorithm.Signature.EC.ES256
-            KeyType.secp384r1 -> JwsAlgorithm.Signature.EC.ES384
-            KeyType.secp521r1 -> JwsAlgorithm.Signature.EC.ES512
-            KeyType.RSA -> JwsAlgorithm.Signature.RSA.PS256
-            KeyType.Ed25519 -> error("Ed25519 JWS signing is not yet supported on iOS")
-            else -> error("Unsupported key type: $keyType")
-        }
-
-        val jwkHeader = headers["jwk"]?.let { jwkElement ->
-            runCatching { joseCompliantSerializer.decodeFromString<JsonWebKey>(jwkElement.toString()) }.getOrNull()
-        }
-
-        val header = JwsHeader(
-            algorithm = jwsAlgorithm,
-            keyId = headers["kid"]?.jsonPrimitive?.content,
-            type = headers["typ"]?.jsonPrimitive?.content,
-            contentType = headers["cty"]?.jsonPrimitive?.content,
-            jsonWebKey = jwkHeader,
-        )
-
-        val jws = JwsCompact(
-            protectedHeader = header,
-            payload = plaintext,
-            signer = { data ->
-                val signResult = signer.sign(data)
-                check(signResult is SignatureResult.Success) { "JWS signing failed: $signResult" }
-                signResult.signature.rawByteArray
-            }
-        )
-        return jws.toString()
+        return signJwsWithPlatformSigner(keyType, plaintext, headers) { data -> signer.sign(data) }
     }
 
     actual override suspend fun verifyRaw(
@@ -127,42 +93,13 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
     ): Result<ByteArray> = runCatching {
         val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow()
-
-        val sigAlg = when (keyType) {
-            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
-            KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-            else -> error("Unsupported key type for verification: $keyType")
-        }
-
-        val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
-        val signature = keyType.toCryptoSignature(signed)
-        val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required for verifyRaw" }
-        verifier.verify(SignatureInput(plaintext), signature).getOrThrow()
-        plaintext
+        verifyRawWithPlatformSigner(keyType, cryptoPubKey, signed, detachedPlaintext).getOrThrow()
     }
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> = runCatching {
-        val parsed = JwsCompact(signedJws)
-
         val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow()
-
-        val sigAlg = when (keyType) {
-            KeyType.secp256r1 -> SignatureAlgorithm.ECDSAwithSHA256
-            KeyType.secp384r1 -> SignatureAlgorithm.ECDSAwithSHA384
-            KeyType.secp521r1 -> SignatureAlgorithm.ECDSAwithSHA512
-            KeyType.RSA -> SignatureAlgorithm.RSAwithSHA256andPSSPadding
-            KeyType.Ed25519 -> error("Ed25519 JWS verification is not yet supported on iOS")
-            else -> error("Unsupported key type for verification: $keyType")
-        }
-
-        val verifier = sigAlg.verifierFor(cryptoPubKey).getOrThrow()
-        val signature = keyType.toCryptoSignature(parsed.plainSignature)
-        verifier.verify(SignatureInput(parsed.signatureInput), signature).getOrThrow()
-
-        Json.parseToJsonElement(parsed.plainPayload.decodeToString())
+        verifyJwsWithPlatformSigner(keyType, cryptoPubKey, signedJws).getOrThrow()
     }
 
     actual override suspend fun getPublicKey(): JWKKey = _jwkObj.toMap().filterKeys {
@@ -194,7 +131,7 @@ actual class JWKKey actual constructor(private val jwk: String?, private val _ke
 
             val signer = when (type) {
                 KeyType.secp256r1 -> IosKeychainProvider.createSigningKey(kid) {
-                    ec { curve = ECCurve.SECP_256_R_1 }
+                    ec { curve = requireNotNull(type.toPlatformKeyStoreCurve()) }
                 }.getOrThrow()
                 KeyType.RSA -> IosKeychainProvider.createSigningKey(kid) {
                     rsa { }
