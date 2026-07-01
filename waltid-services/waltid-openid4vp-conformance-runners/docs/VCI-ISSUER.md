@@ -4,7 +4,7 @@
 
 This document describes how to run OpenID4VCI 1.0 conformance tests against `waltid-issuer-api2`.
 
-**Target Conformance Profile** (from `issuer-req.md`):
+**Target Conformance Profile** 
 
 | Property | Value |
 |----------|-------|
@@ -179,7 +179,7 @@ Note the ngrok URL (e.g., `https://xxxx.ngrok-free.app`).
 ### Set environment variable
 
 ```bash
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK-URL.ngrok-free.app/openid4vci"
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://61b7-2001-871-26a-9ab5-c5fa-edcc-fb02-7b0c.ngrok-free.app/openid4vci"
 ```
 
 **Important:** The path must be `/openid4vci` (not `/draft13`). issuer-api2 uses OpenID4VCI 1.0 paths.

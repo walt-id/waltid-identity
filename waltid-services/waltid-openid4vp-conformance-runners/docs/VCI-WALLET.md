@@ -52,7 +52,6 @@ and process verifiable credentials.
 
 ## Test Profile
 
-Based on `issuer-req.md` requirements (wallet perspective):
 
 | Property | Value |
 |----------|-------|

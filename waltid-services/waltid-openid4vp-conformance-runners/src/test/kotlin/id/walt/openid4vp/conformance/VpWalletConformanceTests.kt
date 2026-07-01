@@ -1,6 +1,6 @@
 package id.walt.openid4vp.conformance
 
-import id.walt.openid4vp.conformance.adapter.WalletConformanceAdapter
+import id.walt.openid4vp.conformance.adapter.VpWalletConformanceAdapter
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletPlan1
@@ -47,10 +47,10 @@ import kotlin.time.Duration.Companion.minutes
  * 
  * Run:
  * ```bash
- * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "WalletConformanceTests"
+ * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VpWalletConformanceTests"
  * ```
  */
-class WalletConformanceTests {
+class VpVpWalletConformanceTests {
 
     companion object {
         val walletApiUrl: String = ConformanceConfig.WALLET_API_URL
@@ -138,7 +138,7 @@ class WalletConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun `Plan 1 - SD-JWT VC + x509_san_dns + direct_post_jwt`() = runTest(timeout = 10.minutes) {
         val httpClient = createHttpClient()
-        val adapter = WalletConformanceAdapter(
+        val adapter = VpWalletConformanceAdapter(
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )
@@ -166,7 +166,7 @@ class WalletConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun `Plan 2 - mDL + x509_san_dns + direct_post_jwt`() = runTest(timeout = 10.minutes) {
         val httpClient = createHttpClient()
-        val adapter = WalletConformanceAdapter(
+        val adapter = VpWalletConformanceAdapter(
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )
@@ -190,7 +190,7 @@ class WalletConformanceTests {
     @EnabledIf("isConformanceAvailable")
     fun `Plan 7 - Negative Tests (Security Validation)`() = runTest(timeout = 10.minutes) {
         val httpClient = createHttpClient()
-        val adapter = WalletConformanceAdapter(
+        val adapter = VpWalletConformanceAdapter(
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )
@@ -212,9 +212,9 @@ class WalletConformanceTests {
      */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun runAllWalletConformanceTests() = runTest(timeout = 60.minutes) {
+    fun runAllVpWalletConformanceTests() = runTest(timeout = 60.minutes) {
         val httpClient = createHttpClient()
-        val adapter = WalletConformanceAdapter(
+        val adapter = VpWalletConformanceAdapter(
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )

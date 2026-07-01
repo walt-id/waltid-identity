@@ -9,7 +9,7 @@ Automated test runners for [OpenID Foundation Conformance Suite](https://gitlab.
 | OpenID4VCI 1.0 | **Wallet** (receives credentials) | `VciWalletConformanceTests` | ✅ 140/140 passing | [VCI-WALLET.md](docs/VCI-WALLET.md) |
 | OpenID4VCI 1.0 | **Issuer** (issues credentials) | `IssuerConformanceTests` | 🟡 Ready | [VCI-ISSUER.md](docs/VCI-ISSUER.md) |
 | OpenID4VP 1.0 | **Verifier** (requests presentations) | `VerifierConformanceTests` | 🟡 Ready | [VP-VERIFIER.md](docs/VP-VERIFIER.md) |
-| OpenID4VP 1.0 | **Wallet** (presents credentials) | `WalletConformanceTests` | ⏳ Blocked (WAL-896) | [VP-WALLET.md](docs/VP-WALLET.md) |
+| OpenID4VP 1.0 | **Wallet** (presents credentials) | `VpWalletConformanceTests` | ⏳ Blocked (WAL-896) | [VP-WALLET.md](docs/VP-WALLET.md) |
 
 ## Quick Start
 
@@ -55,7 +55,7 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 
 # VP Wallet (blocked on WAL-896)
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "WalletConformanceTests" -PrunIntegrationTests
+    --tests "VpWalletConformanceTests" -PrunIntegrationTests
 ```
 
 ## Architecture
@@ -74,7 +74,7 @@ export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 │                         Test Adapters                                   │
 │                                                                         │
 │   VciWalletConformanceAdapter (7007) — bridges VCI wallet flow          │
-│   WalletConformanceAdapter (7006)    — bridges VP wallet flow           │
+│   VpWalletConformanceAdapter (7006)    — bridges VP wallet flow           │
 │                                                                         │
 │   (Adapters simulate "robot users" driving wallet APIs step-by-step)    │
 └──────────────────────────────────┬──────────────────────────────────────┘
@@ -97,7 +97,7 @@ src/
 ├── main/kotlin/id/walt/openid4vp/conformance/
 │   ├── adapter/                    # Test adapters (bridge conformance ↔ wallet APIs)
 │   │   ├── VciWalletConformanceAdapter.kt
-│   │   └── WalletConformanceAdapter.kt
+│   │   └── VpWalletConformanceAdapter.kt
 │   ├── config/
 │   │   └── ConformanceConfig.kt
 │   ├── plans/                      # Shared plan interfaces
@@ -119,7 +119,7 @@ src/
     ├── VciWalletConformanceTests.kt
     ├── IssuerConformanceTests.kt
     ├── VerifierConformanceTests.kt
-    └── WalletConformanceTests.kt
+    └── VpWalletConformanceTests.kt
 
 docs/
 ├── VCI-WALLET.md                   # VCI wallet test docs
