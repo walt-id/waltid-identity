@@ -57,6 +57,7 @@ kotlin {
                     implementation(identityLibs.signum.indispensable)
                     implementation(identityLibs.signum.indispensable.josef)
                     implementation(identityLibs.signum.supreme)
+                    implementation(identityLibs.cryptography.core)
                 }
             }
 
@@ -65,7 +66,6 @@ kotlin {
                     dependsOn(mobileMain)
                     dependencies {
                         implementation(identityLibs.kotlinx.coroutines.android)
-                        implementation(identityLibs.cryptography.core)
                         implementation(identityLibs.cryptography.provider.jdk)
                     }
                 }
@@ -90,7 +90,6 @@ kotlin {
             if (enableIosBuild) {
                 iosMain.get().dependsOn(mobileMain)
                 iosMain.dependencies {
-                    implementation(identityLibs.cryptography.core)
                     implementation(identityLibs.cryptography.provider.optimal)
                     implementation(identityLibs.cryptography.provider.openssl3.prebuilt)
                 }

@@ -114,7 +114,7 @@ class IosKeyTest {
             val key = IosKey.Software.create(IosKey.Options(kid = "test-sw-sign-$type", keyType = type))
             val plaintext = "Hello $type".encodeToByteArray()
 
-            val signature = key.signRaw(plaintext) as ByteArray
+            val signature = key.signRaw(plaintext)
             assertTrue(signature.isNotEmpty(), "signature empty for $type")
 
             val result = key.verifyRaw(signature, plaintext)

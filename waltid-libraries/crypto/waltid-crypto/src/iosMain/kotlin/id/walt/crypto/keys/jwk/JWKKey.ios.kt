@@ -13,23 +13,14 @@ import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.Signer
 import at.asitplus.signum.supreme.symmetric.decrypt
 import dev.whyoleg.cryptography.CryptographyProvider
-import dev.whyoleg.cryptography.algorithms.EC
-import dev.whyoleg.cryptography.algorithms.ECDSA
-import dev.whyoleg.cryptography.algorithms.EdDSA
-import dev.whyoleg.cryptography.algorithms.SHA256
+import id.walt.crypto.MobileSoftwareKey
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.KeyUtils
 import id.walt.crypto.signJwsWithPlatformSigner
 import id.walt.crypto.toPlatformKeyStoreCurve
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
-import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
-import id.walt.crypto.utils.JsonCanonicalizationUtils
 import id.walt.crypto.utils.JsonUtils.toJsonObject
 import id.walt.crypto.utils.JweEncryptionHelper
-import id.walt.crypto.utils.JwsUtils.decodeJwsStrings
-import id.walt.crypto.utils.ShaUtils
 import id.walt.crypto.utils.keyFromIntermediate
 import id.walt.crypto.verifyJwsWithPlatformSigner
 import id.walt.crypto.verifyRawWithPlatformSigner
@@ -73,14 +64,18 @@ actual class JWKKey actual constructor(
 
     private val isSoftwareKey get() = keyType == KeyType.Ed25519 || keyType == KeyType.secp256k1
 
+    private suspend fun softwareKey(): MobileSoftwareKey {
+        val kid = _keyId ?: _jwkObj["kid"]?.jsonPrimitive?.content ?: ""
+        return MobileSoftwareKey.load(CryptographyProvider.Default, kid, keyType, jwk!!.encodeToByteArray())
+    }
+
     actual override suspend fun getKeyId(): String {
         return _keyId ?: _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
     }
 
     actual override suspend fun getThumbprint(): String {
         if (isSoftwareKey) {
-            val canonical = JsonCanonicalizationUtils.convertToRequiredMembersJsonString(this)
-            return ShaUtils.sha256(canonical.encodeToByteArray()).encodeToBase64Url()
+            return softwareKey().getThumbprint()
         }
         val sigJwk = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
         return sigJwk.jwkThumbprint
@@ -92,16 +87,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun exportPEM(): String {
         if (isSoftwareKey) {
-            val pubKey = when (keyType) {
-                KeyType.Ed25519 -> SoftwareKeyOps.edDsa.publicKeyDecoder(EdDSA.Curve.Ed25519)
-                    .decodeFromByteArray(EdDSA.PublicKey.Format.JWK, jwk!!.encodeToByteArray())
-                    .encodeToByteArray(EdDSA.PublicKey.Format.PEM)
-                KeyType.secp256k1 -> SoftwareKeyOps.ecdsa.publicKeyDecoder(EC.Curve.secp256k1)
-                    .decodeFromByteArray(EC.PublicKey.Format.JWK, jwk!!.encodeToByteArray())
-                    .encodeToByteArray(EC.PublicKey.Format.PEM)
-                else -> error("Unexpected key type: $keyType")
-            }
-            return pubKey.decodeToString()
+            return softwareKey().exportPEM()
         }
         val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow()
@@ -111,7 +97,7 @@ actual class JWKKey actual constructor(
     }
 
     actual override suspend fun signRaw(plaintext: ByteArray, customSignatureAlgorithm: String?): ByteArray {
-        if (isSoftwareKey) return SoftwareKeyOps.sign(keyType, jwk!!, plaintext)
+        if (isSoftwareKey) return softwareKey().signRaw(plaintext, customSignatureAlgorithm)
         val kid = getKeyId()
         val signer = getKeychainSigner(kid)
         val result = signer.sign(plaintext)
@@ -121,9 +107,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         if (isSoftwareKey) {
-            val (header, payload, signable) = KeyUtils.rawSignaturePayloadForJws(plaintext, headers, keyType)
-            val signature = signRaw(signable)
-            return KeyUtils.signJwsWithRawSignature(signature, header, payload)
+            return softwareKey().signJws(plaintext, headers)
         }
         val kid = getKeyId()
         val signer = getKeychainSigner(kid)
@@ -133,13 +117,7 @@ actual class JWKKey actual constructor(
     actual override suspend fun verifyRaw(
         signed: ByteArray, detachedPlaintext: ByteArray?, customSignatureAlgorithm: String?
     ): Result<ByteArray> {
-        if (isSoftwareKey) {
-            return runCatching {
-                val plaintext = requireNotNull(detachedPlaintext) { "Detached plaintext required for verifyRaw" }
-                SoftwareKeyOps.verify(keyType, jwk!!, plaintext, signed)
-                plaintext
-            }
-        }
+        if (isSoftwareKey) return softwareKey().verifyRaw(signed, detachedPlaintext, customSignatureAlgorithm)
         return runCatching {
             val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
                 .toCryptoPublicKey().getOrThrow()
@@ -148,13 +126,7 @@ actual class JWKKey actual constructor(
     }
 
     actual override suspend fun verifyJws(signedJws: String): Result<JsonElement> {
-        if (isSoftwareKey) return runCatching {
-            val parts = signedJws.decodeJwsStrings()
-            val signedData = parts.getSignable().encodeToByteArray()
-            val signature = parts.signature.decodeFromBase64Url()
-            SoftwareKeyOps.verify(keyType, jwk!!, signedData, signature)
-            Json.parseToJsonElement(parts.payload.decodeFromBase64Url().decodeToString())
-        }
+        if (isSoftwareKey) return softwareKey().verifyJws(signedJws)
         return runCatching {
             val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
                 .toCryptoPublicKey().getOrThrow()
@@ -168,15 +140,7 @@ actual class JWKKey actual constructor(
 
     actual override suspend fun getPublicKeyRepresentation(): ByteArray {
         if (isSoftwareKey) {
-            return when (keyType) {
-                KeyType.Ed25519 -> SoftwareKeyOps.edDsa.publicKeyDecoder(EdDSA.Curve.Ed25519)
-                    .decodeFromByteArray(EdDSA.PublicKey.Format.JWK, jwk!!.encodeToByteArray())
-                    .encodeToByteArray(EdDSA.PublicKey.Format.RAW)
-                KeyType.secp256k1 -> SoftwareKeyOps.ecdsa.publicKeyDecoder(EC.Curve.secp256k1)
-                    .decodeFromByteArray(EC.PublicKey.Format.JWK, jwk!!.encodeToByteArray())
-                    .encodeToByteArray(EC.PublicKey.Format.RAW)
-                else -> error("Unexpected key type: $keyType")
-            }
+            return softwareKey().getPublicKeyRepresentation()
         }
         val cryptoPubKey = joseCompliantSerializer.decodeFromString<JsonWebKey>(jwk!!)
             .toCryptoPublicKey().getOrThrow()
@@ -200,13 +164,13 @@ actual class JWKKey actual constructor(
             val kid = metadata?.keyId ?: Uuid.random().toString()
             return when (type) {
                 KeyType.Ed25519 -> {
-                    val keyPair = SoftwareKeyOps.edDsa.keyPairGenerator(EdDSA.Curve.Ed25519).generateKey()
-                    val jwkBytes = keyPair.privateKey.encodeToByteArray(EdDSA.PrivateKey.Format.JWK)
+                    val jwkBytes = MobileSoftwareKey.create(CryptographyProvider.Default, kid, type)
+                        .exportPrivateKeyMaterial()
                     JWKKey(jwkBytes.decodeToString(), kid)
                 }
                 KeyType.secp256k1 -> {
-                    val keyPair = SoftwareKeyOps.ecdsa.keyPairGenerator(EC.Curve.secp256k1).generateKey()
-                    val jwkBytes = keyPair.privateKey.encodeToByteArray(EC.PrivateKey.Format.JWK)
+                    val jwkBytes = MobileSoftwareKey.create(CryptographyProvider.Default, kid, type)
+                        .exportPrivateKeyMaterial()
                     JWKKey(jwkBytes.decodeToString(), kid)
                 }
                 KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1 -> {
@@ -330,38 +294,3 @@ private suspend fun JWKKey.getKeychainSigner(kid: String): Signer =
                 "Use generated Keychain-backed keys, or Ed25519/secp256k1 software keys. Cause: ${cause.message}"
         )
     }
-
-private object SoftwareKeyOps {
-    val edDsa by lazy { CryptographyProvider.Default.get(EdDSA) }
-    val ecdsa by lazy { CryptographyProvider.Default.get(ECDSA) }
-
-    suspend fun sign(keyType: KeyType, jwk: String, data: ByteArray): ByteArray {
-        val jwkBytes = jwk.encodeToByteArray()
-        return when (keyType) {
-            KeyType.Ed25519 -> edDsa.privateKeyDecoder(EdDSA.Curve.Ed25519)
-                .decodeFromByteArray(EdDSA.PrivateKey.Format.JWK, jwkBytes)
-                .signatureGenerator()
-                .generateSignature(data)
-            KeyType.secp256k1 -> ecdsa.privateKeyDecoder(EC.Curve.secp256k1)
-                .decodeFromByteArray(EC.PrivateKey.Format.JWK, jwkBytes)
-                .signatureGenerator(SHA256, ECDSA.SignatureFormat.RAW)
-                .generateSignature(data)
-            else -> error("Unexpected software key type: $keyType")
-        }
-    }
-
-    suspend fun verify(keyType: KeyType, jwk: String, data: ByteArray, signature: ByteArray) {
-        val jwkBytes = jwk.encodeToByteArray()
-        when (keyType) {
-            KeyType.Ed25519 -> edDsa.publicKeyDecoder(EdDSA.Curve.Ed25519)
-                .decodeFromByteArray(EdDSA.PublicKey.Format.JWK, jwkBytes)
-                .signatureVerifier()
-                .verifySignature(data, signature)
-            KeyType.secp256k1 -> ecdsa.publicKeyDecoder(EC.Curve.secp256k1)
-                .decodeFromByteArray(EC.PublicKey.Format.JWK, jwkBytes)
-                .signatureVerifier(SHA256, ECDSA.SignatureFormat.RAW)
-                .verifySignature(data, signature)
-            else -> error("Unexpected software key type: $keyType")
-        }
-    }
-}
