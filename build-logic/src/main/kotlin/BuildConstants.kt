@@ -14,4 +14,3 @@ object BuildConstants {
         "kotlin.check"
     )
 }
-

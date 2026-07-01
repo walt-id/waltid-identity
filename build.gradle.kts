@@ -3,6 +3,7 @@ plugins {
     alias(identityLibs.plugins.kotlin.multiplatform) apply false
     alias(identityLibs.plugins.kotlin.cocoapods) apply false
     alias(identityLibs.plugins.kotlin.compose) apply false
+    alias(identityLibs.plugins.compose.multiplatform) apply false
     alias(identityLibs.plugins.kotlin.serialization) apply false
     alias(identityLibs.plugins.versions) apply false
 }

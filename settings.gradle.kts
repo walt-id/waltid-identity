@@ -19,6 +19,8 @@ fun setting(name: String) =
 
 val enableAndroidBuild = setting("enableAndroidBuild")
 val enableIosBuild = setting("enableIosBuild")
+val enableWalletDemoComposeWeb = setting("enableWalletDemoComposeWeb")
+val enableWalletDemoCompose = enableAndroidBuild || enableIosBuild || enableWalletDemoComposeWeb
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
 fun String.group(vararg elements: String?) = elements.map { it?.let { "$this:$it" } }.toTypedArray()
@@ -132,7 +134,11 @@ val modules = listOfNotNull(
     "$applications:waltid-cli",
 
     ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
-    "$applications:waltid-wallet-demo-android" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-compose:sharedLogic" whenEnabled enableWalletDemoCompose,
+    "$applications:waltid-wallet-demo-compose:sharedUI" whenEnabled enableWalletDemoCompose,
+    "$applications:waltid-wallet-demo-compose:androidApp" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-compose:iosApp" whenEnabled enableIosBuild,
+    "$applications:waltid-wallet-demo-compose:webApp" whenEnabled enableWalletDemoComposeWeb,
 
     "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
     "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild,

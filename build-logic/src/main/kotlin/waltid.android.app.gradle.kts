@@ -25,4 +25,3 @@ kotlin {
         jvmTarget.set(JvmTarget.fromTarget(project.javaLibraryVersion.toString()))
     }
 }
-
