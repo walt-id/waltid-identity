@@ -1,5 +1,6 @@
 package id.walt.crypto
 
+import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.KeySerialization
 import id.walt.crypto.keys.jwk.JWKKey
@@ -100,6 +101,36 @@ class JWKKeyIosTest {
             val result = imported.verifyRaw(sig, plaintext)
             assertTrue(result.isSuccess, "imported key sign/verify failed for $type")
         }
+    }
+
+    @Test
+    fun importRawPublicSoftwareKeys() = runTest {
+        for (type in softwareKeyTypes) {
+            val privateKey = JWKKey.generate(type)
+            val rawPublicKey = privateKey.getPublicKeyRepresentation()
+            val imported = JWKKey.importRawPublicKey(type, rawPublicKey, JwkKeyMeta("raw-$type")) as JWKKey
+
+            assertEquals(type, imported.keyType, "imported keyType mismatch for $type")
+            assertTrue(!imported.hasPrivateKey, "raw public import should not create private material for $type")
+
+            val plaintext = "raw import $type".encodeToByteArray()
+            val signature = privateKey.signRaw(plaintext)
+            val result = imported.verifyRaw(signature, plaintext)
+            assertTrue(result.isSuccess, "raw imported public key verify failed for $type: ${result.exceptionOrNull()}")
+
+            val importedWithoutKid = JWKKey.importRawPublicKey(type, rawPublicKey, null) as JWKKey
+            assertTrue("kid" !in importedWithoutKid.exportJWKObject(), "missing metadata should not add kid")
+        }
+    }
+
+    @Test
+    fun importJwkAcceptsSecp256k1P256KAlias() = runTest {
+        val key = JWKKey.generate(KeyType.secp256k1)
+        val aliasedJwk = key.exportJWK().replace("\"secp256k1\"", "\"P-256K\"")
+
+        val imported = JWKKey.importJWK(aliasedJwk).getOrThrow()
+
+        assertEquals(KeyType.secp256k1, imported.keyType)
     }
 
     @Test

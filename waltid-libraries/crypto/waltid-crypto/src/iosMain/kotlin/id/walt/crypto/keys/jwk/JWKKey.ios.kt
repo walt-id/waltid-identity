@@ -13,6 +13,10 @@ import at.asitplus.signum.supreme.os.IosKeychainProvider
 import at.asitplus.signum.supreme.sign.Signer
 import at.asitplus.signum.supreme.symmetric.decrypt
 import dev.whyoleg.cryptography.CryptographyProvider
+import dev.whyoleg.cryptography.CryptographyProviderApi
+import dev.whyoleg.cryptography.algorithms.EC
+import dev.whyoleg.cryptography.algorithms.ECDSA
+import dev.whyoleg.cryptography.algorithms.EdDSA
 import id.walt.crypto.MobileSoftwareKey
 import id.walt.crypto.keys.JwkKeyMeta
 import id.walt.crypto.keys.Key
@@ -29,6 +33,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.io.encoding.Base64
@@ -57,6 +62,7 @@ actual class JWKKey actual constructor(
             _jwkObj["crv"]?.jsonPrimitive?.content == "P-384" -> KeyType.secp384r1
             _jwkObj["crv"]?.jsonPrimitive?.content == "P-521" -> KeyType.secp521r1
             _jwkObj["crv"]?.jsonPrimitive?.content == "secp256k1" -> KeyType.secp256k1
+            _jwkObj["crv"]?.jsonPrimitive?.content == "P-256K" -> KeyType.secp256k1
             _jwkObj["kty"]?.jsonPrimitive?.content == "RSA" -> KeyType.RSA
             _jwkObj["crv"]?.jsonPrimitive?.content == "Ed25519" -> KeyType.Ed25519
             else -> error("Unknown key type in jwk $jwk")
@@ -66,8 +72,18 @@ actual class JWKKey actual constructor(
 
     private suspend fun softwareKey(): MobileSoftwareKey {
         val kid = _keyId ?: _jwkObj["kid"]?.jsonPrimitive?.content ?: ""
-        return MobileSoftwareKey.load(CryptographyProvider.Default, kid, keyType, jwk!!.encodeToByteArray())
+        val normalizedJwk = normalizeSoftwareJwk().toString().encodeToByteArray()
+        return MobileSoftwareKey.load(CryptographyProvider.Default, kid, keyType, normalizedJwk)
     }
+
+    private fun normalizeSoftwareJwk(): JsonObject =
+        if (_jwkObj["crv"]?.jsonPrimitive?.content == "P-256K") {
+            JsonObject(_jwkObj.toMutableMap().apply {
+                this["crv"] = JsonPrimitive("secp256k1")
+            })
+        } else {
+            _jwkObj
+        }
 
     actual override suspend fun getKeyId(): String {
         return _keyId ?: _jwkObj["kid"]?.jsonPrimitive?.content ?: error("Kid not found in $jwk")
@@ -195,6 +211,7 @@ actual class JWKKey actual constructor(
             type: KeyType, rawPublicKey: ByteArray, metadata: JwkKeyMeta?
         ): Key {
             val cryptoPubKey = when (type) {
+                KeyType.Ed25519, KeyType.secp256k1 -> return importSoftwareRawPublicKey(type, rawPublicKey, metadata)
                 KeyType.secp256r1 -> CryptoPublicKey.EC.fromAnsiX963Bytes(ECCurve.SECP_256_R_1, rawPublicKey)
                 KeyType.secp384r1 -> CryptoPublicKey.EC.fromAnsiX963Bytes(ECCurve.SECP_384_R_1, rawPublicKey)
                 KeyType.secp521r1 -> CryptoPublicKey.EC.fromAnsiX963Bytes(ECCurve.SECP_521_R_1, rawPublicKey)
@@ -202,6 +219,29 @@ actual class JWKKey actual constructor(
             }
             val jwkJson = joseCompliantSerializer.encodeToString(cryptoPubKey.toJsonWebKey(metadata?.keyId))
             return JWKKey(jwkJson, metadata?.keyId)
+        }
+
+        @OptIn(CryptographyProviderApi::class)
+        private suspend fun importSoftwareRawPublicKey(
+            type: KeyType,
+            rawPublicKey: ByteArray,
+            metadata: JwkKeyMeta?,
+        ): JWKKey {
+            val jwkBytes = when (type) {
+                KeyType.Ed25519 -> CryptographyProvider.Default.get(EdDSA)
+                    .publicKeyDecoder(EdDSA.Curve.Ed25519)
+                    .decodeFromByteArray(EdDSA.PublicKey.Format.RAW, rawPublicKey)
+                    .encodeToByteArray(EdDSA.PublicKey.Format.JWK)
+                KeyType.secp256k1 -> CryptographyProvider.Default.get(ECDSA)
+                    .publicKeyDecoder(EC.Curve.secp256k1)
+                    .decodeFromByteArray(EC.PublicKey.Format.RAW, rawPublicKey)
+                    .encodeToByteArray(EC.PublicKey.Format.JWK)
+                else -> error("Unsupported software key type: $type")
+            }
+            val jwk = Json.parseToJsonElement(jwkBytes.decodeToString()).jsonObject.toMutableMap().apply {
+                metadata?.keyId?.let { this["kid"] = JsonPrimitive(it) } ?: remove("kid")
+            }
+            return JWKKey(JsonObject(jwk).toString(), metadata?.keyId)
         }
 
         actual override suspend fun importJWK(jwk: String): Result<JWKKey> {
