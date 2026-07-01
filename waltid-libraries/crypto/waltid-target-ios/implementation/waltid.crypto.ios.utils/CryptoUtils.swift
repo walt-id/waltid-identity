@@ -46,6 +46,50 @@ public class DS_Operations: NSObject {
 }
 
 @objc
+public class JWE_Operations: NSObject {
+    @objc
+    public static func encrypt(plaintext: Data, recipientJwk: String, encAlg: String, kid: String?) -> SignResult {
+        do {
+            guard let jwkData = recipientJwk.data(using: .utf8) else {
+                return SignResult.with(failure: "Invalid JWK encoding")
+            }
+
+            let publicKey = try ECPublicKey(data: jwkData)
+
+            guard let enc = ContentEncryptionAlgorithm(rawValue: encAlg) else {
+                return SignResult.with(failure: "Unsupported encryption algorithm: \(encAlg)")
+            }
+
+            guard let encrypter = Encrypter(
+                keyManagementAlgorithm: .ECDH_ES,
+                contentEncryptionAlgorithm: enc,
+                encryptionKey: publicKey
+            ) else {
+                return SignResult.with(failure: "Could not construct JWE encrypter")
+            }
+
+            var headerParams: [String: Any] = [
+                "alg": KeyManagementAlgorithm.ECDH_ES.rawValue,
+                "enc": enc.rawValue,
+                "typ": "JWT"
+            ]
+            if let kid = kid, !kid.isEmpty {
+                headerParams["kid"] = kid
+            }
+
+            guard let header = try? JWEHeader(parameters: headerParams) else {
+                return SignResult.with(failure: "Could not create JWE header")
+            }
+
+            let jwe = try JWE(header: header, payload: Payload(plaintext), encrypter: encrypter)
+            return SignResult.with(success: jwe.compactSerializedString)
+        } catch {
+            return SignResult.with(failure: "JWE encryption failed: \(error.localizedDescription)")
+        }
+    }
+}
+
+@objc
 public class SignResult: NSObject {
     @objc
     public var success: Bool {

@@ -2,6 +2,7 @@ package id.waltid.openid4vci.wallet.token
 
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.requests.authorization.AuthorizationDetail
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -80,7 +81,7 @@ class TokenRequestBuilder(
             }
         }
 
-        return executeTokenRequest(tokenEndpoint, baseParameters, dpopProofGenerator, clientAssertionGenerator)
+        return executeTokenRequestWithDPoP(tokenEndpoint, baseParameters, dpopProofGenerator, clientAssertionGenerator)
     }
 
     /**
@@ -97,6 +98,8 @@ class TokenRequestBuilder(
         preAuthorizedCode: String,
         txCode: String? = null,
         additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -105,6 +108,8 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Transaction code (PIN) present: ${txCode != null}" }
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
+        log.trace { "Additional headers: ${additionalHeaders.keys}" }
+        log.trace { "Client attestation: ${attestationHeaders != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
@@ -117,11 +122,11 @@ class TokenRequestBuilder(
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters)
+        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
     }
 
     /**
-     * Executes a token request and parses the response.
+     * Executes a token request with DPoP support and parses the response.
      * Handles DPoP nonce retry per RFC 9449 §5.
      * 
      * @param tokenEndpoint The token endpoint URL
@@ -129,13 +134,13 @@ class TokenRequestBuilder(
      * @param dpopProofGenerator Optional function to generate DPoP proof with optional nonce
      * @param clientAssertionGenerator Optional function to generate client_assertion (called fresh each attempt)
      */
-    private suspend fun executeTokenRequest(
+    private suspend fun executeTokenRequestWithDPoP(
         tokenEndpoint: String,
         baseParameters: Parameters,
         dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
         clientAssertionGenerator: (suspend () -> String)? = null,
     ): TokenResponse {
-        log.debug { "Sending token request to authorization server" }
+        log.debug { "Sending token request to authorization server (DPoP mode)" }
         log.trace { "Request parameters count: ${baseParameters.names().size}" }
         
         // Build full parameters with fresh client_assertion if needed
@@ -180,6 +185,95 @@ class TokenRequestBuilder(
                     return executeTokenRequestWithNonce(tokenEndpoint, baseParameters, dpopProofGenerator, dpopNonce, clientAssertionGenerator)
                 } else {
                     log.error { "Server requires DPoP nonce but didn't provide DPoP-Nonce header" }
+                }
+            }
+        }
+
+        if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
+            log.error {
+                "Token request failed - Status: ${response.status.value} ${response.status.description}, " +
+                "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
+            }
+            throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
+        }
+
+        log.trace { "Received successful token response (${response.status.value}), parsing" }
+        
+        return try {
+            val tokenResponse = response.body<TokenResponse>()
+            log.info {
+                "Successfully obtained access token - " +
+                "Type: ${tokenResponse.token_type}, " +
+                "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
+                "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
+            }
+            log.trace { "Token scope: ${tokenResponse.scope ?: "not specified"}" }
+            tokenResponse
+        } catch (e: Exception) {
+            val responseBody = response.bodyAsText()
+            log.error(e) {
+                "Failed to parse token response - " +
+                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+            }
+            throw Exception("Failed to parse token response", e)
+        }
+    }
+
+    /**
+     * Executes a token request with attestation headers and parses the response.
+     * Handles redirect following with same-origin checks.
+     * 
+     * @param tokenEndpoint The token endpoint URL
+     * @param parameters The form parameters for the request
+     * @param additionalHeaders Additional headers to include
+     * @param attestationHeaders Client attestation headers (if attestation-based auth is used)
+     */
+    private suspend fun executeTokenRequest(
+        tokenEndpoint: String,
+        parameters: Parameters,
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+    ): TokenResponse {
+        log.debug { "Sending token request to authorization server" }
+        log.trace { "Request parameters count: ${parameters.names().size}" }
+
+        var response: HttpResponse = try {
+            httpClient.post(tokenEndpoint) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(parameters.formUrlEncode())
+                additionalHeaders.forEach { (name, value) -> header(name, value) }
+                attestationHeaders?.let {
+                    header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
+                    header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+                }
+            }
+        } catch (e: Exception) {
+            log.error(e) { "Network error sending token request to: $tokenEndpoint" }
+            throw Exception("Failed to send token request", e)
+        }
+
+        if (response.status.value in listOf(301, 302, 303, 307, 308)) {
+            val location = response.headers[HttpHeaders.Location]
+            if (location != null) {
+                log.debug { "Following redirect to: $location" }
+                val isSameOrigin = isSameOrigin(tokenEndpoint, location)
+                if (!isSameOrigin && (additionalHeaders.isNotEmpty() || attestationHeaders != null)) {
+                    error(
+                        "Cross-origin redirect from $tokenEndpoint to $location is not supported when token request " +
+                            "headers are present"
+                    )
+                }
+                response = httpClient.post(location) {
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody(parameters.formUrlEncode())
+                    if (isSameOrigin) {
+                        additionalHeaders.forEach { (name, value) -> header(name, value) }
+                        attestationHeaders?.let {
+                            header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
+                            header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+                        }
+                    }
                 }
             }
         }
@@ -262,5 +356,13 @@ class TokenRequestBuilder(
         }
         
         return response.body<TokenResponse>()
+    }
+
+    private fun isSameOrigin(source: String, target: String): Boolean {
+        val sourceUrl = Url(source)
+        val targetUrl = Url(target)
+        return sourceUrl.protocol == targetUrl.protocol &&
+            sourceUrl.host == targetUrl.host &&
+            sourceUrl.port == targetUrl.port
     }
 }

@@ -1,0 +1,285 @@
+Parallel Configuration Cache is an incubating feature.
+Reusing configuration cache.
+> Task :waltid-services:waltid-service-commons:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-services:waltid-service-commons:generateBuildConfigClasses SKIPPED
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:waltid-library-commons:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:waltid-library-commons:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:web:waltid-web-data-fetching:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:crypto:waltid-x509:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:web:waltid-web-data-fetching:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:crypto:waltid-x509:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-verification-policies:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-verification-policies:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:crypto:waltid-crypto:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:waltid-did:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:crypto:waltid-crypto:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:waltid-did:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:crypto:waltid-cose:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:crypto:waltid-cose:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:crypto:waltid-crypto:jvmProcessResources UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-crypto:processJvmMainResources SKIPPED
+> Task :waltid-libraries:protocols:waltid-openid4vc:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:protocols:waltid-openid4vc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:waltid-did:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-verification-policies:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:waltid-library-commons:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:crypto:waltid-cose:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:crypto:waltid-x509:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:web:waltid-web-data-fetching:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:waltid-library-commons:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:processJvmMainResources SKIPPED
+> Task :waltid-libraries:web:waltid-web-data-fetching:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:processJvmMainResources SKIPPED
+> Task :waltid-libraries:waltid-did:processJvmMainResources SKIPPED
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-verification-policies:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:crypto:waltid-x509:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:processJvmMainResources SKIPPED
+> Task :waltid-services:waltid-verifier-api2:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:protocols:waltid-openid4vp:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-dcql:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-dcql:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:crypto:waltid-cose:processJvmMainResources SKIPPED
+> Task :waltid-libraries:protocols:waltid-openid4vc:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vc:processJvmMainResources SKIPPED
+> Task :waltid-libraries:waltid-library-commons:compileKotlinJvm NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-trust-registry:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:protocols:waltid-openid4vp:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-trust-registry:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-services:waltid-verifier-api2:generateBuildConfigClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-digital-credentials:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-verification-policies2:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-digital-credentials:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-vical:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-vical:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-digital-credentials:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-trust-registry:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:waltid-library-commons:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:waltid-library-commons:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-digital-credentials:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-trust-registry:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-dcql:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-dcql:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:protocols:waltid-openid4vp:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vp:processJvmMainResources SKIPPED
+> Task :waltid-services:waltid-service-commons:processResources NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:processJvmMainResources SKIPPED
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:processJvmMainResources SKIPPED
+> Task :waltid-libraries:credentials:waltid-verification-policies2:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-vical:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:web:waltid-ktor-notifications:kmpPartiallyResolvedDependenciesChecker
+> Task :waltid-libraries:credentials:waltid-vical:processJvmMainResources SKIPPED
+> Task :waltid-libraries:web:waltid-ktor-notifications:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :waltid-libraries:credentials:waltid-verification-policies2:processJvmMainResources SKIPPED
+> Task :waltid-libraries:waltid-library-commons:jvmJar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi:processResources NO-SOURCE
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:processJvmMainResources SKIPPED
+> Task :waltid-services:waltid-verifier-api2:processResources NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:processJvmMainResources SKIPPED
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:web:waltid-ktor-notifications:jvmProcessResources NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:processJvmMainResources SKIPPED
+> Task :waltid-libraries:web:waltid-ktor-notifications:processJvmMainResources SKIPPED
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:web:waltid-ktor-notifications-core:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-dcql:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-dcql:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-dcql:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:web:waltid-web-data-fetching:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-dcql:jvmJar UP-TO-DATE
+> Task :waltid-libraries:web:waltid-web-data-fetching:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:web:waltid-web-data-fetching:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:web:waltid-web-data-fetching:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-trust-registry:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-trust-registry:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-trust-registry:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-trust-registry:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials:jvmJar UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-crypto:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-crypto:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:crypto:waltid-crypto:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-crypto:jvmJar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-cose:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-x509:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-x509:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:crypto:waltid-cose:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vp:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:crypto:waltid-x509:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-cose:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-x509:jvmJar UP-TO-DATE
+> Task :waltid-libraries:crypto:waltid-cose:jvmJar UP-TO-DATE
+> Task :waltid-libraries:sdjwt:waltid-sdjwt:jvmJar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp:jvmJar UP-TO-DATE
+> Task :waltid-libraries:waltid-did:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:waltid-did:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:waltid-did:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:waltid-did:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-vical:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-vical:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-vical:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-vical:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-credential-key-resolver:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-mdoc-credentials2:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-w3c-credentials:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-digital-credentials:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-digital-credentials:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-digital-credentials:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-dif-definitions-parser:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-digital-credentials:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2-vp:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-verification-policies:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:credentials:waltid-verification-policies:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies2:jvmJar UP-TO-DATE
+> Task :waltid-libraries:credentials:waltid-verification-policies:jvmJar UP-TO-DATE
+> Task :waltid-libraries:web:waltid-ktor-notifications:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:web:waltid-ktor-notifications:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:web:waltid-ktor-notifications:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:web:waltid-ktor-notifications:jvmJar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-18013-7-verifier:jvmJar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vc:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vc:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vc:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vc:jvmJar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:compileKotlinJvm UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:compileJvmMainJava NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:jvmMainClasses UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier:jvmJar UP-TO-DATE
+> Task :waltid-services:waltid-service-commons:compileKotlin UP-TO-DATE
+> Task :waltid-services:waltid-service-commons:compileJava NO-SOURCE
+> Task :waltid-services:waltid-service-commons:classes UP-TO-DATE
+> Task :waltid-services:waltid-service-commons:jar UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi:compileKotlin UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi:compileJava NO-SOURCE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi:classes UP-TO-DATE
+> Task :waltid-libraries:protocols:waltid-openid4vp-verifier-openapi:jar UP-TO-DATE
+> Task :waltid-services:waltid-verifier-api2:compileKotlin UP-TO-DATE
+> Task :waltid-services:waltid-verifier-api2:compileJava NO-SOURCE
+> Task :waltid-services:waltid-verifier-api2:classes UP-TO-DATE
+
+> Task :waltid-services:waltid-verifier-api2:run
+-- walt.id verifier 1.0.0-SNAPSHOT --
+12:44:50.913821211 [32m INFO[0m [                main] :        Configuration : Configuration set using the DSL with append=true
+12:44:50.952507115 [32m INFO[0m [                main] :     walt.id verifier : Starting walt.id verifier 1.0.0-SNAPSHOT...
+12:44:50.968508037 [32m INFO[0m [                main] :         Feature-Init : Initializing features...
+12:44:50.968683197 [32m INFO[0m [                main] :         Feature-Init : Registering common feature catalog...
+12:44:51.110755875 [32m INFO[0m [                main] :         Feature-Init : Registering service feature catalog...
+12:44:51.111558947 [32m INFO[0m [                main] :         Feature-Init : Loading feature amendments...
+12:44:51.278391126 [32m INFO[0m [                main] :       FeatureManager : Disabled features (0): 
+12:44:51.278832287 [32m INFO[0m [                main] :       FeatureManager : Enabling base feature "verifier-service"...
+12:44:51.279939002 [32m INFO[0m [                main] :       FeatureManager : ↳ Loading config "verifier-service" for feature "verifier-service"...
+12:44:51.342630206 [32m INFO[0m [                main] :       FeatureManager : Enabling base feature "web"...
+12:44:51.342746545 [32m INFO[0m [                main] :       FeatureManager : ↳ Loading config "web" for feature "web"...
+12:44:51.359450360 [32m INFO[0m [                main] :       FeatureManager : Enabled features (2): verifier-service, web
+12:44:51.359850594 [32m INFO[0m [                main] :       FeatureManager : Defaulted features (9): openapi, authservice, feature-flag-information-endpoint, healthchecks, transaction-data-profiles, persistence, debug-endpoints, httpclient, dev-mode
+12:44:51.360174925 [32m INFO[0m [                main] :       FeatureManager : Enabling default feature "openapi"...
+12:44:51.360409136 [32m INFO[0m [                main] :       FeatureManager : Enabling default feature "authservice"...
+12:44:51.360463319 [32m INFO[0m [                main] :       FeatureManager : Enabling default feature "feature-flag-information-endpoint"...
+12:44:51.360500469 [32m INFO[0m [                main] :       FeatureManager : Enabling default feature "healthchecks"...
+12:44:51.360555693 [32m INFO[0m [                main] :       FeatureManager : Enabling default feature "transaction-data-profiles"...
+12:44:51.360592231 [32m INFO[0m [                main] :       FeatureManager : ↳ Loading config "transaction-data-profiles" for feature "transaction-data-profiles"...
+12:44:51.390255509 [32m INFO[0m [                main] :       FeatureManager : Enabling default feature "httpclient"...
+12:44:51.390386476 [32m INFO[0m [                main] :       FeatureManager : ↳ Loading config "httpclient" for feature "httpclient"...
+12:44:51.401561246 [32m INFO[0m [                main] :       FeatureManager : Enabling feature "httpclient"...
+12:44:51.404053902 [32m INFO[0m [                main] :         Feature-Init : Feature initialization completed (433.158869ms).
+12:44:51.404444337 [32m INFO[0m [                main] :         Service-Init : Initializing walt.id verifier 1.0.0-SNAPSHOT...
+kotlin-logging: initializing... active logger factory: Slf4jLoggerFactory
+12:44:51.522403071 [32m INFO[0m [                main] :         Service-Init : Service initialization completed (117.138979ms).
+12:44:51.522934853 [32m INFO[0m [                main] :       Service-Runner : Running walt.id verifier 1.0.0-SNAPSHOT...
+12:44:51.524747187 [32m INFO[0m [                main] :           WebService : Starting web server (binding to 0.0.0.0, listening on port 7003)...
+12:44:51.543986999 [32m INFO[0m [                main] :    i.k.s.Application : Autoreload is disabled because the development mode is off.
+12:44:52.217789488  INFO [                main] :     EnterpriseStatus : walt.id verifier - Application modules loaded, web server is starting...
+12:44:52.218054307  INFO [                main] :    i.k.s.Application : Application started in 0.681 seconds.
+12:44:52.218217605  INFO [                main] :     EnterpriseStatus : walt.id verifier - Web server started, the app will be ready soon...
+12:44:52.954256681  INFO [          D-worker-2] :    i.k.s.Application : Responding at http://0.0.0.0:7003
+12:44:52.957002103  INFO [                main] :     EnterpriseStatus : walt.id verifier - Web server ready! [total startup time: 2138ms]
+12:45:25.874873332  INFO [          D-worker-4] :    i.k.s.Application : 404 Not Found: GET - /openapi.json in 12ms
+12:45:30.470752430  INFO [          D-worker-1] :    i.k.s.Application : 404 Not Found: GET - /swagger/api.json in 8ms
+12:45:34.856190925  INFO [          D-worker-5] :    i.k.s.Application : 302 Found: GET - / in 1ms -> swagger
+12:45:34.859032107  INFO [          D-worker-4] :    i.k.s.Application : 302 Found: GET - /swagger in 2ms -> /swagger/index.html
+12:45:34.863749794  INFO [          D-worker-3] :    i.k.s.Application : 200 OK: GET - /swagger/index.html in 3ms
+12:45:38.986581002  INFO [          D-worker-3] :    i.k.s.Application : 404 Not Found: GET - /swagger-initializer.js in 1ms
+12:45:43.113811345  INFO [          D-worker-4] :    i.k.s.Application : 200 OK: GET - /swagger/swagger-initializer.js in 3ms
+12:45:47.103686586  INFO [          D-worker-9] :    i.k.s.Application : 200 OK: GET - /api.json in 9ms
+12:47:21.056884673  INFO [          D-worker-2] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 2ms
+12:51:21.837006266  INFO [          D-worker-3] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 0ms
+12:52:35.675810297  INFO [          D-worker-5] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 1ms
+12:52:36.476760380  INFO [          D-worker-8] :    i.k.s.Application : 200 OK: POST - /verification-session/create in 85ms
+12:52:36.605780414  INFO [         D-worker-10] :    i.k.s.Application : 200 OK: GET - /verification-session/7e2d7bcb-b38e-4a06-bfc7-9a89bb29bfcb/request in 7ms
+12:52:37.047869147  INFO [          D-worker-7] :    i.k.s.Application : 200 OK: POST - /verification-session/7e2d7bcb-b38e-4a06-bfc7-9a89bb29bfcb/response in 220ms
+12:52:37.143366784  INFO [          D-worker-7] :    i.k.s.Application : 200 OK: GET - /verification-session/7e2d7bcb-b38e-4a06-bfc7-9a89bb29bfcb/info in 35ms
+12:53:48.606530840  INFO [          D-worker-3] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 1ms
+12:53:59.190804688  INFO [          D-worker-1] :    i.k.s.Application : 200 OK: GET - /livez in 57ms
+12:54:25.289289869  INFO [          D-worker-3] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 1ms
+13:01:01.689742020  INFO [         D-worker-10] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 1ms
+13:02:56.867006995  INFO [          D-worker-7] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 0ms
+13:04:35.829182726  INFO [          D-worker-7] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 1ms
+13:05:56.173467017  INFO [          D-worker-8] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 1ms
+13:07:04.758728538  INFO [          D-worker-7] :    i.k.s.Application : 404 Not Found: GET - /verification-session in 0ms
+13:07:05.557937147  INFO [          D-worker-5] :    i.k.s.Application : 200 OK: POST - /verification-session/create in 6ms
+13:07:05.766548162  INFO [         D-worker-10] :    i.k.s.Application : 200 OK: GET - /verification-session/c488dac8-d8fc-48d8-93ff-8e75967bfbcd/request in 2ms
+13:07:06.421762817  INFO [          D-worker-8] :    i.k.s.Application : 200 OK: POST - /verification-session/c488dac8-d8fc-48d8-93ff-8e75967bfbcd/response in 65ms
+13:07:06.527246114  INFO [          D-worker-8] :    i.k.s.Application : 200 OK: GET - /verification-session/c488dac8-d8fc-48d8-93ff-8e75967bfbcd/info in 22ms

@@ -10,5 +10,6 @@ internal actual suspend fun platformSignDocumentSignerCertificate(
     publicKey: Key,
     iacaSignerSpec: IACASignerSpecification,
 ): DocumentSignerCertificateBundle {
+    // TODO(iOS): Implement ISO document signer certificate building, then remove the guarded ISO X.509 tests.
     TODO("Not yet implemented")
 }

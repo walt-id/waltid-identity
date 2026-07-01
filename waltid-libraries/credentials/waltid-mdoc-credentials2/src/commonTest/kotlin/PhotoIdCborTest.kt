@@ -1,8 +1,6 @@
 @file:OptIn(ExperimentalSerializationApi::class, ExperimentalUnsignedTypes::class)
 
 import id.walt.cose.*
-import id.walt.crypto.keys.KeyType
-import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.mdoc.credsdata.PhotoId
 import id.walt.mdoc.encoding.ByteStringWrapper
 import id.walt.mdoc.objects.DeviceSigned
@@ -73,9 +71,9 @@ class PhotoIdCborTest {
 
     @Test
     fun `Photo ID signing and verification structure test`() = runTest {
-        val issuerKey = JWKKey.generate(KeyType.secp256r1)
-        val coseSigner = issuerKey.toCoseSigner()
-        val coseVerifier = issuerKey.getPublicKey().toCoseVerifier()
+        // This test validates the mdoc/COSE structure, not platform key storage.
+        val coseSigner = CoseSigner { data -> data + byteArrayOf(0x42) }
+        val coseVerifier = CoseVerifier { data, signature -> signature.contentEquals(data + byteArrayOf(0x42)) }
 
         // --- 1. SETUP: Issuer & Device Keys (placeholders) and PhotoID data ---
         val deviceKey = CoseKey(

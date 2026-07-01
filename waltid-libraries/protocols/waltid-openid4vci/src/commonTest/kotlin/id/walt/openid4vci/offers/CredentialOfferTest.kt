@@ -199,4 +199,56 @@ class CredentialOfferTest {
         assertEquals(6, txCode["length"]?.jsonPrimitive?.content?.toInt())
         assertEquals("Enter the code from your device", txCode["description"]?.jsonPrimitive?.content)
     }
+    @Test
+    fun `credential offer deserializes tx_code with embedded value`() {
+        val payload = """
+        {
+          "credential_issuer": "https://issuer.example",
+          "credential_configuration_ids": ["cred-id-1"],
+          "grants": {
+            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+              "pre-authorized_code": "pre-auth-123",
+              "tx_code": {
+                "input_mode": "numeric",
+                "length": 4,
+                "description": "Enter the PIN",
+                "value": "1234"
+              }
+            }
+          }
+        }
+        """.trimIndent()
+
+        val offer = json.decodeFromString(CredentialOffer.serializer(), payload)
+        val txCode = offer.grants?.preAuthorizedCode?.txCode
+        assertNotNull(txCode)
+        assertEquals("numeric", txCode.inputMode)
+        assertEquals(4, txCode.length)
+        assertEquals("1234", txCode.value?.content)
+    }
+
+    @Test
+    fun `credential offer deserializes tx_code with numeric value`() {
+        val payload = """
+        {
+          "credential_issuer": "https://issuer.example",
+          "credential_configuration_ids": ["cred-id-1"],
+          "grants": {
+            "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
+              "pre-authorized_code": "pre-auth-456",
+              "tx_code": {
+                "input_mode": "numeric",
+                "length": 4,
+                "value": 5678
+              }
+            }
+          }
+        }
+        """.trimIndent()
+
+        val offer = json.decodeFromString(CredentialOffer.serializer(), payload)
+        val txCode = offer.grants?.preAuthorizedCode?.txCode
+        assertNotNull(txCode)
+        assertEquals("5678", txCode.value?.content)
+    }
 }

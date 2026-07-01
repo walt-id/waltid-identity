@@ -4,6 +4,7 @@ import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -17,6 +18,7 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
@@ -327,6 +329,7 @@ object WalletIssuanceHandler {
     fun receiveCredentialFlow(
         wallet: Wallet,
         request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient(),
         /**
@@ -386,26 +389,26 @@ object WalletIssuanceHandler {
         val tokenEndpoint = asMetadata.tokenEndpoint
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
-        // TODO (missing in openid4vci lib):
-        //   TokenRequestBuilder.exchangePreAuthorizedCode currently only accepts `additionalParameters`
-        //   (form params, for the legacy client_assertion style). To support header-based attestation-
-        //   based client authentication (OpenID4VCI 1.0 Token Endpoint; OAuth-Client-Attestation /
-        //   OAuth-Client-Attestation-PoP headers per ietf-oauth-attestation-based-client-auth),
-        //   it requires something like `additionalHeaders: Map<String,String>` parameter to exchangePreAuthorizedCode /
-        //   exchangeAuthorizationCode / executeTokenRequest and set them on the HTTP request.
-        //   Once available, forward `request.tokenRequestHeaders` here:
-        //       tokenBuilder.exchangePreAuthorizedCode(..., additionalHeaders = request.tokenRequestHeaders)
-        if (request.tokenRequestHeaders.isNotEmpty()) {
-            log.warn {
-                "tokenRequestHeaders were supplied (${request.tokenRequestHeaders.keys}) but TokenRequestBuilder " +
-                        "does not yet support per-request headers; attestation-based client auth headers will NOT be sent. " +
-                        "See TODO(WAL-864 follow-up)."
-            }
-        }
+
+        val attestationHeaders = if (attestationAssembler != null &&
+            asMetadata.tokenEndpointAuthMethodsSupported?.contains("attest_jwt_client_auth") == true
+        ) {
+            log.debug { "Issuer requires attestation-based client auth, building attestation headers" }
+            val asIssuer = asMetadata.issuer ?: tokenEndpoint
+            val headers = attestationAssembler.buildAttestationHeaders(key, request.clientId, asIssuer)
+            onEvent(WalletSessionEvent.issuance_attestation_obtained)
+            headers
+        } else null
+
+        val effectiveTxCode = request.txCode
+            ?: preAuthGrant.txCode?.value?.content
+
         val tokenResponse = tokenBuilder.exchangePreAuthorizedCode(
             tokenEndpoint = tokenEndpoint,
             preAuthorizedCode = preAuthGrant.preAuthorizedCode,
-            txCode = request.txCode
+            txCode = effectiveTxCode,
+            additionalHeaders = request.tokenRequestHeaders,
+            attestationHeaders = attestationHeaders,
         )
         log.trace { "Token obtained, c_nonce=${tokenResponse.c_nonce}" }
         onEvent(WalletSessionEvent.issuance_token_obtained)
@@ -424,9 +427,11 @@ object WalletIssuanceHandler {
         for (offeredCredential in offeredCredentials) {
             log.trace { "Issuing credential configId=${offeredCredential.credentialConfigurationId}, format=${offeredCredential.configuration.format}" }
             val proofs = if (offeredCredential.configuration.proofTypesSupported?.isNotEmpty() == true) {
-                val nonce = cNonce ?: tokenResponse.access_token
+                val nonce = cNonce
+                    ?: error("Issuer requires proof but did not provide a c_nonce")
                 log.trace { "Building proof JWT, did=$did, nonce=$nonce" }
-                if (did != null) {
+                val preferJwkBinding = shouldPreferJwkBinding(offeredCredential.configuration.cryptographicBindingMethodsSupported)
+                if (did != null && !preferJwkBinding) {
                     proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, keyId = did)
                 } else {
                     proofBuilder.buildJwtProof(key, offer.credentialIssuer, nonce, includeJwk = true)
@@ -448,7 +453,7 @@ object WalletIssuanceHandler {
             }
             log.trace { "Posting to credential endpoint: ${credentialRequestJson.toString().take(200)}" }
 
-            val credentialResponse = httpClient.post(credentialEndpoint) {
+            val credentialResponse = postFollowingRedirects(httpClient, credentialEndpoint) {
                 header(HttpHeaders.Authorization, "Bearer ${tokenResponse.access_token}")
                 contentType(ContentType.Application.Json)
                 setBody(credentialRequestJson.toString())
@@ -501,13 +506,14 @@ object WalletIssuanceHandler {
     suspend fun receiveCredential(
         wallet: Wallet,
         request: ReceiveCredentialRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient()
     ): ReceiveCredentialResult {
         val ids = mutableListOf<String>()
         val deferredIds = mutableMapOf<String, String>()
         receiveCredentialFlow(
-            wallet, request, onEvent, httpClient,
+            wallet, request, attestationAssembler, onEvent, httpClient,
             onDeferredTransactionId = { configId, txId -> deferredIds[configId] = txId }
         ).collect { ids += it.id }
         return ReceiveCredentialResult(credentialIds = ids, deferredTransactionIds = deferredIds)
@@ -670,9 +676,28 @@ object WalletIssuanceHandler {
         else -> wallet.defaultKey()
     }
 
+    private suspend fun postFollowingRedirects(
+        httpClient: HttpClient,
+        url: String,
+        block: HttpRequestBuilder.() -> Unit
+    ): HttpResponse {
+        var response = httpClient.post(url, block)
+        if (response.status.value in listOf(301, 302, 303, 307, 308)) {
+            val location = response.headers[HttpHeaders.Location]
+            if (location != null) {
+                log.debug { "Following redirect to: $location" }
+                check(isSameOrigin(url, location)) {
+                    "Cross-origin redirect from $url to $location is not supported for wallet POST requests"
+                }
+                response = httpClient.post(location, block)
+            }
+        }
+        return response
+    }
+
     private suspend fun fetchCNonce(httpClient: HttpClient, nonceEndpoint: String): String? =
         runCatching {
-            val response = httpClient.post(nonceEndpoint) {
+            val response = postFollowingRedirects(httpClient, nonceEndpoint) {
                 contentType(ContentType.Application.Json)
             }
             if (response.status.isSuccess()) {
@@ -680,6 +705,23 @@ object WalletIssuanceHandler {
                     ?.let { (it as? JsonPrimitive)?.content }
             } else null
         }.getOrNull()
+
+    private fun shouldPreferJwkBinding(
+        methods: Set<CryptographicBindingMethod>?
+    ): Boolean {
+        if (methods.isNullOrEmpty()) return false
+        val supportsJwk = methods.any { it is CryptographicBindingMethod.Jwk }
+        val supportsDid = methods.any { it is CryptographicBindingMethod.Did }
+        return supportsJwk && !supportsDid
+    }
+
+    private fun isSameOrigin(source: String, target: String): Boolean {
+        val sourceUrl = Url(source)
+        val targetUrl = Url(target)
+        return sourceUrl.protocol == targetUrl.protocol &&
+            sourceUrl.host == targetUrl.host &&
+            sourceUrl.port == targetUrl.port
+    }
 
     // ---------------------------------------------------------------------------
     // Authorization-code grant isolated steps
@@ -1060,8 +1102,10 @@ object WalletIssuanceHandler {
         tokenEndpoint: Url,
         code: String,
         codeVerifier: String?,
+        credentialIssuer: String,
         credentialEndpoint: Url,
         credentialConfigurationId: String,
+        nonceEndpoint: String? = null,
         clientId: String = "wallet-client",
         redirectUri: Url = Url("openid://"),
         /** Inline key for proof-of-possession; takes precedence over the wallet's stores. */
@@ -1085,13 +1129,15 @@ object WalletIssuanceHandler {
         ))
         onEvent(WalletSessionEvent.issuance_token_obtained)
 
-        // Sign proof
-        val cNonce = tokenResult.cNonce ?: tokenResult.accessToken
+        // Sign proof — nonce from nonce endpoint or token response (never fall back to access_token)
+        val cNonce = nonceEndpoint?.let { fetchCNonce(httpClient, it) }
+            ?: tokenResult.cNonce
+            ?: error("Issuer did not provide a c_nonce (neither via nonce endpoint nor token response)")
         val proofBuilder = JwtProofBuilder()
         val proofs = if (did != null) {
-            proofBuilder.buildJwtProof(key, credentialEndpoint.host, cNonce, keyId = did)
+            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, keyId = did)
         } else {
-            proofBuilder.buildJwtProof(key, credentialEndpoint.host, cNonce, includeJwk = true)
+            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, includeJwk = true)
         }
         onEvent(WalletSessionEvent.issuance_proof_signed)
 

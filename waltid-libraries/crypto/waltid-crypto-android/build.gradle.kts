@@ -1,5 +1,3 @@
-import com.android.build.api.dsl.androidLibrary
-
 plugins {
     id("waltid.android.library")
     id("waltid.publish.maven")
@@ -8,10 +6,8 @@ plugins {
 group = "id.walt.crypto"
 
 kotlin {
-    androidLibrary {
+    android {
         namespace = group.toString()
-        compileSdk = 34
-        minSdk = 30
 
         withJava()
 
@@ -47,7 +43,6 @@ kotlin {
         }
     }
 }
-
 
 mavenPublishing {
     pom {
