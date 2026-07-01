@@ -54,6 +54,12 @@ class InMemorySessionStore : SessionStore {
     override suspend fun storeSession(session: AuthSession) {
         log.debug { "Saving session: $session" }
         sessions[session.id] = session
+        
+        session.accountId?.let { accountId ->
+            val existingSessions = accountSessions[accountId]?.toMutableList() ?: mutableListOf()
+            existingSessions.add(session.id)
+            accountSessions[accountId] = existingSessions
+        }
     }
 
     override suspend fun invalidateAllSessionsForAccount(accountId: String) {
