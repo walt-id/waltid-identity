@@ -8,11 +8,7 @@ import kotlin.uuid.Uuid
 class AndroidPlatformKeyProvider : PlatformKeyProvider {
 
     override val supportedPlatformKeyTypes: Set<KeyType> =
-        setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA)
-
-    override val isPlatformBackingAvailable: Boolean = true
-
-    override fun isPlatformBacked(keyType: KeyType): Boolean = keyType in supportedPlatformKeyTypes
+        PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES
 
     override suspend fun generateKey(keyType: KeyType, keyId: String?): Key {
         val alias = keyId ?: "wallet_key_${Uuid.random()}"
