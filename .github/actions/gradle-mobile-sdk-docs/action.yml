@@ -1,0 +1,52 @@
+name: gradle-mobile-sdk-docs
+description: Generate Dokka API docs for the mobile wallet SDK modules
+inputs:
+  waltid-directory:
+    description: 'Path to the waltid-identity directory'
+    required: false
+    default: '.'
+  xcode-developer-dir:
+    description: 'Full path to the Xcode Developer directory to select'
+    required: false
+    default: ''
+runs:
+  using: "composite"
+  steps:
+    - name: Select Xcode toolchain
+      shell: bash
+      run: |
+        XCODE_DEVELOPER_DIR="${{ inputs.xcode-developer-dir }}"
+        if [[ -n "$XCODE_DEVELOPER_DIR" ]]; then
+          if [[ ! -d "$XCODE_DEVELOPER_DIR" ]]; then
+            echo "::error::Xcode developer directory not found: $XCODE_DEVELOPER_DIR"
+            echo "Available Xcode installations under /Applications:"
+            ls -1 /Applications | grep '^Xcode' || true
+            exit 1
+          fi
+
+          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
+          echo "Selected Xcode developer directory: $XCODE_DEVELOPER_DIR"
+          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> $GITHUB_ENV
+        else
+          echo "Using runner default Xcode selection"
+        fi
+
+        xcodebuild -version
+
+    - name: Configure iOS build environment
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
+      with:
+        gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
+
+    - name: Generate mobile SDK API docs
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        ./gradlew \
+          :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml \
+          :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml \
+          -PenableAndroidBuild=true \
+          -PenableIosBuild=true \
+          --no-daemon \
+          --console=plain \
+          --warning-mode=summary
