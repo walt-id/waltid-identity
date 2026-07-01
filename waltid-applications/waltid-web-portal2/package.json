@@ -1,0 +1,19 @@
+{
+  "name": "@waltid/demo-portal2",
+  "private": true,
+  "scripts": {
+    "dev": "nuxi dev",
+    "build": "nuxi build",
+    "generate": "nuxi generate",
+    "start": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "qrcode.vue": "^3.6.0"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.13.2",
+    "@types/node": "^25.9.3",
+    "nuxt": "3.19.0",
+    "typescript": "5.8.3"
+  }
+}
