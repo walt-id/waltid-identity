@@ -5,6 +5,7 @@ const props = defineProps<{
   examples: SwaggerExample[]
   loading: boolean
   error: string | null
+  optionsLabel: string
   warning?: string | null
 }>()
 
@@ -25,7 +26,7 @@ function onSelectChange(e: Event) {
   <div class="grid gap-3">
     <div class="flex items-end gap-2">
       <div class="flex-1">
-        <label class="form-label">Swagger Example</label>
+        <label class="form-label">{{ optionsLabel }}</label>
         <select
           v-if="examples.length > 0"
           :value="selectedIndex"
@@ -42,7 +43,7 @@ function onSelectChange(e: Event) {
       </div>
 
       <button class="btn btn-secondary" :disabled="loading" @click="$emit('reload')">
-        Reload Swagger Examples
+        Reload Options
       </button>
     </div>
 

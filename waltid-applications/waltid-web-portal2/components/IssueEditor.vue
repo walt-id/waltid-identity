@@ -97,7 +97,7 @@ async function submit() {
   <div class="grid gap-4">
     <div class="grid gap-3">
       <div>
-        <label class="form-label">Profile</label>
+        <label class="form-label">Credential Type</label>
         <select
           v-if="profiles.profiles.value.length > 0"
           :value="selectedProfile"
@@ -117,7 +117,7 @@ async function submit() {
       </div>
 
       <JsonViewer
-        label="Profile definition"
+        label="Credential Definition"
         :value="selectedProfileDetail"
         :loading="profiles.detailLoading.value"
         :error="profiles.detailError.value"
@@ -127,6 +127,7 @@ async function submit() {
     <JsonEditor
       v-model="json"
       v-model:selected-index="selectedIndex"
+      options-label="Credential Offer Options"
       :examples="swagger.examples.value"
       :loading="swagger.loading.value"
       :error="swagger.error.value"

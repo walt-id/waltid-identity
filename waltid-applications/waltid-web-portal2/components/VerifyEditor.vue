@@ -25,6 +25,7 @@ async function submit() {
     <JsonEditor
       v-model="json"
       v-model:selected-index="selectedIndex"
+      options-label="Verification Session Options"
       :examples="swagger.examples.value"
       :loading="swagger.loading.value"
       :error="swagger.error.value"
