@@ -7,6 +7,7 @@ import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.TestPlanRunner
 import io.ktor.client.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
@@ -32,6 +33,9 @@ class VerifierConformanceTestRunner(
     val conformancePort: Int = 8443
 ) {
     private val http = HttpClient {
+        defaultRequest {
+            url(verifierNgrokUrl)
+        }
         install(ContentNegotiation) {
             json()
         }
