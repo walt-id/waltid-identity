@@ -33,15 +33,26 @@ class VerifierConformanceTestRunner(
     val conformanceHost: String = "localhost.emobix.co.uk",
     val conformancePort: Int = 8443
 ) {
-    private val http = HttpClient {
-        defaultRequest {
-            url(verifierNgrokUrl)
-            contentType(ContentType.Application.Json)
-        }
-        install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-            })
+    private val http: HttpClient by lazy {
+        // Parse the ngrok URL to extract host and protocol
+        val parsedUrl = Url(verifierNgrokUrl)
+        
+        HttpClient {
+            defaultRequest {
+                url {
+                    protocol = parsedUrl.protocol
+                    host = parsedUrl.host
+                    if (parsedUrl.specifiedPort != 0) {
+                        port = parsedUrl.specifiedPort
+                    }
+                }
+                contentType(ContentType.Application.Json)
+            }
+            install(ContentNegotiation) {
+                json(Json {
+                    ignoreUnknownKeys = true
+                })
+            }
         }
     }
 
