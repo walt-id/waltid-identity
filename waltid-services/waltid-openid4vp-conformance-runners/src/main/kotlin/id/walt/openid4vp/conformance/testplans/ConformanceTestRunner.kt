@@ -20,7 +20,7 @@ import kotlin.reflect.jvm.jvmName
 import kotlin.test.assertNotNull
 
 class ConformanceTestRunner(
-    verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session",
+    private val verifier2UrlPrefix: String = "https://verifier2.localhost/verification-session",
     val conformanceHost: String = "localhost.emobix.co.uk",
     val conformancePort: Int = 8443
 ) {
@@ -34,6 +34,7 @@ class ConformanceTestRunner(
 
     fun run() {
         val localVerifierHost = "127.0.0.1"
+        val localVerifierBindHost = "0.0.0.0"
         val localVerifierPort = 7003
 
         E2ETest(localVerifierHost, localVerifierPort, true).testBlock(
@@ -42,7 +43,7 @@ class ConformanceTestRunner(
                 ConfigManager.preloadConfig(
                     "verifier-service", OSSVerifier2ServiceConfig(
                         clientId = "NOT-CONFIGURED_verifier2",
-                        urlPrefix = "NOT-CONFIGURED_http://$localVerifierHost:$localVerifierPort/verification-session",
+                        urlPrefix = "NOT-CONFIGURED_$verifier2UrlPrefix",
                         urlHost = "NOT-CONFIGURED_openid4vp://authorize"
                     )
                 )
@@ -53,7 +54,8 @@ class ConformanceTestRunner(
                     updateResolversForMethods()
                 }
             },
-            module = Application::verifierModule
+            module = Application::verifierModule,
+            host = localVerifierBindHost
         ) {
             val http = testHttpClient()
 

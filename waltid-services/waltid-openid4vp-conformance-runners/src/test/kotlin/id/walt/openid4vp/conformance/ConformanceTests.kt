@@ -12,8 +12,13 @@ import kotlin.time.Duration.Companion.minutes
 class ConformanceTests {
 
     companion object {
+        private const val verifier2UrlPrefixProperty = "openid4vp.conformance.verifier2-url-prefix"
+        private const val verifier2UrlPrefixEnv = "OPENID4VP_CONFORMANCE_VERIFIER2_URL_PREFIX"
+
         val verifier2UrlPrefix: String =
-            "https://verifier2.localhost/verification-session" // "https://xyz.ngrok-free.app/verification-session"
+            System.getProperty(verifier2UrlPrefixProperty)
+                ?: System.getenv(verifier2UrlPrefixEnv)
+                ?: "http://host.docker.internal:7003/verification-session"
         val conformanceHost: String = "localhost.emobix.co.uk" // "conformance.waltid.cloud" // conformance-v5-1-43.waltid.cloud
         val conformancePort: Int = 8443 // 443
 
