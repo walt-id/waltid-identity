@@ -9,6 +9,8 @@ import id.walt.openid4vci.handlers.granttypes.preauthorizedcode.PreAuthorizedCod
 import id.walt.openid4vci.handlers.par.PushedAuthorizationRequestEndpointHandler
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.CredentialFormat
+import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.validation.DefaultAuthorizationRequestValidator
 
 /**
@@ -50,6 +52,7 @@ fun buildOAuth2Provider(
     includePreAuthorizedCodeDefaultHandlers: Boolean = true,
     includePushedAuthorizationDefaultHandlers: Boolean = true,
     includeCredentialDefaultHandlers: Boolean = true,
+    includeClientAttestationDefaultMethod: Boolean = true,
 ): OAuth2Provider {
     val resolvedConfig = applyIssuerStateValidator(config)
     registerDefaultGrantTypeHandlers(
@@ -65,7 +68,11 @@ fun buildOAuth2Provider(
         config = resolvedConfig,
         includeCredentialDefaultHandlers = includeCredentialDefaultHandlers,
     )
-    return DefaultOAuth2Provider(resolvedConfig)
+    val clientAuthConfig = registerDefaultClientAuthenticationMethods(
+        config = resolvedConfig,
+        includeClientAttestationDefaultMethod = includeClientAttestationDefaultMethod,
+    )
+    return DefaultOAuth2Provider(clientAuthConfig)
 }
 
 private fun applyIssuerStateValidator(config: OAuth2ProviderConfig): OAuth2ProviderConfig =
@@ -166,4 +173,36 @@ private fun registerDefaultCredentialHandlers(
     if (config.credentialEndpointHandlers.get(mdocFormat) == null) {
         config.credentialEndpointHandlers.register(mdocFormat, MdocCredentialHandler())
     }
+}
+
+private fun registerDefaultClientAuthenticationMethods(
+    config: OAuth2ProviderConfig,
+    includeClientAttestationDefaultMethod: Boolean,
+): OAuth2ProviderConfig {
+    val clientAttestationConfig = config.clientAttestationConfig
+    if (!includeClientAttestationDefaultMethod || clientAttestationConfig == null) {
+        return config
+    }
+
+    val serviceConfig = config.clientAuthenticationServiceConfig
+    val hasAttestationMethod = serviceConfig.methods
+        .any { it.name == ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH }
+    val serviceConfigWithMethod =
+        if (hasAttestationMethod) {
+            serviceConfig
+        } else {
+            serviceConfig.withMethod(clientAttestationConfig.toAuthenticationMethod())
+        }
+
+    val supportedMethods = serviceConfigWithMethod.methods.map { it.name }.toSet()
+    val serviceConfigWithEndpointDefaults = serviceConfigWithMethod.withDefaultAllowedMethodsByEndpoint(
+        mapOf(
+            ClientAuthenticationEndpoint.PUSHED_AUTHORIZATION to supportedMethods,
+            ClientAuthenticationEndpoint.TOKEN to supportedMethods,
+        ),
+    )
+
+    return config.copy(
+        clientAuthenticationServiceConfig = serviceConfigWithEndpointDefaults,
+    )
 }
