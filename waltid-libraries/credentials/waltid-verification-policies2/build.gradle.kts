@@ -63,6 +63,11 @@ kotlin {
             implementation(identityLibs.ktor.server.netty)
             implementation(identityLibs.mockk)
         }
+        if (enableIosBuild) {
+            iosTest.dependencies {
+                implementation(identityLibs.ktor.client.darwin)
+            }
+        }
     }
 }
 

@@ -114,7 +114,11 @@ class Issuer2MetadataEndpointTest {
         assertEquals(setOf("ES256"), authorizationServerMetadata.dpopSigningAlgValuesSupported)
         assertEquals(true, authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported)
         assertEquals(
-            setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
+            setOf(
+                GrantType.AuthorizationCode.value,
+                GrantType.PreAuthorizedCode.value,
+                GrantType.RefreshToken.value,
+            ),
             authorizationServerMetadata.grantTypesSupported,
         )
         assertFalse("code_challenge_methods_supported" in authorizationServerMetadataJson)
@@ -186,24 +190,24 @@ class Issuer2MetadataEndpointTest {
     private fun assertJwtVcJsonConfiguration(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
-        val universityDegreeConfiguration = assertNotNull(
-            credentialIssuerMetadata.credentialConfigurationsSupported[UNIVERSITY_DEGREE_CONFIG_ID],
-            "Expected credential configuration for $UNIVERSITY_DEGREE_CONFIG_ID",
+        val openBadgeConfiguration = assertNotNull(
+            credentialIssuerMetadata.credentialConfigurationsSupported[OPEN_BADGE_CONFIG_ID],
+            "Expected credential configuration for $OPEN_BADGE_CONFIG_ID",
         )
-        assertEquals(CredentialFormat.JWT_VC_JSON.value, universityDegreeConfiguration.format.value)
+        assertEquals(CredentialFormat.JWT_VC_JSON.value, openBadgeConfiguration.format.value)
         assertEquals(
             setOf(SigningAlgId.Jose("ES256")),
-            universityDegreeConfiguration.credentialSigningAlgValuesSupported,
+            openBadgeConfiguration.credentialSigningAlgValuesSupported,
         )
         assertEquals(
             JWT_PROOF_BINDING_METHODS,
-            universityDegreeConfiguration.cryptographicBindingMethodsSupported,
+            openBadgeConfiguration.cryptographicBindingMethodsSupported,
         )
         assertEquals(
-            setOf("VerifiableCredential", "UniversityDegree"),
-            universityDegreeConfiguration.credentialDefinition?.type?.toSet(),
+            setOf("VerifiableCredential", "OpenBadgeCredential"),
+            openBadgeConfiguration.credentialDefinition?.type?.toSet(),
         )
-        assertNotNull(universityDegreeConfiguration.proofTypesSupported?.get("jwt"))
+        assertNotNull(openBadgeConfiguration.proofTypesSupported?.get("jwt"))
     }
 
     private fun assertMdocConfiguration(
@@ -293,7 +297,7 @@ class Issuer2MetadataEndpointTest {
         const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
         const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
-        const val UNIVERSITY_DEGREE_CONFIG_ID = "UniversityDegree_jwt_vc_json"
+        const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
 

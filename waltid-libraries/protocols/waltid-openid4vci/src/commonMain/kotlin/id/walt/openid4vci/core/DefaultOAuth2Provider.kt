@@ -38,7 +38,7 @@ import id.walt.openid4vci.metadata.issuer.CredentialDisplay
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig as LegacyMdocJsonObjectToCborMappingConfig
 import id.walt.crypto.keys.Key
 import id.walt.mdoc.objects.mso.Status
-import id.walt.openid4vci.tokens.AccessTokenContext
+import id.walt.openid4vci.tokens.access.AccessTokenContext
 import id.walt.sdjwt.SDMap
 import id.walt.x509.CertificateDer
 import kotlinx.serialization.json.JsonElement
@@ -373,6 +373,7 @@ class DefaultOAuth2Provider(
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 400,
+            headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
                 error.description?.let { put("error_description", JsonPrimitive(it)) }
@@ -388,10 +389,13 @@ class DefaultOAuth2Provider(
     ): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
             status = 200,
+            headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("token_type", JsonPrimitive(response.tokenType))
                 put("access_token", JsonPrimitive(response.accessToken))
                 response.expiresIn?.let { put("expires_in", JsonPrimitive(it)) }
+                response.refreshToken?.let { put("refresh_token", JsonPrimitive(it)) }
+                response.scope?.let { put("scope", JsonPrimitive(it)) }
                 response.extra.forEach { (key, value) ->
                     put(key, value.toJsonElement())
                 }
@@ -412,6 +416,13 @@ class DefaultOAuth2Provider(
         is Array<*> -> buildJsonArray { this@toJsonElement.forEach { add(it.toJsonElement()) } }
         is Map<*, *> -> JsonObject(this.entries.associate { (k, v) -> k.toString() to v.toJsonElement() })
         else -> JsonPrimitive(this.toString())
+    }
+
+    private companion object {
+        val TOKEN_RESPONSE_HEADERS = mapOf(
+            "Cache-Control" to "no-store",
+            "Pragma" to "no-cache",
+        )
     }
 
     override suspend fun createCredentialRequest(

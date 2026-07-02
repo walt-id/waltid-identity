@@ -8,6 +8,7 @@ import id.walt.issuer2.testsupport.apiClient
 import id.walt.issuer2.testsupport.assertBearerAccessToken
 import id.walt.issuer2.testsupport.assertIsoMdlCredentialPayload
 import id.walt.issuer2.testsupport.assertJwtVcJsonCredentialPayload
+import id.walt.issuer2.testsupport.assertRefreshToken
 import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
@@ -51,7 +52,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             server.start()
             val client = server.httpClient()
             try {
-                val scenario = Issuer2CredentialScenarios.universityDegree
+                val scenario = Issuer2CredentialScenarios.openBadgeCredential
                 val walletClientConfig = ClientConfiguration(
                     clientId = "issuer2-keycloak-browser-test",
                     redirectUris = listOf(WALLET_REDIRECT_URI),
@@ -84,10 +85,19 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                val refreshToken = assertRefreshToken(tokenResponse)
+
+                val refreshedTokenResponse = walletFlow.refreshAccessToken(
+                    resolvedOffer = resolvedOffer,
+                    refreshToken = refreshToken,
+                )
+                assertBearerAccessToken(refreshedTokenResponse)
+                val rotatedRefreshToken = assertRefreshToken(refreshedTokenResponse)
+                assertNotEquals(refreshToken, rotatedRefreshToken)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
-                    accessToken = tokenResponse.access_token,
+                    accessToken = refreshedTokenResponse.access_token,
                 )
                 assertJwtVcJsonCredentialPayload(credentialPayload)
                 assertSessionStatus(client, createdOffer.offerId, "SUCCESSFUL")
@@ -141,6 +151,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
@@ -207,6 +218,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
                     code = authorizationCode,
                 )
                 assertBearerAccessToken(tokenResponse)
+                assertRefreshToken(tokenResponse)
 
                 val credentialPayload = walletFlow.requestCredential(
                     resolvedOffer = resolvedOffer,
@@ -230,7 +242,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     @Test
     fun walletAuthorizationRequestRedirectsToExternalLoginWithIssuerState() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
@@ -256,7 +268,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     @Test
     fun walletAuthorizationRequestWithoutIssuerStateCreatesProfileDerivedSession() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
@@ -286,7 +298,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     @Test
     fun offerlessAuthorizationRequestCreatesProfileDerivedSessionFromScope() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
 

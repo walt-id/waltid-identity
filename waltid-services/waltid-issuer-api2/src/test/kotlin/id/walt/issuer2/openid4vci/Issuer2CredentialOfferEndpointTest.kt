@@ -102,7 +102,7 @@ class Issuer2CredentialOfferEndpointTest {
         assertFalse(profiles.isEmpty(), "Expected issuer2 config to expose credential profiles")
 
         val representativeProfiles = listOf(
-            client.getProfile(UNIVERSITY_DEGREE_PROFILE_ID),
+            client.getProfile(OPEN_BADGE_PROFILE_ID),
             client.getProfile(ISO_MDL_PROFILE_ID),
             client.getProfile(ISO_PHOTO_ID_PROFILE_ID),
             client.getProfile(IDENTITY_SD_JWT_PROFILE_ID),
@@ -368,13 +368,13 @@ class Issuer2CredentialOfferEndpointTest {
     fun shouldRejectRuntimeOverridesForAuthorizedOffersWithoutIssuerState() {
         val error = assertFailsWith<IllegalArgumentException> {
             CredentialOfferCreateRequest(
-                profileId = UNIVERSITY_DEGREE_PROFILE_ID,
+                profileId = OPEN_BADGE_PROFILE_ID,
                 authMethod = AuthenticationMethod.AUTHORIZED,
                 issuerStateMode = IssuerStateMode.OMIT,
                 runtimeOverrides = CredentialOfferRuntimeOverrides(
                     credentialData = buildJsonObject {
                         putJsonObject("credentialSubject") {
-                            putJsonObject("degree") {
+                            putJsonObject("achievement") {
                                 put("name", "Computer Science")
                             }
                         }
@@ -789,7 +789,7 @@ class Issuer2CredentialOfferEndpointTest {
                             }
                           },
                           "credential_definition": {
-                            "type": ["VerifiableCredential", "UniversityDegreeCredential"]
+                            "type": ["VerifiableCredential", "OpenBadgeCredential"]
                           }
                         }
                         """.trimIndent()
@@ -831,7 +831,7 @@ class Issuer2CredentialOfferEndpointTest {
         })
         put("type", buildJsonArray {
             add("VerifiableCredential")
-            add("UniversityDegreeCredential")
+            add("OpenBadgeCredential")
         })
         putJsonObject("credentialSubject") {
             put("id", "did:example:holder")
@@ -851,10 +851,10 @@ class Issuer2CredentialOfferEndpointTest {
 
     private fun runtimeOverridesForConfiguredProfile(profileId: String): CredentialOfferRuntimeOverrides? =
         when (profileId) {
-            UNIVERSITY_DEGREE_PROFILE_ID -> CredentialOfferRuntimeOverrides(
+            OPEN_BADGE_PROFILE_ID -> CredentialOfferRuntimeOverrides(
                 credentialData = buildJsonObject {
                     putJsonObject("credentialSubject") {
-                        putJsonObject("degree") {
+                        putJsonObject("achievement") {
                             put("name", "Computer Science")
                         }
                     }
@@ -886,10 +886,10 @@ class Issuer2CredentialOfferEndpointTest {
     }
 
     private companion object {
-        const val PROFILE_ID = "universityDegree"
-        const val CREDENTIAL_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
+        const val PROFILE_ID = "openBadgeCredential"
+        const val CREDENTIAL_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
         const val ISSUER_BASE_URL = "http://localhost/openid4vci"
-        const val UNIVERSITY_DEGREE_PROFILE_ID = "universityDegree"
+        const val OPEN_BADGE_PROFILE_ID = "openBadgeCredential"
         const val ISO_MDL_PROFILE_ID = "isoMdl"
         const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
         const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"

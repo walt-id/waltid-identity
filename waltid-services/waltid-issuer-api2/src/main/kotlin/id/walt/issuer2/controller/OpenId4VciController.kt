@@ -95,7 +95,7 @@ class OpenId4VciController(
             authenticate("auth-oauth") {
                 install(authOAuthInterceptor)
 
-                get("external_login/{internalAuthReq...}", OpenId4VciRoutesDocs.externalLogin()) {
+                get("external_login/{internalAuthReq}", OpenId4VciRoutesDocs.externalLogin()) {
                     // Ktor OAuth redirects to the configured external authorization server.
                 }
 

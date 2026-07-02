@@ -31,10 +31,9 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.jsonObject
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 class OpenId4VpPresentationService(
     private val credentialService: CredentialsService,
     private val unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =

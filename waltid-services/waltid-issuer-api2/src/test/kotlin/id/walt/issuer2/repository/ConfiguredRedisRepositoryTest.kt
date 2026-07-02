@@ -9,12 +9,17 @@ import id.walt.issuer2.domain.IssuanceSession
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPARRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
+import id.walt.issuer2.repository.openid4vci.ConfiguredRefreshTokenRepository
+import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
+import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.TxCode
 import id.walt.openid4vci.repository.authorization.DefaultAuthorizationCodeRecord
 import id.walt.openid4vci.repository.par.DefaultPARRecord
 import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecord
+import id.walt.openid4vci.repository.refresh.DefaultRefreshTokenRecord
+import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -22,9 +27,11 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Instant
 
 @Tag("redis")
 @EnabledIfEnvironmentVariable(named = "ISSUER2_REDIS_HOST", matches = ".+")
@@ -39,11 +46,14 @@ class ConfiguredRedisRepositoryTest {
         val authorizationCodeRepository = ConfiguredAuthorizationCodeRepository()
         val preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository()
         val parRepository = ConfiguredPARRepository()
+        val refreshTokenRepository = ConfiguredRefreshTokenRepository()
 
         val session = testSession(suffix)
         val authorizationCode = testAuthorizationCode(suffix)
         val preAuthorizedCode = testPreAuthorizedCode(suffix)
         val pushedAuthorizationRequest = testPushedAuthorizationRequest(suffix)
+        val refreshToken = testRefreshToken(suffix)
+        val rotatedRefreshToken = testRefreshToken("$suffix-rotated")
 
         try {
             sessionRepository.save(session)
@@ -64,6 +74,15 @@ class ConfiguredRedisRepositoryTest {
                 parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now()),
             )
             assertNull(parRepository.consume(pushedAuthorizationRequest.requestId, Clock.System.now()))
+
+            refreshTokenRepository.save(refreshToken)
+            assertEquals(refreshToken, refreshTokenRepository.get(refreshToken.tokenSignature))
+            assertEquals(
+                refreshToken,
+                refreshTokenRepository.rotate(refreshToken.tokenSignature, rotatedRefreshToken),
+            )
+            assertFalse(refreshTokenRepository.get(refreshToken.tokenSignature)!!.active)
+            assertEquals(rotatedRefreshToken, refreshTokenRepository.get(rotatedRefreshToken.tokenSignature))
         } finally {
             sessionRepository.remove(session.sessionId)
             authorizationCodeRepository.consume(authorizationCode.code)
@@ -148,4 +167,56 @@ class ConfiguredRedisRepositoryTest {
             expiresAt = now.plus(5.minutes),
         )
     }
+
+    private fun testRefreshToken(suffix: String): DefaultRefreshTokenRecord {
+        val refreshTokenExpiresAt = timestampOffset(5.minutes)
+        val session = DefaultSession(
+            subject = "subject",
+            expiresAt = mapOf(
+                TokenType.ACCESS_TOKEN to timestampOffset(5.minutes),
+                TokenType.REFRESH_TOKEN to refreshTokenExpiresAt,
+            ),
+            customAttributes = mapOf("issuance_session_id" to "redis-session-$suffix"),
+        )
+        val client = DefaultClient(
+            id = "wallet-client",
+            redirectUris = listOf("https://wallet.example/callback"),
+            grantTypes = setOf("authorization_code", "refresh_token"),
+            responseTypes = setOf("code"),
+            scopes = setOf("openid"),
+            audience = setOf("issuer2"),
+        )
+        val accessTokenRequest = DefaultAccessTokenRequest(
+            id = "redis-access-token-request-$suffix",
+            requestedAt = timestampOffset(0.minutes),
+            client = client,
+            grantTypes = setOf("authorization_code"),
+            handledGrantTypes = setOf("authorization_code"),
+            requestedScopes = setOf("openid"),
+            grantedScopes = setOf("openid"),
+            requestedAudience = setOf("issuer2"),
+            grantedAudience = setOf("issuer2"),
+            requestForm = mapOf(
+                "grant_type" to listOf("authorization_code"),
+                "client_id" to listOf(client.id),
+            ),
+            session = session,
+            issClaim = "http://localhost",
+        )
+
+        return DefaultRefreshTokenRecord(
+            tokenSignature = "redis-refresh-token-$suffix",
+            active = true,
+            accessTokenRequest = accessTokenRequest,
+            accessTokenSignature = "redis-access-token-$suffix",
+            clientId = client.id,
+            grantedScopes = setOf("openid"),
+            grantedAudience = setOf("issuer2"),
+            session = session,
+            expiresAt = refreshTokenExpiresAt,
+        )
+    }
+
+    private fun timestampOffset(duration: kotlin.time.Duration): Instant =
+        Instant.fromEpochMilliseconds(Clock.System.now().plus(duration).toEpochMilliseconds())
 }

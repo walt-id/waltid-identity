@@ -36,12 +36,9 @@ Libraries for cryptographic operations and key management:
 - **[🟢 waltid-crypto](./crypto/waltid-crypto)**: Multiplatform cryptographic library with support for multiple algorithms and KMS backends
 - **[🟢 waltid-cose](./crypto/waltid-cose)**: CBOR Object Signing and Encryption (COSE) implementation
 - **[🟢 waltid-x509](./crypto/waltid-x509)**: X.509 certificate handling and validation
-- **[🟡 waltid-crypto-android](./crypto/waltid-crypto-android)**: Android-specific cryptographic implementations
-- **[🟡 waltid-crypto-ios](./crypto/waltid-crypto-ios)**: iOS-specific cryptographic implementations
 - **[🟡 waltid-crypto-aws](./crypto/waltid-crypto-aws)**: AWS Key Management Service (KMS) integration
 - **[🟡 waltid-crypto-azure](./crypto/waltid-crypto-azure)**: Azure Key Vault integration for key management and cryptographic operations
 - **[🟡 waltid-crypto-oci](./crypto/waltid-crypto-oci)**: Oracle Cloud Infrastructure (OCI) KMS integration
-- **[🟡 waltid-target-ios](./crypto/waltid-target-ios)**: iOS target support for multiplatform crypto libraries
 
 ### [Credentials](./credentials/)
 
@@ -84,7 +81,6 @@ Libraries implementing identity and credential protocols:
 Libraries for Selective Disclosure JWT (SD-JWT) credentials:
 
 - **[🟢 waltid-sdjwt](./sdjwt/waltid-sdjwt)**: Multiplatform SD-JWT implementation with selective disclosure support
-- **[🟡 waltid-sdjwt-ios](./sdjwt/waltid-sdjwt-ios)**: iOS-specific SD-JWT implementations
 
 ### [Web](./web/)
 
@@ -121,7 +117,7 @@ Most libraries in this directory support multiple platforms:
 - **JavaScript**: Browser and Node.js support
 - **iOS**: Native iOS support (enabled via `enableIosBuild=true` Gradle property)
 
-Platform-specific implementations are provided where needed (e.g., `waltid-crypto-android`, `waltid-crypto-ios`).
+Platform-specific implementations are provided inside the multiplatform modules where needed.
 
 ## Join the community
 
@@ -132,4 +128,3 @@ Platform-specific implementations are provided where needed (e.g., `waltid-crypt
 ## License
 
 Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-

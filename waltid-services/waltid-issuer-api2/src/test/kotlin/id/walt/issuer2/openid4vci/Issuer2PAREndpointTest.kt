@@ -12,6 +12,7 @@ import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerif
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
+import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponseResult
@@ -174,6 +175,7 @@ class Issuer2PAREndpointTest {
             authorizationCodeRepository = ConfiguredAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),
             parRepository = InMemoryPARRepository(),
+            refreshTokenRepository = InMemoryRefreshTokenRepository(),
         ).oauth2Provider
 
     private suspend fun pushAuthorizationRequest(

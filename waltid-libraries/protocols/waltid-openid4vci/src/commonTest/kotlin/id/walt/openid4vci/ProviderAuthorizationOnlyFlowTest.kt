@@ -17,7 +17,7 @@ import id.walt.openid4vci.requests.token.AccessTokenRequestResult
 import id.walt.openid4vci.requests.token.DefaultAccessTokenRequest
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.responses.token.TokenResponseOptions
-import id.walt.openid4vci.tokens.AccessTokenService
+import id.walt.openid4vci.tokens.access.AccessTokenIssuer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
@@ -107,8 +107,8 @@ class ProviderAuthorizationOnlyFlowTest {
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `authorization code access token includes issuance session id from session custom attributes`() = runTest {
-        val tokenService = CapturingTokenService()
-        val config = createTestConfig(accessTokenService = tokenService)
+        val accessTokenIssuer = CapturingTokenIssuer()
+        val config = createTestConfig(accessTokenIssuer = accessTokenIssuer)
         val issuerId = "test-issuer"
         val provider = buildOAuth2Provider(
             config = config,
@@ -140,7 +140,46 @@ class ProviderAuthorizationOnlyFlowTest {
 
         val accessResponse = provider.createAccessTokenResponse(accessRequest)
         assertTrue(accessResponse.isSuccess())
-        assertEquals("session-123", tokenService.lastClaims["issuance_session_id"])
+        assertEquals("session-123", accessTokenIssuer.lastClaims["issuance_session_id"])
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `authorization code token response rejects scopes outside authorization grant`() = runTest {
+        val issuerId = "test-issuer"
+        val provider = buildOAuth2Provider(
+            config = createTestConfig(),
+            includeAuthorizationCodeDefaultHandlers = true,
+            includePreAuthorizedCodeDefaultHandlers = false,
+        )
+
+        val authorizeRequest = (provider.createAuthorizationRequest(
+            mapOf(
+                "response_type" to listOf(ResponseType.CODE.value),
+                "client_id" to listOf("demo-client"),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                "scope" to listOf("openid"),
+            ),
+        ) as AuthorizationRequestResult.Success).request.withIssuer(issuerId)
+        val authorizeResponse = provider.createAuthorizationResponse(
+            authorizeRequest,
+            DefaultSession(subject = "demo-subject"),
+        ) as AuthorizationResponseResult.Success
+
+        val accessRequest = (provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("demo-client"),
+                "code" to listOf(authorizeResponse.response.code),
+                "redirect_uri" to listOf("https://openid4vci.walt.id/callback"),
+                "scope" to listOf("openid email"),
+            ),
+        ) as AccessTokenRequestResult.Success).request.withIssuer(issuerId)
+
+        val accessResponse = provider.createAccessTokenResponse(accessRequest)
+
+        assertTrue(accessResponse is AccessTokenResponseResult.Failure)
+        assertEquals("invalid_scope", accessResponse.error.error)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -553,11 +592,11 @@ class ProviderAuthorizationOnlyFlowTest {
     }
 }
 
-private class CapturingTokenService : AccessTokenService {
+private class CapturingTokenIssuer : AccessTokenIssuer {
     var lastClaims: Map<String, Any?> = emptyMap()
         private set
 
-    override suspend fun createAccessToken(claims: Map<String, Any?>): String {
+    override suspend fun issue(claims: Map<String, Any?>): String {
         lastClaims = claims
         return "captured-access-token"
     }

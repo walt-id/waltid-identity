@@ -35,6 +35,13 @@ spec:
             name: '{{ include "wallet-api.fullname" . }}-api'
             port:
               name: http
+        path: /api.json
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
         path: /livez
         pathType: Prefix
       - backend:
@@ -74,6 +81,13 @@ spec:
             port:
               name: http
         path: /swagger
+        pathType: Prefix
+      - backend:
+          service:
+            name: '{{ include "wallet-api.fullname" . }}-api'
+            port:
+              name: http
+        path: /api.json
         pathType: Prefix
       - backend:
           service:

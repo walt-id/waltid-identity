@@ -7,11 +7,7 @@ plugins {
 group = "id.walt.openid4vc"
 
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
-    applyDefaultHierarchyTemplate()
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
@@ -34,6 +30,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
 
             // walt.id
+            implementation(project(":waltid-libraries:crypto:waltid-cose"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
             implementation(project(":waltid-libraries:credentials:waltid-w3c-credentials"))

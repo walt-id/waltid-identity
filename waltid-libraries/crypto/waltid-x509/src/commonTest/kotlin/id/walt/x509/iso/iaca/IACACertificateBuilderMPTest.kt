@@ -1,10 +1,9 @@
 package id.walt.x509.iso.iaca
 
-import id.walt.crypto.keys.KeyGenerationRequest
-import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
 import id.walt.x509.iso.IsoSharedTestHarnessValidResources
 import id.walt.x509.iso.assertIACABuilderDataEqualsCertificateData
+import id.walt.x509.iso.createIsoTestKey
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -65,12 +64,7 @@ class IACACertificateBuilderMPTest {
             KeyType.RSA4096,
             KeyType.secp256k1,
         ).forEach { invalidKeyType ->
-            val signingKey = KeyManager.createKey(
-                generationRequest = KeyGenerationRequest(
-                    backend = "jwk",
-                    keyType = invalidKeyType,
-                )
-            )
+            val signingKey = createIsoTestKey(invalidKeyType)
 
             assertFails {
                 IsoSharedTestHarnessValidResources.iacaBuilder.build(

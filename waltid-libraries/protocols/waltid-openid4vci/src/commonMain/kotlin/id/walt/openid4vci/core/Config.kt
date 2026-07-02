@@ -10,9 +10,12 @@ import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
+import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.tokens.access.AccessTokenIssuer
+import id.walt.openid4vci.tokens.access.AccessTokenVerifier
+import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
+import id.walt.openid4vci.tokens.refresh.RefreshTokenVerifier
 import id.walt.openid4vci.responses.par.PushedAuthorizationResponse
-import id.walt.openid4vci.tokens.AccessTokenService
-import id.walt.openid4vci.tokens.AccessTokenVerifier
 import id.walt.openid4vci.validation.AccessTokenRequestValidator
 import id.walt.openid4vci.validation.AuthorizationRequestValidator
 import id.walt.openid4vci.validation.CredentialRequestValidator
@@ -47,8 +50,11 @@ data class OAuth2ProviderConfig(
 
     val accessTokenRequestValidator: AccessTokenRequestValidator,
     val tokenEndpointHandlers: TokenEndpointHandlers,
-    val accessTokenService: AccessTokenService,
+    val accessTokenIssuer: AccessTokenIssuer,
     val accessTokenVerifier: AccessTokenVerifier? = null,
+    val refreshTokenIssuer: RefreshTokenIssuer,
+    val refreshTokenVerifier: RefreshTokenVerifier,
+    val refreshTokenRepository: RefreshTokenRepository,
 
     val preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
     val preAuthorizedCodeIssuer: PreAuthorizedCodeIssuer,
