@@ -1,4 +1,4 @@
-package id.walt.openid4vci.clientauth.attestation
+package id.walt.openid4vci.clientauth.attestation.verifier
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64

@@ -113,7 +113,7 @@ class AttestationBasedClientAuthenticationMethodTest {
             ),
         )
         val method = AttestationBasedClientAuthenticationMethod(
-            trustResolver = StaticJwkClientAttestationTrustResolver(attesterKey.getPublicKey()),
+            trustedAttesterKeys = { _, _ -> listOf(attesterKey.getPublicKey()) },
         )
 
         return method.authenticate(

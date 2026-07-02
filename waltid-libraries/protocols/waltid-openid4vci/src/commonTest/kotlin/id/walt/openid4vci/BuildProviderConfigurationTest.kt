@@ -6,11 +6,11 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
-import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
-import id.walt.openid4vci.clientauth.attestation.ClientAttestationVerificationResult
-import id.walt.openid4vci.clientauth.attestation.ClientAttestationVerifier
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationResult
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier
 import id.walt.openid4vci.core.DefaultOAuth2Provider
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.core.OAuth2Provider
@@ -352,7 +352,7 @@ class BuildProviderConfigurationTest {
 
     private class RecordingClientAuthenticationMethod(
         override val name: String,
-    ) : ClientAuthenticationServiceMethod {
+    ) : ClientAuthenticationMethod {
         var calls: Int = 0
             private set
         var lastEndpoint: ClientAuthenticationEndpoint? = null

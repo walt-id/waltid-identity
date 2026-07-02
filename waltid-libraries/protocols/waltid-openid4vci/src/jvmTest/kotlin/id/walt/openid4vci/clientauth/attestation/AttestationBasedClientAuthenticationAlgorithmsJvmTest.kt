@@ -61,7 +61,7 @@ class AttestationBasedClientAuthenticationAlgorithmsJvmTest {
             put("jti", "proof-$now")
         }
         val method = AttestationBasedClientAuthenticationMethod(
-            trustResolver = StaticJwkClientAttestationTrustResolver(attesterKey.getPublicKey()),
+            trustedAttesterKeys = { _, _ -> listOf(attesterKey.getPublicKey()) },
         )
 
         return method.authenticate(

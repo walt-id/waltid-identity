@@ -1,29 +1,21 @@
-package id.walt.openid4vci.clientauth.attestation
+package id.walt.openid4vci.clientauth.attestation.verifier
 
+import id.walt.crypto.keys.Key
 import kotlinx.serialization.json.JsonObject
 
-interface ClientAttestationVerifier {
-    suspend fun verifyAttestationJwt(
-        jwt: String,
+class KeyBasedClientAttestationVerifier(
+    private val trustedAttesterKeys: suspend (
         header: JsonObject,
         payload: JsonObject,
-    ): ClientAttestationVerificationResult
-}
-
-sealed interface ClientAttestationVerificationResult {
-    data object Verified : ClientAttestationVerificationResult
-    data class Rejected(val reason: String? = null) : ClientAttestationVerificationResult
-}
-
-class DefaultClientAttestationVerifier(
-    private val trustResolver: ClientAttestationTrustResolver,
+    ) -> List<Key>,
 ) : ClientAttestationVerifier {
+
     override suspend fun verifyAttestationJwt(
         jwt: String,
         header: JsonObject,
         payload: JsonObject,
     ): ClientAttestationVerificationResult {
-        val trustedKeys = trustResolver.resolveTrustedAttesterKeys(header, payload)
+        val trustedKeys = trustedAttesterKeys(header, payload)
         if (trustedKeys.isEmpty()) {
             return ClientAttestationVerificationResult.Rejected("Client attester is not trusted")
         }

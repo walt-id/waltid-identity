@@ -1,13 +1,17 @@
 package id.walt.openid4vci.clientauth.attestation
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
-import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationResult
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifier
+import id.walt.openid4vci.clientauth.attestation.verifier.KeyBasedClientAttestationVerifier
 import id.walt.openid4vci.clientauth.oauthHeaderValues
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
@@ -23,45 +27,6 @@ import kotlinx.serialization.json.longOrNull
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-class ClientAttestationConfig(
-    private val attestationVerifier: ClientAttestationVerifier,
-    private val acceptedAttestationSigningAlgorithms: Set<String> =
-        ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
-    private val acceptedPopSigningAlgorithms: Set<String> =
-        ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
-    private val clock: () -> Instant = { Clock.System.now() },
-    private val clockSkewSeconds: Long = 60,
-    private val popMaxAgeSeconds: Long = 300,
-) {
-    constructor(
-        trustResolver: ClientAttestationTrustResolver,
-        acceptedAttestationSigningAlgorithms: Set<String> =
-            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
-        acceptedPopSigningAlgorithms: Set<String> =
-            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
-        clock: () -> Instant = { Clock.System.now() },
-        clockSkewSeconds: Long = 60,
-        popMaxAgeSeconds: Long = 300,
-    ) : this(
-        attestationVerifier = DefaultClientAttestationVerifier(trustResolver),
-        acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
-        acceptedPopSigningAlgorithms = acceptedPopSigningAlgorithms,
-        clock = clock,
-        clockSkewSeconds = clockSkewSeconds,
-        popMaxAgeSeconds = popMaxAgeSeconds,
-    )
-
-    internal fun toAuthenticationMethod(): AttestationBasedClientAuthenticationMethod =
-        AttestationBasedClientAuthenticationMethod(
-            attestationVerifier = attestationVerifier,
-            acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
-            acceptedPopSigningAlgorithms = acceptedPopSigningAlgorithms,
-            clock = clock,
-            clockSkewSeconds = clockSkewSeconds,
-            popMaxAgeSeconds = popMaxAgeSeconds,
-        )
-}
-
 class AttestationBasedClientAuthenticationMethod(
     private val attestationVerifier: ClientAttestationVerifier,
     private val acceptedAttestationSigningAlgorithms: Set<String> =
@@ -71,10 +36,13 @@ class AttestationBasedClientAuthenticationMethod(
     private val clock: () -> Instant = { Clock.System.now() },
     private val clockSkewSeconds: Long = 60,
     private val popMaxAgeSeconds: Long = 300,
-) : ClientAuthenticationServiceMethod {
+) : ClientAuthenticationMethod {
 
     constructor(
-        trustResolver: ClientAttestationTrustResolver,
+        trustedAttesterKeys: suspend (
+            header: JsonObject,
+            payload: JsonObject,
+        ) -> List<Key>,
         acceptedAttestationSigningAlgorithms: Set<String> =
             ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
         acceptedPopSigningAlgorithms: Set<String> =
@@ -83,7 +51,7 @@ class AttestationBasedClientAuthenticationMethod(
         clockSkewSeconds: Long = 60,
         popMaxAgeSeconds: Long = 300,
     ) : this(
-        attestationVerifier = DefaultClientAttestationVerifier(trustResolver),
+        attestationVerifier = KeyBasedClientAttestationVerifier(trustedAttesterKeys),
         acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
         acceptedPopSigningAlgorithms = acceptedPopSigningAlgorithms,
         clock = clock,

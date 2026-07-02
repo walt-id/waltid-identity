@@ -1,4 +1,4 @@
-package id.walt.openid4vci.clientauth.attestation
+package id.walt.openid4vci.clientauth.attestation.verifier
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
@@ -7,6 +7,9 @@ import id.walt.crypto.utils.Base64Utils.encodeToBase64
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
+import id.walt.openid4vci.clientauth.attestation.AttestationBasedClientAuthenticationMethod
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationJwtTypes
 import id.walt.x509.CertificateDer
 import id.walt.x509.GenericX509CertificateBuilder
 import id.walt.x509.GenericX509CertificateBundle
