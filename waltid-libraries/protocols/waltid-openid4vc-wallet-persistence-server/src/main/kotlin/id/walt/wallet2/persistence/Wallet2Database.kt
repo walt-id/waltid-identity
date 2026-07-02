@@ -8,8 +8,22 @@ import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import java.io.File
 
 private val log = KotlinLogging.logger {}
+
+private fun ensureSqliteParentDir(jdbcUrl: String) {
+    val prefix = "jdbc:sqlite:"
+    if (!jdbcUrl.startsWith(prefix)) return
+
+    val path = jdbcUrl.removePrefix(prefix).substringBefore('?')
+    if (path.isBlank() || path.startsWith(":")) return // e.g. ":memory:"
+
+    val parent = File(path).absoluteFile.parentFile ?: return
+    if (!parent.exists() && parent.mkdirs()) {
+        log.info { "Created SQLite data directory: $parent" }
+    }
+}
 
 /**
  * HOCON configuration for the wallet2 persistence layer.
@@ -55,6 +69,8 @@ fun initWallet2Database(
     config: Wallet2PersistenceConfig = Wallet2PersistenceConfig()
 ): Database {
     log.info { "Initialising wallet2 database: ${config.jdbcUrl}" }
+
+    ensureSqliteParentDir(config.jdbcUrl)
 
     val hikari = HikariConfig().apply {
         jdbcUrl = config.jdbcUrl
