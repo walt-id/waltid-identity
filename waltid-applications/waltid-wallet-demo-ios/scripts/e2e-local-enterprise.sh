@@ -18,7 +18,6 @@ TENANT_PATH="${ORG}.${TENANT}"
 ISSUER_PROFILE="${ISSUER_PROFILE:-}"
 VERIFIER="${VERIFIER:-verifier2-mobile}"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
-SKIP_IOS_APP_SETUP="${SKIP_IOS_APP_SETUP:-false}"
 
 ATTESTED=false
 PREPARE_ONLY=false
@@ -84,12 +83,6 @@ raise SystemExit(1)
 fi
 
 log "CHECK" "Simulator: $SIMULATOR_ID"
-
-if [ "$SKIP_IOS_APP_SETUP" != "true" ]; then
-  require_e2e_command pod
-  log "SETUP" "Installing CocoaPods dependencies"
-  (cd "$IOSAPP_DIR" && pod install)
-fi
 
 PLIST_DEBUG="$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Info-Debug.plist"
 grep -q "NSAppTransportSecurity" "$PLIST_DEBUG" \

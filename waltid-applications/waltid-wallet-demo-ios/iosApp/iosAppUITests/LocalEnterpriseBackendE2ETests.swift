@@ -8,6 +8,7 @@ import TestHelpers
 ///
 /// This is an E2E test (slow, requires UI automation + local infrastructure) - runs locally only.
 /// Requires: enterprise stack running + ngrok tunnel
+@MainActor
 final class LocalEnterpriseBackendE2ETests: XCTestCase {
     private let backend = LocalEnterpriseBackend()
 
@@ -24,31 +25,31 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         let preparedBackend = try await prepareBackend(config: config)
 
         let app = XCUIApplication()
-        let ui = await WalletE2EUI(app: app)
+        let ui = WalletE2EUI(app: app)
 
         if attested {
             let attestationBaseURL = LocalEnterpriseBackendConfig.attestationBaseURL()
-            await ui.launch(attestation: [
+            ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
                 "ATTESTATION_BEARER_TOKEN": preparedBackend.token,
                 "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
             ])
         } else {
-            await ui.launch()
+            ui.launch()
         }
 
-        let readyStatus = await ui.waitForStatus(
+        let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
             timeout: walletReadyTimeout
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
-        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        await ui.replaceText(in: offerInput, value: preparedBackend.offerURL)
-        await ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: preparedBackend.offerURL)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
-        let receiveStatus = await ui.waitForStatus(
+        let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
@@ -56,11 +57,11 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
 
         XCTAssertFalse(app.staticTexts["No credentials"].exists)
 
-        let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
-        await ui.replaceText(in: presentInput, value: preparedBackend.verifier.bootstrapAuthorizationRequestURL)
-        await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
+        let presentInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        ui.replaceText(in: presentInput, value: preparedBackend.verifier.bootstrapAuthorizationRequestURL)
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
-        let presentStatus = await ui.waitForStatus(
+        let presentStatus = ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
@@ -80,29 +81,29 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         let preparedBackend = try await prepareBackend(config: config)
 
         let app = XCUIApplication()
-        let ui = await WalletE2EUI(app: app)
+        let ui = WalletE2EUI(app: app)
 
         if attested {
             let attestationBaseURL = LocalEnterpriseBackendConfig.attestationBaseURL()
-            await ui.launch(attestation: [
+            ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
                 "ATTESTATION_BEARER_TOKEN": preparedBackend.token,
                 "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
             ])
         } else {
-            await ui.launch()
+            ui.launch()
         }
 
         // Phase 1: Bootstrap + receive
-        let readyStatus = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
+        let readyStatus = ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet not ready: \(readyStatus ?? "nil")")
 
-        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        await ui.replaceText(in: offerInput, value: preparedBackend.offerURL)
-        await ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: preparedBackend.offerURL)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
-        let receiveStatus = await ui.waitForStatus(
+        let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
@@ -116,26 +117,26 @@ final class LocalEnterpriseBackendE2ETests: XCTestCase {
         // Phase 3: Relaunch and verify credentials survived
         if attested {
             let attestationBaseURL = LocalEnterpriseBackendConfig.attestationBaseURL()
-            await ui.launch(attestation: [
+            ui.launch(attestation: [
                 "ATTESTATION_BASE_URL": attestationBaseURL,
                 "ATTESTATION_ATTESTER_PATH": "\(config.tenantPath).client-attester",
                 "ATTESTATION_BEARER_TOKEN": preparedBackend.token,
                 "ATTESTATION_HOST_HEADER": "\(config.organization).enterprise.localhost",
             ])
         } else {
-            await ui.launch()
+            ui.launch()
         }
 
-        let readyAfterRestart = await ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
+        let readyAfterRestart = ui.waitForStatus(prefixes: ["Wallet ready", "Bootstrap failed"], timeout: walletReadyTimeout)
         XCTAssertEqual(readyAfterRestart, "Wallet ready", "Wallet not ready after restart: \(readyAfterRestart ?? "nil")")
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials not persisted — 'No credentials' shown after restart")
 
         // Phase 4: Present from persisted credential
-        let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
-        await ui.replaceText(in: presentInput, value: preparedBackend.verifier.bootstrapAuthorizationRequestURL)
-        await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
+        let presentInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        ui.replaceText(in: presentInput, value: preparedBackend.verifier.bootstrapAuthorizationRequestURL)
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
-        let presentStatus = await ui.waitForStatus(
+        let presentStatus = ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
