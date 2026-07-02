@@ -213,7 +213,7 @@ class ClientAuthenticationServiceTest {
 
     private class RecordingClientAuthenticationMethod(
         override val name: String,
-    ) : ClientAuthenticationServiceMethod {
+    ) : ClientAuthenticationMethod {
         var calls: Int = 0
             private set
 

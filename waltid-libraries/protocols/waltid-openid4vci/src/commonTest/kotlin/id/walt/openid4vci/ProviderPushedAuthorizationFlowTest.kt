@@ -7,7 +7,7 @@ import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
-import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.errors.OAuthErrorCodes
@@ -355,7 +355,7 @@ class ProviderPushedAuthorizationFlowTest {
             "state" to listOf("state-123"),
         )
 
-    private object AcceptingClientSecretPostAuthenticationMethod : ClientAuthenticationServiceMethod {
+    private object AcceptingClientSecretPostAuthenticationMethod : ClientAuthenticationMethod {
         override val name: String = ClientAuthenticationMethods.CLIENT_SECRET_POST
 
         @Suppress("UNUSED_PARAMETER")

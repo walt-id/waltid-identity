@@ -6,7 +6,7 @@ import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
-import id.walt.openid4vci.clientauth.ClientAuthenticationServiceMethod
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.core.buildOAuth2Provider
@@ -563,7 +563,7 @@ private class CapturingTokenService : AccessTokenService {
     }
 }
 
-private object TokenTestClientSecretPostAuthenticationMethod : ClientAuthenticationServiceMethod {
+private object TokenTestClientSecretPostAuthenticationMethod : ClientAuthenticationMethod {
     override val name: String = ClientAuthenticationMethods.CLIENT_SECRET_POST
 
     @Suppress("UNUSED_PARAMETER")

@@ -1,7 +1,7 @@
 package id.walt.openid4vci.clientauth
 
 data class ClientAuthenticationServiceConfig(
-    val methods: List<ClientAuthenticationServiceMethod> = emptyList(),
+    val methods: List<ClientAuthenticationMethod> = emptyList(),
     val methodsByEndpoint: Map<ClientAuthenticationEndpoint, Set<String>> = emptyMap(),
 ) {
     init {
@@ -31,7 +31,7 @@ data class ClientAuthenticationServiceConfig(
         }
     }
 
-    fun withMethod(method: ClientAuthenticationServiceMethod): ClientAuthenticationServiceConfig =
+    fun withMethod(method: ClientAuthenticationMethod): ClientAuthenticationServiceConfig =
         copy(methods = methods + method)
 
     fun withDefaultMethodsByEndpoint(

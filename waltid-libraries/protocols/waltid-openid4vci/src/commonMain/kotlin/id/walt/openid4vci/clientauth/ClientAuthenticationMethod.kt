@@ -2,7 +2,7 @@ package id.walt.openid4vci.clientauth
 
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 
-interface ClientAuthenticationServiceMethod {
+interface ClientAuthenticationMethod {
     val name: String
 
     suspend fun authenticate(
