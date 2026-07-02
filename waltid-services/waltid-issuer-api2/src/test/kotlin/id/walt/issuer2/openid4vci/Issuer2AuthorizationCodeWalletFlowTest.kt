@@ -52,7 +52,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
             server.start()
             val client = server.httpClient()
             try {
-                val scenario = Issuer2CredentialScenarios.universityDegree
+                val scenario = Issuer2CredentialScenarios.openBadgeCredential
                 val walletClientConfig = ClientConfiguration(
                     clientId = "issuer2-keycloak-browser-test",
                     redirectUris = listOf(WALLET_REDIRECT_URI),
@@ -242,7 +242,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     @Test
     fun walletAuthorizationRequestRedirectsToExternalLoginWithIssuerState() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
@@ -268,7 +268,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     @Test
     fun walletAuthorizationRequestWithoutIssuerStateCreatesProfileDerivedSession() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)
@@ -298,7 +298,7 @@ class Issuer2AuthorizationCodeWalletFlowTest {
 
     @Test
     fun offerlessAuthorizationRequestCreatesProfileDerivedSessionFromScope() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
 

@@ -79,7 +79,7 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             credentialData = buildJsonObject {
                 putJsonObject("credentialSubject") {
-                    putJsonObject("degree") {
+                    putJsonObject("achievement") {
                         put("name", "Computer Science")
                     }
                 }
@@ -99,8 +99,8 @@ object Issuer2RequestExamples {
         runtimeOverrides = CredentialOfferRuntimeOverrides(
             selectiveDisclosure = SDMap.generateSDMap(
                 listOf(
-                    "credentialSubject.degree.type",
-                    "credentialSubject.degree.name",
+                    "credentialSubject.achievement.type",
+                    "credentialSubject.achievement.name",
                 )
             ),
         ),
@@ -246,10 +246,10 @@ object Issuer2RequestExamples {
             )
         ).toUrl()
 
-    private const val W3C_PROFILE_ID = "universityDegree"
+    private const val W3C_PROFILE_ID = "openBadgeCredential"
     private const val MDOC_PHOTO_ID_PROFILE_ID = "isoPhotoId"
     private const val MDOC_MDL_PROFILE_ID = "isoMdl"
-    private const val W3C_CREDENTIAL_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
+    private const val W3C_CREDENTIAL_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
     private const val EXAMPLE_CREDENTIAL_ISSUER = "http://localhost:7002/openid4vci"
     private const val EXAMPLE_OFFER_ID = "018f8d6e-8df4-7b73-9f3d-f3df21a4374a"
     private const val EXAMPLE_EXPIRES_AT = 1_739_000_000_000
