@@ -40,9 +40,9 @@ internal class MobileDemoWallet(
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {
         WalletAttestationConfig(
-            enterpriseBaseUrl = it,
+            baseUrl = it,
             attesterPath = attestationAttesterPath,
             bearerToken = attestationBearerToken,
-            enterpriseHostHeader = attestationHostHeader,
+            hostHeader = attestationHostHeader,
         )
     }

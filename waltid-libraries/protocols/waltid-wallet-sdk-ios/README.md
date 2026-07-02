@@ -9,6 +9,7 @@ generated bridge symbols behind the package implementation.
 ## Status
 
 - Minimum iOS version: 15.4
+- Runtime platform: iOS only
 - Public API style: `async`/`await`, `Sendable` values, typed `WalletError`
 - Documentation: DocC catalog in `Sources/WaltIDWalletSDK/Documentation.docc`
 - Local binary dependency: `WaltIDWalletCore.xcframework`

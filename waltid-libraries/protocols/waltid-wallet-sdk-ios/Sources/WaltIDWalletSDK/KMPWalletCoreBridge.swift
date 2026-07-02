@@ -144,10 +144,10 @@ private extension WalletConfiguration {
 private extension WalletAttestationConfiguration {
     func toKMPAttestationConfiguration() -> WalletBridgeAttestationConfiguration {
         WalletBridgeAttestationConfiguration(
-            enterpriseBaseUrl: enterpriseBaseURL,
+            baseUrl: baseURL,
             attesterPath: attesterPath,
             bearerToken: bearerToken,
-            enterpriseHostHeader: enterpriseHostHeader
+            hostHeader: hostHeader
         )
     }
 }
