@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "WaltidWalletSDK",
     platforms: [
-        .iOS(.v15),
+        .iOS("15.4"),
         .macOS(.v10_15),
     ],
     products: [
