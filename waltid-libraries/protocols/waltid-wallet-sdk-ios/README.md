@@ -52,17 +52,18 @@ let presentation = try await client.present(
 )
 ```
 
-## Sample Consumer
+## Native iOS Consumer
 
-The minimal SwiftPM/XCFramework consumer fixture lives at:
+The native iOS consumer proof lives in the existing demo app:
 
 ```text
-waltid-applications/waltid-wallet-sdk-ios-sample
+waltid-applications/waltid-wallet-demo-ios
 ```
 
-The existing `waltid-wallet-demo-ios` app remains the richer product demo. Its
-KMP `shared` bridge delegates to the same `WalletSdkBridge` boundary used by
-this package.
+That app imports `WaltidWalletSDK` directly from SwiftUI and exercises the same
+Swift package boundary a native iOS integrator would use. The separate Compose
+Multiplatform demo remains the KMP/Compose consumer proof and uses its generated
+Kotlin `sharedUI` framework instead of routing through this Swift facade.
 
 ## Publishing Follow-up
 
