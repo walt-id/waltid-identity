@@ -21,15 +21,17 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.datetime)
         }
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+            implementation(identityLibs.kotlinx.coroutines.test)
+        }
         if (enableAndroidBuild) {
             androidMain.dependencies {
                 implementation(identityLibs.sqldelight.android.driver)
-                api(project(":waltid-libraries:crypto:waltid-crypto-android"))
             }
         }
         if (enableIosBuild) {
             iosMain.dependencies {
-                api(project(":waltid-libraries:crypto:waltid-crypto-ios"))
                 implementation(identityLibs.sqldelight.native.driver)
             }
         }

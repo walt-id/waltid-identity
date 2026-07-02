@@ -10,7 +10,7 @@ import TestHelpers
 /// against the public EUDI test backend.
 ///
 /// These are integration tests (not E2E UI tests) - they test the library directly
-/// without UI automation. Run on every PR for fast feedback.
+/// without UI automation.
 final class MobileWalletIntegrationTests: XCTestCase {
 
     private let testWalletId = "ios-unit-test-wallet"

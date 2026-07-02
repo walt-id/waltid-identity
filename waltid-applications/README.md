@@ -97,17 +97,10 @@ Android sample project for key generation, DID creation, signing, and verificati
 
 **Use when:** You need the legacy Android crypto/sample app while it is still available, or you are migrating existing Android sample usage to the Compose wallet demo.
 
+<br />
+<br />
+
 ### Test Applications
-
-### [🟡 waltid-crypto-ios-testApp](./waltid-crypto-ios-testApp)
-iOS test application for crypto library. Demonstrates cryptographic operations and key management on iOS.
-
-**Use when:** You need to test iOS cryptographic functionality or understand iOS crypto integration.
-
-### [🟡 waltid-openid4vc-ios-testApp](./waltid-openid4vc-ios-testApp)
-iOS test application for OpenID4VC library. Demonstrates OpenID4VC flows and credential operations on iOS.
-
-**Use when:** You need to test OpenID4VC functionality on iOS or understand iOS protocol integration.
 
 ### [🟢 waltid-digital-credentials](./waltid-digital-credentials)
 Standalone web test app for validating the Digital Credentials API flow directly against verifier endpoints. Provides a user-friendly interface for testing and debugging DC API verification flows.
