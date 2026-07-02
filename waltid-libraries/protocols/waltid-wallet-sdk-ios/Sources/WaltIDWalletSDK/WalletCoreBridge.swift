@@ -1,5 +1,6 @@
 import Foundation
 
+@available(macOS 10.15, *)
 protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
@@ -9,6 +10,7 @@ protocol WalletCoreBridge: Sendable {
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
 }
 
+@available(macOS 10.15, *)
 enum DefaultWalletCoreBridgeFactory {
     static func makeBridge(configuration: WalletConfiguration) throws -> any WalletCoreBridge {
         #if canImport(WaltIDWalletCore) && os(iOS)
@@ -19,6 +21,7 @@ enum DefaultWalletCoreBridgeFactory {
     }
 }
 
+@available(macOS 10.15, *)
 struct UnavailableWalletCoreBridge: WalletCoreBridge {
     var events: AsyncStream<WalletEvent> {
         AsyncStream { continuation in

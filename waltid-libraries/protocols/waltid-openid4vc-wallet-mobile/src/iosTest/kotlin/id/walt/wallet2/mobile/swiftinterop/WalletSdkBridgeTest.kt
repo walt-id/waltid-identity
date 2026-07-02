@@ -126,10 +126,10 @@ class WalletSdkBridgeTest {
                 walletId = "consumer-wallet",
                 defaultKeyType = WalletBridgeKeyType.Ed25519,
                 attestation = WalletBridgeAttestationConfiguration(
-                    enterpriseBaseUrl = "https://enterprise.example",
+                    baseUrl = "https://attestation.example",
                     attesterPath = "/wallet-attestation",
                     bearerToken = "token",
-                    enterpriseHostHeader = "enterprise.example",
+                    hostHeader = "attestation.example",
                 ),
             )
         )
@@ -137,10 +137,10 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
         assertEquals(KeyType.Ed25519, capturedConfig?.defaultKeyType)
-        assertEquals("https://enterprise.example", capturedConfig?.attestationConfig?.enterpriseBaseUrl)
+        assertEquals("https://attestation.example", capturedConfig?.attestationConfig?.baseUrl)
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
-        assertEquals("enterprise.example", capturedConfig?.attestationConfig?.enterpriseHostHeader)
+        assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
 
         val credentials = result.value.credentials()
         assertIs<WalletBridgeResult.Success<List<WalletBridgeCredential>>>(credentials)
