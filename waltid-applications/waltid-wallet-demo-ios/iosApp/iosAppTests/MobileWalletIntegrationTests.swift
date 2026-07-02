@@ -1,11 +1,11 @@
 import XCTest
 @testable import iosApp
-import shared
 import TestHelpers
+import WaltidWalletSDK
 
 /// iOS integration tests for the mobile wallet library.
 ///
-/// Tests the WalletDemoBridgeController (iOS bridge to the KMP mobile wallet).
+/// Tests the Swift package facade that iOS apps consume directly.
 /// Uses real iOS Keychain crypto, SQLDelight persistence, and OID4VCI/VP protocol
 /// against the public EUDI test backend.
 ///
@@ -50,64 +50,60 @@ final class MobileWalletIntegrationTests: XCTestCase {
         // This is acceptable for tests (keychain clears between simulator resets).
     }
 
-    private func makeController() -> WalletDemoBridgeController {
-        WalletDemoBridgeController(
-            walletId: testWalletId,
-            attestationBaseUrl: nil,
-            attestationAttesterPath: nil,
-            attestationBearerToken: nil,
-            attestationHostHeader: nil
+    private func makeClient() async throws -> WalletClient {
+        try await WalletClient(
+            configuration: WalletConfiguration(walletID: testWalletId)
         )
     }
 
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
     func testBootstrapCreatesKeyAndDid() async throws {
-        let controller = makeController()
+        let client = try await makeClient()
 
-        let result = try await controller.bootstrap()
+        let result = try await client.bootstrap()
 
-        XCTAssertTrue(result.success, "bootstrap should succeed")
-        XCTAssertTrue(result.message.starts(with: "did:"), "DID should start with 'did:', got: \(result.message)")
+        XCTAssertTrue(result.did.starts(with: "did:"), "DID should start with 'did:', got: \(result.did)")
     }
 
     func testReceiveCredentialFromEudi() async throws {
-        let controller = makeController()
-        _ = try await controller.bootstrap()
+        let client = try await makeClient()
+        _ = try await client.bootstrap()
 
         let offer = try await EudiTestBackend.shared.generateOffer()
-        let result = try await controller.receiveCredential(offerUrl: offer.offerUrl)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await client.receive(offer: offerURL)
 
-        XCTAssertTrue(result.success, "Should receive credential: \(result.message)")
-        XCTAssertTrue(result.message.contains("Received"), "Message should confirm receipt: \(result.message)")
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
     }
 
     // EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168
     func skip_testReceiveAndPresentFullFlow() async throws {
-        let controller = makeController()
+        let client = try await makeClient()
 
-        let bootstrapResult = try await controller.bootstrap()
-        XCTAssertTrue(bootstrapResult.success, "Bootstrap should succeed")
-        let did = bootstrapResult.message // DID is returned in the message
+        let bootstrapResult = try await client.bootstrap()
+        let did = bootstrapResult.did
 
         let offer = try await EudiTestBackend.shared.generateOffer()
-        let receiveResult = try await controller.receiveCredential(offerUrl: offer.offerUrl)
-        XCTAssertTrue(receiveResult.success, "Should receive credential: \(receiveResult.message)")
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await client.receive(offer: offerURL)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
-        let credentials = try await controller.listCredentials()
+        let credentials = try await client.credentials()
         XCTAssertFalse(credentials.isEmpty, "Should have stored credentials")
 
         let credentialId = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
         let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: credentialId)
+        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
 
-        let presentResult = try await controller.presentCredential(
-            requestUrl: transaction.authorizationRequestUri,
+        let presentResult = try await client.present(
+            request: presentationURL,
             did: did
         )
 
         XCTAssertTrue(
             presentResult.success,
-            "Presentation should succeed. Credentials: \(credentials), Result: \(presentResult.message)"
+            "Presentation should succeed. Credentials: \(credentials), Result: \(presentResult)"
         )
 
         // Wait for verifier to confirm receipt
@@ -116,35 +112,35 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     // EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168
     func skip_testCredentialPersistsAcrossControllerRecreation() async throws {
-        let controller1 = makeController()
+        let client1 = try await makeClient()
 
-        let bootstrapResult = try await controller1.bootstrap()
-        XCTAssertTrue(bootstrapResult.success, "Bootstrap should succeed")
-        let did = bootstrapResult.message
+        let bootstrapResult = try await client1.bootstrap()
+        let did = bootstrapResult.did
 
         let offer = try await EudiTestBackend.shared.generateOffer()
-        let receiveResult = try await controller1.receiveCredential(offerUrl: offer.offerUrl)
-        XCTAssertTrue(receiveResult.success, "Should receive credential: \(receiveResult.message)")
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await client1.receive(offer: offerURL)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
-        // Recreate controller (simulates app restart)
-        let controller2 = makeController()
+        // Recreate client (simulates app restart)
+        let client2 = try await makeClient()
 
-        _ = try await controller2.bootstrap()
-        let credentials = try await controller2.listCredentials()
+        _ = try await client2.bootstrap()
+        let credentials = try await client2.credentials()
         XCTAssertFalse(credentials.isEmpty, "Credentials should persist across controller recreation")
 
         let credentialId = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
         let transaction = try await EudiTestBackend.shared.createVerifierTransaction(credentialId: credentialId)
+        let presentationURL = try XCTUnwrap(URL(string: transaction.authorizationRequestUri))
 
-        // Pass the did parameter
-        let presentResult = try await controller2.presentCredential(
-            requestUrl: transaction.authorizationRequestUri,
+        let presentResult = try await client2.present(
+            request: presentationURL,
             did: did
         )
 
         XCTAssertTrue(
             presentResult.success,
-            "Should present from persisted credentials. Credentials: \(credentials), Result: \(presentResult.message)"
+            "Should present from persisted credentials. Credentials: \(credentials), Result: \(presentResult)"
         )
 
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)

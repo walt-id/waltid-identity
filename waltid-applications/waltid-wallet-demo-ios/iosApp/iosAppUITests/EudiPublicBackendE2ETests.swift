@@ -7,6 +7,7 @@ import TestHelpers
 /// Uses XCUIApplication for UI interaction and TestHelpers for backend operations.
 ///
 /// This is an E2E test (slow, requires UI automation) - runs nightly or on-demand.
+@MainActor
 final class EudiPublicBackendE2ETests: XCTestCase {
     private let backend = EudiPublicBackend()
 
@@ -25,31 +26,31 @@ final class EudiPublicBackendE2ETests: XCTestCase {
         }
 
         let app = XCUIApplication()
-        let ui = await WalletE2EUI(app: app)
-        await ui.launch()
+        let ui = WalletE2EUI(app: app)
+        ui.launch()
 
-        let readyStatus = await ui.waitForStatus(
+        let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
             timeout: walletReadyTimeout
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
-        let offerInput = await ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
-        await ui.replaceText(in: offerInput, value: offerURL)
-        await ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: offerURL)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
 
-        let receiveStatus = await ui.waitForStatus(
+        let receiveStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
         let verifier = try await backend.createVerifierTransaction(credentialID: config.credentialID)
-        let presentInput = await ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
-        await ui.replaceText(in: presentInput, value: verifier.authorizationRequestURI)
-        await ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
+        let presentInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        ui.replaceText(in: presentInput, value: verifier.authorizationRequestURI)
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
-        let presentStatus = await ui.waitForStatus(
+        let presentStatus = ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )

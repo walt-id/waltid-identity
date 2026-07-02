@@ -136,7 +136,6 @@ val modules = listOfNotNull(
     "$applications:waltid-wallet-demo-compose:webApp" whenEnabled enableWalletDemoComposeWeb,
 
     "$applications:waltid-wallet-demo-ios" whenEnabled enableIosBuild,
-    "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )
 
 include(*modules.distinct().toTypedArray())
