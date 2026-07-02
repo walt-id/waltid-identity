@@ -65,21 +65,11 @@ runs:
       shell: bash
       run: ./gradlew iosSimulatorArm64Test
 
-    - name: Compile wallet modules for iOS
+    - name: Assemble Swift wallet SDK core XCFramework
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:compileKotlinIosSimulatorArm64
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:compileKotlinIosSimulatorArm64
-        ./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:syncFramework \
-          -Pkotlin.native.cocoapods.platform=iphonesimulator \
-          -Pkotlin.native.cocoapods.archs="arm64" \
-          -Pkotlin.native.cocoapods.configuration=Debug
-
-    - name: Install CocoaPods for iOS app
-      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
-      shell: bash
-      run: pod install
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWaltidWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
       id: resolve-simulator
