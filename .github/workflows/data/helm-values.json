@@ -186,7 +186,7 @@
         {
           "secretName": "wallet-tls-secret",
           "hosts": [
-            "web-wallet.test.waltid.cloud",
+            "wallet-dev.test.waltid.cloud",
             "wallet.test.waltid.cloud"
           ]
         }
