@@ -8,11 +8,15 @@ struct ReceiveView: View {
             Text("Receive")
                 .font(.headline)
 
-            TextField("Credential offer URL", text: $viewModel.offerUrl, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
+            TextEditor(text: $viewModel.offerUrl)
+                .font(.footnote.monospaced())
+                .frame(minHeight: 72, maxHeight: 96)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(.separator), lineWidth: 1)
+                )
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
-                .lineLimit(3)
                 .accessibilityIdentifier("wallet.offerInput")
 
             Button("Receive") {

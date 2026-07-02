@@ -19,10 +19,11 @@ struct WalletDemoIosApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationStack {
+            NavigationView {
                 ContentView(viewModel: viewModel)
                     .navigationTitle("walt.id Wallet")
             }
+            .navigationViewStyle(.stack)
             .tint(.waltBlue)
             .onOpenURL { url in
                 viewModel.handleDeepLink(url)
