@@ -1,8 +1,8 @@
 # WaltidWalletSDKSample
 
-Minimal iOS consumer app for the local `WaltidWalletSDK` Swift package.
+Minimal iOS consumer fixture for the local `WaltidWalletSDK` Swift package.
 
-This sample exists as a consumer proof for WAL-1065:
+This sample exists as a pure SwiftPM consumer proof for WAL-1065. It is not a replacement for `waltid-wallet-demo-ios`; the existing demo app remains the product demo and its shared bridge now delegates to the WAL-1065 `WalletSdkBridge` boundary.
 
 - `WaltidWalletSDKSamplePackage` depends on `../../../waltid-libraries/protocols/waltid-wallet-sdk-ios`.
 - The feature view imports `WaltidWalletSDK`.

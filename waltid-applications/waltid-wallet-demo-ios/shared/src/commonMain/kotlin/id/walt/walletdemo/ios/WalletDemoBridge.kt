@@ -1,9 +1,13 @@
 package id.walt.walletdemo.ios
 
-import id.walt.wallet2.mobile.MobileWalletConfig
-import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.MobileWallet
-import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.mobile.iosbridge.WalletBridgeAttestationConfiguration
+import id.walt.wallet2.mobile.iosbridge.WalletBridgeBootstrapResult
+import id.walt.wallet2.mobile.iosbridge.WalletBridgeConfiguration
+import id.walt.wallet2.mobile.iosbridge.WalletBridgeCredential
+import id.walt.wallet2.mobile.iosbridge.WalletBridgePresentationResult
+import id.walt.wallet2.mobile.iosbridge.WalletBridgeResult
+import id.walt.wallet2.mobile.iosbridge.WalletSdkBridge
+import id.walt.wallet2.mobile.iosbridge.WalletSdkBridgeFactory
 
 data class BridgeCredential(
     val id: String,
@@ -18,33 +22,34 @@ data class BridgeOperationResult(
     val message: String,
 )
 
-class WalletDemoBridgeController(
-    walletId: String = "default",
-    attestationBaseUrl: String? = null,
-    attestationAttesterPath: String? = null,
-    attestationBearerToken: String? = null,
-    attestationHostHeader: String? = null,
+class WalletDemoBridgeController private constructor(
+    private val operationsResult: Result<WalletDemoBridgeOperations>,
 ) {
-    private val clientResult = runCatching {
-        MobileWalletFactory().create(
-            MobileWalletConfig(
-                walletId = walletId,
-                attestationConfig = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
-                    WalletAttestationConfig(
-                        enterpriseBaseUrl = it,
-                        attesterPath = attestationAttesterPath ?: "",
-                        bearerToken = attestationBearerToken ?: "",
-                        enterpriseHostHeader = attestationHostHeader ?: "",
-                    )
-                },
-            )
-        )
-    }
+    constructor(
+        walletId: String = "default",
+        attestationBaseUrl: String? = null,
+        attestationAttesterPath: String? = null,
+        attestationBearerToken: String? = null,
+        attestationHostHeader: String? = null,
+    ) : this(
+        operationsResult = runCatching {
+            val bridge = WalletSdkBridgeFactory().create(
+                WalletBridgeConfiguration(
+                    walletId = walletId,
+                    attestation = attestationBaseUrl?.takeIf { it.isNotBlank() }?.let {
+                        WalletBridgeAttestationConfiguration(
+                            enterpriseBaseUrl = it,
+                            attesterPath = attestationAttesterPath ?: "",
+                            bearerToken = attestationBearerToken ?: "",
+                            enterpriseHostHeader = attestationHostHeader ?: "",
+                        )
+                    },
+                )
+            ).successOrThrow()
 
-    private val client: MobileWallet
-        get() = clientResult.getOrThrow()
-
-    private var did = ""
+            SdkWalletDemoBridgeOperations(bridge)
+        }
+    )
 
     constructor(
         attestationBaseUrl: String? = null,
@@ -59,13 +64,20 @@ class WalletDemoBridgeController(
         attestationHostHeader = attestationHostHeader,
     )
 
+    internal constructor(operations: WalletDemoBridgeOperations) : this(Result.success(operations))
+
+    private val operations: WalletDemoBridgeOperations
+        get() = operationsResult.getOrThrow()
+
+    private var did = ""
+
     suspend fun bootstrap(): BridgeOperationResult {
         if (did.isNotBlank()) {
             return BridgeOperationResult(success = true, message = did)
         }
 
         return try {
-            val result = client.bootstrap()
+            val result = operations.bootstrap().successOrThrow()
             did = result.did
             BridgeOperationResult(success = true, message = result.did)
         } catch (e: Throwable) {
@@ -75,7 +87,7 @@ class WalletDemoBridgeController(
 
     suspend fun receiveCredential(offerUrl: String): BridgeOperationResult {
         return try {
-            val ids = client.receive(offerUrl = offerUrl)
+            val ids = operations.receiveCredential(offerUrl = offerUrl).successOrThrow()
             BridgeOperationResult(success = true, message = "Received ${ids.size} credential(s)")
         } catch (e: Throwable) {
             BridgeOperationResult(success = false, message = "Receive failed: ${e.message ?: e::class.simpleName}")
@@ -84,7 +96,7 @@ class WalletDemoBridgeController(
 
     suspend fun listCredentials(): List<BridgeCredential> =
         try {
-            client.credentials().map { credential ->
+            operations.listCredentials().successOrThrow().map { credential ->
                 BridgeCredential(
                     id = credential.id,
                     format = credential.format,
@@ -100,7 +112,7 @@ class WalletDemoBridgeController(
 
     suspend fun presentCredential(requestUrl: String, did: String? = null): BridgeOperationResult {
         return try {
-            val result = client.present(requestUrl = requestUrl, did = did)
+            val result = operations.presentCredential(requestUrl = requestUrl, did = did).successOrThrow()
             BridgeOperationResult(
                 success = result.success,
                 message = if (result.success) "Presentation sent" else "Presentation finished without verifier confirmation",
@@ -110,3 +122,42 @@ class WalletDemoBridgeController(
         }
     }
 }
+
+internal interface WalletDemoBridgeOperations {
+    suspend fun bootstrap(): WalletBridgeResult<WalletBridgeBootstrapResult>
+
+    suspend fun receiveCredential(offerUrl: String): WalletBridgeResult<List<String>>
+
+    suspend fun listCredentials(): WalletBridgeResult<List<WalletBridgeCredential>>
+
+    suspend fun presentCredential(
+        requestUrl: String,
+        did: String?,
+    ): WalletBridgeResult<WalletBridgePresentationResult>
+}
+
+private class SdkWalletDemoBridgeOperations(
+    private val bridge: WalletSdkBridge,
+) : WalletDemoBridgeOperations {
+    override suspend fun bootstrap(): WalletBridgeResult<WalletBridgeBootstrapResult> =
+        bridge.bootstrap()
+
+    override suspend fun receiveCredential(offerUrl: String): WalletBridgeResult<List<String>> =
+        bridge.receive(offerUrl = offerUrl)
+
+    override suspend fun listCredentials(): WalletBridgeResult<List<WalletBridgeCredential>> =
+        bridge.credentials()
+
+    override suspend fun presentCredential(
+        requestUrl: String,
+        did: String?,
+    ): WalletBridgeResult<WalletBridgePresentationResult> =
+        bridge.present(requestUrl = requestUrl, did = did)
+}
+
+private fun <T> WalletBridgeResult<T>.successOrThrow(): T = when (this) {
+    is WalletBridgeResult.Success -> value
+    is WalletBridgeResult.Failure -> throw WalletDemoBridgeException(error.message)
+}
+
+private class WalletDemoBridgeException(message: String) : RuntimeException(message)
