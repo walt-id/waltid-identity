@@ -50,6 +50,8 @@ class Issuer2Module(
         metadataConfig = metadataConfig,
         profileService = credentialProfileService,
         sessionService = issuanceSessionService,
+        preAuthorizedGrantAnonymousAccessSupported =
+            openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
     )
 
     private val credentialOfferService = CredentialOfferService(
