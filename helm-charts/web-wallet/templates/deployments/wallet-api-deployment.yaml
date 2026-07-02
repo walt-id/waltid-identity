@@ -14,7 +14,7 @@ spec:
         app: wallet-api
         {{- include "wallet-api.selectorLabels" . | nindent 8 }}
       annotations:
-        deployment/id: _DEFAULT_DEPLOYMENT_
+        deployment/id: {{ .Values.global.deploymentId | default "unset" | quote }}
     spec:
       securityContext:
         fsGroup: 10001

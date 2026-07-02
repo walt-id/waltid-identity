@@ -79,6 +79,7 @@ jobs:
         run: |
           helm upgrade --install waltid-helm-release ./helm-charts/waltid \
             --namespace ${{ inputs.namespace }} \
+            --set-string global.deploymentId=${{ github.sha }} \
             -f helm-values.json
       - name: Add deployment URLs to summary
         run: |

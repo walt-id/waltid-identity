@@ -16,7 +16,7 @@ spec:
         app: {{ include "common.name" . }}
         {{- include "common.labels" . | nindent 8 }}
       annotations:
-        deployment/id: _DEFAULT_DEPLOYMENT_
+        deployment/id: {{ .Values.global.deploymentId | default "unset" | quote }}
     spec:
       securityContext:
         runAsNonRoot: true
