@@ -48,6 +48,6 @@ fun Application.oidcAuthRoutes() = webWalletRoute {
 
             call.respond(oidcSession.token)
         }
+        OidcLogoutController().routes("logout-oidc")(this)
     }
-    OidcLogoutController().routes("logout-oidc")
 }

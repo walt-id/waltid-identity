@@ -25,8 +25,8 @@ fun Application.keycloakAuthRoutes() = webWalletRoute {
             val accessToken = KeycloakAccountStrategy.getAccessToken()
             call.respond(accessToken)
         }
+        KeycloakLoginController().routes("login").invoke(this)
+        KeycloakRegisterController().routes("create")(this)
+        KeycloakLogoutController().routes("logout")(this)
     }
-    KeycloakLoginController().routes("login").invoke(this)
-    KeycloakRegisterController().routes("create")(this)
-    KeycloakLogoutController().routes("logout")(this)
 }
