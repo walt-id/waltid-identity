@@ -2,6 +2,7 @@ package id.walt.crypto.keys.aws
 
 import aws.sdk.kotlin.services.kms.KmsClient
 import aws.sdk.kotlin.services.kms.model.*
+import id.walt.crypto.exceptions.KeyAlreadyExistsException
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.exceptions.SigningException
 import id.walt.crypto.keys.*
@@ -31,6 +32,7 @@ class AWSKey(
     private var _keyType: KeyType? = null,
 ) : Key() {
 
+    @Transient
     private val log = KotlinLogging.logger { }
 
     @Transient
@@ -368,15 +370,35 @@ $encodedPk
             val keyId = response.keyMetadata?.keyId
                 ?: throw IllegalStateException("Key ID not returned by AWS KMS")
 
-            // Create alias if keyName is specified
+            // Create alias if keyName is specified, with rollback on failure
             config.keyName?.let { keyName ->
-                KmsClient { region = config.auth.region }.use { kms ->
-                    kms.createAlias(
-                        CreateAliasRequest {
-                            aliasName = "alias/$keyName"
-                            targetKeyId = keyId
-                        }
-                    )
+                try {
+                    KmsClient { region = config.auth.region }.use { kms ->
+                        kms.createAlias(
+                            CreateAliasRequest {
+                                aliasName = "alias/$keyName"
+                                targetKeyId = keyId
+                            }
+                        )
+                    }
+                } catch (e: AlreadyExistsException) {
+                    // Rollback: schedule key deletion since alias already exists
+                    KmsClient { region = config.auth.region }.use { kms ->
+                        kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
+                            this.keyId = keyId
+                            pendingWindowInDays = 7
+                        })
+                    }
+                    throw KeyAlreadyExistsException(keyName, cause = e)
+                } catch (e: Exception) {
+                    // Rollback: schedule key deletion on any alias creation failure
+                    KmsClient { region = config.auth.region }.use { kms ->
+                        kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
+                            this.keyId = keyId
+                            pendingWindowInDays = 7
+                        })
+                    }
+                    throw e
                 }
             }
 
