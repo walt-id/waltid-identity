@@ -41,6 +41,7 @@ kotlin {
             implementation(identityLibs.kotlinx.io.core)
             implementation(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.whyoleg.cryptography.random)
 
         }
         commonTest.dependencies {

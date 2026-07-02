@@ -9,10 +9,8 @@ class IosPlatformKeyProvider(
     private val useSecureElement: Boolean = true,
 ) : PlatformKeyProvider {
 
-    override val supportedHardwareKeyTypes: Set<KeyType> =
-        setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA)
-
-    override val isHardwareBackingAvailable: Boolean = true
+    override val supportedPlatformKeyTypes: Set<KeyType> =
+        PlatformKeyProvider.DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES
 
     override suspend fun generateKey(keyType: KeyType, keyId: String?): Key {
         val kid = keyId ?: Uuid.random().toString()
@@ -21,7 +19,11 @@ class IosPlatformKeyProvider(
             keyType = keyType,
             inSecureElement = useSecureElement && keyType == KeyType.secp256r1,
         )
-        return IosKey.create(options)
+        return if (isPlatformBacked(keyType)) {
+            IosKey.Platform.create(options)
+        } else {
+            IosKey.Software.create(options)
+        }
     }
 
     override suspend fun loadKey(keyId: String, keyType: KeyType): Key? = runCatching {
@@ -30,10 +32,21 @@ class IosPlatformKeyProvider(
             keyType = keyType,
             inSecureElement = useSecureElement && keyType == KeyType.secp256r1,
         )
-        IosKey.load(options)
+        IosKey.Platform.load(options)
     }.getOrNull()
 
+    override suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key? = runCatching {
+        IosKey.Software.load(IosKey.Options(kid = keyId, keyType = keyType), jwkMaterial)
+    }.getOrNull()
+
+    override suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray {
+        require(key is IosKey.Software) { "Can only export material from Software keys" }
+        return IosKey.Software.exportKeyMaterial(key)
+    }
+
     override suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean = runCatching {
-        IosKey.delete(keyId, keyType)
+        if (isPlatformBacked(keyType)) {
+            IosKey.Platform.delete(keyId)
+        }
     }.isSuccess
 }

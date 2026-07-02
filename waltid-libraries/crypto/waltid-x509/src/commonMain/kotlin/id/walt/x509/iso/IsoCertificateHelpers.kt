@@ -1,5 +1,6 @@
 package id.walt.x509.iso
 
+import dev.whyoleg.cryptography.random.CryptographyRandom
 import kotlinx.io.bytestring.ByteString
 
 /**
@@ -17,7 +18,8 @@ internal fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
     return ByteString(randomBytes)
 }
 
-internal expect fun secureRandomBytes(size: Int): ByteArray
+internal fun secureRandomBytes(size: Int): ByteArray =
+    CryptographyRandom.Default.nextBytes(size)
 
 /**
  * Validate that a country code is a valid ISO 3166-1 alpha-2 code.

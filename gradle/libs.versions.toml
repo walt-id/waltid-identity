@@ -90,7 +90,7 @@ kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
 
 # whyoleg cryptography (multiplatform)
-whyoleg-cryptography-random = "0.6.0"
+whyoleg-cryptography = "0.6.0"
 tink = "1.21.0"
 
 # Persistence
@@ -224,7 +224,7 @@ kotlincrypto-hash-sha1 = { module = "org.kotlincrypto.hash:sha1", version.ref = 
 kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
 kotlincrypto-macs-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
 kotlincrypto-random = { module = "org.kotlincrypto.random:crypto-rand", version.ref = "kotlincrypto-rand" }
-whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "whyoleg-cryptography-random" }
+whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "whyoleg-cryptography" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-lts8on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "bouncycastle" }
@@ -352,6 +352,12 @@ kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
 signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
 signum-indispensable-josef = { module = "at.asitplus.signum:indispensable-josef", version.ref = "signum" }
 signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "supreme" }
+
+## dev.whyoleg cryptography (Ed25519/secp256k1 on mobile)
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "whyoleg-cryptography" }
+cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "whyoleg-cryptography" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "whyoleg-cryptography" }
+cryptography-provider-openssl3-prebuilt = { module = "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt", version.ref = "whyoleg-cryptography" }
 
 [bundles]
 waltid-ktor-client = [
