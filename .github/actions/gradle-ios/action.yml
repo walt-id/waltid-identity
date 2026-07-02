@@ -69,7 +69,7 @@ runs:
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWaltidWalletCoreReleaseXCFramework
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWaltIDWalletCoreReleaseXCFramework
 
     - name: Resolve iOS simulator destination
       id: resolve-simulator

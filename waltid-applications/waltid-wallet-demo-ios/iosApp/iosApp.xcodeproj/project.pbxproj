@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0221E8E7784E493B08CF5888 /* WaltidWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WaltidWalletSDK */; };
-		2185E0068DD9855D00602730 /* WaltidWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WaltidWalletSDK */; };
+		0221E8E7784E493B08CF5888 /* WaltIDWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 256D4E3F703216DC04F0C650 /* WaltIDWalletSDK */; };
+		2185E0068DD9855D00602730 /* WaltIDWalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WaltIDWalletSDK */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
 		A1000002AAAA000100000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000002AAAA000000000002 /* HomeView.swift */; };
 		A1000003AAAA000100000003 /* ReceiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000003AAAA000000000003 /* ReceiveView.swift */; };
@@ -94,7 +94,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0221E8E7784E493B08CF5888 /* WaltidWalletSDK in Frameworks */,
+				0221E8E7784E493B08CF5888 /* WaltIDWalletSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -117,7 +117,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2185E0068DD9855D00602730 /* WaltidWalletSDK in Frameworks */,
+				2185E0068DD9855D00602730 /* WaltIDWalletSDK in Frameworks */,
 				D69044562FDAA61A009AB1FB /* TestHelpers.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -242,7 +242,7 @@
 			);
 			name = iosApp;
 			packageProductDependencies = (
-				256D4E3F703216DC04F0C650 /* WaltidWalletSDK */,
+				256D4E3F703216DC04F0C650 /* WaltIDWalletSDK */,
 			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
@@ -287,7 +287,7 @@
 			);
 			name = iosAppTests;
 			packageProductDependencies = (
-				519D794773D1421EEC9493DE /* WaltidWalletSDK */,
+				519D794773D1421EEC9493DE /* WaltIDWalletSDK */,
 			);
 			productName = iosAppTests;
 			productReference = D6B7A34A2FD94CC3009C69E7 /* iosAppTests.xctest */;
@@ -847,15 +847,15 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		256D4E3F703216DC04F0C650 /* WaltidWalletSDK */ = {
+		256D4E3F703216DC04F0C650 /* WaltIDWalletSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WaltidWalletSDK;
+			productName = WaltIDWalletSDK;
 		};
-		519D794773D1421EEC9493DE /* WaltidWalletSDK */ = {
+		519D794773D1421EEC9493DE /* WaltIDWalletSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;
-			productName = WaltidWalletSDK;
+			productName = WaltIDWalletSDK;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

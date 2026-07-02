@@ -1,4 +1,4 @@
-package id.walt.wallet2.mobile.iosbridge
+package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.mobile.MobileWallet

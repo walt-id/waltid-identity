@@ -1,12 +1,13 @@
-package id.walt.wallet2.mobile.iosbridge
+package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletFactory
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
-actual class WalletSdkBridgeFactory actual constructor() {
-    private var createOperations: (MobileWalletConfig) -> WalletSdkBridgeOperations = {
-        throw UnsupportedOperationException("WalletSdkBridgeFactory is only available on iOS")
+class WalletSdkBridgeFactory() {
+    private var createOperations: (MobileWalletConfig) -> WalletSdkBridgeOperations = { config ->
+        MobileWalletSdkBridgeOperations(MobileWalletFactory().create(config))
     }
 
     private constructor(
@@ -15,8 +16,8 @@ actual class WalletSdkBridgeFactory actual constructor() {
         this.createOperations = createOperations
     }
 
-    actual fun create(
-        configuration: WalletBridgeConfiguration,
+    fun create(
+        configuration: WalletBridgeConfiguration = WalletBridgeConfiguration(),
     ): WalletBridgeResult<WalletSdkBridge> =
         try {
             val events = MutableSharedFlow<WalletBridgeEvent>(replay = 10)
@@ -34,8 +35,8 @@ actual class WalletSdkBridgeFactory actual constructor() {
             WalletBridgeResult.Failure(WalletBridgeError.fromThrowable(throwable))
         }
 
-    actual companion object {
-        internal actual fun forOperationsFactory(
+    companion object {
+        internal fun forOperationsFactory(
             createOperations: (MobileWalletConfig) -> WalletSdkBridgeOperations,
         ): WalletSdkBridgeFactory =
             WalletSdkBridgeFactory(createOperations)
