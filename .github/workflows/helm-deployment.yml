@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout waltid-identity
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: walt-id/waltid-identity
           ref: ${{ github.ref_name }}
@@ -63,7 +63,7 @@ jobs:
 
           # Update image name in helm-values.json
           sed -i "s|\"latest\"|\"${IMAGE_NAME}\"|g" helm-values.json
-      - uses: azure/setup-helm@v5.0.0
+      - uses: azure/setup-helm@v5.0.1
       - name: Create kubeconfig file
         run: echo "${{ secrets[inputs.kubeconfig_secret] }}" | base64 --decode > ${{ github.workspace }}/kubeconfig
       - name: Helm Dependency Build
