@@ -1,27 +1,110 @@
 issuer:
+  api:
+    containerPort: 7002
+    image:
+      repository: waltid/issuer-api
+      tag: latest
+      imagePullPolicy: Always
+  configMountPath: /waltid-issuer-api/config
+  configFiles:
+    _features.conf: |-
+      enabledFeatures = [
+          entra
+      ]
+    issuer-service.conf: |-
+      baseUrl = "https://{{ .Values.ingress.host }}"
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:
           - issuer.portal.test.waltid.cloud
-        secretName: issuer-portal-tls
+        secretName: issuer-tls-secret
     host: issuer.portal.test.waltid.cloud
 
+issuer2:
+  api:
+    containerPort: 7002
+    image:
+      repository: waltid/issuer-api2
+      tag: latest
+      imagePullPolicy: Always
+  configMountPath: /waltid-issuer-api2/config
+  configFiles:
+    _features.conf: |-
+      enabledFeatures = [
+          entra
+      ]
+    issuer-service.conf: |-
+      baseUrl = "https://{{ .Values.ingress.host }}"
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - issuer2.portal.test.waltid.cloud
+        secretName: issuer2-tls-secret
+    host: issuer2.portal.test.waltid.cloud
+
 verifier:
-  webConfig:
-    verifierServiceConf: baseUrl = "https://verifier.portal.test.waltid.cloud"
-    entraConf:  callbackUrl = "https://verifier.portal.test.waltid.cloud/entra/verification-callback/"
+  api:
+    containerPort: 7003
+    image:
+      repository: waltid/verifier-api
+      tag: latest
+      imagePullPolicy: Always
+  configMountPath: /waltid-verifier-api/config
+  configFiles:
+    _features.conf: |-
+      enabledFeatures = [
+          entra
+      ]
+    verifier-service.conf: |-
+      baseUrl = "https://{{ .Values.ingress.host }}"
+    entra.conf: |-
+      callbackUrl = "https://{{ .Values.ingress.host }}/entra/verification-callback/"
   ingress:
     ingressClassName: "traefik"
     clusterIssuer: letsencrypt-prod
     tls:
       - hosts:
           - verifier.portal.test.waltid.cloud
-        secretName: verifier-portal-tls
+        secretName: verifier-tls-secret
     host: verifier.portal.test.waltid.cloud
 
+verifier2:
+  api:
+    containerPort: 7003
+    image:
+      repository: waltid/verifier-api2
+      tag: latest
+      imagePullPolicy: Always
+  configMountPath: /waltid-verifier-api2/config
+  configFiles:
+    _features.conf: |-
+      enabledFeatures = [
+          entra
+      ]
+    verifier-service.conf: |-
+      baseUrl = "https://{{ .Values.ingress.host }}"
+    entra.conf: |-
+      callbackUrl = "https://{{ .Values.ingress.host }}/entra/verification-callback/"
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - verifier2.portal.test.waltid.cloud
+        secretName: verifier2-tls-secret
+    host: verifier2.portal.test.waltid.cloud
+
 portal:
+  api:
+    containerPort: 3000
+    image:
+      repository: waltid/portal
+      tag: latest
+      imagePullPolicy: Always
   env:
     NEXT_PUBLIC_VC_REPO: "https://credentials.walt.id"
     NEXT_PUBLIC_ISSUER: "https://issuer.portal.test.waltid.cloud"
@@ -33,8 +116,28 @@ portal:
     tls:
       - hosts:
           - portal.test.waltid.cloud
-        secretName: portal-tls
+        secretName: portal-tls-secret
     host: portal.test.waltid.cloud
+
+portal2:
+  api:
+    containerPort: 3000
+    image:
+      repository: waltid/portal2
+      tag: latest
+      imagePullPolicy: Always
+  env:
+    NUXT_PUBLIC_ISSUER_BASE: "https://issuer2.portal.test.waltid.cloud"
+    NUXT_PUBLIC_VERIFIER_BASE: "https://verifier2.portal.test.waltid.cloud"
+    NUXT_PUBLIC_WALLET_URL: "https://wallet.test.waltid.cloud"
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - portal2.test.waltid.cloud
+        secretName: portal2-tls-secret
+    host: portal2.test.waltid.cloud
 
 web-wallet:
   pvc:
@@ -42,8 +145,8 @@ web-wallet:
       accessMode: ReadWriteOnce
       storageClass: gp3-retain
       storageRequest: 1Gi
-  walletConfig:
-    oidcConf: |-
+  configFiles:
+    oidc.conf: |-
       publicBaseUrl = "https://wallet-dev.test.waltid.cloud"
       providerName = keycloak
       oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
@@ -62,6 +165,7 @@ web-wallet:
               refillRateMinutes: 1
           }
       }
+  walletConfig:
     authConf: |-
       encryptionKey = "oshaaddgtwcqvcsg"
       signKey = "gyccmrunkqwnzswl"
@@ -83,4 +187,27 @@ web-wallet:
       - hosts:
           - wallet-dev.test.waltid.cloud
           - wallet.test.waltid.cloud
-        secretName: web-wallet-tls
+        secretName: wallet-tls-secret
+
+wallet-api2:
+  api:
+    containerPort: 7005
+    image:
+      repository: waltid/wallet-api2
+      tag: latest
+      imagePullPolicy: Always
+  configMountPath: /waltid-wallet-api2/config
+  persistence:
+    enabled: true
+    mountPath: /waltid-wallet-api2/data/
+    accessMode: ReadWriteOnce
+    storageClass: gp3-retain
+    storageRequest: 1Gi
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - wallet-api2.portal.test.waltid.cloud
+        secretName: wallet-api2-tls-secret
+    host: wallet-api2.portal.test.waltid.cloud

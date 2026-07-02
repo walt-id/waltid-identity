@@ -20,6 +20,10 @@
     "image": "wallet-api"
   },
   {
+    "commandPath": ":waltid-services:waltid-wallet-api2",
+    "image": "wallet-api2"
+  },
+  {
     "commandPath": ":waltid-enterprise-api",
     "image": "waltid-enterprise-api"
   }

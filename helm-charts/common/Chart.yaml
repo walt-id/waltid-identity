@@ -1,6 +1,6 @@
 apiVersion: v2
-name: verifier
-description: A Helm chart for Kubernetes
+name: common
+description: Reusable Helm chart for a single waltid workload (issuer, verifier, wallet-api, portal, ...)
 
 # A chart can be either an 'application' or a 'library' chart.
 #

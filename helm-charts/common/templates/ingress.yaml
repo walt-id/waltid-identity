@@ -1,7 +1,9 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "portal.fullname" . }}-ingress
+  name: {{ include "common.fullname" . }}-ingress
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
   {{- if .Values.ingress.clusterIssuer }}
   annotations:
     cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
@@ -9,17 +11,17 @@ metadata:
 spec:
   ingressClassName: {{ .Values.ingress.ingressClassName }}
   {{- if .Values.ingress.tls }}
-  tls: 
+  tls:
     {{- .Values.ingress.tls | toYaml | nindent 4 }}
   {{- end }}
   rules:
-    - host: {{ quote .Values.ingress.host }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "portal.fullname" . }}-service
-                port:
-                  number: 80
+  - host: {{ quote .Values.ingress.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: '{{ include "common.fullname" . }}-service'
+            port:
+              name: http

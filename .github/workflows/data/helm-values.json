@@ -1,10 +1,8 @@
 {
   "issuer": {
     "api": {
-      "issuerApi": {
-        "image": {
-          "tag": "latest"
-        }
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
@@ -20,16 +18,29 @@
       ]
     }
   },
-  "verifier": {
-    "webConfig": {
-      "verifierServiceConf": "baseUrl = \"https://verifier.portal.test.waltid.cloud\"",
-      "entraConf": "callbackUrl = \"https://verifier.portal.test.waltid.cloud/entra/verification-callback/\""
-    },
+  "issuer2": {
     "api": {
-      "verifierApi": {
-        "image": {
-          "tag": "latest"
+      "image": {
+        "tag": "latest"
+      }
+    },
+    "ingress": {
+      "host": "issuer2.portal.test.waltid.cloud",
+      "clusterIssuer": "letsencrypt-prod",
+      "tls": [
+        {
+          "secretName": "issuer2-tls-secret",
+          "hosts": [
+            "issuer2.portal.test.waltid.cloud"
+          ]
         }
+      ]
+    }
+  },
+  "verifier": {
+    "api": {
+      "image": {
+        "tag": "latest"
       }
     },
     "ingress": {
@@ -45,6 +56,25 @@
       ]
     }
   },
+  "verifier2": {
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
+    },
+    "ingress": {
+      "host": "verifier2.portal.test.waltid.cloud",
+      "clusterIssuer": "letsencrypt-prod",
+      "tls": [
+        {
+          "secretName": "verifier2-tls-secret",
+          "hosts": [
+            "verifier2.portal.test.waltid.cloud"
+          ]
+        }
+      ]
+    }
+  },
   "portal": {
     "env": {
       "NEXT_PUBLIC_VC_REPO": "https://credentials.walt.id",
@@ -52,8 +82,10 @@
       "NEXT_PUBLIC_VERIFIER": "https://verifier.portal.test.waltid.cloud",
       "NEXT_PUBLIC_WALLET": "https://wallet.test.waltid.cloud"
     },
-    "image": {
-      "tag": "latest"
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
     },
     "ingress": {
       "host": "portal.test.waltid.cloud",
@@ -68,9 +100,54 @@
       ]
     }
   },
+  "portal2": {
+    "env": {
+      "NUXT_PUBLIC_ISSUER_BASE": "https://issuer2.portal.test.waltid.cloud",
+      "NUXT_PUBLIC_VERIFIER_BASE": "https://verifier2.portal.test.waltid.cloud",
+      "NUXT_PUBLIC_WALLET_URL": "https://wallet.test.waltid.cloud"
+    },
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
+    },
+    "ingress": {
+      "host": "portal2.test.waltid.cloud",
+      "clusterIssuer": "letsencrypt-prod",
+      "tls": [
+        {
+          "secretName": "portal2-tls-secret",
+          "hosts": [
+            "portal2.test.waltid.cloud"
+          ]
+        }
+      ]
+    }
+  },
+  "wallet-api2": {
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
+    },
+    "ingress": {
+      "host": "wallet-api2.test.waltid.cloud",
+      "clusterIssuer": "letsencrypt-prod",
+      "tls": [
+        {
+          "secretName": "wallet-api2-tls-secret",
+          "hosts": [
+            "wallet-api2.test.waltid.cloud"
+          ]
+        }
+      ]
+    }
+  },
   "web-wallet": {
+    "configFiles": {
+      "oidc.conf": "publicBaseUrl = \"https://wallet-dev.test.waltid.cloud\"\nproviderName = keycloak\noidcRealm = \"https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor\"\noidcJwks = \"${oidcRealm}/protocol/openid-connect/certs\"\nauthorizeUrl = \"${oidcRealm}/protocol/openid-connect/auth\"\naccessTokenUrl = \"${oidcRealm}/protocol/openid-connect/token\"\nlogoutUrl = \"${oidcRealm}/protocol/openid-connect/logout\"\nclientId = \"wallet_backend_prod\"\nclientSecret = \"__DEFAULT_KEYCLOAK_CLIENT_SECRET__\"\nkeycloakUserApi = \"https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users\"\njwksCache = {\n    cacheSize = 10\n    cacheExpirationHours = 24\n    rateLimit: {\n        bucketSize: 10\n        refillRateMinutes: 1\n    }\n}"
+    },
     "walletConfig": {
-      "oidcConf": "publicBaseUrl = \"https://wallet-dev.test.waltid.cloud\"\nproviderName = keycloak\noidcRealm = \"https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor\"\noidcJwks = \"${oidcRealm}/protocol/openid-connect/certs\"\nauthorizeUrl = \"${oidcRealm}/protocol/openid-connect/auth\"\naccessTokenUrl = \"${oidcRealm}/protocol/openid-connect/token\"\nlogoutUrl = \"${oidcRealm}/protocol/openid-connect/logout\"\nclientId = \"wallet_backend_prod\"\nclientSecret = \"__DEFAULT_KEYCLOAK_CLIENT_SECRET__\"\nkeycloakUserApi = \"https://keycloak.walt-test.cloud/admin/realms/waltid-keycloak-ktor/users\"\njwksCache = {\n    cacheSize = 10\n    cacheExpirationHours = 24\n    rateLimit: {\n        bucketSize: 10\n        refillRateMinutes: 1\n    }\n}",
       "authConf": "encryptionKey = \"<128 bit -- key>\"\nsignKey = \"<128 bit -- key>\"\ntokenKey = \"<a - longer 256+ bit key or rsa private key in jwk format- here>\"\ntokenLifetime = \"30\"\naudTokenClaim = \"audience value\"\nissTokenClaim = \"issuer value\""
     },
     "web": {
