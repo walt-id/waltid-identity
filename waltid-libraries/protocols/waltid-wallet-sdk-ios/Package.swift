@@ -6,7 +6,6 @@ let package = Package(
     name: "WaltIDWalletSDK",
     platforms: [
         .iOS("15.4"),
-        .macOS(.v10_15),
     ],
     products: [
         .library(

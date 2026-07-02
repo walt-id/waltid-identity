@@ -50,10 +50,10 @@ public enum WalletKeyType: Equatable, Sendable {
     case rsa4096
 }
 
-/// Enterprise wallet attestation settings.
+/// Wallet attestation settings.
 public struct WalletAttestationConfiguration: Equatable, Sendable {
-    /// Enterprise API base URL.
-    public var enterpriseBaseURL: String
+    /// Attestation API base URL.
+    public var baseURL: String
 
     /// Relative attester endpoint path.
     public var attesterPath: String
@@ -61,20 +61,20 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     /// Optional bearer token for attestation requests.
     public var bearerToken: String
 
-    /// Optional host header override.
-    public var enterpriseHostHeader: String
+    /// Optional host header override for attestation requests.
+    public var hostHeader: String
 
-    /// Creates enterprise wallet attestation settings.
+    /// Creates wallet attestation settings.
     public init(
-        enterpriseBaseURL: String,
+        baseURL: String,
         attesterPath: String,
         bearerToken: String = "",
-        enterpriseHostHeader: String = ""
+        hostHeader: String = ""
     ) {
-        self.enterpriseBaseURL = enterpriseBaseURL
+        self.baseURL = baseURL
         self.attesterPath = attesterPath
         self.bearerToken = bearerToken
-        self.enterpriseHostHeader = enterpriseHostHeader
+        self.hostHeader = hostHeader
     }
 }
 

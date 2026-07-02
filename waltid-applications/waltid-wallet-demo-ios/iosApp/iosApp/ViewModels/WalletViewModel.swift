@@ -136,10 +136,10 @@ class WalletViewModel: ObservableObject {
         }
 
         return WalletAttestationConfiguration(
-            enterpriseBaseURL: baseUrl,
+            baseURL: baseUrl,
             attesterPath: attesterPath ?? "",
             bearerToken: bearerToken ?? "",
-            enterpriseHostHeader: hostHeader ?? ""
+            hostHeader: hostHeader ?? ""
         )
     }
 

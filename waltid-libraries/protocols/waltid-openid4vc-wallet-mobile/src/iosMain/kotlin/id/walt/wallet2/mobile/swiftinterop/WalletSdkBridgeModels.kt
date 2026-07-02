@@ -53,17 +53,17 @@ fun WalletBridgeConfiguration.toMobileWalletConfig(
 
 @Serializable
 data class WalletBridgeAttestationConfiguration(
-    val enterpriseBaseUrl: String,
+    val baseUrl: String,
     val attesterPath: String,
     val bearerToken: String = "",
-    val enterpriseHostHeader: String = "",
+    val hostHeader: String = "",
 )
 
 fun WalletBridgeAttestationConfiguration.toWalletAttestationConfig() = WalletAttestationConfig(
-    enterpriseBaseUrl = enterpriseBaseUrl,
+    baseUrl = baseUrl,
     attesterPath = attesterPath,
     bearerToken = bearerToken,
-    enterpriseHostHeader = enterpriseHostHeader,
+    hostHeader = hostHeader,
 )
 
 @Serializable

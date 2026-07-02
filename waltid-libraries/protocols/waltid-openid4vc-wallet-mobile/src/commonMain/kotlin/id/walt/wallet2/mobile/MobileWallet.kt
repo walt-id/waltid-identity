@@ -40,10 +40,10 @@ data class MobileWalletPresentationResult(
 )
 
 data class WalletAttestationConfig(
-    val enterpriseBaseUrl: String,
+    val baseUrl: String,
     val attesterPath: String,
     val bearerToken: String = "",
-    val enterpriseHostHeader: String = "",
+    val hostHeader: String = "",
 )
 
 class MobileWallet(
@@ -59,10 +59,10 @@ class MobileWallet(
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
         ClientAttestationAssembler(
             HttpWalletAttestationProvider(
-                enterpriseBaseUrl = config.enterpriseBaseUrl,
+                baseUrl = config.baseUrl,
                 attesterPath = config.attesterPath,
                 bearerToken = config.bearerToken,
-                enterpriseHostHeader = config.enterpriseHostHeader,
+                hostHeader = config.hostHeader,
             )
         )
     }

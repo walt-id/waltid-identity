@@ -1,6 +1,7 @@
 import Foundation
 
 /// Actor-isolated entry point for the walt.id wallet SDK on iOS.
+@available(macOS 10.15, *)
 public actor Wallet {
     /// Configuration used to create this wallet.
     public let configuration: WalletConfiguration
