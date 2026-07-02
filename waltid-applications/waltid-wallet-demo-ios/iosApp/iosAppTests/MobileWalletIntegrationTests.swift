@@ -32,14 +32,20 @@ final class MobileWalletIntegrationTests: XCTestCase {
     private func clearTestData() async {
         let fileManager = FileManager.default
         if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
+            let databaseDirectories = [
+                appSupport,
+                appSupport.appendingPathComponent("databases", isDirectory: true)
+            ]
             let dbFiles = [
                 "wallet_\(testWalletId).db",
                 "wallet_\(testWalletId).db-shm",
                 "wallet_\(testWalletId).db-wal"
             ]
-            for dbFile in dbFiles {
-                let dbPath = appSupport.appendingPathComponent(dbFile)
-                try? fileManager.removeItem(at: dbPath)
+            for directory in databaseDirectories {
+                for dbFile in dbFiles {
+                    let dbPath = directory.appendingPathComponent(dbFile)
+                    try? fileManager.removeItem(at: dbPath)
+                }
             }
         }
 
