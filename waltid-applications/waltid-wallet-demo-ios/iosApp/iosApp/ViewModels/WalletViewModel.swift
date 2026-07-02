@@ -1,5 +1,5 @@
 import Foundation
-import WaltidWalletSDK
+import WaltIDWalletSDK
 
 @MainActor
 class WalletViewModel: ObservableObject {
@@ -13,7 +13,7 @@ class WalletViewModel: ObservableObject {
     @Published var presentationRequestUrl = ""
 
     private let configuration: WalletConfiguration
-    private var client: WalletClient?
+    private var cachedWallet: Wallet?
 
     init(
         walletID: String = "default",
@@ -56,9 +56,9 @@ class WalletViewModel: ObservableObject {
         setLoading("Receiving credential...")
         Task {
             do {
-                let client = try await walletClient()
-                let credentialIDs = try await client.receive(offer: offer)
-                credentials = try await client.credentials()
+                let wallet = try await wallet()
+                let credentialIDs = try await wallet.receive(offer: offer)
+                credentials = try await wallet.credentials()
                 setSuccess("Received \(credentialIDs.count) credential(s)")
             } catch {
                 setError("Receive failed: \(error.localizedDescription)")
@@ -76,8 +76,8 @@ class WalletViewModel: ObservableObject {
         setLoading("Presenting credential...")
         Task {
             do {
-                let client = try await walletClient()
-                let result = try await client.present(
+                let wallet = try await wallet()
+                let result = try await wallet.present(
                     request: request,
                     did: did.isEmpty ? nil : did
                 )
@@ -93,13 +93,13 @@ class WalletViewModel: ObservableObject {
         logE2E("Bootstrap started")
         Task {
             do {
-                let client = try await walletClient()
-                logE2E("Bootstrap: calling client.bootstrap()")
-                let result = try await client.bootstrap()
+                let wallet = try await wallet()
+                logE2E("Bootstrap: calling wallet.bootstrap()")
+                let result = try await wallet.bootstrap()
                 logE2E("Bootstrap: success, DID: \(result.did)")
 
-                logE2E("Bootstrap: calling client.credentials()")
-                let list = try await client.credentials()
+                logE2E("Bootstrap: calling wallet.credentials()")
+                let list = try await wallet.credentials()
                 logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
 
                 did = result.did
@@ -114,14 +114,14 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    private func walletClient() async throws -> WalletClient {
-        if let client {
-            return client
+    private func wallet() async throws -> Wallet {
+        if let cachedWallet {
+            return cachedWallet
         }
 
-        let client = try await WalletClient(configuration: configuration)
-        self.client = client
-        return client
+        let wallet = try await Wallet(configuration: configuration)
+        cachedWallet = wallet
+        return wallet
     }
 
     private static func attestationConfiguration(
