@@ -97,7 +97,7 @@ class Issuer2WalletFlowDriver(
     suspend fun startAuthorizationCodeFlowWithIssuerState(
         createdOffer: CredentialOfferCreateResponse,
         resolvedOffer: ResolvedCredentialOffer,
-        scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.universityDegree,
+        scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.openBadgeCredential,
         requestMode: Issuer2AuthorizationRequestMode = Issuer2AuthorizationRequestMode.AUTHORIZATION_DETAILS,
     ): String {
         val issuerState = resolvedOffer.offer.grants?.authorizationCode?.issuerState
@@ -117,7 +117,7 @@ class Issuer2WalletFlowDriver(
 
     suspend fun startAuthorizationCodeFlowWithoutIssuerState(
         resolvedOffer: ResolvedCredentialOffer,
-        scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.universityDegree,
+        scenario: Issuer2CredentialScenario = Issuer2CredentialScenarios.openBadgeCredential,
         requestMode: Issuer2AuthorizationRequestMode = Issuer2AuthorizationRequestMode.AUTHORIZATION_DETAILS,
     ): String {
         val redirectUri = startAuthorizationCodeFlow(
