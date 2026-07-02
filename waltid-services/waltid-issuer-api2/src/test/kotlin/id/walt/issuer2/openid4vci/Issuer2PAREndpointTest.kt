@@ -1,11 +1,15 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
+import id.walt.issuer2.config.ClientAuthenticationConfig
+import id.walt.issuer2.config.ClientAuthenticationMethod
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.openid4vci.ResponseType
 import id.walt.openid4vci.core.OAuth2Provider
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
 import id.walt.openid4vci.requests.authorization.AuthorizationRequestResult
@@ -16,6 +20,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFailsWith
 
 class Issuer2PAREndpointTest {
 
@@ -136,11 +141,35 @@ class Issuer2PAREndpointTest {
         assertEquals("abc123xyz", requestId)
     }
 
-    private fun issuerProvider(enforcePushedAuthorizationRequests: Boolean = false): OAuth2Provider =
+    @Test
+    fun `issuer module rejects key reference client attestation without resolver`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            issuerProvider(
+                clientAttestation = ClientAttestationVerifierConfig(
+                    verificationMethod = ClientAttestationVerificationMethod.KeyReference("test-key-reference"),
+                ),
+            )
+        }
+
+        assertEquals(
+            "key-reference client attestation verification requires a key reference resolver",
+            error.message,
+        )
+    }
+
+    private fun issuerProvider(
+        enforcePushedAuthorizationRequests: Boolean = false,
+        clientAttestation: ClientAttestationVerifierConfig? = null,
+    ): OAuth2Provider =
         OpenId4VciModule.create(
             config = Issuer2ServiceConfig(
                 baseUrl = "http://localhost",
                 enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+                clientAuthenticationConfig = clientAttestation?.let {
+                    ClientAuthenticationConfig(
+                        supportedMethods = listOf(ClientAuthenticationMethod.ClientAttestation(it)),
+                    )
+                },
             ),
             authorizationCodeRepository = ConfiguredAuthorizationCodeRepository(),
             preAuthorizedCodeRepository = ConfiguredPreAuthorizedCodeRepository(),

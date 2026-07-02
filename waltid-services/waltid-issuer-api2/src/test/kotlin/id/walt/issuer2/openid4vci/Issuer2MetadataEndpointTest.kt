@@ -15,6 +15,7 @@ import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import id.walt.openid4vci.CredentialFormat
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.SigningAlgId
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
@@ -101,8 +102,15 @@ class Issuer2MetadataEndpointTest {
         assertEquals(false, authorizationServerMetadata.requirePushedAuthorizationRequests)
         assertNull(authorizationServerMetadata.codeChallengeMethodsSupported)
         assertEquals(setOf("attest_jwt_client_auth"), authorizationServerMetadata.tokenEndpointAuthMethodsSupported)
-        assertEquals(setOf("ES256"), authorizationServerMetadata.clientAttestationSigningAlgValuesSupported)
-        assertEquals(setOf("ES256"), authorizationServerMetadata.clientAttestationPopSigningAlgValuesSupported)
+        assertNull(authorizationServerMetadata.tokenEndpointAuthSigningAlgValuesSupported)
+        assertEquals(
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+            authorizationServerMetadata.clientAttestationSigningAlgValuesSupported,
+        )
+        assertEquals(
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+            authorizationServerMetadata.clientAttestationPopSigningAlgValuesSupported,
+        )
         assertEquals(setOf("ES256"), authorizationServerMetadata.dpopSigningAlgValuesSupported)
         assertEquals(true, authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported)
         assertEquals(

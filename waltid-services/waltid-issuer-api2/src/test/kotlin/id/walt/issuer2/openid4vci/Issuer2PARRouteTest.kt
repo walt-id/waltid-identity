@@ -1,6 +1,10 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
+import id.walt.issuer2.config.ClientAuthenticationConfig
+import id.walt.issuer2.config.ClientAuthenticationMethod
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -13,6 +17,10 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
@@ -21,6 +29,7 @@ import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.forms.FormDataContent
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpHeaders
@@ -33,9 +42,11 @@ import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -59,7 +70,11 @@ class Issuer2PARRouteTest {
                 bearer("auth-oauth") {}
             }
             routing {
-                testController().register(this)
+                testController(
+                    serviceConfig = Issuer2ServiceConfig(
+                        baseUrl = "http://localhost",
+                    ),
+                ).register(this)
             }
         }
         val client = createClient {
@@ -92,8 +107,72 @@ class Issuer2PARRouteTest {
         assertEquals("90", payload["expires_in"]?.jsonPrimitive?.content)
     }
 
-    private fun testController(): OpenId4VciController {
-        val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
+    @Test
+    fun `par route passes client attestation headers to library`() = testApplication {
+        application {
+            install(ServerContentNegotiation) {
+                json(json)
+            }
+            install(Authentication) {
+                bearer("auth-oauth") {}
+            }
+            routing {
+                testController(serviceConfig = serviceConfigWithClientAttestation()).register(this)
+            }
+        }
+        val client = createClient {
+            install(ClientContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val response = client.post("/openid4vci/par") {
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION, "not-a-jwt")
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("client_id", "test-client")
+                        append("response_type", "code")
+                        append("redirect_uri", "https://wallet.example/callback")
+                        append("scope", "openid")
+                        append("state", "state123")
+                    }
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val payload = response.body<JsonObject>()
+        assertEquals(OAuthErrorCodes.INVALID_CLIENT, payload["error"]?.jsonPrimitive?.content)
+        assertEquals(
+            "Exactly one ${ClientAttestationHeaders.CLIENT_ATTESTATION_POP} header is required",
+            payload["error_description"]?.jsonPrimitive?.content,
+        )
+    }
+
+    private fun serviceConfigWithClientAttestation(): Issuer2ServiceConfig {
+        val trustedAttesterKey = runBlocking { JWKKey.generate(KeyType.secp256r1) }
+        return Issuer2ServiceConfig(
+            baseUrl = "http://localhost",
+            clientAuthenticationConfig = ClientAuthenticationConfig(
+                supportedMethods = listOf(
+                    ClientAuthenticationMethod.ClientAttestation(
+                        config = ClientAttestationVerifierConfig(
+                            verificationMethod = ClientAttestationVerificationMethod.StaticJwk(
+                                jwk = json.parseToJsonElement(
+                                    runBlocking { trustedAttesterKey.getPublicKey().exportJWK() },
+                                ).jsonObject,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private fun testController(
+        serviceConfig: Issuer2ServiceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost"),
+    ): OpenId4VciController {
         val metadataConfig = Issuer2MetadataConfig()
         val profileService = CredentialProfileService(
             profilesConfig = Issuer2ProfilesConfig(),
@@ -112,6 +191,8 @@ class Issuer2PARRouteTest {
             metadataConfig = metadataConfig,
             profileService = profileService,
             sessionService = sessionService,
+            preAuthorizedGrantAnonymousAccessSupported =
+                openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
         )
 
         return OpenId4VciController(
