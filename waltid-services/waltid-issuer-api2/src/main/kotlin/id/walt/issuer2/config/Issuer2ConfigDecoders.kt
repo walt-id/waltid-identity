@@ -16,6 +16,7 @@ import com.sksamuel.hoplite.decoder.Decoder
 import com.sksamuel.hoplite.fp.Validated
 import id.walt.commons.config.ConfigManager
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
@@ -28,12 +29,29 @@ import kotlin.reflect.KClass
 import kotlin.reflect.KType
 
 fun registerIssuer2ConfigDecoders() {
-    ConfigManager.registerCustomDecoder(Issuer2KotlinxConfigDecoder(SDMap::class, SDMap.serializer()))
+    ConfigManager.registerCustomDecoder(
+        Issuer2KotlinxConfigDecoder(
+            SDMap::class,
+            SDMap.serializer(),
+        ),
+    )
+    ConfigManager.registerCustomDecoder(
+        Issuer2KotlinxConfigDecoder(
+            ClientAuthenticationConfig::class,
+            ClientAuthenticationConfig.serializer(),
+        ),
+    )
+    ConfigManager.registerCustomDecoder(
+        Issuer2KotlinxConfigDecoder(
+            ClientAttestationVerifierConfig::class,
+            ClientAttestationVerifierConfig.serializer(),
+        ),
+    )
     ConfigManager.registerCustomDecoder(
         Issuer2KotlinxConfigDecoder(
             JsonObjectToCborMappingConfig::class,
             JsonObjectToCborMappingConfig.serializer(),
-        )
+        ),
     )
 }
 
