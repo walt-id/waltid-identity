@@ -1,5 +1,8 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     id("waltid.mobile.library")
+    alias(identityLibs.plugins.skie)
 }
 
 group = "id.walt.protocols"
@@ -9,6 +12,23 @@ waltidMobile {
 }
 
 kotlin {
+    if (enableIosBuild) {
+        val walletCoreXcFramework = XCFramework("WaltidWalletCore")
+
+        targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+            binaries.framework {
+                baseName = "WaltidWalletCore"
+                isStatic = true
+                binaryOption("bundleId", "id.walt.wallet.core")
+                walletCoreXcFramework.add(this)
+            }
+
+            binaries.configureEach {
+                linkerOpts("-lsqlite3")
+            }
+        }
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
