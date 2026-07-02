@@ -1,8 +1,23 @@
 package id.walt.x509.iso
 
-import kotlinx.io.bytestring.ByteString
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.usePinned
+import platform.Security.SecRandomCopyBytes
+import platform.Security.kSecRandomDefault
 
-internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
-    // TODO(iOS): Implement ISO-compliant serial generation, then remove the guarded ISO X.509 tests.
-    TODO("Not yet implemented")
+@OptIn(ExperimentalForeignApi::class)
+internal actual fun secureRandomBytes(size: Int): ByteArray {
+    require(size >= 0) {
+        "Random byte count must not be negative."
+    }
+    if (size == 0) return ByteArray(0)
+
+    val randomBytes = ByteArray(size)
+    val status = randomBytes.usePinned { pinned ->
+        SecRandomCopyBytes(kSecRandomDefault, size.convert(), pinned.addressOf(0))
+    }
+    check(status == 0) { "SecRandomCopyBytes failed with status $status." }
+    return randomBytes
 }

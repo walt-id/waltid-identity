@@ -93,7 +93,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D690444B2FDAA5D2009AB1FB /* TestHelpers */ = {
+		D690444B2FDAA5D2009AB1FB /* ../../mobile-e2e-fixtures/ios/TestHelpers */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 			);
@@ -101,7 +101,6 @@
 			};
 			explicitFolders = (
 			);
-			name = TestHelpers;
 			path = "../../mobile-e2e-fixtures/ios/TestHelpers";
 			sourceTree = "<group>";
 		};
@@ -206,7 +205,7 @@
 				B33B17E82C2C394F001A32F7 /* iosApp */,
 				E2E00010AAAA000000000010 /* iosAppUITests */,
 				D6B7A34B2FD94CC3009C69E7 /* iosAppTests */,
-				D690444B2FDAA5D2009AB1FB /* TestHelpers */,
+				D690444B2FDAA5D2009AB1FB /* ../../mobile-e2e-fixtures/ios/TestHelpers */,
 				B33B17E72C2C394F001A32F7 /* Products */,
 				C7F7791DA2DDDF41CE0CB49F /* Pods */,
 				76E29D6CBD9A178AFD844515 /* Frameworks */,
@@ -279,7 +278,6 @@
 				B33B17E22C2C394F001A32F7 /* Sources */,
 				B33B17E32C2C394F001A32F7 /* Frameworks */,
 				B33B17E42C2C394F001A32F7 /* Resources */,
-				6E859251A9425E8DC643D02A /* [CP] Embed Pods Frameworks */,
 				D69044522FDAA5D2009AB1FB /* Embed Frameworks */,
 			);
 			buildRules = (
@@ -306,7 +304,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				D690444B2FDAA5D2009AB1FB /* TestHelpers */,
+				D690444B2FDAA5D2009AB1FB /* ../../mobile-e2e-fixtures/ios/TestHelpers */,
 			);
 			name = TestHelpers;
 			productName = TestHelpers;
@@ -424,23 +422,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		6E859251A9425E8DC643D02A /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
 		FBEF9ED8794E31C63F399D7B /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;

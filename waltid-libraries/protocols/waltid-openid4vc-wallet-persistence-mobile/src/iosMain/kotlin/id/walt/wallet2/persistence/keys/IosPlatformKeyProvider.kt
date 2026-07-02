@@ -9,7 +9,8 @@ class IosPlatformKeyProvider(
     private val useSecureElement: Boolean = true,
 ) : PlatformKeyProvider {
 
-    override val supportedHardwareKeyTypes: Set<KeyType> = setOf(KeyType.secp256r1)
+    override val supportedHardwareKeyTypes: Set<KeyType> =
+        setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA)
 
     override val isHardwareBackingAvailable: Boolean = true
 

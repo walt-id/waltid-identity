@@ -2,7 +2,6 @@ package id.walt.x509.iso.vical
 
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.x509.CertificateDer
-import id.walt.x509.iso.supportsIsoX509PlatformOperations
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidationConfig
 import id.walt.x509.iso.iaca.validate.IACAValidator
@@ -73,8 +72,6 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
     @Test
     fun `must be able to decode and validate all qualified Austroads IACA certificate entries`() = runTest {
-        if (!supportsIsoX509PlatformOperations) return@runTest
-
         iacaPemEncodedCertificates.map { pemEncodedCertificate ->
             JWKKey.convertDERorPEMtoByteArray(pemEncodedCertificate)
         }.forEach { derEncodedCertificate ->
@@ -91,8 +88,6 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
     @Test
     fun `must be able to decode but validation will fail because KeyUsage extension marked as non-critical`() =
         runTest {
-            if (!supportsIsoX509PlatformOperations) return@runTest
-
             listOf(
                 //Development ThalesCA Digital Licence Queensland - Australia
                 """
@@ -157,8 +152,6 @@ class AustroadsVicalDecodeValidateIACAEntriesTest {
 
     @Test
     fun `must be able to decode but validation will fail because 'ZZ' is not a valid ISO country code`() = runTest {
-        if (!supportsIsoX509PlatformOperations) return@runTest
-
         /*
             Table B.1 - "IACA root certificate" of Section B.1.2 - "IACA root certificate" of Annex B - "Certificate and
             CRL profiles" of ISO/IEC 18013-5 states the following regarding the certificate issuer's X500 name:

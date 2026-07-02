@@ -40,10 +40,6 @@ kotlin {
 
             implementation(identityLibs.korlibs.io)
         }
-        jvmMain.dependencies {
-            // BouncyCastle for X.509 certificate chain validation
-            implementation("org.bouncycastle:bcpkix-jdk18on:1.79")
-        }
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)

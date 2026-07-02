@@ -1,18 +1,14 @@
 package id.walt.wallet2.persistence.keys
 
-import id.walt.crypto.keys.AndroidKey
-import id.walt.crypto.keys.AndroidKeyGenerator
-import id.walt.crypto.keys.AndroidKeyParameters
-import id.walt.crypto.keys.AndroidKeystoreLoader
+import id.walt.crypto.AndroidKey
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.KeyAlias
 import id.walt.crypto.keys.KeyType
 import kotlin.uuid.Uuid
 
 class AndroidPlatformKeyProvider : PlatformKeyProvider {
 
     override val supportedHardwareKeyTypes: Set<KeyType> =
-        setOf(KeyType.secp256r1, KeyType.RSA)
+        setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA)
 
     override val isHardwareBackingAvailable: Boolean = true
 
@@ -21,16 +17,14 @@ class AndroidPlatformKeyProvider : PlatformKeyProvider {
             "KeyType $keyType is not supported in Android KeyStore. Supported: $supportedHardwareKeyTypes"
         }
         val alias = keyId ?: "wallet_key_${Uuid.random()}"
-        return AndroidKeyGenerator.generate(
-            type = keyType,
-            metadata = AndroidKeyParameters(keyId = alias),
-        )
+        return AndroidKey.create(AndroidKey.Options(kid = alias, keyType = keyType))
     }
 
-    override suspend fun loadKey(keyId: String, keyType: KeyType): Key? =
-        AndroidKeystoreLoader.load(type = keyType, keyId = keyId)
+    override suspend fun loadKey(keyId: String, keyType: KeyType): Key? = runCatching {
+        AndroidKey.load(AndroidKey.Options(kid = keyId, keyType = keyType))
+    }.getOrNull()
 
     override suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean = runCatching {
-        AndroidKey(KeyAlias(keyId), keyType).deleteKey()
-    }.getOrDefault(false)
+        AndroidKey.delete(keyId, keyType)
+    }.isSuccess
 }

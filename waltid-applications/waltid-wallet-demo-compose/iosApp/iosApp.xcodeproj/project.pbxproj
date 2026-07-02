@@ -146,7 +146,6 @@
 				B33B17E22C2C394F001A32F7 /* Sources */,
 				B33B17E32C2C394F001A32F7 /* Frameworks */,
 				B33B17E42C2C394F001A32F7 /* Resources */,
-				6E859251A9425E8DC643D02A /* [CP] Embed Pods Frameworks */,
 				3AD1D6FE8B29711C80EF4D52 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
@@ -240,23 +239,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		6E859251A9425E8DC643D02A /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		FBEF9ED8794E31C63F399D7B /* [CP] Check Pods Manifest.lock */ = {

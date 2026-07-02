@@ -1,6 +1,5 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
-import id.walt.credentials.trustedauthorities.X5CChainValidatorHelper
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
@@ -8,6 +7,8 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.x509.CertificateDer
+import id.walt.x509.verifyOrderedCertificateChainSignatures
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -36,7 +37,9 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
 
             // 1. Verify the certificate chain signatures when more than one cert is present.
             if (x5cHeader.size > 1) {
-                X5CChainValidatorHelper.verifyChain(x5cHeader.map { it.jsonPrimitive.content.decodeFromBase64() })
+                verifyOrderedCertificateChainSignatures(
+                    x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
+                )
             }
 
             // 2. Verify JWS signature with the leaf certificate's public key.
@@ -60,4 +63,3 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
         )
     }
 }
-
