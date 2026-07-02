@@ -337,27 +337,11 @@ $encodedPk
     companion object {
         private val log = KotlinLogging.logger { }
 
-        // Valid AWS regions as of 2024
-        private val VALID_AWS_REGIONS = setOf(
-            "us-east-1", "us-east-2", "us-west-1", "us-west-2",
-            "eu-central-1", "eu-west-1", "eu-west-2", "eu-west-3", "eu-north-1", "eu-south-1", "eu-south-2",
-            "ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-southeast-3", "ap-northeast-1", "ap-northeast-2", "ap-northeast-3",
-            "sa-east-1", "ca-central-1", "af-south-1", "me-south-1", "me-central-1",
-            "ap-east-1", "cn-north-1", "cn-northwest-1"
-        )
-
         /**
          * Validates the configuration before making any AWS API calls.
          * Throws IllegalArgumentException with helpful messages if validation fails.
          */
         private fun validateConfig(config: AWSKeyMetadataSDK) {
-            // Validate primary region
-            if (config.auth.region !in VALID_AWS_REGIONS) {
-                throw IllegalArgumentException(
-                    "Invalid primary region '${config.auth.region}'. Valid AWS regions: ${VALID_AWS_REGIONS.sorted().joinToString(", ")}"
-                )
-            }
-
             // Validate multi-region configuration
             val hasMultiRegionConfig = config.replicaRegions != null || config.enableFailover == true || config.failoverOrder != null
 
@@ -367,13 +351,8 @@ $encodedPk
                 )
             }
 
-            // Validate replica regions
+            // Validate replica regions don't duplicate primary
             config.replicaRegions?.forEach { region ->
-                if (region !in VALID_AWS_REGIONS) {
-                    throw IllegalArgumentException(
-                        "Invalid replica region '$region'. Valid AWS regions: ${VALID_AWS_REGIONS.sorted().joinToString(", ")}"
-                    )
-                }
                 if (region == config.auth.region) {
                     throw IllegalArgumentException(
                         "Replica region '$region' cannot be the same as the primary region '${config.auth.region}'"
@@ -390,7 +369,7 @@ $encodedPk
                 }
             }
 
-            // Validate failover order
+            // Validate failover order matches the actual region set
             config.failoverOrder?.let { failoverOrder ->
                 val allRegions = listOfNotNull(config.auth.region) + (config.replicaRegions ?: emptyList())
 
