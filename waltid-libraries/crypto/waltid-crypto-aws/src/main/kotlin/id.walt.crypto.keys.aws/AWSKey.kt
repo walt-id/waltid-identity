@@ -337,6 +337,81 @@ $encodedPk
     companion object {
         private val log = KotlinLogging.logger { }
 
+        // Valid AWS regions as of 2024
+        private val VALID_AWS_REGIONS = setOf(
+            "us-east-1", "us-east-2", "us-west-1", "us-west-2",
+            "eu-central-1", "eu-west-1", "eu-west-2", "eu-west-3", "eu-north-1", "eu-south-1", "eu-south-2",
+            "ap-south-1", "ap-southeast-1", "ap-southeast-2", "ap-southeast-3", "ap-northeast-1", "ap-northeast-2", "ap-northeast-3",
+            "sa-east-1", "ca-central-1", "af-south-1", "me-south-1", "me-central-1",
+            "ap-east-1", "cn-north-1", "cn-northwest-1"
+        )
+
+        /**
+         * Validates the configuration before making any AWS API calls.
+         * Throws IllegalArgumentException with helpful messages if validation fails.
+         */
+        private fun validateConfig(config: AWSKeyMetadataSDK) {
+            // Validate primary region
+            if (config.auth.region !in VALID_AWS_REGIONS) {
+                throw IllegalArgumentException(
+                    "Invalid primary region '${config.auth.region}'. Valid AWS regions: ${VALID_AWS_REGIONS.sorted().joinToString(", ")}"
+                )
+            }
+
+            // Validate multi-region configuration
+            val hasMultiRegionConfig = config.replicaRegions != null || config.enableFailover == true || config.failoverOrder != null
+
+            if (hasMultiRegionConfig && config.multiRegion != true) {
+                throw IllegalArgumentException(
+                    "Multi-region configuration (replicaRegions, enableFailover, or failoverOrder) requires 'multiRegion: true'"
+                )
+            }
+
+            // Validate replica regions
+            config.replicaRegions?.forEach { region ->
+                if (region !in VALID_AWS_REGIONS) {
+                    throw IllegalArgumentException(
+                        "Invalid replica region '$region'. Valid AWS regions: ${VALID_AWS_REGIONS.sorted().joinToString(", ")}"
+                    )
+                }
+                if (region == config.auth.region) {
+                    throw IllegalArgumentException(
+                        "Replica region '$region' cannot be the same as the primary region '${config.auth.region}'"
+                    )
+                }
+            }
+
+            // Validate failover configuration
+            if (config.enableFailover == true) {
+                if (config.replicaRegions.isNullOrEmpty()) {
+                    throw IllegalArgumentException(
+                        "Failover requires 'replicaRegions' to be specified"
+                    )
+                }
+            }
+
+            // Validate failover order
+            config.failoverOrder?.let { failoverOrder ->
+                val allRegions = listOfNotNull(config.auth.region) + (config.replicaRegions ?: emptyList())
+
+                // Check that all failoverOrder regions are in the actual region set
+                failoverOrder.forEach { region ->
+                    if (region !in allRegions) {
+                        throw IllegalArgumentException(
+                            "Failover order contains region '$region' which is not in the primary region or replicaRegions. " +
+                                    "Available regions: ${allRegions.joinToString(", ")}"
+                        )
+                    }
+                }
+
+                // Warn if not all regions are in failover order (optional - might be intentional)
+                val missingRegions = allRegions.filter { it !in failoverOrder }
+                if (missingRegions.isNotEmpty()) {
+                    log.warn { "Failover order does not include all regions. Missing: ${missingRegions.joinToString(", ")}" }
+                }
+            }
+        }
+
         /**
          * Generate a new AWS KMS key. For multi-region keys with replicaRegions specified,
          * this will also create replica keys in the specified regions.
@@ -346,6 +421,8 @@ $encodedPk
          * @return The generated AWSKey instance
          */
         suspend fun generateKey(keyType: KeyType, config: AWSKeyMetadataSDK): AWSKey {
+            // Validate configuration before making any AWS API calls
+            validateConfig(config)
 
             val awsTags = config.tags
                 ?.map { (key, value) ->
