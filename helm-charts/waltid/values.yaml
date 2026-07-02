@@ -109,7 +109,6 @@ portal:
     NEXT_PUBLIC_VC_REPO: "https://credentials.walt.id"
     NEXT_PUBLIC_ISSUER: "https://issuer.portal.test.waltid.cloud"
     NEXT_PUBLIC_VERIFIER: "https://verifier.portal.test.waltid.cloud"
-    NEXT_PUBLIC_VERIFIER2: "https://verifier2.portal.waltid.cloud"
     NEXT_PUBLIC_WALLET: "https://wallet.test.waltid.cloud"
   ingress:
     ingressClassName: "traefik"

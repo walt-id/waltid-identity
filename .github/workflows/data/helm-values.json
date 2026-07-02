@@ -82,8 +82,10 @@
       "NEXT_PUBLIC_VERIFIER": "https://verifier.portal.test.waltid.cloud",
       "NEXT_PUBLIC_WALLET": "https://wallet.test.waltid.cloud"
     },
-    "image": {
-      "tag": "latest"
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
     },
     "ingress": {
       "host": "portal.test.waltid.cloud",
@@ -93,6 +95,30 @@
           "secretName": "portal-tls-secret",
           "hosts": [
             "portal.test.waltid.cloud"
+          ]
+        }
+      ]
+    }
+  },
+  "portal2": {
+    "env": {
+      "NUXT_PUBLIC_ISSUER_BASE": "https://issuer2.portal.test.waltid.cloud",
+      "NUXT_PUBLIC_VERIFIER_BASE": "https://verifier2.portal.test.waltid.cloud",
+      "NUXT_PUBLIC_WALLET_URL": "https://wallet.test.waltid.cloud"
+    },
+    "api": {
+      "image": {
+        "tag": "latest"
+      }
+    },
+    "ingress": {
+      "host": "portal2.test.waltid.cloud",
+      "clusterIssuer": "letsencrypt-prod",
+      "tls": [
+        {
+          "secretName": "portal2-tls-secret",
+          "hosts": [
+            "portal2.test.waltid.cloud"
           ]
         }
       ]
