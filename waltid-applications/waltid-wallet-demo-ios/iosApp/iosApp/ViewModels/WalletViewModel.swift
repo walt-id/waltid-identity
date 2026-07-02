@@ -1,30 +1,35 @@
 import Foundation
-import shared
+import WaltIDWalletSDK
 
 @MainActor
 class WalletViewModel: ObservableObject {
     @Published var isReady = false
     @Published var did = ""
-    @Published var credentials: [BridgeCredential] = []
+    @Published var credentials: [Credential] = []
     @Published var statusMessage = "Starting wallet..."
     @Published var isLoading = false
     @Published var isError = false
     @Published var offerUrl = ""
     @Published var presentationRequestUrl = ""
 
-    private let controller: WalletDemoBridgeController
+    private let configuration: WalletConfiguration
+    private var cachedWallet: Wallet?
 
     init(
+        walletID: String = "default",
         attestationBaseUrl: String? = nil,
         attestationAttesterPath: String? = nil,
         attestationBearerToken: String? = nil,
         attestationHostHeader: String? = nil
     ) {
-        controller = WalletDemoBridgeController(
-            attestationBaseUrl: attestationBaseUrl,
-            attestationAttesterPath: attestationAttesterPath,
-            attestationBearerToken: attestationBearerToken,
-            attestationHostHeader: attestationHostHeader
+        configuration = WalletConfiguration(
+            walletID: walletID,
+            attestation: Self.attestationConfiguration(
+                baseUrl: attestationBaseUrl,
+                attesterPath: attestationAttesterPath,
+                bearerToken: attestationBearerToken,
+                hostHeader: attestationHostHeader
+            )
         )
         bootstrap()
     }
@@ -42,35 +47,43 @@ class WalletViewModel: ObservableObject {
     }
 
     func receiveCredential() {
+        let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let offer = URL(string: trimmedOfferUrl) else {
+            setError("Receive failed: invalid offer URL")
+            return
+        }
+
         setLoading("Receiving credential...")
         Task {
             do {
-                let result = try await controller.receiveCredential(offerUrl: offerUrl)
-                let list = try await controller.listCredentials()
-                await MainActor.run {
-                    self.credentials = list
-                    self.setSuccess(result.message)
-                }
+                let wallet = try await wallet()
+                let credentialIDs = try await wallet.receive(offer: offer)
+                credentials = try await wallet.credentials()
+                setSuccess("Received \(credentialIDs.count) credential(s)")
             } catch {
-                await MainActor.run {
-                    self.setError("Receive failed: \(error.localizedDescription)")
-                }
+                setError("Receive failed: \(error.localizedDescription)")
             }
         }
     }
 
     func presentCredential() {
+        let trimmedRequestUrl = presentationRequestUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let request = URL(string: trimmedRequestUrl) else {
+            setError("Present failed: invalid request URL")
+            return
+        }
+
         setLoading("Presenting credential...")
         Task {
             do {
-                let result = try await controller.presentCredential(requestUrl: presentationRequestUrl, did: nil)
-                await MainActor.run {
-                    self.setSuccess(result.message)
-                }
+                let wallet = try await wallet()
+                let result = try await wallet.present(
+                    request: request,
+                    did: did.isEmpty ? nil : did
+                )
+                setSuccess(result.success ? "Presentation sent" : "Presentation finished without verifier confirmation")
             } catch {
-                await MainActor.run {
-                    self.setError("Present failed: \(error.localizedDescription)")
-                }
+                setError("Present failed: \(error.localizedDescription)")
             }
         }
     }
@@ -80,28 +93,54 @@ class WalletViewModel: ObservableObject {
         logE2E("Bootstrap started")
         Task {
             do {
-                logE2E("Bootstrap: calling controller.bootstrap()")
-                let result = try await controller.bootstrap()
-                logE2E("Bootstrap: success, DID: \(result.message)")
+                let wallet = try await wallet()
+                logE2E("Bootstrap: calling wallet.bootstrap()")
+                let result = try await wallet.bootstrap()
+                logE2E("Bootstrap: success, DID: \(result.did)")
 
-                logE2E("Bootstrap: calling controller.listCredentials()")
-                let list = try await controller.listCredentials()
+                logE2E("Bootstrap: calling wallet.credentials()")
+                let list = try await wallet.credentials()
                 logE2E("Bootstrap: listCredentials returned \(list.count) credentials")
 
-                await MainActor.run {
-                    self.did = result.message
-                    self.credentials = list
-                    self.isReady = true
-                    self.setSuccess("Wallet ready")
-                    logE2E("Bootstrap: completed successfully, wallet is ready")
-                }
+                did = result.did
+                credentials = list
+                isReady = true
+                setSuccess("Wallet ready")
+                logE2E("Bootstrap: completed successfully, wallet is ready")
             } catch {
                 logE2E("Bootstrap: FAILED with error: \(error.localizedDescription)")
-                await MainActor.run {
-                    self.setError("Bootstrap failed: \(error.localizedDescription)")
-                }
+                setError("Bootstrap failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    private func wallet() async throws -> Wallet {
+        if let cachedWallet {
+            return cachedWallet
+        }
+
+        let wallet = try await Wallet(configuration: configuration)
+        cachedWallet = wallet
+        return wallet
+    }
+
+    private static func attestationConfiguration(
+        baseUrl: String?,
+        attesterPath: String?,
+        bearerToken: String?,
+        hostHeader: String?
+    ) -> WalletAttestationConfiguration? {
+        guard let baseUrl = baseUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !baseUrl.isEmpty else {
+            return nil
+        }
+
+        return WalletAttestationConfiguration(
+            baseURL: baseUrl,
+            attesterPath: attesterPath ?? "",
+            bearerToken: bearerToken ?? "",
+            hostHeader: hostHeader ?? ""
+        )
     }
 
     private func setLoading(_ message: String) {

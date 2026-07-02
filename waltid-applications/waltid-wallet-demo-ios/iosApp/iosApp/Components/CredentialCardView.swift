@@ -1,22 +1,22 @@
 import SwiftUI
-import shared
+import WaltIDWalletSDK
 
 struct CredentialCardView: View {
-    let credential: BridgeCredential
+    let credential: Credential
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(credential.label)
+            Text(credential.label ?? credential.format)
                 .font(.headline)
                 .lineLimit(1)
             HStack {
-                Text(credential.issuer)
+                Text(credential.issuer ?? "Unknown")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
                 Spacer()
-                if !credential.addedAt.isEmpty {
-                    Text(String(credential.addedAt.prefix(10)))
+                if let addedAt = credential.addedAt {
+                    Text(addedAt.formatted(date: .abbreviated, time: .omitted))
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }

@@ -95,6 +95,7 @@ tink = "1.21.0"
 
 # Persistence
 sqldelight = "2.3.2"
+skie = "0.10.13"
 
 # Testing
 junit = "4.13.2"
@@ -404,3 +405,4 @@ shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
 versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
 license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }
+skie = { id = "co.touchlab.skie", version.ref = "skie" }
