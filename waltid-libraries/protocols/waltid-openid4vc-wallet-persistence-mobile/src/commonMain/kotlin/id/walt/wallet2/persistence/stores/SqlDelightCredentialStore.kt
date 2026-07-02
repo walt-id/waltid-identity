@@ -28,7 +28,7 @@ class SqlDelightCredentialStore(
     }
 
     /**
-     * Streams all stored credentials from the mobile database.
+     * Emits all stored credentials from the mobile database.
      */
     override suspend fun listCredentials(): Flow<StoredCredential> = flow {
         queries.selectAllCredentials().executeAsList().forEach { row ->
