@@ -13,7 +13,7 @@ jobs:
         uses: rlespinasse/github-slug-action@v5
       - name: Set release version
         id: set_version
-        run: echo "release_version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+        run: echo "release_version=${GITHUB_REF_POINT}" >> $GITHUB_OUTPUT
   docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
     with:
