@@ -74,9 +74,12 @@ class OpenId4VciProtocolService(
     /**
      * Process Pushed Authorization Request (RFC 9126)
      */
-    suspend fun processPushedAuthorizationRequest(parameters: Map<String, List<String>>): PushedAuthorizationResponseHttp {
+    suspend fun processPushedAuthorizationRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>> = emptyMap(),
+    ): PushedAuthorizationResponseHttp {
         return try {
-            val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters)) {
+            val parRequest = when (val result = oauth2Provider.createPushedAuthorizationRequest(parameters, headers)) {
                 is AuthorizationRequestResult.Success -> result.request
                 is AuthorizationRequestResult.Failure -> return oauth2Provider.writePushedAuthorizationError(result.error)
             }
@@ -211,8 +214,11 @@ class OpenId4VciProtocolService(
         )
     }
 
-    suspend fun processTokenRequest(parameters: Map<String, List<String>>): AccessTokenResponseHttp {
-        val accessTokenRequest = when (val result = oauth2Provider.createAccessTokenRequest(parameters)) {
+    suspend fun processTokenRequest(
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>> = emptyMap(),
+    ): AccessTokenResponseHttp {
+        val accessTokenRequest = when (val result = oauth2Provider.createAccessTokenRequest(parameters, headers)) {
             is AccessTokenRequestResult.Success -> result.request
             is AccessTokenRequestResult.Failure -> return oauth2Provider.writeAccessTokenError(result.error)
         }.withIssuer(metadataService.issuerBaseUrl())
