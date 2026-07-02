@@ -8,11 +8,15 @@ struct PresentView: View {
             Text("Present")
                 .font(.headline)
 
-            TextField("OpenID4VP request URL", text: $viewModel.presentationRequestUrl, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
+            TextEditor(text: $viewModel.presentationRequestUrl)
+                .font(.footnote.monospaced())
+                .frame(minHeight: 72, maxHeight: 96)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(.separator), lineWidth: 1)
+                )
                 .textInputAutocapitalization(.never)
                 .disableAutocorrection(true)
-                .lineLimit(3)
                 .accessibilityIdentifier("wallet.presentationInput")
 
             Button("Present") {
