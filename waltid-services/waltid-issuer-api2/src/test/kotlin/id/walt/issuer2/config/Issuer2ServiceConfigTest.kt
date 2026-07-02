@@ -169,7 +169,7 @@ class Issuer2ServiceConfigTest {
     private fun loadServiceConfig(content: String): Issuer2ServiceConfig {
         registerIssuer2ConfigDecoders()
         val configFile = Files.createTempFile("issuer-service", ".conf")
-        tempFiles += configFile
+        tempFiles.add(configFile)
         Files.writeString(configFile, content)
 
         System.setProperty("config.file.issuer-service", configFile.toString())
