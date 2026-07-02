@@ -26,7 +26,7 @@ class SqlDelightDidStore(
     }
 
     /**
-     * Streams all DID documents stored in the mobile database.
+     * Emits all DID documents stored in the mobile database.
      */
     override suspend fun listDids(): Flow<WalletDidEntry> = flow {
         queries.selectAllDids().executeAsList().forEach { row ->
