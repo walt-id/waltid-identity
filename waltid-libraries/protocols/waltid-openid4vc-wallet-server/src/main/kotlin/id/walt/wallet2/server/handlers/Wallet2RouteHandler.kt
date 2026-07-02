@@ -3,6 +3,7 @@ package id.walt.wallet2.server.handlers
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.DidService
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.StoredCredentialMetadata
@@ -541,8 +542,17 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
                         response { HttpStatusCode.OK to { body<FetchCredentialResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
-                        call.respond(WalletIssuanceHandler.fetchCredential(req))
+                        
+                        // Get wallet's static key for DPoP proof and proof signing
+                        val walletKey = wallet.staticKey as? JWKKey
+                        val enrichedReq = req.copy(
+                            dpopKey = walletKey,
+                            proofKey = walletKey  // Use same key for proof signing
+                        )
+                        
+                        call.respond(WalletIssuanceHandler.fetchCredential(enrichedReq))
                     }
 
                     // Auth-code grant isolated steps
@@ -551,12 +561,32 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
-                            "The caller must redirect to this URL and capture the returned code."
+                            "The caller must redirect to this URL and capture the returned code. " +
+                            "If the wallet has a staticKey and the AS requires private_key_jwt, " +
+                            "the key will be used to sign the client_assertion for PAR."
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<GenerateAuthorizationUrlRequest>()
-                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(req))
+                        
+                        // Get wallet's static key for client_assertion if available
+                        val clientAssertionKey = wallet.staticKey?.exportJWKObject()
+                        
+                        val enrichedReq = if (clientAssertionKey != null && req.clientAssertionKey == null) {
+                            GenerateAuthorizationUrlRequest(
+                                offerUrl = req.offerUrl,
+                                offerJson = req.offerJson,
+                                clientId = req.clientId,
+                                redirectUri = req.redirectUri,
+                                usePkce = req.usePkce,
+                                clientAssertionKey = clientAssertionKey
+                            )
+                        } else {
+                            req
+                        }
+                        
+                        call.respond(WalletIssuanceHandler.generateAuthorizationUrl(enrichedReq))
                     }
 
                     post("/exchange-code", {
@@ -564,8 +594,20 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
-                        call.respond(WalletIssuanceHandler.exchangeCode(req))
+                        
+                        // Get wallet's static key for DPoP proof signing and client_assertion
+                        // staticKey is already a Key object, cast to JWKKey if it's the right type
+                        val walletKey = wallet.staticKey as? JWKKey
+                        
+                        // Enrich request with DPoP key and client assertion key if available
+                        val enrichedReq = req.copy(
+                            dpopKey = walletKey,
+                            clientAssertionKey = walletKey  // Same key for both DPoP and client_assertion
+                        )
+                        
+                        call.respond(WalletIssuanceHandler.exchangeCode(enrichedReq))
                     }
 
                     post("/deferred", {

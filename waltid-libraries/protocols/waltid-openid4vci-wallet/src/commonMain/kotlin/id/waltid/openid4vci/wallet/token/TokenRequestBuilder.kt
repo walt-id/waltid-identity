@@ -48,6 +48,8 @@ class TokenRequestBuilder(
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param code The authorization code received from authorization endpoint
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
+     * @param dpopProofGenerator Optional function to generate DPoP proof (for nonce retry support)
+     * @param clientAssertionGenerator Optional function to generate client_assertion JWT (regenerated on retry to avoid jti reuse)
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -55,6 +57,8 @@ class TokenRequestBuilder(
         tokenEndpoint: String,
         code: String,
         codeVerifier: String? = null,
+        dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
+        clientAssertionGenerator: (suspend () -> String)? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -62,8 +66,11 @@ class TokenRequestBuilder(
         log.info { "Exchanging authorization code for access token" }
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
+        log.trace { "DPoP proof generator present: ${dpopProofGenerator != null}" }
+        log.trace { "Client assertion generator present: ${clientAssertionGenerator != null}" }
 
-        val parameters = Parameters.build {
+        // Build base parameters (without client_assertion - that's added per-request)
+        val baseParameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
             append("code", code)
             append("redirect_uri", clientConfig.primaryRedirectUri)
@@ -74,7 +81,7 @@ class TokenRequestBuilder(
             }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters)
+        return executeTokenRequestWithDPoP(tokenEndpoint, baseParameters, dpopProofGenerator, clientAssertionGenerator)
     }
 
     /**
@@ -119,7 +126,108 @@ class TokenRequestBuilder(
     }
 
     /**
-     * Executes a token request and parses the response
+     * Executes a token request with DPoP support and parses the response.
+     * Handles DPoP nonce retry per RFC 9449 §5.
+     * 
+     * @param tokenEndpoint The token endpoint URL
+     * @param baseParameters The base form parameters for the request (without client_assertion)
+     * @param dpopProofGenerator Optional function to generate DPoP proof with optional nonce
+     * @param clientAssertionGenerator Optional function to generate client_assertion (called fresh each attempt)
+     */
+    private suspend fun executeTokenRequestWithDPoP(
+        tokenEndpoint: String,
+        baseParameters: Parameters,
+        dpopProofGenerator: (suspend (nonce: String?) -> String)? = null,
+        clientAssertionGenerator: (suspend () -> String)? = null,
+    ): TokenResponse {
+        log.debug { "Sending token request to authorization server (DPoP mode)" }
+        log.trace { "Request parameters count: ${baseParameters.names().size}" }
+        
+        // Build full parameters with fresh client_assertion if needed
+        val parameters = if (clientAssertionGenerator != null) {
+            val clientAssertion = clientAssertionGenerator()
+            log.trace { "Generated fresh client_assertion for token request" }
+            Parameters.build {
+                baseParameters.forEach { name, values -> values.forEach { append(name, it) } }
+                append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                append("client_assertion", clientAssertion)
+            }
+        } else {
+            baseParameters
+        }
+        
+        // First attempt (without nonce)
+        val dpopProof = dpopProofGenerator?.invoke(null)
+        if (dpopProof != null) {
+            log.debug { "Including DPoP proof header (initial request without nonce)" }
+        }
+        
+        val response: HttpResponse = try {
+            httpClient.post(tokenEndpoint) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(parameters.formUrlEncode())
+                dpopProof?.let {
+                    header("DPoP", it)
+                }
+            }
+        } catch (e: Exception) {
+            log.error(e) { "Network error sending token request to: $tokenEndpoint" }
+            throw Exception("Failed to send token request", e)
+        }
+        
+        // Check for DPoP nonce requirement (RFC 9449 §5)
+        if (response.status == HttpStatusCode.BadRequest && dpopProofGenerator != null) {
+            val errorBody = response.bodyAsText()
+            if (errorBody.contains("use_dpop_nonce")) {
+                val dpopNonce = response.headers["DPoP-Nonce"]
+                if (dpopNonce != null) {
+                    log.info { "Server requires DPoP nonce, retrying with nonce: $dpopNonce" }
+                    return executeTokenRequestWithNonce(tokenEndpoint, baseParameters, dpopProofGenerator, dpopNonce, clientAssertionGenerator)
+                } else {
+                    log.error { "Server requires DPoP nonce but didn't provide DPoP-Nonce header" }
+                }
+            }
+        }
+
+        if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
+            log.error {
+                "Token request failed - Status: ${response.status.value} ${response.status.description}, " +
+                "Response body: ${errorBody.take(200)}${if (errorBody.length > 200) "..." else ""}"
+            }
+            throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
+        }
+
+        log.trace { "Received successful token response (${response.status.value}), parsing" }
+        
+        return try {
+            val tokenResponse = response.body<TokenResponse>()
+            log.info {
+                "Successfully obtained access token - " +
+                "Type: ${tokenResponse.token_type}, " +
+                "Expires in: ${tokenResponse.expires_in ?: "not specified"} seconds, " +
+                "Refresh token: ${if (tokenResponse.refresh_token != null) "provided" else "none"}"
+            }
+            log.trace { "Token scope: ${tokenResponse.scope ?: "not specified"}" }
+            tokenResponse
+        } catch (e: Exception) {
+            val responseBody = response.bodyAsText()
+            log.error(e) {
+                "Failed to parse token response - " +
+                "Body preview: ${responseBody.take(200)}${if (responseBody.length > 200) "..." else ""}"
+            }
+            throw Exception("Failed to parse token response", e)
+        }
+    }
+
+    /**
+     * Executes a token request with attestation headers and parses the response.
+     * Handles redirect following with same-origin checks.
+     * 
+     * @param tokenEndpoint The token endpoint URL
+     * @param parameters The form parameters for the request
+     * @param additionalHeaders Additional headers to include
+     * @param attestationHeaders Client attestation headers (if attestation-based auth is used)
      */
     private suspend fun executeTokenRequest(
         tokenEndpoint: String,
@@ -199,6 +307,55 @@ class TokenRequestBuilder(
             }
             throw Exception("Failed to parse token response", e)
         }
+    }
+    
+    /**
+     * Retry token request with DPoP nonce (RFC 9449 §5)
+     * Also regenerates client_assertion to avoid jti reuse (RFC 7523)
+     */
+    private suspend fun executeTokenRequestWithNonce(
+        tokenEndpoint: String,
+        baseParameters: Parameters,
+        dpopProofGenerator: suspend (nonce: String?) -> String,
+        nonce: String,
+        clientAssertionGenerator: (suspend () -> String)? = null,
+    ): TokenResponse {
+        val dpopProof = dpopProofGenerator(nonce)
+        log.debug { "Retrying with DPoP proof containing nonce" }
+        
+        // Build full parameters with fresh client_assertion if needed
+        val parameters = if (clientAssertionGenerator != null) {
+            val clientAssertion = clientAssertionGenerator()
+            log.trace { "Generated fresh client_assertion for retry" }
+            Parameters.build {
+                baseParameters.forEach { name, values -> values.forEach { append(name, it) } }
+                append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
+                append("client_assertion", clientAssertion)
+            }
+        } else {
+            baseParameters
+        }
+        
+        val response: HttpResponse = try {
+            httpClient.post(tokenEndpoint) {
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(parameters.formUrlEncode())
+                header("DPoP", dpopProof)
+            }
+        } catch (e: Exception) {
+            log.error(e) { "Network error on DPoP nonce retry to: $tokenEndpoint" }
+            throw Exception("Failed to send token request with nonce", e)
+        }
+        
+        if (!response.status.isSuccess()) {
+            val errorBody = response.bodyAsText()
+            log.error {
+                "Token request failed after nonce retry - Status: ${response.status.value}, Body: $errorBody"
+            }
+            throw Exception("Token request failed. Status: ${response.status}, Body: $errorBody")
+        }
+        
+        return response.body<TokenResponse>()
     }
 
     private fun isSameOrigin(source: String, target: String): Boolean {

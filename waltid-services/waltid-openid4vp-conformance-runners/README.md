@@ -1,194 +1,197 @@
-<div align="center">
-<h1>walt.id OpenID4VP Conformance Runners</h1>
- <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services</p>
+# OpenID4VC Conformance Test Runners
 
-<a href="https://walt.id/community">
-<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
-</a>
-<a href="https://www.linkedin.com/company/walt-id/">
-<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
-</a>
-  
-  <h2>Status</h2>
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-    <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
-  </p>
-</div>
+Automated test runners for [OpenID Foundation Conformance Suite](https://gitlab.com/openid/conformance-suite).
 
-## Quick Start (Docker)
+## Test Coverage
 
-The fastest way to run conformance tests locally:
+| Protocol | Role | Test Class | Status | Docs |
+|----------|------|------------|--------|------|
+| OpenID4VCI 1.0 | **Wallet** | `VciWalletConformanceTests` | ✅ **140/140** | [VCI-WALLET.md](docs/VCI-WALLET.md) |
+| OpenID4VCI 1.0 | **Issuer** | `IssuerConformanceTests` | ⚠️ 53/55 | [VCI-ISSUER.md](docs/VCI-ISSUER.md) |
+| OpenID4VP 1.0 | **Verifier** | `VerifierConformanceTests` | ⚠️ 1/2 (mDL ✅) | [VP-VERIFIER.md](docs/VP-VERIFIER.md) |
+| OpenID4VP 1.0 | **Wallet** | `VpWalletConformanceTests` | 🚫 Blocked | [VP-WALLET.md](docs/VP-WALLET.md) |
+
+### Status Legend
+- ✅ **Complete** — All tests passing
+- ⚠️ **Partial** — Most tests pass, some known issues
+- 🚫 **Blocked** — Waiting on upstream features (WAL-896 HAIP)
+
+## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Java 21+
-- `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
 
-Add the hosts entry:
-```shell
-echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
+1. **Add hosts entry** (one-time setup):
+   ```bash
+   echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
+   ```
+
+2. **Clone and configure conformance suite**:
+   ```bash
+   git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+   
+   # Copy walt.id config
+   cp docker-compose-walt.yml ~/dev/openid/conformance-suite/
+   cp -r nginx ~/dev/openid/conformance-suite/
+   ```
+
+3. **Start conformance suite**:
+   ```bash
+   cd ~/dev/openid/conformance-suite
+   docker compose -f docker-compose-walt.yml up -d
+   
+   # Wait ~30s, then verify
+   curl -k https://localhost.emobix.co.uk:8443/
+   ```
+
+4. **Install ngrok** (for issuer/verifier tests):
+   ```bash
+   # macOS
+   brew install ngrok
+   
+   # Linux (snap)
+   sudo snap install ngrok
+   ```
+
+### Running Tests
+
+All commands run from: `~/dev/walt-id/waltid-unified-build/waltid-identity`
+
+#### VCI Wallet (✅ Complete)
+No external dependencies — runs standalone against conformance suite.
+
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VciWalletConformanceTests"
 ```
 
-### 1. Clone and Start the Conformance Suite
+#### VCI Issuer (⚠️ 53/55)
+Requires: `issuer-api2` running + ngrok tunnel
 
-```shell
-# Clone the conformance suite (if not already done)
-git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+```bash
+# Terminal 1: Start issuer
+./gradlew :waltid-services:waltid-issuer-api2:run
 
-# Start with Docker
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml up -d
+# Terminal 2: Start ngrok
+ngrok http 7002
+
+# Terminal 3: Run tests (use your ngrok URL)
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vc"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "IssuerConformanceTests"
 ```
 
-Wait ~30 seconds for the server to start, then verify:
-```shell
-curl -k https://localhost.emobix.co.uk:8443/
+#### VP Verifier (⚠️ 1/2 — mDL passing)
+Requires: `verifier-api2` running + ngrok tunnel
+
+```bash
+# Terminal 1: Start verifier
+./gradlew :waltid-services:waltid-verifier-api2:run
+
+# Terminal 2: Start ngrok
+ngrok http 7003
+
+# Terminal 3: Run tests (use your ngrok URL)
+export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VerifierConformanceTests"
 ```
 
-### 2. Run the Conformance Tests
+#### VP Wallet (🚫 Blocked)
+Blocked on WAL-896 HAIP features (JAR, JWE, HAIP policy support).
 
-```shell
-# From the waltid-unified-build directory
-cd ~/dev/walt-id/waltid-unified-build
-
-# Run tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "id.walt.openid4vp.conformance.ConformanceTests"
+```bash
+# Will skip until HAIP features are implemented
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests"
 ```
 
-Or run the main application:
-```shell
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run
+## Known Issues
+
+### VCI Issuer (2 failures)
+1. **"No 'iss' value in authorization response"** — Missing RFC 9207 issuer identification
+2. **"Invalid http status"** — Unexpected HTTP status on credential endpoint
+
+### VP Verifier (SD-JWT HAIP)
+- **Trust anchor configuration** — HAIP test plan requires `Request Object Trust Anchor` in client config
+- mDL (plain VP) tests work; SD-JWT HAIP tests need additional configuration
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    OIDF Conformance Suite (Docker)                      │
+│                  https://localhost.emobix.co.uk:8443                    │
+│                                                                         │
+│   Can act as: Issuer, Verifier, Wallet (depending on test plan)         │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │
+                                   │ HTTPS (via ngrok for external access)
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Test Adapters                                   │
+│                                                                         │
+│   VciWalletConformanceAdapter (7007) — bridges VCI wallet flow          │
+│   VpWalletConformanceAdapter (7006)  — bridges VP wallet flow           │
+│                                                                         │
+│   (Adapters simulate "robot users" driving wallet APIs step-by-step)    │
+└──────────────────────────────────┬──────────────────────────────────────┘
+                                   │
+                                   │ HTTP
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         walt.id Services                                │
+│                                                                         │
+│   wallet-api2   (7005) — credential wallet                              │
+│   issuer-api2   (7002) — credential issuer                              │
+│   verifier-api2 (7003) — presentation verifier                          │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3. Stop the Conformance Suite
+## Code Structure
 
-```shell
-cp ./docker-compose-walt.yml cd ~/dev/openid/conformance-suite
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml down
 ```
+src/
+├── main/kotlin/id/walt/openid4vp/conformance/
+│   ├── adapter/                    # Test adapters (conformance ↔ wallet APIs)
+│   ├── testplans/
+│   │   ├── http/                   # HTTP interfaces to conformance suite
+│   │   ├── httpdata/               # Response DTOs
+│   │   ├── plans/                  # Test plan definitions
+│   │   │   ├── vci/{issuer,wallet}/
+│   │   │   └── vp/{verifier,wallet}/
+│   │   └── runner/                 # Test plan runners
+│   └── utils/
+└── test/kotlin/id/walt/openid4vp/conformance/
+    ├── VciWalletConformanceTests.kt   # ✅ Complete
+    ├── IssuerConformanceTests.kt      # ⚠️ Partial
+    ├── VerifierConformanceTests.kt    # ⚠️ Partial
+    └── VpWalletConformanceTests.kt    # 🚫 Blocked
 
-## SSL Certificate (Already Configured)
-
-This project includes a bundled truststore (`conformance-truststore.jks`) with the conformance suite's self-signed certificate. It's automatically used when running via Gradle.
-
-### Updating the Certificate
-
-If you rebuild the conformance suite's nginx container, extract and import the new certificate:
-
-```shell
-# Extract certificate from running server
-openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk </dev/null 2>/dev/null | \
-  openssl x509 -outform PEM > conformance-test.pem
-
-# Update truststore
-keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks -storepass changeit 2>/dev/null || true
-keytool -importcert -trustcacerts -alias conformance-test-localhost \
-  -file conformance-test.pem -keystore conformance-truststore.jks \
-  -storepass changeit -noprompt
+docs/
+├── VCI-WALLET.md    # VCI wallet documentation
+├── VCI-ISSUER.md    # VCI issuer documentation
+├── VP-VERIFIER.md   # VP verifier documentation
+└── VP-WALLET.md     # VP wallet documentation
 ```
-
-### Running from IntelliJ
-
-Add these VM options to your run configuration:
-```
--Djavax.net.ssl.trustStore=/home/pp/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
--Djavax.net.ssl.trustStorePassword=changeit
-```
-
----
-
-## Alternative: Setup with Devenv (Nix)
-
-For the full nix/devenv setup (creates CA, manages hosts file automatically):
-
-### Install Nix
-
-```shell
-# Option 1: Native package manager (if available)
-sudo pacman -S nix  # Arch
-# or
-sudo apt install nix  # Debian/Ubuntu
-
-# Option 2: Official installer
-sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
-```
-
-Enable and start the nix daemon:
-```shell
-sudo systemctl enable --now nix-daemon.service
-```
-
-### Install Devenv
-
-```shell
-nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixpkgs-unstable
-```
-
-### Run Conformance Suite with Devenv
-
-```shell
-cd ~/dev/openid/conformance-suite
-devenv up
-```
-
-In another terminal:
-```shell
-cd ~/dev/openid/conformance-suite
-mvn spring-boot:run
-```
-
-Visit: https://localhost.emobix.co.uk:8443/
-
----
-
-## Test Plans
-
-OpenID4VP 1.0 test coverage:
-
-**Verifier Tests**
-- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
-- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
-- iso_mdl + x509_san_dns + request_uri_signed + direct_post
-- iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
-
-**Wallet Tests** (unsigned/signed + direct_post/direct_post.jwt)
-- sd_jwt_vc: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-- iso_mdl: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-
-See `config/` for example configuration files.
-
----
 
 ## Troubleshooting
 
-### SSL Handshake Errors
-If you see `SSLHandshakeException` or certificate errors:
-1. Ensure `docker-compose-walt.yml` was used (builds nginx with proper cert)
-2. Verify truststore is being used (check Gradle output for JVM args)
-3. Try rebuilding: `docker compose -f docker-compose-walt.yml build nginx`
+### Tests are SKIPPED
+- Conformance suite not running → `docker compose -f docker-compose-walt.yml up -d`
+- Environment variable not set → Check `VERIFIER_NGROK_URL` or `OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL`
+- ngrok tunnel down → Restart ngrok and update env var
 
-### Conformance Suite Not Starting
-Check container logs:
-```shell
-docker logs conformance-suite-server-1
-docker logs conformance-suite-nginx-1
-```
+### "Connection refused" errors
+- Service not running → Start the required `*-api2` service
+- Wrong port → Verify ngrok is tunneling to correct port (7002 for issuer, 7003 for verifier)
 
----
+### Stale test results
+- Use `--rerun-tasks` flag to force fresh test execution
+- Restart conformance suite if tests get stuck: `docker compose -f docker-compose-walt.yml restart`
 
-## Join the community
+## External Links
 
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-* Find more indepth documentation on our [docs site](https://docs.walt.id)
-
-## License
-
-Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-<div align="center">
-<img src="../../assets/walt-banner.png" alt="walt.id banner" />
-</div>
+- [OpenID4VCI 1.0 Spec](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
+- [OpenID4VP 1.0 Spec](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
+- [HAIP Profile](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
+- [Conformance Suite GitLab](https://gitlab.com/openid/conformance-suite)

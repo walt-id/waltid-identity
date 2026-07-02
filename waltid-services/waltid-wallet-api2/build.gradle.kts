@@ -73,6 +73,19 @@ dependencies {
 
 application {
     mainClass.set("id.walt.wallet2.MainKt")
+    // Use the same truststore as conformance-runners for testing with conformance suite
+    applicationDefaultJvmArgs = listOf(
+        "-Djavax.net.ssl.trustStore=${rootProject.projectDir}/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks",
+        "-Djavax.net.ssl.trustStorePassword=changeit"
+    )
+}
+
+// Also apply truststore args for the `run` task (applicationDefaultJvmArgs only affects distribution)
+tasks.named<JavaExec>("run") {
+    jvmArgs(
+        "-Djavax.net.ssl.trustStore=${rootProject.projectDir}/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks",
+        "-Djavax.net.ssl.trustStorePassword=changeit"
+    )
 }
 
 buildConfig {

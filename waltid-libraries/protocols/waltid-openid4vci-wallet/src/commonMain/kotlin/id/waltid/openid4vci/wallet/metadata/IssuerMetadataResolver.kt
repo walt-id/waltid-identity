@@ -202,11 +202,16 @@ class IssuerMetadataResolver(
     }
 
     /**
-     * Builds a full metadata URL from a base URL and well-known path
+     * Builds a full metadata URL from a base URL and well-known path.
+     * 
+     * Per OID4VCI 1.0 §12.2.2, the metadata URL is formed by:
+     * - Inserting `/.well-known/openid-credential-issuer` after the host
+     * - Appending the path from the issuer URL (preserving trailing slash if present)
      */
     private fun buildMetadataUrl(baseUrl: String, wellKnownSuffix: String): String {
         val url = Url(baseUrl)
-        val pathSuffix = url.encodedPath.trimEnd('/').takeIf { it.isNotEmpty() && it != "/" } ?: ""
+        // Preserve the path exactly as-is, including trailing slash if present (OID4VCI-1FINAL-12.2.2)
+        val pathSuffix = url.encodedPath.takeIf { it.isNotEmpty() && it != "/" } ?: ""
 
         return buildString {
             append(url.protocol.name)
