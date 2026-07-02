@@ -217,7 +217,7 @@ object Issuer2ManagementRoutesDocs {
     }
 
     private val preferredProfileExampleIds = listOf(
-        "universityDegree",
+        "openBadgeCredential",
         "identityCredentialSdJwt",
         "isoPhotoId",
     )

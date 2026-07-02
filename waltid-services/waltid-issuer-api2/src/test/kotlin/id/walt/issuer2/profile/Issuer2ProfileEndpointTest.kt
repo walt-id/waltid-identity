@@ -177,17 +177,17 @@ class Issuer2ProfileEndpointTest {
             )
         }
 
-        val universityDegreeProfile = assertNotNull(
-            profiles.firstOrNull { it.profileId == UNIVERSITY_DEGREE_PROFILE_ID },
-            "Expected configured profile $UNIVERSITY_DEGREE_PROFILE_ID",
+        val openBadgeProfile = assertNotNull(
+            profiles.firstOrNull { it.profileId == OPEN_BADGE_PROFILE_ID },
+            "Expected configured profile $OPEN_BADGE_PROFILE_ID",
         )
-        assertW3CProfile(universityDegreeProfile)
+        assertW3CProfile(openBadgeProfile)
 
-        val profileRaw = client.get("/issuer2/profiles/$UNIVERSITY_DEGREE_PROFILE_ID")
+        val profileRaw = client.get("/issuer2/profiles/$OPEN_BADGE_PROFILE_ID")
         assertEquals(HttpStatusCode.OK, profileRaw.status)
         val profileResponseBody = profileRaw.bodyAsText()
         assertIssuerKeyIsExposed(profileResponseBody)
-        assertProfileJsonEquals(universityDegreeProfile, profileResponseBody)
+        assertProfileJsonEquals(openBadgeProfile, profileResponseBody)
 
         assertMdocCatalogProfiles(profiles)
         assertSdJwtCatalogProfiles(profiles)
@@ -220,7 +220,7 @@ class Issuer2ProfileEndpointTest {
         val examples = Issuer2ManagementRoutesDocs.selectProfileExamples(configuredProfiles)
 
         assertEquals(
-            listOf(UNIVERSITY_DEGREE_PROFILE_ID, IDENTITY_SD_JWT_PROFILE_ID, ISO_PHOTO_ID_PROFILE_ID),
+            listOf(OPEN_BADGE_PROFILE_ID, IDENTITY_SD_JWT_PROFILE_ID, ISO_PHOTO_ID_PROFILE_ID),
             examples.map { it.profileId },
             "Expected profile OpenAPI examples to cover W3C, SD-JWT VC, and mDOC defaults",
         )
@@ -254,17 +254,18 @@ class Issuer2ProfileEndpointTest {
     }
 
     private fun assertW3CProfile(profile: CredentialProfile) {
-        assertEquals(UNIVERSITY_DEGREE_PROFILE_ID, profile.profileId)
-        assertEquals("UniversityDegree", profile.name)
-        assertEquals(UNIVERSITY_DEGREE_CONFIGURATION_ID, profile.credentialConfigurationId)
+        assertEquals(OPEN_BADGE_PROFILE_ID, profile.profileId)
+        assertEquals("OpenBadgeCredential", profile.name)
+        assertEquals(OPEN_BADGE_CONFIGURATION_ID, profile.credentialConfigurationId)
         assertEquals(ISSUER_DID, profile.issuerDid)
         assertEquals(
-            listOf("VerifiableCredential", "UniversityDegree"),
+            listOf("VerifiableCredential", "OpenBadgeCredential"),
             profile.credentialData["type"]?.jsonArray?.map { it.jsonPrimitive.content },
         )
-        val degree = assertNotNull(profile.credentialData["credentialSubject"]?.jsonObject?.get("degree")?.jsonObject)
-        assertEquals("BachelorDegree", degree["type"]?.jsonPrimitive?.content)
-        assertEquals("Bachelor of Science and Arts", degree["name"]?.jsonPrimitive?.content)
+        val credentialSubject = assertNotNull(profile.credentialData["credentialSubject"]?.jsonObject)
+        assertEquals(listOf("AchievementSubject"), credentialSubject["type"]?.jsonArray?.map { it.jsonPrimitive.content })
+        val achievement = assertNotNull(credentialSubject["achievement"]?.jsonObject)
+        assertEquals("Teamwork", achievement["name"]?.jsonPrimitive?.content)
         assertEquals("<uuid>", profile.mapping?.get("id")?.jsonPrimitive?.content)
         assertNull(profile.idTokenClaimsMapping)
     }
@@ -546,8 +547,8 @@ class Issuer2ProfileEndpointTest {
             ?: error("Could not locate waltid-issuer-api2 config directory")
 
     private companion object {
-        const val UNIVERSITY_DEGREE_PROFILE_ID = "universityDegree"
-        const val UNIVERSITY_DEGREE_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
+        const val OPEN_BADGE_PROFILE_ID = "openBadgeCredential"
+        const val OPEN_BADGE_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
         const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
         const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
         const val ISO_PHOTO_ID_COMMON_NAMESPACE_ID = "org.iso.23220.1"
