@@ -11,7 +11,7 @@ protocol WalletCoreBridge: Sendable {
 
 enum DefaultWalletCoreBridgeFactory {
     static func makeBridge(configuration: WalletConfiguration) throws -> any WalletCoreBridge {
-        #if canImport(WaltidWalletCore) && os(iOS)
+        #if canImport(WaltIDWalletCore) && os(iOS)
         return try KMPWalletCoreBridge(configuration: configuration)
         #else
         return UnavailableWalletCoreBridge()
@@ -43,6 +43,6 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     private func unavailableError() -> WalletError {
-        .internalFailure("WaltidWalletCore is only available when the iOS XCFramework is linked.")
+        .internalFailure("WaltIDWalletCore is only available when the iOS XCFramework is linked.")
     }
 }

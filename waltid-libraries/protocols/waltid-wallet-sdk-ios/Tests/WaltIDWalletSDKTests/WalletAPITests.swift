@@ -1,11 +1,11 @@
 import XCTest
-@testable import WaltidWalletSDK
+@testable import WaltIDWalletSDK
 
-final class WalletClientAPITests: XCTestCase {
+final class WalletAPITests: XCTestCase {
     func testPublicAPISymbolsHaveDocCComments() throws {
         let sourceDirectory = packageRoot()
             .appendingPathComponent("Sources")
-            .appendingPathComponent("WaltidWalletSDK")
+            .appendingPathComponent("WaltIDWalletSDK")
         let sourceFiles = try FileManager.default
             .contentsOfDirectory(at: sourceDirectory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }
@@ -73,21 +73,21 @@ final class WalletClientAPITests: XCTestCase {
         XCTAssertEqual(credential, credential)
     }
 
-    func testWalletClientHasAsyncFacadeShape() async {
-        let client = try? await WalletClient(configuration: .init())
+    func testWalletHasAsyncFacadeShape() async {
+        let wallet = try? await Wallet(configuration: .init())
 
-        XCTAssertNotNil(client)
+        XCTAssertNotNil(wallet)
     }
 
     func testBootstrapForwardsDefaultKeyTypeAndDidMethod() async throws {
         let bridge = FakeWalletCoreBridge()
         bridge.bootstrapResult = .init(keyID: "key-1", did: "did:jwk:abc")
-        let client = WalletClient(
+        let wallet = Wallet(
             configuration: .init(defaultKeyType: .ed25519),
             bridge: bridge
         )
 
-        let result = try await client.bootstrap(didMethod: "jwk")
+        let result = try await wallet.bootstrap(didMethod: "jwk")
 
         XCTAssertEqual(result, .init(keyID: "key-1", did: "did:jwk:abc"))
         XCTAssertEqual(bridge.bootstrapCalls.count, 1)
@@ -97,12 +97,12 @@ final class WalletClientAPITests: XCTestCase {
 
     func testBootstrapForwardsExplicitKeyType() async throws {
         let bridge = FakeWalletCoreBridge()
-        let client = WalletClient(
+        let wallet = Wallet(
             configuration: .init(defaultKeyType: .secp256r1),
             bridge: bridge
         )
 
-        _ = try await client.bootstrap(keyType: .rsa4096)
+        _ = try await wallet.bootstrap(keyType: .rsa4096)
 
         XCTAssertEqual(bridge.bootstrapCalls.first?.keyType, .rsa4096)
     }
@@ -111,9 +111,9 @@ final class WalletClientAPITests: XCTestCase {
         let offer = URL(string: "openid-credential-offer://issuer.example?credential_offer=abc")!
         let bridge = FakeWalletCoreBridge()
         bridge.receiveResult = ["credential-1", "credential-2"]
-        let client = WalletClient(bridge: bridge)
+        let wallet = Wallet(bridge: bridge)
 
-        let result = try await client.receive(
+        let result = try await wallet.receive(
             offer: offer,
             txCode: "1234",
             clientID: "ios-client"
@@ -137,9 +137,9 @@ final class WalletClientAPITests: XCTestCase {
         )
         let bridge = FakeWalletCoreBridge()
         bridge.credentialsResult = [credential]
-        let client = WalletClient(bridge: bridge)
+        let wallet = Wallet(bridge: bridge)
 
-        let result = try await client.credentials()
+        let result = try await wallet.credentials()
 
         XCTAssertEqual(result, [credential])
         XCTAssertEqual(bridge.credentialsCallCount, 1)
@@ -154,9 +154,9 @@ final class WalletClientAPITests: XCTestCase {
             redirectTo: redirect,
             verifierResponseJSON: #"{"status":"ok"}"#
         )
-        let client = WalletClient(bridge: bridge)
+        let wallet = Wallet(bridge: bridge)
 
-        let result = try await client.present(
+        let result = try await wallet.present(
             request: request,
             did: "did:key:wallet",
             runPolicies: true
@@ -173,11 +173,11 @@ final class WalletClientAPITests: XCTestCase {
     func testBridgeErrorsSurfaceAsWalletErrors() async {
         let bridge = FakeWalletCoreBridge()
         bridge.error = .invalidInput("missing offer")
-        let client = WalletClient(bridge: bridge)
+        let wallet = Wallet(bridge: bridge)
         let offer = URL(string: "openid-credential-offer://issuer.example")!
 
         do {
-            _ = try await client.receive(offer: offer)
+            _ = try await wallet.receive(offer: offer)
             XCTFail("Expected receive to throw")
         } catch let error as WalletError {
             XCTAssertEqual(error, .invalidInput("missing offer"))
@@ -189,9 +189,9 @@ final class WalletClientAPITests: XCTestCase {
     func testEventsReturnsBridgeEventStream() async {
         let event = WalletEvent(name: "receive", phase: .issuance, status: .progress)
         let bridge = FakeWalletCoreBridge(events: [event])
-        let client = WalletClient(bridge: bridge)
+        let wallet = Wallet(bridge: bridge)
 
-        let events = await client.events
+        let events = await wallet.events
         var iterator = events.makeAsyncIterator()
 
         let first = await iterator.next()

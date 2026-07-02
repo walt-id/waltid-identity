@@ -1,6 +1,6 @@
 import Foundation
 
-/// Configuration for a wallet SDK client instance.
+/// Configuration for a wallet SDK instance.
 public struct WalletConfiguration: Equatable, Sendable {
     /// Stable local wallet identifier used by the underlying wallet store.
     public var walletID: String
@@ -11,7 +11,7 @@ public struct WalletConfiguration: Equatable, Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
-    /// Creates wallet client configuration.
+    /// Creates wallet configuration.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
