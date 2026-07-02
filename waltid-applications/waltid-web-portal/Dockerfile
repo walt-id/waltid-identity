@@ -2,7 +2,7 @@
 FROM node:20-slim AS buildstage
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable
+RUN corepack enable && corepack prepare pnpm@10.11.1 --activate
 
 COPY waltid-applications/waltid-web-portal/. /build
 
