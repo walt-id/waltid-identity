@@ -335,6 +335,7 @@ $encodedPk
     // =========================================================================
 
     companion object {
+        private val log = KotlinLogging.logger { }
 
         /**
          * Generate a new AWS KMS key. For multi-region keys with replicaRegions specified,
@@ -383,20 +384,30 @@ $encodedPk
                     }
                 } catch (e: AlreadyExistsException) {
                     // Rollback: schedule key deletion since alias already exists
-                    KmsClient { region = config.auth.region }.use { kms ->
-                        kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
-                            this.keyId = keyId
-                            pendingWindowInDays = 7
-                        })
+                    try {
+                        KmsClient { region = config.auth.region }.use { kms ->
+                            kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
+                                this.keyId = keyId
+                                pendingWindowInDays = 7
+                            })
+                        }
+                        log.warn { "Key $keyId scheduled for deletion after alias creation failure" }
+                    } catch (rollbackException: Exception) {
+                        log.error(rollbackException) { "Failed to rollback (schedule deletion of key $keyId). Manual cleanup may be required. IAM permissions required: kms:ScheduleKeyDeletion" }
                     }
                     throw KeyAlreadyExistsException(keyName, cause = e)
                 } catch (e: Exception) {
                     // Rollback: schedule key deletion on any alias creation failure
-                    KmsClient { region = config.auth.region }.use { kms ->
-                        kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
-                            this.keyId = keyId
-                            pendingWindowInDays = 7
-                        })
+                    try {
+                        KmsClient { region = config.auth.region }.use { kms ->
+                            kms.scheduleKeyDeletion(ScheduleKeyDeletionRequest {
+                                this.keyId = keyId
+                                pendingWindowInDays = 7
+                            })
+                        }
+                        log.warn { "Key $keyId scheduled for deletion after alias creation failure" }
+                    } catch (rollbackException: Exception) {
+                        log.error(rollbackException) { "Failed to rollback (schedule deletion of key $keyId). Manual cleanup may be required. IAM permissions required: kms:ScheduleKeyDeletion" }
                     }
                     throw e
                 }
