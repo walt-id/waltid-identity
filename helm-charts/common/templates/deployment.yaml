@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "api-service.fullname" . }}
+  name: {{ include "common.fullname" . }}
   labels:
-    {{- include "api-service.labels" . | nindent 4 }}
+    {{- include "common.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.api.replicas }}
   selector:
     matchLabels:
-      app: {{ include "api-service.name" . }}
-      {{- include "api-service.selectorLabels" . | nindent 6 }}
+      app: {{ include "common.name" . }}
+      {{- include "common.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ include "api-service.name" . }}
-        {{- include "api-service.labels" . | nindent 8 }}
+        app: {{ include "common.name" . }}
+        {{- include "common.labels" . | nindent 8 }}
       annotations:
         deployment/id: _DEFAULT_DEPLOYMENT_
     spec:
@@ -25,7 +25,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - name: {{ include "api-service.name" . }}
+      - name: {{ include "common.name" . }}
         image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
         imagePullPolicy: {{ .Values.api.image.imagePullPolicy }}
         securityContext:
@@ -36,10 +36,18 @@ spec:
         ports:
           - name: http-api
             containerPort: {{ .Values.api.containerPort }}
+        {{- with .Values.env }}
+        env:
+        {{- range $name, $value := . }}
+        - name: {{ $name }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if or .Values.configFiles .Values.persistence.enabled }}
         volumeMounts:
         {{- range $name, $content := .Values.configFiles }}
         - mountPath: {{ $.Values.configMountPath }}/{{ $name }}
-          name: web-config
+          name: config
           subPath: {{ $name }}
           readOnly: true
         {{- end }}
@@ -47,12 +55,17 @@ spec:
         - mountPath: {{ .Values.persistence.mountPath | quote }}
           name: data
         {{- end }}
+        {{- end }}
+      {{- if or .Values.configFiles .Values.persistence.enabled }}
       volumes:
-      - name: web-config
+      {{- if .Values.configFiles }}
+      - name: config
         configMap:
-          name: {{ include "api-service.fullname" . }}-web-config
+          name: {{ include "common.fullname" . }}-config
+      {{- end }}
       {{- if .Values.persistence.enabled }}
       - name: data
         persistentVolumeClaim:
-          claimName: {{ include "api-service.fullname" . }}-data-volume-claim
+          claimName: {{ include "common.fullname" . }}-data-volume-claim
+      {{- end }}
       {{- end }}

@@ -1,11 +1,13 @@
+{{- if .Values.configFiles }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "api-service.fullname" . }}-web-config
+  name: {{ include "common.fullname" . }}-config
   labels:
-    {{- include "api-service.labels" . | nindent 4 }}
+    {{- include "common.labels" . | nindent 4 }}
 data:
   {{- range $name, $content := .Values.configFiles }}
   {{ $name }}: |
     {{- tpl $content $ | nindent 4 }}
   {{- end }}
+{{- end }}

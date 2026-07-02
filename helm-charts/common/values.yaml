@@ -13,7 +13,12 @@ configMountPath: /waltid-issuer-api/config
 # Values support Helm templating (tpl), e.g. {{ .Values.ingress.host }}.
 # Kept empty by default so instances (which deep-merge maps) don't inherit
 # config files they shouldn't -- each instance declares its own set.
+# When empty, no ConfigMap or config volume is rendered.
 configFiles: {}
+
+# Plain container environment variables (name: value). Used by workloads that
+# configure via env vars instead of mounted config files (e.g. the portals).
+env: {}
 
 # Optional persistent data volume (used by wallet-api).
 persistence:

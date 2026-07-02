@@ -99,10 +99,17 @@ verifier2:
     host: verifier2.portal.test.waltid.cloud
 
 portal:
+  api:
+    containerPort: 3000
+    image:
+      repository: waltid/portal
+      tag: latest
+      imagePullPolicy: Always
   env:
     NEXT_PUBLIC_VC_REPO: "https://credentials.walt.id"
     NEXT_PUBLIC_ISSUER: "https://issuer.portal.test.waltid.cloud"
     NEXT_PUBLIC_VERIFIER: "https://verifier.portal.test.waltid.cloud"
+    NEXT_PUBLIC_VERIFIER2: "https://verifier2.portal.waltid.cloud"
     NEXT_PUBLIC_WALLET: "https://wallet.test.waltid.cloud"
   ingress:
     ingressClassName: "traefik"
@@ -112,6 +119,26 @@ portal:
           - portal.test.waltid.cloud
         secretName: portal-tls-secret
     host: portal.test.waltid.cloud
+
+portal2:
+  api:
+    containerPort: 3000
+    image:
+      repository: waltid/portal2
+      tag: latest
+      imagePullPolicy: Always
+  env:
+    NUXT_PUBLIC_ISSUER_BASE: "https://issuer2.portal.test.waltid.cloud"
+    NUXT_PUBLIC_VERIFIER_BASE: "https://verifier2.portal.test.waltid.cloud"
+    NUXT_PUBLIC_WALLET_URL: "https://wallet.test.waltid.cloud"
+  ingress:
+    ingressClassName: "traefik"
+    clusterIssuer: letsencrypt-prod
+    tls:
+      - hosts:
+          - portal2.test.waltid.cloud
+        secretName: portal2-tls-secret
+    host: portal2.test.waltid.cloud
 
 web-wallet:
   pvc:
