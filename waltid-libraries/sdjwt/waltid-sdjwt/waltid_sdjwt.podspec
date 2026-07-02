@@ -9,7 +9,6 @@ Pod::Spec.new do |spec|
     spec.vendored_frameworks      = 'build/cocoapods/framework/waltid_sdjwt.framework'
     spec.libraries                = 'c++'
     spec.ios.deployment_target    = '15.4'
-    spec.dependency 'JOSESwift', '2.4.0'
                 
     if !Dir.exist?('build/cocoapods/framework/waltid_sdjwt.framework') || Dir.empty?('build/cocoapods/framework/waltid_sdjwt.framework')
         raise "

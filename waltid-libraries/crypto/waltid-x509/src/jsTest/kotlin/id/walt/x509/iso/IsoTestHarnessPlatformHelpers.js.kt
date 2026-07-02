@@ -3,9 +3,11 @@ package id.walt.x509.iso
 import kotlinx.io.bytestring.ByteString
 
 actual fun isBigIntegerZero(bigInt: ByteString): Boolean {
-    TODO("Not yet implemented")
+    return bigInt.toByteArray().all { it == 0.toByte() }
 }
 
 actual fun isBigIntegerPositive(bigInt: ByteString): Boolean {
-    TODO("Not yet implemented")
+    val bytes = bigInt.toByteArray()
+    if (bytes.isEmpty()) return false
+    return (bytes[0].toInt() and 0x80) == 0 && bytes.any { it != 0.toByte() }
 }

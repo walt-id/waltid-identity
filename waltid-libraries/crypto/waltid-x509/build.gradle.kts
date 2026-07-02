@@ -23,12 +23,25 @@ kotlin {
     }
 
     sourceSets {
+        val jvmIosMain by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation(identityLibs.signum.indispensable)
+                implementation(identityLibs.signum.supreme)
+            }
+        }
+        jvmMain.get().dependsOn(jvmIosMain)
+        if (enableIosBuild) {
+            iosMain.get().dependsOn(jvmIosMain)
+        }
+
         commonMain.dependencies {
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.io.core)
             implementation(identityLibs.kotlinx.io.bytestring)
             implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.whyoleg.cryptography.random)
 
         }
         commonTest.dependencies {
@@ -63,6 +76,16 @@ kotlin {
         jsTest.dependencies {
             implementation(kotlin("test-js"))
 
+        }
+    }
+
+    if (enableAndroidBuild) {
+        // Signum's Android artifacts bring jdk18on Bouncy Castle; this project
+        // already uses lts8on via the shared JVM/Android crypto stack.
+        configurations.all {
+            exclude(group = "org.bouncycastle", module = "bcprov-jdk18on")
+            exclude(group = "org.bouncycastle", module = "bcpkix-jdk18on")
+            exclude(group = "org.bouncycastle", module = "bcutil-jdk18on")
         }
     }
 }

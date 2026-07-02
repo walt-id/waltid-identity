@@ -1,7 +1,6 @@
 package id.walt.x509.iso.iaca
 
 import id.walt.x509.CertificateDer
-import id.walt.x509.iso.supportsIsoX509PlatformOperations
 import id.walt.x509.iso.iaca.parser.IACACertificateParser
 import id.walt.x509.iso.iaca.validate.IACAValidator
 import kotlinx.coroutines.test.runTest
@@ -14,8 +13,6 @@ class IACACertificateInfoVectorsMPTest {
 
     @Test
     fun `certificate info extras match known PEM vectors`() = runTest {
-        if (!supportsIsoX509PlatformOperations) return@runTest
-
         vectors.forEach { vector ->
 
             val decodedCertificate = parser.parse(
