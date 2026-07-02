@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "WaltidWalletSDKSampleFeature",
-    platforms: [.iOS(.v15)],
+    platforms: [.iOS("15.4")],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
