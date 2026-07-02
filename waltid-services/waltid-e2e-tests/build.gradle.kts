@@ -9,7 +9,7 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.10.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.11.0")
     testImplementation(identityLibs.ktor.server.test.host)
     testImplementation(identityLibs.ktor.client.java)
     testImplementation(identityLibs.ktor.client.content.negotiation)
@@ -25,7 +25,7 @@ dependencies {
     testImplementation(project(":waltid-services:waltid-verifier-api"))
     testImplementation(project(":waltid-services:waltid-wallet-api"))
 
-    testImplementation("com.nimbusds:nimbus-jose-jwt:10.6")
+    testImplementation("com.nimbusds:nimbus-jose-jwt:10.9.1")
     implementation("org.cose:cose-java:1.1.1-WALT-SNAPSHOT")
     testImplementation(identityLibs.bouncycastle.pkix)
 

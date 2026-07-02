@@ -46,9 +46,9 @@ dependencies {
     api(identityLibs.sksamuel.cohort)
 
     // OpenAPI
-    api("io.github.smiley4:ktor-openapi:5.6.0")
-    implementation("io.github.smiley4:ktor-swagger-ui:5.6.0")
-    implementation("io.github.smiley4:ktor-redoc:5.6.0")
+    api("io.github.smiley4:ktor-openapi:5.7.0")
+    implementation("io.github.smiley4:ktor-swagger-ui:5.7.0")
+    implementation("io.github.smiley4:ktor-redoc:5.7.0")
     implementation(libs.bundles.smiley4.schema.kenerator)
 
     // Persistence
