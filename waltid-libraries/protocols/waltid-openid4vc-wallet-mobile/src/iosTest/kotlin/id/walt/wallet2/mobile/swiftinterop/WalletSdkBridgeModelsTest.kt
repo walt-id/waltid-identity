@@ -1,4 +1,4 @@
-package id.walt.wallet2.mobile.iosbridge
+package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWalletCredential
 import kotlinx.coroutines.CancellationException

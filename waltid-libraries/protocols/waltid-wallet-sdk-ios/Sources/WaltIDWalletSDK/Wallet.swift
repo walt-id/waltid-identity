@@ -1,12 +1,12 @@
 import Foundation
 
 /// Actor-isolated entry point for the walt.id wallet SDK on iOS.
-public actor WalletClient {
-    /// Configuration used to create this wallet client.
+public actor Wallet {
+    /// Configuration used to create this wallet.
     public let configuration: WalletConfiguration
     private let bridge: any WalletCoreBridge
 
-    /// Creates a wallet client with the provided configuration.
+    /// Creates a wallet with the provided configuration.
     public init(configuration: WalletConfiguration = .init()) async throws {
         self.configuration = configuration
         self.bridge = try DefaultWalletCoreBridgeFactory.makeBridge(configuration: configuration)

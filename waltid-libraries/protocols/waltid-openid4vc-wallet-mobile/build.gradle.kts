@@ -13,11 +13,11 @@ waltidMobile {
 
 kotlin {
     if (enableIosBuild) {
-        val walletCoreXcFramework = XCFramework("WaltidWalletCore")
+        val walletCoreXcFramework = XCFramework("WaltIDWalletCore")
 
         targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
             binaries.framework {
-                baseName = "WaltidWalletCore"
+                baseName = "WaltIDWalletCore"
                 isStatic = true
                 binaryOption("bundleId", "id.walt.wallet.core")
                 walletCoreXcFramework.add(this)
