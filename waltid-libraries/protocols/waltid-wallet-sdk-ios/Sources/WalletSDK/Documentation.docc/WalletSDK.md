@@ -1,10 +1,10 @@
-# ``WaltIDWalletSDK``
+# ``WalletSDK``
 
 Swift-friendly iOS facade for the walt.id mobile wallet SDK.
 
 ## Overview
 
-`WaltIDWalletSDK` gives iOS apps a native Swift entry point for wallet setup,
+`WalletSDK` gives iOS apps a native Swift entry point for wallet setup,
 OpenID4VCI credential issuance, local credential listing, OpenID4VP
 presentation, and progress events.
 

@@ -1,4 +1,4 @@
-# WaltIDWalletSDK
+# WalletSDK
 
 Swift Package facade for the walt.id mobile wallet SDK.
 
@@ -11,8 +11,8 @@ generated bridge symbols behind the package implementation.
 - Minimum iOS version: 15.4
 - Runtime platform: iOS only
 - Public API style: `async`/`await`, `Sendable` values, typed `WalletError`
-- Documentation: DocC catalog in `Sources/WaltIDWalletSDK/Documentation.docc`
-- Local binary dependency: `WaltIDWalletCore.xcframework`
+- Documentation: DocC catalog in `Sources/WalletSDK/Documentation.docc`
+- Local binary dependency: `WalletCore.xcframework`
 - Current delivery mode: local package plus locally assembled XCFramework
 
 ## Local Build
@@ -20,13 +20,13 @@ generated bridge symbols behind the package implementation.
 Generate the KMP core XCFramework before building an iOS consumer:
 
 ```bash
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWaltIDWalletCoreReleaseXCFramework -PenableIosBuild=true --no-configuration-cache
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --no-configuration-cache
 ```
 
 The Swift package expects the local artifact at:
 
 ```text
-../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WaltIDWalletCore.xcframework
+../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework
 ```
 
 Then build or test the Swift facade:
@@ -38,7 +38,7 @@ swift test --package-path waltid-libraries/protocols/waltid-wallet-sdk-ios -Xswi
 ## Usage Sketch
 
 ```swift
-import WaltIDWalletSDK
+import WalletSDK
 
 let wallet = try await Wallet(
     configuration: WalletConfiguration(walletID: "consumer-wallet")
@@ -61,7 +61,7 @@ The native iOS consumer proof lives in the existing demo app:
 waltid-applications/waltid-wallet-demo-ios
 ```
 
-That app imports `WaltIDWalletSDK` directly from SwiftUI and exercises the same
+That app imports `WalletSDK` directly from SwiftUI and exercises the same
 Swift package boundary a native iOS integrator would use. The separate Compose
 Multiplatform demo remains the KMP/Compose consumer proof and uses its generated
 Kotlin `sharedUI` framework instead of routing through this Swift facade.
