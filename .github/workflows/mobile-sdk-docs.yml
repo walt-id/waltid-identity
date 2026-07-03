@@ -19,7 +19,7 @@ jobs:
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
       - name: Generate mobile SDK API docs
-        timeout-minutes: 30
+        timeout-minutes: 45
         uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@82ea5642459bc4f63ac11610cfa863cf6adf4cff
         with:
           waltid-directory: 'waltid-identity'
