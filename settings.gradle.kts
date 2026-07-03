@@ -1,8 +1,26 @@
 // # walt.id identity build configuration
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableAndroidBuild = getSetting("enableAndroidBuild")
-val enableIosBuild = getSetting("enableIosBuild")
+import java.util.Properties
+
+fun properties(path: String) = file(path)
+    .takeIf { it.isFile }
+    ?.inputStream()
+    ?.use { Properties().apply { load(it) } }
+    ?: Properties()
+
+val localProperties = properties("local.properties")
+
+fun setting(name: String) =
+    (startParameter.projectProperties[name]
+        ?: localProperties.getProperty(name)
+        ?: providers.gradleProperty(name).orNull
+        ?: "false")
+        .toBoolean()
+
+val enableAndroidBuild = setting("enableAndroidBuild")
+val enableIosBuild = setting("enableIosBuild")
+val enableWalletDemoComposeWeb = setting("enableWalletDemoComposeWeb")
+val enableWalletDemoCompose = enableAndroidBuild || enableIosBuild || enableWalletDemoComposeWeb
 
 infix fun String.whenEnabled(setting: Boolean) = if (setting) this else null
 fun String.group(vararg elements: String?) = elements.map { it?.let { "$this:$it" } }.toTypedArray()
@@ -20,10 +38,6 @@ val modules = listOfNotNull(
         "waltid-crypto-oci",
         "waltid-crypto-aws",
         "waltid-crypto-azure",
-        "waltid-crypto-android" whenEnabled enableAndroidBuild,
-        "waltid-crypto-ios" whenEnabled enableIosBuild,
-        "waltid-target-ios" whenEnabled enableIosBuild,
-        "waltid-target-ios:implementation" whenEnabled enableIosBuild,
         "waltid-crypto2",
         "waltid-cose",
         "waltid-x509",
@@ -31,6 +45,7 @@ val modules = listOfNotNull(
 
     * "$libraries:credentials".group(
         "waltid-w3c-credentials",
+        "waltid-credential-key-resolver",
         "waltid-digital-credentials",
         "waltid-digital-credentials-examples",
         "waltid-mdoc-credentials",
@@ -55,11 +70,18 @@ val modules = listOfNotNull(
         "waltid-openid4vp-clientidprefix",
         "waltid-openid4vp-wallet",
         "waltid-18013-7-verifier",
+        "waltid-openid4vc-wallet",
+        "waltid-openid4vc-wallet-persistence-mobile" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-persistence-mobile" whenEnabled enableIosBuild,
+        "waltid-openid4vc-wallet-persistence-server",
+        "waltid-openid4vc-wallet-mobile" whenEnabled enableAndroidBuild,
+        "waltid-openid4vc-wallet-mobile" whenEnabled enableIosBuild,
+        "waltid-openid4vc-wallet-server",
+        "waltid-mobile-test-utils" whenEnabled enableAndroidBuild,
     ),
 
     * "$libraries:sdjwt".group(
         "waltid-sdjwt",
-        "waltid-sdjwt-ios" whenEnabled enableIosBuild,
     ),
 
     * "$libraries:auth".group(
@@ -90,22 +112,34 @@ val modules = listOfNotNull(
     "$services:waltid-verifier-api",
     "$services:waltid-verifier-api2",
     "$services:waltid-wallet-api",
+    "$services:waltid-wallet-api2",
+    "$services:waltid-wallet-migration",
+
+    "$services:waltid-etsi-plugtest-cli",
 
     // Service tests
     "$services:waltid-e2e-tests",
     "$services:waltid-integration-tests",
     "$services:waltid-openid4vp-conformance-runners",
 
+    // ETSI Plugtest CLI
+    "$services:waltid-etsi-plugtest-cli",
+
     // CLI
     "$applications:waltid-cli",
 
     ":waltid-applications:waltid-android" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-compose:sharedLogic" whenEnabled enableWalletDemoCompose,
+    "$applications:waltid-wallet-demo-compose:sharedUI" whenEnabled enableWalletDemoCompose,
+    "$applications:waltid-wallet-demo-compose:androidApp" whenEnabled enableAndroidBuild,
+    "$applications:waltid-wallet-demo-compose:iosApp" whenEnabled enableIosBuild,
+    "$applications:waltid-wallet-demo-compose:webApp" whenEnabled enableWalletDemoComposeWeb,
 
-    "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
-    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild
+    "$applications:waltid-wallet-demo-ios" whenEnabled enableIosBuild,
+    "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )
 
-include(*modules.toTypedArray())
+include(*modules.distinct().toTypedArray())
 
 pluginManagement {
     includeBuild("build-logic")

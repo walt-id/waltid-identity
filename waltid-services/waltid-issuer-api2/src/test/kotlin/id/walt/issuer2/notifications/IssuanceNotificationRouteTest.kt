@@ -96,7 +96,7 @@ class IssuanceNotificationRouteTest {
                     .session
             )
             assertEquals(createdOffer.offerId, requestedToken["sessionId"]?.jsonPrimitive?.contentOrNull)
-            assertEquals("UniversityDegree_jwt_vc_json", requestedToken["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
+            assertEquals("OpenBadgeCredential_jwt_vc_json", requestedToken["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
 
             val jwtIssue = receivedUpdates.first { it.event == IssuanceSessionEvent.jwt_issue.toString() }
             assertEquals(createdOffer.offerId, jwtIssue.session["sessionId"]?.jsonPrimitive?.contentOrNull)
@@ -123,7 +123,7 @@ class IssuanceNotificationRouteTest {
         assertEquals(createdOffer.offerId, update.target)
         assertEquals(IssuanceSessionEvent.resolved_credential_offer.toString(), update.event)
         assertEquals(createdOffer.offerId, update.session["sessionId"]?.jsonPrimitive?.contentOrNull)
-        assertEquals("UniversityDegree_jwt_vc_json", update.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("OpenBadgeCredential_jwt_vc_json", update.session["credentialConfigurationId"]?.jsonPrimitive?.contentOrNull)
         assertEquals(
             resolvedOfferCredentialIssuer,
             update.session["credentialOffer"]?.jsonObject?.get("credential_issuer")?.jsonPrimitive?.contentOrNull,

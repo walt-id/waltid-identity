@@ -10,7 +10,6 @@ plugins {
 
 group = "id.walt.crypto"
 
-
 kotlin {
     js(IR) {
         outputModuleName = "cose"
@@ -39,14 +38,14 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(kotlin("test-common"))
             implementation(kotlin("test-annotations-common"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmMain.dependencies {
             implementation(identityLibs.nimbus.jose.jwt)
         }
         jvmTest.dependencies {
             // Logging
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
             // Test
             implementation(kotlin("test"))
@@ -60,7 +59,6 @@ kotlin {
         jsTest.dependencies {
             implementation(kotlin("test-js"))
         }
-
     }
 }
 

@@ -51,14 +51,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.config.list.TransactionDataProfile
 import id.walt.commons.config.list.TransactionDataProfilesConfig
 import id.walt.dcql.models.CredentialFormat as DcqlCredentialFormat
 
-@OptIn(ExperimentalUuidApi::class, ExperimentalSerializationApi::class)
+@OptIn(ExperimentalSerializationApi::class)
 class OpenId4VpPresentationServiceTest {
     companion object {
         private const val SUPPORTED_TX_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"

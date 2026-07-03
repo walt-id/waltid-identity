@@ -31,6 +31,11 @@ fun assertBearerAccessToken(tokenResponse: TokenRequestBuilder.TokenResponse) {
     assertTrue(tokenResponse.access_token.isNotBlank())
 }
 
+fun assertRefreshToken(tokenResponse: TokenRequestBuilder.TokenResponse): String =
+    assertNotNull(tokenResponse.refresh_token).also { refreshToken ->
+        assertTrue(refreshToken.isNotBlank())
+    }
+
 suspend fun assertSessionStatus(
     client: HttpClient,
     sessionId: String,
@@ -82,11 +87,14 @@ private fun assertSdJwtVcDisclosures(
 
     assertTrue(disclosures.isNotEmpty(), "Expected SD-JWT VC to include at least one parsed disclosure")
     assertEquals(disclosures.size, sdJwt.disclosures.size)
-    assertEquals(expectedDisclosureKeys, disclosures.map { it.key }.toSet())
+    val objectDisclosures = disclosures.filterIsInstance<id.walt.sdjwt.ObjectPropertyDisclosure>()
+    assertEquals(expectedDisclosureKeys, objectDisclosures.map { it.key }.toSet())
     assertTrue(sdJwt.sdPayload.verifyDisclosures(), "Expected SD-JWT VC disclosures to match the payload digests")
     disclosures.forEachIndexed { index, disclosure ->
         assertTrue(disclosure.salt.isNotBlank(), "Expected SD-JWT VC disclosure #$index to have a salt")
-        assertTrue(disclosure.key.isNotBlank(), "Expected SD-JWT VC disclosure #$index to have a claim key")
+    }
+    objectDisclosures.forEachIndexed { index, disclosure ->
+        assertTrue(disclosure.key.isNotBlank(), "Expected SD-JWT VC object-property disclosure #$index to have a claim key")
     }
 }
 
@@ -176,7 +184,7 @@ private fun assertJwtVcJsonMappingFunctionsApplied(issuedCredential: String) {
     val vc = jwtPayload["vc"]?.jsonObject ?: jwtPayload
     val credentialSubject = assertNotNull(vc["credentialSubject"]?.jsonObject)
 
-    // UniversityDegree is the default W3C wallet-flow profile. Its profile mapping uses
+    // OpenBadgeCredential is the default W3C wallet-flow profile. Its profile mapping uses
     // <uuid>, <issuerDid>, <subjectDid>, and <timestamp>; the issued JWT must contain
     // resolved values, not the config placeholders.
     val vcText = vc.toString()
@@ -198,7 +206,7 @@ private fun assertJwtVcJsonMappingFunctionsApplied(issuedCredential: String) {
         assertStringClaim(credentialSubject["id"], "vc.credentialSubject.id").startsWith("did:jwk:"),
         "Expected vc.credentialSubject.id to be resolved from <subjectDid>",
     )
-    Instant.parse(assertStringClaim(vc["issuanceDate"], "vc.issuanceDate"))
+    Instant.parse(assertStringClaim(vc["validFrom"], "vc.validFrom"))
 }
 
 private fun assertStringClaim(value: JsonElement?, claimName: String): String =

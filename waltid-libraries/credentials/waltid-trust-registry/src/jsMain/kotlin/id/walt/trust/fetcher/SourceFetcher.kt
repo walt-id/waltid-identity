@@ -19,14 +19,14 @@ actual object SourceFetcher {
     actual var securityConfig: FetcherSecurityConfig = FetcherSecurityConfig()
 
     actual suspend fun fetch(url: String, config: FetcherSecurityConfig): FetchResult {
-        val scheme = url.substringBefore("://").lowercase()
-        if (scheme !in config.allowedSchemes) {
-            return FetchResult(success = false, error = "Scheme '$scheme' not allowed. Allowed: ${config.allowedSchemes}")
+        val (validatedUrl, validationError) = SourceFetcherCommon.validateUrlBasic(url, config)
+        if (validatedUrl == null) {
+            return FetchResult(success = false, error = "URL validation failed: $validationError")
         }
 
         return try {
             HttpClient().use { client ->
-                val response = client.get(url)
+                val response = client.get(validatedUrl.parsedUrl)
                 if (response.status.isSuccess()) {
                     FetchResult(
                         success = true,
@@ -48,15 +48,6 @@ actual object SourceFetcher {
     }
 
     actual fun detectFormat(contentType: String?, content: String): SourceFormat {
-        contentType?.let {
-            if ("json" in it.lowercase()) return SourceFormat.JSON
-            if ("xml" in it.lowercase()) return SourceFormat.XML
-        }
-        val trimmed = content.trimStart()
-        return when {
-            trimmed.startsWith("{") || trimmed.startsWith("[") -> SourceFormat.JSON
-            trimmed.startsWith("<?xml") || trimmed.startsWith("<") -> SourceFormat.XML
-            else -> SourceFormat.UNKNOWN
-        }
+        return SourceFetcherCommon.detectSourceFormat(contentType, content)
     }
 }

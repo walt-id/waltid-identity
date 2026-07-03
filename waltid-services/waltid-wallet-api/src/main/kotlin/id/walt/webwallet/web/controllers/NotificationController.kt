@@ -20,11 +20,9 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
-@OptIn(ExperimentalUuidApi::class)
 object NotificationController {
 
     /*

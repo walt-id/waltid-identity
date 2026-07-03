@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.ServiceConfiguration
 import id.walt.commons.featureflag.CommonsFeatureCatalog
@@ -32,7 +31,6 @@ import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.minutes
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @Disabled("Deprecated test class: environment startup issues. Migrate to new-style tests like IssueSdJwtCredentialIntegrationTest.")
@@ -74,8 +72,7 @@ class WaltidServicesIntegrationTests : AbstractIntegrationTest(), Klogging {
     }
 
 
-    @OptIn(ExperimentalUuidApi::class)
-    @Test
+        @Test
     fun e2e() = runTest {
         //TODO:
         // All tests here should be ported to JUnit tests. Example: id.walt.test.integration.tests.IssueSdJwtCredentialIntegrationTest

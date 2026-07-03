@@ -18,10 +18,8 @@ pvc:
     storageClass: gp3-retain
     storageRequest: 1Gi
 
-walletConfig:
-  featuresConf: |-
-    enabledFeatures = []
-  dbConf: |-
+configFiles:
+  db.conf: |-
     dataSource {
         jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"
         driverClassName = "org.sqlite.JDBC"
@@ -36,10 +34,10 @@ walletConfig:
         }
     }
     recreateDatabaseOnStart = false
-  webConf: |-
+  web.conf: |-
     webHost = "0.0.0.0"
     webPort = 4545
-  oidcConf: |-
+  oidc.conf: |-
     publicBaseUrl = "https://wallet-dev.waltid.cloud"
     providerName = keycloak
     oidcRealm = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor"
@@ -58,6 +56,8 @@ walletConfig:
             refillRateMinutes: 1
         }
     }
+
+walletConfig:
   authConf: |-
     encryptionKey = "<128 bit -- key>"
     signKey = "<128 bit -- key>"

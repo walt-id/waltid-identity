@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 import id.walt.commons.testing.E2ETest
 import id.walt.webwallet.db.models.WalletCredential
@@ -10,13 +9,11 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import org.junit.jupiter.api.Assertions.assertTrue
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
 class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
+        suspend fun resolveCredentialOffer(wallet: Uuid, offerUrl: String, output: ((String) -> Unit)? = null) =
         e2e.test("/wallet-api/wallet/{wallet}/exchange/resolveCredentialOffer - resolve credential offer") {
             client.post("/wallet-api/wallet/$wallet/exchange/resolveCredentialOffer") {
                 setBody(offerUrl)
@@ -25,8 +22,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun useOfferRequest(
+        suspend fun useOfferRequest(
         wallet: Uuid,
         offerUrl: String,
         numberOfExpected: Int,
@@ -41,8 +37,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         }
     }
 
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun resolvePresentationRequest(
+        suspend fun resolvePresentationRequest(
         wallet: Uuid,
         presentationRequestUrl: String,
         output: ((String) -> Unit)? = null,
@@ -57,8 +52,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
         }
     }
 
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun matchCredentialsForPresentationDefinition(
+        suspend fun matchCredentialsForPresentationDefinition(
         wallet: Uuid,
         presentationDefinition: String,
         expectedCredentialIds: List<String> = emptyList(),
@@ -76,8 +70,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun unmatchedCredentialsForPresentationDefinition(
+        suspend fun unmatchedCredentialsForPresentationDefinition(
         wallet: Uuid,
         presentationDefinition: String,
         expectedData: List<FilterData> = emptyList(),
@@ -93,8 +86,7 @@ class ExchangeApi(private val e2e: E2ETest, private val client: HttpClient) {
             }
         }
 
-    @OptIn(ExperimentalUuidApi::class)
-    suspend fun usePresentationRequest(
+        suspend fun usePresentationRequest(
         wallet: Uuid,
         request: UsePresentationRequest,
         expectStatus: suspend HttpResponse.() -> HttpResponse = expectSuccess,

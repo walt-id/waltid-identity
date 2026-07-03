@@ -1,8 +1,6 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.usecase.issuer
 
-import kotlin.uuid.ExperimentalUuidApi
 
 
 /*

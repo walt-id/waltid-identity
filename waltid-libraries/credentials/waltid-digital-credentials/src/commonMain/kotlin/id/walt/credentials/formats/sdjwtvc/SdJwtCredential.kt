@@ -52,7 +52,7 @@ data class SdJwtCredential(
             else -> throw NotImplementedError("Not yet implemented: Retrieve issuer key from SdJwtCredential with ${signature::class.simpleName} signature")
         }
 
-    suspend fun getHolderKey(): Key? {
+    override suspend fun getHolderKey(): Key? {
         val cnf = credentialData["cnf"]?.jsonObject
             ?: return null
 
@@ -93,8 +93,8 @@ data class SdJwtCredential(
                 publicKey.verifyJws(signed)
             }
 
-            is CoseCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with COSE")
-            is DataIntegrityProofCredentialSignature -> TODO("Not implemented yet: verify SD-JWT with DIP")
+            is CoseCredentialSignature -> throw UnsupportedOperationException("COSE signature verification for SD-JWT credentials is not yet implemented")
+            is DataIntegrityProofCredentialSignature -> throw UnsupportedOperationException("Data Integrity Proof (LDP) signature verification for SD-JWT credentials is not yet implemented")
             null -> throw IllegalArgumentException("Credential contains no signature, cannot verify")
         }
 }

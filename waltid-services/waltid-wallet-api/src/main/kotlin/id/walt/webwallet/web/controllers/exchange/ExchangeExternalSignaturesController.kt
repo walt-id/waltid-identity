@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers.exchange
 
@@ -54,11 +53,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlin.uuid.ExperimentalUuidApi
 
 private const val W_3_C_VERIFIABLE_CREDENTIAL = "W3C Verifiable Credential"
 
-@OptIn(ExperimentalUuidApi::class)
 fun Application.exchangeExternalSignatures() = walletRoute {
     val logger = KotlinLogging.logger { }
     route(

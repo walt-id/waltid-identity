@@ -37,7 +37,7 @@ class ProviderCombinedFlowTest {
         val provider = buildOAuth2Provider(config)
 
         // Authorization code flow
-        val AuthorizationRequestResult = provider.createAuthorizationRequest(
+        val authorizationRequestResult = provider.createAuthorizationRequest(
             mapOf(
                 "response_type" to listOf(ResponseType.CODE.value),
                 "client_id" to listOf("demo-client"),
@@ -46,8 +46,8 @@ class ProviderCombinedFlowTest {
                 "state" to listOf("abc"),
             ),
         )
-        assertTrue(AuthorizationRequestResult.isSuccess())
-        val authorizeRequest = (AuthorizationRequestResult as AuthorizationRequestResult.Success).request.withIssuer(issClaim)
+        assertTrue(authorizationRequestResult.isSuccess())
+        val authorizeRequest = (authorizationRequestResult as AuthorizationRequestResult.Success).request.withIssuer(issClaim)
 
         val session = DefaultSession(subject = "demo-subject")
         val authorizeResponse = provider.createAuthorizationResponse(authorizeRequest, session)
@@ -208,7 +208,7 @@ class ProviderCombinedFlowTest {
 
             assertEquals(TOKEN_TYPE_BEARER, tokenResponse.tokenType)
             assertTrue((tokenResponse.expiresIn ?: -1) >= 0)
-            assertTrue(tokenResponse.extra.isEmpty())
+            assertTrue(tokenResponse.refreshToken?.isNotBlank() == true)
             return tokenResponse to accessRequest
         }
 

@@ -50,11 +50,6 @@ Multiplatform SD-JWT implementation with selective disclosure support. Provides 
 
 **Use when:** You need to work with SD-JWT credentials, implement selective disclosure, or build issuers/verifiers that support SD-JWT format credentials.
 
-### [🟡 waltid-sdjwt-ios](./waltid-sdjwt-ios)
-iOS-specific SD-JWT implementations. Provides iOS platform optimizations and native iOS support for SD-JWT operations.
-
-**Use when:** You're building iOS applications and need native iOS SD-JWT support or platform-specific optimizations.
-
 ## Related Libraries
 
 SD-JWT credentials are also supported through the unified credential abstraction in [waltid-digital-credentials](../credentials/waltid-digital-credentials), which can automatically detect and parse SD-JWT credentials alongside other formats.
@@ -72,4 +67,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-

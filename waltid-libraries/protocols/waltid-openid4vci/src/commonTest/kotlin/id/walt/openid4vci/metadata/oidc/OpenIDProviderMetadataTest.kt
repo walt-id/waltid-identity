@@ -152,7 +152,7 @@ class OpenIDProviderMetadataTest {
         assertEquals(setOf(ResponseType.CODE.value), metadata.responseTypesSupported)
         assertEquals(setOf(ResponseMode.QUERY.value, ResponseMode.FRAGMENT.value), metadata.responseModesSupported)
         assertEquals(
-            setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value),
+            setOf(GrantType.AuthorizationCode.value, GrantType.PreAuthorizedCode.value, GrantType.RefreshToken.value),
             metadata.grantTypesSupported
         )
         assertEquals(setOf("public"), metadata.subjectTypesSupported)

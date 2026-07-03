@@ -2,8 +2,8 @@ package id.walt.openid4vci.tokens
 
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
 import id.walt.openid4vci.tokens.jwt.defaultAccessTokenClaims
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonPrimitive
@@ -28,7 +28,7 @@ class JwtAccessTokenVerifierTest {
             scopes = setOf("openid"),
         )
 
-        val token = signer.createAccessToken(claims)
+        val token = signer.issue(claims)
         val payload = verifier.verify(
             token = token,
             expectedIssuer = "https://issuer.example",
@@ -55,7 +55,7 @@ class JwtAccessTokenVerifierTest {
             remove("iss")
         }
 
-        val token = signer.createAccessToken(claims)
+        val token = signer.issue(claims)
         val ex = assertFailsWith<IllegalArgumentException> {
             verifier.verify(token, expectedIssuer = "https://issuer.example")
         }
@@ -76,7 +76,7 @@ class JwtAccessTokenVerifierTest {
             remove("exp")
         }
 
-        val token = signer.createAccessToken(claims)
+        val token = signer.issue(claims)
         val ex = assertFailsWith<IllegalArgumentException> {
             verifier.verify(token, expectedIssuer = "https://issuer.example")
         }
@@ -97,7 +97,7 @@ class JwtAccessTokenVerifierTest {
             put("exp", Clock.System.now().epochSeconds - 5)
         }
 
-        val token = signer.createAccessToken(expiredClaims)
+        val token = signer.issue(expiredClaims)
         val ex = assertFailsWith<IllegalArgumentException> {
             verifier.verify(token, expectedIssuer = "https://issuer.example")
         }

@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.fullname" . }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: {{ include "common.name" . }}
+      {{- include "common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "common.name" . }}
+        {{- include "common.labels" . | nindent 8 }}
+      annotations:
+        deployment/id: {{ .Values.global.deploymentId | default "unset" | quote }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: {{ include "common.name" . }}
+        image: {{ .Values.api.image.repository }}:{{ .Values.api.image.tag | default .Chart.AppVersion }}
+        imagePullPolicy: {{ .Values.api.image.imagePullPolicy }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+        ports:
+          - name: http-api
+            containerPort: {{ .Values.api.containerPort }}
+        {{- with .Values.env }}
+        env:
+        {{- range $name, $value := . }}
+        - name: {{ $name }}
+          value: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if or .Values.configFiles .Values.persistence.enabled }}
+        volumeMounts:
+        {{- range $name, $content := .Values.configFiles }}
+        - mountPath: {{ $.Values.configMountPath }}/{{ $name }}
+          name: config
+          subPath: {{ $name }}
+          readOnly: true
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        - mountPath: {{ .Values.persistence.mountPath | quote }}
+          name: data
+        {{- end }}
+        {{- end }}
+      {{- if or .Values.configFiles .Values.persistence.enabled }}
+      volumes:
+      {{- if .Values.configFiles }}
+      - name: config
+        configMap:
+          name: {{ include "common.fullname" . }}-config
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "common.fullname" . }}-data-volume-claim
+      {{- end }}
+      {{- end }}

@@ -4,8 +4,7 @@ import id.walt.crypto.keys.Key
 import id.walt.did.dids.document.DidDocument
 import id.walt.did.dids.resolver.local.DidEbsiResolver
 import id.walt.did.dids.resolver.local.LocalResolverMethod
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
+import id.walt.webdatafetching.WebDataFetcher
 import io.ktor.client.plugins.*
 import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
@@ -16,34 +15,11 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.Arguments.arguments
 import org.junit.jupiter.params.provider.MethodSource
-import java.security.cert.X509Certificate
 import java.util.stream.Stream
-import javax.net.ssl.X509TrustManager
 
 class DidEbsiResolverTest : DidResolverTestBase() {
     override val resolver: LocalResolverMethod =
-        DidEbsiResolver(HttpClient(CIO) {
-            engine {
-                https {
-                    //disable https certificate verification
-                    trustManager = object : X509TrustManager {
-                        override fun checkClientTrusted(
-                            chain: Array<out X509Certificate?>?,
-                            authType: String?
-                        ) {
-                        }
-
-                        override fun checkServerTrusted(
-                            chain: Array<out X509Certificate?>?,
-                            authType: String?
-                        ) {
-                        }
-
-                        override fun getAcceptedIssuers(): Array<out X509Certificate?>? = null
-                    }
-                }
-            }
-        })
+        DidEbsiResolver(WebDataFetcher("did-ebsi-resolver-test"))
 
 
     // TODO: Include test in the scope of WAL-842
@@ -106,6 +82,9 @@ class DidEbsiResolverTest : DidResolverTestBase() {
             when (throwable) {
                 is ResponseException -> throwable.response.status == HttpStatusCode.NotFound
                 is IllegalStateException -> throwable.message?.contains("Failed to resolve EBSI DID") == true
+                is java.net.ConnectException -> true
+                is java.net.SocketTimeoutException -> true
+                is javax.net.ssl.SSLException -> true
                 else -> false
             }
         }

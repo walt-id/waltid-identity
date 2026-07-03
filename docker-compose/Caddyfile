@@ -28,6 +28,11 @@
     reverse_proxy http://verifier-api2:{$VERIFIER_API2_PORT}
 }
 
+# Wallet API2
+:{$WALLET_API2_PORT} {
+    reverse_proxy http://wallet-api2:{$WALLET_API2_PORT}
+}
+
 
 # Web Demo Wallet Frontend
 :{$DEMO_WALLET_FRONTEND_PORT} {
@@ -44,6 +49,11 @@
 # Web Portal
 :{$WEB_PORTAL_PORT} {
     reverse_proxy http://web-portal:{$WEB_PORTAL_PORT}
+}
+
+# Web Portal2
+:{$WEB_PORTAL2_PORT} {
+    reverse_proxy http://web-portal2:{$WEB_PORTAL2_PORT}
 }
 
 # VC Repo

@@ -6,6 +6,7 @@ import cbor.Cbor
 import com.nimbusds.jose.jwk.ECKey
 import com.nimbusds.jose.jwk.JWK
 import com.nimbusds.jose.util.X509CertUtils
+import com.upokecenter.cbor.CBORObject
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.persistence.ConfiguredPersistence
 import id.walt.crypto.keys.KeyManager
@@ -19,8 +20,11 @@ import id.walt.issuer.config.OIDCIssuerServiceConfig
 import id.walt.mdoc.COSECryptoProviderKeyInfo
 import id.walt.mdoc.SimpleCOSECryptoProvider
 import id.walt.mdoc.cose.COSESign1
+import id.walt.mdoc.dataelement.ByteStringElement
 import id.walt.mdoc.dataelement.DataElement
+import id.walt.mdoc.dataelement.ListElement
 import id.walt.mdoc.dataelement.MapElement
+import id.walt.mdoc.dataelement.MapKey
 import id.walt.mdoc.dataelement.toDataElement
 import id.walt.mdoc.dataelement.json.toDataElement
 import id.walt.mdoc.doc.MDocBuilder
@@ -42,7 +46,6 @@ import id.walt.oid4vc.providers.CredentialIssuerConfig
 import id.walt.oid4vc.providers.TokenTarget
 import id.walt.oid4vc.requests.*
 import id.walt.oid4vc.responses.*
-import id.walt.oid4vc.util.COSESign1Utils
 import id.walt.oid4vc.util.JwtUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -335,7 +338,8 @@ open class CIProvider(
 
             request.run {
                 when (credentialFormat) {
-                    CredentialFormat.sd_jwt_vc -> OpenID4VCI.generateSdJwtVC(
+                    CredentialFormat.sd_jwt_vc,
+                    CredentialFormat.sd_jwt_dc -> OpenID4VCI.generateSdJwtVC(
                         credentialRequest = credentialRequest,
                         credentialData = vc,
                         issuerId = issuerDid ?: baseUrl,
@@ -347,6 +351,7 @@ open class CIProvider(
                         },
                         x5Chain = x5c,
                         sdJwtCredentialClaims = request.sdJwtCredentialClaims,
+                        sdJwtTypeHeader = id.walt.sdjwt.SDJwtVC.SD_JWT_VC_TYPE_HEADER,
                     ).also {
                         if (!issuanceSession.callbackUrl.isNullOrEmpty())
                             sendCallback(
@@ -392,22 +397,53 @@ open class CIProvider(
         when (proof.proofType) {
             ProofType.cwt -> {
                 return proof.cwt?.base64UrlDecode()?.let {
-                    COSESign1Utils.extractHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
+                    extractCwtHolderKey(Cbor.decodeFromByteArray<COSESign1>(it))
                 }
             }
 
             else -> {
                 return proof.jwt?.let { JwtUtils.parseJWTHeader(it) }?.get(JWTClaims.Header.jwk)?.jsonObject?.let {
                     JWKKey.importJWK(it.toString()).getOrNull()?.let { key ->
+                        val ecKey = ECKey.parse(key.exportJWK())
+                        val algID = when (ecKey.curve.stdName) {
+                            "P-384" -> AlgorithmID.ECDSA_384
+                            "P-521" -> AlgorithmID.ECDSA_512
+                            else -> AlgorithmID.ECDSA_256
+                        }
                         COSECryptoProviderKeyInfo(
                             keyID = key.getKeyId(),
-                            algorithmID = AlgorithmID.ECDSA_256,
-                            publicKey = ECKey.parse(key.exportJWK()).toECPublicKey(),
+                            algorithmID = algID,
+                            publicKey = ecKey.toECPublicKey(),
                             privateKey = null
                         )
                     }
                 }
             }
+        }
+    }
+
+    private fun extractCwtHolderKey(coseSign1: COSESign1): COSECryptoProviderKeyInfo {
+        val tokenHeader = coseSign1.decodeProtectedHeader()
+        val coseKeyLabel = MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_COSE_KEY)
+        return if (tokenHeader.value.containsKey(coseKeyLabel)) {
+            val rawKey = (tokenHeader.value[coseKeyLabel] as ByteStringElement).value
+            COSECryptoProviderKeyInfo(
+                keyID = "pub-key",
+                algorithmID = AlgorithmID.ECDSA_256,
+                publicKey = OneKey(CBORObject.DecodeFromBytes(rawKey)).AsPublicKey()
+            )
+        } else {
+            val x5c = tokenHeader.value[MapKey(ProofOfPossession.CWTProofBuilder.HEADER_LABEL_X5CHAIN)]
+            val x5Chain = when (x5c) {
+                is ListElement -> x5c.value.map { X509CertUtils.parse((it as ByteStringElement).value) }
+                else -> listOf(X509CertUtils.parse((x5c as ByteStringElement).value))
+            }
+            COSECryptoProviderKeyInfo(
+                keyID = "pub-key",
+                algorithmID = AlgorithmID.ECDSA_256,
+                publicKey = x5Chain.first().publicKey,
+                x5Chain = x5Chain
+            )
         }
     }
 
@@ -449,11 +485,18 @@ open class CIProvider(
 
         val keyID = resolvedIssuerKey.getKeyId()
 
+        // Select COSE algorithm based on the key curve (ISO 18013-5 requires EC keys; P-256, P-384, P-521 are supported)
+        val coseAlgorithmID = when (issuerKey.curve.stdName) {
+            "P-384" -> AlgorithmID.ECDSA_384
+            "P-521" -> AlgorithmID.ECDSA_512
+            else -> AlgorithmID.ECDSA_256 // P-256 default
+        }
+
         val cryptoProvider = SimpleCOSECryptoProvider(
             listOf(
                 COSECryptoProviderKeyInfo(
                     keyID = keyID,
-                    algorithmID = AlgorithmID.ECDSA_256,
+                    algorithmID = coseAlgorithmID,
                     publicKey = issuerKey.toECPublicKey(),
                     privateKey = issuerKey.toECPrivateKey(),
                     x5Chain = request.x5Chain?.map { X509CertUtils.parse(it) } ?: listOf(),
@@ -481,11 +524,11 @@ open class CIProvider(
                     )
                 }
             }
-        }.sign( // TODO: expiration date!
+        }.sign( // Validity period configurable via IssuanceRequest.mdocValidityDays (default: 365 days)
             validityInfo = ValidityInfo(
                 signed = Clock.System.now(),
                 validFrom = Clock.System.now(),
-                validUntil = Clock.System.now().plus(365 * 24, DateTimeUnit.HOUR)
+                validUntil = Clock.System.now().plus((request.mdocValidityDays ?: 365) * 24, DateTimeUnit.HOUR)
             ),
             deviceKeyInfo = DeviceKeyInfo(
                 deviceKey = DataElement.fromCBOR(
@@ -620,7 +663,8 @@ open class CIProvider(
                         (types == credentialRequest.credentialDefinition?.type) || (types == credentialRequest.types)
                     }
 
-                    CredentialFormat.sd_jwt_vc -> {
+                    CredentialFormat.sd_jwt_vc,
+                    CredentialFormat.sd_jwt_dc -> {
                         val vct = metadata.getVctByCredentialConfigurationId(credentialConfigurationId)
                         vct == credentialRequest.vct
                     }

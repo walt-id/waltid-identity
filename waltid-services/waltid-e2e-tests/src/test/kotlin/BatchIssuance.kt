@@ -9,10 +9,8 @@ import io.ktor.client.*
 import kotlinx.serialization.json.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import kotlin.test.assertTrue
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 class BatchIssuance(private val e2e: E2ETest, val client: HttpClient, val wallet: Uuid) {
     private val issuerApi = IssuerApi(e2e, client)
     private val exchangeApi = ExchangeApi(e2e, client)

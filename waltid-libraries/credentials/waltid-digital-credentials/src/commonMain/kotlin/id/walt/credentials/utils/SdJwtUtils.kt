@@ -38,6 +38,44 @@ object SdJwtUtils {
     fun Map<String, Set<String>>.dropDollarPrefix() =
         mapKeys { it.key.removePrefix("$.") }
 
+    /**
+     * Parses a `_sd` array location key produced by [getSdArrays] (e.g. `$.credentialSubject.degree._sd`
+     * or `$.vc._sd`) into a Claim Path prefix as a list of [JsonElement] string components, per
+     * SD-JWT VC §4.6.1.
+     *
+     * The JSONPath root (`$`), the trailing `_sd` segment, and (for W3C credentials) a leading `vc`
+     * wrapper segment are removed so the resulting path is relative to the credential root. For
+     * example:
+     *   - `$._sd`                           -> `[]`                              (root object)
+     *   - `$.credentialSubject.degree._sd`  -> `["credentialSubject","degree"]`
+     *   - `$.vc._sd`                         -> `[]`                              (vc wrapper dropped)
+     *   - `$.vc.credentialSubject._sd`      -> `["credentialSubject"]`
+     */
+    fun parseSdLocationToClaimPath(sdLocation: String): List<JsonElement> =
+        sdLocation
+            .removePrefix("$")
+            .removePrefix(".")
+            .removeSuffix("_sd")
+            .trim('.')
+            .split('.')
+            .filter { it.isNotEmpty() }
+            .dropVcWrapper()
+            .map { JsonPrimitive(it) }
+
+    /**
+     * Drops a leading `vc` segment used by W3C JWT-VCs that embed the credential under a `vc` claim.
+     * Claim Paths are resolved relative to the credential root (the `vc` content), not the JWT payload.
+     */
+    private fun List<String>.dropVcWrapper(): List<String> =
+        if (firstOrNull() == "vc") drop(1) else this
+
+    /** Appends a claim name (object key) component to a Claim Path. */
+    fun List<JsonElement>.appendClaimName(name: String): List<JsonElement> = this + JsonPrimitive(name)
+
+    /** Appends an array index component to a Claim Path. */
+    fun List<JsonElement>.appendArrayIndex(index: Int): List<JsonElement> = this + JsonPrimitive(index)
+
+
     // Recursive helper function
     private fun findSdArraysRecursive(
         element: JsonElement,
@@ -105,6 +143,12 @@ object SdJwtUtils {
             disclosures.split("~").mapNotNull {
                 log.trace { "Parsing disclosure part: $it" }
                 if (it.isNotBlank()) {
+                    // Per RFC 9901 §4: disclosures are base64url-encoded JSON arrays and never
+                    // contain '.'. A part containing '.' is a KB-JWT (or similar) and must be skipped.
+                    if (it.contains('.')) {
+                        log.trace { "Skipping non-disclosure tilde-part (contains '.'): ${it.take(20)}..." }
+                        return@mapNotNull null
+                    }
                     val jsonArrayString = it.base64UrlDecode().decodeToString()
                     val jsonArray = Json.decodeFromString<JsonArray>(jsonArrayString)
 
@@ -124,7 +168,11 @@ object SdJwtUtils {
                         salt = jsonArray[0].jsonPrimitive.content,
                         name = name, // Ensure your data class accepts String? here
                         value = value,
-                        encoded = jsonArrayString
+                        // Preserve the EXACT original base64url wire encoding. The issuer's digest in
+                        // `_sd` is SHA-256 over this exact string; re-serializing [salt,name,value]
+                        // can differ byte-for-byte (number/string formatting, key order) and would
+                        // produce a non-matching digest. See SdJwtSelectiveDisclosure.asEncoded().
+                        encoded = it
                     )
                 } else null
             }

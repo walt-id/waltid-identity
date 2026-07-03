@@ -1,8 +1,12 @@
 name: cocoapods-setup
 description: cocoapods-setup
 inputs:
-  version:
+  cocoapods-version:
     description: 'Specific CocoaPods version to install (optional)'
+    required: false
+    default: ''
+  xcodeproj-version:
+    description: 'Specific xcodeproj version to install (optional)'
     required: false
     default: ''
 runs:
@@ -12,13 +16,23 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        
-        if [[ "${{ inputs.version }}" != "" ]]; then
-          echo "Installing CocoaPods version ${{ inputs.version }}"
-          gem install cocoapods -v ${{ inputs.version }} --no-document
+
+        if [[ "${{ inputs.cocoapods-version }}" != "" ]]; then
+          echo "Installing CocoaPods version ${{ inputs.cocoapods-version }}"
+          gem install cocoapods -v ${{ inputs.cocoapods-version }} --no-document
         else
-          echo "Updating CocoaPods to latest version"
-          gem update cocoapods --no-document
+          echo "Installing latest CocoaPods"
+          gem install cocoapods --no-document
+        fi
+
+        if [[ "${{ inputs.xcodeproj-version }}" != "" ]]; then
+          echo "Installing xcodeproj version ${{ inputs.xcodeproj-version }}"
+          gem install xcodeproj -v ${{ inputs.xcodeproj-version }} --no-document
+        elif [[ "${{ inputs.cocoapods-version }}" == "" ]]; then
+          echo "Installing latest xcodeproj"
+          gem install xcodeproj --no-document
+        else
+          echo "Using xcodeproj version resolved by CocoaPods dependencies"
         fi
         
         # Only update repo if cache miss or forced

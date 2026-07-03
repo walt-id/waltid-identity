@@ -4,6 +4,7 @@ import id.walt.crypto.keys.KeyManager
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
+import id.walt.openid4vci.core.PushedAuthorizationConfig
 import id.walt.openid4vci.core.buildOAuth2Provider
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
@@ -11,9 +12,13 @@ import id.walt.openid4vci.handlers.endpoints.token.TokenEndpointHandlers
 import id.walt.openid4vci.preauthorized.DefaultPreAuthorizedCodeIssuer
 import id.walt.openid4vci.preauthorized.PreAuthorizedCodeIssuer
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
+import id.walt.openid4vci.repository.par.PARRepository
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenIssuer
-import id.walt.openid4vci.tokens.jwt.JwtAccessTokenVerifier
+import id.walt.openid4vci.repository.refresh.RefreshTokenRepository
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenVerifier
+import id.walt.openid4vci.tokens.jwt.access.JwtAccessTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenIssuer
+import id.walt.openid4vci.tokens.jwt.refresh.JwtRefreshTokenVerifier
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtVerificationKeyResolver
 import id.walt.openid4vci.validation.DefaultAccessTokenRequestValidator
@@ -30,6 +35,8 @@ data class OpenId4VciModule(
             config: Issuer2ServiceConfig,
             authorizationCodeRepository: AuthorizationCodeRepository,
             preAuthorizedCodeRepository: PreAuthorizedCodeRepository,
+            parRepository: PARRepository,
+            refreshTokenRepository: RefreshTokenRepository,
         ): OpenId4VciModule {
             val signingKeyResolver = JwtSigningKeyResolver {
                 KeyManager.resolveSerializedKey(config.ciTokenKey)
@@ -42,20 +49,32 @@ data class OpenId4VciModule(
             val accessTokenVerifier = JwtAccessTokenVerifier(verificationKeyResolver)
             val provider = buildOAuth2Provider(
                 OAuth2ProviderConfig(
-                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
-                    authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
-                    authorizationCodeRepository = authorizationCodeRepository,
 
-                    accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+                    authorizationEndpointHandlers = AuthorizationEndpointHandlers(),
                     tokenEndpointHandlers = TokenEndpointHandlers(),
-                    accessTokenService = JwtAccessTokenIssuer(signingKeyResolver),
+                    credentialEndpointHandlers = CredentialEndpointHandlers(),
+
+                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
+                    accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
+                    credentialRequestValidator = DefaultCredentialRequestValidator(),
+
+                    authorizationCodeRepository = authorizationCodeRepository,
+                    preAuthorizedCodeRepository = preAuthorizedCodeRepository,
+                    refreshTokenRepository = refreshTokenRepository,
+
+                    pushedAuthorizationConfig = PushedAuthorizationConfig(
+                        repository = parRepository,
+                        enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
+                    ),
+
+
+                    accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),
                     accessTokenVerifier = accessTokenVerifier,
 
-                    preAuthorizedCodeRepository = preAuthorizedCodeRepository,
-                    preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
+                    refreshTokenIssuer = JwtRefreshTokenIssuer(signingKeyResolver),
+                    refreshTokenVerifier = JwtRefreshTokenVerifier(verificationKeyResolver),
 
-                    credentialRequestValidator = DefaultCredentialRequestValidator(),
-                    credentialEndpointHandlers = CredentialEndpointHandlers(),
+                    preAuthorizedCodeIssuer = preAuthorizedCodeIssuer,
                 )
             )
 

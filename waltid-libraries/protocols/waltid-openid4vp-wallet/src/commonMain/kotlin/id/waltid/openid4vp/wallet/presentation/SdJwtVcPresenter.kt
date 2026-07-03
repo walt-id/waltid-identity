@@ -21,7 +21,7 @@ object SdJwtVcPresenter {
         matchResult: DcqlMatcher.DcqlMatchResult,
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
-        holderDid: String
+        holderDid: String?
     ): JsonPrimitive {
         val selectedClaimsMap = matchResult.selectedDisclosures
 
