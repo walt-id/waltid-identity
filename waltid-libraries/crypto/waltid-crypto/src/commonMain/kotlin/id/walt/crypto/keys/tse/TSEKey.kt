@@ -4,6 +4,8 @@ import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TseKeyMeta
+import id.walt.crypto.keys.externalKmsFailure
+import id.walt.crypto.keys.externalKmsGenerationFailure
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -33,6 +35,7 @@ import kotlin.js.JsExport
 import kotlin.random.Random
 
 private val logger = KotlinLogging.logger { }
+private const val TSE_PROVIDER = "HashiCorp Vault Transit"
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -101,16 +104,7 @@ class TSEKey(
         val keyStr = keyData["1"]?.jsonObject?.get("public_key")?.jsonPrimitive?.content
             ?: throw KeyNotFoundException(id = id)
 
-        logger.debug { "Public key PEM-encoded string is: $keyStr" }
-
-        val base64PublicKey = keyStr.lineSequence()
-            .filterNot { it.startsWith("-----") }
-            .joinToString("")
-            .replace("\\s".toRegex(), "") // Remove all whitespace just in case
-
-        logger.debug { "Base64 public key is: $base64PublicKey" }
-
-        return Base64.decode(base64PublicKey)
+        return decodeVaultPublicKey(keyStr)
     }
 
     private suspend fun retrieveKeyType(): KeyType = tseKeyToKeyTypeMapping(
@@ -323,20 +317,50 @@ class TSEKey(
             else -> throw KeyTypeNotSupportedException(type)
         }
 
+        internal fun decodeVaultPublicKey(publicKey: String): ByteArray {
+            val base64PublicKey = publicKey.lineSequence()
+                .filterNot { it.trim().startsWith("-----") }
+                .joinToString("")
+                .replace("\\s".toRegex(), "")
+
+            return runCatching { Base64.decode(base64PublicKey) }.getOrElse {
+                externalKmsFailure(
+                    provider = TSE_PROVIDER,
+                    operation = "public key decoding",
+                    message = "Vault returned a public key that is neither PEM nor base64 encoded",
+                    cause = it,
+                )
+            }
+        }
+
         @JvmBlocking
         @JvmAsync
         @JsPromise
         @JsExport.Ignore
-        suspend fun HttpResponse.tseJsonDataBody(): JsonObject {
-            val baseMsg = { "TSE server (URL: ${this.request.url}) returned invalid response: " }
+        suspend fun HttpResponse.tseJsonDataBody(operation: String = "request"): JsonObject {
+            val bodyStr = bodyAsText()
 
-            if (!status.isSuccess()) throw RuntimeException(baseMsg.invoke() + "non-success status: $status")
+            if (!status.isSuccess()) externalKmsFailure(
+                provider = TSE_PROVIDER,
+                operation = operation,
+                message = "returned HTTP ${status.value} ${status.description}: ${bodyStr.ifBlank { "empty response" }}",
+            )
 
-            return runCatching { this.body<JsonObject>() }.getOrElse {
-                val bodyStr = this.bodyAsText()
-                throw IllegalArgumentException(baseMsg.invoke() + if (bodyStr == "") "empty response (instead of JSON data)" else "invalid response: $bodyStr")
-            }["data"]?.jsonObject
-                ?: throw IllegalArgumentException(baseMsg.invoke() + "no data in response: ${this.bodyAsText()}")
+            val json = runCatching { Json.parseToJsonElement(bodyStr).jsonObject }.getOrElse {
+                externalKmsFailure(
+                    provider = TSE_PROVIDER,
+                    operation = operation,
+                    message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
+                    cause = it,
+                )
+            }
+
+            return json["data"]?.jsonObject
+                ?: externalKmsFailure(
+                    provider = TSE_PROVIDER,
+                    operation = operation,
+                    message = "response did not contain a data object: $bodyStr",
+                )
         }
 
         @JvmBlocking
@@ -345,28 +369,32 @@ class TSEKey(
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: TSEKeyMetadata): TSEKey {
 
-            logger.debug { "Generating TSE key ($type)" }
+            return runCatching {
+                logger.debug { "Generating TSE key ($type)" }
 
-            val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
-                header("X-Vault-Token", metadata.auth.getCachedLogin(metadata.server))
-                metadata.namespace?.let { header("X-Vault-Namespace", metadata.namespace) }
-                setBody(mapOf("type" to keyTypeToTseKeyMapping(type)))
-            }.tseJsonDataBody()
+                val keyData = http.post("${metadata.server}/keys/k${metadata.id ?: Random.nextInt()}") {
+                    header("X-Vault-Token", metadata.auth.getCachedLogin(metadata.server))
+                    metadata.namespace?.let { header("X-Vault-Namespace", metadata.namespace) }
+                    setBody(mapOf("type" to keyTypeToTseKeyMapping(type)))
+                }.tseJsonDataBody("key generation")
 
-            val keyName = keyData["name"]?.jsonPrimitive?.content
-                ?: throw TSEError.MissingKeyNameException()
+                val keyName = keyData["name"]?.jsonPrimitive?.content
+                    ?: throw TSEError.MissingKeyNameException()
 
-            val publicKey = (keyData["keys"]
-                ?: throw TSEError.MissingKeyDataException()).jsonObject["1"]!!.jsonObject["public_key"]!!.jsonPrimitive.content.decodeBase64Bytes()
+                val publicKeyStr = keyData["keys"]?.jsonObject?.get("1")?.jsonObject?.get("public_key")?.jsonPrimitive?.content
+                    ?: throw TSEError.MissingKeyDataException()
 
-            return TSEKey(
-                server = metadata.server,
-                auth = metadata.auth,
-                namespace = metadata.namespace,
-                id = keyName,
-                _publicKey = publicKey,
-                _keyType = type
-            ).apply { init() }
+                TSEKey(
+                    server = metadata.server,
+                    auth = metadata.auth,
+                    namespace = metadata.namespace,
+                    id = keyName,
+                    _publicKey = decodeVaultPublicKey(publicKeyStr),
+                    _keyType = type
+                ).apply { init() }
+            }.getOrElse {
+                externalKmsGenerationFailure(TSE_PROVIDER, type.name, it)
+            }
         }
 
         private val http = HttpClient {
