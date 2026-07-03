@@ -23,6 +23,7 @@ public struct WalletConfiguration: Equatable, Sendable {
     ///     when no operation-specific override is supplied.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
+    ///   - persistence: Local persistence mode for wallet-owned state.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,

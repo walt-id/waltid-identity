@@ -19,6 +19,12 @@ public actual class DriverFactory {
     public actual fun createDriver(databaseName: String): SqlDriver =
         NativeSqliteDriver(WalletPersistenceDatabase.Schema, "$databaseName.db")
 
+    /**
+     * Creates a SQLCipher-backed native driver for [databaseName].
+     *
+     * @param encryptionKey Raw database key used by SQLCipher.
+     * @param walletId Wallet identifier used in typed persistence errors.
+     */
     fun createEncryptedDriver(
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -85,6 +91,9 @@ public actual class DriverFactory {
             (byte.toInt() and 0xff).toString(16).padStart(2, '0')
         }
 
+    /**
+     * Deletes the native database file and SQLite sidecar files for [databaseName].
+     */
     fun deleteDatabase(databaseName: String) {
         DatabaseFileContext.deleteDatabase("$databaseName.db")
     }

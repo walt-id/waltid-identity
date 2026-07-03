@@ -62,6 +62,14 @@ let presentation = try await wallet.present(
 )
 ```
 
+## Local persistence
+
+`WalletConfiguration()` uses `.sdkManagedEncrypted` persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.
+
+The SDK-managed key is device-local. It protects local wallet data at rest, but it is not a cross-device recovery mechanism. Future public Swift configuration can expose integrator-managed key recovery when the release shape needs it; the current Swift facade intentionally advertises the encrypted default only.
+
+Call `try await wallet.deleteLocalData()` to remove SDK-owned local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
+
 ## Native iOS Consumer
 
 The native iOS consumer proof lives in the existing demo app:

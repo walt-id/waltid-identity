@@ -29,22 +29,54 @@ public data class MobileWalletConfig(
     val onEvent: suspend (MobileWalletEvent) -> Unit = {},
 )
 
+/**
+ * Backup and recovery ownership for SDK-managed mobile wallet persistence.
+ */
 enum class BackupPolicy {
+    /**
+     * Keep SDK-managed database keys bound to the current app install/device.
+     */
     DeviceLocalOnly,
+
+    /**
+     * The integrator owns database-key recovery outside the SDK.
+     */
     IntegratorManagedRecovery,
 }
 
+/**
+ * Selects how [MobileWalletFactory] wires wallet-local persistence.
+ */
 sealed interface MobileWalletPersistenceConfig {
 
+    /**
+     * Uses encrypted SQLDelight persistence and SDK-managed database keys.
+     *
+     * @property backupPolicy Backup and recovery ownership for the generated database key.
+     */
     data class SdkManagedEncrypted(
         val backupPolicy: BackupPolicy = BackupPolicy.DeviceLocalOnly,
     ) : MobileWalletPersistenceConfig
 
+    /**
+     * Uses encrypted SQLDelight persistence with database keys supplied by the integrator.
+     *
+     * @property keyProvider Provider that returns the SQLCipher key material for this wallet database.
+     * @property backupPolicy Backup and recovery ownership for the supplied database key.
+     */
     data class IntegratorManagedKey(
         val keyProvider: DatabaseEncryptionKeyProvider,
         val backupPolicy: BackupPolicy = BackupPolicy.IntegratorManagedRecovery,
     ) : MobileWalletPersistenceConfig
 
+    /**
+     * Replaces SDK SQLDelight persistence with integrator-owned wallet stores.
+     *
+     * @property keyStore Store for wallet key references.
+     * @property didStore Store for DID documents.
+     * @property credentialStore Store for credentials.
+     * @property keyGenerator Generator used when the wallet needs to create signing keys.
+     */
     data class CustomStores(
         val keyStore: WalletKeyStore,
         val didStore: WalletDidStore,

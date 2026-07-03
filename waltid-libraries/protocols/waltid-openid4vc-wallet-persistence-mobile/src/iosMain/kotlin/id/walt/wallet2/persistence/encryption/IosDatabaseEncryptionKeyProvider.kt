@@ -46,6 +46,9 @@ import platform.posix.memcpy
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
 
+    /**
+     * Returns the existing Keychain database key or creates and stores a new one.
+     */
     override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
         val keyId = keyId(walletId, databaseName)
         readKeyMaterial(walletId, keyId)?.let { material ->
@@ -56,6 +59,9 @@ class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
         return DatabaseEncryptionKey(keyId = keyId, material = storeKeyMaterial(walletId, keyId, material))
     }
 
+    /**
+     * Removes the database key stored in iOS Keychain.
+     */
     override suspend fun deleteKey(walletId: String, databaseName: String) {
         val keyId = keyId(walletId, databaseName)
         val query = keychainQuery(keyId)

@@ -24,6 +24,9 @@ class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptio
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val secureRandom = SecureRandom()
 
+    /**
+     * Returns the existing Android-protected database key or creates and stores a new one.
+     */
     override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
         val keyId = keyId(walletId, databaseName)
         val stored = preferences.getString(keyId, null)
@@ -41,6 +44,9 @@ class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptio
         return DatabaseEncryptionKey(keyId = keyId, material = material)
     }
 
+    /**
+     * Removes the stored encrypted database key and its Android Keystore wrapping key.
+     */
     override suspend fun deleteKey(walletId: String, databaseName: String) {
         val keyId = keyId(walletId, databaseName)
         preferences.edit().remove(keyId).apply()

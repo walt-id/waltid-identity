@@ -26,6 +26,10 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
+## Local wallet data
+
+Android and iOS demo targets use the SDK default encrypted local persistence. Wallet database files are SQLCipher-encrypted, and SDK-managed database keys live in platform-protected storage. During local development, reset wallet state through `MobileWallet.deleteWallet()`, by uninstalling the app, or by deleting the app's local data.
+
 ## Target status
 
 - Android and iOS are the supported mobile demo targets for wallet SDK issuance, presentation, platform-backed keys, and persistence.

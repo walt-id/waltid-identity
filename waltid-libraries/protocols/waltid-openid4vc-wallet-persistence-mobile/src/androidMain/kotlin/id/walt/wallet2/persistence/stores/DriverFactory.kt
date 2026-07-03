@@ -22,6 +22,13 @@ public actual class DriverFactory(private val context: Context) {
     public actual fun createDriver(databaseName: String): SqlDriver =
         AndroidSqliteDriver(WalletPersistenceDatabase.Schema, context, "$databaseName.db")
 
+    /**
+     * Creates a SQLCipher-backed Android driver for [databaseName].
+     *
+     * @param encryptionKey Raw database key used by SQLCipher.
+     * @param useNoBackupDirectory Stores the database under Android's no-backup directory when true.
+     * @param walletId Wallet identifier used in typed persistence errors.
+     */
     fun createEncryptedDriver(
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
@@ -58,6 +65,9 @@ public actual class DriverFactory(private val context: Context) {
         }
     }
 
+    /**
+     * Deletes the Android database file and SQLite sidecar files for [databaseName].
+     */
     fun deleteDatabase(databaseName: String): Boolean {
         val fileName = "$databaseName.db"
         var deleted = context.deleteDatabase(fileName)
