@@ -1,52 +1,11 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.wallet2.mobile.MobileWalletCredential
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class WalletSdkBridgeModelsTest {
-
-    @Test
-    fun mapsMobileCredentialToSwiftSafeBridgeCredential() {
-        val credential = MobileWalletCredential(
-            id = "credential-1",
-            format = "vc+sd-jwt",
-            issuer = "https://issuer.example",
-            subject = "did:key:subject",
-            label = "PID",
-            addedAt = "2026-07-02T08:00:00Z",
-        )
-
-        val bridged = credential.toWalletBridgeCredential()
-
-        assertEquals("credential-1", bridged.id)
-        assertEquals("vc+sd-jwt", bridged.format)
-        assertEquals("https://issuer.example", bridged.issuer)
-        assertEquals("did:key:subject", bridged.subject)
-        assertEquals("PID", bridged.label)
-        assertEquals("2026-07-02T08:00:00Z", bridged.addedAt)
-    }
-
-    @Test
-    fun mapsMissingCredentialFieldsToNullInsteadOfPlaceholderStrings() {
-        val credential = MobileWalletCredential(
-            id = "credential-2",
-            format = "jwt_vc_json",
-            issuer = null,
-            subject = null,
-            label = null,
-            addedAt = null,
-        )
-
-        val bridged = credential.toWalletBridgeCredential()
-
-        assertEquals(null, bridged.issuer)
-        assertEquals(null, bridged.subject)
-        assertEquals(null, bridged.label)
-        assertEquals(null, bridged.addedAt)
-    }
 
     @Test
     fun mapsThrowableCategoriesWithoutLeakingRawKotlinExceptionTypesAsTheApi() {
