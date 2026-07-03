@@ -8,7 +8,7 @@ final class WalletAPITests: XCTestCase {
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
-        XCTAssertEqual(configuration.persistence, .sdkManagedEncrypted)
+        XCTAssertTrue(configuration.persistence.isSdkManagedEncrypted)
         XCTAssertNil(configuration.attestation)
     }
 
@@ -16,7 +16,15 @@ final class WalletAPITests: XCTestCase {
         let configuration = WalletConfiguration(persistence: .sdkManagedEncrypted)
 
         acceptsSendable(configuration.persistence)
-        XCTAssertEqual(configuration.persistence, .sdkManagedEncrypted)
+        XCTAssertTrue(configuration.persistence.isSdkManagedEncrypted)
+    }
+
+    func testPublicPersistenceConfigurationAcceptsIntegratorManagedKeyProvider() {
+        let provider = FakeDatabaseKeyProvider()
+        let configuration = WalletConfiguration(persistence: .integratorManagedKey(provider))
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertTrue(configuration.persistence.isIntegratorManagedKey)
     }
 
     func testPublicModelsAreValueTypesAndEquatable() {
@@ -173,6 +181,37 @@ final class WalletAPITests: XCTestCase {
 
     private func acceptsSendable<T: Sendable>(_ value: T) {
         _ = value
+    }
+}
+
+private extension WalletPersistenceConfiguration {
+    var isSdkManagedEncrypted: Bool {
+        switch self {
+        case .sdkManagedEncrypted:
+            return true
+        case .integratorManagedKey:
+            return false
+        }
+    }
+
+    var isIntegratorManagedKey: Bool {
+        switch self {
+        case .sdkManagedEncrypted:
+            return false
+        case .integratorManagedKey:
+            return true
+        }
+    }
+}
+
+private struct FakeDatabaseKeyProvider: WalletDatabaseKeyProvider {
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        WalletDatabaseKey(keyID: "\(walletID)-\(databaseName)", material: Data(repeating: 7, count: 32))
+    }
+
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+        _ = walletID
+        _ = databaseName
     }
 }
 

@@ -2,10 +2,12 @@ package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
+import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
@@ -25,24 +27,9 @@ public data class MobileWalletConfig(
     val walletId: String = "default",
     val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     val attestationConfig: WalletAttestationConfig? = null,
-    val persistence: MobileWalletPersistenceConfig = MobileWalletPersistenceConfig.SdkManagedEncrypted(),
+    val persistence: MobileWalletPersistenceConfig = MobileWalletPersistenceConfig.SdkManagedEncrypted,
     val onEvent: suspend (MobileWalletEvent) -> Unit = {},
 )
-
-/**
- * Backup and recovery ownership for SDK-managed mobile wallet persistence.
- */
-enum class BackupPolicy {
-    /**
-     * Keep SDK-managed database keys bound to the current app install/device.
-     */
-    DeviceLocalOnly,
-
-    /**
-     * The integrator owns database-key recovery outside the SDK.
-     */
-    IntegratorManagedRecovery,
-}
 
 /**
  * Selects how [MobileWalletFactory] wires wallet-local persistence.
@@ -51,22 +38,16 @@ sealed interface MobileWalletPersistenceConfig {
 
     /**
      * Uses encrypted SQLDelight persistence and SDK-managed database keys.
-     *
-     * @property backupPolicy Backup and recovery ownership for the generated database key.
      */
-    data class SdkManagedEncrypted(
-        val backupPolicy: BackupPolicy = BackupPolicy.DeviceLocalOnly,
-    ) : MobileWalletPersistenceConfig
+    data object SdkManagedEncrypted : MobileWalletPersistenceConfig
 
     /**
      * Uses encrypted SQLDelight persistence with database keys supplied by the integrator.
      *
      * @property keyProvider Provider that returns the SQLCipher key material for this wallet database.
-     * @property backupPolicy Backup and recovery ownership for the supplied database key.
      */
     data class IntegratorManagedKey(
         val keyProvider: DatabaseEncryptionKeyProvider,
-        val backupPolicy: BackupPolicy = BackupPolicy.IntegratorManagedRecovery,
     ) : MobileWalletPersistenceConfig
 
     /**
@@ -92,23 +73,14 @@ public expect class MobileWalletFactory {
     /**
      * Creates a mobile wallet instance for the current platform.
      *
-     * @param config Wallet configuration. Defaults create a new wallet identifier and P-256 key material.
+     * @param config Wallet configuration. Defaults use the stable `default` wallet identifier and P-256 key material.
      */
-    public fun create(config: MobileWalletConfig = MobileWalletConfig()): MobileWallet
+    public suspend fun create(config: MobileWalletConfig = MobileWalletConfig()): MobileWallet
 }
 
-internal fun createMobileWallet(
+internal suspend fun createMobileWallet(
     config: MobileWalletConfig,
-    db: WalletPersistenceDatabase,
-    keyProvider: PlatformKeyProvider,
-    deleteLocalPersistence: suspend () -> Unit = {},
-): MobileWallet = createMobileWallet(config) {
-    createSqlDelightMobileWallet(config, db, keyProvider, deleteLocalPersistence)
-}
-
-internal fun createMobileWallet(
-    config: MobileWalletConfig,
-    createSqlDelightWallet: () -> MobileWallet,
+    createSqlDelightWallet: suspend () -> MobileWallet,
 ): MobileWallet = when (val persistence = config.persistence) {
     is MobileWalletPersistenceConfig.CustomStores -> MobileWallet(
         walletId = config.walletId,
@@ -124,6 +96,45 @@ internal fun createMobileWallet(
     is MobileWalletPersistenceConfig.IntegratorManagedKey,
     is MobileWalletPersistenceConfig.SdkManagedEncrypted,
     -> createSqlDelightWallet()
+}
+
+internal suspend fun createEncryptedSqlDelightMobileWallet(
+    config: MobileWalletConfig,
+    sdkManagedKeyProvider: DatabaseEncryptionKeyProvider,
+    platformKeyProvider: PlatformKeyProvider,
+    openEncryptedDriver: (
+        databaseName: String,
+        encryptionKey: DatabaseEncryptionKey,
+        isDeviceLocal: Boolean,
+        walletId: String,
+    ) -> SqlDriver,
+    deleteDatabase: (databaseName: String) -> Unit,
+): MobileWallet {
+    val databaseName = "wallet_${config.walletId}"
+    val databaseKeyProvider = when (val persistence = config.persistence) {
+        is MobileWalletPersistenceConfig.SdkManagedEncrypted -> sdkManagedKeyProvider
+        is MobileWalletPersistenceConfig.IntegratorManagedKey -> persistence.keyProvider
+        is MobileWalletPersistenceConfig.CustomStores ->
+            error("Custom store wallets do not use SDK SQLDelight persistence")
+    }
+    val driver = openEncryptedDriver(
+        databaseName,
+        databaseKeyProvider.getOrCreateKey(config.walletId, databaseName),
+        config.persistence is MobileWalletPersistenceConfig.SdkManagedEncrypted,
+        config.walletId,
+    )
+    val db = WalletPersistenceDatabase(driver)
+
+    return createSqlDelightMobileWallet(
+        config = config,
+        db = db,
+        keyProvider = platformKeyProvider,
+        deleteLocalPersistence = {
+            runCatching { driver.close() }
+            deleteDatabase(databaseName)
+            databaseKeyProvider.deleteKey(config.walletId, databaseName)
+        },
+    )
 }
 
 private fun createSqlDelightMobileWallet(

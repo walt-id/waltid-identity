@@ -66,7 +66,29 @@ let presentation = try await wallet.present(
 
 `WalletConfiguration()` uses `.sdkManagedEncrypted` persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.
 
-The SDK-managed key is device-local. It protects local wallet data at rest, but it is not a cross-device recovery mechanism. Future public Swift configuration can expose integrator-managed key recovery when the release shape needs it; the current Swift facade intentionally advertises the encrypted default only.
+The SDK-managed key is device-local. It protects local wallet data at rest, but it is not a cross-device recovery mechanism. Apps that need enterprise/KMS ownership or recoverable database-key material can provide an app-owned key provider:
+
+```swift
+struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        let keyData = try await loadOrCreateKeyData(walletID: walletID, databaseName: databaseName)
+        return WalletDatabaseKey(keyID: "\(walletID):\(databaseName)", material: keyData)
+    }
+
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+        try await deleteKeyData(walletID: walletID, databaseName: databaseName)
+    }
+}
+
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: .integratorManagedKey(KMSDatabaseKeyProvider())
+    )
+)
+```
+
+The Swift facade does not expose fully custom wallet stores yet; use the Kotlin Multiplatform `MobileWalletPersistenceConfig.CustomStores` API when custom store injection is required.
 
 Call `try await wallet.deleteLocalData()` to remove SDK-owned local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
 

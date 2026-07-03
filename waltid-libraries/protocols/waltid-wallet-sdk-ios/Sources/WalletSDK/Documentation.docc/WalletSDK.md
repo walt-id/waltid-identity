@@ -36,9 +36,27 @@ opens a SQLCipher-encrypted local wallet database and stores the per-wallet
 database key in iOS Keychain. Normal Swift SDK users do not provide database
 key material.
 
+Use ``WalletPersistenceConfiguration/integratorManagedKey(_:)`` when an app
+needs enterprise/KMS ownership or recoverable database-key material:
+
+```swift
+struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        let keyData = try await loadOrCreateKeyData(walletID: walletID, databaseName: databaseName)
+        return WalletDatabaseKey(keyID: "\(walletID):\(databaseName)", material: keyData)
+    }
+
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+        try await deleteKeyData(walletID: walletID, databaseName: databaseName)
+    }
+}
+```
+
 Use ``Wallet/deleteLocalData()`` to reset SDK-owned local data for the wallet.
 This removes wallet records, platform signing keys referenced by the wallet,
-encrypted database files and sidecars, and the SDK-managed database key. Old
+encrypted database files and sidecars, and SDK-managed database keys. When using
+an integrator-managed key provider, deletion also calls
+``WalletDatabaseKeyProvider/deleteDatabaseKey(walletID:databaseName:)``. Old
 local development databases created before encrypted persistence may need this
 reset; plaintext-to-encrypted migration is not performed.
 
@@ -55,6 +73,9 @@ reset; plaintext-to-encrypted migration is not performed.
 
 - ``Wallet``
 - ``WalletConfiguration``
+- ``WalletPersistenceConfiguration``
+- ``WalletDatabaseKeyProvider``
+- ``WalletDatabaseKey``
 - ``WalletAttestationConfiguration``
 
 ### Wallet Data

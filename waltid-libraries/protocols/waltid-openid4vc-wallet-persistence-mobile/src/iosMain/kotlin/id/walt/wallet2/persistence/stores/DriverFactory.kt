@@ -14,21 +14,17 @@ import id.walt.wallet2.persistence.encryption.WalletPersistenceException
  */
 public actual class DriverFactory {
     /**
-     * Creates a native SQLite driver for [databaseName].
-     */
-    public actual fun createDriver(databaseName: String): SqlDriver =
-        NativeSqliteDriver(WalletPersistenceDatabase.Schema, "$databaseName.db")
-
-    /**
      * Creates a SQLCipher-backed native driver for [databaseName].
      *
      * @param encryptionKey Raw database key used by SQLCipher.
+     * @param isDeviceLocal Reserved for platform parity; iOS database-key locality is controlled by Keychain attributes.
      * @param walletId Wallet identifier used in typed persistence errors.
      */
-    fun createEncryptedDriver(
+    public actual fun createEncryptedDriver(
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
-        walletId: String = databaseName,
+        isDeviceLocal: Boolean,
+        walletId: String,
     ): SqlDriver {
         val driver = runCatching {
             NativeSqliteDriver(
@@ -94,7 +90,7 @@ public actual class DriverFactory {
     /**
      * Deletes the native database file and SQLite sidecar files for [databaseName].
      */
-    fun deleteDatabase(databaseName: String) {
+    public actual fun deleteDatabase(databaseName: String) {
         DatabaseFileContext.deleteDatabase("$databaseName.db")
     }
 }

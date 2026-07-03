@@ -23,6 +23,7 @@ class IosEncryptedDriverTest {
         DriverFactory().createEncryptedDriver(
             databaseName = databaseName,
             encryptionKey = correctKey,
+            isDeviceLocal = true,
             walletId = databaseName,
         ).close()
 
@@ -30,6 +31,7 @@ class IosEncryptedDriverTest {
             DriverFactory().createEncryptedDriver(
                 databaseName = databaseName,
                 encryptionKey = wrongKey,
+                isDeviceLocal = true,
                 walletId = databaseName,
             )
         }
