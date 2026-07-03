@@ -35,6 +35,7 @@ E2E scripts live in [scripts](scripts/README.md).
 
 ## Related modules
 
+- [WalletSDK](../../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md)
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)

@@ -7,6 +7,7 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | Goal | Start here |
 |------|------------|
 | Shared mobile wallet API | [waltid-openid4vc-wallet-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md) |
+| Native iOS Swift API | [WalletSDK](../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md) |
 | Mobile persistence | [waltid-openid4vc-wallet-persistence-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md) |
 | Compose demo app | [waltid-wallet-demo-compose](../waltid-applications/waltid-wallet-demo-compose/README.md) |
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
@@ -107,14 +108,26 @@ From either platform scripts directory, create the mobile-only helper resources 
 
 This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart.
 
-## Documentation checks
+## API documentation checks
 
-The SDK-facing mobile modules use KDoc and Dokka for Kotlin API reference docs:
+The SDK-facing Kotlin mobile modules use KDoc and Dokka for Kotlin API
+reference docs. Dokka is configured to fail on warnings and undocumented public
+API for these modules:
 
 ```bash
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
 ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
 ```
+
+The native iOS Swift facade uses DocC. Generate and validate the Swift archive
+after assembling the local `WalletCore.xcframework`:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
+waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/generate-docc.sh
+```
+
+The mobile SDK docs CI workflow runs both documentation paths.
 
 ## Troubleshooting
 
