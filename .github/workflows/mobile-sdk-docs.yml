@@ -5,7 +5,7 @@ on:
   push:
 
 jobs:
-  dokka:
+  mobile-sdk-docs:
     runs-on: macos-26
     env:
       XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
@@ -24,3 +24,10 @@ jobs:
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+
+      - name: Upload Swift WalletSDK DocC archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: walletsdk-doccarchive
+          path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive
+          if-no-files-found: error

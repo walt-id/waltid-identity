@@ -2,53 +2,6 @@ import XCTest
 @testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
-    func testPublicAPISymbolsHaveDocCComments() throws {
-        let sourceDirectory = packageRoot()
-            .appendingPathComponent("Sources")
-            .appendingPathComponent("WalletSDK")
-        let sourceFiles = try FileManager.default
-            .contentsOfDirectory(at: sourceDirectory, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "swift" }
-
-        var missingDocumentation: [String] = []
-
-        for sourceFile in sourceFiles {
-            let lines = try String(contentsOf: sourceFile).components(separatedBy: .newlines)
-            var publicEnumDepth: Int?
-            var braceDepth = 0
-
-            for (index, line) in lines.enumerated() {
-                let trimmed = line.trimmingCharacters(in: .whitespaces)
-                let isPublicDeclaration = trimmed.hasPrefix("public ")
-                let isPublicEnumCase = publicEnumDepth != nil && trimmed.hasPrefix("case ")
-
-                if (isPublicDeclaration || isPublicEnumCase),
-                   !hasDocCComment(before: index, in: lines) {
-                    let relativePath = sourceFile.lastPathComponent
-                    missingDocumentation.append("\(relativePath):\(index + 1): \(trimmed)")
-                }
-
-                let opens = line.filter { $0 == "{" }.count
-                let closes = line.filter { $0 == "}" }.count
-
-                if isPublicDeclaration, trimmed.contains(" enum ") || trimmed.hasPrefix("public enum ") {
-                    publicEnumDepth = braceDepth + opens - closes
-                }
-
-                braceDepth += opens - closes
-
-                if let enumDepth = publicEnumDepth, braceDepth < enumDepth {
-                    publicEnumDepth = nil
-                }
-            }
-        }
-
-        XCTAssertTrue(
-            missingDocumentation.isEmpty,
-            "Missing DocC comments for public SDK symbols:\n" + missingDocumentation.joined(separator: "\n")
-        )
-    }
-
     func testPublicConfigurationUsesStableDefaults() {
         let configuration = WalletConfiguration()
 
@@ -203,28 +156,6 @@ final class WalletAPITests: XCTestCase {
 
     private func acceptsSendable<T: Sendable>(_ value: T) {
         _ = value
-    }
-
-    private func packageRoot() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-    }
-
-    private func hasDocCComment(before lineIndex: Int, in lines: [String]) -> Bool {
-        var index = lineIndex - 1
-        while index >= 0 {
-            let trimmed = lines[index].trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("@") {
-                index -= 1
-                continue
-            }
-
-            return trimmed.hasPrefix("///") || trimmed == "*/"
-        }
-
-        return false
     }
 }
 

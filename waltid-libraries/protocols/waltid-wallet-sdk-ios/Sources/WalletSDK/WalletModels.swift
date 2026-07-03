@@ -12,6 +12,14 @@ public struct WalletConfiguration: Equatable, Sendable {
     public var attestation: WalletAttestationConfiguration?
 
     /// Creates wallet configuration.
+    ///
+    /// - Parameters:
+    ///   - walletID: Stable local wallet identifier used for database naming
+    ///     and persisted wallet state.
+    ///   - defaultKeyType: Key type used by ``Wallet/bootstrap(keyType:didMethod:)``
+    ///     when no operation-specific override is supplied.
+    ///   - attestation: Optional wallet attestation configuration for issuers
+    ///     that require client attestation.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -65,6 +73,12 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     public var hostHeader: String
 
     /// Creates wallet attestation settings.
+    ///
+    /// - Parameters:
+    ///   - baseURL: Base URL of the attestation service.
+    ///   - attesterPath: Relative attester endpoint path.
+    ///   - bearerToken: Optional bearer token used for attestation requests.
+    ///   - hostHeader: Optional host header override for attestation requests.
     public init(
         baseURL: String,
         attesterPath: String,
@@ -99,6 +113,16 @@ public struct Credential: Equatable, Identifiable, Sendable {
     public let addedAt: Date?
 
     /// Creates credential metadata visible to SDK consumers.
+    ///
+    /// - Parameters:
+    ///   - id: Stable local credential identifier.
+    ///   - format: Credential format, for example `vc+sd-jwt` or
+    ///     `jwt_vc_json`.
+    ///   - issuer: Issuer identifier or URL when available.
+    ///   - subject: Credential subject identifier when available.
+    ///   - label: User-facing credential label when available.
+    ///   - addedAt: Date the credential was added to the wallet when
+    ///     available.
     public init(
         id: String,
         format: String,
@@ -125,6 +149,10 @@ public struct WalletBootstrapResult: Equatable, Sendable {
     public let did: String
 
     /// Creates a bootstrap result.
+    ///
+    /// - Parameters:
+    ///   - keyID: Identifier of the created or selected wallet key.
+    ///   - did: DID created for the wallet.
     public init(keyID: String, did: String) {
         self.keyID = keyID
         self.did = did
@@ -143,6 +171,12 @@ public struct PresentationResult: Equatable, Sendable {
     public let verifierResponseJSON: String?
 
     /// Creates a presentation result.
+    ///
+    /// - Parameters:
+    ///   - success: Indicates whether the presentation flow completed
+    ///     successfully.
+    ///   - redirectTo: Optional verifier redirect URL.
+    ///   - verifierResponseJSON: Optional raw verifier response JSON.
     public init(
         success: Bool,
         redirectTo: URL?,
@@ -166,6 +200,11 @@ public struct WalletEvent: Equatable, Sendable {
     public let status: WalletEventStatus
 
     /// Creates a wallet progress event.
+    ///
+    /// - Parameters:
+    ///   - name: Event name emitted by the wallet core.
+    ///   - phase: High-level issuance or presentation phase.
+    ///   - status: High-level progress status.
     public init(
         name: String,
         phase: WalletEventPhase,
