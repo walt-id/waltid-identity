@@ -35,6 +35,15 @@ Then build or test the Swift facade:
 swift test --package-path waltid-libraries/protocols/waltid-wallet-sdk-ios -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
 ```
 
+Generate and validate the Swift DocC archive:
+
+```bash
+waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/generate-docc.sh
+```
+
+The validation keeps owned public Swift symbols covered by DocC abstracts and
+parameter documentation.
+
 ## Usage Sketch
 
 ```swift
