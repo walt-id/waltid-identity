@@ -66,6 +66,24 @@ Swift package boundary a native iOS integrator would use. The separate Compose
 Multiplatform demo remains the KMP/Compose consumer proof and uses its generated
 Kotlin `sharedUI` framework instead of routing through this Swift facade.
 
+## Interop Boundary
+
+`WalletSDK` is the intended public iOS API. It exposes Swift-owned models,
+errors, and the `Wallet` actor so app code does not need to import or handle
+generated Kotlin, Objective-C, or SKIE symbols directly.
+
+`WalletCore` is the local binary implementation dependency behind that facade.
+It is assembled from `waltid-openid4vc-wallet-mobile` with SKIE enabled for the
+KMP features the facade consumes: cancellable Swift `async` calls for Kotlin
+`suspend` functions, Flow-to-`AsyncSequence` support for wallet events, and
+Swift-friendly enum/sealed wrappers at the bridge boundary.
+
+The Compose Multiplatform demo intentionally does not apply this Swift facade.
+Its iOS app hosts Kotlin Compose UI through the generated `sharedUI` framework,
+which is the right proof path for KMP/Compose integrators. SKIE would become
+useful there only if the demo adds a native SwiftUI path that directly consumes
+shared Kotlin state, flows, sealed UI state, or suspend APIs.
+
 ## Publishing Follow-up
 
 This package currently uses a local binary target path for the spike. A customer
