@@ -17,23 +17,17 @@ import java.io.File
  */
 actual class DriverFactory(private val context: Context) {
     /**
-     * Creates an Android SQLite driver for [databaseName].
-     */
-    actual fun createDriver(databaseName: String): SqlDriver =
-        AndroidSqliteDriver(WalletPersistenceDatabase.Schema, context, "$databaseName.db")
-
-    /**
      * Creates a SQLCipher-backed Android driver for [databaseName].
      *
      * @param encryptionKey Raw database key used by SQLCipher.
-     * @param useNoBackupDirectory Stores the database under Android's no-backup directory when true.
+     * @param isDeviceLocal Stores the database under Android's no-backup directory when true.
      * @param walletId Wallet identifier used in typed persistence errors.
      */
-    fun createEncryptedDriver(
+    actual fun createEncryptedDriver(
         databaseName: String,
         encryptionKey: DatabaseEncryptionKey,
-        useNoBackupDirectory: Boolean = true,
-        walletId: String = databaseName,
+        isDeviceLocal: Boolean,
+        walletId: String,
     ): SqlDriver {
         val driver = runCatching {
             System.loadLibrary("sqlcipher")
@@ -42,7 +36,7 @@ actual class DriverFactory(private val context: Context) {
                 context = context,
                 name = "$databaseName.db",
                 factory = SupportOpenHelperFactory(encryptionKey.material),
-                useNoBackupDirectory = useNoBackupDirectory,
+                useNoBackupDirectory = isDeviceLocal,
             )
         }.getOrElse { cause ->
             throw WalletPersistenceException.EncryptionConfigurationFailed(walletId, cause)
@@ -68,12 +62,11 @@ actual class DriverFactory(private val context: Context) {
     /**
      * Deletes the Android database file and SQLite sidecar files for [databaseName].
      */
-    fun deleteDatabase(databaseName: String): Boolean {
+    actual fun deleteDatabase(databaseName: String) {
         val fileName = "$databaseName.db"
-        var deleted = context.deleteDatabase(fileName)
-        deleted = deleteDatabaseFiles(context.getDatabasePath(fileName)) || deleted
-        deleted = deleteDatabaseFiles(File(context.noBackupFilesDir, fileName)) || deleted
-        return deleted
+        context.deleteDatabase(fileName)
+        deleteDatabaseFiles(context.getDatabasePath(fileName))
+        deleteDatabaseFiles(File(context.noBackupFilesDir, fileName))
     }
 
     private fun deleteDatabaseFiles(databaseFile: File): Boolean {

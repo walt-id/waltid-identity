@@ -13,12 +13,14 @@ fun createAndroidDemoWallet(
 ): DemoWallet {
     WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
 
-    return MobileDemoWallet(
-        MobileWalletFactory(context).create(
-            MobileWalletConfig(
-                walletId = config.walletId,
-                attestationConfig = config.toWalletAttestationConfig(),
+    return LazyDemoWallet {
+        MobileDemoWallet(
+            MobileWalletFactory(context).create(
+                MobileWalletConfig(
+                    walletId = config.walletId,
+                    attestationConfig = config.toWalletAttestationConfig(),
+                )
             )
         )
-    )
+    }
 }

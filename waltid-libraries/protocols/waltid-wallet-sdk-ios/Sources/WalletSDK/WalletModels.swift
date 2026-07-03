@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for a wallet SDK instance.
-public struct WalletConfiguration: Equatable, Sendable {
+public struct WalletConfiguration: Sendable {
     /// Stable local wallet identifier used by the underlying wallet store.
     public var walletID: String
 
@@ -38,9 +38,49 @@ public struct WalletConfiguration: Equatable, Sendable {
 }
 
 /// Persistence modes supported by the wallet SDK.
-public enum WalletPersistenceConfiguration: Equatable, Sendable {
+public enum WalletPersistenceConfiguration: Sendable {
     /// SDK-managed encrypted local SQLDelight persistence.
     case sdkManagedEncrypted
+
+    /// Encrypted local SQLDelight persistence with app-owned database key material.
+    case integratorManagedKey(any WalletDatabaseKeyProvider)
+}
+
+/// Database key material used for wallet-local SQLCipher persistence.
+public struct WalletDatabaseKey: Equatable, Sendable {
+    /// Stable identifier for the database encryption key.
+    public let keyID: String
+
+    /// Raw SQLCipher key material.
+    public let material: Data
+
+    /// Creates wallet database key material.
+    ///
+    /// - Parameters:
+    ///   - keyID: Stable identifier for the database encryption key.
+    ///   - material: Raw SQLCipher key material.
+    public init(keyID: String, material: Data) {
+        self.keyID = keyID
+        self.material = material
+    }
+}
+
+/// App-owned provider for wallet database encryption keys.
+public protocol WalletDatabaseKeyProvider: Sendable {
+    /// Returns the existing database encryption key or creates it when absent.
+    ///
+    /// - Parameters:
+    ///   - walletID: Stable wallet identifier from ``WalletConfiguration``.
+    ///   - databaseName: Wallet database name derived from the wallet ID.
+    /// - Returns: Raw SQLCipher database key material.
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey
+
+    /// Deletes provider-owned key material when local wallet data is deleted.
+    ///
+    /// - Parameters:
+    ///   - walletID: Stable wallet identifier from ``WalletConfiguration``.
+    ///   - databaseName: Wallet database name derived from the wallet ID.
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws
 }
 
 /// Key algorithms supported by the wallet bridge.

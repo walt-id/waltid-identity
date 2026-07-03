@@ -56,7 +56,8 @@ class MobileWalletEncryptionTest {
                 keyId = "test-key",
                 material = ByteArray(32) { index -> index.toByte() },
             ),
-            useNoBackupDirectory = false,
+            isDeviceLocal = false,
+            walletId = databaseName,
         )
         val database = WalletPersistenceDatabase(driver)
         database.walletPersistenceQueries.insertDid(
@@ -97,7 +98,8 @@ class MobileWalletEncryptionTest {
         val driver = DriverFactory(context).createEncryptedDriver(
             databaseName = databaseName,
             encryptionKey = rightKey,
-            useNoBackupDirectory = false,
+            isDeviceLocal = false,
+            walletId = databaseName,
         )
         val database = WalletPersistenceDatabase(driver)
         database.walletPersistenceQueries.insertDid(
@@ -110,7 +112,7 @@ class MobileWalletEncryptionTest {
             DriverFactory(context).createEncryptedDriver(
                 databaseName = databaseName,
                 encryptionKey = wrongKey,
-                useNoBackupDirectory = false,
+                isDeviceLocal = false,
                 walletId = "android-wrong-key-wallet",
             )
         }

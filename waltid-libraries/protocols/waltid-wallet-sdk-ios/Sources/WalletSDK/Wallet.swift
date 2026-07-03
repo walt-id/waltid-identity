@@ -19,7 +19,7 @@ public actor Wallet {
     ///   bridge cannot be created.
     public init(configuration: WalletConfiguration = .init()) async throws {
         self.configuration = configuration
-        self.bridge = try DefaultWalletCoreBridgeFactory.makeBridge(configuration: configuration)
+        self.bridge = try await DefaultWalletCoreBridgeFactory.makeBridge(configuration: configuration)
     }
 
     init(

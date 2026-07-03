@@ -13,9 +13,9 @@ protocol WalletCoreBridge: Sendable {
 
 @available(macOS 10.15, *)
 enum DefaultWalletCoreBridgeFactory {
-    static func makeBridge(configuration: WalletConfiguration) throws -> any WalletCoreBridge {
+    static func makeBridge(configuration: WalletConfiguration) async throws -> any WalletCoreBridge {
         #if canImport(WalletCore) && os(iOS)
-        return try KMPWalletCoreBridge(configuration: configuration)
+        return try await KMPWalletCoreBridge(configuration: configuration)
         #else
         return UnavailableWalletCoreBridge()
         #endif

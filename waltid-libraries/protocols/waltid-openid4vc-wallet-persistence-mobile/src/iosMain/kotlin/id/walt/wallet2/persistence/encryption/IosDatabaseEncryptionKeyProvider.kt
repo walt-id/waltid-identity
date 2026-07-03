@@ -116,21 +116,6 @@ class IosDatabaseEncryptionKeyProvider : DatabaseEncryptionKeyProvider {
         }
     }
 
-    private fun deleteStoredKey(walletId: String, keyId: String) {
-        val query = keychainQuery(keyId)
-        try {
-            val status = SecItemDelete(query.dictionary)
-            if (status != errSecSuccess && status != errSecItemNotFound) {
-                throw WalletPersistenceException.EncryptionConfigurationFailed(
-                    walletId = walletId,
-                    cause = IllegalStateException("Keychain delete failed with status $status"),
-                )
-            }
-        } finally {
-            query.release()
-        }
-    }
-
     private fun generateKeyMaterial(walletId: String): ByteArray {
         val material = ByteArray(DATABASE_KEY_BYTES)
         material.usePinned { pinned ->

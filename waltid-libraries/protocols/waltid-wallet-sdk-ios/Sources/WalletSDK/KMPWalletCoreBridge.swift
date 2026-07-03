@@ -6,8 +6,8 @@ import Foundation
 final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     private let bridge: WalletSdkBridge
 
-    init(configuration: WalletConfiguration) throws {
-        let result = WalletSdkBridgeFactory().create(
+    init(configuration: WalletConfiguration) async throws {
+        let result = try await WalletSdkBridgeFactory().create(
             configuration: configuration.toKMPConfiguration()
         )
         self.bridge = try Self.successValue(result, as: WalletSdkBridge.self, operation: "create wallet bridge")
@@ -17,7 +17,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         AsyncStream { continuation in
             let task = Task { [self] in
                 let flow = SkieSwiftFlow<MobileWalletEvent>(
-                    SkieKotlinFlow<MobileWalletEvent>(bridge.events)
+                    SkieKotlinFlow(bridge.events)
                 )
 
                 for await event in flow {
@@ -142,6 +142,7 @@ private extension WalletConfiguration {
             walletId: walletID,
             defaultKeyType: defaultKeyType.toKMPKeyType(),
             persistence: persistence.toKMPPersistenceConfiguration(),
+            databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration()
         )
     }
@@ -152,7 +153,51 @@ private extension WalletPersistenceConfiguration {
         switch self {
         case .sdkManagedEncrypted:
             return .sdkManagedEncrypted
+        case .integratorManagedKey:
+            return .integratorManagedKey
         }
+    }
+
+    func toKMPDatabaseKeyProvider() -> WalletBridgeDatabaseEncryptionKeyProvider? {
+        switch self {
+        case .sdkManagedEncrypted:
+            return nil
+        case let .integratorManagedKey(provider):
+            return KMPWalletDatabaseKeyProviderAdapter(provider: provider)
+        }
+    }
+}
+
+private final class KMPWalletDatabaseKeyProviderAdapter: WalletBridgeDatabaseEncryptionKeyProvider, @unchecked Sendable {
+    private let provider: any WalletDatabaseKeyProvider
+
+    init(provider: any WalletDatabaseKeyProvider) {
+        self.provider = provider
+    }
+
+    func __getOrCreateKey(walletId: String, databaseName: String) async throws -> WalletBridgeDatabaseEncryptionKey {
+        let key = try await provider.databaseKey(walletID: walletId, databaseName: databaseName)
+        return WalletBridgeDatabaseEncryptionKey(
+            keyId: key.keyID,
+            material: key.material.toKotlinByteArray()
+        )
+    }
+
+    func __deleteKey(walletId: String, databaseName: String) async throws {
+        try await provider.deleteDatabaseKey(walletID: walletId, databaseName: databaseName)
+    }
+}
+
+private extension Data {
+    func toKotlinByteArray() -> KotlinByteArray {
+        let bytes = [UInt8](self)
+        let array = KotlinByteArray(size: Int32(bytes.count))
+
+        for (index, byte) in bytes.enumerated() {
+            array.set(index: Int32(index), value: Int8(bitPattern: byte))
+        }
+
+        return array
     }
 }
 

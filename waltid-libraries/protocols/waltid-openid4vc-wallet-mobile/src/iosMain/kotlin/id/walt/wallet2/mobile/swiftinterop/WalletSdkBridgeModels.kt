@@ -4,6 +4,8 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
@@ -14,12 +16,15 @@ import kotlinx.serialization.Serializable
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
  * @property defaultKeyType Key type used by wallet bootstrap when no key type override is supplied.
  * @property persistence Persistence mode used for wallet-local state.
+ * @property databaseKeyProvider Swift-owned database key provider used when [persistence] is
+ * [WalletBridgePersistenceConfiguration.IntegratorManagedKey].
  * @property attestation Optional client-attestation configuration for issuers that require it.
  */
 data class WalletBridgeConfiguration(
     val walletId: String = "default",
     val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     val persistence: WalletBridgePersistenceConfiguration = WalletBridgePersistenceConfiguration.SdkManagedEncrypted,
+    val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     val attestation: WalletAttestationConfig? = null,
 )
 
@@ -27,7 +32,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
     walletId = walletId,
     defaultKeyType = defaultKeyType,
     attestationConfig = attestation,
-    persistence = persistence.toMobileWalletPersistenceConfig(),
+    persistence = persistence.toMobileWalletPersistenceConfig(databaseKeyProvider),
 )
 
 /**
@@ -36,13 +41,68 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
 enum class WalletBridgePersistenceConfiguration {
     /** SDK-managed encrypted SQLDelight persistence. */
     SdkManagedEncrypted,
+
+    /** Encrypted SQLDelight persistence with database keys supplied by Swift app code. */
+    IntegratorManagedKey,
 }
 
-private fun WalletBridgePersistenceConfiguration.toMobileWalletPersistenceConfig(): MobileWalletPersistenceConfig =
+/**
+ * Database key material returned by a Swift-owned database key provider.
+ *
+ * @property keyId Stable identifier for the database key.
+ * @property material Raw SQLCipher key material.
+ */
+data class WalletBridgeDatabaseEncryptionKey(
+    val keyId: String,
+    val material: ByteArray,
+)
+
+/**
+ * Swift-facing provider for integrator-managed encrypted wallet database keys.
+ */
+interface WalletBridgeDatabaseEncryptionKeyProvider {
+    /**
+     * Returns the existing encryption key for [databaseName] or creates one if this provider owns creation.
+     */
+    suspend fun getOrCreateKey(walletId: String, databaseName: String): WalletBridgeDatabaseEncryptionKey
+
+    /**
+     * Deletes provider-owned key material for [databaseName], if present.
+     */
+    suspend fun deleteKey(walletId: String, databaseName: String)
+}
+
+private fun WalletBridgePersistenceConfiguration.toMobileWalletPersistenceConfig(
+    databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
+): MobileWalletPersistenceConfig =
     when (this) {
         WalletBridgePersistenceConfiguration.SdkManagedEncrypted ->
-            MobileWalletPersistenceConfig.SdkManagedEncrypted()
+            MobileWalletPersistenceConfig.SdkManagedEncrypted
+
+        WalletBridgePersistenceConfiguration.IntegratorManagedKey ->
+            MobileWalletPersistenceConfig.IntegratorManagedKey(
+                keyProvider = BridgeDatabaseEncryptionKeyProvider(
+                    databaseKeyProvider
+                        ?: throw IllegalArgumentException("Integrator-managed persistence requires a database key provider"),
+                )
+            )
     }
+
+private class BridgeDatabaseEncryptionKeyProvider(
+    private val bridgeProvider: WalletBridgeDatabaseEncryptionKeyProvider,
+) : DatabaseEncryptionKeyProvider {
+    override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
+        val key = bridgeProvider.getOrCreateKey(walletId, databaseName)
+        return DatabaseEncryptionKey(
+            keyId = key.keyId,
+            material = key.material,
+        )
+    }
+
+    override suspend fun deleteKey(walletId: String, databaseName: String) {
+        bridgeProvider.deleteKey(walletId, databaseName)
+    }
+}
 
 /**
  * Coarse error category for Swift bridge failures.
