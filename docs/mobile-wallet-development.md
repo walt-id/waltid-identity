@@ -10,8 +10,7 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | Mobile persistence | [waltid-openid4vc-wallet-persistence-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md) |
 | Compose demo app | [waltid-wallet-demo-compose](../waltid-applications/waltid-wallet-demo-compose/README.md) |
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
-| Android key storage | [waltid-crypto-android](../waltid-libraries/crypto/waltid-crypto-android/README.md) |
-| iOS key storage | [waltid-crypto-ios](../waltid-libraries/crypto/waltid-crypto-ios/README.md) |
+| Mobile key storage | [waltid-crypto](../waltid-libraries/crypto/waltid-crypto/README.md) |
 
 ## IDE guidance
 
@@ -33,12 +32,17 @@ Configure machine-local paths and platform flags in `local.properties`:
 
 ```properties
 sdk.dir=/path/to/android-sdk
-kotlin.apple.cocoapods.bin=/path/to/pod
 
 enableAndroidBuild=true
 enableIosBuild=true
 # Optional: enables the mock Web/Wasm preview module.
 # enableWalletDemoComposeWeb=true
+```
+
+If CocoaPods is installed somewhere outside `PATH`, add an explicit override:
+
+```properties
+kotlin.apple.cocoapods.bin=/path/to/pod
 ```
 
 `local.properties` is ignored by Git and overrides the tracked defaults in `gradle.properties`. Command-line `-P` flags still take highest precedence for CI and one-off overrides.
@@ -105,12 +109,21 @@ From either platform scripts directory, create the mobile-only helper resources 
 
 This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart. The iOS local Enterprise script runs `pod install` by default so the CocoaPods sandbox is in sync before Xcode starts.
 
+## Documentation checks
+
+The SDK-facing mobile modules use KDoc and Dokka for Kotlin API reference docs:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
 ## Troubleshooting
 
 - **Android modules missing:** set `enableAndroidBuild=true` in `local.properties`, or pass `-PenableAndroidBuild=true`, then reload Gradle.
 - **iOS modules missing:** set `enableIosBuild=true` in `local.properties`, configure `kotlin.apple.cocoapods.bin`, or pass `-PenableIosBuild=true`, then reload Gradle.
 - **Web/Wasm preview module missing:** set `enableWalletDemoComposeWeb=true` in `local.properties`, or pass `-PenableWalletDemoComposeWeb=true`, then reload Gradle.
 - **Android SDK not found:** check `sdk.dir` in `local.properties`.
-- **CocoaPods not found:** check `kotlin.apple.cocoapods.bin` in `local.properties`.
+- **CocoaPods not found:** make sure `pod` is on `PATH`, or set `kotlin.apple.cocoapods.bin=/path/to/pod` in `local.properties`.
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
 - **Local Enterprise E2E cannot reach services:** check `HOST_ALIAS_DOMAIN`, the running Enterprise stack, `baseSsl=true`, and omitted `basePort`.

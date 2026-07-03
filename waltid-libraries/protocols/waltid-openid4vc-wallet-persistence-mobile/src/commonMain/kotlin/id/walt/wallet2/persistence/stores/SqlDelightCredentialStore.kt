@@ -10,21 +10,35 @@ import kotlinx.coroutines.flow.flow
 import kotlin.time.Clock
 import kotlin.time.Instant
 
+/**
+ * SQLDelight-backed implementation of [WalletCredentialStore] for mobile wallets.
+ *
+ * @param queries SQLDelight queries for wallet persistence tables.
+ */
 class SqlDelightCredentialStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletCredentialStore {
 
+    /**
+     * Loads a stored credential by wallet-local identifier.
+     */
     override suspend fun getCredential(id: String): StoredCredential? {
         val row = queries.selectCredentialById(id).executeAsOneOrNull() ?: return null
         return row.toStoredCredential()
     }
 
+    /**
+     * Emits all stored credentials from the mobile database.
+     */
     override suspend fun listCredentials(): Flow<StoredCredential> = flow {
         queries.selectAllCredentials().executeAsList().forEach { row ->
             emit(row.toStoredCredential())
         }
     }
 
+    /**
+     * Stores a credential and its display metadata.
+     */
     override suspend fun addCredential(entry: StoredCredential) {
         val rawString = entry.credential.signed ?: entry.credential.credentialData.toString()
         queries.insertCredential(
@@ -36,6 +50,9 @@ class SqlDelightCredentialStore(
         )
     }
 
+    /**
+     * Removes a credential by wallet-local identifier.
+     */
     override suspend fun removeCredential(id: String): Boolean {
         val exists = queries.selectCredentialById(id).executeAsOneOrNull() != null
         if (exists) queries.deleteCredentialById(id)

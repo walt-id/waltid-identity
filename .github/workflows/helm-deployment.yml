@@ -56,8 +56,12 @@ jobs:
 
           # Update domain names in the file
           sed -i "s/issuer\.portal\.test\.waltid\.cloud/issuer.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/issuer2\.portal\.test\.waltid\.cloud/issuer2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/verifier\.portal\.test\.waltid\.cloud/verifier.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/verifier2\.portal\.test\.waltid\.cloud/verifier2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/wallet-api2\.test\.waltid\.cloud/wallet-api2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/wallet\.test\.waltid\.cloud/wallet.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
+          sed -i "s/portal2\.test\.waltid\.cloud/portal2.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/portal\.test\.waltid\.cloud/portal.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
           sed -i "s/wallet-dev\.test\.waltid\.cloud/wallet-dev.${IMAGE_NAME}.waltid.cloud/g" helm-values.json
 
@@ -75,6 +79,7 @@ jobs:
         run: |
           helm upgrade --install waltid-helm-release ./helm-charts/waltid \
             --namespace ${{ inputs.namespace }} \
+            --set-string global.deploymentId=${{ github.sha }} \
             -f helm-values.json
       - name: Add deployment URLs to summary
         run: |
@@ -83,7 +88,11 @@ jobs:
           echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
           echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
           echo "| Issuer | https://issuer.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Issuer2 | https://issuer2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Verifier | https://verifier.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Verifier2 | https://verifier2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Wallet API2 | https://wallet-api2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Wallet | https://wallet.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
-          echo "| Portal | https://portal.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
           echo "| Wallet Dev | https://wallet-dev.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Portal | https://portal.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY
+          echo "| Portal2 | https://portal2.${VERSION}.waltid.cloud |" >> $GITHUB_STEP_SUMMARY

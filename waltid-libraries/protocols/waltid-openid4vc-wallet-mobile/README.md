@@ -36,3 +36,13 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 - [Compose Wallet Demo](../../../waltid-applications/waltid-wallet-demo-compose/README.md)
 - [iOS Wallet Demo](../../../waltid-applications/waltid-wallet-demo-ios/README.md)
+
+## API documentation
+
+Generate the SDK facade API reference with Dokka:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+The generated HTML is written to `build/dokka/html`.

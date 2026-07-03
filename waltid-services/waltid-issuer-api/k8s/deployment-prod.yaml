@@ -12,11 +12,6 @@ data:
     webPort = 3000
   issuer-service.conf: |
     baseUrl = "https://issuer.demo.walt.id"
-  authentication-service.conf: |
-    name = "keycloak"
-    authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
-    accessTokenUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token"
-    clientId = "issuer_api"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -49,7 +44,16 @@ spec:
                 - ALL
           volumeMounts:
             - name: issuer-web-config
-              mountPath: "/waltid-issuer-api/config/"
+              mountPath: "/waltid-issuer-api/config/_features.conf"
+              subPath: _features.conf
+              readOnly: true
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/web.conf"
+              subPath: web.conf
+              readOnly: true
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/issuer-service.conf"
+              subPath: issuer-service.conf
               readOnly: true
           ports:
             - containerPort: 3000

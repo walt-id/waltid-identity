@@ -65,16 +65,6 @@ X.509 certificate handling and validation. Provides utilities for parsing, valid
 
 **Use when:** You need to handle X.509 certificates, validate certificate chains, or work with PKI-based trust systems.
 
-### [🟡 waltid-crypto-android](./waltid-crypto-android)
-Android-specific cryptographic implementations. Provides Android platform optimizations and Android Keystore integration.
-
-**Use when:** You're building Android applications and need platform-specific cryptographic optimizations or Android Keystore integration.
-
-### [🟡 waltid-crypto-ios](./waltid-crypto-ios)
-iOS-specific cryptographic implementations. Provides iOS platform support and native iOS cryptographic operations.
-
-**Use when:** You're building iOS applications and need native iOS cryptographic support.
-
 ### [🟡 waltid-crypto-aws](./waltid-crypto-aws)
 AWS Key Management Service (KMS) integration. Provides seamless integration with AWS KMS for key management and cryptographic operations.
 
@@ -84,11 +74,6 @@ AWS Key Management Service (KMS) integration. Provides seamless integration with
 Oracle Cloud Infrastructure (OCI) KMS integration. Provides integration with OCI Key Management for key management and cryptographic operations.
 
 **Use when:** You need to use Oracle Cloud Infrastructure KMS for key management in OCI-based deployments that require the SDK over the REST API.
-
-### [🟡 waltid-target-ios](./waltid-target-ios)
-iOS target support for multiplatform crypto libraries. Provides the necessary infrastructure and bindings for iOS platform support in multiplatform cryptographic libraries.
-
-**Use when:** You're building multiplatform libraries that need iOS support and require iOS-specific implementations.
 
 ## Join the community
 
@@ -103,4 +88,3 @@ Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/walt
 <div align="center">
 <img src="../../assets/walt-banner.png" alt="walt.id banner" />
 </div>
-

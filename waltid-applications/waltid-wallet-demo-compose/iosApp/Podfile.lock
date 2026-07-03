@@ -1,23 +1,16 @@
 PODS:
-  - JOSESwift (3.0.0)
   - sharedUI (1.0)
 
 DEPENDENCIES:
-  - JOSESwift (= 3.0.0)
   - sharedUI (from `../sharedUI`)
-
-SPEC REPOS:
-  trunk:
-    - JOSESwift
 
 EXTERNAL SOURCES:
   sharedUI:
     :path: "../sharedUI"
 
 SPEC CHECKSUMS:
-  JOSESwift: 7784b1b844194d0f534eb6ac4fba5af683bccc79
   sharedUI: 26832040d5f87c40198f79d698196144d25ef91c
 
-PODFILE CHECKSUM: 53ecdb98c77cec86a3685d3d38af4b24e82d689b
+PODFILE CHECKSUM: 8e6292e5cbd49e10de7b8e2f6643d9183a6b335d
 
 COCOAPODS: 1.16.2

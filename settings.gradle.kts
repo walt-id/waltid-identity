@@ -38,10 +38,6 @@ val modules = listOfNotNull(
         "waltid-crypto-oci",
         "waltid-crypto-aws",
         "waltid-crypto-azure",
-        "waltid-crypto-android" whenEnabled enableAndroidBuild,
-        "waltid-crypto-ios" whenEnabled enableIosBuild,
-        "waltid-target-ios" whenEnabled enableIosBuild,
-        "waltid-target-ios:implementation" whenEnabled enableIosBuild,
         "waltid-crypto2",
         "waltid-cose",
         "waltid-x509",
@@ -86,7 +82,6 @@ val modules = listOfNotNull(
 
     * "$libraries:sdjwt".group(
         "waltid-sdjwt",
-        "waltid-sdjwt-ios" whenEnabled enableIosBuild,
     ),
 
     * "$libraries:auth".group(
@@ -140,8 +135,6 @@ val modules = listOfNotNull(
     "$applications:waltid-wallet-demo-compose:iosApp" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-compose:webApp" whenEnabled enableWalletDemoComposeWeb,
 
-    "$applications:waltid-openid4vc-ios-testApp" whenEnabled enableIosBuild,
-    "$applications:waltid-openid4vc-ios-testApp:shared" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-ios" whenEnabled enableIosBuild,
     "$applications:waltid-wallet-demo-ios:shared" whenEnabled enableIosBuild
 )

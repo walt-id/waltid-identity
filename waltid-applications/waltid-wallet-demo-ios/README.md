@@ -38,4 +38,4 @@ E2E scripts live in [scripts](scripts/README.md).
 
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
-- [waltid-crypto-ios](../../waltid-libraries/crypto/waltid-crypto-ios/README.md)
+- [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)
