@@ -56,7 +56,7 @@ data class MobileWalletCredential(
  *
  * @property success `true` when the wallet transmitted the presentation successfully.
  * @property redirectTo Optional verifier redirect URI returned by the presentation flow.
- * @property verifierResponse Raw verifier response body, when the verifier returns structured JSON.
+ * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
  */
 data class MobileWalletPresentationResult(
     val success: Boolean,
@@ -70,10 +70,10 @@ data class MobileWalletPresentationResult(
  * The wallet uses this configuration to request a client attestation JWT from the
  * enterprise client-attester service and attach the resulting proof to token requests.
  *
- * @property enterpriseBaseUrl Base URL of the enterprise deployment that hosts the attester service.
- * @property attesterPath Path to the attester endpoint, relative to [enterpriseBaseUrl].
+ * @property baseUrl Base URL of the deployment that hosts the attester service.
+ * @property attesterPath Path to the attester endpoint, relative to [baseUrl].
  * @property bearerToken Optional bearer token for protected attester endpoints.
- * @property enterpriseHostHeader Optional `Host` header override for tunneled local enterprise tests.
+ * @property hostHeader Optional `Host` header override for tunneled local tests.
  */
 data class WalletAttestationConfig(
     val baseUrl: String,
@@ -101,6 +101,9 @@ class MobileWallet(
 ) {
     private val eventStream = MobileWalletEventStream()
 
+    /**
+     * Buffered stream of recent issuance and presentation events emitted by this wallet.
+     */
     val events: Flow<MobileWalletEvent> = eventStream.events
 
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
