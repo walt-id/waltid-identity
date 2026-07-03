@@ -72,6 +72,19 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertTrue(result.did.starts(with: "did:"), "DID should start with 'did:', got: \(result.did)")
     }
 
+    func testSdkManagedEncryptedWalletBootstrapsAcrossRecreation() async throws {
+        let wallet1 = try await makeWallet()
+
+        let first = try await wallet1.bootstrap()
+        XCTAssertTrue(first.did.starts(with: "did:"), "DID should start with 'did:', got: \(first.did)")
+
+        let wallet2 = try await makeWallet()
+        let second = try await wallet2.bootstrap()
+
+        XCTAssertEqual(second.did, first.did, "Encrypted wallet state should survive wallet facade recreation")
+        XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
+    }
+
     func testReceiveCredentialFromEudi() async throws {
         let wallet = try await makeWallet()
         _ = try await wallet.bootstrap()

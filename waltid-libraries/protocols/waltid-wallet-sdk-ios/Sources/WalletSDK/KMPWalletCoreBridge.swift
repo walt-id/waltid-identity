@@ -136,8 +136,18 @@ private extension WalletConfiguration {
         WalletBridgeConfiguration(
             walletId: walletID,
             defaultKeyType: defaultKeyType.toKMPKeyType(),
+            persistence: persistence.toKMPPersistenceConfiguration(),
             attestation: attestation?.toKMPAttestationConfiguration()
         )
+    }
+}
+
+private extension WalletPersistenceConfiguration {
+    func toKMPPersistenceConfiguration() -> WalletBridgePersistenceConfiguration {
+        switch self {
+        case .sdkManagedEncrypted:
+            return .sdkManagedEncrypted
+        }
     }
 }
 

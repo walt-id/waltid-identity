@@ -11,6 +11,9 @@ public struct WalletConfiguration: Equatable, Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
+    /// Persistence mode used for wallet-local state.
+    public var persistence: WalletPersistenceConfiguration
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -23,12 +26,20 @@ public struct WalletConfiguration: Equatable, Sendable {
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
-        attestation: WalletAttestationConfiguration? = nil
+        attestation: WalletAttestationConfiguration? = nil,
+        persistence: WalletPersistenceConfiguration = .sdkManagedEncrypted
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
+        self.persistence = persistence
     }
+}
+
+/// Persistence modes supported by the wallet SDK.
+public enum WalletPersistenceConfiguration: Equatable, Sendable {
+    /// SDK-managed encrypted local SQLDelight persistence.
+    case sdkManagedEncrypted
 }
 
 /// Key algorithms supported by the wallet bridge.

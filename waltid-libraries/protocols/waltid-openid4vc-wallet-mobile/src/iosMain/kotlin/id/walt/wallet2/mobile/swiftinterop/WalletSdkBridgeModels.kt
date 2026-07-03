@@ -2,7 +2,9 @@ package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletKeyType
+import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
 import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
 
@@ -11,11 +13,13 @@ import kotlinx.serialization.Serializable
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
  * @property defaultKeyType Key type used by wallet bootstrap when no key type override is supplied.
+ * @property persistence Persistence mode used for wallet-local state.
  * @property attestation Optional client-attestation configuration for issuers that require it.
  */
 public data class WalletBridgeConfiguration(
     val walletId: String = "default",
     val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    val persistence: WalletBridgePersistenceConfiguration = WalletBridgePersistenceConfiguration.SdkManagedEncrypted,
     val attestation: WalletAttestationConfig? = null,
 )
 
@@ -23,7 +27,22 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
     walletId = walletId,
     defaultKeyType = defaultKeyType,
     attestationConfig = attestation,
+    persistence = persistence.toMobileWalletPersistenceConfig(),
 )
+
+/**
+ * Persistence modes exposed to the Swift wallet bridge.
+ */
+enum class WalletBridgePersistenceConfiguration {
+    /** SDK-managed encrypted SQLDelight persistence. */
+    SdkManagedEncrypted,
+}
+
+private fun WalletBridgePersistenceConfiguration.toMobileWalletPersistenceConfig(): MobileWalletPersistenceConfig =
+    when (this) {
+        WalletBridgePersistenceConfiguration.SdkManagedEncrypted ->
+            MobileWalletPersistenceConfig.SdkManagedEncrypted()
+    }
 
 /**
  * Coarse error category for Swift bridge failures.
@@ -76,6 +95,7 @@ public data class WalletBridgeError(
             val category = when (throwable) {
                 is CancellationException -> WalletBridgeErrorCategory.cancelled
                 is IllegalArgumentException -> WalletBridgeErrorCategory.invalidInput
+                is WalletPersistenceException -> WalletBridgeErrorCategory.storage
                 else -> WalletBridgeErrorCategory.internalFailure
             }
 
