@@ -31,6 +31,13 @@ module boundary.
 
 ## Topics
 
+### Integration Guides
+
+- <doc:GettingStarted>
+- <doc:IssuingCredentials>
+- <doc:PresentingCredentials>
+- <doc:ObservingEventsAndErrors>
+
 ### Wallet
 
 - ``Wallet``
