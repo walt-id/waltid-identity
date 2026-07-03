@@ -10,11 +10,23 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlin.time.Clock
 
+/**
+ * Wallet key store that persists key metadata in SQLDelight.
+ *
+ * Platform-backed keys keep their material in the platform key store. Software keys store serialized key
+ * material in the SQLDelight table so they can be reloaded on platforms that require a fallback.
+ *
+ * @param keyProvider Platform key provider used to load, export, and delete keys.
+ * @param queries SQLDelight queries for wallet persistence tables.
+ */
 class PlatformKeyStore(
     private val keyProvider: PlatformKeyProvider,
     private val queries: WalletPersistenceQueries,
 ) : WalletKeyStore {
 
+    /**
+     * Loads a wallet key by its wallet-local key identifier.
+     */
     override suspend fun getKey(keyId: String): Key? {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return null
         val keyType = KeyType.valueOf(ref.key_type)
@@ -27,12 +39,21 @@ class PlatformKeyStore(
         }
     }
 
+    /**
+     * Streams all persisted key references.
+     */
     override suspend fun listKeys(): Flow<WalletKeyInfo> = flow {
         queries.selectAll().executeAsList().forEach { ref ->
             emit(WalletKeyInfo(keyId = ref.key_id, keyType = ref.key_type))
         }
     }
 
+    /**
+     * Persists a key reference for [key].
+     *
+     * Platform-backed key material remains in the platform key store. Software key material is serialized
+     * into the SQLDelight table.
+     */
     override suspend fun addKey(key: Key): String {
         val keyId = key.getKeyId()
         val isPlatformBacked = keyProvider.isPlatformBacked(key.keyType)
@@ -48,6 +69,9 @@ class PlatformKeyStore(
         return keyId
     }
 
+    /**
+     * Removes the platform-backed key when present and deletes its SQLDelight key reference.
+     */
     override suspend fun removeKey(keyId: String): Boolean {
         val ref = queries.selectByKeyId(keyId).executeAsOneOrNull() ?: return false
         val keyType = KeyType.valueOf(ref.key_type)
