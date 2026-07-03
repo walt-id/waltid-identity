@@ -1,13 +1,10 @@
 package id.walt.wallet2.mobile
 
-import id.walt.crypto.keys.KeyType
-import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.PlatformKeyProvider
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
-import kotlin.uuid.Uuid
 
 /**
  * Configuration for creating a [MobileWallet].
@@ -18,10 +15,10 @@ import kotlin.uuid.Uuid
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  */
 data class MobileWalletConfig(
-    val walletId: String = Uuid.random().toString(),
-    val defaultKeyType: KeyType = KeyType.secp256r1,
+    val walletId: String = "default",
+    val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     val attestationConfig: WalletAttestationConfig? = null,
-    val onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    val onEvent: suspend (MobileWalletEvent) -> Unit = {},
 )
 
 /**

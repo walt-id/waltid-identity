@@ -16,8 +16,8 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     var events: AsyncStream<WalletEvent> {
         AsyncStream { continuation in
             let task = Task { [self] in
-                let flow = SkieSwiftFlow<WalletBridgeEvent>(
-                    SkieKotlinFlow<WalletBridgeEvent>(bridge.events())
+                let flow = SkieSwiftFlow<MobileWalletEvent>(
+                    SkieKotlinFlow<MobileWalletEvent>(bridge.events)
                 )
 
                 for await event in flow {
@@ -40,7 +40,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: WalletBridgeBootstrapResult.self,
+            as: MobileWalletBootstrapResult.self,
             operation: "bootstrap wallet"
         )
 
@@ -69,11 +69,11 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         let result = try await bridge.credentials()
         let value = try Self.successAnyValue(result, operation: "list credentials")
 
-        if let credentials = value as? [WalletBridgeCredential] {
+        if let credentials = value as? [MobileWalletCredential] {
             return credentials.map { $0.toSwiftCredential() }
         }
         if let credentials = value as? NSArray {
-            return credentials.compactMap { ($0 as? WalletBridgeCredential)?.toSwiftCredential() }
+            return credentials.compactMap { ($0 as? MobileWalletCredential)?.toSwiftCredential() }
         }
 
         throw WalletError.internalFailure("Unexpected credentials result type: \(type(of: value))")
@@ -87,7 +87,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         )
         let value = try Self.successValue(
             result,
-            as: WalletBridgePresentationResult.self,
+            as: MobileWalletPresentationResult.self,
             operation: "present credentials"
         )
 
@@ -142,8 +142,8 @@ private extension WalletConfiguration {
 }
 
 private extension WalletAttestationConfiguration {
-    func toKMPAttestationConfiguration() -> WalletBridgeAttestationConfiguration {
-        WalletBridgeAttestationConfiguration(
+    func toKMPAttestationConfiguration() -> WalletAttestationConfig {
+        WalletAttestationConfig(
             baseUrl: baseURL,
             attesterPath: attesterPath,
             bearerToken: bearerToken,
@@ -153,7 +153,7 @@ private extension WalletAttestationConfiguration {
 }
 
 private extension WalletKeyType {
-    func toKMPKeyType() -> WalletBridgeKeyType {
+    func toKMPKeyType() -> MobileWalletKeyType {
         switch self {
         case .ed25519:
             return .ed25519
@@ -175,7 +175,7 @@ private extension WalletKeyType {
     }
 }
 
-private extension WalletBridgeCredential {
+private extension MobileWalletCredential {
     func toSwiftCredential() -> Credential {
         Credential(
             id: id,
@@ -188,7 +188,7 @@ private extension WalletBridgeCredential {
     }
 }
 
-private extension WalletBridgeEvent {
+private extension MobileWalletEvent {
     func toSwiftEvent() -> WalletEvent {
         WalletEvent(
             name: name,
@@ -198,7 +198,7 @@ private extension WalletBridgeEvent {
     }
 }
 
-private extension WalletBridgeEventPhase {
+private extension MobileWalletEventPhase {
     func toSwiftPhase() -> WalletEventPhase {
         switch self {
         case .presentation:
@@ -209,7 +209,7 @@ private extension WalletBridgeEventPhase {
     }
 }
 
-private extension WalletBridgeEventStatus {
+private extension MobileWalletEventStatus {
     func toSwiftStatus() -> WalletEventStatus {
         switch self {
         case .completed:

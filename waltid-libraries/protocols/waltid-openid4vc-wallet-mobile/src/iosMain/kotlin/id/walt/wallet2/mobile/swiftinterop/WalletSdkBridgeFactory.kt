@@ -2,33 +2,39 @@ package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import id.walt.wallet2.mobile.MobileWalletEvent
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 class WalletSdkBridgeFactory() {
-    private var createOperations: (MobileWalletConfig) -> WalletSdkBridgeOperations = { config ->
-        MobileWalletSdkBridgeOperations(MobileWalletFactory().create(config))
+    private var createDependencies: (MobileWalletConfig) -> WalletSdkBridgeDependencies = { config ->
+        val wallet = MobileWalletFactory().create(config)
+        WalletSdkBridgeDependencies(
+            operations = MobileWalletSdkBridgeOperations(wallet),
+            eventFlow = wallet.events,
+        )
     }
 
     private constructor(
         createOperations: (MobileWalletConfig) -> WalletSdkBridgeOperations,
     ) : this() {
-        this.createOperations = createOperations
+        this.createDependencies = { config ->
+            WalletSdkBridgeDependencies(
+                operations = createOperations(config),
+                eventFlow = emptyFlow(),
+            )
+        }
     }
 
     fun create(
         configuration: WalletBridgeConfiguration = WalletBridgeConfiguration(),
     ): WalletBridgeResult<WalletSdkBridge> =
         try {
-            val events = MutableSharedFlow<WalletBridgeEvent>(replay = 10)
+            val dependencies = createDependencies(configuration.toMobileWalletConfig())
             WalletBridgeResult.Success(
                 WalletSdkBridge.forOperations(
-                    operations = createOperations(
-                        configuration.toMobileWalletConfig(
-                            onEvent = { event -> events.emit(event.toWalletBridgeEvent()) }
-                        )
-                    ),
-                    eventFlow = events.asSharedFlow(),
+                    operations = dependencies.operations,
+                    eventFlow = dependencies.eventFlow,
                 )
             )
         } catch (throwable: Throwable) {
@@ -42,3 +48,8 @@ class WalletSdkBridgeFactory() {
             WalletSdkBridgeFactory(createOperations)
     }
 }
+
+internal data class WalletSdkBridgeDependencies(
+    val operations: WalletSdkBridgeOperations,
+    val eventFlow: Flow<MobileWalletEvent>,
+)
