@@ -20,7 +20,7 @@ generated bridge symbols behind the package implementation.
 Generate the KMP core XCFramework before building an iOS consumer:
 
 ```bash
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true --no-configuration-cache
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
 ```
 
 The Swift package expects the local artifact at:
