@@ -85,6 +85,17 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun bridgeDeletesWalletAsSuccessResult() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.deleteWallet()
+
+        assertIs<WalletBridgeResult.Success<Unit>>(result)
+        assertEquals(1, operations.deleteWalletCalls)
+    }
+
+    @Test
     fun bridgePresentationMapsJsonElementToJsonString() = runTest {
         val operations = FakeWalletSdkBridgeOperations()
         val bridge = WalletSdkBridge.forOperations(operations)
@@ -215,6 +226,8 @@ class WalletSdkBridgeTest {
             private set
         var presentationRunPolicies: Boolean? = null
             private set
+        var deleteWalletCalls = 0
+            private set
 
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
@@ -248,6 +261,10 @@ class WalletSdkBridgeTest {
                     addedAt = null,
                 )
             )
+
+        override suspend fun deleteWallet() {
+            deleteWalletCalls++
+        }
 
         override suspend fun present(
             requestUrl: String,

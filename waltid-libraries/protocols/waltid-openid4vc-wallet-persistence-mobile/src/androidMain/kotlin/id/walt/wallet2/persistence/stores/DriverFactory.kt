@@ -8,6 +8,7 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
+import java.io.File
 
 /**
  * Android SQLDelight driver factory for app-private SQLite wallet databases.
@@ -55,5 +56,24 @@ public actual class DriverFactory(private val context: Context) {
             driver.close()
             throw WalletPersistenceException.DatabaseUnlockFailed(walletId, cause)
         }
+    }
+
+    fun deleteDatabase(databaseName: String): Boolean {
+        val fileName = "$databaseName.db"
+        var deleted = context.deleteDatabase(fileName)
+        deleted = deleteDatabaseFiles(context.getDatabasePath(fileName)) || deleted
+        deleted = deleteDatabaseFiles(File(context.noBackupFilesDir, fileName)) || deleted
+        return deleted
+    }
+
+    private fun deleteDatabaseFiles(databaseFile: File): Boolean {
+        var deleted = databaseFile.delete()
+        deleted = File("${databaseFile.absolutePath}-journal").delete() || deleted
+        deleted = File("${databaseFile.absolutePath}-shm").delete() || deleted
+        deleted = File("${databaseFile.absolutePath}-wal").delete() || deleted
+        databaseFile.parentFile
+            ?.listFiles { file -> file.name.startsWith("${databaseFile.name}-mj") }
+            ?.forEach { file -> deleted = file.delete() || deleted }
+        return deleted
     }
 }

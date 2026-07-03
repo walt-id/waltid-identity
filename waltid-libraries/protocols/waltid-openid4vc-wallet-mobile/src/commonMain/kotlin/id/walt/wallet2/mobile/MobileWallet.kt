@@ -93,11 +93,12 @@ public class MobileWallet internal constructor(
     walletId: String,
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
-    credentialStore: WalletCredentialStore,
+    private val credentialStore: WalletCredentialStore,
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
+    private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
     private val eventStream = MobileWalletEventStream()
 
@@ -242,6 +243,25 @@ public class MobileWallet internal constructor(
                 Json.encodeToString(JsonElement.serializer(), it)
             },
         )
+    }
+
+    /**
+     * Deletes local wallet material owned by this mobile wallet instance.
+     *
+     * Custom-store wallets receive store-level remove calls for keys, credentials, and DIDs.
+     * SDK-managed SQLDelight wallets additionally close and delete the platform database and database key.
+     */
+    suspend fun deleteWallet() {
+        keyStore.listKeys().toList().forEach { key ->
+            keyStore.removeKey(key.keyId)
+        }
+        credentialStore.listCredentials().toList().forEach { credential ->
+            credentialStore.removeCredential(credential.id)
+        }
+        didStore.listDids().toList().forEach { did ->
+            didStore.removeDid(did.did)
+        }
+        deleteLocalPersistence()
     }
 
     private suspend fun emitSessionEvent(event: WalletSessionEvent) {

@@ -61,6 +61,31 @@ class MobileWalletTest {
     }
 
     @Test
+    fun deleteWalletRemovesCustomStoreEntries() = runTest {
+        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
+        val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
+        val credentialStore = RecordingCredentialStore()
+        val wallet = createMobileWallet(
+            config = MobileWalletConfig(
+                walletId = "custom-wallet",
+                persistence = MobileWalletPersistenceConfig.CustomStores(
+                    keyStore = keyStore,
+                    didStore = didStore,
+                    credentialStore = credentialStore,
+                    keyGenerator = { error("deleteWallet should not generate a key") },
+                ),
+            ),
+            createSqlDelightWallet = { error("Custom-store wallets should not create SQLDelight persistence") },
+        )
+
+        wallet.deleteWallet()
+
+        assertEquals(listOf("custom-key"), keyStore.removedKeyIds)
+        assertEquals(listOf("did:key:custom"), didStore.removedDids)
+        assertEquals(emptyList(), credentialStore.removedCredentialIds)
+    }
+
+    @Test
     fun mobileWalletKeyTypeMapsToCryptoKeyTypeInternally() {
         assertEquals(KeyType.Ed25519, MobileWalletKeyType.Ed25519.toKeyType())
         assertEquals(KeyType.secp256k1, MobileWalletKeyType.secp256k1.toKeyType())
@@ -131,6 +156,7 @@ class MobileWalletTest {
 
     private class PreloadedKeyStore(private val keyInfo: WalletKeyInfo) : WalletKeyStore {
         var listKeysCalls = 0
+        val removedKeyIds = mutableListOf<String>()
 
         override suspend fun getKey(keyId: String) = null
 
@@ -142,11 +168,15 @@ class MobileWalletTest {
         override suspend fun addKey(key: id.walt.crypto.keys.Key): String =
             error("Preloaded test key store should not add keys")
 
-        override suspend fun removeKey(keyId: String) = false
+        override suspend fun removeKey(keyId: String): Boolean {
+            removedKeyIds += keyId
+            return true
+        }
     }
 
     private class PreloadedDidStore(private val did: WalletDidEntry) : WalletDidStore {
         var listDidsCalls = 0
+        val removedDids = mutableListOf<String>()
 
         override suspend fun getDid(did: String): WalletDidEntry? = this.did.takeIf { it.did == did }
 
@@ -158,18 +188,28 @@ class MobileWalletTest {
         override suspend fun addDid(entry: WalletDidEntry) =
             error("Preloaded test DID store should not add DIDs")
 
-        override suspend fun removeDid(did: String) = false
+        override suspend fun removeDid(did: String): Boolean {
+            removedDids += did
+            return true
+        }
     }
 
-    private class RecordingCredentialStore : WalletCredentialStore {
+    private class RecordingCredentialStore(
+        private vararg val credentials: StoredCredential,
+    ) : WalletCredentialStore {
+        val removedCredentialIds = mutableListOf<String>()
+
         override suspend fun getCredential(id: String): StoredCredential? = null
 
         override suspend fun listCredentials(): Flow<StoredCredential> =
-            emptyList<StoredCredential>().asFlow()
+            credentials.toList().asFlow()
 
         override suspend fun addCredential(entry: StoredCredential) =
             error("Recording credential store should not add credentials in this test")
 
-        override suspend fun removeCredential(id: String) = false
+        override suspend fun removeCredential(id: String): Boolean {
+            removedCredentialIds += id
+            return true
+        }
     }
 }

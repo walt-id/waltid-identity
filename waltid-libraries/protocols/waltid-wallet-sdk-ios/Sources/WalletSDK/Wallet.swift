@@ -83,6 +83,11 @@ public actor Wallet {
         try await bridge.credentials()
     }
 
+    /// Deletes wallet-local state and SDK-managed persistence material.
+    public func deleteLocalData() async throws {
+        try await bridge.deleteLocalData()
+    }
+
     /// Presents credentials for an OpenID4VP request URL.
     ///
     /// - Parameters:
