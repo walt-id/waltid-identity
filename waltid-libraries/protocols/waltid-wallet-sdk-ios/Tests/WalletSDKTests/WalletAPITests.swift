@@ -106,6 +106,15 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.credentialsCallCount, 1)
     }
 
+    func testDeleteLocalDataForwardsToBridge() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+
+        try await wallet.deleteLocalData()
+
+        XCTAssertEqual(bridge.deleteLocalDataCallCount, 1)
+    }
+
     func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let redirect = URL(string: "https://verifier.example/callback")!
@@ -194,6 +203,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var receiveCalls: [ReceiveCall] = []
     private(set) var credentialsCallCount = 0
+    private(set) var deleteLocalDataCallCount = 0
     private(set) var presentCalls: [PresentCall] = []
 
     init(events: [WalletEvent] = []) {
@@ -230,6 +240,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         credentialsCallCount += 1
         return credentialsResult
+    }
+
+    func deleteLocalData() async throws {
+        if let error {
+            throw error
+        }
+
+        deleteLocalDataCallCount += 1
     }
 
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {

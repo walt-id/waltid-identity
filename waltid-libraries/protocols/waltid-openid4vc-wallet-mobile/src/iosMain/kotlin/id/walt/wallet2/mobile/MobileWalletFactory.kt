@@ -17,26 +17,37 @@ actual class MobileWalletFactory {
         return createMobileWallet(config) {
             val databaseName = "wallet_${config.walletId}"
             val persistence = config.persistence
-            val encryptionKey = runBlocking {
-                when (persistence) {
-                    is MobileWalletPersistenceConfig.SdkManagedEncrypted ->
-                        IosDatabaseEncryptionKeyProvider().getOrCreateKey(config.walletId, databaseName)
+            val databaseKeyProvider = when (persistence) {
+                is MobileWalletPersistenceConfig.SdkManagedEncrypted ->
+                    IosDatabaseEncryptionKeyProvider()
 
-                    is MobileWalletPersistenceConfig.IntegratorManagedKey ->
-                        persistence.keyProvider.getOrCreateKey(config.walletId, databaseName)
+                is MobileWalletPersistenceConfig.IntegratorManagedKey ->
+                    persistence.keyProvider
 
-                    is MobileWalletPersistenceConfig.CustomStores ->
-                        error("Custom store wallets do not use iOS SQLDelight persistence")
-                }
+                is MobileWalletPersistenceConfig.CustomStores ->
+                    error("Custom store wallets do not use iOS SQLDelight persistence")
             }
-            val driver = DriverFactory().createEncryptedDriver(
+            val encryptionKey = runBlocking {
+                databaseKeyProvider.getOrCreateKey(config.walletId, databaseName)
+            }
+            val driverFactory = DriverFactory()
+            val driver = driverFactory.createEncryptedDriver(
                 databaseName = databaseName,
                 encryptionKey = encryptionKey,
                 walletId = config.walletId,
             )
             val db = WalletPersistenceDatabase(driver)
             val keyProvider = IosPlatformKeyProvider()
-            createMobileWallet(config, db, keyProvider)
+            createMobileWallet(
+                config = config,
+                db = db,
+                keyProvider = keyProvider,
+                deleteLocalPersistence = {
+                    runCatching { driver.close() }
+                    driverFactory.deleteDatabase(databaseName)
+                    databaseKeyProvider.deleteKey(config.walletId, databaseName)
+                },
+            )
         }
     }
 }

@@ -4,6 +4,8 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import androidx.test.platform.app.InstrumentationRegistry
+import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -11,9 +13,11 @@ import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.stores.DriverFactory
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import java.io.File
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class MobileWalletEncryptionTest {
 
@@ -112,5 +116,54 @@ class MobileWalletEncryptionTest {
         }
 
         context.deleteDatabase("$databaseName.db")
+    }
+
+    @Test
+    fun deleteWalletRemovesSdkManagedAndroidDatabaseAndKey() = runBlocking {
+        val walletId = "android-encryption-delete-test"
+        val databaseName = "wallet_$walletId"
+        val databaseFileName = "$databaseName.db"
+        val provider = AndroidDatabaseEncryptionKeyProvider(context)
+        provider.deleteKey(walletId, databaseName)
+        deleteDatabaseFiles(databaseFileName)
+
+        val firstKey = provider.getOrCreateKey(walletId, databaseName)
+        val wallet = MobileWalletFactory(context).create(
+            MobileWalletConfig(walletId = walletId)
+        )
+        assertTrue(databaseFiles(databaseFileName).any { it.exists() }, "Encrypted wallet DB should exist before deletion")
+
+        wallet.deleteWallet()
+
+        assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "SDK-managed wallet DB files should be deleted")
+        val regeneratedKey = provider.getOrCreateKey(walletId, databaseName)
+        assertFalse(firstKey.material.contentEquals(regeneratedKey.material), "DB key should be regenerated after wallet deletion")
+
+        provider.deleteKey(walletId, databaseName)
+        deleteDatabaseFiles(databaseFileName)
+    }
+
+    private fun deleteDatabaseFiles(databaseFileName: String) {
+        databaseFiles(databaseFileName).forEach { file ->
+            file.delete()
+            file.parentFile?.listFiles { candidate -> candidate.name.startsWith("${file.name}-mj") }
+                ?.forEach { it.delete() }
+        }
+        context.deleteDatabase(databaseFileName)
+    }
+
+    private fun databaseFiles(databaseFileName: String): List<File> {
+        val baseFiles = listOf(
+            context.getDatabasePath(databaseFileName),
+            File(context.noBackupFilesDir, databaseFileName),
+        )
+        return baseFiles.flatMap { file ->
+            listOf(
+                file,
+                File("${file.absolutePath}-journal"),
+                File("${file.absolutePath}-shm"),
+                File("${file.absolutePath}-wal"),
+            )
+        }
     }
 }

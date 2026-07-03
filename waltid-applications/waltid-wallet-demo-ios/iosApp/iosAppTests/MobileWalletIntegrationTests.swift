@@ -85,6 +85,19 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
     }
 
+    func testDeleteLocalDataRemovesSdkManagedEncryptedWalletState() async throws {
+        let wallet1 = try await makeWallet()
+        let first = try await wallet1.bootstrap()
+
+        try await wallet1.deleteLocalData()
+
+        let wallet2 = try await makeWallet()
+        let second = try await wallet2.bootstrap()
+
+        XCTAssertNotEqual(second.did, first.did, "Deleting local data should remove the persisted DID state")
+        XCTAssertNotEqual(second.keyID, first.keyID, "Deleting local data should remove the persisted platform key reference")
+    }
+
     func testReceiveCredentialFromEudi() async throws {
         let wallet = try await makeWallet()
         _ = try await wallet.bootstrap()

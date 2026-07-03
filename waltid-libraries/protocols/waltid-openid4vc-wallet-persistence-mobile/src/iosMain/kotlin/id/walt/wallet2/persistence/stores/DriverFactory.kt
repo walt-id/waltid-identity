@@ -4,6 +4,7 @@ import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
 import co.touchlab.sqliter.DatabaseConfiguration
+import co.touchlab.sqliter.DatabaseFileContext
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
@@ -83,4 +84,8 @@ actual class DriverFactory {
         joinToString(separator = "") { byte ->
             (byte.toInt() and 0xff).toString(16).padStart(2, '0')
         }
+
+    fun deleteDatabase(databaseName: String) {
+        DatabaseFileContext.deleteDatabase("$databaseName.db")
+    }
 }

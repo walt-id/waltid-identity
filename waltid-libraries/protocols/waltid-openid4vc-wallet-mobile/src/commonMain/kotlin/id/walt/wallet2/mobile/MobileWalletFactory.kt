@@ -69,8 +69,9 @@ internal fun createMobileWallet(
     config: MobileWalletConfig,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformKeyProvider,
+    deleteLocalPersistence: suspend () -> Unit = {},
 ): MobileWallet = createMobileWallet(config) {
-    createSqlDelightMobileWallet(config, db, keyProvider)
+    createSqlDelightMobileWallet(config, db, keyProvider, deleteLocalPersistence)
 }
 
 internal fun createMobileWallet(
@@ -97,6 +98,7 @@ private fun createSqlDelightMobileWallet(
     config: MobileWalletConfig,
     db: WalletPersistenceDatabase,
     keyProvider: PlatformKeyProvider,
+    deleteLocalPersistence: suspend () -> Unit,
 ): MobileWallet {
     val queries = db.walletPersistenceQueries
     val keyStore = PlatformKeyStore(keyProvider, queries)
@@ -112,5 +114,6 @@ private fun createSqlDelightMobileWallet(
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
         onEvent = config.onEvent,
+        deleteLocalPersistence = deleteLocalPersistence,
     )
 }

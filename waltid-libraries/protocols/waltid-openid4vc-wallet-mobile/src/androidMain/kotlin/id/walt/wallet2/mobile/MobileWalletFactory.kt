@@ -23,19 +23,21 @@ actual class MobileWalletFactory(private val context: Context) {
         return createMobileWallet(config) {
             val databaseName = "wallet_${config.walletId}"
             val persistence = config.persistence
-            val encryptionKey = runBlocking {
-                when (persistence) {
-                    is MobileWalletPersistenceConfig.SdkManagedEncrypted ->
-                        AndroidDatabaseEncryptionKeyProvider(context).getOrCreateKey(config.walletId, databaseName)
+            val databaseKeyProvider = when (persistence) {
+                is MobileWalletPersistenceConfig.SdkManagedEncrypted ->
+                    AndroidDatabaseEncryptionKeyProvider(context)
 
-                    is MobileWalletPersistenceConfig.IntegratorManagedKey ->
-                        persistence.keyProvider.getOrCreateKey(config.walletId, databaseName)
+                is MobileWalletPersistenceConfig.IntegratorManagedKey ->
+                    persistence.keyProvider
 
-                    is MobileWalletPersistenceConfig.CustomStores ->
-                        error("Custom store wallets do not use Android SQLDelight persistence")
-                }
+                is MobileWalletPersistenceConfig.CustomStores ->
+                    error("Custom store wallets do not use Android SQLDelight persistence")
             }
-            val driver = DriverFactory(context).createEncryptedDriver(
+            val encryptionKey = runBlocking {
+                databaseKeyProvider.getOrCreateKey(config.walletId, databaseName)
+            }
+            val driverFactory = DriverFactory(context)
+            val driver = driverFactory.createEncryptedDriver(
                 databaseName = databaseName,
                 encryptionKey = encryptionKey,
                 useNoBackupDirectory = persistence is MobileWalletPersistenceConfig.SdkManagedEncrypted &&
@@ -43,7 +45,16 @@ actual class MobileWalletFactory(private val context: Context) {
             )
             val db = WalletPersistenceDatabase(driver)
             val keyProvider = AndroidPlatformKeyProvider()
-            createMobileWallet(config, db, keyProvider)
+            createMobileWallet(
+                config = config,
+                db = db,
+                keyProvider = keyProvider,
+                deleteLocalPersistence = {
+                    runCatching { driver.close() }
+                    driverFactory.deleteDatabase(databaseName)
+                    databaseKeyProvider.deleteKey(config.walletId, databaseName)
+                },
+            )
         }
     }
 }

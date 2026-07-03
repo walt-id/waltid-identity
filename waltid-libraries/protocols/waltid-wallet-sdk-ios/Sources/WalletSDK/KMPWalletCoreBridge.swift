@@ -79,6 +79,11 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         throw WalletError.internalFailure("Unexpected credentials result type: \(type(of: value))")
     }
 
+    func deleteLocalData() async throws {
+        let result = try await bridge.deleteWallet()
+        _ = try Self.successAnyValue(result, operation: "delete local wallet data")
+    }
+
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {
         let result = try await bridge.present(
             requestUrl: request.absoluteString,
