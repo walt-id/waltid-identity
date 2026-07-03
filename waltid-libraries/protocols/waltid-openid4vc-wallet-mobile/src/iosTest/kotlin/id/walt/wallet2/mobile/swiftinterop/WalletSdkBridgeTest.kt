@@ -1,16 +1,20 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.crypto.keys.KeyType
-import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.mobile.MobileWalletEvent
+import id.walt.wallet2.mobile.MobileWalletEventPhase
+import id.walt.wallet2.mobile.MobileWalletEventStatus
+import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.WalletAttestationConfig
+import id.walt.wallet2.mobile.toKeyType
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -56,11 +60,11 @@ class WalletSdkBridgeTest {
         val bridge = WalletSdkBridge.forOperations(operations)
 
         val result = bridge.bootstrap(
-            keyType = WalletBridgeKeyType.secp256r1,
+            keyType = MobileWalletKeyType.secp256r1,
             didMethod = "jwk",
         )
 
-        assertIs<WalletBridgeResult.Success<WalletBridgeBootstrapResult>>(result)
+        assertIs<WalletBridgeResult.Success<MobileWalletBootstrapResult>>(result)
         assertEquals("key-1", result.value.keyId)
         assertEquals("did:jwk:issuer", result.value.did)
         assertEquals(KeyType.secp256r1, operations.bootstrapKeyType)
@@ -74,7 +78,7 @@ class WalletSdkBridgeTest {
 
         val result = bridge.credentials()
 
-        assertIs<WalletBridgeResult.Success<List<WalletBridgeCredential>>>(result)
+        assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(result)
         assertEquals("credential-1", result.value.single().id)
         assertEquals("https://issuer.example", result.value.single().issuer)
     }
@@ -90,7 +94,7 @@ class WalletSdkBridgeTest {
             runPolicies = true,
         )
 
-        assertIs<WalletBridgeResult.Success<WalletBridgePresentationResult>>(result)
+        assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
         assertEquals(true, result.value.success)
         assertEquals("wallet://return", result.value.redirectTo)
         assertEquals("""{"accepted":true}""", result.value.verifierResponseJson)
@@ -124,8 +128,8 @@ class WalletSdkBridgeTest {
         val result = factory.create(
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
-                defaultKeyType = WalletBridgeKeyType.Ed25519,
-                attestation = WalletBridgeAttestationConfiguration(
+                defaultKeyType = MobileWalletKeyType.Ed25519,
+                attestation = WalletAttestationConfig(
                     baseUrl = "https://attestation.example",
                     attesterPath = "/wallet-attestation",
                     bearerToken = "token",
@@ -136,14 +140,14 @@ class WalletSdkBridgeTest {
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
-        assertEquals(KeyType.Ed25519, capturedConfig?.defaultKeyType)
+        assertEquals(MobileWalletKeyType.Ed25519, capturedConfig?.defaultKeyType)
         assertEquals("https://attestation.example", capturedConfig?.attestationConfig?.baseUrl)
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
 
         val credentials = result.value.credentials()
-        assertIs<WalletBridgeResult.Success<List<WalletBridgeCredential>>>(credentials)
+        assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(credentials)
         assertEquals("credential-1", credentials.value.single().id)
     }
 
@@ -152,7 +156,7 @@ class WalletSdkBridgeTest {
         val config = WalletBridgeConfiguration().toMobileWalletConfig()
 
         assertEquals("default", config.walletId)
-        assertEquals(KeyType.secp256r1, config.defaultKeyType)
+        assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
     }
 
@@ -170,41 +174,24 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun mapsWalletSessionEventsToSwiftSafeBridgeEvents() {
-        val progress = WalletSessionEvent.issuance_offer_resolved.toWalletBridgeEvent()
-        val completed = WalletSessionEvent.presentation_completed.toWalletBridgeEvent()
-        val failed = WalletSessionEvent.issuance_failed.toWalletBridgeEvent()
+    fun bridgeExposesCommonMobileWalletEvents() = runTest {
+        val events = MutableSharedFlow<MobileWalletEvent>(replay = 1)
+        val bridge = WalletSdkBridge.forOperations(
+            operations = FakeWalletSdkBridgeOperations(),
+            eventFlow = events,
+        )
 
-        assertEquals(WalletBridgeEventPhase.issuance, progress.phase)
-        assertEquals(WalletBridgeEventStatus.progress, progress.status)
-        assertEquals("issuance_offer_resolved", progress.name)
+        events.emit(
+            MobileWalletEvent(
+                name = "presentation_completed",
+                phase = MobileWalletEventPhase.presentation,
+                status = MobileWalletEventStatus.completed,
+            )
+        )
+        val event = bridge.events.first()
 
-        assertEquals(WalletBridgeEventPhase.presentation, completed.phase)
-        assertEquals(WalletBridgeEventStatus.completed, completed.status)
-        assertEquals("presentation_completed", completed.name)
-
-        assertEquals(WalletBridgeEventPhase.issuance, failed.phase)
-        assertEquals(WalletBridgeEventStatus.failed, failed.status)
-        assertEquals("issuance_failed", failed.name)
-    }
-
-    @Test
-    fun factoryWiresWalletSessionEventsIntoBridgeEventFlow() = runTest {
-        var capturedConfig: MobileWalletConfig? = null
-        val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
-            capturedConfig = config
-            FakeWalletSdkBridgeOperations()
-        }
-
-        val result = factory.create()
-
-        assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
-
-        capturedConfig?.onEvent?.invoke(WalletSessionEvent.presentation_completed)
-        val event = result.value.events().first()
-
-        assertEquals(WalletBridgeEventPhase.presentation, event.phase)
-        assertEquals(WalletBridgeEventStatus.completed, event.status)
+        assertEquals(MobileWalletEventPhase.presentation, event.phase)
+        assertEquals(MobileWalletEventStatus.completed, event.status)
         assertEquals("presentation_completed", event.name)
     }
 
@@ -223,10 +210,10 @@ class WalletSdkBridgeTest {
             private set
 
         override suspend fun bootstrap(
-            keyType: KeyType?,
+            keyType: MobileWalletKeyType?,
             didMethod: String,
         ): MobileWalletBootstrapResult {
-            bootstrapKeyType = keyType
+            bootstrapKeyType = keyType?.toKeyType()
             bootstrapDidMethod = didMethod
             return MobileWalletBootstrapResult(
                 keyId = "key-1",
@@ -266,7 +253,7 @@ class WalletSdkBridgeTest {
             return MobileWalletPresentationResult(
                 success = true,
                 redirectTo = "wallet://return",
-                verifierResponse = JsonObject(mapOf("accepted" to JsonPrimitive(true))),
+                verifierResponseJson = """{"accepted":true}""",
             )
         }
     }

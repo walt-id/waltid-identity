@@ -1,9 +1,10 @@
 package id.walt.wallet2.mobile.swiftinterop
 
-import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletEvent
+import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -20,24 +21,24 @@ suspend fun <T> walletBridgeCall(block: suspend () -> T): WalletBridgeResult<T> 
 
 class WalletSdkBridge private constructor(
     private val operations: WalletSdkBridgeOperations,
-    private val eventFlow: Flow<WalletBridgeEvent>,
+    private val eventFlow: Flow<MobileWalletEvent>,
 ) {
     constructor(wallet: MobileWallet) : this(
         operations = MobileWalletSdkBridgeOperations(wallet),
-        eventFlow = emptyFlow(),
+        eventFlow = wallet.events,
     )
 
-    fun events(): Flow<WalletBridgeEvent> = eventFlow
+    val events: Flow<MobileWalletEvent> = eventFlow
 
     suspend fun bootstrap(
-        keyType: WalletBridgeKeyType? = null,
+        keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
-    ): WalletBridgeResult<WalletBridgeBootstrapResult> =
+    ): WalletBridgeResult<MobileWalletBootstrapResult> =
         walletBridgeCall {
             operations.bootstrap(
-                keyType = keyType?.toKeyType(),
+                keyType = keyType,
                 didMethod = didMethod,
-            ).toWalletBridgeBootstrapResult()
+            )
         }
 
     suspend fun receive(
@@ -53,28 +54,28 @@ class WalletSdkBridge private constructor(
             )
         }
 
-    suspend fun credentials(): WalletBridgeResult<List<WalletBridgeCredential>> =
+    suspend fun credentials(): WalletBridgeResult<List<MobileWalletCredential>> =
         walletBridgeCall {
-            operations.credentials().map { it.toWalletBridgeCredential() }
+            operations.credentials()
         }
 
     suspend fun present(
         requestUrl: String,
         did: String? = null,
         runPolicies: Boolean? = null,
-    ): WalletBridgeResult<WalletBridgePresentationResult> =
+    ): WalletBridgeResult<MobileWalletPresentationResult> =
         walletBridgeCall {
             operations.present(
                 requestUrl = requestUrl,
                 did = did,
                 runPolicies = runPolicies,
-            ).toWalletBridgePresentationResult()
+            )
         }
 
     companion object {
         internal fun forOperations(
             operations: WalletSdkBridgeOperations,
-            eventFlow: Flow<WalletBridgeEvent> = emptyFlow(),
+            eventFlow: Flow<MobileWalletEvent> = emptyFlow(),
         ) = WalletSdkBridge(
             operations = operations,
             eventFlow = eventFlow,
@@ -84,7 +85,7 @@ class WalletSdkBridge private constructor(
 
 internal interface WalletSdkBridgeOperations {
     suspend fun bootstrap(
-        keyType: KeyType?,
+        keyType: MobileWalletKeyType?,
         didMethod: String,
     ): MobileWalletBootstrapResult
 
@@ -107,7 +108,7 @@ internal class MobileWalletSdkBridgeOperations(
     private val wallet: MobileWallet,
 ) : WalletSdkBridgeOperations {
     override suspend fun bootstrap(
-        keyType: KeyType?,
+        keyType: MobileWalletKeyType?,
         didMethod: String,
     ): MobileWalletBootstrapResult =
         wallet.bootstrap(
