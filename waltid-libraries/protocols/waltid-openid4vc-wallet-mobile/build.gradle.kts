@@ -12,6 +12,20 @@ waltidMobile {
     androidNamespace.set("id.walt.wallet2.mobile")
 }
 
+skie {
+    analytics {
+        enabled.set(false)
+    }
+
+    build {
+        produceDistributableFramework()
+    }
+
+    swiftBundling {
+        enabled.set(false)
+    }
+}
+
 kotlin {
     if (enableIosBuild) {
         val walletCoreXcFramework = XCFramework("WalletCore")
