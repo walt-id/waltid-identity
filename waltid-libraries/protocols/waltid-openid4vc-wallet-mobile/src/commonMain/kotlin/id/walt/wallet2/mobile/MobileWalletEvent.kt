@@ -6,17 +6,38 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
+/**
+ * High-level protocol flow that emitted a [MobileWalletEvent].
+ */
 enum class MobileWalletEventPhase {
+    /** Credential issuance flow. */
     issuance,
+
+    /** Credential presentation flow. */
     presentation,
 }
 
+/**
+ * Progress state represented by a [MobileWalletEvent].
+ */
 enum class MobileWalletEventStatus {
+    /** The flow is still running. */
     progress,
+
+    /** The flow completed successfully. */
     completed,
+
+    /** The flow failed. */
     failed,
 }
 
+/**
+ * Observable mobile wallet session event.
+ *
+ * @property name Stable event name emitted by the underlying wallet flow.
+ * @property phase Issuance or presentation flow that emitted the event.
+ * @property status Current progress state for the event.
+ */
 data class MobileWalletEvent(
     val name: String,
     val phase: MobileWalletEventPhase,

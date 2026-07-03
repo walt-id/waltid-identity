@@ -2,14 +2,32 @@ package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.KeyType
 
+/**
+ * Key algorithms supported by the mobile wallet bootstrap flow.
+ */
 enum class MobileWalletKeyType {
+    /** Ed25519 signing key. */
     Ed25519,
+
+    /** secp256k1 elliptic-curve signing key. */
     secp256k1,
+
+    /** NIST P-256 elliptic-curve signing key. */
     secp256r1,
+
+    /** NIST P-384 elliptic-curve signing key. */
     secp384r1,
+
+    /** NIST P-521 elliptic-curve signing key. */
     secp521r1,
+
+    /** Default RSA signing key size used by the core crypto layer. */
     RSA,
+
+    /** RSA signing key with a 3072-bit modulus. */
     RSA3072,
+
+    /** RSA signing key with a 4096-bit modulus. */
     RSA4096,
 }
 

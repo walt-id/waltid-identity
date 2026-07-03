@@ -6,6 +6,9 @@ import id.walt.wallet2.mobile.MobileWalletEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
+/**
+ * Factory for creating [WalletSdkBridge] instances with iOS storage and key dependencies.
+ */
 class WalletSdkBridgeFactory() {
     private var createDependencies: (MobileWalletConfig) -> WalletSdkBridgeDependencies = { config ->
         val wallet = MobileWalletFactory().create(config)
@@ -26,6 +29,9 @@ class WalletSdkBridgeFactory() {
         }
     }
 
+    /**
+     * Creates an iOS wallet bridge from the supplied configuration.
+     */
     fun create(
         configuration: WalletBridgeConfiguration = WalletBridgeConfiguration(),
     ): WalletBridgeResult<WalletSdkBridge> =
@@ -41,7 +47,7 @@ class WalletSdkBridgeFactory() {
             WalletBridgeResult.Failure(WalletBridgeError.fromThrowable(throwable))
         }
 
-    companion object {
+    internal companion object {
         internal fun forOperationsFactory(
             createOperations: (MobileWalletConfig) -> WalletSdkBridgeOperations,
         ): WalletSdkBridgeFactory =
