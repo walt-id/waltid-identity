@@ -85,6 +85,16 @@ The mobile schema includes the following tables:
 
 Schema creation and migration are managed by SQLDelight on the target platform driver.
 
+## API documentation
+
+Generate the mobile persistence API reference with Dokka:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+The generated HTML is written to `build/dokka/html`.
+
 ## Related Libraries
 
 - **[waltid-openid4vc-wallet](../waltid-openid4vc-wallet)** — Core wallet library (store interfaces)
