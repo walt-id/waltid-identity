@@ -78,6 +78,13 @@ KMP features the facade consumes: cancellable Swift `async` calls for Kotlin
 `suspend` functions, Flow-to-`AsyncSequence` support for wallet events, and
 Swift-friendly enum/sealed wrappers at the bridge boundary.
 
+The facade is currently kept as a separate SwiftPM source target instead of
+bundling the hand-written Swift wrappers into `WalletCore`. That keeps the
+public SDK module small for DocC, symbol graph checks, and host-side SwiftPM
+tests. SKIE Swift code bundling remains a viable future packaging option if the
+release shape should become a single binary framework that includes both the
+KMP core and the Swift facade.
+
 The Compose Multiplatform demo intentionally does not apply this Swift facade.
 Its iOS app hosts Kotlin Compose UI through the generated `sharedUI` framework,
 which is the right proof path for KMP/Compose integrators. SKIE would become

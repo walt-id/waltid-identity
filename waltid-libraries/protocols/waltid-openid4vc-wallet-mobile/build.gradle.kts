@@ -20,10 +20,6 @@ skie {
     build {
         produceDistributableFramework()
     }
-
-    swiftBundling {
-        enabled.set(false)
-    }
 }
 
 kotlin {
