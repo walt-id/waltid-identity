@@ -3,26 +3,26 @@
 import PackageDescription
 
 let package = Package(
-    name: "WaltIDWalletSDK",
+    name: "WalletSDK",
     platforms: [
         .iOS("15.4"),
     ],
     products: [
         .library(
-            name: "WaltIDWalletSDK",
-            targets: ["WaltIDWalletSDK"]
+            name: "WalletSDK",
+            targets: ["WalletSDK"]
         ),
     ],
     targets: [
         .binaryTarget(
-            name: "WaltIDWalletCore",
-            path: "../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WaltIDWalletCore.xcframework"
+            name: "WalletCore",
+            path: "../waltid-openid4vc-wallet-mobile/build/XCFrameworks/release/WalletCore.xcframework"
         ),
         .target(
-            name: "WaltIDWalletSDK",
+            name: "WalletSDK",
             dependencies: [
                 .target(
-                    name: "WaltIDWalletCore",
+                    name: "WalletCore",
                     condition: .when(platforms: [.iOS])
                 ),
             ],
@@ -31,8 +31,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "WaltIDWalletSDKTests",
-            dependencies: ["WaltIDWalletSDK"]
+            name: "WalletSDKTests",
+            dependencies: ["WalletSDK"]
         ),
     ]
 )

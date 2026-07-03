@@ -1,7 +1,7 @@
 import XCTest
 @testable import iosApp
 import TestHelpers
-import WaltIDWalletSDK
+import WalletSDK
 
 /// iOS integration tests for the mobile wallet library.
 ///

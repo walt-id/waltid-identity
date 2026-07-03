@@ -1,7 +1,7 @@
 import Foundation
 
-#if canImport(WaltIDWalletCore) && os(iOS)
-@preconcurrency import WaltIDWalletCore
+#if canImport(WalletCore) && os(iOS)
+@preconcurrency import WalletCore
 
 final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     private let bridge: WalletSdkBridge

@@ -1,11 +1,11 @@
 import XCTest
-@testable import WaltIDWalletSDK
+@testable import WalletSDK
 
 final class WalletAPITests: XCTestCase {
     func testPublicAPISymbolsHaveDocCComments() throws {
         let sourceDirectory = packageRoot()
             .appendingPathComponent("Sources")
-            .appendingPathComponent("WaltIDWalletSDK")
+            .appendingPathComponent("WalletSDK")
         let sourceFiles = try FileManager.default
             .contentsOfDirectory(at: sourceDirectory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }

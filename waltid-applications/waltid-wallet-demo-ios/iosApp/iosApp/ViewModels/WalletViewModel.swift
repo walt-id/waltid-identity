@@ -1,5 +1,5 @@
 import Foundation
-import WaltIDWalletSDK
+import WalletSDK
 
 @MainActor
 class WalletViewModel: ObservableObject {

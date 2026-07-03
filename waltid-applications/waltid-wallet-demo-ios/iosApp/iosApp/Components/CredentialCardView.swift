@@ -1,5 +1,5 @@
 import SwiftUI
-import WaltIDWalletSDK
+import WalletSDK
 
 struct CredentialCardView: View {
     let credential: Credential
