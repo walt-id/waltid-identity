@@ -25,9 +25,17 @@ jobs:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
 
+      - name: Package Swift WalletSDK DocC archive
+        working-directory: waltid-identity
+        run: |
+          tar -czf \
+            waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz \
+            -C waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc \
+            WalletSDK.doccarchive
+
       - name: Upload Swift WalletSDK DocC archive
         uses: actions/upload-artifact@v4
         with:
           name: walletsdk-doccarchive
-          path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive
+          path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
           if-no-files-found: error
