@@ -24,6 +24,10 @@ Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletS
 
 For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
+## Local wallet data
+
+The demo uses the SDK default encrypted local persistence. Wallet database files are SQLCipher-encrypted, and SDK-managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.
+
 ## Common commands
 
 ```bash

@@ -29,6 +29,19 @@ The public API intentionally exposes Swift actors, structs, enums, and typed
 errors. Kotlin Multiplatform and bridge implementation details stay behind this
 module boundary.
 
+### Local Persistence
+
+``WalletConfiguration`` defaults to SDK-managed encrypted persistence. The SDK
+opens a SQLCipher-encrypted local wallet database and stores the per-wallet
+database key in iOS Keychain. Normal Swift SDK users do not provide database
+key material.
+
+Use ``Wallet/deleteLocalData()`` to reset SDK-owned local data for the wallet.
+This removes wallet records, platform signing keys referenced by the wallet,
+encrypted database files and sidecars, and the SDK-managed database key. Old
+local development databases created before encrypted persistence may need this
+reset; plaintext-to-encrypted migration is not performed.
+
 ## Topics
 
 ### Integration Guides

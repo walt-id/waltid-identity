@@ -34,6 +34,16 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 - Present credentials using OpenID4VP.
 - Support mobile issuance flows using OAuth 2.0 client attestation.
 
+## Persistence and encryption
+
+`MobileWalletConfig()` uses SDK-managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
+
+SDK-managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletPersistenceConfig.IntegratorManagedKey` when an app needs enterprise/KMS ownership or recoverable database-key material, and use `MobileWalletPersistenceConfig.CustomStores` to replace SDK persistence entirely. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+
+Call `MobileWallet.deleteWallet()` to delete SDK-owned local wallet material for a wallet: stored key references, credentials, DIDs, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. For `CustomStores`, cleanup remains owned by the integrator; the facade only calls the store-level remove operations exposed by the injected stores.
+
+If a local development build has an old plaintext database or a database restored without its matching key, opening the wallet can fail with a typed storage error. Reset local state by calling `deleteWallet()`, uninstalling the app, or deleting the app's local wallet data. WAL-1085 does not perform plaintext-to-encrypted migration.
+
 ## Demo apps
 
 - [Compose Wallet Demo](../../../waltid-applications/waltid-wallet-demo-compose/README.md)
