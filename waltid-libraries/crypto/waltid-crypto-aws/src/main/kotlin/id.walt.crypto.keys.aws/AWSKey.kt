@@ -79,10 +79,6 @@ class AWSKey(
         }
     }
 
-    // =========================================================================
-    // Failover Support (Phase 3)
-    // =========================================================================
-
     /**
      * Lazily initialized failover client for multi-region keys.
      * Only created when failover is enabled and replica regions are configured.
@@ -224,7 +220,7 @@ $encodedPk
     }
 
     // =========================================================================
-    // Key Deletion (Phase 2: Cascade Delete)
+    // Key Deletion
     // =========================================================================
 
     /**
