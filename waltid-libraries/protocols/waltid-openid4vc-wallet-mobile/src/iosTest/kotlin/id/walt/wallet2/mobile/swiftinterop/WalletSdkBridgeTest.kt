@@ -9,6 +9,7 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
+import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -129,6 +130,7 @@ class WalletSdkBridgeTest {
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
                 defaultKeyType = MobileWalletKeyType.Ed25519,
+                persistence = WalletBridgePersistenceConfiguration.SdkManagedEncrypted,
                 attestation = WalletAttestationConfig(
                     baseUrl = "https://attestation.example",
                     attesterPath = "/wallet-attestation",
@@ -141,6 +143,10 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
         assertEquals("consumer-wallet", capturedConfig?.walletId)
         assertEquals(MobileWalletKeyType.Ed25519, capturedConfig?.defaultKeyType)
+        assertEquals(
+            MobileWalletPersistenceConfig.SdkManagedEncrypted(),
+            capturedConfig?.persistence,
+        )
         assertEquals("https://attestation.example", capturedConfig?.attestationConfig?.baseUrl)
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
@@ -158,6 +164,7 @@ class WalletSdkBridgeTest {
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
+        assertEquals(MobileWalletPersistenceConfig.SdkManagedEncrypted(), config.persistence)
     }
 
     @Test

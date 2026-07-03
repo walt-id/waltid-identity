@@ -15,6 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
+        .package(url: "https://github.com/sqlcipher/SQLCipher.swift.git", exact: "4.16.0"),
     ],
     targets: [
         .binaryTarget(
@@ -28,9 +29,11 @@ let package = Package(
                     name: "WalletCore",
                     condition: .when(platforms: [.iOS])
                 ),
-            ],
-            linkerSettings: [
-                .linkedLibrary("sqlite3", .when(platforms: [.iOS])),
+                .product(
+                    name: "SQLCipher",
+                    package: "SQLCipher.swift",
+                    condition: .when(platforms: [.iOS])
+                ),
             ]
         ),
         .testTarget(

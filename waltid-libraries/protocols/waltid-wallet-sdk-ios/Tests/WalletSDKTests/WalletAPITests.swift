@@ -8,7 +8,15 @@ final class WalletAPITests: XCTestCase {
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
+        XCTAssertEqual(configuration.persistence, .sdkManagedEncrypted)
         XCTAssertNil(configuration.attestation)
+    }
+
+    func testPublicPersistenceConfigurationUsesEncryptedDefault() {
+        let configuration = WalletConfiguration(persistence: .sdkManagedEncrypted)
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertEqual(configuration.persistence, .sdkManagedEncrypted)
     }
 
     func testPublicModelsAreValueTypesAndEquatable() {
