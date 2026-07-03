@@ -5,12 +5,12 @@ Scripts to run end-to-end tests for the Compose iOS wallet demo app.
 ## Prerequisites
 
 - iOS Simulator running (or specify `IOS_SIMULATOR_ID`)
-- CocoaPods available on `PATH`
+- Xcode command line tools available on `PATH`
 - For local enterprise tests: a provisioned Enterprise quickstart stack + ngrok tunnel
 
-The scripts sync the Compose iOS framework and run `pod install` before invoking
-the Xcode UI tests. Set `SKIP_IOS_APP_SETUP=true` when the workspace is already
-fresh and you only want to rerun Xcode tests.
+The scripts refresh the Compose iOS SwiftPM linkage package before invoking the
+Xcode UI tests. Set `SKIP_IOS_APP_SETUP=true` when the project is already fresh
+and you only want to rerun Xcode tests.
 
 ## Public EUDI Backend (No Infrastructure Required)
 
@@ -86,7 +86,7 @@ Non-attested issuer/profile setup is shared with the Android runner through
    ./e2e-local-enterprise.sh
    ```
 
-The normal script validates the quickstart-owned resources and the mobile-only helper resources before launching the UI test, syncs the Compose iOS framework, runs `pod install`, and then runs only the local Enterprise UI tests. Set `SKIP_IOS_APP_SETUP=true` only if the Compose framework and CocoaPods sandbox are already in sync. It does not create resources; rerun `--prepare-only` when you intentionally want to create or refresh the mobile helper resources.
+The normal script validates the quickstart-owned resources and the mobile-only helper resources before launching the UI test, refreshes the Compose iOS SwiftPM linkage package, and then runs only the local Enterprise UI tests. Set `SKIP_IOS_APP_SETUP=true` only if the project is already in sync. It does not create resources; rerun `--prepare-only` when you intentionally want to create or refresh the mobile helper resources.
 
 ## What Gets Tested
 

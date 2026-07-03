@@ -117,24 +117,6 @@ runs:
           -parallel-testing-enabled NO \
           OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
 
-    - name: Build shared framework for Compose iOS app (CocoaPods location)
-      working-directory: ${{ inputs.waltid-directory }}
-      shell: bash
-      run: |
-        PLATFORM_NAME=iphonesimulator \
-        SDK_NAME=iphonesimulator \
-        ARCHS="arm64" \
-        CONFIGURATION=Debug \
-          ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:syncFramework \
-          -Pkotlin.native.cocoapods.platform=iphonesimulator \
-          -Pkotlin.native.cocoapods.archs="arm64" \
-          -Pkotlin.native.cocoapods.configuration=Debug
-
-    - name: Install CocoaPods for Compose iOS app
-      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
-      shell: bash
-      run: pod install
-
     - name: Execute Compose iOS demo app tests
       id: compose_ios_demo_app_tests
       continue-on-error: true
@@ -142,7 +124,7 @@ runs:
       shell: bash
       run: |
         xcodebuild test \
-          -workspace iosApp.xcworkspace \
+          -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
           -skip-testing:iosAppUITests/EudiPublicBackendE2ETests \
@@ -150,8 +132,7 @@ runs:
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
-          -parallel-testing-enabled NO \
-          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+          -parallel-testing-enabled NO
 
     - name: Collect iOS test reports
       if: always()

@@ -40,15 +40,9 @@ enableIosBuild=true
 # enableWalletDemoComposeWeb=true
 ```
 
-If CocoaPods is installed somewhere outside `PATH`, add an explicit override:
-
-```properties
-kotlin.apple.cocoapods.bin=/path/to/pod
-```
-
 `local.properties` is ignored by Git and overrides the tracked defaults in `gradle.properties`. Command-line `-P` flags still take highest precedence for CI and one-off overrides.
 
-Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. Compose iOS still requires CocoaPods. The Web/Wasm flag only enables the mock Compose preview module.
+Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag only enables the mock Compose preview module.
 
 ## Common checks
 
@@ -61,10 +55,8 @@ Android:
 
 iOS (Compose):
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-compose:shared:generateDummyFramework
 cd waltid-applications/waltid-wallet-demo-compose/iosApp
-pod install
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
 iOS (Native)
@@ -132,9 +124,8 @@ The mobile SDK docs CI workflow runs both documentation paths.
 ## Troubleshooting
 
 - **Android modules missing:** set `enableAndroidBuild=true` in `local.properties`, or pass `-PenableAndroidBuild=true`, then reload Gradle.
-- **iOS modules missing:** set `enableIosBuild=true` in `local.properties`, configure `kotlin.apple.cocoapods.bin`, or pass `-PenableIosBuild=true`, then reload Gradle.
+- **iOS modules missing:** set `enableIosBuild=true` in `local.properties`, or pass `-PenableIosBuild=true`, then reload Gradle.
 - **Web/Wasm preview module missing:** set `enableWalletDemoComposeWeb=true` in `local.properties`, or pass `-PenableWalletDemoComposeWeb=true`, then reload Gradle.
 - **Android SDK not found:** check `sdk.dir` in `local.properties`.
-- **CocoaPods not found for Compose iOS:** make sure `pod` is on `PATH`, or set `kotlin.apple.cocoapods.bin=/path/to/pod` in `local.properties`.
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
 - **Local Enterprise E2E cannot reach services:** check `HOST_ALIAS_DOMAIN`, the running Enterprise stack, `baseSsl=true`, and omitted `basePort`.
