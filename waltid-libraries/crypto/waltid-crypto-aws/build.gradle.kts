@@ -25,12 +25,17 @@ dependencies {
     implementation(identityLibs.nimbus.jose.jwt)
 
     // Hashing with SHA-2
-
     implementation(identityLibs.kotlincrypto.hash.sha2)
+
+    // Logging
+    implementation(identityLibs.oshai.kotlinlogging)
 }
 
 tasks.withType<Test> {
-    enabled = false
+    // AWS integration tests require credentials; enable with RUN_AWS_TESTS=true
+    // Unit tests for config/model classes run regardless
+    enabled = System.getenv("RUN_AWS_TESTS")?.toBoolean() ?: false
+    useJUnitPlatform()
 }
 
 mavenPublishing {

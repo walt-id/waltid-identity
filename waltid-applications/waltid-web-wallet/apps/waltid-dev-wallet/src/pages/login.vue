@@ -555,11 +555,12 @@ async function tryLoginWithOidcSession() {
         .then(() => {
             console.log("Signed in with OIDC");
             console.log("Token: " + decodeJwt(tokenText).sub);
+            const jwt = decodeJwt(tokenText);
             user.value = {
                 token: tokenText,
                 id: "",
-                email: decodeJwt(tokenText).email,
-                name: decodeJwt(tokenText).name,
+                email: jwt.email,
+                friendlyName: jwt.preferred_username as string ?? jwt.name as string ?? jwt.sub as string,
                 oidcSession: true
             };
 
