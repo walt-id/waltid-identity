@@ -62,7 +62,6 @@ data class OpenId4VciModule(
                     tokenEndpointHandlers = TokenEndpointHandlers(),
                     credentialEndpointHandlers = CredentialEndpointHandlers(),
 
-                    authorizationRequestValidator = DefaultAuthorizationRequestValidator(),
                     accessTokenRequestValidator = DefaultAccessTokenRequestValidator(),
                     credentialRequestValidator = DefaultCredentialRequestValidator(),
 
