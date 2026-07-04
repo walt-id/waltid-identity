@@ -1,17 +1,20 @@
 package id.walt.issuer2.testsupport
 
+import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.did.dids.registrar.dids.DidJwkCreateOptions
 import id.walt.did.dids.registrar.local.jwk.DidJwkRegistrar
 import id.walt.issuer2.models.CredentialOfferCreateResponse
-import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.offers.AuthenticationMethod
 import id.walt.openid4vci.offers.CredentialOffer
 import id.walt.openid4vci.offers.IssuerStateMode
 import id.walt.openid4vci.prooftypes.Proofs
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
@@ -29,10 +32,8 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
-import io.ktor.http.Parameters
 import io.ktor.http.URLBuilder
 import io.ktor.http.contentType
-import io.ktor.http.formUrlEncode
 import io.ktor.http.parseQueryString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -47,7 +48,10 @@ class Issuer2WalletFlowDriver(
         clientId = "issuer2-wallet-test",
         redirectUris = listOf("https://wallet.example/callback"),
     ),
+    private val attestationAssembler: ClientAttestationAssembler? = null,
 ) {
+    private var walletInstanceKey: Key? = null
+
     suspend fun resolve(createdOffer: CredentialOfferCreateResponse): ResolvedCredentialOffer {
         val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(createdOffer.credentialOffer)
         val offer = CredentialOfferResolver(client).resolveCredentialOffer(
@@ -70,10 +74,14 @@ class Issuer2WalletFlowDriver(
         txCode: String?,
     ): TokenRequestBuilder.TokenResponse {
         val preAuthorizedCode = requireNotNull(resolvedOffer.offer.grants?.preAuthorizedCode?.preAuthorizedCode)
+        val attestationHeaders = buildAttestationHeaders(resolvedOffer)
         return TokenRequestBuilder(walletClientConfig, client).exchangePreAuthorizedCode(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             preAuthorizedCode = preAuthorizedCode,
             txCode = txCode,
+            attestationHeaders = attestationHeaders,
+            anonymous = attestationHeaders == null &&
+                resolvedOffer.authorizationServerMetadata.preAuthorizedGrantAnonymousAccessSupported == true,
         )
     }
 
@@ -217,19 +225,12 @@ class Issuer2WalletFlowDriver(
     suspend fun refreshAccessToken(
         resolvedOffer: ResolvedCredentialOffer,
         refreshToken: String,
-    ): TokenRequestBuilder.TokenResponse {
-        val response = client.post(requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint)) {
-            contentType(ContentType.Application.FormUrlEncoded)
-            setBody(
-                Parameters.build {
-                    append("grant_type", GrantType.RefreshToken.value)
-                    append("refresh_token", refreshToken)
-                }.formUrlEncode()
-            )
-        }
-        assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return response.body()
-    }
+    ): TokenRequestBuilder.TokenResponse =
+        TokenRequestBuilder(walletClientConfig, client).refreshAccessToken(
+            tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
+            refreshToken = refreshToken,
+            attestationHeaders = buildAttestationHeaders(resolvedOffer),
+        )
 
     suspend fun requestCredential(
         resolvedOffer: ResolvedCredentialOffer,
@@ -272,6 +273,28 @@ class Issuer2WalletFlowDriver(
         assertEquals(HttpStatusCode.Found, authorizationResponse.status, authorizationResponse.bodyAsText())
         return assertNotNull(authorizationResponse.headers[HttpHeaders.Location])
     }
+
+    private suspend fun buildAttestationHeaders(
+        resolvedOffer: ResolvedCredentialOffer,
+    ): ClientAttestationHeaders? {
+        val assembler = attestationAssembler ?: return null
+        if (
+            resolvedOffer.authorizationServerMetadata.tokenEndpointAuthMethodsSupported
+                ?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) != true
+        ) {
+            return null
+        }
+        return assembler.buildAttestationHeaders(
+            instanceKey = getWalletInstanceKey(),
+            clientId = walletClientConfig.clientId,
+            audience = resolvedOffer.authorizationServerMetadata.issuer,
+        )
+    }
+
+    private suspend fun getWalletInstanceKey(): Key =
+        walletInstanceKey ?: JWKKey.generate(KeyType.secp256r1).also {
+            walletInstanceKey = it
+        }
 
     private fun buildAuthorizationRequestUrl(
         authorizationEndpoint: String,
