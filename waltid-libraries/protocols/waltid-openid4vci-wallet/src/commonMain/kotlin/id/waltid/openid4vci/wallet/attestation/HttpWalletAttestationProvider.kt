@@ -30,6 +30,9 @@ data class AttestationObtainResponse(
     val storedAt: String? = null,
 )
 
+/**
+ * Enterprise wallet attester provider.
+ */
 class HttpWalletAttestationProvider(
     private val enterpriseBaseUrl: String,
     private val attesterPath: String,
