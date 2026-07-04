@@ -41,6 +41,7 @@ import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -151,10 +152,11 @@ object Wallet2RouteHandler {
          * When provided, wallet routes check that the authenticated account owns
          * the requested wallet. When null, all wallets are accessible (dev / no-auth mode).
          */
-        getAccountId: (suspend RoutingCall.() -> String?)? = null
+        getAccountId: (suspend RoutingCall.() -> String?)? = null,
+        attestationAssembler: ClientAttestationAssembler? = null,
     ) {
         route("/wallet", { tags = listOf("Wallet Management") }) {
-            registerWalletManagementRoutes(resolver, getAccountId)
+            registerWalletManagementRoutes(resolver, getAccountId, attestationAssembler)
         }
         route("/stores", { tags = listOf("Named Store Management") }) {
             registerNamedStoreRoutes(resolver)
@@ -167,7 +169,8 @@ object Wallet2RouteHandler {
 
     internal fun Route.registerWalletManagementRoutes(
         resolver: WalletResolver,
-        getAccountId: (suspend RoutingCall.() -> String?)?
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
@@ -504,7 +507,12 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ReceiveCredentialRequest>()
-                        val result = WalletIssuanceHandler.receiveCredential(wallet, req, onEvent = noopOnEvent)
+                        val result = WalletIssuanceHandler.receiveCredential(
+                            wallet = wallet,
+                            request = req,
+                            attestationAssembler = attestationAssembler,
+                            onEvent = noopOnEvent,
+                        )
                         call.respond(result)
                     }
 
