@@ -42,10 +42,17 @@ jobs:
       images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
       publish: true
-  deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@main
+  sdk-docs:
+    uses: walt-id/waltid-identity/.github/workflows/mobile-sdk-docs.yml@feature/sdk-docs-release-deploy
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: version
+    with:
+      deploy: true
+      version: ${{ needs.version.outputs.release_version }}
+  deploy:
+    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@feature/sdk-docs-release-deploy
+    secrets: inherit
+    needs: [ version, gradle, docker, api-docker, sdk-docs ]
     with:
       version: ${{ needs.version.outputs.release_version }}
   tag:
