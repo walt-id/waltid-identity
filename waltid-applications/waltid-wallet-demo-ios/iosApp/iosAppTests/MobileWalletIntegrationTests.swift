@@ -82,7 +82,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertTrue(result.message.contains("Received"), "Message should confirm receipt: \(result.message)")
     }
 
-    func testReceiveAndPresentFullFlow() async throws {
+    // EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168
+    func skip_testReceiveAndPresentFullFlow() async throws {
         let controller = makeController()
 
         let bootstrapResult = try await controller.bootstrap()
@@ -113,7 +114,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 
-    func testCredentialPersistsAcrossControllerRecreation() async throws {
+    // EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168
+    func skip_testCredentialPersistsAcrossControllerRecreation() async throws {
         let controller1 = makeController()
 
         let bootstrapResult = try await controller1.bootstrap()

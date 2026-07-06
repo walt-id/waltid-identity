@@ -19,12 +19,14 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class EudiPublicBackendE2ETest {
 
+    @Ignore("EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168")
     @Test
     fun receiveAndPresentAgainstEudiPublicBackends() = runBlocking {
         val args = InstrumentationRegistry.getArguments()
