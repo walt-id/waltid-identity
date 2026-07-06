@@ -66,7 +66,7 @@ fi
 
 require_e2e_command xcrun
 require_e2e_command xcodebuild
-[ -f "$IOSAPP_DIR/iosApp.xcworkspace/contents.xcworkspacedata" ] || err "iosApp workspace not found"
+[ -d "$IOSAPP_DIR/iosApp.xcodeproj" ] || err "iosApp project not found"
 
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
 if [ -z "$SIMULATOR_ID" ]; then
@@ -116,7 +116,7 @@ env \
   TEST_RUNNER_E2E_ATTESTATION_BASE_URL="http://localhost:$PORT" \
   TEST_RUNNER_E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
   xcodebuild \
-    -workspace "$IOSAPP_DIR/iosApp.xcworkspace" \
+    -project "$IOSAPP_DIR/iosApp.xcodeproj" \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     test \
