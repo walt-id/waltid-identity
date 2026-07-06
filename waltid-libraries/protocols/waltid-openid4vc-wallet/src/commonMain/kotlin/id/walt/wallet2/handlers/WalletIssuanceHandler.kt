@@ -154,7 +154,8 @@ data class ResolveOfferResult(
     val grantType: String?,
     val txCodeRequired: Boolean,
     val credentialEndpoint: Url,
-    val offeredCredentials: List<String>
+    val offeredCredentials: List<String>,
+    val tokenEndpoint: Url? = null,
 )
 
 @Serializable
@@ -515,7 +516,9 @@ object WalletIssuanceHandler {
                 credentialOfferUri = offerRequest.credentialOfferUri
             )
         }
-        val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val metadataResolver = IssuerMetadataResolver(httpClient)
+        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(offer.credentialIssuer)
+        val asMetadata = metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         return ResolveOfferResult(
             credentialIssuer = offer.credentialIssuer,
@@ -523,6 +526,7 @@ object WalletIssuanceHandler {
             grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
                 ?: offer.grants?.authorizationCode?.let { "authorization_code" },
             txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
+            tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
             credentialEndpoint = Url(
                 issuerMetadata.credentialEndpoint
                     ?: error("Issuer metadata contains no credential_endpoint")
