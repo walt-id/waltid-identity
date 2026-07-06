@@ -39,6 +39,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
+private const val DEFAULT_CLIENT_ID = "eudiw-abca"
 
 // ---------------------------------------------------------------------------
 // Request / response types
@@ -86,7 +87,7 @@ data class ReceiveCredentialRequest(
     val txCode: String? = null,
 
     /** OAuth 2.0 client_id presented to the authorization server. */
-    val clientId: String = "wallet-client",
+    val clientId: String = DEFAULT_CLIENT_ID,
 
     /** redirect_uri registered with the authorization server (auth-code flows only). */
     val redirectUri: Url = Url("openid://"),
@@ -166,7 +167,7 @@ data class RequestTokenRequest(
     val preAuthorizedCode: String,
     val credentialIssuer: String? = null,
     val txCode: String? = null,
-    val clientId: String = "wallet-client",
+    val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
     val anonymousPreAuthorizedCode: Boolean = false,
@@ -202,7 +203,7 @@ data class FetchCredentialRequest(
     val accessToken: String,
     val credentialConfigurationId: String,
     val proofJwt: String? = null,
-    val clientId: String = "wallet-client"
+    val clientId: String = DEFAULT_CLIENT_ID
 )
 
 @Serializable
@@ -228,7 +229,7 @@ data class PollDeferredRequest(
 data class GenerateAuthorizationUrlRequest(
     val offerUrl: Url? = null,
     val offerJson: JsonObject? = null,
-    val clientId: String = "wallet-client",
+    val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
     val usePkce: Boolean = true
 ) {
@@ -259,7 +260,7 @@ data class ExchangeCodeRequest(
     val code: String,
     val credentialIssuerBaseUrl: String,
     val codeVerifier: String? = null,
-    val clientId: String = "wallet-client",
+    val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
     val key: DirectSerializedKey? = null,
@@ -946,7 +947,7 @@ object WalletIssuanceHandler {
         credentialEndpoint: Url,
         credentialConfigurationId: String,
         nonceEndpoint: String? = null,
-        clientId: String = "wallet-client",
+        clientId: String = DEFAULT_CLIENT_ID,
         redirectUri: Url = Url("openid://"),
         /** Inline key for proof-of-possession; takes precedence over the wallet's stores. */
         inlineKey: DirectSerializedKey? = null,
