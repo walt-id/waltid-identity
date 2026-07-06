@@ -940,10 +940,9 @@ object WalletIssuanceHandler {
      */
     fun receiveCredentialAuthCodeFlow(
         wallet: Wallet,
-        tokenEndpoint: Url,
         code: String,
         codeVerifier: String?,
-        credentialIssuer: String,
+        credentialIssuerBaseUrl: String,
         credentialEndpoint: Url,
         credentialConfigurationId: String,
         nonceEndpoint: String? = null,
@@ -953,6 +952,7 @@ object WalletIssuanceHandler {
         inlineKey: DirectSerializedKey? = null,
         /** Inline DID for holder binding; defaults to the wallet's default DID. */
         inlineDid: String? = null,
+        attestationAssembler: ClientAttestationAssembler? = null,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient()
     ): Flow<StoredCredential> = channelFlow {
@@ -961,14 +961,20 @@ object WalletIssuanceHandler {
         val did = inlineDid ?: wallet.defaultDid()
 
         // Exchange code for token
+        val exchangeRequest = ExchangeCodeRequest(
+            code = code,
+            codeVerifier = codeVerifier,
+            clientId = clientId,
+            redirectUri = redirectUri,
+            credentialIssuerBaseUrl = credentialIssuerBaseUrl,
+            key = inlineKey,
+        )
         val tokenResult = exchangeCode(
-            ExchangeCodeRequest(
-                tokenEndpoint = tokenEndpoint,
-                code = code,
-                codeVerifier = codeVerifier,
-                clientId = clientId,
-                redirectUri = redirectUri
-            )
+            wallet = wallet,
+            request = exchangeRequest,
+            attestationAssembler = attestationAssembler,
+            httpClient = httpClient,
+            onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
         )
         onEvent(WalletSessionEvent.issuance_token_obtained)
 
@@ -978,9 +984,9 @@ object WalletIssuanceHandler {
             ?: error("Issuer did not provide a c_nonce (neither via nonce endpoint nor token response)")
         val proofBuilder = JwtProofBuilder()
         val proofs = if (did != null) {
-            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, keyId = did)
+            proofBuilder.buildJwtProof(key, credentialIssuerBaseUrl, cNonce, keyId = did)
         } else {
-            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, includeJwk = true)
+            proofBuilder.buildJwtProof(key, credentialIssuerBaseUrl, cNonce, includeJwk = true)
         }
         onEvent(WalletSessionEvent.issuance_proof_signed)
 
