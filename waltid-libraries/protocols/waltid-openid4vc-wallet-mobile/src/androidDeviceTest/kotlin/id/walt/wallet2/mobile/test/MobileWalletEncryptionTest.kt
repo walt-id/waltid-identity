@@ -194,23 +194,29 @@ class MobileWalletEncryptionTest {
         val databaseName = "wallet_$walletId"
         val databaseFileName = "$databaseName.db"
         val credentialStore = RecordingCredentialStore()
+        val config = MobileWalletConfig(
+            walletId = walletId,
+            persistence = MobileWalletPersistence(
+                stores = MobileWalletStores(credentials = credentialStore),
+            ),
+        )
+        val factory = MobileWalletFactory(context)
         deleteDatabaseFiles(databaseFileName)
 
-        val wallet = MobileWalletFactory(context).create(
-            MobileWalletConfig(
-                walletId = walletId,
-                persistence = MobileWalletPersistence(
-                    stores = MobileWalletStores(credentials = credentialStore),
-                ),
-            )
-        )
+        val wallet = factory.create(config)
 
         val bootstrap = wallet.bootstrap()
         val credentials = wallet.credentials()
+        val reopenedWallet = factory.create(config)
+        val reopenedBootstrap = reopenedWallet.bootstrap()
+        val reopenedCredentials = reopenedWallet.credentials()
 
         assertTrue(bootstrap.did.startsWith("did:"), "Custom credential stores should keep Android platform signing keys")
         assertEquals(emptyList(), credentials)
-        assertEquals(1, credentialStore.listCredentialsCalls)
+        assertEquals(bootstrap.did, reopenedBootstrap.did, "Default DID store should survive wallet recreation")
+        assertEquals(bootstrap.keyId, reopenedBootstrap.keyId, "Platform signing-key reference should survive wallet recreation")
+        assertEquals(emptyList(), reopenedCredentials)
+        assertEquals(2, credentialStore.listCredentialsCalls)
 
         wallet.deleteWallet()
         deleteDatabaseFiles(databaseFileName)
