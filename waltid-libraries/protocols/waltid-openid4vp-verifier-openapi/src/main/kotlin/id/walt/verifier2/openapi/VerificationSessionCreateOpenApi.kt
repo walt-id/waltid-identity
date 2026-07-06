@@ -5,7 +5,6 @@ import id.walt.verifier2.data.DcApiAnnexCFlowSetup
 import id.walt.verifier2.data.DcApiAnnexDFlowSetup
 import id.walt.verifier2.data.VerificationSessionSetup
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
-import id.walt.verifier2.openapi.Verifier2OpenApiExamples.nestedPresentationRequestWithMultipleClaims
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.*
 
@@ -72,7 +71,7 @@ object VerificationSessionCreateOpenApi {
                     value = Verifier2OpenApiExamples.nestedPresentationRequestW3C
                 }
                 example("[openid4vp-http][w3c vc] DCQL: Nested presentation request with multiple claims") {
-                    value = nestedPresentationRequestWithMultipleClaims
+                    value = Verifier2OpenApiExamples.nestedPresentationRequestWithMultipleClaims
                 }
                 example("[openid4vp-http][w3c vc] DCQL: W3C credential with type values only") {
                     value = Verifier2OpenApiExamples.w3cTypeValues
@@ -87,6 +86,12 @@ object VerificationSessionCreateOpenApi {
                 // IETF SD-JWT VC Examples
                 example("[openid4vp-http][ietf sd-jwt vc] default dc+sd-jwt") {
                     value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcDefault
+                }
+                example("[openid4vp-http][ietf sd-jwt vc] expiration_duration") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcExpirationDuration
+                }
+                example("[openid4vp-http][ietf sd-jwt vc] expiration_date") {
+                    value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcExpirationDate
                 }
                 example("[openid4vp-http][ietf sd-jwt vc] basic w3c policies (signature, expiration, not-before, allowed-issuer, regex)") {
                     value = Verifier2OpenApiExamples.openid4vpHttpSdJwtVcBasic
