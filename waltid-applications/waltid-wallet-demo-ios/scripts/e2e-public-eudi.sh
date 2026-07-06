@@ -31,7 +31,7 @@ log "TEST" "Running EudiPublicBackendE2ETests"
 env \
   E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
   xcodebuild \
-    -workspace "$IOSAPP_DIR/iosApp.xcworkspace" \
+    -project "$IOSAPP_DIR/iosApp.xcodeproj" \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     test \

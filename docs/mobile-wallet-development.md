@@ -62,7 +62,7 @@ open iosApp.xcodeproj
 iOS (Native)
 ```bash
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
 Public EUDI and local Enterprise E2E scripts live under:

@@ -28,7 +28,7 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 
 ```bash
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
 E2E scripts live in [scripts](scripts/README.md).
