@@ -84,7 +84,7 @@ runs:
         fi
 
         echo "Resolving a compatible iPhone simulator destination from xcodebuild..."
-        DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -workspace iosApp.xcworkspace -scheme iosApp 2>&1)
+        DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -project iosApp.xcodeproj -scheme iosApp 2>&1)
         MATCHING_LINE=$(printf '%s\n' "$DESTINATIONS_OUTPUT" | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -n 1 || true)
         SIMULATOR_ID=$(printf '%s\n' "$MATCHING_LINE" | sed -n 's/.*id:\([^,}]*\).*/\1/p' | tr -d ' ')
 
@@ -106,7 +106,7 @@ runs:
       shell: bash
       run: |
         xcodebuild test \
-          -workspace iosApp.xcworkspace \
+          -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
           -only-testing:iosAppTests \
