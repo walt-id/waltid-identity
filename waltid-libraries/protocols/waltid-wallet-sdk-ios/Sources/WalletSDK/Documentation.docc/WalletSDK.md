@@ -64,15 +64,32 @@ let wallet = try await Wallet(
 ``WalletDatabaseKey`` descriptions redact raw key material, but apps should still
 avoid logging, serializing, or otherwise exposing the `material` bytes.
 
-Use ``WalletStores`` with ``WalletCredentialStore`` to override credential
-storage while keeping the managed encrypted database key, DID store, and
-platform signing-key store.
+Use ``WalletStores`` when an app owns credential, DID, or signing-key
+durability. Store overrides are independent except for signing keys:
+``WalletKeys`` keeps the ``WalletKeyStore`` and its generator together so newly
+generated keys are persisted into the same app-owned key domain.
 
-Provided database keys and custom credential stores can be combined when an app
-owns both database-key recovery and credential durability. Swift currently keeps
-DID document storage and signing-key storage managed by the SDK; those store
-overrides remain Kotlin Multiplatform-only until Swift has stable public models,
-deletion semantics, and typed errors for app-owned DID and key stores.
+```swift
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            stores: WalletStores(
+                credentials: AppCredentialStore(),
+                dids: AppDidStore(),
+                keys: WalletKeys(store: AppKeyStore()) { keyType in
+                    try await generateSerializedWalletKey(type: keyType)
+                }
+            )
+        )
+    )
+)
+```
+
+Provided database keys and custom stores can be combined when an app owns both
+database-key recovery and wallet-record durability. ``StoredKey`` carries
+walt.id serialized key JSON and may contain private signing material, so apps
+should keep it in app-owned secure storage and avoid logging it.
 
 Use ``Wallet/deleteLocalData()`` to reset local data for the wallet.
 This removes wallet records, platform signing keys referenced by the wallet,
@@ -101,12 +118,18 @@ reset; plaintext-to-encrypted migration is not performed.
 - ``WalletDatabaseKey``
 - ``WalletStores``
 - ``WalletCredentialStore``
+- ``WalletDidStore``
+- ``WalletKeyStore``
+- ``WalletKeys``
 - ``WalletAttestationConfiguration``
 
 ### Wallet Data
 
 - ``Credential``
 - ``StoredCredential``
+- ``StoredDid``
+- ``StoredKey``
+- ``WalletKeyInfo``
 - ``WalletBootstrapResult``
 - ``PresentationResult``
 

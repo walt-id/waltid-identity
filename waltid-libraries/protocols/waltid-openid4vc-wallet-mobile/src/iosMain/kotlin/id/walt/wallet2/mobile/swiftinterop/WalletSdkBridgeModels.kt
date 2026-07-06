@@ -1,10 +1,19 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.credentials.CredentialParser
+import id.walt.crypto.keys.Key
+import id.walt.crypto.keys.KeyManager
+import id.walt.crypto.keys.KeySerialization
+import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
+import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.WalletDidStore
+import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.MobileWalletKeys
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletStores
@@ -16,6 +25,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlin.time.Instant
 
 /**
@@ -69,9 +81,13 @@ enum class WalletBridgeDatabaseKeyConfiguration {
  * Optional Swift-provided store overrides exposed to the bridge.
  *
  * @property credentials Optional Swift-provided credential store.
+ * @property dids Optional Swift-provided DID document store.
+ * @property keys Optional atomic Swift-provided key store and key generator.
  */
 data class WalletBridgeStores(
     val credentials: WalletBridgeCredentialStore? = null,
+    val dids: WalletBridgeDidStore? = null,
+    val keys: WalletBridgeKeys? = null,
 )
 
 /**
@@ -144,12 +160,130 @@ interface WalletBridgeCredentialStore {
     suspend fun removeCredential(id: String): Boolean
 }
 
+/**
+ * DID document entry exchanged with Swift custom DID stores.
+ *
+ * @property did Stable DID string.
+ * @property documentJson Serialized DID document JSON object.
+ */
+data class WalletBridgeStoredDid(
+    val did: String,
+    val documentJson: String,
+)
+
+/**
+ * Swift-facing DID document store override.
+ */
+interface WalletBridgeDidStore {
+    /**
+     * Returns a stored DID document by DID string.
+     */
+    suspend fun getDid(did: String): WalletBridgeStoredDid?
+
+    /**
+     * Lists all DID documents in this store.
+     */
+    suspend fun listDids(): List<WalletBridgeStoredDid>
+
+    /**
+     * Adds or replaces a DID document entry.
+     */
+    suspend fun addDid(entry: WalletBridgeStoredDid)
+
+    /**
+     * Removes a DID document by DID string.
+     *
+     * @return `true` when a DID existed and was removed.
+     */
+    suspend fun removeDid(did: String): Boolean
+}
+
+/**
+ * Key metadata exchanged with Swift custom key stores.
+ *
+ * @property keyId Stable wallet-local key identifier.
+ * @property keyType Wallet key type name.
+ * @property algorithm Optional signing algorithm label supplied by Swift.
+ */
+data class WalletBridgeKeyInfo(
+    val keyId: String,
+    val keyType: String,
+    val algorithm: String? = null,
+)
+
+/**
+ * Serialized signing key exchanged with Swift custom key stores.
+ *
+ * @property keyId Stable wallet-local key identifier.
+ * @property keyType Wallet key type name.
+ * @property algorithm Optional signing algorithm label supplied by Swift.
+ * @property serializedKeyJson walt.id serialized key JSON payload.
+ */
+data class WalletBridgeStoredKey(
+    val keyId: String,
+    val keyType: String,
+    val algorithm: String? = null,
+    val serializedKeyJson: String,
+)
+
+/**
+ * Atomic Swift-facing key store and generator override.
+ *
+ * KMP requires the store and generator together so generated signing keys are persisted into the same
+ * app-owned key domain.
+ */
+data class WalletBridgeKeys(
+    val store: WalletBridgeKeyStore,
+    val generate: WalletBridgeKeyGenerator,
+)
+
+/**
+ * Swift-facing signing-key store override.
+ */
+interface WalletBridgeKeyStore {
+    /**
+     * Returns a serialized signing key by wallet-local identifier.
+     */
+    suspend fun getKey(keyId: String): WalletBridgeStoredKey?
+
+    /**
+     * Lists stored signing-key metadata.
+     */
+    suspend fun listKeys(): List<WalletBridgeKeyInfo>
+
+    /**
+     * Adds or replaces a serialized signing key entry.
+     *
+     * @return Stable wallet-local key identifier for the stored key.
+     */
+    suspend fun addKey(entry: WalletBridgeStoredKey): String
+
+    /**
+     * Removes a signing key by wallet-local identifier.
+     *
+     * @return `true` when a key existed and was removed.
+     */
+    suspend fun removeKey(keyId: String): Boolean
+}
+
+/**
+ * Swift-facing signing-key generator override.
+ */
+interface WalletBridgeKeyGenerator {
+    /**
+     * Generates a serialized signing key for [keyType].
+     */
+    suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey
+}
+
 private fun WalletBridgePersistence.toMobileWalletPersistence(
     databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
 ): MobileWalletPersistence = MobileWalletPersistence(
     databaseKey = databaseKey.toMobileWalletDatabaseKey(databaseKeyProvider),
     stores = MobileWalletStores(
         credentials = stores.credentials?.let(::BridgeCredentialStore),
+        dids = stores.dids?.let(::BridgeDidStore),
+        keys = stores.keys?.toMobileWalletKeys(),
     ),
 )
 
@@ -201,6 +335,44 @@ private class BridgeCredentialStore(
         bridgeStore.removeCredential(id)
 }
 
+private class BridgeDidStore(
+    private val bridgeStore: WalletBridgeDidStore,
+) : WalletDidStore {
+    override suspend fun getDid(did: String): WalletDidEntry? =
+        bridgeStore.getDid(did)?.toWalletDidEntry()
+
+    override suspend fun listDids(): Flow<WalletDidEntry> =
+        bridgeStore.listDids().map { it.toWalletDidEntry() }.asFlow()
+
+    override suspend fun addDid(entry: WalletDidEntry) {
+        bridgeStore.addDid(entry.toBridgeStoredDid())
+    }
+
+    override suspend fun removeDid(did: String): Boolean =
+        bridgeStore.removeDid(did)
+}
+
+private class BridgeKeyStore(
+    private val bridgeStore: WalletBridgeKeyStore,
+) : WalletKeyStore {
+    override suspend fun getKey(keyId: String): Key? =
+        bridgeStore.getKey(keyId)?.toKey()
+
+    override suspend fun listKeys(): Flow<WalletKeyInfo> =
+        bridgeStore.listKeys().map { it.toWalletKeyInfo() }.asFlow()
+
+    override suspend fun addKey(key: Key): String =
+        bridgeStore.addKey(key.toBridgeStoredKey())
+
+    override suspend fun removeKey(keyId: String): Boolean =
+        bridgeStore.removeKey(keyId)
+}
+
+private fun WalletBridgeKeys.toMobileWalletKeys() = MobileWalletKeys(
+    store = BridgeKeyStore(store),
+    generate = { keyType -> generate.generateKey(keyType.toMobileWalletKeyType()).toKey() },
+)
+
 private suspend fun WalletBridgeStoredCredential.toStoredCredential(): StoredCredential {
     val (_, credential) = CredentialParser.detectAndParse(serializedCredential)
     return StoredCredential(
@@ -218,6 +390,43 @@ private fun StoredCredential.toBridgeStoredCredential() = WalletBridgeStoredCred
     label = label,
     addedAt = addedAt?.toString(),
 )
+
+private fun WalletBridgeStoredDid.toWalletDidEntry() = WalletDidEntry(
+    did = did,
+    document = Json.parseToJsonElement(documentJson).jsonObject,
+)
+
+private fun WalletDidEntry.toBridgeStoredDid() = WalletBridgeStoredDid(
+    did = did,
+    documentJson = Json.encodeToString(JsonObject.serializer(), document),
+)
+
+private fun WalletBridgeKeyInfo.toWalletKeyInfo() = WalletKeyInfo(
+    keyId = keyId,
+    keyType = keyType,
+    algorithm = algorithm,
+)
+
+private suspend fun WalletBridgeStoredKey.toKey(): Key =
+    KeyManager.resolveSerializedKey(serializedKeyJson)
+
+private suspend fun Key.toBridgeStoredKey() = WalletBridgeStoredKey(
+    keyId = getKeyId(),
+    keyType = keyType.name,
+    algorithm = null,
+    serializedKeyJson = KeySerialization.serializeKey(this),
+)
+
+private fun KeyType.toMobileWalletKeyType(): MobileWalletKeyType = when (this) {
+    KeyType.Ed25519 -> MobileWalletKeyType.Ed25519
+    KeyType.secp256k1 -> MobileWalletKeyType.secp256k1
+    KeyType.secp256r1 -> MobileWalletKeyType.secp256r1
+    KeyType.secp384r1 -> MobileWalletKeyType.secp384r1
+    KeyType.secp521r1 -> MobileWalletKeyType.secp521r1
+    KeyType.RSA -> MobileWalletKeyType.RSA
+    KeyType.RSA3072 -> MobileWalletKeyType.RSA3072
+    KeyType.RSA4096 -> MobileWalletKeyType.RSA4096
+}
 
 /**
  * Coarse error category for Swift bridge failures.
