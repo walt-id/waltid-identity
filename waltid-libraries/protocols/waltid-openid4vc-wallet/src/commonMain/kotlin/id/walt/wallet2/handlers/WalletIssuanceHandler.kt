@@ -538,8 +538,55 @@ object WalletIssuanceHandler {
         )
     }
 
-    suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult {
-        val httpClient = defaultHttpClient()
+    suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult =
+        requestToken(
+            request = request,
+            attestationHeaders = null,
+            anonymousPreAuthorizedCode = request.anonymousPreAuthorizedCode,
+        )
+
+    suspend fun requestToken(
+        wallet: Wallet,
+        request: RequestTokenRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = defaultHttpClient(),
+        onAttestationObtained: suspend () -> Unit = {},
+    ): RequestTokenResult {
+        val credentialIssuer = request.credentialIssuer?.takeIf { it.isNotBlank() }
+        val asMetadata = credentialIssuer?.let {
+            val metadataResolver = IssuerMetadataResolver(httpClient)
+            val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(it)
+            metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
+        }
+        val attestationHeaders = asMetadata?.let {
+            buildTokenEndpointAttestationHeaders(
+                asMetadata = it,
+                clientId = request.clientId,
+                attestationAssembler = attestationAssembler,
+                resolveInstanceKey = { resolveKey(wallet, request.key, request.keyId) },
+                onAttestationObtained = onAttestationObtained,
+            )
+        }
+        val anonymousPreAuthorizedCode =
+            request.anonymousPreAuthorizedCode ||
+                (asMetadata?.preAuthorizedGrantAnonymousAccessSupported == true &&
+                    request.tokenRequestHeaders.isEmpty() &&
+                    attestationHeaders == null)
+
+        return requestToken(
+            request = request,
+            attestationHeaders = attestationHeaders,
+            anonymousPreAuthorizedCode = anonymousPreAuthorizedCode,
+            httpClient = httpClient,
+        )
+    }
+
+    private suspend fun requestToken(
+        request: RequestTokenRequest,
+        attestationHeaders: ClientAttestationHeaders?,
+        anonymousPreAuthorizedCode: Boolean,
+        httpClient: HttpClient = defaultHttpClient(),
+    ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
@@ -549,7 +596,8 @@ object WalletIssuanceHandler {
             preAuthorizedCode = request.preAuthorizedCode,
             txCode = request.txCode,
             additionalHeaders = request.tokenRequestHeaders,
-            anonymous = request.anonymousPreAuthorizedCode,
+            attestationHeaders = attestationHeaders,
+            anonymous = anonymousPreAuthorizedCode,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
