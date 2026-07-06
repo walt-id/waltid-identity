@@ -256,12 +256,14 @@ data class GenerateAuthorizationUrlResult(
 
 @Serializable
 data class ExchangeCodeRequest(
-    val tokenEndpoint: Url,
     val code: String,
+    val credentialIssuerBaseUrl: String,
     val codeVerifier: String? = null,
     val clientId: String = "wallet-client",
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
 )
 
 // ---------------------------------------------------------------------------
