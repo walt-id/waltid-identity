@@ -11,6 +11,7 @@ final class WalletE2EUI {
     }
 
     func launch(attestation: [String: String] = [:]) {
+        app.launchEnvironment["E2E_WALLET_ID"] = app.launchEnvironment["E2E_WALLET_ID"] ?? "e2e-\(UUID().uuidString)"
         for (key, value) in attestation {
             app.launchEnvironment[key] = value
         }
