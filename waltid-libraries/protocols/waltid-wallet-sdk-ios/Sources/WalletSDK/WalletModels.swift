@@ -152,8 +152,10 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
     ///
     /// - Parameters:
     ///   - id: Stable local credential identifier.
-    ///   - serializedCredential: Raw serialized credential payload.
-    ///   - format: Credential format, for example `vc+sd-jwt` or `jwt_vc_json`.
+    ///   - serializedCredential: Raw serialized credential, such as a JWT VC,
+    ///     SD-JWT VC, or JSON credential.
+    ///   - format: Credential format, for example `vc+sd-jwt` or
+    ///     `jwt_vc_json`.
     ///   - label: User-facing credential label when available.
     ///   - addedAt: Date the credential was added to the wallet when available.
     public init(
@@ -175,21 +177,24 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
 public protocol WalletCredentialStore: Sendable {
     /// Returns a credential by wallet-local identifier.
     ///
-    /// - Parameter id: Stable local credential identifier.
+    /// - Parameter id: Stable wallet-local credential identifier.
+    /// - Returns: Stored credential when present, or `nil` when absent.
     func credential(id: String) async throws -> StoredCredential?
 
     /// Lists all credentials in this store.
+    ///
+    /// - Returns: Stored credentials currently owned by this store.
     func credentials() async throws -> [StoredCredential]
 
     /// Adds or replaces a credential entry.
     ///
-    /// - Parameter credential: Credential entry to add or replace.
+    /// - Parameter credential: Credential entry to persist.
     func addCredential(_ credential: StoredCredential) async throws
 
     /// Removes a credential by wallet-local identifier.
     ///
-    /// - Parameter id: Stable local credential identifier.
-    /// - Returns: `true` when a credential existed and was removed.
+    /// - Parameter id: Stable wallet-local credential identifier to remove.
+    /// - Returns: `true` when the store removed an existing credential.
     func removeCredential(id: String) async throws -> Bool
 }
 

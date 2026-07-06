@@ -68,6 +68,12 @@ Use ``WalletStores`` with ``WalletCredentialStore`` to override credential
 storage while keeping the managed encrypted database key, DID store, and
 platform signing-key store.
 
+Provided database keys and custom credential stores can be combined when an app
+owns both database-key recovery and credential durability. Swift currently keeps
+DID document storage and signing-key storage managed by the SDK; those store
+overrides remain Kotlin Multiplatform-only until Swift has stable public models,
+deletion semantics, and typed errors for app-owned DID and key stores.
+
 Use ``Wallet/deleteLocalData()`` to reset local data for the wallet.
 This removes wallet records, platform signing keys referenced by the wallet,
 encrypted database files and sidecars, and managed database keys. When using

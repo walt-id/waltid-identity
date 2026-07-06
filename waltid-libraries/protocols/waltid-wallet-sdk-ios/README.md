@@ -128,7 +128,21 @@ let wallet = try await Wallet(
 )
 ```
 
-The Swift facade intentionally exposes credential-store overrides first. Kotlin Multiplatform still supports full credential, DID, and key store overrides through `MobileWalletStores`; Swift key/DID store parity needs public Swift signing-key and DID-document models and is tracked separately.
+Provided database keys and custom credential stores can be combined when an app owns both database-key recovery and credential durability:
+
+```swift
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            databaseKey: .provided(KMSDatabaseKeyProvider()),
+            stores: WalletStores(credentials: AppCredentialStore())
+        )
+    )
+)
+```
+
+The Swift facade intentionally exposes credential-store overrides first. Kotlin Multiplatform still supports full credential, DID, and key store overrides through `MobileWalletStores`; Swift key/DID store parity needs public Swift signing-key and DID-document models, defined deletion semantics for app-owned stores, and typed error behavior before those overrides become public Swift API.
 
 Call `try await wallet.deleteLocalData()` to remove local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
 
