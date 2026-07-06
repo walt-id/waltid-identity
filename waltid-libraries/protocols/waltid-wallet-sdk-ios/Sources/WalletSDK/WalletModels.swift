@@ -47,7 +47,10 @@ public enum WalletPersistenceConfiguration: Sendable {
 }
 
 /// Database key material used for wallet-local SQLCipher persistence.
-public struct WalletDatabaseKey: Equatable, Sendable {
+///
+/// String and debug descriptions redact the raw bytes. Apps should still avoid
+/// logging, serializing, or otherwise exposing ``material``.
+public struct WalletDatabaseKey: CustomDebugStringConvertible, CustomStringConvertible, Equatable, Sendable {
     /// Stable identifier for the database encryption key.
     public let keyID: String
 
@@ -62,6 +65,16 @@ public struct WalletDatabaseKey: Equatable, Sendable {
     public init(keyID: String, material: Data) {
         self.keyID = keyID
         self.material = material
+    }
+
+    /// Text representation that redacts raw key material.
+    public var description: String {
+        "WalletDatabaseKey(keyID: \(keyID), material: <redacted>)"
+    }
+
+    /// Debug representation that redacts raw key material.
+    public var debugDescription: String {
+        description
     }
 }
 

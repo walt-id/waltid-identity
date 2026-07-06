@@ -6,15 +6,18 @@ import android.database.sqlite.SQLiteException
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.stores.DriverFactory
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.File
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -145,6 +148,38 @@ class MobileWalletEncryptionTest {
         deleteDatabaseFiles(databaseFileName)
     }
 
+    @Test
+    fun integratorManagedAndroidDatabaseKeyOpensEncryptedWalletAndIsDeleted() = runBlocking {
+        val walletId = "android-integrator-key-test"
+        val databaseName = "wallet_$walletId"
+        val databaseFileName = "$databaseName.db"
+        val provider = RecordingDatabaseKeyProvider(
+            DatabaseEncryptionKey(
+                keyId = "integrator-key",
+                material = ByteArray(32) { index -> (index + 3).toByte() },
+            )
+        )
+        deleteDatabaseFiles(databaseFileName)
+
+        val factory = MobileWalletFactory(context)
+        val config = MobileWalletConfig(
+            walletId = walletId,
+            persistence = MobileWalletPersistenceConfig.IntegratorManagedKey(provider),
+        )
+        val wallet = factory.create(config)
+
+        val bootstrap = wallet.bootstrap()
+        val reopenedBootstrap = factory.create(config).bootstrap()
+
+        assertEquals(bootstrap, reopenedBootstrap)
+        assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
+        wallet.deleteWallet()
+        assertEquals(listOf("$walletId:$databaseName"), provider.deletedKeys)
+        assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "Integrator-managed wallet DB files should be deleted")
+
+        deleteDatabaseFiles(databaseFileName)
+    }
+
     private fun deleteDatabaseFiles(databaseFileName: String) {
         databaseFiles(databaseFileName).forEach { file ->
             file.delete()
@@ -166,6 +201,22 @@ class MobileWalletEncryptionTest {
                 File("${file.absolutePath}-shm"),
                 File("${file.absolutePath}-wal"),
             )
+        }
+    }
+
+    private class RecordingDatabaseKeyProvider(
+        private val key: DatabaseEncryptionKey,
+    ) : DatabaseEncryptionKeyProvider {
+        val requestedKeys = mutableListOf<String>()
+        val deletedKeys = mutableListOf<String>()
+
+        override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
+            requestedKeys += "$walletId:$databaseName"
+            return key
+        }
+
+        override suspend fun deleteKey(walletId: String, databaseName: String) {
+            deletedKeys += "$walletId:$databaseName"
         }
     }
 }

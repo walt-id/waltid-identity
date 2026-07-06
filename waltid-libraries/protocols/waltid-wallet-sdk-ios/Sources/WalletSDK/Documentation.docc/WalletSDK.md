@@ -52,6 +52,9 @@ struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
 }
 ```
 
+``WalletDatabaseKey`` descriptions redact raw key material, but apps should still
+avoid logging, serializing, or otherwise exposing the `material` bytes.
+
 Use ``Wallet/deleteLocalData()`` to reset SDK-owned local data for the wallet.
 This removes wallet records, platform signing keys referenced by the wallet,
 encrypted database files and sidecars, and SDK-managed database keys. When using

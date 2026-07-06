@@ -72,6 +72,10 @@ val wallet = MobileWalletFactory(context).create(
 )
 ```
 
+This mode is covered by Android device and iOS simulator integration tests so
+provider lookup, encrypted database reopening, and provider deletion stay wired
+to the real platform drivers.
+
 Replace SDK SQLDelight persistence entirely with custom stores when the app owns durability, transactions, encryption, backup, migration, and deletion:
 
 ```kotlin
@@ -87,6 +91,11 @@ val wallet = MobileWalletFactory(context).create(
     )
 )
 ```
+
+`CustomStores` bypasses platform SQLDelight persistence, Android Keystore, and
+iOS Keychain database-key storage. Its behavior is platform-independent and is
+covered in common KMP tests, including store injection and `deleteWallet()`
+cleanup through the injected store interfaces.
 
 Call `MobileWallet.deleteWallet()` to delete SDK-owned local wallet material for a wallet: stored key references, credentials, DIDs, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. For `CustomStores`, cleanup remains owned by the integrator; the facade only calls the store-level remove operations exposed by the injected stores.
 

@@ -27,6 +27,21 @@ final class WalletAPITests: XCTestCase {
         XCTAssertTrue(configuration.persistence.isIntegratorManagedKey)
     }
 
+    func testWalletDatabaseKeyDescriptionRedactsMaterial() {
+        let key = WalletDatabaseKey(
+            keyID: "consumer-wallet:wallet_consumer-wallet",
+            material: Data([1, 2, 3, 4])
+        )
+
+        XCTAssertEqual(
+            String(describing: key),
+            "WalletDatabaseKey(keyID: consumer-wallet:wallet_consumer-wallet, material: <redacted>)"
+        )
+        XCTAssertEqual(String(reflecting: key), String(describing: key))
+        XCTAssertFalse(String(describing: key).contains("1 bytes"))
+        XCTAssertFalse(String(describing: key).contains("4 bytes"))
+    }
+
     func testPublicModelsAreValueTypesAndEquatable() {
         let credential = Credential(
             id: "credential-1",
