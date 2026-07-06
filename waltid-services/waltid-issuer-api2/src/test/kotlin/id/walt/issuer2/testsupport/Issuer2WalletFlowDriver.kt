@@ -220,6 +220,7 @@ class Issuer2WalletFlowDriver(
         TokenRequestBuilder(walletClientConfig, client).exchangeAuthorizationCode(
             tokenEndpoint = requireNotNull(resolvedOffer.authorizationServerMetadata.tokenEndpoint),
             code = code,
+            attestationHeaders = buildAttestationHeaders(resolvedOffer),
         )
 
     suspend fun refreshAccessToken(
