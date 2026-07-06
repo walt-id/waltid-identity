@@ -294,7 +294,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetc
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/authorization-url \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\",\"usePkce\":true}"
-# → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"..."}
+# → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"...","credentialIssuerBaseUrl":"https://issuer.example.com"}
 
 # (User follows authorizationUrl in a browser, then is redirected back with ?code=...)
 
@@ -302,7 +302,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/auth
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exchange-code \
   -H "Content-Type: application/json" \
   -d '{
-    "tokenEndpoint": "https://issuer.example.com/token",
+    "credentialIssuerBaseUrl": "https://issuer.example.com",
     "code": "<code-from-redirect>",
     "codeVerifier": "<pkce-verifier>",
     "redirectUri": "openid://"
