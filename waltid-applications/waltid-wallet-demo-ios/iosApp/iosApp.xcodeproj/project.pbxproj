@@ -16,7 +16,7 @@
 		A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006AAAA000000000006 /* StatusBannerView.swift */; };
 		A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000007AAAA000000000007 /* CredentialCardView.swift */; };
 		A1000008AAAA000100000008 /* WalletColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008AAAA000000000008 /* WalletColors.swift */; };
-		B33B17EA2C2C394F001A32F7 /* iosAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* iosAppApp.swift */; };
+		B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
 		D69044562FDAA61A009AB1FB /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
@@ -53,7 +53,7 @@
 		A1000008AAAA000000000008 /* WalletColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletColors.swift; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B33B17E92C2C394F001A32F7 /* iosAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosAppApp.swift; sourceTree = "<group>"; };
+		B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDemoApp.swift; sourceTree = "<group>"; };
 		B33B17EB2C2C394F001A32F7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B33B17ED2C2C3957001A32F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = TestHelpers.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -194,7 +194,7 @@
 			isa = PBXGroup;
 			children = (
 				B30E22802C2D8AD700D4781C /* Info.plist */,
-				B33B17E92C2C394F001A32F7 /* iosAppApp.swift */,
+				B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */,
 				B33B17EB2C2C394F001A32F7 /* ContentView.swift */,
 				A1000010AAAA000000000010 /* ViewModels */,
 				A1000011AAAA000000000011 /* Views */,
@@ -391,7 +391,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */,
-				B33B17EA2C2C394F001A32F7 /* iosAppApp.swift in Sources */,
+				B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */,
 				A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */,
 				A1000002AAAA000100000002 /* HomeView.swift in Sources */,
 				A1000003AAAA000100000003 /* ReceiveView.swift in Sources */,
