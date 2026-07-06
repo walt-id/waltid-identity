@@ -579,8 +579,15 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
-                        call.respond(WalletIssuanceHandler.exchangeCode(req))
+                        call.respond(
+                            WalletIssuanceHandler.exchangeCode(
+                                wallet = wallet,
+                                request = req,
+                                attestationAssembler = attestationAssembler,
+                            )
+                        )
                     }
 
                     post("/deferred", {
