@@ -47,4 +47,19 @@ extension WalletError: LocalizedError {
             return "The wallet operation was cancelled."
         }
     }
+
+    /// A localized explanation of why the wallet error occurred.
+    public var failureReason: String? {
+        nil
+    }
+
+    /// A localized recovery suggestion for the wallet error.
+    public var recoverySuggestion: String? {
+        nil
+    }
+
+    /// A localized help anchor for documentation related to the wallet error.
+    public var helpAnchor: String? {
+        nil
+    }
 }
