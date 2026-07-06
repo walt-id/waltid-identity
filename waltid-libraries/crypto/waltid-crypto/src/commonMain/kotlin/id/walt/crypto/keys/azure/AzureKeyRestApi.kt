@@ -334,14 +334,14 @@ class AzureKeyRestApi(
             }
             val bodyStr = response.bodyAsText()
 
-            if (!response.status.isSuccess()) externalKmsFailure(
+            if (!response.status.isSuccess()) ExternalKmsError.requestFailed(
                 provider = AZURE_KEY_VAULT_PROVIDER,
                 operation = "access token retrieval",
                 message = "returned HTTP ${response.status.value} ${response.status.description}: ${bodyStr.ifBlank { "empty response" }}",
             )
 
             val parsedResponse = runCatching { responseJson.decodeFromString<AzureTokenResponse>(bodyStr) }.getOrElse { ex ->
-                externalKmsFailure(
+                ExternalKmsError.requestFailed(
                     provider = AZURE_KEY_VAULT_PROVIDER,
                     operation = "access token retrieval",
                     message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
@@ -360,14 +360,14 @@ class AzureKeyRestApi(
         internal suspend fun HttpResponse.azureJsonDataBody(operation: String = "request"): JsonObject {
             val bodyStr = bodyAsText()
 
-            if (!status.isSuccess()) externalKmsFailure(
+            if (!status.isSuccess()) ExternalKmsError.requestFailed(
                 provider = AZURE_KEY_VAULT_PROVIDER,
                 operation = operation,
                 message = "returned HTTP ${status.value} ${status.description}: ${bodyStr.ifBlank { "empty response" }}",
             )
 
             return runCatching { responseJson.parseToJsonElement(bodyStr).jsonObject }.getOrElse {
-                externalKmsFailure(
+                ExternalKmsError.requestFailed(
                     provider = AZURE_KEY_VAULT_PROVIDER,
                     operation = operation,
                     message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
@@ -446,7 +446,7 @@ class AzureKeyRestApi(
 
                 createdKey
             }.getOrElse {
-                externalKmsGenerationFailure(AZURE_KEY_VAULT_PROVIDER, type.name, it)
+                ExternalKmsError.generationFailed(AZURE_KEY_VAULT_PROVIDER, type.name, it)
             }
         }
     }

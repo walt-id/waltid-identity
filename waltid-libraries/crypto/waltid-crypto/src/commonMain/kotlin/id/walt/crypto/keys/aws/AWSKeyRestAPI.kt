@@ -580,7 +580,7 @@ $public
         private suspend fun HttpResponse.awsJsonDataBody(operation: String = "request"): JsonObject {
             val bodyStr = bodyAsText()
 
-            if (!status.isSuccess()) externalKmsFailure(
+            if (!status.isSuccess()) ExternalKmsError.requestFailed(
                 provider = AWS_KMS_PROVIDER,
                 operation = operation,
                 message = "returned HTTP ${status.value} ${status.description}: ${bodyStr.ifBlank { "empty response" }}",
@@ -589,7 +589,7 @@ $public
             return runCatching {
                 Json.parseToJsonElement(bodyStr).jsonObject
             }.getOrElse {
-                externalKmsFailure(
+                ExternalKmsError.requestFailed(
                     provider = AWS_KMS_PROVIDER,
                     operation = operation,
                     message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
@@ -674,7 +674,7 @@ $public
 
                 createdKey
             }.getOrElse {
-                externalKmsGenerationFailure(AWS_KMS_PROVIDER, type.name, it)
+                ExternalKmsError.generationFailed(AWS_KMS_PROVIDER, type.name, it)
             }
         }
 

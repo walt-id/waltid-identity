@@ -4,8 +4,6 @@ import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TseKeyMeta
-import id.walt.crypto.keys.externalKmsFailure
-import id.walt.crypto.keys.externalKmsGenerationFailure
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.base64toBase64Url
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
@@ -324,7 +322,7 @@ class TSEKey(
                 .replace("\\s".toRegex(), "")
 
             return runCatching { Base64.decode(base64PublicKey) }.getOrElse {
-                externalKmsFailure(
+                ExternalKmsError.requestFailed(
                     provider = TSE_PROVIDER,
                     operation = "public key decoding",
                     message = "Vault returned a public key that is neither PEM nor base64 encoded",
@@ -340,14 +338,14 @@ class TSEKey(
         suspend fun HttpResponse.tseJsonDataBody(operation: String = "request"): JsonObject {
             val bodyStr = bodyAsText()
 
-            if (!status.isSuccess()) externalKmsFailure(
+            if (!status.isSuccess()) ExternalKmsError.requestFailed(
                 provider = TSE_PROVIDER,
                 operation = operation,
                 message = "returned HTTP ${status.value} ${status.description}: ${bodyStr.ifBlank { "empty response" }}",
             )
 
             val json = runCatching { Json.parseToJsonElement(bodyStr).jsonObject }.getOrElse {
-                externalKmsFailure(
+                ExternalKmsError.requestFailed(
                     provider = TSE_PROVIDER,
                     operation = operation,
                     message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
@@ -356,7 +354,7 @@ class TSEKey(
             }
 
             return json["data"]?.jsonObject
-                ?: externalKmsFailure(
+                ?: ExternalKmsError.requestFailed(
                     provider = TSE_PROVIDER,
                     operation = operation,
                     message = "response did not contain a data object: $bodyStr",
@@ -393,7 +391,7 @@ class TSEKey(
                     _keyType = type
                 ).apply { init() }
             }.getOrElse {
-                externalKmsGenerationFailure(TSE_PROVIDER, type.name, it)
+                ExternalKmsError.generationFailed(TSE_PROVIDER, type.name, it)
             }
         }
 

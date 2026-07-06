@@ -1,5 +1,6 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.exceptions.ExternalKmsError
 import id.walt.crypto.exceptions.KeyTypeNotSupportedException
 import id.walt.crypto.exceptions.KeyVaultUnavailable
 import id.walt.crypto.keys.aws.AWSKeyMetadata
@@ -48,7 +49,7 @@ class ExternalKmsKeyGenerationTest {
 
     @Test
     fun `external KMS error sanitization redacts credentials`() {
-        val sanitized = sanitizeExternalKmsError(
+        val sanitized = ExternalKmsError.sanitize(
             """{"secretId":"vault-secret","accessKey":"root-token","Authorization":"Bearer abc.def"}"""
         )
 
