@@ -3,6 +3,7 @@ package id.walt.wallet2
 import id.walt.commons.config.WaltConfig
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 /**
  * OSS Wallet Service configuration, loaded from the service's HOCON config file.
@@ -13,6 +14,9 @@ import kotlinx.serialization.Serializable
  *     publicBaseUrl = "http://localhost:4000"
  *     attestationConfig {
  *         attesterUrl = "https://wallet-provider.example.com/wallet-instance-attestation/jwk"
+ *         requestBody {
+ *             jwk = "{{public_jwk}}"
+ *         }
  *     }
  * }
  * ```
@@ -27,4 +31,5 @@ data class OSSWallet2ServiceConfig(
 @Serializable
 data class WalletAttestationConfig(
     val attesterUrl: String,
+    val requestBody: JsonObject,
 )

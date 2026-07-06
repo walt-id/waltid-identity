@@ -16,8 +16,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -44,7 +46,7 @@ class GenericHttpWalletAttestationProviderTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun testDefaultJwkRequestBody() = runTest {
+    fun testConfiguredJwkRequestBody() = runTest {
         var capturedBody: JsonObject? = null
         val client = HttpClient(MockEngine) {
             engine {
@@ -66,6 +68,9 @@ class GenericHttpWalletAttestationProviderTest {
         val provider = GenericHttpWalletAttestationProvider(
             attesterUrl = "https://wallet-provider.example.com/wallet-instance-attestation/jwk",
             httpClient = client,
+            requestBodyTemplate = buildJsonObject {
+                put("jwk", PUBLIC_JWK_PLACEHOLDER)
+            },
         )
 
         val jwt = provider.getAttestationJwt(GenericProviderTestKey(), "wallet-client")

@@ -137,6 +137,7 @@ object OSSWallet2Service {
         return ClientAttestationAssembler(
             GenericHttpWalletAttestationProvider(
                 attesterUrl = config.attesterUrl,
+                requestBodyTemplate = config.requestBody,
             )
         )
     }
