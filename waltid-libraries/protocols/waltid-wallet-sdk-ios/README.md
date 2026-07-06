@@ -88,6 +88,11 @@ let wallet = try await Wallet(
 )
 ```
 
+The provider shape is compiled by the SwiftPM test suite, and the underlying
+KMP bridge is covered by iOS simulator integration tests so provider lookup,
+encrypted database reopening, and provider deletion stay wired to the real iOS
+driver.
+
 The Swift facade does not expose fully custom wallet stores yet; use the Kotlin Multiplatform `MobileWalletPersistenceConfig.CustomStores` API when custom store injection is required.
 
 Call `try await wallet.deleteLocalData()` to remove SDK-owned local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
