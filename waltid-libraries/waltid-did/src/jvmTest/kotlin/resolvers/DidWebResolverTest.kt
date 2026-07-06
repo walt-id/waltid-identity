@@ -59,17 +59,13 @@ class DidWebResolverTest : DidResolverTestBase() {
         @JvmStatic
         @BeforeAll
         fun ensureServerStarted() {
-            if (!serverStarted) {
-                println("Starting test web server...")
-                TestServer.server.start()
-                serverStarted = true
-            }
+            TestServer.ensureStarted()
         }
 
         @JvmStatic
         @AfterAll
         fun stopServer() {
-            TestServer.server.stop()
+            TestServer.stop()
         }
 
         @JvmStatic
