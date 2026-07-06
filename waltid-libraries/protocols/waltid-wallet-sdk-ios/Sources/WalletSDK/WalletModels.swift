@@ -149,6 +149,13 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
     public let addedAt: Date?
 
     /// Creates a credential entry for custom Swift credential stores.
+    ///
+    /// - Parameters:
+    ///   - id: Stable local credential identifier.
+    ///   - serializedCredential: Raw serialized credential payload.
+    ///   - format: Credential format, for example `vc+sd-jwt` or `jwt_vc_json`.
+    ///   - label: User-facing credential label when available.
+    ///   - addedAt: Date the credential was added to the wallet when available.
     public init(
         id: String,
         serializedCredential: String,
@@ -167,15 +174,22 @@ public struct StoredCredential: Equatable, Identifiable, Sendable {
 /// App-owned credential persistence override.
 public protocol WalletCredentialStore: Sendable {
     /// Returns a credential by wallet-local identifier.
+    ///
+    /// - Parameter id: Stable local credential identifier.
     func credential(id: String) async throws -> StoredCredential?
 
     /// Lists all credentials in this store.
     func credentials() async throws -> [StoredCredential]
 
     /// Adds or replaces a credential entry.
+    ///
+    /// - Parameter credential: Credential entry to add or replace.
     func addCredential(_ credential: StoredCredential) async throws
 
     /// Removes a credential by wallet-local identifier.
+    ///
+    /// - Parameter id: Stable local credential identifier.
+    /// - Returns: `true` when a credential existed and was removed.
     func removeCredential(id: String) async throws -> Bool
 }
 
