@@ -40,6 +40,29 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNotNil(configuration.persistence.stores.credentials)
     }
 
+    func testPublicPersistenceConfigurationCombinesProvidedDatabaseKeyAndCustomCredentialStore() {
+        let provider = FakeDatabaseKeyProvider()
+        let store = FakeCredentialStore()
+        let configuration = WalletConfiguration(
+            persistence: WalletPersistence(
+                databaseKey: .provided(provider),
+                stores: WalletStores(credentials: store)
+            )
+        )
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+        XCTAssertNotNil(configuration.persistence.stores.credentials)
+    }
+
+    func testPublicWalletStoresExposeCredentialOverridesOnly() {
+        let store = FakeCredentialStore()
+        let stores = WalletStores(credentials: store)
+
+        acceptsSendable(stores)
+        XCTAssertEqual(Mirror(reflecting: stores).children.compactMap(\.label), ["credentials"])
+    }
+
     func testWalletDatabaseKeyDescriptionRedactsMaterial() {
         let key = WalletDatabaseKey(
             keyID: "consumer-wallet:wallet_consumer-wallet",

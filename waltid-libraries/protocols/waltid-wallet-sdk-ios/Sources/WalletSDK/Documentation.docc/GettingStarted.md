@@ -27,6 +27,11 @@ Apps that own database-key recovery can pass ``WalletPersistence`` with
 ``WalletDatabaseKeyConfiguration/provided(_:)`` and a
 ``WalletDatabaseKeyProvider`` implementation.
 
+Apps can also pass ``WalletStores`` with a ``WalletCredentialStore`` when they
+own credential durability. The Swift facade intentionally exposes credential
+store overrides only; DID storage and signing-key storage stay SDK-managed for
+now.
+
 > Important: Keep Kotlin Multiplatform and generated bridge symbols behind
 > `WalletSDK`. Native iOS consumers should import this Swift package and work
 > with Swift-owned types.

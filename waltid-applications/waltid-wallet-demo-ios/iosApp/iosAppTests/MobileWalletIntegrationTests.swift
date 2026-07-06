@@ -131,6 +131,33 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await wallet.deleteLocalData()
     }
 
+    func testProvidedDatabaseKeyProviderBootstrapsAcrossRecreationAndDeletesProviderKey() async throws {
+        let provider = RecordingWalletDatabaseKeyProvider()
+        let persistence = WalletPersistence(databaseKey: .provided(provider))
+        let wallet1 = try await makeWallet(persistence: persistence)
+
+        let first = try await wallet1.bootstrap()
+
+        let wallet2 = try await makeWallet(persistence: persistence)
+        let second = try await wallet2.bootstrap()
+        let requestedKeys = await provider.requestedKeys
+
+        XCTAssertEqual(second.did, first.did, "Provided database key should reopen encrypted wallet state")
+        XCTAssertEqual(second.keyID, first.keyID, "Provided database key should preserve platform key references")
+        XCTAssertEqual(
+            requestedKeys,
+            [
+                "\(testWalletId):wallet_\(testWalletId)",
+                "\(testWalletId):wallet_\(testWalletId)"
+            ]
+        )
+
+        try await wallet2.deleteLocalData()
+        let deletedKeys = await provider.deletedKeys
+
+        XCTAssertEqual(deletedKeys, ["\(testWalletId):wallet_\(testWalletId)"])
+    }
+
     func testReceiveCredentialFromEudi() async throws {
         let wallet = try await makeWallet()
         _ = try await wallet.bootstrap()
@@ -228,5 +255,23 @@ private actor RecordingWalletCredentialStore: WalletCredentialStore {
 
     func removeCredential(id: String) async throws -> Bool {
         false
+    }
+}
+
+private actor RecordingWalletDatabaseKeyProvider: WalletDatabaseKeyProvider {
+    private let key = WalletDatabaseKey(
+        keyID: "ios-unit-test-provider-key",
+        material: Data((0..<32).map { UInt8($0 + 1) })
+    )
+    private(set) var requestedKeys: [String] = []
+    private(set) var deletedKeys: [String] = []
+
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        requestedKeys.append("\(walletID):\(databaseName)")
+        return key
+    }
+
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+        deletedKeys.append("\(walletID):\(databaseName)")
     }
 }

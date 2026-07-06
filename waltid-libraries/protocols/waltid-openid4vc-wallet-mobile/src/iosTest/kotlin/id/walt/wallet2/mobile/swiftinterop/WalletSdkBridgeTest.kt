@@ -22,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 class WalletSdkBridgeTest {
 
@@ -225,8 +226,50 @@ class WalletSdkBridgeTest {
         )
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
-        val credentialStore = capturedConfig?.persistence?.stores?.credentials
+        val persistence = capturedConfig?.persistence
+        assertIs<MobileWalletDatabaseKey.Managed>(persistence?.databaseKey)
+        assertNull(persistence?.stores?.dids)
+        assertNull(persistence?.stores?.keys)
+        val credentialStore = persistence?.stores?.credentials
         assertEquals(true, credentialStore?.removeCredential("credential-1"))
+        assertEquals(listOf("credential-1"), bridgeCredentialStore.removedCredentialIds)
+    }
+
+    @Test
+    fun factoryCombinesSwiftDatabaseKeyProviderAndCredentialStoreOverride() = runTest {
+        var capturedConfig: MobileWalletConfig? = null
+        val bridgeKeyProvider = RecordingBridgeDatabaseKeyProvider(
+            WalletBridgeDatabaseEncryptionKey(
+                keyId = "swift-key",
+                material = byteArrayOf(4, 5, 6),
+            )
+        )
+        val bridgeCredentialStore = RecordingBridgeCredentialStore()
+        val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
+            capturedConfig = config
+            FakeWalletSdkBridgeOperations()
+        }
+
+        val result = factory.create(
+            WalletBridgeConfiguration(
+                walletId = "swift-combined-wallet",
+                persistence = WalletBridgePersistence(
+                    databaseKey = WalletBridgeDatabaseKeyConfiguration.Provided,
+                    stores = WalletBridgeStores(credentials = bridgeCredentialStore),
+                ),
+                databaseKeyProvider = bridgeKeyProvider,
+            )
+        )
+
+        assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
+        val persistence = capturedConfig?.persistence
+        val databaseKey = assertIs<MobileWalletDatabaseKey.Provided>(persistence?.databaseKey)
+        val key = databaseKey.provider.getOrCreateKey("swift-combined-wallet", "wallet_swift-combined-wallet")
+
+        assertEquals(DatabaseEncryptionKey("swift-key", byteArrayOf(4, 5, 6)), key)
+        assertNull(persistence?.stores?.dids)
+        assertNull(persistence?.stores?.keys)
+        assertEquals(true, persistence?.stores?.credentials?.removeCredential("credential-1"))
         assertEquals(listOf("credential-1"), bridgeCredentialStore.removedCredentialIds)
     }
 
