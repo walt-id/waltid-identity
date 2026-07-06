@@ -660,6 +660,7 @@ class Wallet2AdditionalUseCasesTest {
                 assertTrue(authUrlResult.authorizationUrl.toString().startsWith(issuerBase),
                     "Authorization URL should point to issuer: ${authUrlResult.authorizationUrl}")
                 assertNotNull(authUrlResult.state)
+                assertEquals(offer.credentialIssuer, authUrlResult.credentialIssuerBaseUrl)
                 // usePkce=false: no PKCE for this test (DefaultAuthorizationCodeRecord has no code_challenge)
 
                 // ── Step 2: Exchange auth code for token (isolated) ──
@@ -670,11 +671,11 @@ class Wallet2AdditionalUseCasesTest {
                 val exchangeResp = http.post("/wallet/$walletId/credentials/receive/exchange-code") {
                     contentType(ContentType.Application.Json)
                     setBody(ExchangeCodeRequest(
-                        tokenEndpoint = Url("$issuerBase/token"),
                         code = authCodeValue,
+                        credentialIssuerBaseUrl = authUrlResult.credentialIssuerBaseUrl,
                         codeVerifier = null,  // no PKCE in this test
                         clientId = "wallet-client",
-                        redirectUri = Url("openid://")
+                        redirectUri = Url("openid://"),
                     ))
                 }
                 // The wallet correctly called the token endpoint. Whether the token exchange
