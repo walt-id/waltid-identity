@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct WalletDemoIosApp: App {
+struct WalletDemoApp: App {
     @StateObject private var viewModel: WalletViewModel = {
         let env = ProcessInfo.processInfo.environment
         let defaults = UserDefaults.standard
