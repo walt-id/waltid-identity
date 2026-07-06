@@ -250,7 +250,8 @@ data class GenerateAuthorizationUrlResult(
     val authorizationUrl: Url,
     val state: String,
     val codeVerifier: String? = null,
-    val credentialConfigurationId: String
+    val credentialConfigurationId: String,
+    val credentialIssuerBaseUrl: String,
 )
 
 @Serializable
@@ -779,7 +780,8 @@ object WalletIssuanceHandler {
             authorizationUrl = Url(authRequest.url),
             state = authRequest.state,
             codeVerifier = authRequest.pkceData?.codeVerifier,
-            credentialConfigurationId = credentialConfigurationId
+            credentialConfigurationId = credentialConfigurationId,
+            credentialIssuerBaseUrl = offer.credentialIssuer,
         )
     }
 
