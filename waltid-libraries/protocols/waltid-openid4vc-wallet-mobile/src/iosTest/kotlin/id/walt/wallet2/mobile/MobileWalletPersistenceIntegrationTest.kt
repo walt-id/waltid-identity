@@ -42,22 +42,34 @@ class MobileWalletPersistenceIntegrationTest {
     }
 
     @Test
-    fun customIosCredentialStoreRoutesWithoutReplacingPlatformDatabaseKey() = runTest {
+    fun customIosCredentialStoreRoutesWithProvidedDatabaseKey() = runTest {
         val walletId = "ios-custom-credential-store-${Uuid.random()}"
+        val databaseName = "wallet_$walletId"
+        val provider = RecordingDatabaseKeyProvider(
+            DatabaseEncryptionKey(
+                keyId = "provided-key",
+                material = ByteArray(32) { index -> (index + 9).toByte() },
+            )
+        )
         val credentialStore = RecordingCredentialStore()
         val factory = MobileWalletFactory()
         val config = MobileWalletConfig(
             walletId = walletId,
             persistence = MobileWalletPersistence(
+                databaseKey = MobileWalletDatabaseKey.Provided(provider),
                 stores = MobileWalletStores(credentials = credentialStore),
             ),
         )
 
+        // Kotlin/Native iOS test hosts can report Keychain as unavailable. App-hosted
+        // Swift integration tests cover managed Keychain persistence with this store shape.
         val wallet = factory.create(config)
         assertEquals(emptyList(), wallet.credentials())
         assertEquals(1, credentialStore.listCredentialsCalls)
+        assertEquals(listOf("$walletId:$databaseName"), provider.requestedKeys)
 
         wallet.deleteWallet()
+        assertEquals(listOf("$walletId:$databaseName"), provider.deletedKeys)
     }
 
     private class RecordingDatabaseKeyProvider(
