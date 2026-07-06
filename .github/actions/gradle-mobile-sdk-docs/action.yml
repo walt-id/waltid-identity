@@ -34,7 +34,7 @@ runs:
         xcodebuild -version
 
     - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@213bd0aa82b85591e644561b6df10aec4a4206a7
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@05d717b498ebd9e7e7a367d96cccc22763661e29
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
