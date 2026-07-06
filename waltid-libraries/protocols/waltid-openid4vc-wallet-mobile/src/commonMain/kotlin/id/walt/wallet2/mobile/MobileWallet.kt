@@ -248,8 +248,8 @@ class MobileWallet(
     /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
-     * Custom-store wallets receive store-level remove calls for keys, credentials, and DIDs.
-     * SDK-managed SQLDelight wallets additionally close and delete the platform database and database key.
+     * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
+     * and deletes the encrypted local database and deletes the configured database key.
      */
     suspend fun deleteWallet() {
         keyStore.listKeys().toList().forEach { key ->

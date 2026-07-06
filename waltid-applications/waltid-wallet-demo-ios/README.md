@@ -26,9 +26,9 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 
 ## Local wallet data
 
-The demo uses the SDK default encrypted local persistence. Wallet database files are SQLCipher-encrypted, and SDK-managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.
+The demo uses the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.
 
-The demo intentionally does not expose persistence-mode toggles in the UI. Integrator-managed database keys are documented and tested at the SDK layer so the demo stays focused on the production default.
+The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom credential stores, are documented and covered by SDK and demo integration tests.
 
 ## Common commands
 

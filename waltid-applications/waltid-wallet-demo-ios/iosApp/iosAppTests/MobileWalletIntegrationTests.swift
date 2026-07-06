@@ -62,6 +62,15 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
+    private func makeWallet(persistence: WalletPersistence) async throws -> Wallet {
+        try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                persistence: persistence
+            )
+        )
+    }
+
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
     func testBootstrapCreatesKeyAndDid() async throws {
@@ -72,7 +81,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertTrue(result.did.starts(with: "did:"), "DID should start with 'did:', got: \(result.did)")
     }
 
-    func testSdkManagedEncryptedWalletBootstrapsAcrossRecreation() async throws {
+    func testManagedEncryptedWalletBootstrapsAcrossRecreation() async throws {
         let wallet1 = try await makeWallet()
 
         let first = try await wallet1.bootstrap()
@@ -85,7 +94,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
     }
 
-    func testDeleteLocalDataRemovesSdkManagedEncryptedWalletState() async throws {
+    func testDeleteLocalDataRemovesManagedEncryptedWalletState() async throws {
         let wallet1 = try await makeWallet()
         let first = try await wallet1.bootstrap()
 
@@ -96,6 +105,25 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         XCTAssertNotEqual(second.did, first.did, "Deleting local data should remove the persisted DID state")
         XCTAssertNotEqual(second.keyID, first.keyID, "Deleting local data should remove the persisted platform key reference")
+    }
+
+    func testCustomCredentialStoreRetainsPlatformSigningKeys() async throws {
+        let store = RecordingWalletCredentialStore()
+        let wallet = try await makeWallet(
+            persistence: WalletPersistence(
+                stores: WalletStores(credentials: store)
+            )
+        )
+
+        let bootstrap = try await wallet.bootstrap()
+        let credentials = try await wallet.credentials()
+        let listCredentialsCalls = await store.listCredentialsCalls
+
+        XCTAssertTrue(bootstrap.did.starts(with: "did:"), "DID should start with 'did:', got: \(bootstrap.did)")
+        XCTAssertTrue(credentials.isEmpty)
+        XCTAssertEqual(listCredentialsCalls, 1)
+
+        try await wallet.deleteLocalData()
     }
 
     func testReceiveCredentialFromEudi() async throws {
@@ -176,5 +204,24 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
 
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
+    }
+}
+
+private actor RecordingWalletCredentialStore: WalletCredentialStore {
+    private(set) var listCredentialsCalls = 0
+
+    func credential(id: String) async throws -> StoredCredential? {
+        nil
+    }
+
+    func credentials() async throws -> [StoredCredential] {
+        listCredentialsCalls += 1
+        return []
+    }
+
+    func addCredential(_ credential: StoredCredential) async throws {}
+
+    func removeCredential(id: String) async throws -> Bool {
+        false
     }
 }

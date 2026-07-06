@@ -8,6 +8,8 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
+import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -20,36 +22,65 @@ import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class MobileWalletTest {
 
     @Test
-    fun mobileWalletConfigUsesStableSdkDefaults() {
+    fun mobileWalletConfigUsesStableDefaults() {
         val config = MobileWalletConfig()
 
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
-        assertIs<MobileWalletPersistenceConfig.SdkManagedEncrypted>(config.persistence)
+        assertEquals(MobileWalletPersistence(), config.persistence)
+        assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
+        assertEquals(MobileWalletStores(), config.persistence.stores)
     }
 
     @Test
-    fun customStorePersistenceCreatesWalletFromInjectedStores() = runTest {
+    fun persistenceCanCombineProvidedDatabaseKeyWithIndependentStoreOverrides() {
         val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
-        val wallet = createMobileWallet(
-            config = MobileWalletConfig(
-                walletId = "custom-wallet",
-                persistence = MobileWalletPersistenceConfig.CustomStores(
-                    keyStore = keyStore,
-                    didStore = didStore,
-                    credentialStore = credentialStore,
-                    keyGenerator = { error("Existing custom-store wallets should not generate a new key") },
-                ),
+        val databaseKeyProvider = RecordingDatabaseKeyProvider()
+        val keys = MobileWalletKeys(
+            store = keyStore,
+            generate = { error("Existing custom-store wallets should not generate a new key") },
+        )
+
+        val persistence = MobileWalletPersistence(
+            databaseKey = MobileWalletDatabaseKey.Provided(databaseKeyProvider),
+            stores = MobileWalletStores(
+                credentials = credentialStore,
+                dids = didStore,
+                keys = keys,
             ),
-            createSqlDelightWallet = { error("Custom-store wallets should not create SQLDelight persistence") },
+        )
+
+        assertSame(databaseKeyProvider, assertIs<MobileWalletDatabaseKey.Provided>(persistence.databaseKey).provider)
+        assertSame(credentialStore, persistence.stores.credentials)
+        assertSame(didStore, persistence.stores.dids)
+        assertSame(keyStore, persistence.stores.keys?.store)
+        assertSame(keys.generate, persistence.stores.keys?.generate)
+    }
+
+    @Test
+    fun walletCanUseInjectedStoresAndAtomicKeyConfiguration() = runTest {
+        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
+        val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
+        val credentialStore = RecordingCredentialStore()
+        val keys = MobileWalletKeys(
+            store = keyStore,
+            generate = { error("Existing custom-store wallets should not generate a new key") },
+        )
+        val wallet = MobileWallet(
+            walletId = "custom-wallet",
+            keyStore = keys.store,
+            didStore = didStore,
+            credentialStore = credentialStore,
+            keyGenerator = keys.generate,
         )
 
         val bootstrap = wallet.bootstrap()
@@ -61,48 +92,16 @@ class MobileWalletTest {
     }
 
     @Test
-    fun encryptedPersistenceCanUseSuspendSqlDelightCreation() = runTest {
-        val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "sql-key", keyType = "secp256r1"))
-        val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:sql", document = JsonObject(emptyMap())))
-        val credentialStore = RecordingCredentialStore()
-        val expectedWallet = MobileWallet(
-            walletId = "sql-wallet",
-            keyStore = keyStore,
-            didStore = didStore,
-            credentialStore = credentialStore,
-            keyGenerator = { error("Existing SQLDelight wallet should not generate a new key") },
-        )
-
-        val wallet = createMobileWallet(
-            config = MobileWalletConfig(walletId = "sql-wallet"),
-            createSqlDelightWallet = {
-                delay(1)
-                expectedWallet
-            },
-        )
-
-        val bootstrap = wallet.bootstrap()
-
-        assertEquals("sql-key", bootstrap.keyId)
-        assertEquals("did:key:sql", bootstrap.did)
-    }
-
-    @Test
-    fun deleteWalletRemovesCustomStoreEntries() = runTest {
+    fun deleteWalletRemovesEntriesFromActiveStores() = runTest {
         val keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1"))
         val didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap())))
         val credentialStore = RecordingCredentialStore()
-        val wallet = createMobileWallet(
-            config = MobileWalletConfig(
-                walletId = "custom-wallet",
-                persistence = MobileWalletPersistenceConfig.CustomStores(
-                    keyStore = keyStore,
-                    didStore = didStore,
-                    credentialStore = credentialStore,
-                    keyGenerator = { error("deleteWallet should not generate a key") },
-                ),
-            ),
-            createSqlDelightWallet = { error("Custom-store wallets should not create SQLDelight persistence") },
+        val wallet = MobileWallet(
+            walletId = "custom-wallet",
+            keyStore = keyStore,
+            didStore = didStore,
+            credentialStore = credentialStore,
+            keyGenerator = { error("deleteWallet should not generate a key") },
         )
 
         wallet.deleteWallet()
@@ -180,6 +179,13 @@ class MobileWalletTest {
         phase = MobileWalletEventPhase.issuance,
         status = MobileWalletEventStatus.progress,
     )
+
+    private class RecordingDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
+        override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey =
+            DatabaseEncryptionKey("$walletId:$databaseName", ByteArray(32))
+
+        override suspend fun deleteKey(walletId: String, databaseName: String) = Unit
+    }
 
     private class PreloadedKeyStore(private val keyInfo: WalletKeyInfo) : WalletKeyStore {
         var listKeysCalls = 0

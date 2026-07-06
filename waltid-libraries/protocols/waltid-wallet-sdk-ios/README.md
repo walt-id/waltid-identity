@@ -64,9 +64,9 @@ let presentation = try await wallet.present(
 
 ## Local persistence
 
-`WalletConfiguration()` uses `.sdkManagedEncrypted` persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.
+`WalletConfiguration()` uses managed persistence by default. The SDK opens an encrypted SQLDelight database through SQLCipher and manages the per-wallet database key internally in iOS Keychain. Apps using the normal Swift facade do not pass database key material.
 
-The SDK-managed key is device-local. It protects local wallet data at rest, but it is not a cross-device recovery mechanism. Apps that need enterprise/KMS ownership or recoverable database-key material can provide an app-owned key provider:
+The managed key is device-local. It protects local wallet data at rest, but it is not a cross-device recovery mechanism. Apps that need enterprise/KMS ownership or recoverable database-key material can provide an app-owned key provider:
 
 ```swift
 struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
@@ -83,7 +83,9 @@ struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
-        persistence: .integratorManagedKey(KMSDatabaseKeyProvider())
+        persistence: WalletPersistence(
+            databaseKey: .provided(KMSDatabaseKeyProvider())
+        )
     )
 )
 ```
@@ -93,9 +95,42 @@ KMP bridge is covered by iOS simulator integration tests so provider lookup,
 encrypted database reopening, and provider deletion stay wired to the real iOS
 driver.
 
-The Swift facade does not expose fully custom wallet stores yet; use the Kotlin Multiplatform `MobileWalletPersistenceConfig.CustomStores` API when custom store injection is required.
+Apps can override credential storage while retaining the default encrypted database, database-key ownership, DID store, and platform signing-key store:
 
-Call `try await wallet.deleteLocalData()` to remove SDK-owned local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
+```swift
+actor AppCredentialStore: WalletCredentialStore {
+    private var entries: [String: StoredCredential] = [:]
+
+    func credential(id: String) async throws -> StoredCredential? {
+        entries[id]
+    }
+
+    func credentials() async throws -> [StoredCredential] {
+        Array(entries.values)
+    }
+
+    func addCredential(_ credential: StoredCredential) async throws {
+        entries[credential.id] = credential
+    }
+
+    func removeCredential(id: String) async throws -> Bool {
+        entries.removeValue(forKey: id) != nil
+    }
+}
+
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            stores: WalletStores(credentials: AppCredentialStore())
+        )
+    )
+)
+```
+
+The Swift facade intentionally exposes credential-store overrides first. Kotlin Multiplatform still supports full credential, DID, and key store overrides through `MobileWalletStores`; Swift key/DID store parity needs public Swift signing-key and DID-document models and is tracked separately.
+
+Call `try await wallet.deleteLocalData()` to remove local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
 
 ## Native iOS Consumer
 

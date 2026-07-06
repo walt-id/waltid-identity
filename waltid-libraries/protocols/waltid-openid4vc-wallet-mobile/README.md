@@ -36,9 +36,9 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 ## Persistence and encryption
 
-`MobileWalletConfig()` uses SDK-managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
+`MobileWalletConfig()` uses managed encrypted SQLDelight persistence by default on Android and iOS. Normal SDK users do not provide a database key: the SDK generates one per wallet database, stores it in platform-protected storage, and uses SQLCipher for the local wallet database.
 
-SDK-managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletPersistenceConfig.IntegratorManagedKey` when an app needs enterprise/KMS ownership or recoverable database-key material, and use `MobileWalletPersistenceConfig.CustomStores` to replace SDK persistence entirely. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
+Managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Store overrides are independent: `null` credential and DID overrides use the encrypted SQLDelight database opened by this persistence configuration, while a `null` key override keeps platform-backed signing-key persistence and generation. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
 Create a wallet with the encrypted default from a coroutine:
 
@@ -65,8 +65,10 @@ class KmsDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
 val wallet = MobileWalletFactory(context).create(
     MobileWalletConfig(
         walletId = "consumer-wallet",
-        persistence = MobileWalletPersistenceConfig.IntegratorManagedKey(
-            keyProvider = KmsDatabaseKeyProvider()
+        persistence = MobileWalletPersistence(
+            databaseKey = MobileWalletDatabaseKey.Provided(
+                provider = KmsDatabaseKeyProvider()
+            )
         )
     )
 )
@@ -76,28 +78,42 @@ This mode is covered by Android device and iOS simulator integration tests so
 provider lookup, encrypted database reopening, and provider deletion stay wired
 to the real platform drivers.
 
-Replace SDK SQLDelight persistence entirely with custom stores when the app owns durability, transactions, encryption, backup, migration, and deletion:
+Override only credential storage while retaining the default encrypted database, database-key ownership, DID store, and platform signing-key store:
 
 ```kotlin
 val wallet = MobileWalletFactory(context).create(
     MobileWalletConfig(
         walletId = "consumer-wallet",
-        persistence = MobileWalletPersistenceConfig.CustomStores(
-            keyStore = appKeyStore,
-            didStore = appDidStore,
-            credentialStore = appCredentialStore,
-            keyGenerator = { keyType -> appKeyProvider.generateKey(keyType) }
+        persistence = MobileWalletPersistence(
+            stores = MobileWalletStores(
+                credentials = appCredentialStore
+            )
         )
     )
 )
 ```
 
-`CustomStores` bypasses platform SQLDelight persistence, Android Keystore, and
-iOS Keychain database-key storage. Its behavior is platform-independent and is
-covered in common KMP tests, including store injection and `deleteWallet()`
-cleanup through the injected store interfaces.
+KMP consumers can override all wallet stores. Key storage and key generation are configured together so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence:
 
-Call `MobileWallet.deleteWallet()` to delete SDK-owned local wallet material for a wallet: stored key references, credentials, DIDs, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the SDK-managed database key. For `CustomStores`, cleanup remains owned by the integrator; the facade only calls the store-level remove operations exposed by the injected stores.
+```kotlin
+val wallet = MobileWalletFactory(context).create(
+    MobileWalletConfig(
+        walletId = "consumer-wallet",
+        persistence = MobileWalletPersistence(
+            stores = MobileWalletStores(
+                credentials = appCredentialStore,
+                dids = appDidStore,
+                keys = MobileWalletKeys(
+                    store = appKeyStore,
+                    generate = { keyType -> appKeyProvider.generateKey(keyType) }
+                )
+            )
+        )
+    )
+)
+```
+
+Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key references, credentials, DIDs, platform signing keys referenced by the active key store, encrypted database files and sidecars, and the configured database key. Store cleanup uses the active store interfaces, so custom stores receive the same remove calls as default stores.
 
 If a local development build has an old plaintext database or a database restored without its matching key, opening the wallet can fail with a typed storage error. Reset local state by calling `deleteWallet()`, uninstalling the app, or deleting the app's local wallet data. WAL-1085 does not perform plaintext-to-encrypted migration.
 

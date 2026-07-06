@@ -1,29 +1,37 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.credentials.CredentialParser
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletKeyType
-import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
+import id.walt.wallet2.mobile.MobileWalletPersistence
+import id.walt.wallet2.mobile.MobileWalletStores
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.serialization.Serializable
+import kotlin.time.Instant
 
 /**
  * Configuration used when creating an iOS [WalletSdkBridge].
  *
  * @property walletId Stable wallet identifier used for database naming and persisted wallet state.
  * @property defaultKeyType Key type used by wallet bootstrap when no key type override is supplied.
- * @property persistence Persistence mode used for wallet-local state.
- * @property databaseKeyProvider Swift-owned database key provider used when [persistence] is
- * [WalletBridgePersistenceConfiguration.IntegratorManagedKey].
+ * @property persistence Wallet-local persistence configuration.
+ * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
+ * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
  */
 data class WalletBridgeConfiguration(
     val walletId: String = "default",
     val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
-    val persistence: WalletBridgePersistenceConfiguration = WalletBridgePersistenceConfiguration.SdkManagedEncrypted,
+    val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     val attestation: WalletAttestationConfig? = null,
 )
@@ -32,19 +40,39 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
     walletId = walletId,
     defaultKeyType = defaultKeyType,
     attestationConfig = attestation,
-    persistence = persistence.toMobileWalletPersistenceConfig(databaseKeyProvider),
+    persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
 )
 
 /**
- * Persistence modes exposed to the Swift wallet bridge.
+ * Persistence configuration exposed to the Swift wallet bridge.
+ *
+ * @property databaseKey Owner of the encrypted local database key.
+ * @property stores Optional store overrides exposed by the Swift facade.
  */
-enum class WalletBridgePersistenceConfiguration {
-    /** SDK-managed encrypted SQLDelight persistence. */
-    SdkManagedEncrypted,
+data class WalletBridgePersistence(
+    val databaseKey: WalletBridgeDatabaseKeyConfiguration = WalletBridgeDatabaseKeyConfiguration.Managed,
+    val stores: WalletBridgeStores = WalletBridgeStores(),
+)
 
-    /** Encrypted SQLDelight persistence with database keys supplied by Swift app code. */
-    IntegratorManagedKey,
+/**
+ * Database-key ownership modes exposed to the Swift wallet bridge.
+ */
+enum class WalletBridgeDatabaseKeyConfiguration {
+    /** Platform-managed encrypted database key. */
+    Managed,
+
+    /** Encrypted database key supplied by Swift app code. */
+    Provided,
 }
+
+/**
+ * Optional Swift-provided store overrides exposed to the bridge.
+ *
+ * @property credentials Optional Swift-provided credential store.
+ */
+data class WalletBridgeStores(
+    val credentials: WalletBridgeCredentialStore? = null,
+)
 
 /**
  * Database key material returned by a Swift-owned database key provider.
@@ -58,7 +86,7 @@ data class WalletBridgeDatabaseEncryptionKey(
 )
 
 /**
- * Swift-facing provider for integrator-managed encrypted wallet database keys.
+ * Swift-facing provider for app-supplied encrypted wallet database keys.
  */
 interface WalletBridgeDatabaseEncryptionKeyProvider {
     /**
@@ -72,21 +100,73 @@ interface WalletBridgeDatabaseEncryptionKeyProvider {
     suspend fun deleteKey(walletId: String, databaseName: String)
 }
 
-private fun WalletBridgePersistenceConfiguration.toMobileWalletPersistenceConfig(
-    databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
-): MobileWalletPersistenceConfig =
-    when (this) {
-        WalletBridgePersistenceConfiguration.SdkManagedEncrypted ->
-            MobileWalletPersistenceConfig.SdkManagedEncrypted
+/**
+ * Credential entry exchanged with Swift custom credential stores.
+ *
+ * @property id Stable wallet-local credential identifier.
+ * @property serializedCredential Raw serialized credential value.
+ * @property format Credential format, for example `vc+sd-jwt` or `jwt_vc_json`.
+ * @property label Optional user-facing credential label.
+ * @property addedAt Optional ISO-8601 timestamp for when the credential was added.
+ */
+data class WalletBridgeStoredCredential(
+    val id: String,
+    val serializedCredential: String,
+    val format: String,
+    val label: String? = null,
+    val addedAt: String? = null,
+)
 
-        WalletBridgePersistenceConfiguration.IntegratorManagedKey ->
-            MobileWalletPersistenceConfig.IntegratorManagedKey(
-                keyProvider = BridgeDatabaseEncryptionKeyProvider(
-                    databaseKeyProvider
-                        ?: throw IllegalArgumentException("Integrator-managed persistence requires a database key provider"),
-                )
+/**
+ * Swift-facing credential store override.
+ */
+interface WalletBridgeCredentialStore {
+    /**
+     * Returns a stored credential by wallet-local identifier.
+     */
+    suspend fun getCredential(id: String): WalletBridgeStoredCredential?
+
+    /**
+     * Lists all credentials in this store.
+     */
+    suspend fun listCredentials(): List<WalletBridgeStoredCredential>
+
+    /**
+     * Adds or replaces a credential entry.
+     */
+    suspend fun addCredential(entry: WalletBridgeStoredCredential)
+
+    /**
+     * Removes a credential by wallet-local identifier.
+     *
+     * @return `true` when a credential existed and was removed.
+     */
+    suspend fun removeCredential(id: String): Boolean
+}
+
+private fun WalletBridgePersistence.toMobileWalletPersistence(
+    databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
+): MobileWalletPersistence = MobileWalletPersistence(
+    databaseKey = databaseKey.toMobileWalletDatabaseKey(databaseKeyProvider),
+    stores = MobileWalletStores(
+        credentials = stores.credentials?.let(::BridgeCredentialStore),
+    ),
+)
+
+private fun WalletBridgeDatabaseKeyConfiguration.toMobileWalletDatabaseKey(
+    databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider?,
+): MobileWalletDatabaseKey = when (this) {
+    WalletBridgeDatabaseKeyConfiguration.Managed ->
+        MobileWalletDatabaseKey.Managed
+
+    WalletBridgeDatabaseKeyConfiguration.Provided ->
+        MobileWalletDatabaseKey.Provided(
+            provider = BridgeDatabaseEncryptionKeyProvider(
+                databaseKeyProvider
+                    ?: throw IllegalArgumentException("Provided database-key persistence requires a database key provider"),
             )
-    }
+        )
+}
 
 private class BridgeDatabaseEncryptionKeyProvider(
     private val bridgeProvider: WalletBridgeDatabaseEncryptionKeyProvider,
@@ -103,6 +183,41 @@ private class BridgeDatabaseEncryptionKeyProvider(
         bridgeProvider.deleteKey(walletId, databaseName)
     }
 }
+
+private class BridgeCredentialStore(
+    private val bridgeStore: WalletBridgeCredentialStore,
+) : WalletCredentialStore {
+    override suspend fun getCredential(id: String): StoredCredential? =
+        bridgeStore.getCredential(id)?.toStoredCredential()
+
+    override suspend fun listCredentials(): Flow<StoredCredential> =
+        bridgeStore.listCredentials().map { it.toStoredCredential() }.asFlow()
+
+    override suspend fun addCredential(entry: StoredCredential) {
+        bridgeStore.addCredential(entry.toBridgeStoredCredential())
+    }
+
+    override suspend fun removeCredential(id: String): Boolean =
+        bridgeStore.removeCredential(id)
+}
+
+private suspend fun WalletBridgeStoredCredential.toStoredCredential(): StoredCredential {
+    val (_, credential) = CredentialParser.detectAndParse(serializedCredential)
+    return StoredCredential(
+        id = id,
+        credential = credential,
+        label = label,
+        addedAt = addedAt?.let(Instant::parse),
+    )
+}
+
+private fun StoredCredential.toBridgeStoredCredential() = WalletBridgeStoredCredential(
+    id = id,
+    serializedCredential = credential.signed ?: credential.credentialData.toString(),
+    format = credential.format,
+    label = label,
+    addedAt = addedAt?.toString(),
+)
 
 /**
  * Coarse error category for Swift bridge failures.

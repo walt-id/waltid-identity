@@ -11,8 +11,8 @@ public struct WalletConfiguration: Sendable {
     /// Optional enterprise attestation configuration.
     public var attestation: WalletAttestationConfiguration?
 
-    /// Persistence mode used for wallet-local state.
-    public var persistence: WalletPersistenceConfiguration
+    /// Wallet-local persistence configuration.
+    public var persistence: WalletPersistence
 
     /// Creates wallet configuration.
     ///
@@ -23,12 +23,12 @@ public struct WalletConfiguration: Sendable {
     ///     when no operation-specific override is supplied.
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
-    ///   - persistence: Local persistence mode for wallet-owned state.
+    ///   - persistence: Local persistence configuration for wallet-owned state.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
-        persistence: WalletPersistenceConfiguration = .sdkManagedEncrypted
+        persistence: WalletPersistence = WalletPersistence()
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -37,13 +37,48 @@ public struct WalletConfiguration: Sendable {
     }
 }
 
-/// Persistence modes supported by the wallet SDK.
-public enum WalletPersistenceConfiguration: Sendable {
-    /// SDK-managed encrypted local SQLDelight persistence.
-    case sdkManagedEncrypted
+/// Wallet-local persistence configuration.
+public struct WalletPersistence: Sendable {
+    /// Owner of the encrypted local database key.
+    public var databaseKey: WalletDatabaseKeyConfiguration
 
-    /// Encrypted local SQLDelight persistence with app-owned database key material.
-    case integratorManagedKey(any WalletDatabaseKeyProvider)
+    /// Optional store overrides. Omitted stores use default encrypted local persistence.
+    public var stores: WalletStores
+
+    /// Creates wallet persistence configuration.
+    ///
+    /// - Parameters:
+    ///   - databaseKey: Owner of the encrypted local database key.
+    ///   - stores: Optional store overrides.
+    public init(
+        databaseKey: WalletDatabaseKeyConfiguration = .managed,
+        stores: WalletStores = WalletStores()
+    ) {
+        self.databaseKey = databaseKey
+        self.stores = stores
+    }
+}
+
+/// Database-key ownership supported by the wallet SDK.
+public enum WalletDatabaseKeyConfiguration: Sendable {
+    /// Platform-managed encrypted local database key.
+    case managed
+
+    /// Encrypted local database key material provided by app code.
+    case provided(any WalletDatabaseKeyProvider)
+}
+
+/// Optional wallet store overrides.
+public struct WalletStores: Sendable {
+    /// Optional credential store override. `nil` uses default encrypted local persistence.
+    public var credentials: (any WalletCredentialStore)?
+
+    /// Creates wallet store overrides.
+    ///
+    /// - Parameter credentials: Optional credential store override.
+    public init(credentials: (any WalletCredentialStore)? = nil) {
+        self.credentials = credentials
+    }
 }
 
 /// Database key material used for wallet-local SQLCipher persistence.
@@ -94,6 +129,54 @@ public protocol WalletDatabaseKeyProvider: Sendable {
     ///   - walletID: Stable wallet identifier from ``WalletConfiguration``.
     ///   - databaseName: Wallet database name derived from the wallet ID.
     func deleteDatabaseKey(walletID: String, databaseName: String) async throws
+}
+
+/// Credential entry used by custom Swift credential stores.
+public struct StoredCredential: Equatable, Identifiable, Sendable {
+    /// Stable local credential identifier.
+    public let id: String
+
+    /// Raw serialized credential, such as a JWT VC, SD-JWT VC, or JSON credential.
+    public let serializedCredential: String
+
+    /// Credential format, for example `vc+sd-jwt` or `jwt_vc_json`.
+    public let format: String
+
+    /// User-facing credential label when available.
+    public let label: String?
+
+    /// Date the credential was added to the wallet when available.
+    public let addedAt: Date?
+
+    /// Creates a credential entry for custom Swift credential stores.
+    public init(
+        id: String,
+        serializedCredential: String,
+        format: String,
+        label: String? = nil,
+        addedAt: Date? = nil
+    ) {
+        self.id = id
+        self.serializedCredential = serializedCredential
+        self.format = format
+        self.label = label
+        self.addedAt = addedAt
+    }
+}
+
+/// App-owned credential persistence override.
+public protocol WalletCredentialStore: Sendable {
+    /// Returns a credential by wallet-local identifier.
+    func credential(id: String) async throws -> StoredCredential?
+
+    /// Lists all credentials in this store.
+    func credentials() async throws -> [StoredCredential]
+
+    /// Adds or replaces a credential entry.
+    func addCredential(_ credential: StoredCredential) async throws
+
+    /// Removes a credential by wallet-local identifier.
+    func removeCredential(id: String) async throws -> Bool
 }
 
 /// Key algorithms supported by the wallet bridge.

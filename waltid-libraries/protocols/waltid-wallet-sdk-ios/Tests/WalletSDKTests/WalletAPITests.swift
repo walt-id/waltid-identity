@@ -8,23 +8,36 @@ final class WalletAPITests: XCTestCase {
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
-        XCTAssertTrue(configuration.persistence.isSdkManagedEncrypted)
+        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
+        XCTAssertNil(configuration.persistence.stores.credentials)
         XCTAssertNil(configuration.attestation)
     }
 
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
-        let configuration = WalletConfiguration(persistence: .sdkManagedEncrypted)
+        let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
 
         acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.isSdkManagedEncrypted)
+        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
     }
 
-    func testPublicPersistenceConfigurationAcceptsIntegratorManagedKeyProvider() {
+    func testPublicPersistenceConfigurationAcceptsProvidedDatabaseKeyProvider() {
         let provider = FakeDatabaseKeyProvider()
-        let configuration = WalletConfiguration(persistence: .integratorManagedKey(provider))
+        let configuration = WalletConfiguration(
+            persistence: WalletPersistence(databaseKey: .provided(provider))
+        )
 
         acceptsSendable(configuration.persistence)
-        XCTAssertTrue(configuration.persistence.isIntegratorManagedKey)
+        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+    }
+
+    func testPublicPersistenceConfigurationAcceptsCustomCredentialStore() {
+        let store = FakeCredentialStore()
+        let configuration = WalletConfiguration(
+            persistence: WalletPersistence(stores: WalletStores(credentials: store))
+        )
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertNotNil(configuration.persistence.stores.credentials)
     }
 
     func testWalletDatabaseKeyDescriptionRedactsMaterial() {
@@ -55,6 +68,16 @@ final class WalletAPITests: XCTestCase {
         acceptsSendable(credential)
         XCTAssertEqual(credential.id, "credential-1")
         XCTAssertEqual(credential, credential)
+
+        let storedCredential = StoredCredential(
+            id: "stored-credential-1",
+            serializedCredential: #"{"type":["VerifiableCredential"]}"#,
+            format: "jwt_vc_json",
+            label: "PID",
+            addedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        acceptsSendable(storedCredential)
+        XCTAssertEqual(storedCredential, storedCredential)
     }
 
     func testWalletHasAsyncFacadeShape() async {
@@ -199,21 +222,21 @@ final class WalletAPITests: XCTestCase {
     }
 }
 
-private extension WalletPersistenceConfiguration {
-    var isSdkManagedEncrypted: Bool {
+private extension WalletDatabaseKeyConfiguration {
+    var isManaged: Bool {
         switch self {
-        case .sdkManagedEncrypted:
+        case .managed:
             return true
-        case .integratorManagedKey:
+        case .provided:
             return false
         }
     }
 
-    var isIntegratorManagedKey: Bool {
+    var isProvided: Bool {
         switch self {
-        case .sdkManagedEncrypted:
+        case .managed:
             return false
-        case .integratorManagedKey:
+        case .provided:
             return true
         }
     }
@@ -227,6 +250,29 @@ private struct FakeDatabaseKeyProvider: WalletDatabaseKeyProvider {
     func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
         _ = walletID
         _ = databaseName
+    }
+}
+
+private final class FakeCredentialStore: WalletCredentialStore, @unchecked Sendable {
+    private var entries: [StoredCredential] = []
+
+    func credential(id: String) async throws -> StoredCredential? {
+        entries.first { $0.id == id }
+    }
+
+    func credentials() async throws -> [StoredCredential] {
+        entries
+    }
+
+    func addCredential(_ credential: StoredCredential) async throws {
+        entries.removeAll { $0.id == credential.id }
+        entries.append(credential)
+    }
+
+    func removeCredential(id: String) async throws -> Bool {
+        let originalCount = entries.count
+        entries.removeAll { $0.id == id }
+        return entries.count != originalCount
     }
 }
 

@@ -83,7 +83,7 @@ public actor Wallet {
         try await bridge.credentials()
     }
 
-    /// Deletes wallet-local state and SDK-managed persistence material.
+    /// Deletes wallet-local state and managed persistence material.
     ///
     /// - Throws: ``WalletError`` when local wallet material cannot be deleted.
     public func deleteLocalData() async throws {

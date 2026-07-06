@@ -12,15 +12,13 @@ actual class MobileWalletFactory {
      * Creates an iOS mobile wallet using native SQLDelight storage and the default iOS platform key provider.
      */
     actual suspend fun create(config: MobileWalletConfig): MobileWallet {
-        return createMobileWallet(config) {
-            val driverFactory = DriverFactory()
-            createEncryptedSqlDelightMobileWallet(
-                config = config,
-                sdkManagedKeyProvider = IosDatabaseEncryptionKeyProvider(),
-                platformKeyProvider = IosPlatformKeyProvider(),
-                openEncryptedDriver = driverFactory::createEncryptedDriver,
-                deleteDatabase = driverFactory::deleteDatabase,
-            )
-        }
+        val driverFactory = DriverFactory()
+        return createEncryptedSqlDelightMobileWallet(
+            config = config,
+            managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(),
+            platformKeyProvider = IosPlatformKeyProvider(),
+            openEncryptedDriver = driverFactory::createEncryptedDriver,
+            deleteDatabase = driverFactory::deleteDatabase,
+        )
     }
 }

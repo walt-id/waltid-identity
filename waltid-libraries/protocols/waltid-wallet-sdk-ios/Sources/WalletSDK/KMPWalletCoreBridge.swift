@@ -141,30 +141,51 @@ private extension WalletConfiguration {
         WalletBridgeConfiguration(
             walletId: walletID,
             defaultKeyType: defaultKeyType.toKMPKeyType(),
-            persistence: persistence.toKMPPersistenceConfiguration(),
+            persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
             attestation: attestation?.toKMPAttestationConfiguration()
         )
     }
 }
 
-private extension WalletPersistenceConfiguration {
-    func toKMPPersistenceConfiguration() -> WalletBridgePersistenceConfiguration {
+private extension WalletPersistence {
+    func toKMPPersistence() -> WalletBridgePersistence {
+        WalletBridgePersistence(
+            databaseKey: databaseKey.toKMPDatabaseKeyConfiguration(),
+            stores: stores.toKMPStores()
+        )
+    }
+
+    func toKMPDatabaseKeyProvider() -> WalletBridgeDatabaseEncryptionKeyProvider? {
+        databaseKey.toKMPDatabaseKeyProvider()
+    }
+}
+
+private extension WalletDatabaseKeyConfiguration {
+    func toKMPDatabaseKeyConfiguration() -> WalletBridgeDatabaseKeyConfiguration {
         switch self {
-        case .sdkManagedEncrypted:
-            return .sdkManagedEncrypted
-        case .integratorManagedKey:
-            return .integratorManagedKey
+        case .managed:
+            return .managed
+        case .provided:
+            return .provided
         }
     }
 
     func toKMPDatabaseKeyProvider() -> WalletBridgeDatabaseEncryptionKeyProvider? {
         switch self {
-        case .sdkManagedEncrypted:
+        case .managed:
             return nil
-        case let .integratorManagedKey(provider):
+        case let .provided(provider):
             return KMPWalletDatabaseKeyProviderAdapter(provider: provider)
         }
+    }
+}
+
+private extension WalletStores {
+    func toKMPStores() -> WalletBridgeStores {
+        WalletBridgeStores(
+            credentials: credentials.map { KMPWalletCredentialStoreAdapter(store: $0) }
+        )
     }
 }
 
@@ -185,6 +206,54 @@ private final class KMPWalletDatabaseKeyProviderAdapter: WalletBridgeDatabaseEnc
 
     func __deleteKey(walletId: String, databaseName: String) async throws {
         try await provider.deleteDatabaseKey(walletID: walletId, databaseName: databaseName)
+    }
+}
+
+private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore, @unchecked Sendable {
+    private let store: any WalletCredentialStore
+
+    init(store: any WalletCredentialStore) {
+        self.store = store
+    }
+
+    func __getCredential(id: String) async throws -> WalletBridgeStoredCredential? {
+        try await store.credential(id: id)?.toKMPStoredCredential()
+    }
+
+    func __listCredentials() async throws -> [WalletBridgeStoredCredential] {
+        try await store.credentials().map { $0.toKMPStoredCredential() }
+    }
+
+    func __addCredential(entry: WalletBridgeStoredCredential) async throws {
+        try await store.addCredential(entry.toSwiftStoredCredential())
+    }
+
+    func __removeCredential(id: String) async throws -> KotlinBoolean {
+        KotlinBoolean(bool: try await store.removeCredential(id: id))
+    }
+}
+
+private extension StoredCredential {
+    func toKMPStoredCredential() -> WalletBridgeStoredCredential {
+        WalletBridgeStoredCredential(
+            id: id,
+            serializedCredential: serializedCredential,
+            format: format,
+            label: label,
+            addedAt: addedAt.map { ISO8601DateFormatter().string(from: $0) }
+        )
+    }
+}
+
+private extension WalletBridgeStoredCredential {
+    func toSwiftStoredCredential() -> StoredCredential {
+        StoredCredential(
+            id: id,
+            serializedCredential: serializedCredential,
+            format: format,
+            label: label,
+            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+        )
     }
 }
 

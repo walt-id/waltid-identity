@@ -18,15 +18,13 @@ actual class MobileWalletFactory(private val context: Context) {
      * through the Android platform key provider.
      */
     actual suspend fun create(config: MobileWalletConfig): MobileWallet {
-        return createMobileWallet(config) {
-            val driverFactory = DriverFactory(context)
-            createEncryptedSqlDelightMobileWallet(
-                config = config,
-                sdkManagedKeyProvider = AndroidDatabaseEncryptionKeyProvider(context),
-                platformKeyProvider = AndroidPlatformKeyProvider(),
-                openEncryptedDriver = driverFactory::createEncryptedDriver,
-                deleteDatabase = driverFactory::deleteDatabase,
-            )
-        }
+        val driverFactory = DriverFactory(context)
+        return createEncryptedSqlDelightMobileWallet(
+            config = config,
+            managedDatabaseKeyProvider = AndroidDatabaseEncryptionKeyProvider(context),
+            platformKeyProvider = AndroidPlatformKeyProvider(),
+            openEncryptedDriver = driverFactory::createEncryptedDriver,
+            deleteDatabase = driverFactory::deleteDatabase,
+        )
     }
 }

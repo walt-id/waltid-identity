@@ -81,7 +81,7 @@ class WalletSdkBridge private constructor(
         }
 
     /**
-     * Deletes wallet-local state and SDK-owned persistence material.
+     * Deletes wallet-local state and managed persistence material.
      */
     suspend fun deleteWallet(): WalletBridgeResult<Unit> =
         walletBridgeCall {
