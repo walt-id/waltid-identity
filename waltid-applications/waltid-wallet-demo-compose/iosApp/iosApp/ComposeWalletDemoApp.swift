@@ -2,7 +2,7 @@ import SwiftUI
 import sharedUI
 
 @main
-struct WalletDemoIosApp: App {
+struct ComposeWalletDemoApp: App {
     private let walletId: String
     private let attestationBaseUrl: String
     private let attestationAttesterPath: String
