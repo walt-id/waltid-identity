@@ -49,12 +49,18 @@ jobs:
           - k8s: waltid-identity/waltid-services/waltid-verifier-api2/k8s
             name: verifier2
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-services/waltid-wallet-api2/k8s
+            name: wallet-api2
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-services/waltid-wallet-api/k8s
             name: web-wallet
             namespace: ${{ inputs.oss }}
             keycloak: true
           - k8s: waltid-identity/waltid-applications/waltid-web-portal/k8s
             name: portal
+            namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/waltid-applications/waltid-web-portal2/k8s
+            name: portal2
             namespace: ${{ inputs.oss }}
           - k8s: waltid-identity/waltid-applications/waltid-digital-credentials/k8s
             name: digital-credentials

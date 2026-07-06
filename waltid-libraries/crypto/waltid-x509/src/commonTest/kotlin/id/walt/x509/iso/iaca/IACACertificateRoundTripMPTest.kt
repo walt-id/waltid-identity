@@ -44,7 +44,6 @@ class IACACertificateRoundTripMPTest {
 
     @Test
     fun `roundtrip should be safe when called concurrently`() = runTest {
-
         val bundles = List(20) {
             async {
                 val iacaCertBundle = IsoSharedTestHarnessValidResources.iacaBuilder.build(

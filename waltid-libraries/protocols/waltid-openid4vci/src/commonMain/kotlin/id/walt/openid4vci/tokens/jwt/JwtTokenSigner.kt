@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-
 package id.walt.openid4vci.tokens.jwt
 
 import io.ktor.utils.io.core.*

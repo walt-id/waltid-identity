@@ -42,10 +42,10 @@ A tiny, pragmatic **Kotlin Multiplatform** library for working with **X.509 cert
 ## Targets
 
 - **JVM / Android**: Full chain validation, [ISO/IEC 18013-5](https://github.com/ISOWG10/ISO-18013/blob/main/Working%20Documents/Working%20Draft%20WG%2010_N2549_ISO-IEC%2018013-5-%20Personal%20identification%20%E2%80%94%20ISO-compliant%20driving%20licence%20%E2%80%94%20Part%205-%20Mobile%20driving%20lic.pdf) build/parse/validate, JVM extensions.
-- **iOS**: Chain validation stub; ISO tooling not implemented yet.
+- **iOS**: Explicit-trust chain validation plus ISO/IEC 18013-5 build/parse/validate support.
 - **JS**: Chain validation stub; ISO tooling not implemented yet.
 
-> If you only need JVM/Android today, you can use it immediately. iOS/JS will throw `X509ValidationException("Not implemented…")` until completed.
+> JS X.509 support is intentionally limited today. On iOS, system trust anchors and revocation checks are still not supported.
 
 ---
 
@@ -334,9 +334,9 @@ fun jvmExtensionsExample(cert: X509Certificate) {
     ```
   - You can load the system/organizational trust store and pass anchors via `loadTrustAnchorsFromKeyStore`.
 
-- **iOS (planned)**
-  - Implement with `SecTrust`: `SecPolicyCreateBasicX509`, `SecTrustSetAnchorCertificates`, `SecTrustEvaluateWithError`.
-  - Current actual throws `X509ValidationException("Not implemented on iOS yet")`.
+- **iOS**
+  - Supports explicit trust anchors and trusted-chain-root validation.
+  - System trust anchors and revocation checks are not supported yet.
 
 - **JavaScript (planned)**
   - WebCrypto does not expose a PKIX path builder; integrate a JS PKI lib or a WASM backend.

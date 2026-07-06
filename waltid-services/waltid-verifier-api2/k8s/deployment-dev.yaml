@@ -3,8 +3,6 @@ kind: ConfigMap
 metadata:
   name: verifier2-web-config
 data:
-  _features.conf : |
-    enabledFeatures = []
   web.conf: |
     webHost = "0.0.0.0"
     webPort = 3000
@@ -52,7 +50,12 @@ spec:
                 - ALL
           volumeMounts:
             - name: verifier2-web-config
-              mountPath: "/waltid-verifier-api2/config/"
+              mountPath: "/waltid-verifier-api2/config/web.conf"
+              subPath: web.conf
+              readOnly: true
+            - name: verifier2-web-config
+              mountPath: "/waltid-verifier-api2/config/verifier-service.conf"
+              subPath: verifier-service.conf
               readOnly: true
             - name: verifier-request-signing
               mountPath: "/waltid-verifier-api2/request-signing-secret/"

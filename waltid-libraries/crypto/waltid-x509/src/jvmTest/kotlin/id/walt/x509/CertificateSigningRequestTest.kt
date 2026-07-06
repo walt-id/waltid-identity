@@ -39,7 +39,7 @@ class CertificateSigningRequestTest {
         assertEquals(profileData.subjectName.commonName, parsed.subjectName.commonName)
         assertEquals(profileData.subjectName.country, parsed.subjectName.country)
         assertNotNull(parsed.subjectAlternativeNames)
-        assertEquals(listOf("leaf.example.com"), parsed.subjectAlternativeNames?.dnsNames)
+        assertEquals(listOf("leaf.example.com"), parsed.subjectAlternativeNames.dnsNames)
     }
 
     @Test
