@@ -231,6 +231,9 @@ data class WalletBridgeStoredKey(
  *
  * KMP requires the store and generator together so generated signing keys are persisted into the same
  * app-owned key domain.
+ *
+ * @property store Swift-provided signing-key store.
+ * @property generate Swift-provided signing-key generator.
  */
 data class WalletBridgeKeys(
     val store: WalletBridgeKeyStore,
