@@ -530,8 +530,15 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<RequestTokenRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<RequestTokenRequest>()
-                        call.respond(WalletIssuanceHandler.requestToken(req))
+                        call.respond(
+                            WalletIssuanceHandler.requestToken(
+                                wallet = wallet,
+                                request = req,
+                                attestationAssembler = attestationAssembler,
+                            )
+                        )
                     }
 
                     post("/sign-proof", {
