@@ -22,9 +22,15 @@ import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.UrlConfig
 import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.data.Verification2Session.DefinedVerificationPolicies
+import id.walt.verifier2.data.VerificationSessionSetup
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 
 object Verifier2OpenApiExamples {
 
@@ -324,6 +330,25 @@ object Verifier2OpenApiExamples {
             )
         )
     )
+
+    private val exampleJson = Json { encodeDefaults = false }
+
+    private fun withExpiryField(name: String, value: JsonElement): JsonObject {
+        val root = exampleJson.encodeToJsonElement<VerificationSessionSetup>(openid4vpHttpSdJwtVcDefault).jsonObject
+        val coreFlow = root.getValue("core_flow").jsonObject
+        val coreFlowWithExpiry = JsonObject(
+            coreFlow
+                .filterKeys { it != "expiration_duration" && it != "expiration_date" }
+                .plus(name to value)
+        )
+        return JsonObject(root + ("core_flow" to coreFlowWithExpiry))
+    }
+
+    val openid4vpHttpSdJwtVcExpirationDuration =
+        withExpiryField("expiration_duration", JsonPrimitive("PT15M"))
+
+    val openid4vpHttpSdJwtVcExpirationDate =
+        withExpiryField("expiration_date", JsonPrimitive("2026-07-06T15:30:00Z"))
 
     val openid4vpHttpSdJwtVcBasic = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
