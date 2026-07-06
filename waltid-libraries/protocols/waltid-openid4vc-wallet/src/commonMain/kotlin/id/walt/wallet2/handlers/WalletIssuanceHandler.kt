@@ -684,6 +684,15 @@ object WalletIssuanceHandler {
     private fun AuthorizationServerMetadata.supportsAttestationBasedClientAuthentication(): Boolean =
         tokenEndpointAuthMethodsSupported?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
 
+    private suspend fun resolveAuthorizationCodeAuthorizationServerMetadata(
+        credentialIssuerBaseUrl: String,
+        httpClient: HttpClient,
+    ): AuthorizationServerMetadata {
+        val metadataResolver = IssuerMetadataResolver(httpClient)
+        val issuerMetadata = metadataResolver.resolveCredentialIssuerMetadata(credentialIssuerBaseUrl)
+        return metadataResolver.resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
+    }
+
     private suspend fun postFollowingRedirects(
         httpClient: HttpClient,
         url: String,
@@ -793,15 +802,61 @@ object WalletIssuanceHandler {
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
         val httpClient = defaultHttpClient()
+        val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
+            ?: error("credentialIssuerBaseUrl must be provided")
+        val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
+        return exchangeCode(
+            request = request,
+            tokenEndpoint = asMetadata.tokenEndpoint
+                ?: error("Authorization server metadata contains no token_endpoint"),
+            attestationHeaders = null,
+            httpClient = httpClient,
+        )
+    }
+
+    suspend fun exchangeCode(
+        wallet: Wallet,
+        request: ExchangeCodeRequest,
+        attestationAssembler: ClientAttestationAssembler? = null,
+        httpClient: HttpClient = defaultHttpClient(),
+        onAttestationObtained: suspend () -> Unit = {},
+    ): RequestTokenResult {
+        val credentialIssuerBaseUrl = request.credentialIssuerBaseUrl.takeIf { it.isNotBlank() }
+            ?: error("credentialIssuerBaseUrl must be provided")
+        val asMetadata = resolveAuthorizationCodeAuthorizationServerMetadata(credentialIssuerBaseUrl, httpClient)
+        val tokenEndpoint = asMetadata.tokenEndpoint
+            ?: error("Authorization server metadata contains no token_endpoint")
+        val attestationHeaders = buildTokenEndpointAttestationHeaders(
+            asMetadata = asMetadata,
+            clientId = request.clientId,
+            attestationAssembler = attestationAssembler,
+            resolveInstanceKey = { resolveKey(wallet, request.key, request.keyId) },
+            onAttestationObtained = onAttestationObtained,
+        )
+        return exchangeCode(
+            request = request,
+            tokenEndpoint = tokenEndpoint,
+            attestationHeaders = attestationHeaders,
+            httpClient = httpClient,
+        )
+    }
+
+    private suspend fun exchangeCode(
+        request: ExchangeCodeRequest,
+        tokenEndpoint: String,
+        attestationHeaders: ClientAttestationHeaders?,
+        httpClient: HttpClient = defaultHttpClient(),
+    ): RequestTokenResult {
         val clientConfig = ClientConfiguration(
             clientId = request.clientId,
             redirectUris = listOf(request.redirectUri.toString())
         )
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
-            tokenEndpoint = request.tokenEndpoint.toString(),
+            tokenEndpoint = tokenEndpoint,
             code = request.code,
             codeVerifier = request.codeVerifier,
             additionalHeaders = request.tokenRequestHeaders,
+            attestationHeaders = attestationHeaders,
         )
         return RequestTokenResult(
             accessToken = tokenResponse.access_token,
