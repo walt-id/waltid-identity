@@ -109,19 +109,24 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     func testCustomCredentialStoreRetainsPlatformSigningKeys() async throws {
         let store = RecordingWalletCredentialStore()
-        let wallet = try await makeWallet(
-            persistence: WalletPersistence(
-                stores: WalletStores(credentials: store)
-            )
+        let persistence = WalletPersistence(
+            stores: WalletStores(credentials: store)
         )
+        let wallet = try await makeWallet(persistence: persistence)
 
         let bootstrap = try await wallet.bootstrap()
         let credentials = try await wallet.credentials()
+        let reopenedWallet = try await makeWallet(persistence: persistence)
+        let reopenedBootstrap = try await reopenedWallet.bootstrap()
+        let reopenedCredentials = try await reopenedWallet.credentials()
         let listCredentialsCalls = await store.listCredentialsCalls
 
         XCTAssertTrue(bootstrap.did.starts(with: "did:"), "DID should start with 'did:', got: \(bootstrap.did)")
         XCTAssertTrue(credentials.isEmpty)
-        XCTAssertEqual(listCredentialsCalls, 1)
+        XCTAssertEqual(reopenedBootstrap.did, bootstrap.did, "Default DID store should survive wallet facade recreation")
+        XCTAssertEqual(reopenedBootstrap.keyID, bootstrap.keyID, "Platform signing-key reference should survive wallet facade recreation")
+        XCTAssertTrue(reopenedCredentials.isEmpty)
+        XCTAssertEqual(listCredentialsCalls, 2)
 
         try await wallet.deleteLocalData()
     }
