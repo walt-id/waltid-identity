@@ -3,6 +3,8 @@ package id.walt.wallet2.mobile
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -131,7 +133,7 @@ class MobileWallet(
      * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
      *
      * @param keyType Optional key type override. When omitted, [MobileWalletConfig.defaultKeyType] is used.
-     * @param didMethod DID method passed to [DidService.registerByKey], for example `key`.
+     * @param didMethod DID method used for registering a new DID. The default `key` method is handled locally.
      * @return The key identifier and DID used by this wallet.
      * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
      */
@@ -139,8 +141,6 @@ class MobileWallet(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): MobileWalletBootstrapResult {
-        DidService.minimalInit()
-
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
             val existingKeys = keyStore.listKeys().toList()
@@ -156,7 +156,7 @@ class MobileWallet(
         val effectiveKeyType = keyType ?: defaultKeyType
         val key = keyGenerator(effectiveKeyType.toKeyType())
         val keyId = keyStore.addKey(key)
-        val didResult = DidService.registerByKey(didMethod, key)
+        val didResult = registerDidByKey(didMethod, key)
 
         didStore.addDid(
             WalletDidEntry(
@@ -170,6 +170,15 @@ class MobileWallet(
             did = didResult.did,
         )
     }
+
+    private suspend fun registerDidByKey(didMethod: String, key: Key) =
+        when (didMethod.lowercase()) {
+            "key" -> DidKeyRegistrar().registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
+            else -> {
+                DidService.minimalInit()
+                DidService.registerByKey(didMethod, key)
+            }
+        }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.
