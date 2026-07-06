@@ -22,9 +22,9 @@ let wallet = try await Wallet(
 )
 ```
 
-``WalletConfiguration`` uses SDK-managed encrypted local persistence by
-default. Apps that own database-key recovery can pass
-``WalletPersistenceConfiguration/integratorManagedKey(_:)`` with a
+``WalletConfiguration`` uses managed encrypted local persistence by default.
+Apps that own database-key recovery can pass ``WalletPersistence`` with
+``WalletDatabaseKeyConfiguration/provided(_:)`` and a
 ``WalletDatabaseKeyProvider`` implementation.
 
 > Important: Keep Kotlin Multiplatform and generated bridge symbols behind

@@ -8,8 +8,9 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
-import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
+import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
@@ -142,7 +143,9 @@ class WalletSdkBridgeTest {
             WalletBridgeConfiguration(
                 walletId = "consumer-wallet",
                 defaultKeyType = MobileWalletKeyType.Ed25519,
-                persistence = WalletBridgePersistenceConfiguration.SdkManagedEncrypted,
+                persistence = WalletBridgePersistence(
+                    databaseKey = WalletBridgeDatabaseKeyConfiguration.Managed,
+                ),
                 attestation = WalletAttestationConfig(
                     baseUrl = "https://attestation.example",
                     attesterPath = "/wallet-attestation",
@@ -156,7 +159,7 @@ class WalletSdkBridgeTest {
         assertEquals("consumer-wallet", capturedConfig?.walletId)
         assertEquals(MobileWalletKeyType.Ed25519, capturedConfig?.defaultKeyType)
         assertEquals(
-            MobileWalletPersistenceConfig.SdkManagedEncrypted,
+            MobileWalletPersistence(),
             capturedConfig?.persistence,
         )
         assertEquals("https://attestation.example", capturedConfig?.attestationConfig?.baseUrl)
@@ -170,7 +173,7 @@ class WalletSdkBridgeTest {
     }
 
     @Test
-    fun factoryMapsSwiftManagedDatabaseKeyProviderToMobileWalletConfig() = runTest {
+    fun factoryMapsProvidedDatabaseKeyProviderToMobileWalletConfig() = runTest {
         var capturedConfig: MobileWalletConfig? = null
         val bridgeKeyProvider = RecordingBridgeDatabaseKeyProvider(
             WalletBridgeDatabaseEncryptionKey(
@@ -186,18 +189,45 @@ class WalletSdkBridgeTest {
         val result = factory.create(
             WalletBridgeConfiguration(
                 walletId = "swift-managed-wallet",
-                persistence = WalletBridgePersistenceConfiguration.IntegratorManagedKey,
+                persistence = WalletBridgePersistence(
+                    databaseKey = WalletBridgeDatabaseKeyConfiguration.Provided,
+                ),
                 databaseKeyProvider = bridgeKeyProvider,
             )
         )
 
         assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
-        val persistence = assertIs<MobileWalletPersistenceConfig.IntegratorManagedKey>(capturedConfig?.persistence)
-        val key = persistence.keyProvider.getOrCreateKey("swift-managed-wallet", "wallet_swift-managed-wallet")
+        val persistence = capturedConfig?.persistence
+        val databaseKey = assertIs<MobileWalletDatabaseKey.Provided>(persistence?.databaseKey)
+        val key = databaseKey.provider.getOrCreateKey("swift-managed-wallet", "wallet_swift-managed-wallet")
 
         assertEquals(DatabaseEncryptionKey("swift-key", byteArrayOf(1, 2, 3)), key)
-        persistence.keyProvider.deleteKey("swift-managed-wallet", "wallet_swift-managed-wallet")
+        databaseKey.provider.deleteKey("swift-managed-wallet", "wallet_swift-managed-wallet")
         assertEquals(listOf("swift-managed-wallet:wallet_swift-managed-wallet"), bridgeKeyProvider.deletedKeys)
+    }
+
+    @Test
+    fun factoryMapsSwiftCredentialStoreOverrideToMobileWalletConfig() = runTest {
+        var capturedConfig: MobileWalletConfig? = null
+        val bridgeCredentialStore = RecordingBridgeCredentialStore()
+        val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
+            capturedConfig = config
+            FakeWalletSdkBridgeOperations()
+        }
+
+        val result = factory.create(
+            WalletBridgeConfiguration(
+                walletId = "swift-store-wallet",
+                persistence = WalletBridgePersistence(
+                    stores = WalletBridgeStores(credentials = bridgeCredentialStore),
+                ),
+            )
+        )
+
+        assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
+        val credentialStore = capturedConfig?.persistence?.stores?.credentials
+        assertEquals(true, credentialStore?.removeCredential("credential-1"))
+        assertEquals(listOf("credential-1"), bridgeCredentialStore.removedCredentialIds)
     }
 
     @Test
@@ -207,7 +237,7 @@ class WalletSdkBridgeTest {
         assertEquals("default", config.walletId)
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
-        assertEquals(MobileWalletPersistenceConfig.SdkManagedEncrypted, config.persistence)
+        assertEquals(MobileWalletPersistence(), config.persistence)
     }
 
     @Test
@@ -324,6 +354,21 @@ class WalletSdkBridgeTest {
 
         override suspend fun deleteKey(walletId: String, databaseName: String) {
             deletedKeys += "$walletId:$databaseName"
+        }
+    }
+
+    private class RecordingBridgeCredentialStore : WalletBridgeCredentialStore {
+        val removedCredentialIds = mutableListOf<String>()
+
+        override suspend fun getCredential(id: String): WalletBridgeStoredCredential? = null
+
+        override suspend fun listCredentials(): List<WalletBridgeStoredCredential> = emptyList()
+
+        override suspend fun addCredential(entry: WalletBridgeStoredCredential) = Unit
+
+        override suspend fun removeCredential(id: String): Boolean {
+            removedCredentialIds += id
+            return true
         }
     }
 }

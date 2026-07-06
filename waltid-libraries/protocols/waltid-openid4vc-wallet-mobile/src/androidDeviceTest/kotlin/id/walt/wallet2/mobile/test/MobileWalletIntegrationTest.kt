@@ -48,7 +48,7 @@ class MobileWalletIntegrationTest {
         val result = client.bootstrap()
         assertNotNull(result.keyId, "bootstrap should create a key")
         assertNotNull(result.did, "bootstrap should create a DID")
-        assertTrue(result.did!!.startsWith("did:"), "DID should start with 'did:'")
+        assertTrue(result.did.startsWith("did:"), "DID should start with 'did:'")
     }
 
     @Test

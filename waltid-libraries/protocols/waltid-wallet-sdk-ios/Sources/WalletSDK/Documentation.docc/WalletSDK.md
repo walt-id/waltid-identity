@@ -31,12 +31,12 @@ module boundary.
 
 ### Local Persistence
 
-``WalletConfiguration`` defaults to SDK-managed encrypted persistence. The SDK
+``WalletConfiguration`` defaults to managed encrypted persistence. The SDK
 opens a SQLCipher-encrypted local wallet database and stores the per-wallet
 database key in iOS Keychain. Normal Swift SDK users do not provide database
 key material.
 
-Use ``WalletPersistenceConfiguration/integratorManagedKey(_:)`` when an app
+Use ``WalletPersistence`` with ``WalletDatabaseKeyConfiguration/provided(_:)`` when an app
 needs enterprise/KMS ownership or recoverable database-key material:
 
 ```swift
@@ -50,15 +50,28 @@ struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
         try await deleteKeyData(walletID: walletID, databaseName: databaseName)
     }
 }
+
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            databaseKey: .provided(KMSDatabaseKeyProvider())
+        )
+    )
+)
 ```
 
 ``WalletDatabaseKey`` descriptions redact raw key material, but apps should still
 avoid logging, serializing, or otherwise exposing the `material` bytes.
 
-Use ``Wallet/deleteLocalData()`` to reset SDK-owned local data for the wallet.
+Use ``WalletStores`` with ``WalletCredentialStore`` to override credential
+storage while keeping the managed encrypted database key, DID store, and
+platform signing-key store.
+
+Use ``Wallet/deleteLocalData()`` to reset local data for the wallet.
 This removes wallet records, platform signing keys referenced by the wallet,
-encrypted database files and sidecars, and SDK-managed database keys. When using
-an integrator-managed key provider, deletion also calls
+encrypted database files and sidecars, and managed database keys. When using
+a provided database-key provider, deletion also calls
 ``WalletDatabaseKeyProvider/deleteDatabaseKey(walletID:databaseName:)``. Old
 local development databases created before encrypted persistence may need this
 reset; plaintext-to-encrypted migration is not performed.
@@ -76,14 +89,18 @@ reset; plaintext-to-encrypted migration is not performed.
 
 - ``Wallet``
 - ``WalletConfiguration``
-- ``WalletPersistenceConfiguration``
+- ``WalletPersistence``
+- ``WalletDatabaseKeyConfiguration``
 - ``WalletDatabaseKeyProvider``
 - ``WalletDatabaseKey``
+- ``WalletStores``
+- ``WalletCredentialStore``
 - ``WalletAttestationConfiguration``
 
 ### Wallet Data
 
 - ``Credential``
+- ``StoredCredential``
 - ``WalletBootstrapResult``
 - ``PresentationResult``
 

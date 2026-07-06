@@ -5,14 +5,20 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.wallet2.mobile.MobileWalletPersistenceConfig
+import id.walt.wallet2.mobile.MobileWalletPersistence
+import id.walt.wallet2.mobile.MobileWalletStores
+import id.walt.wallet2.data.StoredCredential
+import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import id.walt.wallet2.persistence.stores.DriverFactory
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.io.File
@@ -28,7 +34,7 @@ class MobileWalletEncryptionTest {
         get() = InstrumentationRegistry.getInstrumentation().targetContext
 
     @Test
-    fun sdkManagedAndroidDatabaseKeyIsReusedAndDeleted() = runBlocking {
+    fun managedAndroidDatabaseKeyIsReusedAndDeleted() = runBlocking {
         val provider = AndroidDatabaseEncryptionKeyProvider(context)
         val walletId = "android-encryption-key-test"
         val databaseName = "wallet_$walletId"
@@ -124,7 +130,7 @@ class MobileWalletEncryptionTest {
     }
 
     @Test
-    fun deleteWalletRemovesSdkManagedAndroidDatabaseAndKey() = runBlocking {
+    fun deleteWalletRemovesManagedAndroidDatabaseAndKey() = runBlocking {
         val walletId = "android-encryption-delete-test"
         val databaseName = "wallet_$walletId"
         val databaseFileName = "$databaseName.db"
@@ -140,7 +146,7 @@ class MobileWalletEncryptionTest {
 
         wallet.deleteWallet()
 
-        assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "SDK-managed wallet DB files should be deleted")
+        assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "Managed wallet DB files should be deleted")
         val regeneratedKey = provider.getOrCreateKey(walletId, databaseName)
         assertFalse(firstKey.material.contentEquals(regeneratedKey.material), "DB key should be regenerated after wallet deletion")
 
@@ -149,13 +155,13 @@ class MobileWalletEncryptionTest {
     }
 
     @Test
-    fun integratorManagedAndroidDatabaseKeyOpensEncryptedWalletAndIsDeleted() = runBlocking {
-        val walletId = "android-integrator-key-test"
+    fun providedAndroidDatabaseKeyOpensEncryptedWalletAndIsDeleted() = runBlocking {
+        val walletId = "android-provided-key-test"
         val databaseName = "wallet_$walletId"
         val databaseFileName = "$databaseName.db"
         val provider = RecordingDatabaseKeyProvider(
             DatabaseEncryptionKey(
-                keyId = "integrator-key",
+                keyId = "provided-key",
                 material = ByteArray(32) { index -> (index + 3).toByte() },
             )
         )
@@ -164,7 +170,9 @@ class MobileWalletEncryptionTest {
         val factory = MobileWalletFactory(context)
         val config = MobileWalletConfig(
             walletId = walletId,
-            persistence = MobileWalletPersistenceConfig.IntegratorManagedKey(provider),
+            persistence = MobileWalletPersistence(
+                databaseKey = MobileWalletDatabaseKey.Provided(provider),
+            ),
         )
         val wallet = factory.create(config)
 
@@ -175,9 +183,38 @@ class MobileWalletEncryptionTest {
         assertEquals(listOf("$walletId:$databaseName", "$walletId:$databaseName"), provider.requestedKeys)
         wallet.deleteWallet()
         assertEquals(listOf("$walletId:$databaseName"), provider.deletedKeys)
-        assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "Integrator-managed wallet DB files should be deleted")
+        assertFalse(databaseFiles(databaseFileName).any { it.exists() }, "Provided-key wallet DB files should be deleted")
 
         deleteDatabaseFiles(databaseFileName)
+    }
+
+    @Test
+    fun customAndroidCredentialStoreRetainsPlatformSigningKeys() = runBlocking {
+        val walletId = "android-custom-credentials-test"
+        val databaseName = "wallet_$walletId"
+        val databaseFileName = "$databaseName.db"
+        val credentialStore = RecordingCredentialStore()
+        deleteDatabaseFiles(databaseFileName)
+
+        val wallet = MobileWalletFactory(context).create(
+            MobileWalletConfig(
+                walletId = walletId,
+                persistence = MobileWalletPersistence(
+                    stores = MobileWalletStores(credentials = credentialStore),
+                ),
+            )
+        )
+
+        val bootstrap = wallet.bootstrap()
+        val credentials = wallet.credentials()
+
+        assertTrue(bootstrap.did.startsWith("did:"), "Custom credential stores should keep Android platform signing keys")
+        assertEquals(emptyList(), credentials)
+        assertEquals(1, credentialStore.listCredentialsCalls)
+
+        wallet.deleteWallet()
+        deleteDatabaseFiles(databaseFileName)
+        AndroidDatabaseEncryptionKeyProvider(context).deleteKey(walletId, databaseName)
     }
 
     private fun deleteDatabaseFiles(databaseFileName: String) {
@@ -218,5 +255,21 @@ class MobileWalletEncryptionTest {
         override suspend fun deleteKey(walletId: String, databaseName: String) {
             deletedKeys += "$walletId:$databaseName"
         }
+    }
+
+    private class RecordingCredentialStore : WalletCredentialStore {
+        var listCredentialsCalls = 0
+
+        override suspend fun getCredential(id: String): StoredCredential? = null
+
+        override suspend fun listCredentials(): Flow<StoredCredential> {
+            listCredentialsCalls++
+            return emptyList<StoredCredential>().asFlow()
+        }
+
+        override suspend fun addCredential(entry: StoredCredential) =
+            error("This test only verifies credential-store routing")
+
+        override suspend fun removeCredential(id: String): Boolean = false
     }
 }
