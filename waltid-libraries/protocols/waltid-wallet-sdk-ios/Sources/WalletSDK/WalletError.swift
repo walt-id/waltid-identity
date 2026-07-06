@@ -1,3 +1,5 @@
+import Foundation
+
 /// Errors thrown by the public Swift wallet SDK facade.
 public enum WalletError: Error, Equatable, Sendable {
     /// The SDK input could not be parsed or validated.
@@ -26,4 +28,23 @@ public enum WalletError: Error, Equatable, Sendable {
 
     /// The SDK encountered an unexpected internal failure.
     case internalFailure(String)
+}
+
+extension WalletError: LocalizedError {
+    /// A localized, user-readable description of the wallet error.
+    public var errorDescription: String? {
+        switch self {
+        case .invalidInput(let message),
+             .network(let message),
+             .issuer(let message),
+             .verifier(let message),
+             .storage(let message),
+             .crypto(let message),
+             .credentialNotFound(let message),
+             .internalFailure(let message):
+            return message
+        case .cancelled:
+            return "The wallet operation was cancelled."
+        }
+    }
 }
