@@ -2,9 +2,10 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
 import id.walt.openid4vci.CryptographicBindingMethod
-import id.walt.openid4vci.DefaultClient
-import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.metadata.oauth.AuthorizationServerMetadata
 import id.walt.openid4vci.responses.credential.CredentialResponse
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
@@ -15,10 +16,11 @@ import id.walt.wallet2.handlers.WalletIssuanceHandler.pollDeferredFlow
 import id.walt.wallet2.handlers.WalletIssuanceHandler.receiveCredentialFlow
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.metadata.IssuerMetadataResolver
 import id.waltid.openid4vci.wallet.metadata.OfferedCredentialResolver
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
-import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.offer.CredentialOfferParser
 import id.waltid.openid4vci.wallet.offer.CredentialOfferResolver
 import id.waltid.openid4vci.wallet.proof.JwtProofBuilder
@@ -358,15 +360,13 @@ object WalletIssuanceHandler {
             ?: error("Authorization server metadata contains no token_endpoint")
         log.trace { "Requesting token from $tokenEndpoint" }
 
-        val attestationHeaders = if (attestationAssembler != null &&
-            asMetadata.tokenEndpointAuthMethodsSupported?.contains("attest_jwt_client_auth") == true
-        ) {
-            log.debug { "Issuer requires attestation-based client auth, building attestation headers" }
-            val asIssuer = asMetadata.issuer
-            val headers = attestationAssembler.buildAttestationHeaders(key, request.clientId, asIssuer)
-            onEvent(WalletSessionEvent.issuance_attestation_obtained)
-            headers
-        } else null
+        val attestationHeaders = buildTokenEndpointAttestationHeaders(
+            asMetadata = asMetadata,
+            clientId = request.clientId,
+            attestationAssembler = attestationAssembler,
+            resolveInstanceKey = { key },
+            onAttestationObtained = { onEvent(WalletSessionEvent.issuance_attestation_obtained) },
+        )
 
         val effectiveTxCode = request.txCode
             ?: preAuthGrant.txCode?.value?.content
@@ -600,13 +600,38 @@ object WalletIssuanceHandler {
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveKey(wallet: Wallet, inlineKey: DirectSerializedKey?, keyId: String?) = when {
+    private suspend fun resolveKey(wallet: Wallet, inlineKey: DirectSerializedKey?, keyId: String?): Key? = when {
         inlineKey != null -> inlineKey.key
         keyId != null -> wallet.findKey(keyId)
             ?: error("Key '$keyId' not found in any wallet key store")
 
         else -> wallet.defaultKey()
     }
+
+    private suspend fun buildTokenEndpointAttestationHeaders(
+        asMetadata: AuthorizationServerMetadata,
+        clientId: String,
+        attestationAssembler: ClientAttestationAssembler?,
+        resolveInstanceKey: suspend () -> Key?,
+        onAttestationObtained: suspend () -> Unit = {},
+    ): ClientAttestationHeaders? {
+        val assembler = attestationAssembler ?: return null
+        if (!asMetadata.supportsAttestationBasedClientAuthentication()) return null
+
+        log.debug { "Issuer supports attestation-based client auth, building attestation headers" }
+        val key = resolveInstanceKey()
+            ?: error("No key available for client attestation")
+        val headers = assembler.buildAttestationHeaders(
+            instanceKey = key,
+            clientId = clientId,
+            audience = asMetadata.issuer,
+        )
+        onAttestationObtained()
+        return headers
+    }
+
+    private fun AuthorizationServerMetadata.supportsAttestationBasedClientAuthentication(): Boolean =
+        tokenEndpointAuthMethodsSupported?.contains(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) == true
 
     private suspend fun postFollowingRedirects(
         httpClient: HttpClient,
