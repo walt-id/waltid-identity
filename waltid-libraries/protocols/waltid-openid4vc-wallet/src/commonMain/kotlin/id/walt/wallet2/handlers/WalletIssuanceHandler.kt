@@ -162,11 +162,14 @@ data class ResolveOfferResult(
 data class RequestTokenRequest(
     val tokenEndpoint: Url,
     val preAuthorizedCode: String,
+    val credentialIssuer: String? = null,
     val txCode: String? = null,
     val clientId: String = "wallet-client",
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
     val anonymousPreAuthorizedCode: Boolean = false,
+    val key: DirectSerializedKey? = null,
+    val keyId: String? = null,
 )
 
 @Serializable
