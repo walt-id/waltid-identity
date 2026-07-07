@@ -42,7 +42,13 @@ waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/generate-docc.sh
 ```
 
 The validation keeps owned public Swift symbols covered by DocC abstracts and
-parameter documentation.
+parameter documentation. The mobile docs workflow also checks that persistence
+examples in README and DocC pages match the compiled Kotlin and Swift snippet
+tests:
+
+```bash
+python3 waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-mobile-wallet-doc-snippets.py
+```
 
 ## Usage Sketch
 
@@ -68,6 +74,7 @@ let presentation = try await wallet.present(
 
 The managed key is device-local. It protects local wallet data at rest, but it is not a cross-device recovery mechanism. Apps that need enterprise/KMS ownership or recoverable database-key material can provide an app-owned key provider:
 
+<!-- doc-snippet:start swift-provided-database-key -->
 ```swift
 struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
     func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
@@ -89,6 +96,7 @@ let wallet = try await Wallet(
     )
 )
 ```
+<!-- doc-snippet:end swift-provided-database-key -->
 
 The provider shape is compiled by the SwiftPM test suite, and the underlying
 KMP bridge is covered by iOS simulator integration tests so provider lookup,
@@ -97,6 +105,7 @@ driver.
 
 Apps can override credential storage while retaining the default encrypted database, database-key ownership, DID store, and platform signing-key store:
 
+<!-- doc-snippet:start swift-custom-credential-store -->
 ```swift
 actor AppCredentialStore: WalletCredentialStore {
     private var entries: [String: StoredCredential] = [:]
@@ -127,57 +136,12 @@ let wallet = try await Wallet(
     )
 )
 ```
+<!-- doc-snippet:end swift-custom-credential-store -->
 
-Apps that own more wallet durability can also provide DID and signing-key stores. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically:
+Apps that own more wallet durability can also provide DID and signing-key stores. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically. This example assumes `AppDidStore` and `AppKeyStore` implement the corresponding store protocols, and that `AppKeyStore` exposes app-owned key generation.
 
+<!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
-actor AppDidStore: WalletDidStore {
-    private var entries: [String: StoredDid] = [:]
-
-    func did(id: String) async throws -> StoredDid? {
-        entries[id]
-    }
-
-    func dids() async throws -> [StoredDid] {
-        Array(entries.values)
-    }
-
-    func addDid(_ did: StoredDid) async throws {
-        entries[did.id] = did
-    }
-
-    func removeDid(id: String) async throws -> Bool {
-        entries.removeValue(forKey: id) != nil
-    }
-}
-
-actor AppKeyStore: WalletKeyStore {
-    private var entries: [String: StoredKey] = [:]
-
-    func key(id: String) async throws -> StoredKey? {
-        entries[id]
-    }
-
-    func keys() async throws -> [WalletKeyInfo] {
-        entries.values.map {
-            WalletKeyInfo(keyID: $0.keyID, keyType: $0.keyType, algorithm: $0.algorithm)
-        }
-    }
-
-    func addKey(_ key: StoredKey) async throws -> String {
-        entries[key.id] = key
-        return key.keyID
-    }
-
-    func removeKey(id: String) async throws -> Bool {
-        entries.removeValue(forKey: id) != nil
-    }
-
-    func generateKey(type: WalletKeyType) async throws -> StoredKey {
-        try await createSerializedWalletKey(type: type)
-    }
-}
-
 let keyStore = AppKeyStore()
 
 let wallet = try await Wallet(
@@ -195,12 +159,16 @@ let wallet = try await Wallet(
     )
 )
 ```
+<!-- doc-snippet:end swift-full-store-overrides -->
 
 `StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage.
 
 Provided database keys and custom stores can be combined when an app owns both database-key recovery and wallet-record durability:
 
+<!-- doc-snippet:start swift-combined-persistence -->
 ```swift
+let keyStore = AppKeyStore()
+
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
@@ -217,6 +185,7 @@ let wallet = try await Wallet(
     )
 )
 ```
+<!-- doc-snippet:end swift-combined-persistence -->
 
 Call `try await wallet.deleteLocalData()` to remove local material for that wallet. The active credential, DID, and key stores receive their remove calls; the SDK then removes encrypted database files and sidecars plus the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
 

@@ -40,16 +40,21 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 Managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Store overrides are independent: `null` credential and DID overrides use the encrypted SQLDelight database opened by this persistence configuration, while a `null` key override keeps platform-backed signing-key persistence and generation. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
-Create a wallet with the encrypted default from a coroutine:
+The examples below build `MobileWalletConfig` values. Pass the selected config
+to `MobileWalletFactory(...).create(config)` from a coroutine to create the
+wallet.
 
+Use the encrypted default when the app does not need custom persistence:
+
+<!-- doc-snippet:start kotlin-default-persistence -->
 ```kotlin
-val wallet = MobileWalletFactory(context).create(
-    MobileWalletConfig(walletId = "consumer-wallet")
-)
+val config = MobileWalletConfig(walletId = "consumer-wallet")
 ```
+<!-- doc-snippet:end kotlin-default-persistence -->
 
 Provide database keys while keeping SDK SQLDelight stores by implementing `DatabaseEncryptionKeyProvider`:
 
+<!-- doc-snippet:start kotlin-provided-database-key -->
 ```kotlin
 class KmsDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
     override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
@@ -62,17 +67,16 @@ class KmsDatabaseKeyProvider : DatabaseEncryptionKeyProvider {
     }
 }
 
-val wallet = MobileWalletFactory(context).create(
-    MobileWalletConfig(
-        walletId = "consumer-wallet",
-        persistence = MobileWalletPersistence(
-            databaseKey = MobileWalletDatabaseKey.Provided(
-                provider = KmsDatabaseKeyProvider()
-            )
+val config = MobileWalletConfig(
+    walletId = "consumer-wallet",
+    persistence = MobileWalletPersistence(
+        databaseKey = MobileWalletDatabaseKey.Provided(
+            provider = KmsDatabaseKeyProvider()
         )
     )
 )
 ```
+<!-- doc-snippet:end kotlin-provided-database-key -->
 
 This mode is covered by Android device and iOS simulator integration tests so
 provider lookup, encrypted database reopening, and provider deletion stay wired
@@ -80,38 +84,38 @@ to the real platform drivers.
 
 Override only credential storage while retaining the default encrypted database, database-key ownership, DID store, and platform signing-key store:
 
+<!-- doc-snippet:start kotlin-custom-credential-store -->
 ```kotlin
-val wallet = MobileWalletFactory(context).create(
-    MobileWalletConfig(
-        walletId = "consumer-wallet",
-        persistence = MobileWalletPersistence(
-            stores = MobileWalletStores(
-                credentials = appCredentialStore
-            )
+val config = MobileWalletConfig(
+    walletId = "consumer-wallet",
+    persistence = MobileWalletPersistence(
+        stores = MobileWalletStores(
+            credentials = appCredentialStore
         )
     )
 )
 ```
+<!-- doc-snippet:end kotlin-custom-credential-store -->
 
 KMP consumers can override all wallet stores. Key storage and key generation are configured together so platform-managed signing keys cannot be accidentally mixed with app-owned key persistence:
 
+<!-- doc-snippet:start kotlin-full-store-overrides -->
 ```kotlin
-val wallet = MobileWalletFactory(context).create(
-    MobileWalletConfig(
-        walletId = "consumer-wallet",
-        persistence = MobileWalletPersistence(
-            stores = MobileWalletStores(
-                credentials = appCredentialStore,
-                dids = appDidStore,
-                keys = MobileWalletKeys(
-                    store = appKeyStore,
-                    generate = { keyType -> appKeyProvider.generateKey(keyType) }
-                )
+val config = MobileWalletConfig(
+    walletId = "consumer-wallet",
+    persistence = MobileWalletPersistence(
+        stores = MobileWalletStores(
+            credentials = appCredentialStore,
+            dids = appDidStore,
+            keys = MobileWalletKeys(
+                store = appKeyStore,
+                generate = { keyType -> appKeyProvider.generateKey(keyType) }
             )
         )
     )
 )
 ```
+<!-- doc-snippet:end kotlin-full-store-overrides -->
 
 Call `MobileWallet.deleteWallet()` to delete local wallet material for a wallet: stored key references, credentials, DIDs, platform signing keys referenced by the active key store, encrypted database files and sidecars, and the configured database key. Store cleanup uses the active store interfaces, so custom stores receive the same remove calls as default stores.
 

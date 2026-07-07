@@ -39,6 +39,7 @@ key material.
 Use ``WalletPersistence`` with ``WalletDatabaseKeyConfiguration/provided(_:)`` when an app
 needs enterprise/KMS ownership or recoverable database-key material:
 
+<!-- doc-snippet:start swift-provided-database-key -->
 ```swift
 struct KMSDatabaseKeyProvider: WalletDatabaseKeyProvider {
     func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
@@ -60,6 +61,7 @@ let wallet = try await Wallet(
     )
 )
 ```
+<!-- doc-snippet:end swift-provided-database-key -->
 
 ``WalletDatabaseKey`` descriptions redact raw key material, but apps should still
 avoid logging, serializing, or otherwise exposing the `material` bytes.
@@ -67,9 +69,13 @@ avoid logging, serializing, or otherwise exposing the `material` bytes.
 Use ``WalletStores`` when an app owns credential, DID, or signing-key
 durability. Store overrides are independent except for signing keys:
 ``WalletKeys`` keeps the ``WalletKeyStore`` and its generator together so newly
-generated keys are persisted into the same app-owned key domain.
+generated keys are persisted into the same app-owned key domain. This example
+assumes app-defined store types that implement the corresponding protocols.
 
+<!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
+let keyStore = AppKeyStore()
+
 let wallet = try await Wallet(
     configuration: WalletConfiguration(
         walletID: "consumer-wallet",
@@ -77,14 +83,15 @@ let wallet = try await Wallet(
             stores: WalletStores(
                 credentials: AppCredentialStore(),
                 dids: AppDidStore(),
-                keys: WalletKeys(store: AppKeyStore()) { keyType in
-                    try await generateSerializedWalletKey(type: keyType)
+                keys: WalletKeys(store: keyStore) { keyType in
+                    try await keyStore.generateKey(type: keyType)
                 }
             )
         )
     )
 )
 ```
+<!-- doc-snippet:end swift-full-store-overrides -->
 
 Provided database keys and custom stores can be combined when an app owns both
 database-key recovery and wallet-record durability. ``StoredKey`` carries
