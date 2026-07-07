@@ -1,7 +1,5 @@
 package id.walt.issuer2.openid4vci
 
-import id.walt.issuer2.config.ClientAuthenticationConfig
-import id.walt.issuer2.config.ClientAuthenticationMethod
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
@@ -10,6 +8,8 @@ import id.walt.issuer2.repository.IssuanceSessionRepository
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.MetadataService
+import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
@@ -55,12 +55,11 @@ class Issuer2MetadataServiceTest {
         assertNull(defaultMetadata.clientAttestationSigningAlgValuesSupported)
         assertNull(defaultMetadata.clientAttestationPopSigningAlgValuesSupported)
         assertNull(Issuer2ServiceConfig(baseUrl = "http://localhost").clientAuthenticationConfig)
-        assertNull(Issuer2ServiceConfig(baseUrl = "http://localhost").clientAttestation)
     }
 
     @Test
     fun `authorization server metadata omits client attestation when explicitly disabled`() {
-        val disabledMetadata = metadataService(clientAttestation = null)
+        val disabledMetadata = metadataService(clientAuthenticationConfig = null)
             .getAuthorizationServerMetadata()
 
         assertNull(disabledMetadata.tokenEndpointAuthMethodsSupported)
@@ -73,7 +72,7 @@ class Issuer2MetadataServiceTest {
         val attestationMetadata = metadataService(
             clientAuthenticationConfig = ClientAuthenticationConfig(
                 supportedMethods = listOf(
-                    ClientAuthenticationMethod.ClientAttestation(
+                    ClientAuthenticationMethodConfig.ClientAttestation(
                         config = ClientAttestationVerifierConfig(
                             verificationMethod = ClientAttestationVerificationMethod.StaticJwk(
                                 jwk = buildJsonObject {
@@ -105,7 +104,7 @@ class Issuer2MetadataServiceTest {
         val attestationMetadata = metadataService(
             clientAuthenticationConfig = ClientAuthenticationConfig(
                 supportedMethods = listOf(
-                    ClientAuthenticationMethod.ClientAttestation(
+                    ClientAuthenticationMethodConfig.ClientAttestation(
                         config = ClientAttestationVerifierConfig(
                             verificationMethod = ClientAttestationVerificationMethod.X509Chain(
                                 trustedRootCertificatesPem = listOf(
@@ -136,15 +135,13 @@ class Issuer2MetadataServiceTest {
     private fun metadataService(
         enforcePushedAuthorizationRequests: Boolean = false,
         clientAuthenticationConfig: ClientAuthenticationConfig? = null,
-        clientAttestation: ClientAttestationVerifierConfig? = null,
-        preAuthorizedGrantAnonymousAccessSupported: Boolean = true,
+        preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
     ): MetadataService {
         val metadataConfig = Issuer2MetadataConfig()
         val serviceConfig = Issuer2ServiceConfig(
             baseUrl = "http://localhost",
             enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
             clientAuthenticationConfig = clientAuthenticationConfig,
-            clientAttestation = clientAttestation,
         )
         return MetadataService(
             serviceConfig = serviceConfig,
