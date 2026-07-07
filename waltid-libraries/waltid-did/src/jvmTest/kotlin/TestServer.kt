@@ -19,6 +19,9 @@ object TestServer {
 
     private const val DID_WEB_PORT_PLACEHOLDER = "<DID_WEB_PORT>"
 
+    @Volatile
+    private var serverStarted = false
+
     private val keyStoreFile = File(this.javaClass.classLoader.getResource("")!!.path.plus("keystore.jks"))
 
     private fun loadDidWebReferenceFile(fileName: String): String =
@@ -39,6 +42,23 @@ object TestServer {
     val server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration> by lazy {
         println("Initializing embedded webserver...")
         embeddedServer(Netty, applicationEnvironment(), { envConfig() }, module = { module() })
+    }
+
+    @Synchronized
+    fun ensureStarted() {
+        if (!serverStarted) {
+            println("Starting test web server...")
+            server.start()
+            serverStarted = true
+        }
+    }
+
+    @Synchronized
+    fun stop() {
+        if (serverStarted) {
+            server.stop()
+            serverStarted = false
+        }
     }
 
     private fun Application.module() {
