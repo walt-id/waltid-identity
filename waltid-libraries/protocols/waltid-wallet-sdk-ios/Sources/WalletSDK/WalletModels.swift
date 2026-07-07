@@ -73,11 +73,26 @@ public struct WalletStores: Sendable {
     /// Optional credential store override. `nil` uses default encrypted local persistence.
     public var credentials: (any WalletCredentialStore)?
 
+    /// Optional DID document store override. `nil` uses default encrypted local persistence.
+    public var dids: (any WalletDidStore)?
+
+    /// Optional atomic key store and generator override. `nil` uses platform signing-key persistence.
+    public var keys: WalletKeys?
+
     /// Creates wallet store overrides.
     ///
-    /// - Parameter credentials: Optional credential store override.
-    public init(credentials: (any WalletCredentialStore)? = nil) {
+    /// - Parameters:
+    ///   - credentials: Optional credential store override.
+    ///   - dids: Optional DID document store override.
+    ///   - keys: Optional atomic key store and generator override.
+    public init(
+        credentials: (any WalletCredentialStore)? = nil,
+        dids: (any WalletDidStore)? = nil,
+        keys: WalletKeys? = nil
+    ) {
         self.credentials = credentials
+        self.dids = dids
+        self.keys = keys
     }
 }
 
@@ -198,6 +213,53 @@ public protocol WalletCredentialStore: Sendable {
     func removeCredential(id: String) async throws -> Bool
 }
 
+/// DID document entry used by custom Swift DID stores.
+public struct StoredDid: Equatable, Identifiable, Sendable {
+    /// Stable DID string.
+    public let did: String
+
+    /// Serialized DID document JSON object.
+    public let documentJSON: String
+
+    /// Stable identifier for SwiftUI and collection APIs.
+    public var id: String { did }
+
+    /// Creates a DID document entry for custom Swift DID stores.
+    ///
+    /// - Parameters:
+    ///   - did: Stable DID string.
+    ///   - documentJSON: Serialized DID document JSON object.
+    public init(did: String, documentJSON: String) {
+        self.did = did
+        self.documentJSON = documentJSON
+    }
+}
+
+/// App-owned DID document persistence override.
+public protocol WalletDidStore: Sendable {
+    /// Returns a DID document by DID string.
+    ///
+    /// - Parameter id: Stable DID string.
+    /// - Returns: Stored DID document when present, or `nil` when absent.
+    func did(id: String) async throws -> StoredDid?
+
+    /// Lists all DID documents in this store.
+    ///
+    /// - Returns: Stored DID documents currently owned by this store.
+    func dids() async throws -> [StoredDid]
+
+    /// Adds or replaces a DID document entry.
+    ///
+    /// - Parameter did: DID document entry to persist.
+    func addDid(_ did: StoredDid) async throws
+
+    /// Removes a DID document by DID string.
+    ///
+    /// - Parameter id: Stable DID string to remove.
+    /// - Returns: `true` when the store removed an existing DID document.
+    func removeDid(id: String) async throws -> Bool
+}
+
 /// Key algorithms supported by the wallet bridge.
 public enum WalletKeyType: Equatable, Sendable {
     /// Ed25519 elliptic curve key.
@@ -223,6 +285,131 @@ public enum WalletKeyType: Equatable, Sendable {
 
     /// RSA key with a 4096-bit modulus.
     case rsa4096
+}
+
+/// Lightweight metadata about a signing key stored by a custom Swift key store.
+public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
+    /// Stable wallet-local key identifier.
+    public let keyID: String
+
+    /// Signing-key type.
+    public let keyType: WalletKeyType
+
+    /// Optional signing algorithm label, such as `EdDSA` or `ES256`.
+    public let algorithm: String?
+
+    /// Stable identifier for SwiftUI and collection APIs.
+    public var id: String { keyID }
+
+    /// Creates signing-key metadata.
+    ///
+    /// - Parameters:
+    ///   - keyID: Stable wallet-local key identifier.
+    ///   - keyType: Signing-key type.
+    ///   - algorithm: Optional signing algorithm label.
+    public init(keyID: String, keyType: WalletKeyType, algorithm: String? = nil) {
+        self.keyID = keyID
+        self.keyType = keyType
+        self.algorithm = algorithm
+    }
+}
+
+/// Serialized signing key used by custom Swift key stores.
+///
+/// The serialized key JSON may contain private signing material. Treat it like a secret and avoid
+/// logging or exporting it outside app-owned secure storage.
+public struct StoredKey: CustomDebugStringConvertible, CustomStringConvertible, Equatable, Identifiable, Sendable {
+    /// Stable wallet-local key identifier.
+    public let keyID: String
+
+    /// Signing-key type.
+    public let keyType: WalletKeyType
+
+    /// Optional signing algorithm label, such as `EdDSA` or `ES256`.
+    public let algorithm: String?
+
+    /// walt.id serialized key JSON payload.
+    public let serializedKeyJSON: String
+
+    /// Stable identifier for SwiftUI and collection APIs.
+    public var id: String { keyID }
+
+    /// Text representation that redacts serialized key material.
+    public var description: String {
+        "StoredKey(keyID: \(keyID), keyType: \(keyType), algorithm: \(algorithm ?? "nil"), serializedKeyJSON: <redacted>)"
+    }
+
+    /// Debug representation that redacts serialized key material.
+    public var debugDescription: String {
+        description
+    }
+
+    /// Creates a serialized signing-key entry for custom Swift key stores.
+    ///
+    /// - Parameters:
+    ///   - keyID: Stable wallet-local key identifier.
+    ///   - keyType: Signing-key type.
+    ///   - algorithm: Optional signing algorithm label.
+    ///   - serializedKeyJSON: walt.id serialized key JSON payload.
+    public init(
+        keyID: String,
+        keyType: WalletKeyType,
+        algorithm: String? = nil,
+        serializedKeyJSON: String
+    ) {
+        self.keyID = keyID
+        self.keyType = keyType
+        self.algorithm = algorithm
+        self.serializedKeyJSON = serializedKeyJSON
+    }
+}
+
+/// App-owned signing-key persistence override.
+public protocol WalletKeyStore: Sendable {
+    /// Returns a serialized signing key by wallet-local identifier.
+    ///
+    /// - Parameter id: Stable wallet-local key identifier.
+    /// - Returns: Stored key when present, or `nil` when absent.
+    func key(id: String) async throws -> StoredKey?
+
+    /// Lists signing-key metadata in this store.
+    ///
+    /// - Returns: Stored signing-key metadata currently owned by this store.
+    func keys() async throws -> [WalletKeyInfo]
+
+    /// Adds or replaces a serialized signing-key entry.
+    ///
+    /// - Parameter key: Serialized signing-key entry to persist.
+    /// - Returns: Stable wallet-local key identifier for the stored key.
+    func addKey(_ key: StoredKey) async throws -> String
+
+    /// Removes a signing key by wallet-local identifier.
+    ///
+    /// - Parameter id: Stable wallet-local key identifier to remove.
+    /// - Returns: `true` when the store removed an existing signing key.
+    func removeKey(id: String) async throws -> Bool
+}
+
+/// Atomic custom signing-key persistence configuration.
+public struct WalletKeys: Sendable {
+    /// App-owned signing-key store.
+    public let store: any WalletKeyStore
+
+    /// App-owned signing-key generator.
+    public let generate: @Sendable (WalletKeyType) async throws -> StoredKey
+
+    /// Creates an atomic signing-key store and generator override.
+    ///
+    /// - Parameters:
+    ///   - store: App-owned signing-key store.
+    ///   - generate: App-owned signing-key generator.
+    public init(
+        store: any WalletKeyStore,
+        generate: @escaping @Sendable (WalletKeyType) async throws -> StoredKey
+    ) {
+        self.store = store
+        self.generate = generate
+    }
 }
 
 /// Wallet attestation settings.

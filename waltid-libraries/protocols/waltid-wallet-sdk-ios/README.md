@@ -128,7 +128,77 @@ let wallet = try await Wallet(
 )
 ```
 
-Provided database keys and custom credential stores can be combined when an app owns both database-key recovery and credential durability:
+Apps that own more wallet durability can also provide DID and signing-key stores. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically:
+
+```swift
+actor AppDidStore: WalletDidStore {
+    private var entries: [String: StoredDid] = [:]
+
+    func did(id: String) async throws -> StoredDid? {
+        entries[id]
+    }
+
+    func dids() async throws -> [StoredDid] {
+        Array(entries.values)
+    }
+
+    func addDid(_ did: StoredDid) async throws {
+        entries[did.id] = did
+    }
+
+    func removeDid(id: String) async throws -> Bool {
+        entries.removeValue(forKey: id) != nil
+    }
+}
+
+actor AppKeyStore: WalletKeyStore {
+    private var entries: [String: StoredKey] = [:]
+
+    func key(id: String) async throws -> StoredKey? {
+        entries[id]
+    }
+
+    func keys() async throws -> [WalletKeyInfo] {
+        entries.values.map {
+            WalletKeyInfo(keyID: $0.keyID, keyType: $0.keyType, algorithm: $0.algorithm)
+        }
+    }
+
+    func addKey(_ key: StoredKey) async throws -> String {
+        entries[key.id] = key
+        return key.keyID
+    }
+
+    func removeKey(id: String) async throws -> Bool {
+        entries.removeValue(forKey: id) != nil
+    }
+
+    func generateKey(type: WalletKeyType) async throws -> StoredKey {
+        try await createSerializedWalletKey(type: type)
+    }
+}
+
+let keyStore = AppKeyStore()
+
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            stores: WalletStores(
+                credentials: AppCredentialStore(),
+                dids: AppDidStore(),
+                keys: WalletKeys(store: keyStore) { keyType in
+                    try await keyStore.generateKey(type: keyType)
+                }
+            )
+        )
+    )
+)
+```
+
+`StoredKey.serializedKeyJSON` is a walt.id serialized key payload and may contain private signing material. Treat it like a secret and store it only in app-owned secure storage.
+
+Provided database keys and custom stores can be combined when an app owns both database-key recovery and wallet-record durability:
 
 ```swift
 let wallet = try await Wallet(
@@ -136,15 +206,19 @@ let wallet = try await Wallet(
         walletID: "consumer-wallet",
         persistence: WalletPersistence(
             databaseKey: .provided(KMSDatabaseKeyProvider()),
-            stores: WalletStores(credentials: AppCredentialStore())
+            stores: WalletStores(
+                credentials: AppCredentialStore(),
+                dids: AppDidStore(),
+                keys: WalletKeys(store: keyStore) { keyType in
+                    try await keyStore.generateKey(type: keyType)
+                }
+            )
         )
     )
 )
 ```
 
-The Swift facade intentionally exposes credential-store overrides first. Kotlin Multiplatform still supports full credential, DID, and key store overrides through `MobileWalletStores`; Swift key/DID store parity needs public Swift signing-key and DID-document models, defined deletion semantics for app-owned stores, and typed error behavior before those overrides become public Swift API.
-
-Call `try await wallet.deleteLocalData()` to remove local material for that wallet: stored wallet records, platform signing keys referenced by the wallet, encrypted database files and sidecars, and the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
+Call `try await wallet.deleteLocalData()` to remove local material for that wallet. The active credential, DID, and key stores receive their remove calls; the SDK then removes encrypted database files and sidecars plus the configured database key. Local development databases created before encrypted persistence may fail to open; reset the app by calling `deleteLocalData()`, uninstalling the app, or deleting local app data.
 
 ## Native iOS Consumer
 

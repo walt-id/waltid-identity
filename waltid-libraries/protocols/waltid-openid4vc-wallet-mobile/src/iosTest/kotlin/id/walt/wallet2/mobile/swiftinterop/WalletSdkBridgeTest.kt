@@ -1,6 +1,9 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
@@ -16,11 +19,15 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -56,6 +63,22 @@ class WalletSdkBridgeTest {
         }
 
         assertEquals("cancelled", cancellation.message)
+    }
+
+    @Test
+    fun storedKeyStringRepresentationRedactsSerializedKeyJson() {
+        val key = WalletBridgeStoredKey(
+            keyId = "key-1",
+            keyType = "secp256r1",
+            algorithm = "ES256",
+            serializedKeyJson = """{"type":"jwk","jwk":{"kid":"key-1","d":"secret"}}""",
+        )
+
+        assertEquals(
+            "WalletBridgeStoredKey(keyId=key-1, keyType=secp256r1, algorithm=ES256, serializedKeyJson=<redacted>)",
+            key.toString(),
+        )
+        assertFalse(key.toString().contains("secret"))
     }
 
     @Test
@@ -236,6 +259,78 @@ class WalletSdkBridgeTest {
     }
 
     @Test
+    fun factoryMapsSwiftDidAndKeyStoreOverridesToMobileWalletConfig() = runTest {
+        var capturedConfig: MobileWalletConfig? = null
+        val generatedKey = KeyManager.resolveSerializedKey(ED25519_SERIALIZED_KEY)
+        val generatedBridgeKey = WalletBridgeStoredKey(
+            keyId = generatedKey.getKeyId(),
+            keyType = "Ed25519",
+            algorithm = "EdDSA",
+            serializedKeyJson = ED25519_SERIALIZED_KEY,
+        )
+        val storedBridgeKey = WalletBridgeStoredKey(
+            keyId = P256_KEY_ID,
+            keyType = "secp256r1",
+            algorithm = "ES256",
+            serializedKeyJson = P256_SERIALIZED_KEY,
+        )
+        val bridgeDidStore = RecordingBridgeDidStore(
+            WalletBridgeStoredDid(
+                did = "did:key:swift",
+                documentJson = """{"id":"did:key:swift"}""",
+            )
+        )
+        val bridgeKeyStore = RecordingBridgeKeyStore(storedBridgeKey)
+        val bridgeKeyGenerator = RecordingBridgeKeyGenerator(generatedBridgeKey)
+        val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
+            capturedConfig = config
+            FakeWalletSdkBridgeOperations()
+        }
+
+        val result = factory.create(
+            WalletBridgeConfiguration(
+                walletId = "swift-full-store-wallet",
+                persistence = WalletBridgePersistence(
+                    stores = WalletBridgeStores(
+                        dids = bridgeDidStore,
+                        keys = WalletBridgeKeys(
+                            store = bridgeKeyStore,
+                            generate = bridgeKeyGenerator,
+                        ),
+                    ),
+                ),
+            )
+        )
+
+        assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
+        val persistence = requireNotNull(capturedConfig).persistence
+        assertIs<MobileWalletDatabaseKey.Managed>(persistence.databaseKey)
+
+        val didStore = requireNotNull(persistence.stores.dids)
+        assertEquals(
+            WalletDidEntry("did:key:swift", Json.parseToJsonElement("""{"id":"did:key:swift"}""").jsonObject),
+            didStore.getDid("did:key:swift"),
+        )
+        didStore.addDid(WalletDidEntry("did:key:new", Json.parseToJsonElement("""{"id":"did:key:new"}""").jsonObject))
+        assertEquals(listOf("did:key:new"), bridgeDidStore.addedDids.map { it.did })
+        assertEquals("""{"id":"did:key:new"}""", bridgeDidStore.addedDids.single().documentJson)
+        assertEquals(true, didStore.removeDid("did:key:swift"))
+        assertEquals(listOf("did:key:swift"), bridgeDidStore.removedDids)
+
+        val keys = requireNotNull(persistence.stores.keys)
+        assertEquals(listOf(WalletKeyInfo(P256_KEY_ID, "secp256r1", "ES256")), keys.store.listKeys().toList())
+        assertEquals(P256_KEY_ID, keys.store.getKey(P256_KEY_ID)?.getKeyId())
+        assertEquals(P256_KEY_ID, keys.store.addKey(generatedKey))
+        assertEquals(generatedBridgeKey.keyId, bridgeKeyStore.addedKeys.single().keyId)
+        assertEquals(true, keys.store.removeKey(P256_KEY_ID))
+        assertEquals(listOf(P256_KEY_ID), bridgeKeyStore.removedKeyIds)
+
+        val generated = keys.generate(KeyType.Ed25519)
+        assertEquals(generatedBridgeKey.keyId, generated.getKeyId())
+        assertEquals(listOf(MobileWalletKeyType.Ed25519), bridgeKeyGenerator.requestedTypes)
+    }
+
+    @Test
     fun factoryCombinesSwiftDatabaseKeyProviderAndCredentialStoreOverride() = runTest {
         var capturedConfig: MobileWalletConfig? = null
         val bridgeKeyProvider = RecordingBridgeDatabaseKeyProvider(
@@ -413,5 +508,71 @@ class WalletSdkBridgeTest {
             removedCredentialIds += id
             return true
         }
+    }
+
+    private class RecordingBridgeDidStore(
+        private val did: WalletBridgeStoredDid,
+    ) : WalletBridgeDidStore {
+        val addedDids = mutableListOf<WalletBridgeStoredDid>()
+        val removedDids = mutableListOf<String>()
+
+        override suspend fun getDid(did: String): WalletBridgeStoredDid? =
+            this.did.takeIf { it.did == did }
+
+        override suspend fun listDids(): List<WalletBridgeStoredDid> =
+            listOf(did)
+
+        override suspend fun addDid(entry: WalletBridgeStoredDid) {
+            addedDids += entry
+        }
+
+        override suspend fun removeDid(did: String): Boolean {
+            removedDids += did
+            return true
+        }
+    }
+
+    private class RecordingBridgeKeyStore(
+        private val key: WalletBridgeStoredKey,
+    ) : WalletBridgeKeyStore {
+        val addedKeys = mutableListOf<WalletBridgeStoredKey>()
+        val removedKeyIds = mutableListOf<String>()
+
+        override suspend fun getKey(keyId: String): WalletBridgeStoredKey? =
+            key.takeIf { it.keyId == keyId }
+
+        override suspend fun listKeys(): List<WalletBridgeKeyInfo> =
+            listOf(WalletBridgeKeyInfo(key.keyId, key.keyType, key.algorithm))
+
+        override suspend fun addKey(entry: WalletBridgeStoredKey): String {
+            addedKeys += entry
+            return key.keyId
+        }
+
+        override suspend fun removeKey(keyId: String): Boolean {
+            removedKeyIds += keyId
+            return true
+        }
+    }
+
+    private class RecordingBridgeKeyGenerator(
+        private val key: WalletBridgeStoredKey,
+    ) : WalletBridgeKeyGenerator {
+        val requestedTypes = mutableListOf<MobileWalletKeyType>()
+
+        override suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey {
+            requestedTypes += keyType
+            return key
+        }
+    }
+
+    private companion object {
+        private const val ED25519_SERIALIZED_KEY =
+            """{"type":"jwk","jwk":{"kty":"OKP","d":"lPR4XjW-9_rI4hLjvdjmjoGC6ozblm9juDv4OHYdm5M","crv":"Ed25519","kid":"sryFIxLJ7aIqTsXo0QCnNUR9TG6jmHOQa9CFhxg5OIA","x":"LRHvL7I9utgSl47JksY0-uY21TlIxp_queROJJzknNM"}}"""
+
+        private const val P256_KEY_ID = "_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug"
+
+        private const val P256_SERIALIZED_KEY =
+            """{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""
     }
 }

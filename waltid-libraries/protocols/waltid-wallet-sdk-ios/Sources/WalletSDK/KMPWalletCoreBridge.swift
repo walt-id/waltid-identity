@@ -184,7 +184,14 @@ private extension WalletDatabaseKeyConfiguration {
 private extension WalletStores {
     func toKMPStores() -> WalletBridgeStores {
         WalletBridgeStores(
-            credentials: credentials.map { KMPWalletCredentialStoreAdapter(store: $0) }
+            credentials: credentials.map { KMPWalletCredentialStoreAdapter(store: $0) },
+            dids: dids.map { KMPWalletDidStoreAdapter(store: $0) },
+            keys: keys.map { keyOverride in
+                WalletBridgeKeys(
+                    store: KMPWalletKeyStoreAdapter(store: keyOverride.store),
+                    generate: KMPWalletKeyGeneratorAdapter(generate: keyOverride.generate)
+                )
+            }
         )
     }
 }
@@ -233,6 +240,66 @@ private final class KMPWalletCredentialStoreAdapter: WalletBridgeCredentialStore
     }
 }
 
+private final class KMPWalletDidStoreAdapter: WalletBridgeDidStore, @unchecked Sendable {
+    private let store: any WalletDidStore
+
+    init(store: any WalletDidStore) {
+        self.store = store
+    }
+
+    func __getDid(did: String) async throws -> WalletBridgeStoredDid? {
+        try await store.did(id: did)?.toKMPStoredDid()
+    }
+
+    func __listDids() async throws -> [WalletBridgeStoredDid] {
+        try await store.dids().map { $0.toKMPStoredDid() }
+    }
+
+    func __addDid(entry: WalletBridgeStoredDid) async throws {
+        try await store.addDid(entry.toSwiftStoredDid())
+    }
+
+    func __removeDid(did: String) async throws -> KotlinBoolean {
+        KotlinBoolean(bool: try await store.removeDid(id: did))
+    }
+}
+
+private final class KMPWalletKeyStoreAdapter: WalletBridgeKeyStore, @unchecked Sendable {
+    private let store: any WalletKeyStore
+
+    init(store: any WalletKeyStore) {
+        self.store = store
+    }
+
+    func __getKey(keyId: String) async throws -> WalletBridgeStoredKey? {
+        try await store.key(id: keyId)?.toKMPStoredKey()
+    }
+
+    func __listKeys() async throws -> [WalletBridgeKeyInfo] {
+        try await store.keys().map { $0.toKMPKeyInfo() }
+    }
+
+    func __addKey(entry: WalletBridgeStoredKey) async throws -> String {
+        try await store.addKey(entry.toSwiftStoredKey())
+    }
+
+    func __removeKey(keyId: String) async throws -> KotlinBoolean {
+        KotlinBoolean(bool: try await store.removeKey(id: keyId))
+    }
+}
+
+private final class KMPWalletKeyGeneratorAdapter: WalletBridgeKeyGenerator, @unchecked Sendable {
+    private let generate: @Sendable (WalletKeyType) async throws -> StoredKey
+
+    init(generate: @escaping @Sendable (WalletKeyType) async throws -> StoredKey) {
+        self.generate = generate
+    }
+
+    func __generateKey(keyType: MobileWalletKeyType) async throws -> WalletBridgeStoredKey {
+        try await generate(keyType.toSwiftKeyType()).toKMPStoredKey()
+    }
+}
+
 private extension StoredCredential {
     func toKMPStoredCredential() -> WalletBridgeStoredCredential {
         WalletBridgeStoredCredential(
@@ -253,6 +320,56 @@ private extension WalletBridgeStoredCredential {
             format: format,
             label: label,
             addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+        )
+    }
+}
+
+private extension StoredDid {
+    func toKMPStoredDid() -> WalletBridgeStoredDid {
+        WalletBridgeStoredDid(
+            did: did,
+            documentJson: documentJSON
+        )
+    }
+}
+
+private extension WalletBridgeStoredDid {
+    func toSwiftStoredDid() -> StoredDid {
+        StoredDid(
+            did: did,
+            documentJSON: documentJson
+        )
+    }
+}
+
+private extension WalletKeyInfo {
+    func toKMPKeyInfo() -> WalletBridgeKeyInfo {
+        WalletBridgeKeyInfo(
+            keyId: keyID,
+            keyType: keyType.bridgeName,
+            algorithm: algorithm
+        )
+    }
+}
+
+private extension StoredKey {
+    func toKMPStoredKey() -> WalletBridgeStoredKey {
+        WalletBridgeStoredKey(
+            keyId: keyID,
+            keyType: keyType.bridgeName,
+            algorithm: algorithm,
+            serializedKeyJson: serializedKeyJSON
+        )
+    }
+}
+
+private extension WalletBridgeStoredKey {
+    func toSwiftStoredKey() throws -> StoredKey {
+        StoredKey(
+            keyID: keyId,
+            keyType: try WalletKeyType(bridgeName: keyType),
+            algorithm: algorithm,
+            serializedKeyJSON: serializedKeyJson
         )
     }
 }
@@ -282,7 +399,74 @@ private extension WalletAttestationConfiguration {
 }
 
 private extension WalletKeyType {
+    init(bridgeName: String) throws {
+        switch bridgeName {
+        case "Ed25519":
+            self = .ed25519
+        case "secp256k1":
+            self = .secp256k1
+        case "secp256r1":
+            self = .secp256r1
+        case "secp384r1":
+            self = .secp384r1
+        case "secp521r1":
+            self = .secp521r1
+        case "RSA":
+            self = .rsa
+        case "RSA3072":
+            self = .rsa3072
+        case "RSA4096":
+            self = .rsa4096
+        default:
+            throw WalletError.invalidInput("Unsupported wallet key type: \(bridgeName)")
+        }
+    }
+
+    var bridgeName: String {
+        switch self {
+        case .ed25519:
+            return "Ed25519"
+        case .secp256k1:
+            return "secp256k1"
+        case .secp256r1:
+            return "secp256r1"
+        case .secp384r1:
+            return "secp384r1"
+        case .secp521r1:
+            return "secp521r1"
+        case .rsa:
+            return "RSA"
+        case .rsa3072:
+            return "RSA3072"
+        case .rsa4096:
+            return "RSA4096"
+        }
+    }
+
     func toKMPKeyType() -> MobileWalletKeyType {
+        switch self {
+        case .ed25519:
+            return .ed25519
+        case .secp256k1:
+            return .secp256k1
+        case .secp256r1:
+            return .secp256r1
+        case .secp384r1:
+            return .secp384r1
+        case .secp521r1:
+            return .secp521r1
+        case .rsa:
+            return .rsa
+        case .rsa3072:
+            return .rsa3072
+        case .rsa4096:
+            return .rsa4096
+        }
+    }
+}
+
+private extension MobileWalletKeyType {
+    func toSwiftKeyType() -> WalletKeyType {
         switch self {
         case .ed25519:
             return .ed25519

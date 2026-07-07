@@ -27,10 +27,30 @@ Apps that own database-key recovery can pass ``WalletPersistence`` with
 ``WalletDatabaseKeyConfiguration/provided(_:)`` and a
 ``WalletDatabaseKeyProvider`` implementation.
 
-Apps can also pass ``WalletStores`` with a ``WalletCredentialStore`` when they
-own credential durability. The Swift facade intentionally exposes credential
-store overrides only; DID storage and signing-key storage stay SDK-managed for
-now.
+Apps can also pass ``WalletStores`` when they own credential, DID, or signing-key
+durability. Credential and DID stores can be supplied independently. Signing-key
+stores use ``WalletKeys`` so the app-owned ``WalletKeyStore`` and key generator
+are configured atomically.
+
+```swift
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            stores: WalletStores(
+                credentials: AppCredentialStore(),
+                dids: AppDidStore(),
+                keys: WalletKeys(store: AppKeyStore()) { keyType in
+                    try await generateSerializedWalletKey(type: keyType)
+                }
+            )
+        )
+    )
+)
+```
+
+``StoredKey`` contains walt.id serialized key JSON and may include private key
+material. Keep those entries in app-owned secure storage.
 
 > Important: Keep Kotlin Multiplatform and generated bridge symbols behind
 > `WalletSDK`. Native iOS consumers should import this Swift package and work
