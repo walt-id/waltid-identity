@@ -108,9 +108,9 @@ object StatusPolicyImplementation {
     private suspend fun processW3C(
         data: JsonElement,
         attribute: W3CStatusPolicyAttribute
-    ): Result<Unit> {
+    ): Result<Unit> = runCatching {
         val statusEntry = w3cEntryContentParser.parse(data)
-        return w3cStatusValidator.validate(statusEntry, attribute)
+        w3cStatusValidator.validate(statusEntry, attribute).getOrThrow()
     }
 
     private suspend fun processListW3C(
@@ -147,9 +147,9 @@ object StatusPolicyImplementation {
     private suspend fun processIETF(
         data: JsonElement,
         attribute: IETFStatusPolicyAttribute
-    ): Result<Unit> {
+    ): Result<Unit> = runCatching {
         val statusEntry = ietfEntryContentParser.parse(data)
-        return ietfStatusValidator.validate(statusEntry, attribute)
+        ietfStatusValidator.validate(statusEntry, attribute).getOrThrow()
     }
 
     private fun getStatusEntryElementExtractor(args: StatusPolicyArgument) = when (args) {
