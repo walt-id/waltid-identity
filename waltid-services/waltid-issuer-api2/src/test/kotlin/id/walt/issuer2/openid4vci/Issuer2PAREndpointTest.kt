@@ -1,12 +1,12 @@
 package id.walt.issuer2.openid4vci
 
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
-import id.walt.issuer2.config.ClientAuthenticationConfig
-import id.walt.issuer2.config.ClientAuthenticationMethod
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.repository.openid4vci.ConfiguredAuthorizationCodeRepository
 import id.walt.issuer2.repository.openid4vci.ConfiguredPreAuthorizedCodeRepository
 import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
@@ -168,7 +168,7 @@ class Issuer2PAREndpointTest {
                 enforcePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
                 clientAuthenticationConfig = clientAttestation?.let {
                     ClientAuthenticationConfig(
-                        supportedMethods = listOf(ClientAuthenticationMethod.ClientAttestation(it)),
+                        supportedMethods = listOf(ClientAuthenticationMethodConfig.ClientAttestation(it)),
                     )
                 },
             ),
