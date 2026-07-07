@@ -67,10 +67,12 @@ let wallet = try await Wallet(
 avoid logging, serializing, or otherwise exposing the `material` bytes.
 
 Use ``WalletStores`` when an app owns credential, DID, or signing-key
-durability. Store overrides are independent except for signing keys:
-``WalletKeys`` keeps the ``WalletKeyStore`` and its generator together so newly
-generated keys are persisted into the same app-owned key domain. This example
-assumes app-defined store types that implement the corresponding protocols.
+durability. Omitted credential and DID stores use the encrypted local database,
+while an omitted key store uses platform signing-key persistence and generation.
+Store overrides are independent except for signing keys: ``WalletKeys`` keeps
+the ``WalletKeyStore`` and its generator together so newly generated keys are
+persisted into the same app-owned key domain. This example assumes app-defined
+store types that implement the corresponding protocols.
 
 <!-- doc-snippet:start swift-full-store-overrides -->
 ```swift

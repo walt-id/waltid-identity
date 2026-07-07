@@ -1,6 +1,8 @@
 package id.walt.wallet2.mobile.test
 
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteException
 import androidx.test.platform.app.InstrumentationRegistry
@@ -51,6 +53,17 @@ class MobileWalletEncryptionTest {
         assertFalse(first.material.contentEquals(regenerated.material))
 
         provider.deleteKey(walletId, databaseName)
+    }
+
+    @Test
+    fun managedAndroidDatabaseKeyCreationFailsWhenKeyCannotBePersisted() = runBlocking {
+        val walletId = "android-encryption-key-persist-failure-test"
+
+        assertFailsWith<WalletPersistenceException.EncryptionConfigurationFailed> {
+            AndroidDatabaseEncryptionKeyProvider(FailingPreferencesContext(context))
+                .getOrCreateKey(walletId, "wallet_$walletId")
+        }
+        Unit
     }
 
     @Test
@@ -277,5 +290,41 @@ class MobileWalletEncryptionTest {
             error("This test only verifies credential-store routing")
 
         override suspend fun removeCredential(id: String): Boolean = false
+    }
+
+    private class FailingPreferencesContext(base: Context) : ContextWrapper(base) {
+        override fun getApplicationContext(): Context = this
+
+        override fun getSharedPreferences(name: String?, mode: Int): SharedPreferences =
+            FailingSharedPreferences
+    }
+
+    private object FailingSharedPreferences : SharedPreferences {
+        override fun getString(key: String?, defValue: String?): String? = null
+
+        override fun edit(): SharedPreferences.Editor = FailingEditor
+
+        override fun getAll(): MutableMap<String, *> = mutableMapOf<String, Any>()
+        override fun getStringSet(key: String?, defValues: MutableSet<String>?): MutableSet<String>? = defValues
+        override fun getInt(key: String?, defValue: Int): Int = defValue
+        override fun getLong(key: String?, defValue: Long): Long = defValue
+        override fun getFloat(key: String?, defValue: Float): Float = defValue
+        override fun getBoolean(key: String?, defValue: Boolean): Boolean = defValue
+        override fun contains(key: String?): Boolean = false
+        override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+        override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) = Unit
+    }
+
+    private object FailingEditor : SharedPreferences.Editor {
+        override fun putString(key: String?, value: String?): SharedPreferences.Editor = this
+        override fun putStringSet(key: String?, values: MutableSet<String>?): SharedPreferences.Editor = this
+        override fun putInt(key: String?, value: Int): SharedPreferences.Editor = this
+        override fun putLong(key: String?, value: Long): SharedPreferences.Editor = this
+        override fun putFloat(key: String?, value: Float): SharedPreferences.Editor = this
+        override fun putBoolean(key: String?, value: Boolean): SharedPreferences.Editor = this
+        override fun remove(key: String?): SharedPreferences.Editor = this
+        override fun clear(): SharedPreferences.Editor = this
+        override fun commit(): Boolean = false
+        override fun apply() = Unit
     }
 }

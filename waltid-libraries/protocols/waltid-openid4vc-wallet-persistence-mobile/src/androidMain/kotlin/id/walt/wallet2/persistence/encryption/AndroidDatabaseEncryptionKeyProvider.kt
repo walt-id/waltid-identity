@@ -38,9 +38,7 @@ class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptio
         }
 
         val material = ByteArray(DATABASE_KEY_BYTES).also(secureRandom::nextBytes)
-        preferences.edit()
-            .putString(keyId, encryptKeyMaterial(keyId, material))
-            .apply()
+        persistStoredKey(walletId, keyId, encryptKeyMaterial(keyId, material))
         return DatabaseEncryptionKey(keyId = keyId, material = material)
     }
 
@@ -49,10 +47,29 @@ class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptio
      */
     override suspend fun deleteKey(walletId: String, databaseName: String) {
         val keyId = keyId(walletId, databaseName)
-        preferences.edit().remove(keyId).apply()
+        if (!preferences.edit().remove(keyId).commit()) {
+            throw WalletPersistenceException.EncryptionConfigurationFailed(
+                walletId = walletId,
+                cause = IllegalStateException("Database key removal could not be persisted"),
+            )
+        }
         runCatching {
             keyStore().deleteEntry(keyId)
         }
+    }
+
+    private fun persistStoredKey(walletId: String, keyId: String, storedKey: String) {
+        if (preferences.edit().putString(keyId, storedKey).commit()) {
+            return
+        }
+
+        runCatching {
+            keyStore().deleteEntry(keyId)
+        }
+        throw WalletPersistenceException.EncryptionConfigurationFailed(
+            walletId = walletId,
+            cause = IllegalStateException("Database key could not be persisted"),
+        )
     }
 
     private fun encryptKeyMaterial(keyId: String, material: ByteArray): String {

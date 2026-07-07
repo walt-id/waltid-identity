@@ -42,7 +42,9 @@ public struct WalletPersistence: Sendable {
     /// Owner of the encrypted local database key.
     public var databaseKey: WalletDatabaseKeyConfiguration
 
-    /// Optional store overrides. Omitted stores use default encrypted local persistence.
+    /// Optional store overrides. Omitted credential and DID stores use the
+    /// encrypted local database; omitted key stores use platform signing-key
+    /// persistence and generation.
     public var stores: WalletStores
 
     /// Creates wallet persistence configuration.
@@ -70,10 +72,10 @@ public enum WalletDatabaseKeyConfiguration: Sendable {
 
 /// Optional wallet store overrides.
 public struct WalletStores: Sendable {
-    /// Optional credential store override. `nil` uses default encrypted local persistence.
+    /// Optional credential store override. `nil` uses the encrypted local database.
     public var credentials: (any WalletCredentialStore)?
 
-    /// Optional DID document store override. `nil` uses default encrypted local persistence.
+    /// Optional DID document store override. `nil` uses the encrypted local database.
     public var dids: (any WalletDidStore)?
 
     /// Optional atomic key store and generator override. `nil` uses platform signing-key persistence.

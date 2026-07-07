@@ -28,9 +28,11 @@ Apps that own database-key recovery can pass ``WalletPersistence`` with
 ``WalletDatabaseKeyProvider`` implementation.
 
 Apps can also pass ``WalletStores`` when they own credential, DID, or signing-key
-durability. Credential and DID stores can be supplied independently. Signing-key
-stores use ``WalletKeys`` so the app-owned ``WalletKeyStore`` and key generator
-are configured atomically. This example assumes app-defined store types that
+durability. Omitted credential and DID stores use the encrypted local database,
+while an omitted key store uses platform signing-key persistence and generation.
+Credential and DID stores can be supplied independently. Signing-key stores use
+``WalletKeys`` so the app-owned ``WalletKeyStore`` and key generator are
+configured atomically. This example assumes app-defined store types that
 implement the corresponding protocols.
 
 <!-- doc-snippet:start swift-full-store-overrides -->

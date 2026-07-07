@@ -138,7 +138,7 @@ let wallet = try await Wallet(
 ```
 <!-- doc-snippet:end swift-custom-credential-store -->
 
-Apps that own more wallet durability can also provide DID and signing-key stores. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically. This example assumes `AppDidStore` and `AppKeyStore` implement the corresponding store protocols, and that `AppKeyStore` exposes app-owned key generation.
+Apps that own more wallet durability can also provide DID and signing-key stores. Omitted credential and DID stores use the encrypted local database, while an omitted key store uses platform signing-key persistence and generation. Signing-key overrides are configured through `WalletKeys` so the app-owned `WalletKeyStore` and generator are supplied atomically. This example assumes `AppDidStore` and `AppKeyStore` implement the corresponding store protocols, and that `AppKeyStore` exposes app-owned key generation.
 
 <!-- doc-snippet:start swift-full-store-overrides -->
 ```swift
