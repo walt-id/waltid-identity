@@ -1,14 +1,25 @@
 package id.walt.x509
 
-actual fun parseX5cBase64(x5cBase64: List<String>): List<CertificateDer> =
-    x5cBase64.map { CertificateDer(kotlin.io.encoding.Base64.Default.decode(it).toByteString()) }
-
+@Throws(X509ValidationException::class)
 actual fun validateCertificateChain(
     leaf: CertificateDer,
     chain: List<CertificateDer>,
     trustAnchors: List<CertificateDer>?,
+    enableTrustedChainRoot: Boolean,
+    enableSystemTrustAnchors: Boolean,
     enableRevocation: Boolean
 ) {
-    // TODO: Implement with Web APIs or a JS PKI lib (no native PKIX path builder in WebCrypto).
-    throw X509ValidationException("Not implemented on JS yet.")
+    if (enableSystemTrustAnchors) {
+        throw X509ValidationException("System trust anchors are not supported for iOS certificate validation.")
+    }
+    if (enableRevocation) {
+        throw X509ValidationException("Revocation checking is not supported for iOS certificate validation.")
+    }
+
+    validateCertificateChainWithExplicitTrust(
+        leaf = leaf,
+        chain = chain,
+        trustAnchors = trustAnchors,
+        enableTrustedChainRoot = enableTrustedChainRoot,
+    )
 }

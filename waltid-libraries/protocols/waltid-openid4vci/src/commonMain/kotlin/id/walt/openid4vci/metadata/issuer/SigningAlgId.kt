@@ -67,6 +67,7 @@ internal object SigningAlgIdSetSerializer : KSerializer<Set<SigningAlgId>> {
     override val descriptor: SerialDescriptor = delegate.descriptor
     override fun serialize(encoder: Encoder, value: Set<SigningAlgId>) =
         delegate.serialize(encoder, value)
+
     override fun deserialize(decoder: Decoder): Set<SigningAlgId> =
         delegate.deserialize(decoder)
 }

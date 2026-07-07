@@ -1,6 +1,8 @@
 package id.waltid.openid4vci.wallet.token
 
 import id.walt.openid4vci.GrantType
+import id.walt.openid4vci.requests.authorization.AuthorizationDetail
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.*
@@ -9,6 +11,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 private val log = KotlinLogging.logger {}
 
@@ -36,6 +39,7 @@ class TokenRequestBuilder(
         val scope: String? = null,
         val c_nonce: String? = null,
         val c_nonce_expires_in: Long? = null,
+        val authorization_details: List<AuthorizationDetail>? = null
     )
 
     /**
@@ -87,6 +91,8 @@ class TokenRequestBuilder(
         preAuthorizedCode: String,
         txCode: String? = null,
         additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
@@ -95,6 +101,8 @@ class TokenRequestBuilder(
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Transaction code (PIN) present: ${txCode != null}" }
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
+        log.trace { "Additional headers: ${additionalHeaders.keys}" }
+        log.trace { "Client attestation: ${attestationHeaders != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
@@ -107,7 +115,7 @@ class TokenRequestBuilder(
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters)
+        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
     }
 
     /**
@@ -116,18 +124,50 @@ class TokenRequestBuilder(
     private suspend fun executeTokenRequest(
         tokenEndpoint: String,
         parameters: Parameters,
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
     ): TokenResponse {
         log.debug { "Sending token request to authorization server" }
         log.trace { "Request parameters count: ${parameters.names().size}" }
-        
-        val response: HttpResponse = try {
+
+        var response: HttpResponse = try {
             httpClient.post(tokenEndpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(parameters.formUrlEncode())
+                additionalHeaders.forEach { (name, value) -> header(name, value) }
+                attestationHeaders?.let {
+                    header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
+                    header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+                }
             }
         } catch (e: Exception) {
             log.error(e) { "Network error sending token request to: $tokenEndpoint" }
             throw Exception("Failed to send token request", e)
+        }
+
+        if (response.status.value in listOf(301, 302, 303, 307, 308)) {
+            val location = response.headers[HttpHeaders.Location]
+            if (location != null) {
+                log.debug { "Following redirect to: $location" }
+                val isSameOrigin = isSameOrigin(tokenEndpoint, location)
+                if (!isSameOrigin && (additionalHeaders.isNotEmpty() || attestationHeaders != null)) {
+                    error(
+                        "Cross-origin redirect from $tokenEndpoint to $location is not supported when token request " +
+                            "headers are present"
+                    )
+                }
+                response = httpClient.post(location) {
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody(parameters.formUrlEncode())
+                    if (isSameOrigin) {
+                        additionalHeaders.forEach { (name, value) -> header(name, value) }
+                        attestationHeaders?.let {
+                            header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
+                            header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+                        }
+                    }
+                }
+            }
         }
 
         if (!response.status.isSuccess()) {
@@ -159,5 +199,13 @@ class TokenRequestBuilder(
             }
             throw Exception("Failed to parse token response", e)
         }
+    }
+
+    private fun isSameOrigin(source: String, target: String): Boolean {
+        val sourceUrl = Url(source)
+        val targetUrl = Url(target)
+        return sourceUrl.protocol == targetUrl.protocol &&
+            sourceUrl.host == targetUrl.host &&
+            sourceUrl.port == targetUrl.port
     }
 }

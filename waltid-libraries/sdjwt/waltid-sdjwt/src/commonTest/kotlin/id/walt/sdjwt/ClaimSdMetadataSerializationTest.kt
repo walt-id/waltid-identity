@@ -88,7 +88,7 @@ class ClaimSdMetadataSerializationTest {
     }
 
     @Test
-    fun `decoding wrong-cased value fails (case-sensitive)`() {
+    fun `decoding wrong-cased value fails - case-sensitive`() {
         assertFailsWith<SerializationException> {
             Json.decodeFromString<ClaimSdMetadata>("\"Always\"") // capital A but not the serial name
         }

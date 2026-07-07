@@ -8,7 +8,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.SetSerializer
 import kotlinx.serialization.builtins.serializer
@@ -88,8 +87,8 @@ data class CredentialConfiguration(
             require(
                 algorithms.none {
                     (it is SigningAlgId.Jose && it.value.isBlank()) ||
-                        (it is SigningAlgId.LdSuite && it.value.isBlank()) ||
-                        (it is SigningAlgId.CoseName && it.value.isBlank())
+                            (it is SigningAlgId.LdSuite && it.value.isBlank()) ||
+                            (it is SigningAlgId.CoseName && it.value.isBlank())
                 }
             ) {
                 "credential_signing_alg_values_supported must not contain blank entries"
@@ -99,10 +98,12 @@ data class CredentialConfiguration(
                     require(algorithms.all { it is SigningAlgId.LdSuite }) {
                         "credential_signing_alg_values_supported must contain LD suite identifiers for ${format.value}"
                     }
+
                 CredentialFormat.MSO_MDOC ->
                     require(algorithms.all { it is SigningAlgId.CoseValue || it is SigningAlgId.CoseName }) {
                         "credential_signing_alg_values_supported must contain COSE identifiers for ${format.value}"
                     }
+
                 else ->
                     require(algorithms.all { it is SigningAlgId.Jose }) {
                         "credential_signing_alg_values_supported must contain JOSE identifiers for ${format.value}"

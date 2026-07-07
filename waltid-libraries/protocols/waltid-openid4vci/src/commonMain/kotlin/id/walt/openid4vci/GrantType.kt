@@ -25,6 +25,12 @@ sealed class GrantType {
     }
 
     @Serializable
+    @SerialName("refresh_token")
+    object RefreshToken : GrantType() {
+        override val value: String get() = GRANT_TYPE_REFRESH_TOKEN
+    }
+
+    @Serializable
     @SerialName("custom")
     data class Custom(override val value: String) : GrantType()
 
@@ -32,6 +38,7 @@ sealed class GrantType {
         fun fromValue(raw: String): GrantType = when (raw.lowercase()) {
             GRANT_TYPE_AUTHORIZATION_CODE -> AuthorizationCode
             GRANT_TYPE_PRE_AUTHORIZED_CODE -> PreAuthorizedCode
+            GRANT_TYPE_REFRESH_TOKEN -> RefreshToken
             else -> Custom(raw.lowercase())
         }
     }
@@ -40,3 +47,4 @@ sealed class GrantType {
 
 private const val GRANT_TYPE_AUTHORIZATION_CODE = "authorization_code"
 private const val GRANT_TYPE_PRE_AUTHORIZED_CODE = "urn:ietf:params:oauth:grant-type:pre-authorized_code"
+private const val GRANT_TYPE_REFRESH_TOKEN = "refresh_token"

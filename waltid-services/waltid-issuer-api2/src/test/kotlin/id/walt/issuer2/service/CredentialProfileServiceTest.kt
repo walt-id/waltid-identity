@@ -53,12 +53,12 @@ class CredentialProfileServiceTest {
         val profile = service.listProfiles().single()
 
         assertEquals(PROFILE_ID, profile.profileId)
-        assertEquals("University Degree", profile.name)
+        assertEquals("OpenBadgeCredential", profile.name)
         assertEquals(CREDENTIAL_CONFIGURATION_ID, profile.credentialConfigurationId)
         assertEquals("jwk", profile.issuerKey["type"]?.jsonPrimitive?.content)
         assertEquals(DEFAULT_ISSUER_KEY_D, profile.issuerKey["jwk"]?.jsonObject?.get("d")?.jsonPrimitive?.content)
         assertEquals("did:web:issuer.example", profile.issuerDid)
-        assertEquals("UniversityDegreeCredential", profile.credentialData["type"]?.jsonPrimitive?.content)
+        assertEquals("OpenBadgeCredential", profile.credentialData["type"]?.jsonPrimitive?.content)
         assertNotNull(profile.mapping)
         assertNotNull(profile.selectiveDisclosure)
         assertEquals("$.credentialSubject.id", profile.idTokenClaimsMapping?.get("$.sub"))
@@ -79,7 +79,7 @@ class CredentialProfileServiceTest {
         val profile = service.getProfile(PROFILE_ID)
 
         assertEquals(PROFILE_ID, profile.profileId)
-        assertEquals("University Degree", profile.name)
+        assertEquals("OpenBadgeCredential", profile.name)
     }
 
     @Test
@@ -127,12 +127,12 @@ class CredentialProfileServiceTest {
         )
 
     private fun profileConfig(
-        name: String = "University Degree",
+        name: String = "OpenBadgeCredential",
         credentialConfigurationId: String = CREDENTIAL_CONFIGURATION_ID,
         issuerKey: JsonObject = defaultIssuerKey(),
         issuerDid: String? = null,
         credentialData: JsonObject = buildJsonObject {
-            put("type", "UniversityDegreeCredential")
+            put("type", "OpenBadgeCredential")
             putJsonObject("credentialSubject") {
                 put("id", "did:example:subject")
                 put("givenName", "Jane")
@@ -180,8 +180,8 @@ class CredentialProfileServiceTest {
     }
 
     private companion object {
-        const val PROFILE_ID = "universityDegree"
-        const val CREDENTIAL_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
+        const val PROFILE_ID = "openBadgeCredential"
+        const val CREDENTIAL_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
         const val DEFAULT_ISSUER_KEY_D = "KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ"
     }
 }

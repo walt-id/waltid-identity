@@ -6,28 +6,283 @@ inputs:
     required: false
     type: string
     default: '.'
+  xcode-developer-dir:
+    description: 'Full path to the Xcode Developer directory to select'
+    required: false
+    type: string
+    default: ''
+  simulator-destination:
+    description: 'xcodebuild simulator destination for iOS app tests'
+    required: false
+    type: string
+    default: ''
 runs:
   using: "composite"
   steps:
+    - name: Select Xcode toolchain
+      shell: bash
+      run: |
+        XCODE_DEVELOPER_DIR="${{ inputs.xcode-developer-dir }}"
+        if [[ -n "$XCODE_DEVELOPER_DIR" ]]; then
+          if [[ ! -d "$XCODE_DEVELOPER_DIR" ]]; then
+            echo "::error::Xcode developer directory not found: $XCODE_DEVELOPER_DIR"
+            echo "Available Xcode installations under /Applications:"
+            ls -1 /Applications | grep '^Xcode' || true
+            exit 1
+          fi
+
+          sudo xcode-select -s "$XCODE_DEVELOPER_DIR"
+          echo "Selected Xcode developer directory: $XCODE_DEVELOPER_DIR"
+          echo "DEVELOPER_DIR=$XCODE_DEVELOPER_DIR" >> $GITHUB_ENV
+        else
+          echo "Using runner default Xcode selection"
+        fi
+
+        xcodebuild -version
+
     - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@6eb327cce1c4d04e3e84caac9695cfda9f7ad66a
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@b4f5d19f23dda46a730b0c94450012aac559156c
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
-    - name: Install CocoaPods dependencies for iOS libraries
+    - name: Compile iOS targets
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew :waltid-libraries:crypto:waltid-crypto:compileKotlinIosSimulatorArm64
+
+    - name: Cleanup simulators before tests
+      shell: bash
+      run: |
+        echo "Shutting down running simulators..."
+        xcrun simctl shutdown all || true
+        echo "Available simulators:"
+        xcrun simctl list devices | grep "iPhone"
+
+    - name: Execute iOS simulator tests
+      id: ios_simulator_tests
+      continue-on-error: true
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: ./gradlew iosSimulatorArm64Test
+
+    - name: Compile wallet modules for iOS
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew podInstall --info
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:compileKotlinIosSimulatorArm64
+        ./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:compileKotlinIosSimulatorArm64
+        ./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:syncFramework \
+          -Pkotlin.native.cocoapods.platform=iphonesimulator \
+          -Pkotlin.native.cocoapods.archs="arm64" \
+          -Pkotlin.native.cocoapods.configuration=Debug
 
-    - name: Build iOS simulator frameworks (ARM64)
-      working-directory: ${{ inputs.waltid-directory }}
+    - name: Install CocoaPods for iOS app
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
       shell: bash
-      run: ./gradlew clean linkPodDebugFrameworkIosSimulatorArm64
+      run: pod install
 
-    - name: Execute iOS simulator tests (ARM64)
+    - name: Resolve iOS simulator destination
+      id: resolve-simulator
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
+      shell: bash
+      run: |
+        SIMULATOR_DESTINATION="${{ inputs.simulator-destination }}"
+        if [[ -n "$SIMULATOR_DESTINATION" ]]; then
+          echo "Using configured simulator destination: $SIMULATOR_DESTINATION"
+          echo "destination=$SIMULATOR_DESTINATION" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        echo "Resolving a compatible iPhone simulator destination from xcodebuild..."
+        DESTINATIONS_OUTPUT=$(xcodebuild -showdestinations -workspace iosApp.xcworkspace -scheme iosApp 2>&1)
+        MATCHING_LINE=$(printf '%s\n' "$DESTINATIONS_OUTPUT" | grep 'platform:iOS Simulator' | grep 'name:iPhone' | head -n 1 || true)
+        SIMULATOR_ID=$(printf '%s\n' "$MATCHING_LINE" | sed -n 's/.*id:\([^,}]*\).*/\1/p' | tr -d ' ')
+
+        if [[ -z "$SIMULATOR_ID" ]]; then
+          echo "::error::Failed to resolve an iPhone simulator destination for iosApp"
+          printf '%s\n' "$DESTINATIONS_OUTPUT"
+          exit 1
+        fi
+
+        RESOLVED_DESTINATION="platform=iOS Simulator,id=$SIMULATOR_ID"
+        echo "Resolved simulator destination: $RESOLVED_DESTINATION"
+        echo "Matched destination line: $MATCHING_LINE"
+        echo "destination=$RESOLVED_DESTINATION" >> $GITHUB_OUTPUT
+
+    - name: Execute iOS demo app integration tests
+      id: ios_demo_app_tests
+      continue-on-error: true
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-ios/iosApp
+      shell: bash
+      run: |
+        xcodebuild test \
+          -workspace iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          -only-testing:iosAppTests \
+          -skip-testing:iosAppUITests \
+          -resultBundlePath TestResults \
+          -derivedDataPath /tmp/xcode-derived \
+          -enableCodeCoverage NO \
+          -parallel-testing-enabled NO \
+          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+
+    - name: Build shared framework for Compose iOS app (CocoaPods location)
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
       run: |
-        ./gradlew :waltid-libraries:crypto:waltid-crypto-ios:iosSimulatorArm64Test --info
-        ./gradlew :waltid-libraries:sdjwt:waltid-sdjwt-ios:iosSimulatorArm64Test --info
+        PLATFORM_NAME=iphonesimulator \
+        SDK_NAME=iphonesimulator \
+        ARCHS="arm64" \
+        CONFIGURATION=Debug \
+          ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:syncFramework \
+          -Pkotlin.native.cocoapods.platform=iphonesimulator \
+          -Pkotlin.native.cocoapods.archs="arm64" \
+          -Pkotlin.native.cocoapods.configuration=Debug
+
+    - name: Install CocoaPods for Compose iOS app
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
+      shell: bash
+      run: pod install
+
+    - name: Execute Compose iOS demo app tests
+      id: compose_ios_demo_app_tests
+      continue-on-error: true
+      working-directory: ${{ inputs.waltid-directory }}/waltid-applications/waltid-wallet-demo-compose/iosApp
+      shell: bash
+      run: |
+        xcodebuild test \
+          -workspace iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination "${{ steps.resolve-simulator.outputs.destination }}" \
+          -skip-testing:iosAppUITests/EudiPublicBackendE2ETests \
+          -skip-testing:iosAppUITests/LocalEnterpriseBackendE2ETests \
+          -resultBundlePath TestResults \
+          -derivedDataPath /tmp/xcode-derived-compose \
+          -enableCodeCoverage NO \
+          -parallel-testing-enabled NO \
+          OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+
+    - name: Collect iOS test reports
+      if: always()
+      id: ios_test_report
+      shell: bash
+      run: |
+        WALTID_DIR="${{ inputs.waltid-directory }}"
+        REPORT_ROOT="$WALTID_DIR/build/ios-test-reports"
+        XCODE_REPORT_DIR="$REPORT_ROOT/xcresult"
+        GRADLE_REPORT_DIR="$REPORT_ROOT/gradle"
+
+        rm -rf "$REPORT_ROOT"
+        mkdir -p "$XCODE_REPORT_DIR" "$GRADLE_REPORT_DIR"
+
+        xcode_report_count=0
+        gradle_report_count=0
+        xcresultparser_ready=false
+
+        for xcode_search_root in "$WALTID_DIR" /tmp/xcode-derived/Logs/Test; do
+          [[ -d "$xcode_search_root" ]] || continue
+
+          while IFS= read -r -d '' bundle; do
+            if [[ "$xcresultparser_ready" != "true" ]]; then
+              if ! command -v xcresultparser >/dev/null 2>&1; then
+                brew install xcresultparser
+              fi
+              xcresultparser_ready=true
+            fi
+
+            if [[ "$bundle" == "$WALTID_DIR/"* ]]; then
+              relative_bundle="${bundle#$WALTID_DIR/}"
+            else
+              relative_bundle="$bundle"
+            fi
+            safe_name=$(printf '%s' "$relative_bundle" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+            report_file="$XCODE_REPORT_DIR/${xcode_report_count}-${safe_name}.xml"
+
+            if xcresultparser "$bundle" --output-format=junit > "$report_file"; then
+              echo "Converted iOS xcresult bundle to JUnit: $relative_bundle"
+              xcode_report_count=$((xcode_report_count + 1))
+            else
+              echo "::warning::Failed to convert iOS xcresult bundle at $bundle"
+              rm -f "$report_file"
+            fi
+          done < <(find "$xcode_search_root" -name '*.xcresult' -prune -print0 2>/dev/null || true)
+        done
+
+        if (( xcode_report_count > 0 )); then
+          echo "Converted $xcode_report_count iOS xcresult bundle(s)."
+        fi
+
+        while IFS= read -r -d '' gradle_report; do
+          relative_report="${gradle_report#$WALTID_DIR/}"
+          safe_name=$(printf '%s' "$relative_report" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+          cp "$gradle_report" "$GRADLE_REPORT_DIR/$safe_name"
+          gradle_report_count=$((gradle_report_count + 1))
+        done < <(find "$WALTID_DIR" -path '*/build/test-results/*' -name '*.xml' -type f -print0 2>/dev/null || true)
+
+        {
+          echo "## iOS Test Report Collection"
+          echo "- Xcode result bundles converted: $xcode_report_count"
+          echo "- Gradle XML reports collected: $gradle_report_count"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if (( xcode_report_count == 0 && gradle_report_count == 0 )); then
+          echo "::warning::No iOS test reports found under $WALTID_DIR"
+          echo "has_report=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+    - name: Publish iOS test report
+      if: always() && steps.ios_test_report.outputs.has_report == 'true'
+      uses: mikepenz/action-junit-report@v6
+      with:
+        update_check: true
+        job_name: gradle
+        check_name: iOS Test Report
+        report_paths: ${{ inputs.waltid-directory }}/build/ios-test-reports/**/*.xml
+        detailed_summary: true
+        include_passed: false
+        include_skipped: false
+        require_tests: true
+
+    - name: Cleanup simulators after tests
+      if: always()
+      shell: bash
+      run: |
+        echo "Shutting down all simulators..."
+        xcrun simctl shutdown all || true
+
+    - name: Upload iOS test results
+      if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
+      uses: actions/upload-artifact@v4
+      with:
+        name: ios-integration-test-results
+        path: |
+          ${{ inputs.waltid-directory }}/build/ios-test-reports/**
+          ${{ inputs.waltid-directory }}/**/*.xcresult
+          /tmp/xcode-derived/Logs/Test/**/*.xcresult
+          ${{ inputs.waltid-directory }}/**/build/test-results/**
+        retention-days: 7
+
+    - name: Fail if iOS tests failed
+      if: always()
+      shell: bash
+      run: |
+        failed=()
+
+        if [[ "${{ steps.ios_simulator_tests.outcome }}" == "failure" ]]; then
+          failed+=("iosSimulatorArm64Test")
+        fi
+        if [[ "${{ steps.ios_demo_app_tests.outcome }}" == "failure" ]]; then
+          failed+=("native iOS demo app tests")
+        fi
+        if [[ "${{ steps.compose_ios_demo_app_tests.outcome }}" == "failure" ]]; then
+          failed+=("Compose iOS demo app tests")
+        fi
+
+        if (( ${#failed[@]} > 0 )); then
+          printf '::error::iOS test step(s) failed: %s\n' "${failed[*]}"
+          exit 1
+        fi

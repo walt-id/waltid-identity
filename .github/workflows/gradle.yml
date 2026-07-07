@@ -12,16 +12,26 @@ on:
         required: false
         type: boolean
         default: false
+      report-check-name:
+        description: "Visible GitHub check run name to update with the JUnit report"
+        required: true
+        type: string
 
 jobs:
   gradle:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-latest disabled until all multiplatform modules set up properly
-        # currently configured on workflow dispatch as a separate workflow (gradle-macos)
         os: [ ubuntu-22.04 ]
     steps:
+      - name: Set up swap space
+        run: |
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
         with:
@@ -29,6 +39,18 @@ jobs:
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Enable Android build
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'waltid-identity/gradle.properties'
+          properties: 'enableAndroidBuild=true'
+
+      - name: Enable Android build in unified-build root
+        uses: walt-id/waltid-identity/.github/actions/set-properties@00d4e55e9865cf17c6703d926dce4a4f6e1d404a
+        with:
+          file: 'gradle.properties'
+          properties: 'enableAndroidBuild=true'
 
       - name: Start tunnel and get URL
         id: tunnel
@@ -64,29 +86,23 @@ jobs:
 #            "$FILE"
 
       - name: Clean and build with all tests
-        if: ${{ runner.os != 'macos' }}
-        run: ./gradlew clean build cleanAllTests allTests --rerun-tasks --no-daemon --max-workers=3
+        run: ./gradlew clean cleanAllTests build allTests --rerun-tasks --no-daemon --continue --console=plain --warning-mode=summary
         env:
           CI: "true"
           PLAYWRIGHT_INSTALL_WITH_DEPS: "true"
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
 
-      - name: Upload test reports
+      - name: Publish test report
+        uses: mikepenz/action-junit-report@v6
         if: always()
-        uses: actions/upload-artifact@v7
         with:
-          name: test-reports
-          path: |
-            **/build/reports/tests/test/
-            **/build/reports/tests/allTests/
-          retention-days: 30
-
-      - name: Build iOS Simulator Framework (ARM64)
-        if: ${{ runner.os == 'macos'}}
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@864f84343fdeea17f6f63434bc8036c39f178dc7
-        with:
-          waltid-directory: 'waltid-identity'
+          update_check: true
+          job_name: ${{ inputs.report-check-name }}
+          report_paths: '**/build/test-results/**/*.xml'
+          detailed_summary: true
+          include_passed: false
+          include_skipped: false
 
       - name: Set version
         if: ${{ inputs.version != '' && runner.os == 'linux' }}

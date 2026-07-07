@@ -31,6 +31,11 @@ fun assertBearerAccessToken(tokenResponse: TokenRequestBuilder.TokenResponse) {
     assertTrue(tokenResponse.access_token.isNotBlank())
 }
 
+fun assertRefreshToken(tokenResponse: TokenRequestBuilder.TokenResponse): String =
+    assertNotNull(tokenResponse.refresh_token).also { refreshToken ->
+        assertTrue(refreshToken.isNotBlank())
+    }
+
 suspend fun assertSessionStatus(
     client: HttpClient,
     sessionId: String,
@@ -179,7 +184,7 @@ private fun assertJwtVcJsonMappingFunctionsApplied(issuedCredential: String) {
     val vc = jwtPayload["vc"]?.jsonObject ?: jwtPayload
     val credentialSubject = assertNotNull(vc["credentialSubject"]?.jsonObject)
 
-    // UniversityDegree is the default W3C wallet-flow profile. Its profile mapping uses
+    // OpenBadgeCredential is the default W3C wallet-flow profile. Its profile mapping uses
     // <uuid>, <issuerDid>, <subjectDid>, and <timestamp>; the issued JWT must contain
     // resolved values, not the config placeholders.
     val vcText = vc.toString()
@@ -201,7 +206,7 @@ private fun assertJwtVcJsonMappingFunctionsApplied(issuedCredential: String) {
         assertStringClaim(credentialSubject["id"], "vc.credentialSubject.id").startsWith("did:jwk:"),
         "Expected vc.credentialSubject.id to be resolved from <subjectDid>",
     )
-    Instant.parse(assertStringClaim(vc["issuanceDate"], "vc.issuanceDate"))
+    Instant.parse(assertStringClaim(vc["validFrom"], "vc.validFrom"))
 }
 
 private fun assertStringClaim(value: JsonElement?, claimName: String): String =

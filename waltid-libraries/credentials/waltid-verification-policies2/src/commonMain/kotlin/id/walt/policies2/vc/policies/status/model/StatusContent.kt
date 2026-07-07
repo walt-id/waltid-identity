@@ -1,5 +1,7 @@
 package id.walt.policies2.vc.policies.status.model
 
+import id.walt.crypto.utils.Base64Utils.base64UrlDecode
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -47,7 +49,7 @@ object StringOrByteStringSerializer : KSerializer<String> {
 
     override fun deserialize(decoder: Decoder): String {
         return if (decoder is CborDecoder) {
-            decoder.decodeSerializableValue(ByteArraySerializer()).decodeToString()
+            decoder.decodeSerializableValue(ByteArraySerializer()).encodeToBase64Url()
         } else {
             decoder.decodeString()
         }
@@ -55,7 +57,7 @@ object StringOrByteStringSerializer : KSerializer<String> {
 
     override fun serialize(encoder: Encoder, value: String) {
         if (encoder is CborEncoder) {
-            encoder.encodeSerializableValue(ByteArraySerializer(), value.encodeToByteArray())
+            encoder.encodeSerializableValue(ByteArraySerializer(), value.base64UrlDecode())
         } else {
             encoder.encodeString(value)
         }

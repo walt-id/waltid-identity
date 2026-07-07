@@ -65,11 +65,26 @@ configure<JibExtension> {
             password = pass
         }
     }
+    // Bake the service's config/ directory into the image so the defaults always match the implementation.
+    if (file("config").isDirectory) {
+        extraDirectories {
+            paths {
+                path {
+                    setFrom("config")
+                    into = "/${project.name}/config"
+                }
+            }
+        }
+    }
 }
 
 // Required for hoplite to run correctly with buildFatJar task
 tasks.withType<ShadowJar> {
+    // Keep service descriptor merging, but exclude all other duplicate paths to
+    // avoid building shadow jars with duplicate entries and the associated log flood.
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     mergeServiceFiles()
-
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    filesMatching("META-INF/services/**") {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
 }
