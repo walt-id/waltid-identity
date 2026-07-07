@@ -27,7 +27,7 @@ class MetadataService(
     metadataConfig: Issuer2MetadataConfig,
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
-    private val preAuthorizedGrantAnonymousAccessSupported: Boolean = true,
+    private val preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
