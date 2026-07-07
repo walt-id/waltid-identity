@@ -31,7 +31,7 @@ class Issuer2ServiceConfigTest {
     }
 
     @Test
-    fun `service config does not enable client attestation by default`() {
+    fun `service config does not enable client authentication by default`() {
         val config = loadServiceConfig(
             """
                 baseUrl = "http://localhost:7002"
@@ -39,9 +39,8 @@ class Issuer2ServiceConfigTest {
         )
 
         assertNull(config.clientAuthenticationConfig)
-        assertNull(config.clientAttestation)
         assertNull(config.clientAttestationConfig())
-        assertEquals(true, config.supportsPreAuthAnonymous())
+        assertEquals(false, config.supportsPreAuthAnonymous())
         assertEquals("http://localhost:7002/openid4vci", config.openId4VciBaseUrl())
     }
 
@@ -112,32 +111,7 @@ class Issuer2ServiceConfigTest {
     }
 
     @Test
-    fun `service config keeps legacy top-level client attestation fallback`() {
-        val config = loadServiceConfig(
-            """
-                baseUrl = "http://localhost:7002"
-                clientAttestation {
-                    verificationMethod {
-                        type = "static-jwk"
-                        jwk {
-                            kty = "EC"
-                            crv = "P-256"
-                            x = "x"
-                            y = "y"
-                        }
-                    }
-                }
-            """.trimIndent(),
-        )
-
-        val method = assertIs<ClientAttestationVerificationMethod.StaticJwk>(
-            config.clientAttestationConfig()?.verificationMethod,
-        )
-        assertEquals("EC", method.jwk["kty"]?.jsonPrimitive?.contentOrNull)
-    }
-
-    @Test
-    fun `service config wrapper overrides legacy top-level client attestation`() {
+    fun `service config decodes preauth anonymous without client attestation`() {
         val config = loadServiceConfig(
             """
                 baseUrl = "http://localhost:7002"
@@ -147,17 +121,6 @@ class Issuer2ServiceConfigTest {
                             type = "preauth-anonymous"
                         }
                     ]
-                }
-                clientAttestation {
-                    verificationMethod {
-                        type = "static-jwk"
-                        jwk {
-                            kty = "EC"
-                            crv = "P-256"
-                            x = "x"
-                            y = "y"
-                        }
-                    }
                 }
             """.trimIndent(),
         )
