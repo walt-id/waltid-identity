@@ -200,6 +200,10 @@ private fun registerDefaultClientAuthenticationMethods(
     config: OAuth2ProviderConfig,
     includeClientAttestationDefaultMethod: Boolean,
 ): OAuth2ProviderConfig {
+    if (config.clientAuthenticationServiceResolver != null) {
+        return config
+    }
+
     val clientAttestationConfig = config.clientAttestationConfig
     if (!includeClientAttestationDefaultMethod || clientAttestationConfig == null) {
         return config
