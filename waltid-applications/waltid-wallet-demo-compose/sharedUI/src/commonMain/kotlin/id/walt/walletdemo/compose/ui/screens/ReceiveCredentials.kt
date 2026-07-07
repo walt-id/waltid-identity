@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -30,12 +31,30 @@ fun ReceiveCredential(
     controller: WalletDemoController,
     state: WalletDemoUiState,
     onBack: () -> Unit,
+    onReceived: () -> Unit,
 ) {
     var mode by remember { mutableStateOf(ReceiveMode.SCAN) }
+    var receiveRequested by remember { mutableStateOf(false) }
     val ready = state.session as? WalletSessionState.Ready
     val isReady = ready != null
     val canReceive = isReady && !state.isBusy
     val canSubmitManualOffer = canReceive && state.requestDrafts.offerUrl.isNotBlank()
+
+    LaunchedEffect(state.operation) {
+        when (state.operation) {
+            is WalletOperationState.Succeeded -> {
+                if (receiveRequested) {
+                    receiveRequested = false
+                    onReceived()
+                }
+            }
+            is WalletOperationState.Failed,
+            WalletOperationState.Idle,
+            WalletOperationState.Presenting,
+            -> receiveRequested = false
+            WalletOperationState.Receiving -> Unit
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -66,9 +85,6 @@ fun ReceiveCredential(
                     )
                 }
             }
-            OutlinedButton(onClick = controller::lock) {
-                Text("Lock")
-            }
         }
 
         StatusCard(state)
@@ -83,6 +99,7 @@ fun ReceiveCredential(
                         val offerUrl = rawValue.trim()
                         if (offerUrl.isNotEmpty() && canReceive) {
                             controller.updateOfferUrl(offerUrl)
+                            receiveRequested = true
                             controller.receive()
                         }
                     },
@@ -90,7 +107,10 @@ fun ReceiveCredential(
                 ReceiveMode.MANUAL -> ManualEntrySection(
                     value = state.requestDrafts.offerUrl,
                     onValueChange = controller::updateOfferUrl,
-                    onSubmit = controller::receive,
+                    onSubmit = {
+                        receiveRequested = true
+                        controller.receive()
+                    },
                     isBusy = state.isBusy,
                     enabled = canSubmitManualOffer,
                 )
@@ -164,7 +184,9 @@ private fun ManualEntrySection(
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("wallet.offerInput"),
             label = { Text("Credential offer link") },
             placeholder = { Text("openid-credential-offer://...") },
             singleLine = true,
@@ -176,7 +198,9 @@ private fun ManualEntrySection(
         Button(
             onClick = onSubmit,
             enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("wallet.receiveButton"),
         ) {
             if (isBusy) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)

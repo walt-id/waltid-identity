@@ -18,6 +18,7 @@ import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -47,6 +48,7 @@ data class MobileWalletCredential(
     val subject: String?,
     val label: String?,
     val addedAt: String?,
+    val credentialData : JsonObject
 )
 
 /**
@@ -200,6 +202,7 @@ class MobileWallet(
                 subject = meta.subject,
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
+                credentialData = meta.credentialData
             )
         }
 

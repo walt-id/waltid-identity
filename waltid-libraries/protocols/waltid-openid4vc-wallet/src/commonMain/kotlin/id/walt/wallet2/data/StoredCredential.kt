@@ -29,6 +29,7 @@ data class StoredCredential(
         issuer = credential.issuer,
         subject = credential.subject,
         label = label,
-        addedAt = addedAt
+        addedAt = addedAt,
+        credentialData = credential.credentialData
     )
 }

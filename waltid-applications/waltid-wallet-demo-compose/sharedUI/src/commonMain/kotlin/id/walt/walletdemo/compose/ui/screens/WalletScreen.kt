@@ -27,7 +27,12 @@ import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState , onReceiveClick: () -> Unit,) {
+internal fun WalletScreen(
+    controller: WalletDemoController,
+    state: WalletDemoUiState,
+    onReceiveClick: () -> Unit,
+    onCredentialClick: (String) -> Unit,
+) {
     val ready = state.session as? WalletSessionState.Ready
     val requestDrafts = state.requestDrafts
 
@@ -76,7 +81,9 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
 //        )
         Button(
             onClick = onReceiveClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("wallet.openReceiveButton"),
         ) {
             Text("Receive Credential")
         }
@@ -104,7 +111,10 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             Text("No credentials", color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             credentials.forEach { credential ->
-                CredentialCard(credential)
+                CredentialCard(
+                    credential = credential,
+                    onClick = { onCredentialClick(credential.id) },
+                )
             }
         }
     }
