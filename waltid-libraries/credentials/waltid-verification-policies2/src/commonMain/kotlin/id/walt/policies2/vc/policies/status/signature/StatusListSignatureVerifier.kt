@@ -1,6 +1,8 @@
 package id.walt.policies2.vc.policies.status.signature
 
+import id.walt.cose.CoseHeaders
 import id.walt.cose.CoseSign1
+import id.walt.cose.coseCompliantCbor
 import id.walt.cose.toCoseVerifier
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.jwk.JWKKey
@@ -8,11 +10,14 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.did.dids.DidService
 import id.walt.did.dids.DidUtils
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
+@OptIn(ExperimentalSerializationApi::class)
 class StatusListSignatureVerifier {
     
     private val logger = KotlinLogging.logger {}
@@ -117,17 +122,21 @@ class StatusListSignatureVerifier {
     
     /**
      * Resolves the signing key from COSE headers.
+     * 
      * Resolution order:
-     * 1. x5chain header - import from certificate chain
-     * 2. kid header with DID URL - resolve via DID service
+     * 1. x5chain header in PROTECTED headers (ISO 18013-5 Second Edition §12.3.6.3) - import from certificate chain
+     * 2. kid header with DID URL in PROTECTED headers - resolve via DID service
+     * 
+     * Note: ISO 18013-5 Second Edition mandates x5chain in protected headers.
      */
     private suspend fun resolveKeyFromCoseHeaders(coseSign1: CoseSign1): Result<Key> = runCatching {
-        val unprotectedHeaders = coseSign1.unprotected
+        // Decode protected headers
+        val protectedHeaders = coseCompliantCbor.decodeFromByteArray<CoseHeaders>(coseSign1.protected)
         
-        // Try x5chain first (X.509 certificate chain in COSE)
-        unprotectedHeaders.x5chain?.let { x5chain ->
+        // Try x5chain in PROTECTED headers (ISO 18013-5 Second Edition compliant)
+        protectedHeaders.x5chain?.let { x5chain ->
             if (x5chain.isNotEmpty()) {
-                logger.debug { "Resolving key from x5chain header" }
+                logger.debug { "Resolving key from x5chain in PROTECTED headers (ISO 18013-5 compliant)" }
                 val leafCertBytes = x5chain.first().rawBytes
                 return@runCatching JWKKey.importFromDerCertificate(leafCertBytes).getOrElse {
                     throw KeyResolutionFailedException("Failed to import key from x5chain: ${it.message}")
@@ -135,11 +144,11 @@ class StatusListSignatureVerifier {
             }
         }
         
-        // Try kid with DID URL
-        unprotectedHeaders.kid?.let { kidBytes ->
+        // Try kid with DID URL in PROTECTED headers
+        protectedHeaders.kid?.let { kidBytes ->
             val kid = kidBytes.decodeToString()
             if (DidUtils.isDidUrl(kid)) {
-                logger.debug { "Resolving key from DID in CWT kid: $kid" }
+                logger.debug { "Resolving key from DID in CWT kid (protected): $kid" }
                 val didWithoutFragment = kid.substringBefore("#")
                 return@runCatching DidService.resolveToKey(didWithoutFragment).getOrElse {
                     throw KeyResolutionFailedException("Failed to resolve DID $kid: ${it.message}")
@@ -147,7 +156,7 @@ class StatusListSignatureVerifier {
             }
         }
         
-        throw KeyResolutionFailedException("No resolvable key information in CWT headers (expected x5chain or kid with DID)")
+        throw KeyResolutionFailedException("No resolvable key information in CWT protected headers (expected x5chain or kid with DID)")
     }
     
     /**
