@@ -33,9 +33,13 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.netty)
         }
     }
 }
