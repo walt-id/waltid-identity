@@ -224,7 +224,13 @@ data class WalletBridgeStoredKey(
     val keyType: String,
     val algorithm: String? = null,
     val serializedKeyJson: String,
-)
+) {
+    /**
+     * Text representation that redacts serialized key material.
+     */
+    override fun toString(): String =
+        "WalletBridgeStoredKey(keyId=$keyId, keyType=$keyType, algorithm=$algorithm, serializedKeyJson=<redacted>)"
+}
 
 /**
  * Atomic Swift-facing key store and generator override.

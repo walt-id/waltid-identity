@@ -96,6 +96,23 @@ final class WalletAPITests: XCTestCase {
         XCTAssertFalse(String(describing: key).contains("4 bytes"))
     }
 
+    func testStoredKeyDescriptionRedactsSerializedKeyJSON() {
+        let key = StoredKey(
+            keyID: "key-1",
+            keyType: .secp256r1,
+            algorithm: "ES256",
+            serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"key-1","d":"secret"}}"#
+        )
+
+        XCTAssertEqual(
+            String(describing: key),
+            "StoredKey(keyID: key-1, keyType: secp256r1, algorithm: ES256, serializedKeyJSON: <redacted>)"
+        )
+        XCTAssertEqual(String(reflecting: key), String(describing: key))
+        XCTAssertFalse(String(describing: key).contains("secret"))
+        XCTAssertFalse(String(reflecting: key).contains("secret"))
+    }
+
     func testPublicModelsAreValueTypesAndEquatable() {
         let credential = Credential(
             id: "credential-1",

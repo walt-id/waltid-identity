@@ -318,7 +318,7 @@ public struct WalletKeyInfo: Equatable, Identifiable, Sendable {
 ///
 /// The serialized key JSON may contain private signing material. Treat it like a secret and avoid
 /// logging or exporting it outside app-owned secure storage.
-public struct StoredKey: Equatable, Identifiable, Sendable {
+public struct StoredKey: CustomDebugStringConvertible, CustomStringConvertible, Equatable, Identifiable, Sendable {
     /// Stable wallet-local key identifier.
     public let keyID: String
 
@@ -333,6 +333,16 @@ public struct StoredKey: Equatable, Identifiable, Sendable {
 
     /// Stable identifier for SwiftUI and collection APIs.
     public var id: String { keyID }
+
+    /// Text representation that redacts serialized key material.
+    public var description: String {
+        "StoredKey(keyID: \(keyID), keyType: \(keyType), algorithm: \(algorithm ?? "nil"), serializedKeyJSON: <redacted>)"
+    }
+
+    /// Debug representation that redacts serialized key material.
+    public var debugDescription: String {
+        description
+    }
 
     /// Creates a serialized signing-key entry for custom Swift key stores.
     ///

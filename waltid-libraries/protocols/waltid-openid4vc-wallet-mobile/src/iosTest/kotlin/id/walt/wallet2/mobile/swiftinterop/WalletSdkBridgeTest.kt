@@ -27,6 +27,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
@@ -62,6 +63,22 @@ class WalletSdkBridgeTest {
         }
 
         assertEquals("cancelled", cancellation.message)
+    }
+
+    @Test
+    fun storedKeyStringRepresentationRedactsSerializedKeyJson() {
+        val key = WalletBridgeStoredKey(
+            keyId = "key-1",
+            keyType = "secp256r1",
+            algorithm = "ES256",
+            serializedKeyJson = """{"type":"jwk","jwk":{"kid":"key-1","d":"secret"}}""",
+        )
+
+        assertEquals(
+            "WalletBridgeStoredKey(keyId=key-1, keyType=secp256r1, algorithm=ES256, serializedKeyJson=<redacted>)",
+            key.toString(),
+        )
+        assertFalse(key.toString().contains("secret"))
     }
 
     @Test
