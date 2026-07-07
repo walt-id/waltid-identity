@@ -1,9 +1,6 @@
 package id.walt.crypto.keys.aws
 
-import id.walt.crypto.exceptions.KeyNotFoundException
-import id.walt.crypto.exceptions.KeyTypeNotSupportedException
-import id.walt.crypto.exceptions.SigningException
-import id.walt.crypto.exceptions.VerificationException
+import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
@@ -36,6 +33,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }
+private const val AWS_KMS_PROVIDER = "AWS KMS"
 
 data class AWSAuthConfiguration(
     val accessKeyId: String?,
@@ -156,7 +154,7 @@ class AWSKeyRestAPI(
                 }
             }
             setBody(body) // Set the JSON body
-        }.awsJsonDataBody()
+        }.awsJsonDataBody("sign")
         return signature["Signature"]?.jsonPrimitive?.content?.decodeFromBase64()
             ?: throw SigningException("failed to sign")
     }
@@ -228,7 +226,7 @@ class AWSKeyRestAPI(
                 }
             }
             setBody(body) // Set the JSON body
-        }.awsJsonDataBody()
+        }.awsJsonDataBody("verify")
         return Result.success(
             verification["SignatureValid"]?.jsonPrimitive?.content?.decodeFromBase64()
                 ?: throw VerificationException("failed to verify")
@@ -563,7 +561,7 @@ ${sha256Hex(canonicalRequest)}
                 setBody(
                     body
                 ) // Set the JSON body
-            }.awsJsonDataBody()
+            }.awsJsonDataBody("public key retrieval")
 
             val public = key["PublicKey"]?.jsonPrimitive?.content
 
@@ -579,20 +577,23 @@ $public
             return keyJWK.getOrThrow()
         }
 
-        private suspend fun HttpResponse.awsJsonDataBody(): JsonObject {
-            val baseMsg = { "AWS server (URL: ${this.request.url}) returned an invalid response: " }
+        private suspend fun HttpResponse.awsJsonDataBody(operation: String = "request"): JsonObject {
+            val bodyStr = bodyAsText()
+
+            if (!status.isSuccess()) ExternalKmsError.requestFailed(
+                provider = AWS_KMS_PROVIDER,
+                operation = operation,
+                message = "returned HTTP ${status.value} ${status.description}: ${bodyStr.ifBlank { "empty response" }}",
+            )
 
             return runCatching {
-                // First, get the body as a string
-                val bodyStr = this.bodyAsText()
-
-                // Parse the string as JsonObject
                 Json.parseToJsonElement(bodyStr).jsonObject
             }.getOrElse {
-                val bodyStr = this.bodyAsText() // Get the body in case of an exception
-                throw IllegalArgumentException(
-                    baseMsg.invoke() + if (bodyStr.isEmpty()) "empty response (instead of JSON data)"
-                    else "invalid response: $bodyStr"
+                ExternalKmsError.requestFailed(
+                    provider = AWS_KMS_PROVIDER,
+                    operation = operation,
+                    message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
+                    cause = it,
                 )
             }
         }
@@ -623,56 +624,58 @@ $public
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: AWSKeyMetadata): AWSKeyRestAPI {
+            return runCatching {
+                if (metadata.auth.accessKeyId.isNullOrBlank() && metadata.auth.secretAccessKey.isNullOrBlank()) {
+                    getAccess(metadata)
+                }
 
-            if (metadata.auth.accessKeyId.isNullOrBlank() && metadata.auth.secretAccessKey.isNullOrBlank()) {
-                getAccess(metadata)
-            }
-
-
-            val keyType = keyTypeToAwsKeyMapping(type)
-            val body =
-                """{
+                val keyType = keyTypeToAwsKeyMapping(type)
+                val body =
+                    """{
 "KeySpec":"$keyType",
 "KeyUsage":"SIGN_VERIFY"
 }
 """.trimIndent().trimMargin()
-            val headers = buildSigV4Headers(
-                method = HttpMethod.Post,
-                payload = body,
-                config = metadata
-            )
-            val awsKmsUrl = "kms.${metadata.auth.region}.amazonaws.com"
+                val headers = buildSigV4Headers(
+                    method = HttpMethod.Post,
+                    payload = body,
+                    config = metadata
+                )
+                val awsKmsUrl = "kms.${metadata.auth.region}.amazonaws.com"
 
-            logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
-            val key = client.post("https://$awsKmsUrl/") {
-                headers {
-                    headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
-                    append(HttpHeaders.Host, awsKmsUrl)
-                    append("X-Amz-Target", "TrentService.CreateKey") // Specific KMS action for CreateKey
-                    _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
-                        append("X-Amz-Security-Token", it)
+                logger.debug { "Calling AWS KMS ($awsKmsUrl) - TrentService.CreateKey" }
+                val key = client.post("https://$awsKmsUrl/") {
+                    headers {
+                        headers.forEach { (key, value) -> append(key, value) } // Append each SigV4 header to the request
+                        append(HttpHeaders.Host, awsKmsUrl)
+                        append("X-Amz-Target", "TrentService.CreateKey") // Specific KMS action for CreateKey
+                        _accessAWS?.sessionToken?.takeIf { it.isNotEmpty() }?.let {
+                            append("X-Amz-Security-Token", it)
+                        }
                     }
-                }
-                setBody(body) // Set the JSON body
-            }.awsJsonDataBody()
+                    setBody(body) // Set the JSON body
+                }.awsJsonDataBody("key generation")
 
-            val keyId = key["KeyMetadata"]?.jsonObject?.get("KeyId")?.jsonPrimitive?.content
+                val keyId = key["KeyMetadata"]?.jsonObject?.get("KeyId")?.jsonPrimitive?.content
 
-            if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
+                if (keyId.isNullOrEmpty()) throw KeyNotFoundException(message = "Key ID could not be determined")
 
-            val publicKey = getPublicKey(metadata, keyId)
+                val publicKey = getPublicKey(metadata, keyId)
 
-            val createdKey = AWSKeyRestAPI(
-                config = metadata,
-                id = keyId,
-                _publicKey = publicKey.exportJWK(),
-                _keyType = awsKeyToKeyTypeMapping(keyType)
-            )
+                val createdKey = AWSKeyRestAPI(
+                    config = metadata,
+                    id = keyId,
+                    _publicKey = publicKey.exportJWK(),
+                    _keyType = awsKeyToKeyTypeMapping(keyType)
+                )
 
-            createdKey.config?.auth?.accessKeyId = metadata.auth.accessKeyId
-            createdKey.config?.auth?.secretAccessKey = metadata.auth.secretAccessKey
+                createdKey.config?.auth?.accessKeyId = metadata.auth.accessKeyId
+                createdKey.config?.auth?.secretAccessKey = metadata.auth.secretAccessKey
 
-            return createdKey
+                createdKey
+            }.getOrElse {
+                ExternalKmsError.generationFailed(AWS_KMS_PROVIDER, type.name, it)
+            }
         }
 
     }
