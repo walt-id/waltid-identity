@@ -331,16 +331,22 @@ private fun bytesToUuid(bytes: ByteArray?): String {
 }
 
 /** Infer the wallet2 key type string from a KeySerialization JSON document. */
-private fun inferKeyType(serializedKey: String): String = runCatching {
+internal fun inferKeyType(serializedKey: String): String = runCatching {
     val json = Json.parseToJsonElement(serializedKey).jsonObject
-    val crv  = json["jwk"]?.jsonObject?.get("crv")?.toString()?.trim('"')
+    val jwk = json["jwk"]?.jsonObject
+    val crv = jwk?.get("crv")?.toString()?.trim('"')
+    val kty = jwk?.get("kty")?.toString()?.trim('"')
     when (crv) {
         "P-256"     -> "secp256r1"
         "P-384"     -> "secp384r1"
         "P-521"     -> "secp521r1"
         "Ed25519"   -> "Ed25519"
         "secp256k1" -> "secp256k1"
-        else        -> json["type"]?.toString()?.trim('"') ?: "unknown"
+        else -> when (kty) {
+            "RSA" -> "RSA"
+            "OKP" -> "Ed25519"   // Ed25519/X25519 without explicit crv — treat as Ed25519
+            else  -> kty ?: "unknown"
+        }
     }
 }.getOrDefault("unknown")
 
