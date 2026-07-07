@@ -6,6 +6,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.ClientAuthenticationMethod
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
@@ -177,6 +178,85 @@ class BuildProviderConfigurationTest {
     }
 
     @Test
+    fun `client authentication resolver result takes precedence over configured methods`() = runTest {
+        val configuredMethod = RecordingClientAuthenticationMethod(
+            name = ClientAuthenticationMethods.CLIENT_SECRET_POST,
+        )
+        val resolvedMethod = RecordingClientAuthenticationMethod(
+            name = ClientAuthenticationMethods.PRIVATE_KEY_JWT,
+        )
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                accessRequestValidator = stubAccessValidator(),
+            ).copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(configuredMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+                clientAuthenticationServiceResolver = { endpoint, _, _ ->
+                    ClientAuthenticationServiceResolution(
+                        serviceConfig = ClientAuthenticationServiceConfig(
+                            methods = listOf(resolvedMethod),
+                            methodsByEndpoint = mapOf(
+                                endpoint to setOf(ClientAuthenticationMethods.PRIVATE_KEY_JWT),
+                            ),
+                        ),
+                    )
+                },
+            ),
+        )
+
+        val result = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("client-id"),
+                "client_assertion_type" to listOf("urn:ietf:params:oauth:client-assertion-type:jwt-bearer"),
+                "client_assertion" to listOf("assertion"),
+            ),
+        )
+
+        assertIs<AccessTokenRequestResult.Failure>(result)
+        assertEquals(0, configuredMethod.calls)
+        assertEquals(1, resolvedMethod.calls)
+        assertEquals(ClientAuthenticationEndpoint.TOKEN, resolvedMethod.lastEndpoint)
+    }
+
+    @Test
+    fun `client authentication resolver can allow unauthenticated endpoint requests`() = runTest {
+        val configuredMethod = RecordingClientAuthenticationMethod(
+            name = ClientAuthenticationMethods.CLIENT_SECRET_POST,
+        )
+        val provider = buildOAuth2Provider(
+            createTestConfig(
+                accessRequestValidator = stubAccessValidator(),
+            ).copy(
+                clientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(
+                    methods = listOf(configuredMethod),
+                    methodsByEndpoint = mapOf(
+                        ClientAuthenticationEndpoint.TOKEN to setOf(ClientAuthenticationMethods.CLIENT_SECRET_POST),
+                    ),
+                ),
+                clientAuthenticationServiceResolver = { _, _, _ ->
+                    ClientAuthenticationServiceResolution(ClientAuthenticationServiceConfig())
+                },
+            ),
+        )
+
+        val result = provider.createAccessTokenRequest(
+            mapOf(
+                "grant_type" to listOf(GrantType.AuthorizationCode.value),
+                "client_id" to listOf("client-id"),
+                "client_secret" to listOf("secret"),
+            ),
+        )
+
+        assertIs<AccessTokenRequestResult.Failure>(result)
+        assertEquals(0, configuredMethod.calls)
+    }
+
+    @Test
     fun `buildProvider registers default client attestation method when configured`() = runTest {
         val provider = assertIs<DefaultOAuth2Provider>(
             buildOAuth2Provider(
@@ -241,6 +321,23 @@ class BuildProviderConfigurationTest {
 
         assertEquals("invalid_client", result.error.error)
         assertEquals("Client authentication is required for this endpoint", result.error.description)
+    }
+
+    @Test
+    fun `buildProvider does not register default client attestation when resolver is configured`() {
+        val provider = assertIs<DefaultOAuth2Provider>(
+            buildOAuth2Provider(
+                createTestConfig().copy(
+                    clientAuthenticationServiceResolver = { _, _, _ ->
+                        ClientAuthenticationServiceResolution(ClientAuthenticationServiceConfig())
+                    },
+                    clientAttestationConfig = ClientAttestationConfig(NoopClientAttestationVerifier),
+                ),
+            )
+        )
+
+        assertTrue(provider.config.clientAuthenticationServiceConfig.methods.isEmpty())
+        assertTrue(provider.config.clientAuthenticationServiceConfig.methodsByEndpoint.isEmpty())
     }
 
     @Test
