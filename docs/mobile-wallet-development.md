@@ -153,8 +153,11 @@ explaining why the KMP capability is intentionally not mirrored in Swift.
 Run the local parity gate with:
 
 ```bash
-scripts/check-mobile-swift-parity-decision.sh --base-ref origin/main
+scripts/check-mobile-swift-parity-decision.sh
 ```
+
+The script resolves the PR base when GitHub metadata is available. For detached
+or non-PR comparisons, pass an explicit base with `--base-ref origin/<base-branch>`.
 
 ## Troubleshooting
 
