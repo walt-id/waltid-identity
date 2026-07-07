@@ -30,8 +30,8 @@ import kotlinx.serialization.json.JsonElement
  * @property did Decentralized identifier registered for the persisted key.
  */
 public data class MobileWalletBootstrapResult(
-    val keyId: String,
-    val did: String,
+    public val keyId: String,
+    public val did: String,
 )
 
 /**
@@ -45,12 +45,12 @@ public data class MobileWalletBootstrapResult(
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
  */
 public data class MobileWalletCredential(
-    val id: String,
-    val format: String,
-    val issuer: String?,
-    val subject: String?,
-    val label: String?,
-    val addedAt: String?,
+    public val id: String,
+    public val format: String,
+    public val issuer: String?,
+    public val subject: String?,
+    public val label: String?,
+    public val addedAt: String?,
 )
 
 /**
@@ -61,9 +61,9 @@ public data class MobileWalletCredential(
  * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
  */
 public data class MobileWalletPresentationResult(
-    val success: Boolean,
-    val redirectTo: String?,
-    val verifierResponseJson: String? = null,
+    public val success: Boolean,
+    public val redirectTo: String?,
+    public val verifierResponseJson: String? = null,
 )
 
 /**
@@ -78,10 +78,10 @@ public data class MobileWalletPresentationResult(
  * @property hostHeader Optional `Host` header override for tunneled local tests.
  */
 public data class WalletAttestationConfig(
-    val baseUrl: String,
-    val attesterPath: String,
-    val bearerToken: String = "",
-    val hostHeader: String = "",
+    public val baseUrl: String,
+    public val attesterPath: String,
+    public val bearerToken: String = "",
+    public val hostHeader: String = "",
 )
 
 /**
@@ -260,7 +260,7 @@ public class MobileWallet internal constructor(
      * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
      * and deletes the encrypted local database and deletes the configured database key.
      */
-    suspend fun deleteWallet() {
+    public suspend fun deleteWallet() {
         keyStore.listKeys().toList().forEach { key ->
             keyStore.removeKey(key.keyId)
         }

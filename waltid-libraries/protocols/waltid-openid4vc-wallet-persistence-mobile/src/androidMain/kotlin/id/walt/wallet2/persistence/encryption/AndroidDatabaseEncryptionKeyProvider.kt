@@ -18,7 +18,7 @@ import javax.crypto.spec.GCMParameterSpec
  * The raw SQLCipher key is generated per wallet database, encrypted with an Android Keystore AES key,
  * and stored in app-private SharedPreferences.
  */
-class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptionKeyProvider {
+public class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptionKeyProvider {
 
     private val appContext = context.applicationContext
     private val preferences = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -27,7 +27,7 @@ class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptio
     /**
      * Returns the existing Android-protected database key or creates and stores a new one.
      */
-    override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
+    public override suspend fun getOrCreateKey(walletId: String, databaseName: String): DatabaseEncryptionKey {
         val keyId = keyId(walletId, databaseName)
         val stored = preferences.getString(keyId, null)
         if (stored != null) {
@@ -45,7 +45,7 @@ class AndroidDatabaseEncryptionKeyProvider(context: Context) : DatabaseEncryptio
     /**
      * Removes the stored encrypted database key and its Android Keystore wrapping key.
      */
-    override suspend fun deleteKey(walletId: String, databaseName: String) {
+    public override suspend fun deleteKey(walletId: String, databaseName: String) {
         val keyId = keyId(walletId, databaseName)
         if (!preferences.edit().remove(keyId).commit()) {
             throw WalletPersistenceException.EncryptionConfigurationFailed(

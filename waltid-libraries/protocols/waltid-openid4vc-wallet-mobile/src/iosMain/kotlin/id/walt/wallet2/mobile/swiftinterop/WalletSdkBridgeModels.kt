@@ -41,11 +41,11 @@ import kotlin.time.Instant
  * @property attestation Optional client-attestation configuration for issuers that require it.
  */
 public data class WalletBridgeConfiguration(
-    val walletId: String = "default",
-    val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
-    val persistence: WalletBridgePersistence = WalletBridgePersistence(),
-    val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
-    val attestation: WalletAttestationConfig? = null,
+    public val walletId: String = "default",
+    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
+    public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
+    public val attestation: WalletAttestationConfig? = null,
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
@@ -61,15 +61,15 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
  * @property databaseKey Owner of the encrypted local database key.
  * @property stores Optional store overrides exposed by the Swift facade.
  */
-data class WalletBridgePersistence(
-    val databaseKey: WalletBridgeDatabaseKeyConfiguration = WalletBridgeDatabaseKeyConfiguration.Managed,
-    val stores: WalletBridgeStores = WalletBridgeStores(),
+public data class WalletBridgePersistence(
+    public val databaseKey: WalletBridgeDatabaseKeyConfiguration = WalletBridgeDatabaseKeyConfiguration.Managed,
+    public val stores: WalletBridgeStores = WalletBridgeStores(),
 )
 
 /**
  * Database-key ownership modes exposed to the Swift wallet bridge.
  */
-enum class WalletBridgeDatabaseKeyConfiguration {
+public enum class WalletBridgeDatabaseKeyConfiguration {
     /** Platform-managed encrypted database key. */
     Managed,
 
@@ -84,10 +84,10 @@ enum class WalletBridgeDatabaseKeyConfiguration {
  * @property dids Optional Swift-provided DID document store.
  * @property keys Optional atomic Swift-provided key store and key generator.
  */
-data class WalletBridgeStores(
-    val credentials: WalletBridgeCredentialStore? = null,
-    val dids: WalletBridgeDidStore? = null,
-    val keys: WalletBridgeKeys? = null,
+public data class WalletBridgeStores(
+    public val credentials: WalletBridgeCredentialStore? = null,
+    public val dids: WalletBridgeDidStore? = null,
+    public val keys: WalletBridgeKeys? = null,
 )
 
 /**
@@ -96,24 +96,24 @@ data class WalletBridgeStores(
  * @property keyId Stable identifier for the database key.
  * @property material Raw SQLCipher key material.
  */
-data class WalletBridgeDatabaseEncryptionKey(
-    val keyId: String,
-    val material: ByteArray,
+public data class WalletBridgeDatabaseEncryptionKey(
+    public val keyId: String,
+    public val material: ByteArray,
 )
 
 /**
  * Swift-facing provider for app-supplied encrypted wallet database keys.
  */
-interface WalletBridgeDatabaseEncryptionKeyProvider {
+public interface WalletBridgeDatabaseEncryptionKeyProvider {
     /**
      * Returns the existing encryption key for [databaseName] or creates one if this provider owns creation.
      */
-    suspend fun getOrCreateKey(walletId: String, databaseName: String): WalletBridgeDatabaseEncryptionKey
+    public suspend fun getOrCreateKey(walletId: String, databaseName: String): WalletBridgeDatabaseEncryptionKey
 
     /**
      * Deletes provider-owned key material for [databaseName], if present.
      */
-    suspend fun deleteKey(walletId: String, databaseName: String)
+    public suspend fun deleteKey(walletId: String, databaseName: String)
 }
 
 /**
@@ -125,39 +125,39 @@ interface WalletBridgeDatabaseEncryptionKeyProvider {
  * @property label Optional user-facing credential label.
  * @property addedAt Optional ISO-8601 timestamp for when the credential was added.
  */
-data class WalletBridgeStoredCredential(
-    val id: String,
-    val serializedCredential: String,
-    val format: String,
-    val label: String? = null,
-    val addedAt: String? = null,
+public data class WalletBridgeStoredCredential(
+    public val id: String,
+    public val serializedCredential: String,
+    public val format: String,
+    public val label: String? = null,
+    public val addedAt: String? = null,
 )
 
 /**
  * Swift-facing credential store override.
  */
-interface WalletBridgeCredentialStore {
+public interface WalletBridgeCredentialStore {
     /**
      * Returns a stored credential by wallet-local identifier.
      */
-    suspend fun getCredential(id: String): WalletBridgeStoredCredential?
+    public suspend fun getCredential(id: String): WalletBridgeStoredCredential?
 
     /**
      * Lists all credentials in this store.
      */
-    suspend fun listCredentials(): List<WalletBridgeStoredCredential>
+    public suspend fun listCredentials(): List<WalletBridgeStoredCredential>
 
     /**
      * Adds or replaces a credential entry.
      */
-    suspend fun addCredential(entry: WalletBridgeStoredCredential)
+    public suspend fun addCredential(entry: WalletBridgeStoredCredential)
 
     /**
      * Removes a credential by wallet-local identifier.
      *
      * @return `true` when a credential existed and was removed.
      */
-    suspend fun removeCredential(id: String): Boolean
+    public suspend fun removeCredential(id: String): Boolean
 }
 
 /**
@@ -166,36 +166,36 @@ interface WalletBridgeCredentialStore {
  * @property did Stable DID string.
  * @property documentJson Serialized DID document JSON object.
  */
-data class WalletBridgeStoredDid(
-    val did: String,
-    val documentJson: String,
+public data class WalletBridgeStoredDid(
+    public val did: String,
+    public val documentJson: String,
 )
 
 /**
  * Swift-facing DID document store override.
  */
-interface WalletBridgeDidStore {
+public interface WalletBridgeDidStore {
     /**
      * Returns a stored DID document by DID string.
      */
-    suspend fun getDid(did: String): WalletBridgeStoredDid?
+    public suspend fun getDid(did: String): WalletBridgeStoredDid?
 
     /**
      * Lists all DID documents in this store.
      */
-    suspend fun listDids(): List<WalletBridgeStoredDid>
+    public suspend fun listDids(): List<WalletBridgeStoredDid>
 
     /**
      * Adds or replaces a DID document entry.
      */
-    suspend fun addDid(entry: WalletBridgeStoredDid)
+    public suspend fun addDid(entry: WalletBridgeStoredDid)
 
     /**
      * Removes a DID document by DID string.
      *
      * @return `true` when a DID existed and was removed.
      */
-    suspend fun removeDid(did: String): Boolean
+    public suspend fun removeDid(did: String): Boolean
 }
 
 /**
@@ -205,10 +205,10 @@ interface WalletBridgeDidStore {
  * @property keyType Wallet key type name.
  * @property algorithm Optional signing algorithm label supplied by Swift.
  */
-data class WalletBridgeKeyInfo(
-    val keyId: String,
-    val keyType: String,
-    val algorithm: String? = null,
+public data class WalletBridgeKeyInfo(
+    public val keyId: String,
+    public val keyType: String,
+    public val algorithm: String? = null,
 )
 
 /**
@@ -219,16 +219,16 @@ data class WalletBridgeKeyInfo(
  * @property algorithm Optional signing algorithm label supplied by Swift.
  * @property serializedKeyJson walt.id serialized key JSON payload.
  */
-data class WalletBridgeStoredKey(
-    val keyId: String,
-    val keyType: String,
-    val algorithm: String? = null,
-    val serializedKeyJson: String,
+public data class WalletBridgeStoredKey(
+    public val keyId: String,
+    public val keyType: String,
+    public val algorithm: String? = null,
+    public val serializedKeyJson: String,
 ) {
     /**
      * Text representation that redacts serialized key material.
      */
-    override fun toString(): String =
+    public override fun toString(): String =
         "WalletBridgeStoredKey(keyId=$keyId, keyType=$keyType, algorithm=$algorithm, serializedKeyJson=<redacted>)"
 }
 
@@ -241,48 +241,48 @@ data class WalletBridgeStoredKey(
  * @property store Swift-provided signing-key store.
  * @property generate Swift-provided signing-key generator.
  */
-data class WalletBridgeKeys(
-    val store: WalletBridgeKeyStore,
-    val generate: WalletBridgeKeyGenerator,
+public data class WalletBridgeKeys(
+    public val store: WalletBridgeKeyStore,
+    public val generate: WalletBridgeKeyGenerator,
 )
 
 /**
  * Swift-facing signing-key store override.
  */
-interface WalletBridgeKeyStore {
+public interface WalletBridgeKeyStore {
     /**
      * Returns a serialized signing key by wallet-local identifier.
      */
-    suspend fun getKey(keyId: String): WalletBridgeStoredKey?
+    public suspend fun getKey(keyId: String): WalletBridgeStoredKey?
 
     /**
      * Lists stored signing-key metadata.
      */
-    suspend fun listKeys(): List<WalletBridgeKeyInfo>
+    public suspend fun listKeys(): List<WalletBridgeKeyInfo>
 
     /**
      * Adds or replaces a serialized signing key entry.
      *
      * @return Stable wallet-local key identifier for the stored key.
      */
-    suspend fun addKey(entry: WalletBridgeStoredKey): String
+    public suspend fun addKey(entry: WalletBridgeStoredKey): String
 
     /**
      * Removes a signing key by wallet-local identifier.
      *
      * @return `true` when a key existed and was removed.
      */
-    suspend fun removeKey(keyId: String): Boolean
+    public suspend fun removeKey(keyId: String): Boolean
 }
 
 /**
  * Swift-facing signing-key generator override.
  */
-interface WalletBridgeKeyGenerator {
+public interface WalletBridgeKeyGenerator {
     /**
      * Generates a serialized signing key for [keyType].
      */
-    suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey
+    public suspend fun generateKey(keyType: MobileWalletKeyType): WalletBridgeStoredKey
 }
 
 private fun WalletBridgePersistence.toMobileWalletPersistence(

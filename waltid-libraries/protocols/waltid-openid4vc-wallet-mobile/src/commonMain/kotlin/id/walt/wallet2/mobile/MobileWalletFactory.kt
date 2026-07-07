@@ -24,11 +24,11 @@ import id.walt.wallet2.persistence.stores.SqlDelightDidStore
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  */
 public data class MobileWalletConfig(
-    val walletId: String = "default",
-    val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
-    val attestationConfig: WalletAttestationConfig? = null,
-    val persistence: MobileWalletPersistence = MobileWalletPersistence(),
-    val onEvent: suspend (MobileWalletEvent) -> Unit = {},
+    public val walletId: String = "default",
+    public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
+    public val attestationConfig: WalletAttestationConfig? = null,
+    public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
+    public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
 )
 
 /**
@@ -37,27 +37,27 @@ public data class MobileWalletConfig(
  * @property databaseKey Owner of the SQLCipher key used for the encrypted local wallet database.
  * @property stores Optional store overrides. `null` entries keep the platform default for that state category.
  */
-data class MobileWalletPersistence(
-    val databaseKey: MobileWalletDatabaseKey = MobileWalletDatabaseKey.Managed,
-    val stores: MobileWalletStores = MobileWalletStores(),
+public data class MobileWalletPersistence(
+    public val databaseKey: MobileWalletDatabaseKey = MobileWalletDatabaseKey.Managed,
+    public val stores: MobileWalletStores = MobileWalletStores(),
 )
 
 /**
  * Selects who owns the encrypted wallet database key.
  */
-sealed interface MobileWalletDatabaseKey {
+public sealed interface MobileWalletDatabaseKey {
     /**
      * Uses platform-protected storage to create, load, and delete the database key.
      */
-    data object Managed : MobileWalletDatabaseKey
+    public data object Managed : MobileWalletDatabaseKey
 
     /**
      * Uses key material supplied by application code.
      *
      * @property provider Provider that returns SQLCipher key material for this wallet database.
      */
-    data class Provided(
-        val provider: DatabaseEncryptionKeyProvider,
+    public data class Provided(
+        public val provider: DatabaseEncryptionKeyProvider,
     ) : MobileWalletDatabaseKey
 }
 
@@ -72,10 +72,10 @@ sealed interface MobileWalletDatabaseKey {
  * @property dids Optional DID document store override.
  * @property keys Optional atomic signing-key store and generation override.
  */
-data class MobileWalletStores(
-    val credentials: WalletCredentialStore? = null,
-    val dids: WalletDidStore? = null,
-    val keys: MobileWalletKeys? = null,
+public data class MobileWalletStores(
+    public val credentials: WalletCredentialStore? = null,
+    public val dids: WalletDidStore? = null,
+    public val keys: MobileWalletKeys? = null,
 )
 
 /**
@@ -87,9 +87,9 @@ data class MobileWalletStores(
  * @property store Store for wallet signing-key references.
  * @property generate Generator used when the wallet needs to create signing keys.
  */
-data class MobileWalletKeys(
-    val store: WalletKeyStore,
-    val generate: suspend (KeyType) -> Key,
+public data class MobileWalletKeys(
+    public val store: WalletKeyStore,
+    public val generate: suspend (KeyType) -> Key,
 )
 
 /**
