@@ -1,15 +1,15 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.DefaultSession
-import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.clientauth.ClientAuthenticationContext
 import id.walt.openid4vci.clientauth.ClientAuthenticationEndpoint
-import id.walt.openid4vci.clientauth.ClientAuthenticationMethodDetector
 import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
+import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
@@ -67,8 +67,6 @@ import kotlin.time.Instant
 class DefaultOAuth2Provider(
     val config: OAuth2ProviderConfig,
 ) : OAuth2Provider {
-    private val clientAuthenticationService = ClientAuthenticationService(config.clientAuthenticationServiceConfig)
-
     override suspend fun createAuthorizationRequest(parameters: Map<String, List<String>>): AuthorizationRequestResult =
         when (val resolution = resolveAuthorizationParameters(parameters)) {
             is AuthorizationParameterResolution.Success ->
@@ -272,7 +270,8 @@ class DefaultOAuth2Provider(
         headers: Map<String, List<String>>,
         session: Session?
     ): AccessTokenRequestResult {
-        if (isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
+        if (config.clientAuthenticationServiceResolver == null &&
+            isAnonymousPreAuthorizedCodeTokenRequest(parameters, headers) &&
             !config.preAuthorizedCodeIssuer.anonymousAccessSupported
         ) {
             return AccessTokenRequestResult.Failure(
@@ -281,7 +280,7 @@ class DefaultOAuth2Provider(
         }
 
         val authResult =
-            if (canSkipTokenClientAuthentication(parameters, headers)) {
+            if (config.clientAuthenticationServiceResolver == null && canSkipTokenClientAuthentication(parameters, headers)) {
                 ClientAuthenticationResult.Unauthenticated
             } else {
                 authenticateClient(
@@ -337,15 +336,26 @@ class DefaultOAuth2Provider(
         endpoint: ClientAuthenticationEndpoint,
         parameters: Map<String, List<String>>,
         headers: Map<String, List<String>>,
-    ): ClientAuthenticationResult =
-        clientAuthenticationService.authenticate(
+    ): ClientAuthenticationResult {
+        val resolution = config.clientAuthenticationServiceResolver?.resolve(endpoint, parameters, headers)
+            ?: ClientAuthenticationServiceResolution(
+                serviceConfig = config.clientAuthenticationServiceConfig,
+                context = ClientAuthenticationContext(
+                    authorizationServerIssuer = config.authorizationServerIssuer,
+                ),
+            )
+
+        if (resolution.skipAuthentication) {
+            return ClientAuthenticationResult.Unauthenticated
+        }
+
+        return ClientAuthenticationService(resolution.serviceConfig).authenticate(
             endpoint = endpoint,
             parameters = parameters,
             headers = headers,
-            context = ClientAuthenticationContext(
-                authorizationServerIssuer = config.authorizationServerIssuer,
-            ),
+            context = resolution.context,
         )
+    }
 
     override suspend fun createAccessTokenResponse(
         request: AccessTokenRequest,
@@ -372,7 +382,7 @@ class DefaultOAuth2Provider(
 
     override fun writeAccessTokenError(error: OAuthError): AccessTokenResponseHttp =
         AccessTokenResponseHttp(
-            status = 400,
+            status = oauthJsonErrorStatus(error),
             headers = TOKEN_RESPONSE_HEADERS,
             payload = buildMap {
                 put("error", JsonPrimitive(error.error))
@@ -683,22 +693,6 @@ class DefaultOAuth2Provider(
             "client_id" to id,
             "client_authentication_method" to authenticationMethod,
         )
-
-    private fun Map<String, List<String>>.singleNonBlankValue(name: String): String? =
-        this[name].orEmpty()
-            .filter { it.isNotBlank() }
-            .singleOrNull()
-
-    private fun isAnonymousPreAuthorizedCodeTokenRequest(
-        parameters: Map<String, List<String>>,
-        headers: Map<String, List<String>>,
-    ): Boolean =
-        parameters.singleNonBlankValue("grant_type") == GrantType.PreAuthorizedCode.value &&
-            parameters.hasNoClientId() &&
-            !ClientAuthenticationMethodDetector.hasClientAuthenticationInput(parameters, headers)
-
-    private fun Map<String, List<String>>.hasNoClientId(): Boolean =
-        this["client_id"].orEmpty().none { it.isNotBlank() }
 
     private sealed class AuthorizationParameterResolution {
         data class Success(val parameters: Map<String, List<String>>) : AuthorizationParameterResolution()
