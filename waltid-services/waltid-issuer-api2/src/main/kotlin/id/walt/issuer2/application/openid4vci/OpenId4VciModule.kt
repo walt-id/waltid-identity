@@ -2,8 +2,7 @@ package id.walt.issuer2.application.openid4vci
 
 import id.walt.crypto.keys.KeyManager
 import id.walt.issuer2.config.Issuer2ServiceConfig
-import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
-import id.walt.openid4vci.clientauth.attestation.verifier.toClientAttestationConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
 import id.walt.openid4vci.core.OAuth2Provider
 import id.walt.openid4vci.core.OAuth2ProviderConfig
 import id.walt.openid4vci.core.PushedAuthorizationConfig
@@ -73,7 +72,7 @@ data class OpenId4VciModule(
                         repository = parRepository,
                         enforcePushedAuthorizationRequests = config.enforcePushedAuthorizationRequests,
                     ),
-                    clientAttestationConfig = createClientAttestationConfig(config),
+                    clientAuthenticationServiceConfig = createClientAuthenticationServiceConfig(config),
 
 
                     accessTokenIssuer = JwtAccessTokenIssuer(signingKeyResolver),
@@ -92,10 +91,11 @@ data class OpenId4VciModule(
             )
         }
 
-        private fun createClientAttestationConfig(config: Issuer2ServiceConfig): ClientAttestationConfig? {
-            val attestationConfig = config.clientAttestationConfig() ?: return null
+        private fun createClientAuthenticationServiceConfig(config: Issuer2ServiceConfig): ClientAuthenticationServiceConfig {
+            val clientAuthenticationConfig = config.clientAuthenticationConfig
+                ?: return ClientAuthenticationServiceConfig()
             return runBlocking {
-                attestationConfig.toClientAttestationConfig()
+                clientAuthenticationConfig.toClientAuthenticationServiceConfig()
             }
         }
     }
