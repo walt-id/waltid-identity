@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -49,6 +50,7 @@ public data class MobileWalletCredential(
     val subject: String?,
     val label: String?,
     val addedAt: String?,
+    val credentialData : JsonObject
 )
 
 /**
@@ -209,6 +211,7 @@ public class MobileWallet internal constructor(
                 subject = meta.subject,
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
+                credentialData = meta.credentialData
             )
         }
 

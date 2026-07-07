@@ -14,17 +14,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletSessionState
+import id.walt.walletdemo.compose.ui.screens.CredentialDetailScreen
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.ReceiveCredential
 import id.walt.walletdemo.compose.ui.screens.WalletScreen
-private enum class WalletRoute { Main, Receive }
+private enum class WalletRoute { Main, Receive, CredentialDetail }
 
 @Composable
 fun WalletDemoApp(controller: WalletDemoController) {
     val state by controller.state.collectAsState()
 
     var route by remember { mutableStateOf(WalletRoute.Main) }
+    var selectedCredentialId by remember { mutableStateOf<String?>(null) }
 
     MaterialTheme {
         Surface(
@@ -51,11 +54,38 @@ fun WalletDemoApp(controller: WalletDemoController) {
                             controller = controller,
                             state = state,
                             onReceiveClick = { route = WalletRoute.Receive },
+                            onCredentialClick = { credentialId ->
+                                selectedCredentialId = credentialId
+                                route = WalletRoute.CredentialDetail
+                            },
                         )
                         WalletRoute.Receive -> ReceiveCredential(
                             controller, state,
-                            onBack = { route = WalletRoute.Main }
+                            onBack = { route = WalletRoute.Main },
+                            onReceived = { route = WalletRoute.Main },
                         )
+                        WalletRoute.CredentialDetail -> {
+                            val credential = (state.session as? WalletSessionState.Ready)
+                                ?.credentials
+                                ?.firstOrNull { it.id == selectedCredentialId }
+
+                            if (credential == null) {
+                                WalletScreen(
+                                    controller = controller,
+                                    state = state,
+                                    onReceiveClick = { route = WalletRoute.Receive },
+                                    onCredentialClick = { credentialId ->
+                                        selectedCredentialId = credentialId
+                                        route = WalletRoute.CredentialDetail
+                                    },
+                                )
+                            } else {
+                                CredentialDetailScreen(
+                                    credential = credential,
+                                    onBack = { route = WalletRoute.Main },
+                                )
+                            }
+                        }
                     }
                 }
             }

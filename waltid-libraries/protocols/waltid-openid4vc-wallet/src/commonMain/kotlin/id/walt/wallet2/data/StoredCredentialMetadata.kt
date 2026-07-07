@@ -1,6 +1,7 @@
 package id.walt.wallet2.data
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
 /**
@@ -14,5 +15,6 @@ data class StoredCredentialMetadata(
     val issuer: String? = null,
     val subject: String? = null,
     val label: String? = null,
-    val addedAt: Instant? = null
+    val addedAt: Instant? = null,
+    val credentialData : JsonObject
 )
