@@ -18,6 +18,20 @@ data class ClientAuthenticationContext(
     val challenge: String? = null,
 )
 
+data class ClientAuthenticationServiceResolution(
+    val serviceConfig: ClientAuthenticationServiceConfig,
+    val context: ClientAuthenticationContext = ClientAuthenticationContext(),
+    val skipAuthentication: Boolean = false,
+)
+
+fun interface ClientAuthenticationServiceResolver {
+    suspend fun resolve(
+        endpoint: ClientAuthenticationEndpoint,
+        parameters: Map<String, List<String>>,
+        headers: Map<String, List<String>>,
+    ): ClientAuthenticationServiceResolution
+}
+
 enum class ClientAuthenticationEndpoint {
     PUSHED_AUTHORIZATION,
     TOKEN,
