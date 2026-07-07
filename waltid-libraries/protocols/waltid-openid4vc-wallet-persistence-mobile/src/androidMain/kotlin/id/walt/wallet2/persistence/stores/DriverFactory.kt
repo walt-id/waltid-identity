@@ -10,10 +10,10 @@ import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
  *
  * @param context Android context used by [AndroidSqliteDriver].
  */
-actual class DriverFactory(private val context: Context) {
+public actual class DriverFactory(private val context: Context) {
     /**
      * Creates an Android SQLite driver for [databaseName].
      */
-    actual fun createDriver(databaseName: String): SqlDriver =
+    public actual fun createDriver(databaseName: String): SqlDriver =
         AndroidSqliteDriver(WalletPersistenceDatabase.Schema, context, "$databaseName.db")
 }

@@ -1,3 +1,8 @@
+@file:OptIn(ExperimentalAbiValidation::class)
+
+import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+
 plugins {
     id("waltid.mobile.library")
     id("waltid.mobile.sdk.documentation")
@@ -11,6 +16,12 @@ waltidMobile {
 }
 
 kotlin {
+    explicitApi()
+
+    abiValidation {
+        binariesSource.set(BinariesSource.MAIN_COMPILATION)
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))

@@ -27,7 +27,7 @@ import kotlinx.serialization.json.JsonElement
  * @property keyId Identifier of the persisted signing key used by the wallet.
  * @property did Decentralized identifier registered for the persisted key.
  */
-data class MobileWalletBootstrapResult(
+public data class MobileWalletBootstrapResult(
     val keyId: String,
     val did: String,
 )
@@ -42,7 +42,7 @@ data class MobileWalletBootstrapResult(
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
  */
-data class MobileWalletCredential(
+public data class MobileWalletCredential(
     val id: String,
     val format: String,
     val issuer: String?,
@@ -58,7 +58,7 @@ data class MobileWalletCredential(
  * @property redirectTo Optional verifier redirect URI returned by the presentation flow.
  * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
  */
-data class MobileWalletPresentationResult(
+public data class MobileWalletPresentationResult(
     val success: Boolean,
     val redirectTo: String?,
     val verifierResponseJson: String? = null,
@@ -75,7 +75,7 @@ data class MobileWalletPresentationResult(
  * @property bearerToken Optional bearer token for protected attester endpoints.
  * @property hostHeader Optional `Host` header override for tunneled local tests.
  */
-data class WalletAttestationConfig(
+public data class WalletAttestationConfig(
     val baseUrl: String,
     val attesterPath: String,
     val bearerToken: String = "",
@@ -89,7 +89,7 @@ data class WalletAttestationConfig(
  * and SQLDelight driver. The facade keeps the public mobile API intentionally small while delegating
  * protocol work to the core wallet handlers.
  */
-class MobileWallet(
+public class MobileWallet internal constructor(
     walletId: String,
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
@@ -104,7 +104,7 @@ class MobileWallet(
     /**
      * Buffered stream of recent issuance and presentation events emitted by this wallet.
      */
-    val events: Flow<MobileWalletEvent> = eventStream.events
+    public val events: Flow<MobileWalletEvent> = eventStream.events
 
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
         ClientAttestationAssembler(
@@ -134,7 +134,7 @@ class MobileWallet(
      * @return The key identifier and DID used by this wallet.
      * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
      */
-    suspend fun bootstrap(
+    public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): MobileWalletBootstrapResult {
@@ -178,7 +178,7 @@ class MobileWallet(
      * @param clientId Client identifier sent to the issuer.
      * @return Wallet-local identifiers of the stored credentials.
      */
-    suspend fun receive(
+    public suspend fun receive(
         offerUrl: String,
         txCode: String? = null,
         clientId: String = "wallet-client",
@@ -199,7 +199,7 @@ class MobileWallet(
      *
      * @return Credential summaries ordered by the underlying credential store.
      */
-    suspend fun credentials(): List<MobileWalletCredential> =
+    public suspend fun credentials(): List<MobileWalletCredential> =
         wallet.streamAllCredentials().toList().map { credential ->
             val meta = credential.toMetadata()
             MobileWalletCredential(
@@ -220,7 +220,7 @@ class MobileWallet(
      * @param runPolicies Optional override for verifier policy execution in the core presentation handler.
      * @return Transmission status, optional redirect, and optional verifier response details.
      */
-    suspend fun present(
+    public suspend fun present(
         requestUrl: String,
         did: String? = null,
         runPolicies: Boolean? = null,

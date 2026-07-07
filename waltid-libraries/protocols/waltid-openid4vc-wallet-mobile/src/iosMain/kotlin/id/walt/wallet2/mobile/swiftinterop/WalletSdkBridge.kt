@@ -25,14 +25,14 @@ internal suspend fun <T> walletBridgeCall(block: suspend () -> T): WalletBridgeR
  * The bridge keeps errors and results explicit for Swift callers while preserving the small
  * cross-platform wallet API shape.
  */
-class WalletSdkBridge private constructor(
+public class WalletSdkBridge private constructor(
     private val operations: WalletSdkBridgeOperations,
     private val eventFlow: Flow<MobileWalletEvent>,
 ) {
     /**
      * Creates a bridge backed by the supplied [MobileWallet].
      */
-    constructor(wallet: MobileWallet) : this(
+    public constructor(wallet: MobileWallet) : this(
         operations = MobileWalletSdkBridgeOperations(wallet),
         eventFlow = wallet.events,
     )
@@ -40,12 +40,12 @@ class WalletSdkBridge private constructor(
     /**
      * Buffered stream of recent issuance and presentation events emitted by the bridged wallet.
      */
-    val events: Flow<MobileWalletEvent> = eventFlow
+    public val events: Flow<MobileWalletEvent> = eventFlow
 
     /**
      * Initializes the bridged wallet and returns the persisted key and DID information.
      */
-    suspend fun bootstrap(
+    public suspend fun bootstrap(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): WalletBridgeResult<MobileWalletBootstrapResult> =
@@ -59,7 +59,7 @@ class WalletSdkBridge private constructor(
     /**
      * Receives credentials from an OpenID4VCI credential offer.
      */
-    suspend fun receive(
+    public suspend fun receive(
         offerUrl: String,
         txCode: String? = null,
         clientId: String = "wallet-client",
@@ -75,7 +75,7 @@ class WalletSdkBridge private constructor(
     /**
      * Lists credential summaries stored in the bridged wallet.
      */
-    suspend fun credentials(): WalletBridgeResult<List<MobileWalletCredential>> =
+    public suspend fun credentials(): WalletBridgeResult<List<MobileWalletCredential>> =
         walletBridgeCall {
             operations.credentials()
         }
@@ -83,7 +83,7 @@ class WalletSdkBridge private constructor(
     /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
      */
-    suspend fun present(
+    public suspend fun present(
         requestUrl: String,
         did: String? = null,
         runPolicies: Boolean? = null,

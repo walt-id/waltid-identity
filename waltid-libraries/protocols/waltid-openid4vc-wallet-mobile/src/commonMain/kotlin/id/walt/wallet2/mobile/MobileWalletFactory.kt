@@ -14,7 +14,7 @@ import id.walt.wallet2.persistence.stores.SqlDelightDidStore
  * @property attestationConfig Optional client-attestation configuration for issuer deployments that require it.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  */
-data class MobileWalletConfig(
+public data class MobileWalletConfig(
     val walletId: String = "default",
     val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     val attestationConfig: WalletAttestationConfig? = null,
@@ -24,13 +24,13 @@ data class MobileWalletConfig(
 /**
  * Platform factory that wires [MobileWallet] to Android or iOS storage and key infrastructure.
  */
-expect class MobileWalletFactory {
+public expect class MobileWalletFactory {
     /**
      * Creates a mobile wallet instance for the current platform.
      *
      * @param config Wallet configuration. Defaults create a new wallet identifier and P-256 key material.
      */
-    fun create(config: MobileWalletConfig = MobileWalletConfig()): MobileWallet
+    public fun create(config: MobileWalletConfig = MobileWalletConfig()): MobileWallet
 }
 
 internal fun createMobileWallet(

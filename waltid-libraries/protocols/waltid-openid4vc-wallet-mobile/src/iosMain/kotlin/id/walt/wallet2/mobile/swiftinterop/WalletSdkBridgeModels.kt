@@ -13,7 +13,7 @@ import kotlinx.serialization.Serializable
  * @property defaultKeyType Key type used by wallet bootstrap when no key type override is supplied.
  * @property attestation Optional client-attestation configuration for issuers that require it.
  */
-data class WalletBridgeConfiguration(
+public data class WalletBridgeConfiguration(
     val walletId: String = "default",
     val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     val attestation: WalletAttestationConfig? = null,
@@ -29,7 +29,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
  * Coarse error category for Swift bridge failures.
  */
 @Serializable
-enum class WalletBridgeErrorCategory {
+public enum class WalletBridgeErrorCategory {
     /** Input supplied by the caller is invalid. */
     invalidInput,
 
@@ -66,7 +66,7 @@ enum class WalletBridgeErrorCategory {
  * @property causeClass Kotlin exception class name when available.
  */
 @Serializable
-data class WalletBridgeError(
+public data class WalletBridgeError(
     val category: WalletBridgeErrorCategory,
     val message: String,
     val causeClass: String? = null,
@@ -91,18 +91,18 @@ data class WalletBridgeError(
 /**
  * Result wrapper used by Swift bridge operations.
  */
-sealed interface WalletBridgeResult<out T> {
+public sealed interface WalletBridgeResult<out T> {
     /**
      * Successful bridge operation result.
      *
      * @property value Value returned by the wallet operation.
      */
-    data class Success<T>(val value: T) : WalletBridgeResult<T>
+    public data class Success<T>(public val value: T) : WalletBridgeResult<T>
 
     /**
      * Failed bridge operation result.
      *
      * @property error Structured bridge error returned to Swift callers.
      */
-    data class Failure(val error: WalletBridgeError) : WalletBridgeResult<Nothing>
+    public data class Failure(public val error: WalletBridgeError) : WalletBridgeResult<Nothing>
 }

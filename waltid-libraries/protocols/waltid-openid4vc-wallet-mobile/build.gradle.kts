@@ -1,4 +1,8 @@
+@file:OptIn(ExperimentalAbiValidation::class)
+
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     id("waltid.mobile.library")
@@ -23,6 +27,12 @@ skie {
 }
 
 kotlin {
+    explicitApi()
+
+    abiValidation {
+        binariesSource.set(BinariesSource.MAIN_COMPILATION)
+    }
+
     if (enableIosBuild) {
         val walletCoreXcFramework = XCFramework("WalletCore")
 

@@ -10,14 +10,14 @@ import id.walt.wallet2.persistence.stores.DriverFactory
  *
  * @param context Android context used to open the wallet database.
  */
-actual class MobileWalletFactory(private val context: Context) {
+public actual class MobileWalletFactory(private val context: Context) {
     /**
      * Creates an Android mobile wallet for [config].
      *
      * The database is named from [MobileWalletConfig.walletId], and signing keys are created or loaded
      * through the Android platform key provider.
      */
-    actual fun create(config: MobileWalletConfig): MobileWallet {
+    public actual fun create(config: MobileWalletConfig): MobileWallet {
         val driver = DriverFactory(context).createDriver("wallet_${config.walletId}")
         val db = WalletPersistenceDatabase(driver)
         val keyProvider = AndroidPlatformKeyProvider()

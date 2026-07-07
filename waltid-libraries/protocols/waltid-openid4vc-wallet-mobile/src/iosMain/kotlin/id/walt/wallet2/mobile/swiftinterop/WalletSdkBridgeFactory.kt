@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.emptyFlow
 /**
  * Factory for creating [WalletSdkBridge] instances with iOS storage and key dependencies.
  */
-class WalletSdkBridgeFactory() {
+public class WalletSdkBridgeFactory() {
     private var createDependencies: (MobileWalletConfig) -> WalletSdkBridgeDependencies = { config ->
         val wallet = MobileWalletFactory().create(config)
         WalletSdkBridgeDependencies(
@@ -32,7 +32,7 @@ class WalletSdkBridgeFactory() {
     /**
      * Creates an iOS wallet bridge from the supplied configuration.
      */
-    fun create(
+    public fun create(
         configuration: WalletBridgeConfiguration = WalletBridgeConfiguration(),
     ): WalletBridgeResult<WalletSdkBridge> =
         try {
