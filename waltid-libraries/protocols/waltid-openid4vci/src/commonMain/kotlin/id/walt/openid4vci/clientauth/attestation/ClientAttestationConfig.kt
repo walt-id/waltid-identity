@@ -38,7 +38,7 @@ class ClientAttestationConfig(
         popMaxAgeSeconds = popMaxAgeSeconds,
     )
 
-    internal fun toAuthenticationMethod(): AttestationBasedClientAuthenticationMethod =
+    fun toAuthenticationMethod(): AttestationBasedClientAuthenticationMethod =
         AttestationBasedClientAuthenticationMethod(
             attestationVerifier = attestationVerifier,
             acceptedAttestationSigningAlgorithms = acceptedAttestationSigningAlgorithms,
