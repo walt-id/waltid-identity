@@ -32,6 +32,7 @@ kotlin {
                 dependsOn(commonMain.get())
                 dependencies {
                     implementation(project(":waltid-libraries:protocols:waltid-openid4vc-wallet-mobile"))
+                    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
                 }
             }
 

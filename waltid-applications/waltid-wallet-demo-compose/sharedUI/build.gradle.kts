@@ -40,13 +40,16 @@ kotlin {
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
             implementation(identityLibs.compose.material3)
-            implementation("androidx.camera:camera-core:1.6.1")
-            implementation("androidx.camera:camera-camera2:1.6.1")
-            implementation("androidx.camera:camera-lifecycle:1.4.1")
-            implementation("androidx.camera:camera-view:1.4.1")
-            implementation("com.google.mlkit:barcode-scanning:17.3.0")
-            implementation("androidx.activity:activity-compose:1.9.3")
-            implementation("androidx.compose.material:material-icons-core:1.7.8")
+            implementation(identityLibs.androidx.camera.core)
+            implementation(identityLibs.androidx.camera.camera2)
+            implementation(identityLibs.androidx.camera.lifecycle)
+            implementation(identityLibs.androidx.camera.view)
+            implementation(identityLibs.mlkit.barcode.scanning)
+            implementation(identityLibs.androidx.activity.compose)
+            implementation(identityLibs.compose.material.icons.core)
+            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+            implementation("androidx.compose.material:material-icons-extended:1.7.8")
+
 
         }
 
