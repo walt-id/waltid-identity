@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_REF="origin/main"
+BASE_REF=""
 HEAD_REF="HEAD"
 CHANGED_FILES_FILE=""
 
@@ -18,6 +18,64 @@ read_changed_files() {
   while IFS= read -r changed_file; do
     changed_files+=("$changed_file")
   done
+}
+
+current_branch_name() {
+  if [[ -n "${GITHUB_HEAD_REF:-}" ]]; then
+    printf '%s\n' "$GITHUB_HEAD_REF"
+    return
+  fi
+
+  if [[ -n "${GITHUB_REF_NAME:-}" ]]; then
+    printf '%s\n' "$GITHUB_REF_NAME"
+    return
+  fi
+
+  git branch --show-current 2>/dev/null || true
+}
+
+detect_base_branch() {
+  if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+    printf '%s\n' "$GITHUB_BASE_REF"
+    return
+  fi
+
+  local branch_name
+  branch_name="$(current_branch_name)"
+  if [[ -z "$branch_name" || -z "${GITHUB_REPOSITORY:-}" ]] || ! command -v gh >/dev/null 2>&1; then
+    return
+  fi
+
+  gh pr view "$branch_name" \
+    --repo "$GITHUB_REPOSITORY" \
+    --json baseRefName \
+    --jq .baseRefName 2>/dev/null || true
+}
+
+resolve_branch_ref() {
+  local branch_name="$1"
+  if git rev-parse --verify "refs/remotes/origin/$branch_name" >/dev/null 2>&1; then
+    printf 'origin/%s\n' "$branch_name"
+    return
+  fi
+
+  if git rev-parse --verify "refs/heads/$branch_name" >/dev/null 2>&1; then
+    printf '%s\n' "$branch_name"
+    return
+  fi
+
+  printf 'origin/%s\n' "$branch_name"
+}
+
+ensure_base_ref() {
+  if git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
+    return
+  fi
+
+  if [[ "$BASE_REF" == origin/* ]]; then
+    local branch_name="${BASE_REF#origin/}"
+    git fetch --prune origin "+refs/heads/${branch_name}:refs/remotes/origin/${branch_name}" >/dev/null 2>&1 || true
+  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -49,6 +107,17 @@ done
 if [[ -n "$CHANGED_FILES_FILE" ]]; then
   read_changed_files < "$CHANGED_FILES_FILE"
 else
+  if [[ -z "$BASE_REF" ]]; then
+    base_branch="$(detect_base_branch)"
+    if [[ -n "$base_branch" ]]; then
+      BASE_REF="$(resolve_branch_ref "$base_branch")"
+    else
+      BASE_REF="origin/main"
+    fi
+  fi
+
+  ensure_base_ref
+
   if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
     echo "Swift parity gate could not find base ref '$BASE_REF'." >&2
     echo "Fetch the base branch or pass --changed-files-file for deterministic verification." >&2

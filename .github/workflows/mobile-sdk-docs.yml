@@ -21,6 +21,8 @@ jobs:
       - name: Check mobile SDK API contract
         timeout-minutes: 20
         working-directory: waltid-identity
+        env:
+          GH_TOKEN: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
         run: |
           if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
             git fetch --prune --unshallow origin
@@ -33,7 +35,7 @@ jobs:
             -PenableIosBuild=true \
             --no-daemon \
             --console=plain
-          scripts/check-mobile-swift-parity-decision.sh --base-ref origin/main
+          scripts/check-mobile-swift-parity-decision.sh
 
       - name: Generate mobile SDK API docs
         timeout-minutes: 45
