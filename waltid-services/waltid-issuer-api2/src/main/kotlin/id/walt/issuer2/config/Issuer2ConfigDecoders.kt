@@ -16,6 +16,7 @@ import com.sksamuel.hoplite.decoder.Decoder
 import com.sksamuel.hoplite.fp.Validated
 import id.walt.commons.config.ConfigManager
 import id.walt.mdoc.dataelement.json.JsonObjectToCborMappingConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationConfig
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
 import id.walt.sdjwt.SDMap
 import kotlinx.serialization.KSerializer
