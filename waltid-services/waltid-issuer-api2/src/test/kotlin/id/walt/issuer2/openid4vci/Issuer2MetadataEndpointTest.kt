@@ -127,6 +127,25 @@ class Issuer2MetadataEndpointTest {
         assertSelfHostedSdJwtVcTypeMetadata(client, credentialIssuerMetadata)
     }
 
+    @Test
+    fun shouldServeJwtVcIssuerMetadataFromSpecWellKnownPathOnly() = testApplication {
+        installIssuer2WithConfigFiles()
+        val client = apiClient()
+
+        val authorizationServerMetadata = client
+            .get(AUTHORIZATION_SERVER_METADATA_PATH)
+            .body<AuthorizationServerMetadata>()
+        val jwtVcIssuerMetadataRaw = client.get(JWT_VC_ISSUER_METADATA_PATH)
+        assertEquals(HttpStatusCode.OK, jwtVcIssuerMetadataRaw.status)
+        val jwtVcIssuerMetadata = jwtVcIssuerMetadataRaw.body<JWTVCIssuerMetadata>()
+
+        assertEquals(authorizationServerMetadata.issuer, jwtVcIssuerMetadata.issuer)
+        assertEquals(authorizationServerMetadata.jwksUri, jwtVcIssuerMetadata.jwksUri)
+        assertNull(jwtVcIssuerMetadata.jwks)
+
+        assertEquals(HttpStatusCode.NotFound, client.get(NESTED_JWT_VC_ISSUER_METADATA_PATH).status)
+    }
+
     private fun assertConfiguredCredentialScenariosAreAdvertised(
         credentialIssuerMetadata: CredentialIssuerMetadata,
     ) {
@@ -289,6 +308,9 @@ class Issuer2MetadataEndpointTest {
         const val ISSUER_AUTHORITY_BASE_URL = "http://localhost:7002"
         const val OPENID4VCI_PREFIX = "/openid4vci"
         const val ISSUER_BASE_URL = "$ISSUER_AUTHORITY_BASE_URL/openid4vci"
+        const val AUTHORIZATION_SERVER_METADATA_PATH = "/.well-known/oauth-authorization-server/openid4vci"
+        const val JWT_VC_ISSUER_METADATA_PATH = "/.well-known/jwt-vc-issuer/openid4vci"
+        const val NESTED_JWT_VC_ISSUER_METADATA_PATH = "$OPENID4VCI_PREFIX/.well-known/jwt-vc-issuer"
         const val OPEN_BADGE_CONFIG_ID = "OpenBadgeCredential_jwt_vc_json"
         const val SD_JWT_INTERNAL_CONFIG_ID = "identity_credential"
         const val INTERNAL_SD_JWT_VCT = "$ISSUER_BASE_URL/$SD_JWT_INTERNAL_CONFIG_ID"
