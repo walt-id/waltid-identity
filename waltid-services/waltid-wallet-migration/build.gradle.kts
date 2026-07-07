@@ -26,4 +26,15 @@ dependencies {
     // JDBC drivers — source and target databases
     implementation("org.xerial:sqlite-jdbc:3.47.0.0")
     runtimeOnly("org.postgresql:postgresql:42.7.3")
+
+    // Tests
+    testImplementation(kotlin("test"))
+    testImplementation(identityLibs.junit.jupiter.api)
+    testRuntimeOnly(identityLibs.junit.jupiter.engine)
+    testRuntimeOnly(identityLibs.junit.platform.launcher)
+    testImplementation(identityLibs.kotlinx.coroutines.test)
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
