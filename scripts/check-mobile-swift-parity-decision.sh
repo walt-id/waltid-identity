@@ -13,6 +13,13 @@ Fails when a mobile SDK ABI baseline changes without an explicit Swift facade pa
 USAGE
 }
 
+read_changed_files() {
+  changed_files=()
+  while IFS= read -r changed_file; do
+    changed_files+=("$changed_file")
+  done
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base-ref)
@@ -40,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "$CHANGED_FILES_FILE" ]]; then
-  mapfile -t changed_files < "$CHANGED_FILES_FILE"
+  read_changed_files < "$CHANGED_FILES_FILE"
 else
   if ! git rev-parse --verify "$BASE_REF" >/dev/null 2>&1; then
     echo "Swift parity gate could not find base ref '$BASE_REF'." >&2
@@ -48,7 +55,7 @@ else
     exit 2
   fi
   merge_base="$(git merge-base "$BASE_REF" "$HEAD_REF")"
-  mapfile -t changed_files < <(git diff --name-only "$merge_base...$HEAD_REF")
+  read_changed_files < <(git diff --name-only "$merge_base...$HEAD_REF")
 fi
 
 mobile_abi_changed=false
