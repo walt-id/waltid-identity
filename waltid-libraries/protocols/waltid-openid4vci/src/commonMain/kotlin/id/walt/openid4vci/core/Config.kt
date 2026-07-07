@@ -1,6 +1,7 @@
 package id.walt.openid4vci.core
 
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
@@ -45,7 +46,11 @@ data class OAuth2ProviderConfig(
     val pushedAuthorizationEndpointHandlers: PushedAuthorizationEndpointHandlers = PushedAuthorizationEndpointHandlers(),
     val pushedAuthorizationConfig: PushedAuthorizationConfig? = null,
 
+    // Static client-auth setup for providers with one fixed runtime configuration.
     val clientAuthenticationServiceConfig: ClientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(),
+    // Dynamic client-auth setup for singleton providers that resolve configuration from request context.
+    // If present, it owns client-auth policy for the request. Static config is used only when this is null.
+    val clientAuthenticationServiceResolver: ClientAuthenticationServiceResolver? = null,
     val clientAttestationConfig: ClientAttestationConfig? = null,
 
     val accessTokenRequestValidator: AccessTokenRequestValidator,
