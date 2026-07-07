@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,7 +27,7 @@ import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
 
 @Composable
-internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
+internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState , onReceiveClick: () -> Unit,) {
     val ready = state.session as? WalletSessionState.Ready
     val requestDrafts = state.requestDrafts
 
@@ -60,19 +61,25 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
         StatusCard(state)
 
         HorizontalDivider()
-        UrlActionSection(
-            title = "Receive",
-            value = requestDrafts.offerUrl,
-            onValueChange = controller::updateOfferUrl,
-            label = "Credential offer URL",
-            buttonText = "Receive",
-            enabled = ready != null &&
-                requestDrafts.offerUrl.isNotBlank() &&
-                !state.isBusy,
-            inputTestTag = "wallet.offerInput",
-            buttonTestTag = "wallet.receiveButton",
-            onClick = controller::receive,
-        )
+//        UrlActionSection(
+//            title = "Receive",
+//            value = requestDrafts.offerUrl,
+//            onValueChange = controller::updateOfferUrl,
+//            label = "Credential offer URL",
+//            buttonText = "Receive",
+//            enabled = ready != null &&
+//                requestDrafts.offerUrl.isNotBlank() &&
+//                !state.isBusy,
+//            inputTestTag = "wallet.offerInput",
+//            buttonTestTag = "wallet.receiveButton",
+//            onClick = controller::receive,
+//        )
+        Button(
+            onClick = onReceiveClick,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Receive Credential")
+        }
 
         HorizontalDivider()
         UrlActionSection(
