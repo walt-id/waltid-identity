@@ -28,6 +28,7 @@ object DemoTestBackend {
 
     private const val ISSUER_BASE_URL = "https://issuer2.demo.walt.id"
     private const val VERIFIER_BASE_URL = "https://verifier2.demo.walt.id"
+    private const val EUDI_PID_SD_JWT_VCT = "$ISSUER_BASE_URL/openid4vci/urn:eudi:pid:1"
 
     val scenarios = listOf(
         CredentialScenario(
@@ -38,7 +39,7 @@ object DemoTestBackend {
             format = "dc+sd-jwt",
             verifierCredentialQuery = sdJwtQuery(
                 id = "pid",
-                vct = "urn:eudi:pid:1",
+                vct = EUDI_PID_SD_JWT_VCT,
             ),
         ),
         CredentialScenario(
@@ -69,11 +70,9 @@ object DemoTestBackend {
         ),
     )
 
-    // Keep SD-JWT in issuer coverage, but limit verifier2 presentation to the
-    // public demo formats the mobile wallet currently fulfills end to end.
-    val presentationScenarios = scenarios.filter { it.format == "mso_mdoc" }
+    val presentationScenarios = scenarios
 
-    val persistenceScenario = presentationScenarios.first()
+    val persistenceScenario = scenarios.first { it.id == "eudi-pid-mdoc" }
 
     private val client by lazy {
         HttpClient {

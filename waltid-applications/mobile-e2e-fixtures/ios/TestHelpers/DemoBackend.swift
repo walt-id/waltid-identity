@@ -20,6 +20,7 @@ public struct DemoVerifierSession {
 
 public final class DemoBackend {
     public static let shared = DemoBackend()
+    private static let eudiPidSdJwtVct = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
 
     public static let scenarios: [DemoCredentialScenario] = [
         DemoCredentialScenario(
@@ -30,7 +31,7 @@ public final class DemoBackend {
             format: "dc+sd-jwt",
             verifierCredentialQuery: sdJwtQuery(
                 id: "pid",
-                vct: "urn:eudi:pid:1"
+                vct: eudiPidSdJwtVct
             )
         ),
         DemoCredentialScenario(
@@ -61,11 +62,9 @@ public final class DemoBackend {
         ),
     ]
 
-    // Keep SD-JWT in issuer coverage, but limit verifier2 presentation to the
-    // public demo formats the mobile wallet currently fulfills end to end.
-    public static let presentationScenarios = scenarios.filter { $0.format == "mso_mdoc" }
+    public static let presentationScenarios = scenarios
 
-    public static let persistenceScenario = presentationScenarios[0]
+    public static let persistenceScenario = scenarios.first { $0.id == "eudi-pid-mdoc" }!
 
     private static let issuerBaseURL = URL(string: "https://issuer2.demo.walt.id")!
     private static let verifierBaseURL = URL(string: "https://verifier2.demo.walt.id")!

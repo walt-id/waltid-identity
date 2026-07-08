@@ -127,6 +127,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 
+    func testReceiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() async throws {
+        try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-sdjwt")
+    }
+
     func testReceiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() async throws {
         try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-mdoc")
     }

@@ -101,6 +101,11 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
+    fun receiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        receiveAndPresentDemoCredential("eudi-pid-sdjwt")
+    }
+
+    @Test
     fun receiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
         receiveAndPresentDemoCredential("eudi-pid-mdoc")
     }
