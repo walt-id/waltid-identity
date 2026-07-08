@@ -19,6 +19,7 @@ private class MockDemoWallet : DemoWallet {
                 id = "mock-credential",
                 format = "jwt_vc_json",
                 issuer = "walt.id demo issuer",
+                subject = "did:key:mock-wallet-demo",
                 label = "Mock credential",
                 addedAt = "2026-06-17",
             )

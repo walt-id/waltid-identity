@@ -22,6 +22,13 @@ import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.statusText
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
@@ -38,6 +45,10 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Example Credential").performClick()
+        onNodeWithTag("credential.detailScreen").assertIsDisplayed()
+        onNodeWithText("Credential Details").assertIsDisplayed()
+        onNodeWithText("did:key:subject").assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
     }
 
@@ -50,6 +61,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
         wallet.credentials = listOf(sampleCredential)
+        openReceiveScreenAndSelectManual()
         onNodeWithTag("wallet.offerInput").performScrollTo().performTextInput("openid-credential-offer://example")
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
@@ -93,6 +105,7 @@ class WalletDemoAppTestScenarios {
 
         controller.handleDeepLink(offerUrl)
         waitForIdle()
+        openReceiveScreenAndSelectManual()
         onNodeWithTag("wallet.offerInput").performScrollTo().assertTextContains(offerUrl)
 
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
@@ -121,6 +134,7 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.session is WalletSessionState.Ready }
 
         firstController.handleDeepLink("openid-credential-offer://example")
+        openReceiveScreenAndSelectManual()
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
@@ -143,13 +157,65 @@ class WalletDemoAppTestScenarios {
         waitForIdle()
     }
 
+    private fun ComposeUiTest.openReceiveScreenAndSelectManual() {
+        onNodeWithTag("wallet.openReceiveButton").performScrollTo().performClick()
+        waitForIdle()
+        onNodeWithText("Enter link").performClick()
+        waitForIdle()
+    }
+
     private companion object {
         val sampleCredential = WalletDemoCredential(
             id = "cred-1",
             format = "jwt_vc_json",
             issuer = "Example Issuer",
+            subject = "did:key:subject",
             label = "Example Credential",
             addedAt = "2026-06-17",
+            credentialData = JsonObject(
+                mapOf(
+                    "name" to JsonPrimitive("Introduction to Decentralized Identity"),
+                    "description" to JsonPrimitive(
+                        "Awarded for completing the foundational course on verifiable credentials and DIDs."
+                    ),
+                    "type" to buildJsonArray {
+                        add(JsonPrimitive("VerifiableCredential"))
+                        add(JsonPrimitive("OpenBadgeCredential"))
+                    },
+                    "issuanceDate" to JsonPrimitive("2026-06-15T09:30:00Z"),
+                    "expirationDate" to JsonNull,
+                    "achievement" to buildJsonObject {
+                        put("name", JsonPrimitive("Decentralized Identity Fundamentals"),)
+                        put("achievementType", JsonPrimitive("Certificate"))
+                        put("criteria", buildJsonObject {
+                            put("narrative", JsonPrimitive("Completed all modules and passed the final assessment."))
+                        })
+                    },
+                    "alignment" to buildJsonArray {
+                        add(buildJsonObject {
+                            put("targetName", JsonPrimitive("Information Security Analyst"))
+                            put("targetFramework", JsonPrimitive("O*NET"))
+                            put("targetCode", JsonPrimitive("15-1212.00"))
+                        })
+                        add(buildJsonObject {
+                            put("targetName", JsonPrimitive("Digital Identity Management"))
+                            put("targetFramework", JsonPrimitive("ESCO"))
+                            put("targetCode", JsonPrimitive("S1.2.3"))
+                        })
+                    },
+                    "evidence" to buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", JsonPrimitive("Evidence"))
+                            put("name", JsonPrimitive("Final Project Submission"))
+                            put("description", JsonPrimitive("Implemented an OID4VCI issuer demo."))
+                        })
+                    },
+                    "recipient" to buildJsonObject {
+                        put("identity", JsonPrimitive("did:key:subject"))
+                        put("type", JsonPrimitive("DID"))
+                    },
+                )
+            ),
         )
     }
 }
