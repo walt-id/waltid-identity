@@ -6,6 +6,9 @@ import WalletSDK
 final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
 
     private let verifierPollingTimeout: TimeInterval = 90
+    private let fixtureBaseURL = URL(
+        string: ProcessInfo.processInfo.environment["ENTERPRISE_MOBILE_FIXTURE_BASE_URL"] ?? "http://localhost:33335"
+    )!
 
     func testReceiveEnterpriseMdlFromEnterpriseIssuer2() async throws {
         try await receiveCredentialFromEnterpriseIssuer2(scenarioID: "enterprise-mdl")
@@ -24,7 +27,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
     }
 
     func testEnterpriseCredentialPersistsAcrossControllerRecreation() async throws {
-        let fixture = try makeFixture()
+        let fixture = makeFixture()
         let selectedScenario = try await enterpriseScenario(fixture: fixture, scenarioID: "enterprise-mdl")
         let offer = try await fixture.createOffer(scenario: selectedScenario, platform: .ios)
         let walletId = "ios-enterprise-persist-\(selectedScenario.id)-\(UUID().uuidString)"
@@ -51,12 +54,8 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
         try await fixture.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
     }
 
-    private func makeFixture() throws -> EnterpriseMobileFixture {
-        guard let value = ProcessInfo.processInfo.environment["ENTERPRISE_MOBILE_FIXTURE_BASE_URL"],
-              let url = URL(string: value), !value.isEmpty else {
-            throw XCTSkip("Set ENTERPRISE_MOBILE_FIXTURE_BASE_URL to run Enterprise mobile integration tests")
-        }
-        return EnterpriseMobileFixture(baseURL: url)
+    private func makeFixture() -> EnterpriseMobileFixture {
+        EnterpriseMobileFixture(baseURL: fixtureBaseURL)
     }
 
     private func makeWallet(
@@ -99,7 +98,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
     }
 
     private func receiveCredentialFromEnterpriseIssuer2(scenarioID: String) async throws {
-        let fixture = try makeFixture()
+        let fixture = makeFixture()
         let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
         let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
         let walletId = "ios-enterprise-receive-\(scenario.id)-\(UUID().uuidString)"
@@ -115,7 +114,7 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
     }
 
     private func receiveAndPresentEnterpriseCredential(scenarioID: String) async throws {
-        let fixture = try makeFixture()
+        let fixture = makeFixture()
         let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
         XCTAssertTrue(scenario.supportsPresentation, "\(scenario.displayName) should support presentation")
 
