@@ -1,0 +1,33 @@
+api:
+  replicas: 1
+  type: ClusterIP
+  containerPort: 3000
+  image:
+    repository: waltid/issuer-api
+    tag: latest
+    imagePullPolicy: Always
+
+configMountPath: /waltid-issuer-api/config
+
+# Config files rendered into a ConfigMap and mounted at configMountPath.
+# Values support Helm templating (tpl), e.g. {{ .Values.ingress.host }}.
+# Kept empty by default so instances (which deep-merge maps) don't inherit
+# config files they shouldn't -- each instance declares its own set.
+# When empty, no ConfigMap or config volume is rendered.
+configFiles: {}
+
+# Plain container environment variables (name: value). Used by workloads that
+# configure via env vars instead of mounted config files (e.g. the portals).
+env: {}
+
+# Optional persistent data volume (used by wallet-api).
+persistence:
+  enabled: false
+  mountPath: /waltid-wallet-api/data/
+  accessMode: ReadWriteOnce
+  storageClass: gp3-retain
+  storageRequest: 1Gi
+
+ingress:
+  ingressClassName: traefik
+  host: issuer.portal.waltid.cloud

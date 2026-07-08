@@ -1,4 +1,3 @@
-import com.google.cloud.tools.jib.gradle.JibExtension
 import io.ktor.plugin.features.*
 
 object Versions {
@@ -87,17 +86,6 @@ buildConfig {
 ktor {
     docker {
         portMappings.set(listOf(DockerPortMapping(7002, 7002, DockerPortMappingProtocol.TCP)))
-    }
-}
-
-configure<JibExtension> {
-    extraDirectories {
-        paths {
-            path {
-                setFrom(file("config"))
-                setInto("/${project.name}/config")
-            }
-        }
     }
 }
 

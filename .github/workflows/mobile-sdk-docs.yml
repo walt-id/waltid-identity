@@ -1,0 +1,26 @@
+name: Mobile SDK API docs
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  dokka:
+    runs-on: macos-26
+    env:
+      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Generate mobile SDK API docs
+        timeout-minutes: 30
+        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@d803fe4800fe059ed9a98bd4ffaf60affa1d1c82
+        with:
+          waltid-directory: 'waltid-identity'
+          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}

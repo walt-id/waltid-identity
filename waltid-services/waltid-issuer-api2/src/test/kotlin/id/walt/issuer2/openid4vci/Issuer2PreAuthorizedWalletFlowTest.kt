@@ -45,7 +45,7 @@ class Issuer2PreAuthorizedWalletFlowTest {
 
     @Test
     fun walletCanCompletePreAuthorizedByReferenceOfferWithoutTxCode() = testApplication {
-        val scenario = Issuer2CredentialScenarios.universityDegree
+        val scenario = Issuer2CredentialScenarios.openBadgeCredential
         installIssuer2WithConfigFiles()
         val client = apiClient()
         val walletFlow = Issuer2WalletFlowDriver(client)

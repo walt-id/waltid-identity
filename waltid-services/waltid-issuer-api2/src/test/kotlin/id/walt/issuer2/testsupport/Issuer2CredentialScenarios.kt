@@ -15,8 +15,8 @@ data class Issuer2CredentialScenario(
 )
 
 object Issuer2CredentialScenarios {
-    const val UNIVERSITY_DEGREE_PROFILE_ID = "universityDegree"
-    const val UNIVERSITY_DEGREE_CONFIGURATION_ID = "UniversityDegree_jwt_vc_json"
+    const val OPEN_BADGE_PROFILE_ID = "openBadgeCredential"
+    const val OPEN_BADGE_CONFIGURATION_ID = "OpenBadgeCredential_jwt_vc_json"
 
     const val ISO_PHOTO_ID_PROFILE_ID = "isoPhotoId"
     const val ISO_PHOTO_ID_CONFIGURATION_ID = "org.iso.23220.photoid.1"
@@ -34,9 +34,9 @@ object Issuer2CredentialScenarios {
     const val MSO_MDOC_FORMAT = "mso_mdoc"
     const val SD_JWT_VC_FORMAT = "dc+sd-jwt"
 
-    val universityDegree = Issuer2CredentialScenario(
-        profileId = UNIVERSITY_DEGREE_PROFILE_ID,
-        credentialConfigurationId = UNIVERSITY_DEGREE_CONFIGURATION_ID,
+    val openBadgeCredential = Issuer2CredentialScenario(
+        profileId = OPEN_BADGE_PROFILE_ID,
+        credentialConfigurationId = OPEN_BADGE_CONFIGURATION_ID,
         format = JWT_VC_JSON_FORMAT,
         family = Issuer2CredentialFamily.JWT_VC_JSON,
     )
@@ -104,40 +104,11 @@ object Issuer2CredentialScenarios {
     val configured: List<Issuer2CredentialScenario> = listOf(
         jwtVcJson("alpsTourReservation", "AlpsTourReservation_jwt_vc_json"),
         jwtVcJson("bankId", "BankId_jwt_vc_json"),
-        jwtVcJson("boardingPass", "BoardingPass_jwt_vc_json"),
-        jwtVcJson("dataspaceParticipantCredential", "DataspaceParticipantCredential_jwt_vc_json"),
-        jwtVcJson("educationalID", "EducationalID_jwt_vc_json"),
-        jwtVcJson("eID", "eID_jwt_vc_json"),
-        jwtVcJson("emailVerificationCredential", "EmailVerificationCredential_jwt_vc_json"),
-        jwtVcJson("enrollmentCredential", "EnrollmentCredential_jwt_vc_json"),
-        jwtVcJson("ePassport", "ePassport_jwt_vc_json"),
-        jwtVcJson("gaiaXTermsAndConditions", "GaiaXTermsAndConditions_jwt_vc_json"),
         jwtVcJson("hotelReservation", "HotelReservation_jwt_vc_json"),
-        jwtVcJson("identityCredential", "IdentityCredential_jwt_vc_json"),
-        jwtVcJson("iso18013DriversLicenseCredential", "Iso18013DriversLicenseCredential_jwt_vc_json"),
-        jwtVcJson("kiwiAccessCredential", "KiwiAccessCredential_jwt_vc_json"),
-        jwtVcJson("kycChecksCredential", "KycChecksCredential_jwt_vc_json"),
         jwtVcJson("kycCredential", "KycCredential_jwt_vc_json"),
-        jwtVcJson("kycDataCredential", "KycDataCredential_jwt_vc_json"),
-        jwtVcJson("legalPerson", "LegalPerson_jwt_vc_json"),
-        jwtVcJson("legalRegistrationNumberEORI", "LegalRegistrationNumberEORI_jwt_vc_json"),
-        jwtVcJson("legalRegistrationNumberLeiCode", "LegalRegistrationNumberLeiCode_jwt_vc_json"),
-        jwtVcJson("legalRegistrationNumberVatId", "LegalRegistrationNumberVatId_jwt_vc_json"),
-        jwtVcJson("mortgageEligibility", "MortgageEligibility_jwt_vc_json"),
-        jwtVcJson("naturalPersonVerifiableID", "NaturalPersonVerifiableID_jwt_vc_json"),
-        jwtVcJson("openBadgeCredential", "OpenBadgeCredential_jwt_vc_json"),
-        jwtVcJson("passportCh", "PassportCh_jwt_vc_json"),
-        jwtVcJson("photoIDCredential", "PhotoIDCredential_jwt_vc_json"),
+        openBadgeCredential,
         jwtVcJson("pnd91Credential", "PND91Credential_jwt_vc_json"),
         jwtVcJson("proofOfAddress", "ProofOfAddress_jwt_vc_json"),
-        jwtVcJson("taxCredential", "TaxCredential_jwt_vc_json"),
-        jwtVcJson("taxReceipt", "TaxReceipt_jwt_vc_json"),
-        universityDegree,
-        jwtVcJson("vaccinationCertificate", "VaccinationCertificate_jwt_vc_json"),
-        jwtVcJson("verifiableId", "VerifiableId_jwt_vc_json"),
-        jwtVcJson("verifiablePortableDocumentA1", "VerifiablePortableDocumentA1_jwt_vc_json"),
-        jwtVcJson("visa", "Visa_jwt_vc_json"),
-        jwtVcJson("walletHolderCredential", "WalletHolderCredential_jwt_vc_json"),
         isoMdl,
         isoMdlAamva,
         isoPhotoId,

@@ -11,9 +11,12 @@ java-library = "17"
 vanniktech-publish = "0.36.0"
 npm-publish = "3.5.3"
 jib = "3.5.3"
-android-gradle = "8.12.3"
+android-gradle = "9.2.1"
 gradle-shadow = "9.4.2"
 buildconfig = "6.0.10"
+compose-multiplatform = "1.11.1"
+compose-material3 = "1.11.0-alpha07"
+dokka = "2.2.0"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -88,18 +91,38 @@ kotlincrypto = "0.8.0"
 kotlincrypto-rand = "0.6.0"
 
 # whyoleg cryptography (multiplatform)
-whyoleg-cryptography-random = "0.6.0"
+whyoleg-cryptography = "0.6.0"
 tink = "1.21.0"
 
+# Persistence
+sqldelight = "2.3.2"
+
 # Testing
+junit = "4.13.2"
 junit-jupiter = "6.1.0"
 mokkery = "3.4.1"
+robolectric = "4.16"
+
+# AndroidX
+androidx-core-ktx = "1.19.0"
+androidx-lifecycle = "2.10.0"
+androidx-activity-compose = "1.13.0"
+androidx-compose-bom = "2026.05.01"
+androidx-test-runner = "1.7.0"
+androidx-test-ext-junit = "1.3.0"
+androidx-test-rules = "1.7.0"
+androidx-test-uiautomator = "2.3.0"
 
 # HTTP
 okio = "3.17.0"
 
 # Misc
 clikt = "5.1.0"
+smiley4-schema-kenerator = "2.7.2"
+
+# a-sit-plus signum (mobile crypto)
+signum = "3.24.0"
+supreme = "0.15.0"
 
 [libraries]
 
@@ -120,11 +143,13 @@ android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref
 jetbrains-compose = { module = "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin", version.ref = "kotlin" }
 mokkery-gradle-plugin = { module = "dev.mokkery:dev.mokkery.gradle.plugin", version.ref = "mokkery" }
 buildconfig-plugin = { module="com.github.gmazzo.buildconfig:com.github.gmazzo.buildconfig.gradle.plugin", version.ref="buildconfig" }
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
 
 # Libraries
 
 ## Kotlin Test
 kotlintest = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
+junit = { module = "junit:junit", version.ref = "junit" }
 
 ## Ktor Client
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -201,7 +226,7 @@ kotlincrypto-hash-sha1 = { module = "org.kotlincrypto.hash:sha1", version.ref = 
 kotlincrypto-hash-sha2 = { module = "org.kotlincrypto.hash:sha2", version.ref = "kotlincrypto" }
 kotlincrypto-macs-hmac-sha2 = { module = "org.kotlincrypto.macs:hmac-sha2", version.ref = "kotlincrypto" }
 kotlincrypto-random = { module = "org.kotlincrypto.random:crypto-rand", version.ref = "kotlincrypto-rand" }
-whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "whyoleg-cryptography-random" }
+whyoleg-cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "whyoleg-cryptography" }
 tink = { module = "com.google.crypto.tink:tink", version.ref = "tink" }
 bouncycastle-prov = { module = "org.bouncycastle:bcprov-lts8on", version.ref = "bouncycastle" }
 bouncycastle-pkix = { module = "org.bouncycastle:bcpkix-lts8on", version.ref = "bouncycastle" }
@@ -214,6 +239,31 @@ junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engi
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit-jupiter" }
 junit-platform-launcher = { group = "org.junit.platform", name = "junit-platform-launcher", version.ref = "junit-jupiter" }
 junit-platform-console = { group = "org.junit.platform", name = "junit-platform-console", version.ref = "junit-jupiter" }
+
+## AndroidX
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core-ktx" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "androidx-compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+
+# Compose Multiplatform
+compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
+compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
+compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-multiplatform" }
+compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
+compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
+compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
+androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidx-test-rules" }
+androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", version.ref = "androidx-test-uiautomator" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 ## HTTP
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" } # should be replaced with kotlinx-io
@@ -234,8 +284,20 @@ optimumcode-jsonschemavalidator = { module = "io.github.optimumcode:json-schema-
 jsonpathkt = { module = "com.eygraber:jsonpathkt-kotlinx", version = "4.0.0" }
 jaywayjsonpath = { module = "com.jayway.jsonpath:json-path", version = "2.9.0" }
 
+## Persistence
+sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
+sqldelight-coroutines = { module = "app.cash.sqldelight:coroutines-extensions", version.ref = "sqldelight" }
+sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
+sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", version.ref = "sqldelight" }
+sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", version.ref = "sqldelight" }
+
 ## Misc
 cache4k = { module = "io.github.reactivecircus.cache4k:cache4k", version.ref = "cache4k" }
+
+smiley4-schema-kenerator-core = { group = "io.github.smiley4", name = "schema-kenerator-core", version.ref = "smiley4-schema-kenerator" }
+smiley4-schema-kenerator-swagger = { group = "io.github.smiley4", name = "schema-kenerator-swagger", version.ref = "smiley4-schema-kenerator" }
+smiley4-schema-kenerator-serialization = { group = "io.github.smiley4", name = "schema-kenerator-serialization", version.ref = "smiley4-schema-kenerator" }
+smiley4-schema-kenerator-reflection = { group = "io.github.smiley4", name = "schema-kenerator-reflection", version.ref = "smiley4-schema-kenerator" }
 
 ## Testing
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
@@ -288,6 +350,17 @@ commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "co
 onetime = { module = "com.atlassian:onetime", version.ref = "onetime" }
 kedis = { module = "io.github.domgew:kedis", version.ref = "kedis" }
 
+## a-sit-plus signum (mobile crypto)
+signum-indispensable = { module = "at.asitplus.signum:indispensable", version.ref = "signum" }
+signum-indispensable-josef = { module = "at.asitplus.signum:indispensable-josef", version.ref = "signum" }
+signum-supreme = { module = "at.asitplus.signum:supreme", version.ref = "supreme" }
+
+## dev.whyoleg cryptography (Ed25519/secp256k1 on mobile)
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "whyoleg-cryptography" }
+cryptography-provider-optimal = { module = "dev.whyoleg.cryptography:cryptography-provider-optimal", version.ref = "whyoleg-cryptography" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "whyoleg-cryptography" }
+cryptography-provider-openssl3-prebuilt = { module = "dev.whyoleg.cryptography:cryptography-provider-openssl3-prebuilt", version.ref = "whyoleg-cryptography" }
+
 [bundles]
 waltid-ktor-client = [
     "ktor-client-core",
@@ -310,15 +383,27 @@ waltid-ktortesting = [
     "ktor-server-test-host"
 ]
 
+smiley4-schema-kenerator = [
+    "smiley4-schema-kenerator-core",
+    "smiley4-schema-kenerator-swagger",
+    "smiley4-schema-kenerator-serialization",
+    "smiley4-schema-kenerator-reflection"
+]
+
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-power-assert = { id = "org.jetbrains.kotlin.plugin.power-assert", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-cocoapods = { id = "org.jetbrains.kotlin.native.cocoapods", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 android-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle" }
 android-application = { id = "com.android.application", version.ref = "android-gradle" }
 buildconfig = { id = "com.github.gmazzo.buildconfig", version.ref = "buildconfig" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
 shadow = { id = "com.gradleup.shadow", version.ref = "gradle-shadow" }
 versions = { id = "com.github.ben-manes.versions", version = "0.54.0" }
 license = { id = "com.github.jk1.dependency-license-report", version = "3.1.2" }
+sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }

@@ -3,6 +3,8 @@ package id.walt.commons.web.plugins
 import id.walt.commons.web.AuthException
 import id.walt.commons.web.SerializableWebException
 import id.walt.commons.web.WebException
+import id.walt.crypto.exceptions.KeyAlreadyExistsException
+import id.walt.crypto.exceptions.KeySerializationException
 import io.klogging.logger
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -39,6 +41,8 @@ fun Application.configureStatusPages() {
 }
 
 private fun statusCodeForException(cause: Throwable): HttpStatusCode = when (cause) {
+    is KeyAlreadyExistsException -> HttpStatusCode.Conflict
+    is KeySerializationException -> HttpStatusCode.InternalServerError
     is NotFoundException -> HttpStatusCode.NotFound
     is IllegalArgumentException -> HttpStatusCode.BadRequest
     is BadRequestException -> HttpStatusCode.BadRequest

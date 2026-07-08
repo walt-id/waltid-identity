@@ -72,11 +72,6 @@ data:
     webPort = 3000
   issuer-service.conf: |
     baseUrl = "https://issuer.portal.test.waltid.cloud"
-  authentication-service.conf: |
-    name = "keycloak"
-    authorizeUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/auth"
-    accessTokenUrl = "https://keycloak.walt-test.cloud/realms/waltid-keycloak-ktor/protocol/openid-connect/token"
-    clientId = "issuer_api"
 ---
 kind: Deployment
 apiVersion: apps/v1
@@ -113,7 +108,12 @@ spec:
               value: /config/klogging.json
           volumeMounts:
             - name: issuer-web-config
-              mountPath: "/waltid-issuer-api/config/"
+              mountPath: "/waltid-issuer-api/config/web.conf"
+              subPath: web.conf
+              readOnly: true
+            - name: issuer-web-config
+              mountPath: "/waltid-issuer-api/config/issuer-service.conf"
+              subPath: issuer-service.conf
               readOnly: true
             - name: dev-klogging-config
               mountPath: /config
