@@ -1,99 +1,100 @@
-name: Release on manual push
+name: Fix release on manual push
 
 on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Release version'
+        description: 'Fix release version (e.g. 0.20.1)'
         required: true
 
 jobs:
   version:
-    uses: walt-id/waltid-identity/.github/workflows/version.yml@6f15f719a6820cf631bce0399a89b3f060302d3d
+    uses: walt-id/waltid-identity/.github/workflows/version.yml@main
     with:
       preferred: ${{ inputs.release_version }}
   gradle:
-    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@42302437bcdd1ba26da603f998887049aea0a009
+    uses: walt-id/waltid-identity/.github/workflows/gradle.yml@1fa2e4b5f02e5403063d6084af8cf0cfba5e4f66
     secrets: inherit
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
       publish: true
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@43ba2cb6031b8001d73d6e6a66e211c18a7a7d12
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@3a0b58287aa318e34845cd7f8279a1441ae8cbe2
+    uses: walt-id/waltid-identity/.github/workflows/docker.yml@main
     secrets: inherit
     needs: [ version, docker-matrix ]
     with:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable"]'
       publish: true
   api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@43ba2cb6031b8001d73d6e6a66e211c18a7a7d12
+    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
   api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@807020d067847768f59cdd493703bcb88748b598
+    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@main
     secrets: inherit
     needs: [ version, api-docker-matrix ]
     with:
       images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable"]'
       publish: true
-  deploy:
-    uses: walt-id/waltid-identity/.github/workflows/deployment.yml@1fa2e4b5f02e5403063d6084af8cf0cfba5e4f66
+  tag:
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
     secrets: inherit
     needs: [ version, gradle, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
-      deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
-      oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
-      enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
-  tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
-    secrets: inherit
-    needs: [ version, deploy ]
-    with:
-      version: ${{ needs.version.outputs.release_version }}
+      ref: ${{ github.ref_name }}
   enterprise-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
     secrets: inherit
-    needs: [ version, deploy ]
+    needs: [ version, gradle, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-identity-enterprise
+      ref: ${{ github.ref_name }}
   docs-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
     secrets: inherit
-    needs: [ version, deploy ]
+    needs: [ version, gradle, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-docs
+      ref: ${{ github.ref_name }}
   quickstart-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
     secrets: inherit
-    needs: [ version, deploy ]
+    needs: [ version, gradle, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-enterprise-quickstart
+      ref: ${{ github.ref_name }}
   unified-build-tag:
-    uses: walt-id/waltid-identity/.github/workflows/tag.yml@40178bca5ee6dbc8fb3ec818d308e8b72b0c6dd3
+    uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
     secrets: inherit
-    needs: [ version, deploy ]
+    needs: [ version, gradle, docker, api-docker ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       repository: walt-id/waltid-unified-build
+      ref: ${{ github.ref_name }}
   release:
-    uses: walt-id/waltid-identity/.github/workflows/changelog.yml@cf46ed618f9b296fd9b63c7207ca288855bb5343
-    secrets: inherit
+    name: Create Release
+    runs-on: ubuntu-latest
     needs: [ tag ]
-    with:
-      tag: ${{ needs.tag.outputs.tag }}
+    steps:
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.tag.outputs.tag }}
+          prerelease: ${{ contains(needs.tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
   enterprise-release:
     name: Create Enterprise Release
     runs-on: ubuntu-latest
@@ -106,6 +107,7 @@ jobs:
           repository: walt-id/waltid-identity-enterprise
           tag_name: ${{ needs.enterprise-tag.outputs.tag }}
           prerelease: ${{ contains(needs.enterprise-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
   docs-release:
     name: Create Docs Release
     runs-on: ubuntu-latest
@@ -118,6 +120,7 @@ jobs:
           repository: walt-id/waltid-docs
           tag_name: ${{ needs.docs-tag.outputs.tag }}
           prerelease: ${{ contains(needs.docs-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
   quickstart-release:
     name: Create Quickstart Release
     runs-on: ubuntu-latest
@@ -130,6 +133,7 @@ jobs:
           repository: walt-id/waltid-enterprise-quickstart
           tag_name: ${{ needs.quickstart-tag.outputs.tag }}
           prerelease: ${{ contains(needs.quickstart-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
   unified-build-release:
     name: Create Unified Build Release
     runs-on: ubuntu-latest
@@ -142,3 +146,4 @@ jobs:
           repository: walt-id/waltid-unified-build
           tag_name: ${{ needs.unified-build-tag.outputs.tag }}
           prerelease: ${{ contains(needs.unified-build-tag.outputs.tag, 'PRE-RELEASE') }}
+          make_latest: false
