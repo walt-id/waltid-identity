@@ -218,10 +218,17 @@ data class DcSdJwtPresentation(
             claimsQuery: List<ClaimsQuery>
         ): Result<Unit> {
             for (claimQuery in claimsQuery) {
-                // Use a helper to resolve the path in the credential's data
-                val resolvedValue = resolveClaimPath(credential.credentialData, claimQuery.path)
+                // Handle mdoc claims (namespace + claim_name)
+                val resolvedValue = if (claimQuery.namespace != null && claimQuery.claimName != null) {
+                    val namespaceData = credential.credentialData[claimQuery.namespace]?.jsonObject
+                    namespaceData?.get(claimQuery.claimName)
+                } else {
+                    // Use a helper to resolve the path in the credential's data
+                    claimQuery.path?.let { resolveClaimPath(credential.credentialData, it) }
+                }
 
-                presentationRequireNotNull(resolvedValue, DcqlValidationError.MISSING_CLAIM) { "Claim is: ${claimQuery.path}" }
+                val claimKey = claimQuery.path?.toString() ?: "${claimQuery.namespace}.${claimQuery.claimName}"
+                presentationRequireNotNull(resolvedValue, DcqlValidationError.MISSING_CLAIM) { "Claim is: $claimKey" }
 
                 // Optionally, re-check value constraints if they were present in the query
                 if (!claimQuery.values.isNullOrEmpty()) {
