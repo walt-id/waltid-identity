@@ -91,9 +91,7 @@ Enterprise mobile platform coverage is owned by the Enterprise integration test
 module in the coordinated unified-build checkout. These tests are
 self-contained: the Gradle tasks start an Enterprise mobile fixture server,
 provision the required issuer2/verifier2 resources, and run the actual Android
-or iOS mobile wallet calls against that fixture. They do not require
-`waltid-enterprise-quickstart`, ngrok, app-specific shell wrappers, or
-pre-created helper resources.
+or iOS mobile wallet calls against that fixture.
 
 Run these commands from the unified-build root, where `waltid-identity` and
 `waltid-identity-enterprise` are sibling checkouts:
