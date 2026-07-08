@@ -91,12 +91,107 @@ jobs:
           test-report-require-tests: 'false'
           test-result-artifact-name: compose-ios-demo-test-results
 
+  enterprise-ios-mobile-tests:
+    runs-on: macos-26
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Execute Enterprise iOS mobile platform tests
+        id: enterprise_ios_mobile_tests
+        continue-on-error: true
+        run: |
+          ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
+            --no-configuration-cache \
+            -Penterprise.ios.destination="${IOS_SIMULATOR_DESTINATION}"
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+      - name: Collect Enterprise iOS mobile test reports
+        if: always() && steps.enterprise_ios_mobile_tests.outcome != 'skipped'
+        id: enterprise_ios_test_report
+        run: |
+          REPORT_ROOT="waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports"
+          XCODE_REPORT_DIR="$REPORT_ROOT/xcresult"
+          SOURCE_ROOT="waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-results"
+
+          rm -rf "$REPORT_ROOT"
+          mkdir -p "$XCODE_REPORT_DIR"
+
+          xcode_report_count=0
+          while IFS= read -r -d '' bundle; do
+            if ! command -v xcresultparser >/dev/null 2>&1; then
+              brew install xcresultparser
+            fi
+
+            relative_bundle="${bundle#$SOURCE_ROOT/}"
+            safe_name=$(printf '%s' "$relative_bundle" | tr '/ ' '__' | LC_ALL=C tr -c '[:alnum:]_.-' '_')
+            report_file="$XCODE_REPORT_DIR/${xcode_report_count}-${safe_name}.xml"
+
+            if xcresultparser "$bundle" --output-format=junit > "$report_file"; then
+              echo "Converted Enterprise iOS xcresult bundle to JUnit: $relative_bundle"
+              xcode_report_count=$((xcode_report_count + 1))
+            else
+              echo "::warning::Failed to convert Enterprise iOS xcresult bundle at $bundle"
+              rm -f "$report_file"
+            fi
+          done < <(find "$SOURCE_ROOT" -name '*.xcresult' -prune -print0 2>/dev/null || true)
+
+          {
+            echo "## Enterprise iOS Mobile Test Report Collection"
+            echo "- Xcode result bundles converted: $xcode_report_count"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if (( xcode_report_count == 0 )); then
+            echo "::warning::No Enterprise iOS mobile test reports found under $SOURCE_ROOT"
+            echo "has_report=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_report=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish Enterprise iOS mobile test report
+        if: always() && steps.enterprise_ios_test_report.outputs.has_report == 'true'
+        uses: mikepenz/action-junit-report@v6
+        with:
+          update_check: true
+          job_name: enterprise-ios-mobile-tests
+          check_name: Enterprise iOS Mobile Test Report
+          report_paths: waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports/**/*.xml
+          detailed_summary: true
+          include_passed: false
+          include_skipped: false
+          require_tests: true
+
+      - name: Upload Enterprise iOS mobile test results
+        if: always() && steps.enterprise_ios_mobile_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-ios-mobile-test-results
+          path: |
+            waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-reports/**
+            waltid-identity-enterprise/waltid-enterprise-integration-tests/build/ios-test-results/**
+          retention-days: 7
+
+      - name: Fail if Enterprise iOS mobile tests failed
+        if: always() && steps.enterprise_ios_mobile_tests.outcome == 'failure'
+        run: |
+          echo "::error::Enterprise iOS mobile platform tests failed"
+          exit 1
+
   gradle:
     runs-on: ubuntu-22.04
     needs:
       - ios-simulator-tests
       - wallet-core-native-ios-demo-tests
       - compose-ios-demo-tests
+      - enterprise-ios-mobile-tests
     if: always()
     steps:
       - name: Verify iOS workflow jobs
@@ -112,6 +207,9 @@ jobs:
           fi
           if [[ "${{ needs.compose-ios-demo-tests.result }}" != "success" ]]; then
             failed+=("compose-ios-demo-tests=${{ needs.compose-ios-demo-tests.result }}")
+          fi
+          if [[ "${{ needs.enterprise-ios-mobile-tests.result }}" != "success" ]]; then
+            failed+=("enterprise-ios-mobile-tests=${{ needs.enterprise-ios-mobile-tests.result }}")
           fi
 
           if (( ${#failed[@]} > 0 )); then

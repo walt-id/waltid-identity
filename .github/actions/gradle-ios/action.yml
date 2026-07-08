@@ -179,7 +179,6 @@ runs:
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
-          -skip-testing:iosAppUITests/LocalEnterpriseBackendE2ETests \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \

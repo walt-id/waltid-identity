@@ -50,8 +50,8 @@ Android:
 
 ```bash
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true -Pandroid.testInstrumentationRunnerArguments.class=id.walt.wallet2.mobile.test.MobileWalletIntegrationTest
-./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest -PenableAndroidBuild=true -Pandroid.testInstrumentationRunnerArguments.class=id.walt.walletdemo.compose.android.PublicDemoBackendE2ETest
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest -PenableAndroidBuild=true
 ```
 
 iOS (Compose):
@@ -72,8 +72,9 @@ xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=
 ```
 
 The public mobile integration tests run through the normal Gradle Android
-instrumentation and Xcode XCTest entry points. They cover the EUDI public
-backend and the public OSS issuer2/verifier2 demo backend:
+instrumentation and Xcode XCTest entry points. The Android commands above run
+the full connected test tasks. The tests cover the EUDI public backend and the
+public OSS issuer2/verifier2 demo backend:
 
 ```text
 https://issuer2.demo.walt.id/

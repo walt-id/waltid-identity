@@ -87,7 +87,8 @@ public final class DemoBackend {
             body: Data(try jsonString([
                 "profileId": scenario.profileId,
                 "authMethod": "PRE_AUTHORIZED",
-            ]).utf8)
+            ]).utf8),
+            retryTransientFailures: true
         )
 
         guard let offerUrl = response["credentialOffer"] as? String, !offerUrl.isEmpty else {
@@ -117,7 +118,8 @@ public final class DemoBackend {
             url: endpoint,
             method: "POST",
             headers: ["Content-Type": "application/json"],
-            body: Data(try jsonString(payload).utf8)
+            body: Data(try jsonString(payload).utf8),
+            retryTransientFailures: true
         )
 
         guard let sessionID = response["sessionId"] as? String, !sessionID.isEmpty else {
@@ -150,9 +152,8 @@ public final class DemoBackend {
                 .appendingPathComponent("verification-session")
                 .appendingPathComponent(sessionID)
                 .appendingPathComponent("info")
-            let (data, _) = try await URLSession.shared.data(from: url)
-
-            if let response = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            do {
+                let response = try await client.jsonRequest(url: url, retryTransientFailures: true)
                 let status = (response["status"] as? String)
                     ?? ((response["session"] as? [String: Any])?["status"] as? String)
                 if let status {
@@ -170,6 +171,10 @@ public final class DemoBackend {
                         break
                     }
                 }
+            } catch let error as NSError where error.domain == "WalletE2E" && error.code == 303 {
+                throw error
+            } catch {
+                lastStatus = "request failed: \(error.localizedDescription)"
             }
 
             try await Task.sleep(nanoseconds: 2_000_000_000)
