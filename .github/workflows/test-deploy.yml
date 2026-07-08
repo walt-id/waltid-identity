@@ -29,6 +29,7 @@ jobs:
     with:
       images: ${{ needs.docker-matrix.outputs.json }}s
       version: ${{ needs.version.outputs.release_version }}
+      tags: '["dev", "latest"]'
       publish: true
   api-docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
@@ -41,6 +42,7 @@ jobs:
     with:
       images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
+      tags: '["dev", "latest"]'
       publish: true
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/deployment.yml@main
