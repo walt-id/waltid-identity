@@ -34,11 +34,20 @@ The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM li
 
 ## Common commands
 
+Android and shared UI:
+
 ```bash
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:installDebug
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:allTests
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
+```
+
+iOS:
+
+```bash
+cd waltid-applications/waltid-wallet-demo-compose/iosApp
+open iosApp.xcodeproj
 ```
 
 Backend E2E fixtures are intentionally shared:
