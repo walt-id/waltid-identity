@@ -1,5 +1,6 @@
 package id.walt.openid4vci.tokens.jwt.refresh
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.tokens.jwt.JwtPayloadClaims
 import id.walt.openid4vci.tokens.jwt.JwtSigningKeyResolver
 import id.walt.openid4vci.tokens.jwt.JwtTokenSigner
@@ -7,7 +8,6 @@ import id.walt.openid4vci.tokens.jwt.compactJwsSignature
 import id.walt.openid4vci.tokens.refresh.RefreshTokenGenerationRequest
 import id.walt.openid4vci.tokens.refresh.RefreshTokenIssuer
 import org.kotlincrypto.random.CryptoRand
-import kotlin.io.encoding.Base64
 
 const val KEYCLOAK_REFRESH_TOKEN_TYPE = "Refresh"
 
@@ -47,7 +47,7 @@ class JwtRefreshTokenIssuer internal constructor(
         compactJwsSignature(token, "Refresh token")
 
     private fun generateTokenId(): String =
-        Base64.UrlSafe.encode(CryptoRand.nextBytes(ByteArray(TOKEN_ID_BYTES)))
+        CryptoRand.nextBytes(ByteArray(TOKEN_ID_BYTES)).encodeToBase64Url()
 
     private companion object {
         const val TOKEN_ID_BYTES = 32
