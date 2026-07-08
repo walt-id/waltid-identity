@@ -10,7 +10,6 @@ import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
 import kotlinx.coroutines.runBlocking
 import org.junit.BeforeClass
-import org.junit.Ignore
 import org.junit.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -62,7 +61,6 @@ class MobileWalletIntegrationTest {
         assertTrue(credentialIds.isNotEmpty(), "Should receive at least one credential")
     }
 
-    @Ignore("EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168")
     @Test
     fun receiveAndPresentFullFlow() = runBlocking {
         val client = MobileWalletFactory(context).create(
@@ -85,7 +83,6 @@ class MobileWalletIntegrationTest {
         EudiTestBackend.waitForVerifierSuccess(transaction.transactionId)
     }
 
-    @Ignore("EUDI backend certificate expired 2026-07-04 - https://github.com/eu-digital-identity-wallet/eudi-srv-web-issuing-eudiw-py/issues/168")
     @Test
     fun credentialPersistsAcrossWalletRecreation() = runBlocking {
         val walletConfig = MobileWalletConfig(
