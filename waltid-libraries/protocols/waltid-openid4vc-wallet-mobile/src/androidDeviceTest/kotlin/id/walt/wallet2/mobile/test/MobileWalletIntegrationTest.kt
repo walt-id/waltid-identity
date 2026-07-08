@@ -2,8 +2,8 @@ package id.walt.wallet2.mobile.test
 
 import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
-import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.mobile.test.backend.DemoTestBackend
+import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.webdatafetching.WebDataFetcherManager
@@ -64,18 +64,18 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun receiveCredentialsFromDemoIssuer2() = runBlocking {
-        for (scenario in DemoTestBackend.scenarios) {
-            val client = MobileWalletFactory(context).create(walletConfig("receive-${scenario.id}"))
-            client.bootstrap()
+    fun receiveEudiPidSdJwtFromDemoIssuer2() = runBlocking {
+        receiveCredentialFromDemoIssuer2("eudi-pid-sdjwt")
+    }
 
-            val offer = DemoTestBackend.createOffer(scenario)
-            val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
-            assertTrue(
-                credentialIds.isNotEmpty(),
-                "Should receive at least one ${scenario.displayName} credential from public demo issuer2",
-            )
-        }
+    @Test
+    fun receiveEudiPidMdocFromDemoIssuer2() = runBlocking {
+        receiveCredentialFromDemoIssuer2("eudi-pid-mdoc")
+    }
+
+    @Test
+    fun receiveIsoMdlFromDemoIssuer2() = runBlocking {
+        receiveCredentialFromDemoIssuer2("iso-mdl")
     }
 
     @Test
@@ -101,30 +101,13 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
-    fun receiveAndPresentFullFlowAgainstDemoIssuer2AndVerifier2() = runBlocking {
-        for (scenario in DemoTestBackend.presentationScenarios) {
-            val client = MobileWalletFactory(context).create(walletConfig("present-${scenario.id}"))
-            val bootstrapResult = client.bootstrap()
+    fun receiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        receiveAndPresentDemoCredential("eudi-pid-mdoc")
+    }
 
-            val offer = DemoTestBackend.createOffer(scenario)
-            val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
-            assertTrue(
-                credentialIds.isNotEmpty(),
-                "Should receive ${scenario.displayName} from public demo issuer2",
-            )
-
-            val credentials = client.credentials()
-            assertTrue(credentials.isNotEmpty(), "Should have stored ${scenario.displayName} credentials")
-
-            val session = DemoTestBackend.createVerifierSession(scenario)
-            val presentResult = client.present(session.authorizationRequestUri, did = bootstrapResult.did)
-            assertTrue(
-                presentResult.success,
-                "public demo verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
-            )
-
-            DemoTestBackend.waitForVerifierSuccess(session.sessionId)
-        }
+    @Test
+    fun receiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        receiveAndPresentDemoCredential("iso-mdl")
     }
 
     @Test
@@ -179,4 +162,46 @@ class MobileWalletIntegrationTest {
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         onEvent = { event -> println("WALLET EVENT: $event") },
     )
+
+    private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
+        val scenario = demoScenario(scenarioId)
+        val client = MobileWalletFactory(context).create(walletConfig("receive-${scenario.id}"))
+        client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive at least one ${scenario.displayName} credential from public demo issuer2",
+        )
+    }
+
+    private suspend fun receiveAndPresentDemoCredential(scenarioId: String) {
+        val scenario = demoPresentationScenario(scenarioId)
+        val client = MobileWalletFactory(context).create(walletConfig("present-${scenario.id}"))
+        val bootstrapResult = client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive ${scenario.displayName} from public demo issuer2",
+        )
+
+        val credentials = client.credentials()
+        assertTrue(credentials.isNotEmpty(), "Should have stored ${scenario.displayName} credentials")
+
+        val session = DemoTestBackend.createVerifierSession(scenario)
+        val presentResult = client.present(session.authorizationRequestUri, did = bootstrapResult.did)
+        assertTrue(
+            presentResult.success,
+            "public demo verifier2 presentation should succeed for ${scenario.displayName}: credentials=$credentials, result=$presentResult",
+        )
+
+        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+    }
+
+    private fun demoScenario(id: String) = DemoTestBackend.scenarios.first { it.id == id }
+
+    private fun demoPresentationScenario(id: String) = DemoTestBackend.presentationScenarios.first { it.id == id }
 }

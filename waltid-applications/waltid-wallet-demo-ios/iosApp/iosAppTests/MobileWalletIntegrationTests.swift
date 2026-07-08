@@ -83,23 +83,16 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
     }
 
-    func testReceiveCredentialsFromDemoIssuer2() async throws {
-        for scenario in DemoBackend.scenarios {
-            let walletId = "ios-demo-receive-\(scenario.id)-\(UUID().uuidString)"
-            await clearTestData(walletId: walletId)
+    func testReceiveEudiPidSdJwtCredentialFromDemoIssuer2() async throws {
+        try await receiveCredentialFromDemoIssuer2(scenarioID: "eudi-pid-sdjwt")
+    }
 
-            let wallet = try await makeWallet(walletId: walletId)
-            _ = try await wallet.bootstrap()
+    func testReceiveEudiPidMdocCredentialFromDemoIssuer2() async throws {
+        try await receiveCredentialFromDemoIssuer2(scenarioID: "eudi-pid-mdoc")
+    }
 
-            let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
-            let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-            let credentialIDs = try await wallet.receive(offer: offerURL)
-
-            XCTAssertFalse(
-                credentialIDs.isEmpty,
-                "Should receive \(scenario.displayName) from public demo issuer2"
-            )
-        }
+    func testReceiveIsoMdlCredentialFromDemoIssuer2() async throws {
+        try await receiveCredentialFromDemoIssuer2(scenarioID: "iso-mdl")
     }
 
     func testReceiveAndPresentFullFlow() async throws {
@@ -134,43 +127,12 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
     }
 
-    func testReceiveAndPresentFullFlowAgainstDemoIssuer2AndVerifier2() async throws {
-        for scenario in DemoBackend.presentationScenarios {
-            let walletId = "ios-demo-present-\(scenario.id)-\(UUID().uuidString)"
-            await clearTestData(walletId: walletId)
+    func testReceiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() async throws {
+        try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-mdoc")
+    }
 
-            let wallet = try await makeWallet(walletId: walletId)
-            let bootstrapResult = try await wallet.bootstrap()
-            let did = bootstrapResult.did
-
-            let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
-            let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-            let credentialIDs = try await wallet.receive(offer: offerURL)
-            XCTAssertFalse(
-                credentialIDs.isEmpty,
-                "Should receive \(scenario.displayName) from public demo issuer2"
-            )
-
-            let credentials = try await wallet.credentials()
-            XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
-
-            let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
-            let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-            let presentResult = try await wallet.present(
-                request: presentationURL,
-                did: did
-            )
-
-            XCTAssertTrue(
-                presentResult.success,
-                "public demo verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
-            )
-
-            try await DemoBackend.shared.waitForVerifierSuccess(
-                sessionID: session.sessionID,
-                timeoutSeconds: verifierPollingTimeout
-            )
-        }
+    func testReceiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() async throws {
+        try await receiveAndPresentDemoCredential(scenarioID: "iso-mdl")
     }
 
     func testCredentialPersistsAcrossControllerRecreation() async throws {
@@ -246,5 +208,69 @@ final class MobileWalletIntegrationTests: XCTestCase {
             sessionID: session.sessionID,
             timeoutSeconds: verifierPollingTimeout
         )
+    }
+
+    private func receiveCredentialFromDemoIssuer2(scenarioID: String) async throws {
+        let scenario = try demoScenario(scenarioID)
+        let walletId = "ios-demo-receive-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId)
+        _ = try await wallet.bootstrap()
+
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL)
+
+        XCTAssertFalse(
+            credentialIDs.isEmpty,
+            "Should receive \(scenario.displayName) from public demo issuer2"
+        )
+    }
+
+    private func receiveAndPresentDemoCredential(scenarioID: String) async throws {
+        let scenario = try demoPresentationScenario(scenarioID)
+        let walletId = "ios-demo-present-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId)
+        let bootstrapResult = try await wallet.bootstrap()
+        let did = bootstrapResult.did
+
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL)
+        XCTAssertFalse(
+            credentialIDs.isEmpty,
+            "Should receive \(scenario.displayName) from public demo issuer2"
+        )
+
+        let credentials = try await wallet.credentials()
+        XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
+
+        let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        let presentResult = try await wallet.present(
+            request: presentationURL,
+            did: did
+        )
+
+        XCTAssertTrue(
+            presentResult.success,
+            "public demo verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
+        )
+
+        try await DemoBackend.shared.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func demoScenario(_ id: String) throws -> DemoCredentialScenario {
+        try XCTUnwrap(DemoBackend.scenarios.first { $0.id == id })
+    }
+
+    private func demoPresentationScenario(_ id: String) throws -> DemoCredentialScenario {
+        try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == id })
     }
 }

@@ -41,14 +41,11 @@ The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM li
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:webApp:wasmJsBrowserDevelopmentRun -PenableWalletDemoComposeWeb=true
 ```
 
-Android E2E scripts live in [androidApp/scripts](androidApp/scripts/README.md).
-Compose iOS E2E scripts live in [iosApp/scripts](iosApp/scripts/README.md).
-
 Backend E2E fixtures are intentionally shared:
 
-- Android tests use `waltid-mobile-test-utils` for public EUDI and local Enterprise backend operations.
+- Android tests use `waltid-mobile-test-utils` for public EUDI, public OSS demo, and local Enterprise backend operations.
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
-- Android and iOS local Enterprise scripts source the common setup helpers in [mobile-e2e-fixtures](../mobile-e2e-fixtures/).
+- Public OSS UI tests run through the normal Android instrumentation and XCTest runners without app-specific shell wrappers.
 
 ## Related modules
 

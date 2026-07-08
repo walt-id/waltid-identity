@@ -7,62 +7,25 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
 
     private let verifierPollingTimeout: TimeInterval = 90
 
-    func testReceiveCredentialsFromEnterpriseIssuer2() async throws {
-        let fixture = try makeFixture()
-        for scenario in try await fixture.scenarios() {
-            let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
-            let walletId = "ios-enterprise-receive-\(scenario.id)-\(UUID().uuidString)"
-            await clearTestData(walletId: walletId)
-
-            let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-            _ = try await wallet.bootstrap()
-
-            let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-            let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
-
-            XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName) from Enterprise issuer2")
-        }
+    func testReceiveEnterpriseMdlFromEnterpriseIssuer2() async throws {
+        try await receiveCredentialFromEnterpriseIssuer2(scenarioID: "enterprise-mdl")
     }
 
-    func testReceiveAndPresentEnterpriseIssuer2Verifier2Flow() async throws {
-        let fixture = try makeFixture()
-        let scenarios = try await fixture.scenarios()
-        for scenario in scenarios {
-            guard scenario.supportsPresentation else { continue }
-            let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
-            let walletId = "ios-enterprise-present-\(scenario.id)-\(UUID().uuidString)"
-            await clearTestData(walletId: walletId)
+    func testReceiveEnterpriseMdlWithClientAttestationFromEnterpriseIssuer2() async throws {
+        try await receiveCredentialFromEnterpriseIssuer2(scenarioID: "enterprise-mdl-client-attestation")
+    }
 
-            let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
-            let bootstrapResult = try await wallet.bootstrap()
+    func testReceiveAndPresentEnterpriseMdlIssuer2Verifier2Flow() async throws {
+        try await receiveAndPresentEnterpriseCredential(scenarioID: "enterprise-mdl")
+    }
 
-            let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-            let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
-            XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName)")
-
-            let credentials = try await wallet.credentials()
-            XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
-
-            let session = try await fixture.createVerifierSession(scenario: scenario, platform: .ios)
-            let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
-            let presentResult = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
-            XCTAssertTrue(
-                presentResult.success,
-                "Enterprise verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
-            )
-
-            try await fixture.waitForVerifierSuccess(
-                sessionID: session.sessionID,
-                timeoutSeconds: verifierPollingTimeout
-            )
-        }
+    func testReceiveAndPresentEnterpriseMdlWithClientAttestationIssuer2Verifier2Flow() async throws {
+        try await receiveAndPresentEnterpriseCredential(scenarioID: "enterprise-mdl-client-attestation")
     }
 
     func testEnterpriseCredentialPersistsAcrossControllerRecreation() async throws {
         let fixture = try makeFixture()
-        let scenarios = try await fixture.scenarios()
-        let scenario = scenarios.first { $0.supportsPresentation && !$0.requiresClientAttestation }
-        let selectedScenario = try XCTUnwrap(scenario)
+        let selectedScenario = try await enterpriseScenario(fixture: fixture, scenarioID: "enterprise-mdl")
         let offer = try await fixture.createOffer(scenario: selectedScenario, platform: .ios)
         let walletId = "ios-enterprise-persist-\(selectedScenario.id)-\(UUID().uuidString)"
         await clearTestData(walletId: walletId)
@@ -133,5 +96,62 @@ final class EnterpriseMobileWalletIntegrationTests: XCTestCase {
                 }
             }
         }
+    }
+
+    private func receiveCredentialFromEnterpriseIssuer2(scenarioID: String) async throws {
+        let fixture = try makeFixture()
+        let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
+        let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
+        let walletId = "ios-enterprise-receive-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
+        _ = try await wallet.bootstrap()
+
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
+
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName) from Enterprise issuer2")
+    }
+
+    private func receiveAndPresentEnterpriseCredential(scenarioID: String) async throws {
+        let fixture = try makeFixture()
+        let scenario = try await enterpriseScenario(fixture: fixture, scenarioID: scenarioID)
+        XCTAssertTrue(scenario.supportsPresentation, "\(scenario.displayName) should support presentation")
+
+        let offer = try await fixture.createOffer(scenario: scenario, platform: .ios)
+        let walletId = "ios-enterprise-present-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId, attestation: offer.attestation)
+        let bootstrapResult = try await wallet.bootstrap()
+
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
+        XCTAssertFalse(credentialIDs.isEmpty, "Should receive \(scenario.displayName)")
+
+        let credentials = try await wallet.credentials()
+        XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
+
+        let session = try await fixture.createVerifierSession(scenario: scenario, platform: .ios)
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        let presentResult = try await wallet.present(request: presentationURL, did: bootstrapResult.did)
+        XCTAssertTrue(
+            presentResult.success,
+            "Enterprise verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
+        )
+
+        try await fixture.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func enterpriseScenario(
+        fixture: EnterpriseMobileFixture,
+        scenarioID: String
+    ) async throws -> EnterpriseMobileScenario {
+        let scenarios = try await fixture.scenarios()
+        return try XCTUnwrap(scenarios.first { $0.id == scenarioID })
     }
 }
