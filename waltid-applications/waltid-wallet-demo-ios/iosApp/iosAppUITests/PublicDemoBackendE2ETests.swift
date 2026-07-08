@@ -1,12 +1,12 @@
 import XCTest
 import TestHelpers
 
-/// End-to-end UI test for the SwiftUI wallet demo app against the public OSS demo stack.
+/// End-to-end UI test for the SwiftUI wallet demo app against the public demo stack.
 ///
 /// Tests the full user flow: launch app, receive credential, present credential,
 /// and confirm verifier2 observed the presentation.
 @MainActor
-final class OssPublicDemoBackendE2ETests: XCTestCase {
+final class PublicDemoBackendE2ETests: XCTestCase {
 
     private let backend = DemoBackend.shared
 
@@ -15,8 +15,8 @@ final class OssPublicDemoBackendE2ETests: XCTestCase {
     private let credentialOperationTimeout: TimeInterval = 90
     private let verifierPollingTimeout: TimeInterval = 30
 
-    func testReceiveAndPresentAgainstOssPublicDemoIssuer2Verifier2() async throws {
-        let scenario = try ossUiScenario()
+    func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
+        let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
 
         let app = XCUIApplication()
@@ -56,7 +56,7 @@ final class OssPublicDemoBackendE2ETests: XCTestCase {
         try await backend.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
     }
 
-    private func ossUiScenario() throws -> DemoCredentialScenario {
+    private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }
 }

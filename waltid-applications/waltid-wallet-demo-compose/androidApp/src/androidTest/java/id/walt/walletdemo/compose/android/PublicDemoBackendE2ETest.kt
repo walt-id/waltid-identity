@@ -22,10 +22,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class OssPublicDemoBackendE2ETest {
+class PublicDemoBackendE2ETest {
 
     @Test
-    fun receiveAndPresentAgainstOssPublicDemoIssuer2Verifier2() = runBlocking {
+    fun receiveAndPresentAgainstPublicDemoIssuer2Verifier2() = runBlocking {
         val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
         val offer = DemoTestBackend.createOffer(scenario)
 

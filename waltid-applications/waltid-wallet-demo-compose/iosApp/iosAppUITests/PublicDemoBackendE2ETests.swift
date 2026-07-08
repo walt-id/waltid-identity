@@ -1,11 +1,11 @@
 import XCTest
 
-/// End-to-end UI tests for the Compose wallet demo app against the public OSS demo stack.
+/// End-to-end UI tests for the Compose wallet demo app against the public demo stack.
 ///
 /// Tests the full user flow: launch app, receive credential, present credential,
 /// and keep received credentials across app restart.
 @MainActor
-final class OssPublicDemoBackendE2ETests: XCTestCase {
+final class PublicDemoBackendE2ETests: XCTestCase {
 
     private let backend = DemoBackend.shared
 
@@ -30,8 +30,8 @@ final class OssPublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(didLabel.label.starts(with: "did:"), "DID should start with 'did:', got: \(didLabel.label)")
     }
 
-    func testReceiveAndPresentAgainstOssPublicDemoIssuer2Verifier2() async throws {
-        let scenario = try ossUiScenario()
+    func testReceiveAndPresentAgainstPublicDemoIssuer2Verifier2() async throws {
+        let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
 
         let app = XCUIApplication()
@@ -84,7 +84,7 @@ final class OssPublicDemoBackendE2ETests: XCTestCase {
     }
 
     func testDemoCredentialPersistsAcrossAppRestart() async throws {
-        let scenario = try ossUiScenario()
+        let scenario = try publicDemoScenario()
         let offer = try await backend.createOffer(scenario: scenario)
 
         let app = XCUIApplication()
@@ -127,11 +127,11 @@ final class OssPublicDemoBackendE2ETests: XCTestCase {
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
     }
 
-    private func ossUiScenario() throws -> DemoCredentialScenario {
+    private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }
 
     private func isolatedWalletEnvironment() -> [String: String] {
-        ["WALLET_ID": "compose-ios-oss-demo-\(UUID().uuidString)"]
+        ["WALLET_ID": "compose-ios-public-demo-\(UUID().uuidString)"]
     }
 }

@@ -185,6 +185,22 @@ runs:
           -enableCodeCoverage NO \
           -parallel-testing-enabled NO
 
+    - name: Execute Enterprise iOS mobile platform tests
+      id: enterprise_ios_mobile_tests
+      continue-on-error: true
+      shell: bash
+      run: |
+        UNIFIED_DIR="$(cd "${{ inputs.waltid-directory }}/.." && pwd)"
+        if [[ ! -f "$UNIFIED_DIR/settings.gradle.kts" || ! -d "$UNIFIED_DIR/waltid-identity-enterprise/waltid-enterprise-integration-tests" ]]; then
+          echo "::warning::Skipping Enterprise iOS mobile platform tests because the coordinated unified checkout was not found at $UNIFIED_DIR"
+          exit 0
+        fi
+
+        cd "$UNIFIED_DIR"
+        ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
+          --no-configuration-cache \
+          -Penterprise.ios.destination="${{ steps.resolve-simulator.outputs.destination }}"
+
     - name: Collect iOS test reports
       if: ${{ always() && (inputs.run-ios-simulator-tests == 'true' || inputs.run-native-demo-tests == 'true' || inputs.run-compose-demo-tests == 'true') }}
       id: ios_test_report
@@ -277,7 +293,7 @@ runs:
         xcrun simctl shutdown all || true
 
     - name: Upload iOS test results
-      if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure')
+      if: always() && (failure() || steps.ios_simulator_tests.outcome == 'failure' || steps.ios_demo_app_tests.outcome == 'failure' || steps.compose_ios_demo_app_tests.outcome == 'failure' || steps.enterprise_ios_mobile_tests.outcome == 'failure')
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.test-result-artifact-name }}
@@ -302,6 +318,9 @@ runs:
         fi
         if [[ "${{ inputs.run-compose-demo-tests }}" == "true" && "${{ steps.compose_ios_demo_app_tests.outcome }}" == "failure" ]]; then
           failed+=("Compose iOS demo app tests")
+        fi
+        if [[ "${{ steps.enterprise_ios_mobile_tests.outcome }}" == "failure" ]]; then
+          failed+=("Enterprise iOS mobile platform tests")
         fi
 
         if (( ${#failed[@]} > 0 )); then

@@ -43,9 +43,9 @@ The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM li
 
 Backend E2E fixtures are intentionally shared:
 
-- Android tests use `waltid-mobile-test-utils` for public EUDI, public OSS demo, and local Enterprise backend operations.
+- Android tests use `waltid-mobile-test-utils` for public EUDI, public demo, and local Enterprise backend operations.
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
-- Public OSS UI tests run through the normal Android instrumentation and XCTest runners without app-specific shell wrappers.
+- Public demo UI tests run through the normal Android instrumentation and XCTest runners without app-specific shell wrappers.
 
 ## Related modules
 
