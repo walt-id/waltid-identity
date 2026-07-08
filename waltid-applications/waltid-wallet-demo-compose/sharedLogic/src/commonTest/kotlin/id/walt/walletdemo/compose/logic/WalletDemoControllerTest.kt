@@ -5,6 +5,11 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -178,8 +183,53 @@ class WalletDemoControllerTest {
             id = "cred-1",
             format = "jwt_vc_json",
             issuer = "Example Issuer",
+            subject = "did:key:subject",
             label = "Example Credential",
             addedAt = "2026-06-17",
+            credentialData = JsonObject(
+                mapOf(
+                    "name" to JsonPrimitive("Introduction to Decentralized Identity"),
+                    "description" to JsonPrimitive(
+                        "Awarded for completing the foundational course on verifiable credentials and DIDs."
+                    ),
+                    "type" to buildJsonArray {
+                        add(JsonPrimitive("VerifiableCredential"))
+                        add(JsonPrimitive("OpenBadgeCredential"))
+                    },
+                    "issuanceDate" to JsonPrimitive("2026-06-15T09:30:00Z"),
+                    "expirationDate" to JsonNull,
+                    "achievement" to buildJsonObject {
+                        put("name", JsonPrimitive("Decentralized Identity Fundamentals"),)
+                        put("achievementType", JsonPrimitive("Certificate"))
+                        put("criteria", buildJsonObject {
+                            put("narrative", JsonPrimitive("Completed all modules and passed the final assessment."))
+                        })
+                    },
+                    "alignment" to buildJsonArray {
+                        add(buildJsonObject {
+                            put("targetName", JsonPrimitive("Information Security Analyst"))
+                            put("targetFramework", JsonPrimitive("O*NET"))
+                            put("targetCode", JsonPrimitive("15-1212.00"))
+                        })
+                        add(buildJsonObject {
+                            put("targetName", JsonPrimitive("Digital Identity Management"))
+                            put("targetFramework", JsonPrimitive("ESCO"))
+                            put("targetCode", JsonPrimitive("S1.2.3"))
+                        })
+                    },
+                    "evidence" to buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", JsonPrimitive("Evidence"))
+                            put("name", JsonPrimitive("Final Project Submission"))
+                            put("description", JsonPrimitive("Implemented an OID4VCI issuer demo."))
+                        })
+                    },
+                    "recipient" to buildJsonObject {
+                        put("identity", JsonPrimitive("did:key:subject"))
+                        put("type", JsonPrimitive("DID"))
+                    },
+                )
+            ),
         )
     }
 }

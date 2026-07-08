@@ -40,6 +40,7 @@ data class MobileWalletBootstrapResult(
  * @property subject Subject identifier extracted from the credential when available.
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
+ * @property credentialData structured credential data, when available.
  */
 data class MobileWalletCredential(
     val id: String,
