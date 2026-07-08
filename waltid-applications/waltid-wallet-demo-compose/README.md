@@ -22,7 +22,7 @@
 
 Compose Multiplatform demo app for the mobile wallet SDK. It demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, platform-backed keys, and SQLDelight-backed wallet persistence on Android and iOS.
 
-For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
 The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
 
@@ -43,7 +43,7 @@ The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM li
 
 Backend E2E fixtures are intentionally shared:
 
-- Android tests use `waltid-mobile-test-utils` for public EUDI, public demo, and local Enterprise backend operations.
+- Android tests use `waltid-mobile-test-utils` for public EUDI, public demo, and Enterprise fixture backend operations.
 - iOS UI tests use the shared Swift `TestHelpers` backend fixtures from `../mobile-e2e-fixtures/ios/TestHelpers`.
 - Public demo UI tests run through the normal Android instrumentation and XCTest runners without app-specific shell wrappers.
 
