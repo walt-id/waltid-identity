@@ -6,11 +6,6 @@ on:
       release_version:
         description: 'Release version'
         required: true
-      tag_stable:
-        description: 'Tag images as "stable" (disable for patch releases of older versions)'
-        required: false
-        type: boolean
-        default: true
 
 jobs:
   version:
@@ -58,7 +53,7 @@ jobs:
     with:
       deploy: true
       version: ${{ needs.version.outputs.release_version }}
-      tags: ${{ inputs.tag_stable && '["stable"]' || '[]' }}
+      tags: '["stable", "latest"]'
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/deployment.yml@main
     secrets: inherit
