@@ -36,9 +36,10 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
@@ -65,9 +66,10 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
@@ -94,9 +96,10 @@ jobs:
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
         with:
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
@@ -119,12 +122,15 @@ jobs:
           test-result-artifact-name: compose-ios-demo-test-results
 
   enterprise-ios-mobile-tests:
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     runs-on: macos-26
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@c95b601fc5095d5668eb8c906af992d8e00ed513
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
         with:
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@c95b601fc5095d5668eb8c906af992d8e00ed513
