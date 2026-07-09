@@ -34,7 +34,7 @@ jobs:
             WalletSDK.doccarchive
 
       - name: Upload Swift WalletSDK DocC archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: walletsdk-doccarchive
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
