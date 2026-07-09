@@ -1,0 +1,44 @@
+name: Create release branch (reusable workflow)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "release version (e.g. 0.20.0)"
+        required: true
+        type: string
+      repository:
+        description: "repository to branch (default: current repo)"
+        required: false
+        type: string
+        default: ${{ github.repository }}
+    outputs:
+      branch:
+        description: "The created branch"
+        value: ${{ jobs.branch.outputs.result }}
+
+jobs:
+  branch:
+    name: Git branch
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.branch.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          repository: ${{ inputs.repository }}
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+      - name: Create and push the release branch
+        id: branch
+        run: |
+          # Derive the release branch from the release version:
+          # 0.20.0 -> release/v0.20.x
+          minor=$(echo "${{ inputs.version }}" | cut -d. -f1-2)
+          branch="release/v${minor}.x"
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "Branch $branch already exists, skipping."
+          else
+            git branch "$branch"
+            git push origin "$branch"
+          fi
+          echo "branch=${branch}" >> $GITHUB_OUTPUT
