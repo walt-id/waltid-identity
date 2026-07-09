@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
+import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import io.ktor.client.*
@@ -46,12 +47,13 @@ class WalletTestPlanRunner(
         println("  Signed request: ${testPlan.requiresSignedRequest}")
         println()
 
-        // Create test plan
-        val testPlanId = createTestPlan()
+        // Create test plan (response includes modules)
+        val planResponse = createTestPlan()
+        val testPlanId = planResponse.id
         println("Test plan created: $testPlanId")
 
-        // Get test modules
-        val modules = getTestModules(testPlanId)
+        // Get test modules from create response
+        val modules = planResponse.modules.map { it.testModule }
         println("Test modules: ${modules.size}")
         modules.forEach { println("   - $it") }
         println()
@@ -78,9 +80,10 @@ class WalletTestPlanRunner(
     }
 
     /**
-     * Create test plan on conformance suite
+     * Create test plan on conformance suite.
+     * Returns the full response which includes the modules list.
      */
-    private suspend fun createTestPlan(): String {        
+    private suspend fun createTestPlan(): CreateTestPlanResponse {        
         // Conformance suite API expects planName AND variant as URL-encoded query parameters
         val variantJson = Json.encodeToString(testPlan.variant)
         
@@ -102,31 +105,10 @@ class WalletTestPlanRunner(
         val body = buildJsonObject {
             put("configuration", testPlan.configuration)
         }
-        val createTestPlanResponse = conformance.createTestPlan(createTestPlanUrl, body)
+        val response = conformance.createTestPlan(createTestPlanUrl, body)
 
-        val planId = createTestPlanResponse.id
-        println("Created test plan: $planId")
-        return planId
-    }
-
-    /**
-     * Get list of test modules for the plan
-     */
-    private suspend fun getTestModules(testPlanId: String): List<String> {
-        val response = conformance.conformanceHttp.get("/api/plan/$testPlanId/modules")
-
-        if (!response.status.isSuccess()) {
-            error("Failed to get test modules: ${response.status}")
-        }
-
-        val responseBody = response.body<JsonObject>()
-        val modulesArray = responseBody["modules"]?.jsonArray
-            ?: error("No modules array in response")
-
-        return modulesArray.map { module ->
-            module.jsonObject["testModule"]?.jsonPrimitive?.content
-                ?: error("No testModule in module object")
-        }
+        println("Created test plan: ${response.id}")
+        return response
     }
 
     /**

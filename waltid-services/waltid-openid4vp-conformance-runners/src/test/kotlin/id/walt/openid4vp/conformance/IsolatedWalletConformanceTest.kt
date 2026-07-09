@@ -11,20 +11,17 @@ import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * Isolated Wallet Conformance Test
  * 
- * This test class demonstrates that the conformance API integration WORKS when run in isolation.
- * It successfully creates test plans against the OpenID conformance suite.
- * 
- * ## Why This Exists
- * 
- * The main `VpWalletConformanceTests` class has mysterious HTTP timeout issues during test plan
- * creation. This isolated test proves the HTTP client, SSL truststore, and API calls all work
- * correctly when run without complex companion object initialization.
+ * This test validates that we can successfully create test plans and retrieve modules
+ * from the conformance suite. It does NOT run the full test flow (which requires
+ * the wallet adapter and wallet API to be running).
  * 
  * ## Running
  * 
@@ -32,11 +29,6 @@ import kotlin.test.Test
  * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
  *     --tests "IsolatedWalletConformanceTest"
  * ```
- * 
- * ## Current Status
- * 
- * ✅ Test plan creation works (response: `Created test plan: <id>`)
- * ❌ `getTestModules()` returns 404 - API path needs investigation
  * 
  * ## Prerequisites
  * 
@@ -64,38 +56,51 @@ class IsolatedWalletConformanceTest {
         val isConformanceAvailable = conformanceServerVersionResult.isSuccess
     }
 
+    /**
+     * Test that we can create a test plan and get modules from the response.
+     * 
+     * This validates:
+     * - SSL/TLS connection to conformance suite works
+     * - Test plan creation API works
+     * - Modules are returned in the create response
+     */
     @Test
     @EnabledIf("isConformanceAvailable")
-    fun testWalletTestPlanRunner() = runBlocking {
-        println("=== Isolated Wallet Conformance Test ===")
+    fun testCreatePlanAndGetModules() = runBlocking {
+        println("=== Test Plan Creation Test ===")
         
-        val httpClient = HttpClient(Java) {
-            install(ContentNegotiation) {
-                json(Json {
-                    ignoreUnknownKeys = true
-                    isLenient = true
-                })
-            }
-            install(HttpTimeout) {
-                requestTimeoutMillis = 60_000
-                connectTimeoutMillis = 30_000
-            }
-            expectSuccess = false
+        val conformance = ConformanceInterface(conformanceHost, conformancePort)
+        val adapterUrl = "http://host.docker.internal:${ConformanceConfig.WALLET_ADAPTER_PORT}/openid4vp/authorize"
+        val plan = VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
+        
+        println("Creating test plan: ${plan.planName}")
+        println("Variant: ${plan.variant}")
+        
+        // Create test plan URL
+        val variantJson = Json.encodeToString(plan.variant)
+        val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
+            append("planName", plan.planName)
+            append("variant", variantJson)
         }
         
-        try {
-            val adapterUrl = "http://host.docker.internal:${ConformanceConfig.WALLET_ADAPTER_PORT}/openid4vp/authorize"
-            val plan = VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            
-            println("Creating test plan: ${plan.planName}")
-            println("Variant: ${plan.variant}")
-            
-            val runner = WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort)
-            runner.test()
-            
-            println("=== Test Complete ===")
-        } finally {
-            httpClient.close()
+        // Create test plan
+        val body = buildJsonObject {
+            put("configuration", plan.configuration)
         }
+        val response = conformance.createTestPlan(createTestPlanUrl, body)
+        
+        println("Created test plan: ${response.id}")
+        println("Modules: ${response.modules.size}")
+        response.modules.forEach { module ->
+            println("  - ${module.testModule}")
+        }
+        
+        // Assertions
+        assertTrue(response.id.isNotEmpty(), "Test plan ID should not be empty")
+        assertTrue(response.modules.isNotEmpty(), "Should have at least one test module")
+        assertTrue(response.modules.any { it.testModule.contains("happy-flow") }, 
+            "Should include happy-flow test module")
+        
+        println("=== Test Plan Creation Successful ===")
     }
 }
