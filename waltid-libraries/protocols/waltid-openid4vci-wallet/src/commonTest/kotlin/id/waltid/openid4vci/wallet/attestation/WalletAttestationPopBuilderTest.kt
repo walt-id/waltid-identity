@@ -3,13 +3,14 @@ package id.waltid.openid4vci.wallet.attestation
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyMeta
 import id.walt.crypto.keys.KeyType
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -34,8 +35,8 @@ private class PopTestP256Key : Key() {
 
     override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val headerJson = JsonObject(headers).toString()
-        val headerB64 = Base64.UrlSafe.encode(headerJson.encodeToByteArray()).trimEnd('=')
-        val payloadB64 = Base64.UrlSafe.encode(plaintext).trimEnd('=')
+        val headerB64 = headerJson.encodeToByteArray().encodeToBase64Url()
+        val payloadB64 = plaintext.encodeToBase64Url()
         return "$headerB64.$payloadB64.mock-sig"
     }
 }
@@ -70,16 +71,14 @@ class WalletAttestationPopBuilderTest {
         val parts = jwt.split(".")
         assertEquals(3, parts.size, "JWT should have 3 parts")
 
-        val b64 = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT_OPTIONAL)
-
         val header = Json.parseToJsonElement(
-            b64.decode(parts[0]).decodeToString()
+            parts[0].decodeFromBase64Url().decodeToString()
         ).jsonObject
         assertEquals("oauth-client-attestation-pop+jwt", header["typ"]?.jsonPrimitive?.content)
         assertEquals("ES256", header["alg"]?.jsonPrimitive?.content)
 
         val payload = Json.parseToJsonElement(
-            b64.decode(parts[1]).decodeToString()
+            parts[1].decodeFromBase64Url().decodeToString()
         ).jsonObject
         assertEquals("wallet-client", payload["iss"]?.jsonPrimitive?.content)
         assertEquals("https://issuer.example.com/token", payload["aud"]?.jsonPrimitive?.content)

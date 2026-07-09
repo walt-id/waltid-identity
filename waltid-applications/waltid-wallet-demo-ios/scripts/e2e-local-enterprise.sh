@@ -18,7 +18,6 @@ TENANT_PATH="${ORG}.${TENANT}"
 ISSUER_PROFILE="${ISSUER_PROFILE:-}"
 VERIFIER="${VERIFIER:-verifier2-mobile}"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
-SKIP_IOS_APP_SETUP="${SKIP_IOS_APP_SETUP:-false}"
 
 ATTESTED=false
 PREPARE_ONLY=false
@@ -67,7 +66,7 @@ fi
 
 require_e2e_command xcrun
 require_e2e_command xcodebuild
-[ -f "$IOSAPP_DIR/iosApp.xcworkspace/contents.xcworkspacedata" ] || err "iosApp workspace not found"
+[ -d "$IOSAPP_DIR/iosApp.xcodeproj" ] || err "iosApp project not found"
 
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
 if [ -z "$SIMULATOR_ID" ]; then
@@ -84,12 +83,6 @@ raise SystemExit(1)
 fi
 
 log "CHECK" "Simulator: $SIMULATOR_ID"
-
-if [ "$SKIP_IOS_APP_SETUP" != "true" ]; then
-  require_e2e_command pod
-  log "SETUP" "Installing CocoaPods dependencies"
-  (cd "$IOSAPP_DIR" && pod install)
-fi
 
 PLIST_DEBUG="$IDENTITY_DIR/waltid-applications/waltid-wallet-demo-ios/iosApp/iosApp/Info-Debug.plist"
 grep -q "NSAppTransportSecurity" "$PLIST_DEBUG" \
@@ -123,7 +116,7 @@ env \
   TEST_RUNNER_E2E_ATTESTATION_BASE_URL="http://localhost:$PORT" \
   TEST_RUNNER_E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
   xcodebuild \
-    -workspace "$IOSAPP_DIR/iosApp.xcworkspace" \
+    -project "$IOSAPP_DIR/iosApp.xcodeproj" \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     test \

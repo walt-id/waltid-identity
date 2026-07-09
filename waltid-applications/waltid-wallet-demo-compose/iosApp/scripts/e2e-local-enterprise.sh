@@ -21,7 +21,6 @@ VERIFIER="${VERIFIER:-verifier2-mobile}"
 ATTESTER_PATH="${ATTESTER_PATH:-$TENANT_PATH.client-attester}"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
-IOS_SIMULATOR_ARCHS="${IOS_SIMULATOR_ARCHS:-arm64}"
 RESULT_BUNDLE_PATH="${RESULT_BUNDLE_PATH:-$IOSAPP_DIR/build/compose-local-enterprise-e2e.xcresult}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$IOSAPP_DIR/build/xcode-derived-compose-local-enterprise}"
 SKIP_IOS_APP_SETUP="${SKIP_IOS_APP_SETUP:-false}"
@@ -57,7 +56,7 @@ require_e2e_command curl
 require_e2e_command python3
 
 [ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
-[ -f "$IOSAPP_DIR/iosApp.xcworkspace/contents.xcworkspacedata" ] || err "iosApp workspace not found"
+[ -d "$IOSAPP_DIR/iosApp.xcodeproj" ] || err "iosApp project not found"
 
 log "CHECK" "Verifying local Enterprise backend prerequisites"
 TOKEN="$(get_token)"
@@ -97,19 +96,13 @@ raise SystemExit(1)
 fi
 
 if [ "$SKIP_IOS_APP_SETUP" != "true" ]; then
-  log "BUILD" "Syncing Compose iOS framework and CocoaPods"
+  log "BUILD" "Resolving Compose iOS SwiftPM linkage package"
   (
     cd "$IDENTITY_DIR"
-    PLATFORM_NAME=iphonesimulator \
-    SDK_NAME=iphonesimulator \
-    ARCHS="$IOS_SIMULATOR_ARCHS" \
-    CONFIGURATION=Debug \
-      ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:syncFramework \
-        -Pkotlin.native.cocoapods.platform=iphonesimulator \
-        -Pkotlin.native.cocoapods.archs="$IOS_SIMULATOR_ARCHS" \
-        -Pkotlin.native.cocoapods.configuration=Debug
+    XCODEPROJ_PATH="$IOSAPP_DIR/iosApp.xcodeproj" \
+      ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:integrateLinkagePackage \
+        -PenableIosBuild=true
   )
-  (cd "$IOSAPP_DIR" && pod install)
 fi
 
 log "CHECK" "Verifying Compose iOS prerequisites (simulator=$SIMULATOR_ID)"
@@ -150,13 +143,12 @@ env \
   ATTESTATION_BASE_URL="${E2E_ATTESTATION_BASE_URL:-http://localhost:$PORT}" \
   ATTESTATION_ATTESTER_PATH="$ATTESTER_PATH" \
   xcodebuild \
-    -workspace "$IOSAPP_DIR/iosApp.xcworkspace" \
+    -project "$IOSAPP_DIR/iosApp.xcodeproj" \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     -resultBundlePath "$RESULT_BUNDLE_PATH" \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     test \
-    -only-testing:iosAppUITests/LocalEnterpriseBackendE2ETests \
-    OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+    -only-testing:iosAppUITests/LocalEnterpriseBackendE2ETests
 
 log "DONE" "Compose iOS local UI E2E completed (attested=$ATTESTED)"

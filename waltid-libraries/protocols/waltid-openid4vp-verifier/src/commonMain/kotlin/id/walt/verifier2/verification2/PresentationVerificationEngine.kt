@@ -203,194 +203,242 @@ object PresentationVerificationEngine {
         suspend fun Verification2Session.failSession(event: SessionEvent) =
             failSessionCallback.invoke(this, event, updateSessionCallback)
 
-        // --- Presentation validation ---
+        // ── Top-level exception guard ─────────────────────────────────────────────
+        //
+        // Without this guard, any unexpected exception thrown inside this function
+        // (e.g. a policy implementation that throws instead of returning Result.failure,
+        // a network error during status list fetching, a deserialisation error in a
+        // presentation parser) would propagate back to the HTTP handler uncaught.
+        //
+        // The HTTP handler only catches [PresentationRejectionException]; everything
+        // else leaves the session permanently stuck in PROCESSING_FLOW — it can never
+        // transition to SUCCESSFUL or FAILED, so callers polling the session (SSE,
+        // heartbeat, frontend) will hang indefinitely.
+        //
+        // This try/catch ensures that *any* exception that is not already a
+        // [PresentationRejectionException] (which carries its own session state update)
+        // is:
+        //   1. Logged with context
+        //   2. Stored on the session as a [SessionFailure.PresentationValidation] with
+        //      the exception message so the error is visible via the session's failure field
+        //   3. Marked FAILED via failSessionCallback
+        //   4. Rethrown as a [PresentationRejectionException] so the HTTP handler can
+        //      return 400 to the wallet instead of 500 (the wallet misbehaving or sending
+        //      an unprocessable credential should not be a 500)
+        try {
 
 
-        val parsedPresentations = parseAllPresentations(vpTokenContents, session)
+            val parsedPresentations = parseAllPresentations(vpTokenContents, session)
 
-        session.updateSession(SessionEvent.parsed_presentation_available) {
-            presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
-        }
-
-        val presentationValidationResult = verifyAllPresentations(parsedPresentations, session)
-
-        session.updateSession(SessionEvent.presentation_validation_available) {
-            presentationValidationResults = presentationValidationResult
-        }
-
-        val anyError = presentationValidationResult.any { it.value.any { it.value.errors.isNotEmpty() } }
-
-        if (anyError) {
-            // Handle validation failure
-            log.warn { "One or more presentations in vp_token failed validation for session ${session.id}" }
-            log.info { "Validation results for session ${session.id}:" }
-            presentationValidationResult.forEach { (query, policyResults) ->
-                log.info { "$query -> " }
-                policyResults.forEach { (s, result) ->
-                    log.info { "  --- $s: $result" }
-                }
+            session.updateSession(SessionEvent.parsed_presentation_available) {
+                presentedPresentations = parsedPresentations.map { it.key.second.id to it.value }.toMap()
             }
 
-            val firstError =
-                presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
-            log.warn { "First error: $firstError" }
-
-            val failedPoliciesMap = presentationValidationResult
-                .mapValues { (_, byPolicy) -> byPolicy.filterValues { it.errors.isNotEmpty() } }
-                .filterValues { it.isNotEmpty() }
+            val presentationValidationResult = verifyAllPresentations(parsedPresentations, session)
 
             session.updateSession(SessionEvent.presentation_validation_available) {
-                failure = SessionFailure.PresentationValidation(
-                    reason = firstError?.message?.let { "Presentation validation failed: $it" }
-                        ?: "One or more presentations in vp_token failed validation",
-                    failedPolicies = failedPoliciesMap,
+                presentationValidationResults = presentationValidationResult
+            }
+
+            val anyError = presentationValidationResult.any { it.value.any { it.value.errors.isNotEmpty() } }
+
+            if (anyError) {
+                // Handle validation failure
+                log.warn { "One or more presentations in vp_token failed validation for session ${session.id}" }
+                log.info { "Validation results for session ${session.id}:" }
+                presentationValidationResult.forEach { (query, policyResults) ->
+                    log.info { "$query -> " }
+                    policyResults.forEach { (s, result) ->
+                        log.info { "  --- $s: $result" }
+                    }
+                }
+
+                val firstError =
+                    presentationValidationResult.firstNotNullOfOrNull { it.value.firstNotNullOfOrNull { it.value.errors.firstOrNull() } }
+                log.warn { "First error: $firstError" }
+
+                val failedPoliciesMap = presentationValidationResult
+                    .mapValues { (_, byPolicy) -> byPolicy.filterValues { it.errors.isNotEmpty() } }
+                    .filterValues { it.isNotEmpty() }
+
+                session.updateSession(SessionEvent.presentation_validation_available) {
+                    failure = SessionFailure.PresentationValidation(
+                        reason = firstError?.message?.let { "Presentation validation failed: $it" }
+                            ?: "One or more presentations in vp_token failed validation",
+                        failedPolicies = failedPoliciesMap,
+                    )
+                }
+
+                session.failSession(SessionEvent.presentation_validation_failed)
+
+                val failedPoliciesNames = presentationValidationResult.flatMap { (queryId, policyResults) ->
+                    policyResults.filter { it.value.errors.isNotEmpty() }
+                        .map { (policyId, _) -> "$queryId/$policyId" }
+                }
+                throw PresentationRejectionException(
+                    "Presentation validation failed. Failed VP policies: ${failedPoliciesNames.joinToString()}"
                 )
             }
 
-            session.failSession(SessionEvent.presentation_validation_failed)
 
-            val failedPoliciesNames = presentationValidationResult.flatMap { (queryId, policyResults) ->
-                policyResults.filter { it.value.errors.isNotEmpty() }
-                    .map { (policyId, _) -> "$queryId/$policyId" }
-            }
-            throw PresentationRejectionException(
-                "Presentation validation failed. Failed VP policies: ${failedPoliciesNames.joinToString()}"
-            )
-        }
-
-
-        val allSuccessfullyValidatedAndProcessedData = parsedPresentations.map {
-            it.key.second.id to when (val presentation = it.value) {
-                is JwtVcJsonPresentation -> {
-                    if (presentation.vp == null) {
-                        throw PresentationRejectionException(
-                            "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
-                        )
-                    }
-                    presentation.credentials ?: emptyList()
-                }
-
-                is DcSdJwtPresentation -> listOf(presentation.credential)
-                is MsoMdocPresentation -> listOf(presentation.mdoc)
-                is LdpVcPresentation -> throw NotImplementedError()
-            }
-        }.toMap()
-
-        session.updateSession(SessionEvent.validated_credentials_available) {
-            presentedCredentials = allSuccessfullyValidatedAndProcessedData
-        }
-
-        // --- trusted_authorities check ---
-        // Per OID4VP §6.1.1: if a CredentialQuery specifies trusted_authorities, every credential
-        // presented for that query MUST satisfy at least one authority entry.
-        if (trustedAuthoritiesChecker != null) {
-            val dcqlQuery = session.authorizationRequest.dcqlQuery
-            if (dcqlQuery != null) {
-                for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
-                    val credentialQuery = dcqlQuery.credentials.find { it.id == queryId }
-                    val authorities = credentialQuery?.trustedAuthorities
-                    if (!authorities.isNullOrEmpty()) {
-                        for (credential in credentials) {
-                            val dcqlCredential = RawDcqlCredential(
-                                id = queryId,
-                                format = credentialQuery.format.name,
-                                data = credential.credentialData,
-                                originalCredential = credential
+            val allSuccessfullyValidatedAndProcessedData = parsedPresentations.map {
+                it.key.second.id to when (val presentation = it.value) {
+                    is JwtVcJsonPresentation -> {
+                        if (presentation.vp == null) {
+                            throw PresentationRejectionException(
+                                "Presentation for query '${it.key.second.id}' is missing the required 'vp' claim."
                             )
-                            if (!trustedAuthoritiesChecker(dcqlCredential, authorities)) {
-                                val msg = "Credential for query '$queryId' does not satisfy trusted_authorities constraint"
-                                log.warn { msg }
-                                session.updateSession(SessionEvent.presentation_validation_available) {
-                                    failure = SessionFailure.PresentationValidation(
-                                        reason = msg,
-                                        failedPolicies = emptyMap()
-                                    )
+                        }
+                        presentation.credentials ?: emptyList()
+                    }
+
+                    is DcSdJwtPresentation -> listOf(presentation.credential)
+                    is MsoMdocPresentation -> listOf(presentation.mdoc)
+                    is LdpVcPresentation -> throw NotImplementedError()
+                }
+            }.toMap()
+
+            session.updateSession(SessionEvent.validated_credentials_available) {
+                presentedCredentials = allSuccessfullyValidatedAndProcessedData
+            }
+
+            // --- trusted_authorities check ---
+            // Per OID4VP §6.1.1: if a CredentialQuery specifies trusted_authorities, every credential
+            // presented for that query MUST satisfy at least one authority entry.
+            if (trustedAuthoritiesChecker != null) {
+                val dcqlQuery = session.authorizationRequest.dcqlQuery
+                if (dcqlQuery != null) {
+                    for ((queryId, credentials) in allSuccessfullyValidatedAndProcessedData) {
+                        val credentialQuery = dcqlQuery.credentials.find { it.id == queryId }
+                        val authorities = credentialQuery?.trustedAuthorities
+                        if (!authorities.isNullOrEmpty()) {
+                            for (credential in credentials) {
+                                val dcqlCredential = RawDcqlCredential(
+                                    id = queryId,
+                                    format = credentialQuery.format.name,
+                                    data = credential.credentialData,
+                                    originalCredential = credential
+                                )
+                                if (!trustedAuthoritiesChecker(dcqlCredential, authorities)) {
+                                    val msg = "Credential for query '$queryId' does not satisfy trusted_authorities constraint"
+                                    log.warn { msg }
+                                    session.updateSession(SessionEvent.presentation_validation_available) {
+                                        failure = SessionFailure.PresentationValidation(
+                                            reason = msg,
+                                            failedPolicies = emptyMap()
+                                        )
+                                    }
+                                    session.failSession(SessionEvent.presentation_validation_failed)
+                                    throw PresentationRejectionException(msg)
                                 }
-                                session.failSession(SessionEvent.presentation_validation_failed)
-                                throw PresentationRejectionException(msg)
                             }
                         }
                     }
                 }
             }
-        }
 
-        // --- DCQL validation ---
+            // --- DCQL validation ---
 
-        // Check if the set of validated presentations satisfies the overall DCQL Query
-        // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
-        val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
-            DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
-                dcqlQuery = dcqlQuery,
-                successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
-            )
-        }
-        val dcqlFailure = dcqlFulfilled?.exceptionOrNull() as? DcqlFulfillmentChecker.DcqlFulfillmentException
-        if (dcqlFailure != null) {
-            log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFailure.message}" }
+            // Check if the set of validated presentations satisfies the overall DCQL Query
+            // (e.g., credential_sets, all *required* CredentialQuery IDs are present in allSuccessfullyValidatedAndProcessedData)
+            val dcqlFulfilled = session.authorizationRequest.dcqlQuery?.let { dcqlQuery ->
+                DcqlFulfillmentChecker.checkOverallDcqlFulfillment(
+                    dcqlQuery = dcqlQuery,
+                    successfullyValidatedQueryIds = allSuccessfullyValidatedAndProcessedData.keys // set of query IDs for which we have valid presentations
+                )
+            }
+            val dcqlFailure = dcqlFulfilled?.exceptionOrNull() as? DcqlFulfillmentChecker.DcqlFulfillmentException
+            if (dcqlFailure != null) {
+                log.error { "The set of validated presentations does not fulfill all DCQL requirements for session ${session.id}, reported error is: ${dcqlFailure.message}" }
 
-            session.updateSession(SessionEvent.validated_credentials_available) {
-                failure = SessionFailure.DcqlFulfillment(
-                    reason = dcqlFailure.message,
-                    failure = dcqlFailure.details,
+                session.updateSession(SessionEvent.validated_credentials_available) {
+                    failure = SessionFailure.DcqlFulfillment(
+                        reason = dcqlFailure.message,
+                        failure = dcqlFailure.details,
+                    )
+                }
+
+                session.failSession(SessionEvent.dcql_fulfillment_check_failed)
+
+                throw PresentationRejectionException(
+                    "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.exceptionOrNull()?.message}",
+                    dcqlFulfilled.exceptionOrNull()!!
                 )
             }
 
-            session.failSession(SessionEvent.dcql_fulfillment_check_failed)
+            session.updateSession(SessionEvent.presentation_fulfils_dcql_query) {
 
-            throw PresentationRejectionException(
-                "The set of validated presentations does not fulfill all DCQL requirements. DCQL errors are: ${dcqlFulfilled.exceptionOrNull()?.message}",
-                dcqlFulfilled.exceptionOrNull()!!
-            )
-        }
-
-        session.updateSession(SessionEvent.presentation_fulfils_dcql_query) {
-
-        }
-
-        // --- Credential verification ---
-
-        val credentialPolicyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
-            session.policies,
-            allSuccessfullyValidatedAndProcessedData,
-            policyContext
-        )
-
-        val verificationSessionPolicyResults = Verifier2PolicyResults(
-            vpPolicies = presentationValidationResult,
-            vcPolicies = credentialPolicyResults.vcPolicies,
-            specificVcPolicies = credentialPolicyResults.specificVcPolicies,
-        )
-
-        val vcPolicyViolations =
-            credentialPolicyResults.vcPolicies.filter { !it.success } +
-                    credentialPolicyResults.specificVcPolicies.values.flatten().filter { !it.success }
-
-        session.updateSession(SessionEvent.credential_policy_results_available) {
-            this.policyResults = verificationSessionPolicyResults
-            this.status = when {
-                verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL
-                else -> Verification2Session.VerificationSessionStatus.FAILED
             }
+
+            // --- Credential verification ---
+
+            val credentialPolicyResults = Verifier2SessionCredentialPolicyValidation.validateCredentialPolicies(
+                session.policies,
+                allSuccessfullyValidatedAndProcessedData,
+                policyContext
+            )
+
+            val verificationSessionPolicyResults = Verifier2PolicyResults(
+                vpPolicies = presentationValidationResult,
+                vcPolicies = credentialPolicyResults.vcPolicies,
+                specificVcPolicies = credentialPolicyResults.specificVcPolicies,
+            )
+
+            val vcPolicyViolations =
+                credentialPolicyResults.vcPolicies.filter { !it.success } +
+                        credentialPolicyResults.specificVcPolicies.values.flatten().filter { !it.success }
+
+            session.updateSession(SessionEvent.credential_policy_results_available) {
+                this.policyResults = verificationSessionPolicyResults
+                this.status = when {
+                    verificationSessionPolicyResults.overallSuccess -> Verification2Session.VerificationSessionStatus.SUCCESSFUL
+                    else -> Verification2Session.VerificationSessionStatus.FAILED
+                }
+                if (!verificationSessionPolicyResults.overallSuccess) {
+                    // Invariant: overallSuccess=false implies at least one credential policy failure
+                    // in the same lists used to compute the overall result.
+                    failure = SessionFailure.VcPolicyViolations(
+                        reason = "${vcPolicyViolations.size} credential policy violation(s)",
+                        violations = vcPolicyViolations,
+                    )
+                }
+            }
+
             if (!verificationSessionPolicyResults.overallSuccess) {
-                // Invariant: overallSuccess=false implies at least one credential policy failure
-                // in the same lists used to compute the overall result.
-                failure = SessionFailure.VcPolicyViolations(
-                    reason = "${vcPolicyViolations.size} credential policy violation(s)",
-                    violations = vcPolicyViolations,
+                val failedVcPolicies = credentialPolicyResults.vcPolicies
+                    .filter { !it.success }
+                    .map { it.policy.id }
+                val failedSpecificVcPolicies = credentialPolicyResults.specificVcPolicies
+                    .flatMap { (queryId, results) -> results.filter { !it.success }.map { "$queryId/${it.policy.id}" } }
+                val allFailed = (failedVcPolicies + failedSpecificVcPolicies).distinct()
+                throw PresentationRejectionException(
+                    "Credential policy verification failed. Failed VC policies: ${allFailed.joinToString()}"
                 )
             }
-        }
 
-        if (!verificationSessionPolicyResults.overallSuccess) {
-            val failedVcPolicies = credentialPolicyResults.vcPolicies
-                .filter { !it.success }
-                .map { it.policy.id }
-            val failedSpecificVcPolicies = credentialPolicyResults.specificVcPolicies
-                .flatMap { (queryId, results) -> results.filter { !it.success }.map { "$queryId/${it.policy.id}" } }
-            val allFailed = (failedVcPolicies + failedSpecificVcPolicies).distinct()
+        } catch (e: PresentationRejectionException) {
+            // Already handled: session state was updated before this was thrown.
+            // Re-throw so the HTTP handler can return 400 to the wallet.
+            throw e
+        } catch (e: Exception) {
+            // Unexpected exception — policy threw instead of returning Result.failure,
+            // network error during status check, parse error, etc.
+            // Mark the session FAILED so it doesn't stay stuck in PROCESSING_FLOW forever.
+            log.error(e) {
+                "Unexpected exception during verification of session ${session.id} — " +
+                        "marking session FAILED to prevent it from being stuck in PROCESSING_FLOW. " +
+                        "Exception: ${e::class.simpleName}: ${e.message}"
+            }
+            session.updateSession(SessionEvent.presentation_validation_available) {
+                failure = SessionFailure.PresentationValidation(
+                    reason = "Internal verification error: ${e::class.simpleName}: ${e.message}",
+                    failedPolicies = emptyMap(),
+                )
+            }
+            session.failSession(SessionEvent.presentation_validation_failed)
             throw PresentationRejectionException(
-                "Credential policy verification failed. Failed VC policies: ${allFailed.joinToString()}"
+                "Verification failed due to an internal error: ${e.message}",
+                cause = e
             )
         }
 

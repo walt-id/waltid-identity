@@ -20,7 +20,7 @@
 
 ## Overview
 
-This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, plus platform key stores for hardware-backed key references.
+This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, plus platform key stores for non-exportable platform-backed key references.
 
 Use this library when you need persistent wallet storage inside a mobile wallet application.
 
@@ -54,7 +54,7 @@ dependencies {
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
-import id.walt.wallet2.persistence.stores.HardwareKeyStore
+import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
@@ -62,7 +62,7 @@ val driver = DriverFactory(context).createDriver("wallet_wallet-id")
 val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
 val keyProvider = AndroidPlatformKeyProvider()
-val keyStore = HardwareKeyStore(keyProvider, queries)
+val keyStore = PlatformKeyStore(keyProvider, queries)
 val credentialStore = SqlDelightCredentialStore(queries)
 val didStore = SqlDelightDidStore(queries)
 ```
@@ -71,7 +71,7 @@ val didStore = SqlDelightDidStore(queries)
 
 | Interface | Implementation | Description |
 |-----------|----------------|-------------|
-| `WalletKeyStore` | `HardwareKeyStore` | Hardware-backed platform key references |
+| `WalletKeyStore` | `PlatformKeyStore` | Platform-backed key references and persisted software key material |
 | `WalletCredentialStore` | `SqlDelightCredentialStore` | Stored credentials with metadata |
 | `WalletDidStore` | `SqlDelightDidStore` | DIDs and their documents |
 
@@ -84,6 +84,16 @@ The mobile schema includes the following tables:
 - `wallet2_dids` — Stored DIDs
 
 Schema creation and migration are managed by SQLDelight on the target platform driver.
+
+## API documentation
+
+Generate the mobile persistence API reference with Dokka:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+The generated HTML is written to `build/dokka/html`.
 
 ## Related Libraries
 

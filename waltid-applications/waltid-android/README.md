@@ -37,8 +37,7 @@
 
 1. Clone the repository.
 2. Open the project in Android Studio.
-3. Set your `sdk.dir` in `local.properties` and then enable the Android build
-   with `enableAndroidBuild=true` in `gradle.properties`.
+3. Set your `sdk.dir` in `local.properties`.
 4. Run the application on your device or emulator.
 
 For the current wallet issuance/presentation demo and Android E2E scripts, see [waltid-wallet-demo-compose](../waltid-wallet-demo-compose/README.md). For broader mobile setup, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).

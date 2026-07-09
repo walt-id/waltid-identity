@@ -12,10 +12,10 @@ on:
         required: true
         type: string
       tags:
-        description: 'JSON array of desired tags, e.g. ["stable"]'
+        description: 'JSON array of extra tags to apply, e.g. ["stable", "latest"]. The version tag is always applied.'
         required: false
         type: string
-        default: '["dev"]'
+        default: '[]'
       publish:
         description: "Specifies whether to publish the images (defaults to false)"
         required: false
@@ -66,7 +66,7 @@ jobs:
       - name: Generate Docker tags
         id: tags
         run: |
-          TAGS="waltid/${{ matrix.image }}:${{ inputs.version }}, waltid/${{ matrix.image }}:latest"
+          TAGS="waltid/${{ matrix.image }}:${{ inputs.version }}"
           for tag in $(echo '${{ inputs.tags }}' | jq -r '.[]'); do
             TAGS="$TAGS, waltid/${{ matrix.image }}:$tag"
           done

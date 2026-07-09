@@ -1,5 +1,9 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins {
     id("waltid.mobile.library")
+    id("waltid.mobile.sdk.documentation")
+    alias(identityLibs.plugins.skie)
 }
 
 group = "id.walt.protocols"
@@ -8,7 +12,34 @@ waltidMobile {
     androidNamespace.set("id.walt.wallet2.mobile")
 }
 
+skie {
+    analytics {
+        enabled.set(false)
+    }
+
+    build {
+        produceDistributableFramework()
+    }
+}
+
 kotlin {
+    if (enableIosBuild) {
+        val walletCoreXcFramework = XCFramework("WalletCore")
+
+        targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+            binaries.framework {
+                baseName = "WalletCore"
+                isStatic = true
+                binaryOption("bundleId", "id.walt.wallet.core")
+                walletCoreXcFramework.add(this)
+            }
+
+            binaries.configureEach {
+                linkerOpts("-lsqlite3")
+            }
+        }
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
@@ -48,16 +79,5 @@ kotlin {
                 }
             }
         }
-    }
-}
-
-// Exclude JVM-only ktor engines from Android device test runtime.
-// waltid-web-data-fetching's JVM artifact (consumed by Android since no Android target exists)
-// includes ktor-client-java/cio/apache5 which fail on Android Runtime (java.net.http.HttpClient unavailable).
-configurations.configureEach {
-    if (name.contains("androidDeviceTest") && name.contains("RuntimeClasspath")) {
-        exclude(group = "io.ktor", module = "ktor-client-java")
-        exclude(group = "io.ktor", module = "ktor-client-cio")
-        exclude(group = "io.ktor", module = "ktor-client-apache5")
     }
 }

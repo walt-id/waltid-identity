@@ -50,7 +50,20 @@ spec:
                 - ALL
           volumeMounts:
             - name: verifier-web-config
-              mountPath: "/waltid-verifier-api/config/"
+              mountPath: "/waltid-verifier-api/config/_features.conf"
+              subPath: "_features.conf"
+              readOnly: true
+            - name: verifier-web-config
+              mountPath: "/waltid-verifier-api/config/web.conf"
+              subPath: "web.conf"
+              readOnly: true
+            - name: verifier-web-config
+              mountPath: "/waltid-verifier-api/config/verifier-service.conf"
+              subPath: "verifier-service.conf"
+              readOnly: true
+            - name: verifier-web-config
+              mountPath: "/waltid-verifier-api/config/entra.conf"
+              subPath: "entra.conf"
               readOnly: true
             - name: verifier-request-signing
               mountPath: "/waltid-verifier-api/request-signing-secret/"

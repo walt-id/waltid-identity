@@ -13,7 +13,7 @@ spec:
         app: {{ include "wallet-api.fullname" . }}-dev-ui
         {{- include "wallet-api.selectorLabels" . | nindent 8 }}
       annotations:
-        deployment/id: "_DEFAULT_DEPLOYMENT_"
+        deployment/id: {{ .Values.global.deploymentId | default "unset" | quote }}
     spec:
       securityContext:
         runAsNonRoot: true
@@ -52,7 +52,7 @@ spec:
         app: {{ include "wallet-api.fullname" . }}-demo-ui
         {{- include "wallet-api.selectorLabels" . | nindent 8 }}
       annotations:
-        deployment/id: "_DEFAULT_DEPLOYMENT_"
+        deployment/id: {{ .Values.global.deploymentId | default "unset" | quote }}
     spec:
       securityContext:
         runAsNonRoot: true

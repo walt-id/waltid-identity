@@ -3,9 +3,6 @@ kind: ConfigMap
 metadata:
   name: wallet-config
 data:
-  _features.conf: |
-    enabledFeatures = [
-    ]
   db.conf: |
     dataSource {
         jdbcUrl = "jdbc:sqlite:/waltid-wallet-api/data/data.db"
@@ -53,20 +50,6 @@ data:
       configurationEndpoint = "https://issuer.demo.walt.id/.well-known/openid-credential-issuer",
       authorized = false,
     }
-#  rejectionreason.conf: |
-#    reasons = [
-#        "Unknown sender",
-#        "Not relevant to me",
-#        "Unsure about accuracy",
-#        "Need more details",
-#    ]
-#  logins.conf: |
-#    enabledLoginMethods: [
-#        "email",
-#        "web3",
-#        "oidc",
-#        "passkeys"
-#    ]
 #  oci.conf: |
 #    vaultId = "ocid1.vault.oc1.eu-frankfurt-1.entcvrlraabc4.abtheljrpyimqvzheblr6ce4bqt2snnz36i4etlgtg32n4du5dbrnpgagf6q"
 #    compartmentId = "ocid1.compartment.oc1..aaaaaaaawirugoz35riiybcxsvf7bmelqsxo3sajaav5w3i2vqowcwqrllxa"

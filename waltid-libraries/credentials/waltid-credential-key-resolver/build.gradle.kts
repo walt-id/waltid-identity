@@ -29,16 +29,17 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:waltid-did"))
             api(project(":waltid-libraries:web:waltid-web-data-fetching"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-        }
-        jvmMain.dependencies {
-            // X.509 certificate chain validation (AKI/SKI, signature chain)
-            implementation(project(":waltid-libraries:crypto:waltid-x509"))
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
+            implementation(identityLibs.ktor.serialization.kotlinx.json)
+            implementation(identityLibs.ktor.server.content.negotiation)
+            implementation(identityLibs.ktor.server.netty)
         }
     }
 }

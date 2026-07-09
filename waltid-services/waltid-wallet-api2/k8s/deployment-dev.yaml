@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wallet-api2-data-volume-claim
+spec:
+  storageClassName: gp3-retain
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: wallet-api2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wallet-api2
+  template:
+    metadata:
+      labels:
+        app: wallet-api2
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: wallet-api2
+          image: waltid/wallet-api2:__DEFAULT_IMAGE_TAG__
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 10001
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - mountPath: "/waltid-wallet-api2/data/"
+              name: wallet-data
+          ports:
+            - containerPort: 7005
+              name: http-api
+      volumes:
+        - name: wallet-data
+          persistentVolumeClaim:
+            claimName: wallet-api2-data-volume-claim
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: wallet-api2
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: wallet-api2
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: wallet-api2-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - wallet-api2.test.waltid.cloud
+      secretName: wallet-api2-tls-secret
+  rules:
+    - host: wallet-api2.test.waltid.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: wallet-api2
+                port:
+                  name: http

@@ -126,7 +126,7 @@ public final class LocalEnterpriseBackend {
             "password": config.adminPassword,
         ])
         let response = try await client.jsonRequest(
-            url: config.apiBaseURL.appending(path: "/auth/account/emailpass"),
+            url: config.apiBaseURL.appendingE2EPath("/auth/account/emailpass"),
             method: "POST",
             headers: ["Content-Type": "application/json", "ngrok-skip-browser-warning": "true"],
             body: Data(body.utf8)
@@ -143,7 +143,7 @@ public final class LocalEnterpriseBackend {
     }
 
     public func createPreAuthorizedOffer(config: LocalEnterpriseBackendConfig, token: String) async throws -> String {
-        let endpoint = config.ngrokBaseURL.appending(path: "/v2/\(config.tenantPath).\(config.issuerProfile)/issuer-service-api/credentials/offers")
+        let endpoint = config.ngrokBaseURL.appendingE2EPath("/v2/\(config.tenantPath).\(config.issuerProfile)/issuer-service-api/credentials/offers")
         let response = try await client.jsonRequest(
             url: endpoint,
             method: "POST",
@@ -183,7 +183,7 @@ public final class LocalEnterpriseBackend {
             ],
         ]
 
-        let endpoint = config.ngrokBaseURL.appending(path: "/v1/\(config.tenantPath).\(config.verifier)/verifier2-service-api/verification-session/create")
+        let endpoint = config.ngrokBaseURL.appendingE2EPath("/v1/\(config.tenantPath).\(config.verifier)/verifier2-service-api/verification-session/create")
         let response = try await client.jsonRequest(
             url: endpoint,
             method: "POST",
@@ -220,7 +220,7 @@ public final class LocalEnterpriseBackend {
 
         while Date() < deadline {
             let token = try await getAdminToken(config: config)
-            let endpoint = config.apiBaseURL.appending(path: "/v1/\(config.tenantPath).\(config.verifier).\(sessionID)/verifier2-service-api/verification-session/info")
+            let endpoint = config.apiBaseURL.appendingE2EPath("/v1/\(config.tenantPath).\(config.verifier).\(sessionID)/verifier2-service-api/verification-session/info")
             let response = try await client.jsonRequest(
                 url: endpoint,
                 headers: [
@@ -240,5 +240,11 @@ public final class LocalEnterpriseBackend {
         }
 
         return lastStatus
+    }
+}
+
+private extension URL {
+    func appendingE2EPath(_ path: String) -> URL {
+        appendingPathComponent(path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
     }
 }

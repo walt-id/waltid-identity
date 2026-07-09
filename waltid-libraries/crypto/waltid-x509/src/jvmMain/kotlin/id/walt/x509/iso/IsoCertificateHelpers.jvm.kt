@@ -1,7 +1,6 @@
 package id.walt.x509.iso
 
 import id.walt.crypto.keys.KeyType
-import kotlinx.io.bytestring.ByteString
 import org.bouncycastle.asn1.ASN1OctetString
 import org.bouncycastle.asn1.DERIA5String
 import org.bouncycastle.asn1.x509.CRLDistPoint
@@ -9,17 +8,7 @@ import org.bouncycastle.asn1.x509.Extension
 import org.bouncycastle.asn1.x509.GeneralName
 import org.bouncycastle.asn1.x509.GeneralNames
 import org.bouncycastle.operator.DefaultSignatureAlgorithmIdentifierFinder
-import java.math.BigInteger
-import java.security.SecureRandom
 import java.security.cert.X509Certificate
-
-
-internal actual fun generateIsoCompliantX509CertificateSerialNo(): ByteString {
-    val random = SecureRandom()
-    val randomBytes = ByteArray(ISO_CERT_SERIAL_NUMBER_REQUIRED_LENGTH)
-    random.nextBytes(randomBytes)
-    return ByteString(BigInteger(randomBytes).abs().toByteArray())
-}
 
 internal fun getJcaSigningAlgorithmNameFromKeyType(
     keyType: KeyType,
@@ -35,7 +24,6 @@ internal fun getJcaSigningAlgorithmNameFromKeyType(
     }
 }
 
-
 internal fun issuerAlternativeNameToGeneralNameArray(
     issuerAlternativeName: IssuerAlternativeName,
 ) = listOfNotNull(
@@ -46,7 +34,6 @@ internal fun issuerAlternativeNameToGeneralNameArray(
         GeneralName(GeneralName.rfc822Name, it)
     }
 ).toTypedArray()
-
 
 internal fun parseCrlDistributionPointUriFromCert(
     cert: X509Certificate,
