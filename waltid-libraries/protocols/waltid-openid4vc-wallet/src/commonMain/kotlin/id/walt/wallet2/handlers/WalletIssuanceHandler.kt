@@ -451,6 +451,11 @@ object WalletIssuanceHandler {
                     id = Uuid.random().toString(),
                     credential = parsed,
                     label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
+                    metadata = issuerMetadata.display?.let { display ->
+                        buildJsonObject {
+                            put("issuerDisplay", Json.encodeToJsonElement(display))
+                        }
+                    },
                     addedAt = Clock.System.now()
                 )
                 wallet.addCredential(entry)

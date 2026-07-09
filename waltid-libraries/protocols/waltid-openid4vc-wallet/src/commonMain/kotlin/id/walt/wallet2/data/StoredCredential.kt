@@ -2,6 +2,7 @@ package id.walt.wallet2.data
 
 import id.walt.credentials.formats.DigitalCredential
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import kotlin.time.Instant
 
 /**
@@ -19,6 +20,7 @@ data class StoredCredential(
     val credential: DigitalCredential,
     /** Optional human-readable label set by the user or derived from the credential. */
     val label: String? = null,
+    val metadata: JsonObject? = null,
     /** When the credential was added to this wallet. */
     val addedAt: Instant? = null,
 ) {
