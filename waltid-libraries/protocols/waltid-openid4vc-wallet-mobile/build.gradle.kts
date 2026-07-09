@@ -44,9 +44,6 @@ kotlin {
                 walletCoreXcFramework.add(this)
             }
 
-            binaries.configureEach {
-                linkerOpts("-lsqlite3")
-            }
         }
     }
 

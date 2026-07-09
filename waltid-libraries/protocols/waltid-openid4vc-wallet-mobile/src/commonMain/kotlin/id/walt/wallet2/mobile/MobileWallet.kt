@@ -3,6 +3,8 @@ package id.walt.wallet2.mobile
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyType
 import id.walt.did.dids.DidService
+import id.walt.did.dids.registrar.dids.DidKeyCreateOptions
+import id.walt.did.dids.registrar.local.key.DidKeyRegistrar
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidEntry
@@ -28,8 +30,8 @@ import kotlinx.serialization.json.JsonElement
  * @property did Decentralized identifier registered for the persisted key.
  */
 public data class MobileWalletBootstrapResult(
-    val keyId: String,
-    val did: String,
+    public val keyId: String,
+    public val did: String,
 )
 
 /**
@@ -43,12 +45,12 @@ public data class MobileWalletBootstrapResult(
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
  */
 public data class MobileWalletCredential(
-    val id: String,
-    val format: String,
-    val issuer: String?,
-    val subject: String?,
-    val label: String?,
-    val addedAt: String?,
+    public val id: String,
+    public val format: String,
+    public val issuer: String?,
+    public val subject: String?,
+    public val label: String?,
+    public val addedAt: String?,
 )
 
 /**
@@ -59,9 +61,9 @@ public data class MobileWalletCredential(
  * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
  */
 public data class MobileWalletPresentationResult(
-    val success: Boolean,
-    val redirectTo: String?,
-    val verifierResponseJson: String? = null,
+    public val success: Boolean,
+    public val redirectTo: String?,
+    public val verifierResponseJson: String? = null,
 )
 
 /**
@@ -76,10 +78,10 @@ public data class MobileWalletPresentationResult(
  * @property hostHeader Optional `Host` header override for tunneled local tests.
  */
 public data class WalletAttestationConfig(
-    val baseUrl: String,
-    val attesterPath: String,
-    val bearerToken: String = "",
-    val hostHeader: String = "",
+    public val baseUrl: String,
+    public val attesterPath: String,
+    public val bearerToken: String = "",
+    public val hostHeader: String = "",
 )
 
 /**
@@ -93,11 +95,12 @@ public class MobileWallet internal constructor(
     walletId: String,
     private val keyStore: WalletKeyStore,
     private val didStore: WalletDidStore,
-    credentialStore: WalletCredentialStore,
+    private val credentialStore: WalletCredentialStore,
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
+    private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
     private val eventStream = MobileWalletEventStream()
 
@@ -130,7 +133,7 @@ public class MobileWallet internal constructor(
      * If the wallet already contains persisted DIDs, the first persisted DID and key are reused.
      *
      * @param keyType Optional key type override. When omitted, [MobileWalletConfig.defaultKeyType] is used.
-     * @param didMethod DID method passed to [DidService.registerByKey], for example `key`.
+     * @param didMethod DID method used for registering a new DID. The default `key` method is handled locally.
      * @return The key identifier and DID used by this wallet.
      * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
      */
@@ -138,8 +141,6 @@ public class MobileWallet internal constructor(
         keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): MobileWalletBootstrapResult {
-        DidService.minimalInit()
-
         val existingDids = didStore.listDids().toList()
         if (existingDids.isNotEmpty()) {
             val existingKeys = keyStore.listKeys().toList()
@@ -155,7 +156,7 @@ public class MobileWallet internal constructor(
         val effectiveKeyType = keyType ?: defaultKeyType
         val key = keyGenerator(effectiveKeyType.toKeyType())
         val keyId = keyStore.addKey(key)
-        val didResult = DidService.registerByKey(didMethod, key)
+        val didResult = registerDidByKey(didMethod, key)
 
         didStore.addDid(
             WalletDidEntry(
@@ -169,6 +170,15 @@ public class MobileWallet internal constructor(
             did = didResult.did,
         )
     }
+
+    private suspend fun registerDidByKey(didMethod: String, key: Key) =
+        when (didMethod.lowercase()) {
+            "key" -> DidKeyRegistrar().registerByKey(key, DidKeyCreateOptions(keyType = key.keyType))
+            else -> {
+                DidService.minimalInit()
+                DidService.registerByKey(didMethod, key)
+            }
+        }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.
@@ -242,6 +252,25 @@ public class MobileWallet internal constructor(
                 Json.encodeToString(JsonElement.serializer(), it)
             },
         )
+    }
+
+    /**
+     * Deletes local wallet material owned by this mobile wallet instance.
+     *
+     * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
+     * and deletes the encrypted local database and deletes the configured database key.
+     */
+    public suspend fun deleteWallet() {
+        keyStore.listKeys().toList().forEach { key ->
+            keyStore.removeKey(key.keyId)
+        }
+        credentialStore.listCredentials().toList().forEach { credential ->
+            credentialStore.removeCredential(credential.id)
+        }
+        didStore.listDids().toList().forEach { did ->
+            didStore.removeDid(did.did)
+        }
+        deleteLocalPersistence()
     }
 
     private suspend fun emitSessionEvent(event: WalletSessionEvent) {

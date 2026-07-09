@@ -39,7 +39,7 @@ jobs:
 
       - name: Generate mobile SDK API docs
         timeout-minutes: 45
-        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@108ad19bd20ff41d0adf823457adf6b017e9d91e
+        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@88ae3106d2882f728b7c79f16295dcf665506af3
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}

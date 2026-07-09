@@ -62,6 +62,15 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
     }
 
+    private func makeWallet(persistence: WalletPersistence) async throws -> Wallet {
+        try await Wallet(
+            configuration: WalletConfiguration(
+                walletID: testWalletId,
+                persistence: persistence
+            )
+        )
+    }
+
     // MARK: - Tests (mirror Android MobileWalletIntegrationTest.kt)
 
     func testBootstrapCreatesKeyAndDid() async throws {
@@ -70,6 +79,83 @@ final class MobileWalletIntegrationTests: XCTestCase {
         let result = try await wallet.bootstrap()
 
         XCTAssertTrue(result.did.starts(with: "did:"), "DID should start with 'did:', got: \(result.did)")
+    }
+
+    func testManagedEncryptedWalletBootstrapsAcrossRecreation() async throws {
+        let wallet1 = try await makeWallet()
+
+        let first = try await wallet1.bootstrap()
+        XCTAssertTrue(first.did.starts(with: "did:"), "DID should start with 'did:', got: \(first.did)")
+
+        let wallet2 = try await makeWallet()
+        let second = try await wallet2.bootstrap()
+
+        XCTAssertEqual(second.did, first.did, "Encrypted wallet state should survive wallet facade recreation")
+        XCTAssertEqual(second.keyID, first.keyID, "Encrypted wallet key reference should survive wallet facade recreation")
+    }
+
+    func testDeleteLocalDataRemovesManagedEncryptedWalletState() async throws {
+        let wallet1 = try await makeWallet()
+        let first = try await wallet1.bootstrap()
+
+        try await wallet1.deleteLocalData()
+
+        let wallet2 = try await makeWallet()
+        let second = try await wallet2.bootstrap()
+
+        XCTAssertNotEqual(second.did, first.did, "Deleting local data should remove the persisted DID state")
+        XCTAssertNotEqual(second.keyID, first.keyID, "Deleting local data should remove the persisted platform key reference")
+    }
+
+    func testCustomCredentialStoreRetainsPlatformSigningKeys() async throws {
+        let store = RecordingWalletCredentialStore()
+        let persistence = WalletPersistence(
+            stores: WalletStores(credentials: store)
+        )
+        let wallet = try await makeWallet(persistence: persistence)
+
+        let bootstrap = try await wallet.bootstrap()
+        let credentials = try await wallet.credentials()
+        let reopenedWallet = try await makeWallet(persistence: persistence)
+        let reopenedBootstrap = try await reopenedWallet.bootstrap()
+        let reopenedCredentials = try await reopenedWallet.credentials()
+        let listCredentialsCalls = await store.listCredentialsCalls
+
+        XCTAssertTrue(bootstrap.did.starts(with: "did:"), "DID should start with 'did:', got: \(bootstrap.did)")
+        XCTAssertTrue(credentials.isEmpty)
+        XCTAssertEqual(reopenedBootstrap.did, bootstrap.did, "Default DID store should survive wallet facade recreation")
+        XCTAssertEqual(reopenedBootstrap.keyID, bootstrap.keyID, "Platform signing-key reference should survive wallet facade recreation")
+        XCTAssertTrue(reopenedCredentials.isEmpty)
+        XCTAssertEqual(listCredentialsCalls, 2)
+
+        try await wallet.deleteLocalData()
+    }
+
+    func testProvidedDatabaseKeyProviderBootstrapsAcrossRecreationAndDeletesProviderKey() async throws {
+        let provider = RecordingWalletDatabaseKeyProvider()
+        let persistence = WalletPersistence(databaseKey: .provided(provider))
+        let wallet1 = try await makeWallet(persistence: persistence)
+
+        let first = try await wallet1.bootstrap()
+
+        let wallet2 = try await makeWallet(persistence: persistence)
+        let second = try await wallet2.bootstrap()
+        let requestedKeys = await provider.requestedKeys
+
+        XCTAssertEqual(second.did, first.did, "Provided database key should reopen encrypted wallet state")
+        XCTAssertEqual(second.keyID, first.keyID, "Provided database key should preserve platform key references")
+        XCTAssertEqual(
+            requestedKeys,
+            [
+                "\(testWalletId):wallet_\(testWalletId)",
+                "\(testWalletId):wallet_\(testWalletId)"
+            ]
+        )
+
+        try await wallet2.deleteLocalData()
+        let deletedKeys = await provider.deletedKeys
+
+        XCTAssertEqual(deletedKeys, ["\(testWalletId):wallet_\(testWalletId)"])
     }
 
     func testReceiveCredentialFromEudi() async throws {
@@ -148,5 +234,42 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
 
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
+    }
+}
+
+private actor RecordingWalletCredentialStore: WalletCredentialStore {
+    private(set) var listCredentialsCalls = 0
+
+    func credential(id: String) async throws -> StoredCredential? {
+        nil
+    }
+
+    func credentials() async throws -> [StoredCredential] {
+        listCredentialsCalls += 1
+        return []
+    }
+
+    func addCredential(_ credential: StoredCredential) async throws {}
+
+    func removeCredential(id: String) async throws -> Bool {
+        false
+    }
+}
+
+private actor RecordingWalletDatabaseKeyProvider: WalletDatabaseKeyProvider {
+    private let key = WalletDatabaseKey(
+        keyID: "ios-unit-test-provider-key",
+        material: Data((0..<32).map { UInt8($0 + 1) })
+    )
+    private(set) var requestedKeys: [String] = []
+    private(set) var deletedKeys: [String] = []
+
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        requestedKeys.append("\(walletID):\(databaseName)")
+        return key
+    }
+
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+        deletedKeys.append("\(walletID):\(databaseName)")
     }
 }

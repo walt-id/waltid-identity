@@ -11,12 +11,14 @@ fun createIosDemoWallet(
 ): DemoWallet {
     WebDataFetcherManager.globalDefaultConfiguration = WebDataFetchingConfiguration(http = HttpEngine.Native)
 
-    return MobileDemoWallet(
-        MobileWalletFactory().create(
-            MobileWalletConfig(
-                walletId = config.walletId,
-                attestationConfig = config.toWalletAttestationConfig(),
+    return LazyDemoWallet {
+        MobileDemoWallet(
+            MobileWalletFactory().create(
+                MobileWalletConfig(
+                    walletId = config.walletId,
+                    attestationConfig = config.toWalletAttestationConfig(),
+                )
             )
         )
-    )
+    }
 }

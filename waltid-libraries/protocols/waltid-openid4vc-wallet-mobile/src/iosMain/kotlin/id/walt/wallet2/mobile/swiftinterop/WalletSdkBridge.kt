@@ -81,6 +81,14 @@ public class WalletSdkBridge private constructor(
         }
 
     /**
+     * Deletes wallet-local state and managed persistence material.
+     */
+    public suspend fun deleteWallet(): WalletBridgeResult<Unit> =
+        walletBridgeCall {
+            operations.deleteWallet()
+        }
+
+    /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
      */
     public suspend fun present(
@@ -121,6 +129,8 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun credentials(): List<MobileWalletCredential>
 
+    suspend fun deleteWallet()
+
     suspend fun present(
         requestUrl: String,
         did: String?,
@@ -153,6 +163,9 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun credentials(): List<MobileWalletCredential> =
         wallet.credentials()
+
+    override suspend fun deleteWallet() =
+        wallet.deleteWallet()
 
     override suspend fun present(
         requestUrl: String,

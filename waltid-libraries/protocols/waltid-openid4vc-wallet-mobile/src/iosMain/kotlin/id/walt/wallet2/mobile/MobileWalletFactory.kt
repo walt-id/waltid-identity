@@ -1,6 +1,6 @@
 package id.walt.wallet2.mobile
 
-import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.encryption.IosDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.IosPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
 
@@ -11,10 +11,14 @@ public actual class MobileWalletFactory {
     /**
      * Creates an iOS mobile wallet using native SQLDelight storage and the default iOS platform key provider.
      */
-    public actual fun create(config: MobileWalletConfig): MobileWallet {
-        val driver = DriverFactory().createDriver("wallet_${config.walletId}")
-        val db = WalletPersistenceDatabase(driver)
-        val keyProvider = IosPlatformKeyProvider()
-        return createMobileWallet(config, db, keyProvider)
+    public actual suspend fun create(config: MobileWalletConfig): MobileWallet {
+        val driverFactory = DriverFactory()
+        return createEncryptedSqlDelightMobileWallet(
+            config = config,
+            managedDatabaseKeyProvider = IosDatabaseEncryptionKeyProvider(),
+            platformKeyProvider = IosPlatformKeyProvider(),
+            openEncryptedDriver = driverFactory::createEncryptedDriver,
+            deleteDatabase = driverFactory::deleteDatabase,
+        )
     }
 }

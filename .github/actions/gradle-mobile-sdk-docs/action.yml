@@ -38,6 +38,11 @@ runs:
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
+    - name: Check mobile wallet documentation snippets
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: python3 waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/check-mobile-wallet-doc-snippets.py
+
     - name: Generate mobile SDK API docs
       working-directory: ${{ inputs.waltid-directory }}
       shell: bash
