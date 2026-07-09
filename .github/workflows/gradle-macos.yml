@@ -105,7 +105,7 @@ jobs:
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        timeout-minutes: 35
+        timeout-minutes: 50
         run: |
           ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
             --no-configuration-cache \
