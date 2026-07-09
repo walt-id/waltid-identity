@@ -3,7 +3,6 @@ package id.walt.webwallet.usecase.issuer
 /*
 import id.walt.webwallet.service.issuers.IssuerCredentialsDataTransferObject
 import id.walt.webwallet.service.issuers.IssuerDataTransferObject
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 

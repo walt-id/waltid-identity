@@ -5,6 +5,7 @@ package id.walt.cose
 import id.walt.crypto.keys.KeyType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.cbor.ByteString
 import kotlinx.serialization.cbor.CborLabel
@@ -321,7 +322,7 @@ data class CoseKey(
     @CborLabel(2) @ByteString val kid: ByteArray? = null,
     @CborLabel(3) val alg: Int? = null,
     @CborLabel(4) val key_ops: List<Int>? = null,
-    @CborLabel(5) @ByteString val `Base IV`: ByteArray? = null,
+    @CborLabel(5) @SerialName("Base IV") @ByteString val baseIv: ByteArray? = null,
     /** for OKP and EC2 */
     @CborLabel(-1) val crv: Int? = null,
     /** for OKP and EC2 */
@@ -441,7 +442,7 @@ data class CoseKey(
         if (crv != other.crv) return false
         if (!kid.contentEquals(other.kid)) return false
         if (key_ops != other.key_ops) return false
-        if (!`Base IV`.contentEquals(other.`Base IV`)) return false
+        if (!baseIv.contentEquals(other.baseIv)) return false
         if (!x.contentEquals(other.x)) return false
         if (!y.contentEquals(other.y)) return false
         if (!d.contentEquals(other.d)) return false
@@ -455,7 +456,7 @@ data class CoseKey(
         result = 31 * result + (crv ?: 0)
         result = 31 * result + (kid?.contentHashCode() ?: 0)
         result = 31 * result + (key_ops?.hashCode() ?: 0)
-        result = 31 * result + (`Base IV`?.contentHashCode() ?: 0)
+        result = 31 * result + (baseIv?.contentHashCode() ?: 0)
         result = 31 * result + (x?.contentHashCode() ?: 0)
         result = 31 * result + (y?.contentHashCode() ?: 0)
         result = 31 * result + (d?.contentHashCode() ?: 0)
@@ -634,4 +635,3 @@ object Cose {
     }
 
 }
-

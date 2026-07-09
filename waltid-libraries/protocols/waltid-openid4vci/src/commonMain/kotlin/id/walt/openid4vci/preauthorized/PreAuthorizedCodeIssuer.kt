@@ -1,7 +1,6 @@
-@file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
-
 package id.walt.openid4vci.preauthorized
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.Session
 import id.walt.openid4vci.TokenType
 import id.walt.openid4vci.offers.TxCode
@@ -10,7 +9,6 @@ import id.walt.openid4vci.repository.preauthorized.DefaultPreAuthorizedCodeRecor
 import id.walt.openid4vci.repository.preauthorized.PreAuthorizedCodeRepository
 import org.kotlincrypto.hash.sha2.SHA256
 import org.kotlincrypto.random.CryptoRand
-import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -110,7 +108,7 @@ class DefaultPreAuthorizedCodeIssuer(
         buildRecord: (String) -> DefaultPreAuthorizedCodeRecord,
     ): Pair<String, DefaultPreAuthorizedCodeRecord> {
         repeat(maxGenerateAttempts) { attempt ->
-            val code = Base64.UrlSafe.encode(secureRandomBytes(33))
+            val code = secureRandomBytes(33).encodeToBase64Url()
             try {
                 val record = buildRecord(code)
                 repository.save(record)
@@ -180,7 +178,7 @@ private fun generateRandomString(alphabet: String, length: Int): String =
     }
 
 internal fun hashTxCode(txCode: String): String =
-    Base64.UrlSafe.encode(SHA256().digest(txCode.encodeToByteArray()))
+    SHA256().digest(txCode.encodeToByteArray()).encodeToBase64Url()
 
 internal fun secureRandomBytes(size: Int): ByteArray {
     val bytes = ByteArray(size)

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "common.fullname" . }}-service
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.api.type }}
+  selector:
+    app: {{ include "common.name" . }}
+    {{- include "common.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: http-api

@@ -5,6 +5,10 @@ import kotlinx.serialization.Serializable
 
 /**
  * OpenID4VCI 1.0 Credential Format identifiers.
+ *
+ * Note: [id.walt.dcql.models.CredentialFormat] in `waltid-dcql` is the canonical
+ * format enum used by the verifier and wallet stacks. This enum exists for the
+ * Issuer2 (`waltid-openid4vci`) library which predates that consolidation.
  */
 @Serializable
 enum class CredentialFormat(val value: String) {

@@ -67,11 +67,9 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlin.uuid.toKotlinUuid
 
-@OptIn(ExperimentalUuidApi::class)
 object WalletServiceManager {
 
     private val logger = KotlinLogging.logger { }

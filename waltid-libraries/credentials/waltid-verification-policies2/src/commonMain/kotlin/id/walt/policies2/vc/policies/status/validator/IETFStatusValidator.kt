@@ -27,12 +27,15 @@ class IETFStatusValidator(
     override suspend fun getBitValue(
         statusList: IETFStatusContent,
         entry: IETFEntry
-    ): List<Char> = bitValueReader.get(
-        bitstring = statusList.list,
-        idx = entry.index,
-        bitSize = statusList.size,
-        expansionAlgorithm = expansionAlgorithm,
-    )
+    ): List<Char> =
+        bitValueReader.get(
+            bitstring = statusList.list,
+            idx = entry.index,
+            bitSize = statusList.size,
+            expansionAlgorithm = expansionAlgorithm,
+        ).let { bitValue ->
+            if (bitValue.all { it == '0' || it == '1' }) bitValue.reversed() else bitValue
+        }
 
     override fun customValidations(
         statusList: IETFStatusContent,

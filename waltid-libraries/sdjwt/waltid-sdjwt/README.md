@@ -25,6 +25,7 @@
 * [Usage with NPM/NodeJs (JavaScript)](#usage-with-npmnodejs-javascript)
 * [Sign SD-JWT tokens](#create-and-sign-an-sd-jwt-using-the-nimbusds-based-jwt-crypto-provider)
 * [Present SD-JWT tokens with selection of disclosed and undisclosed payload fields](#present-an-sd-jwt)
+* [Disclose individual array elements](#array-element-selective-disclosure)
 * [Parse and verify SD-JWT tokens, resolving original payload with disclosed fields](#parse-and-verify-an-sd-jwt-using-the-nimbusds-based-jwt-crypto-provider)
 * [Integrate with your choice of framework or library, for cryptography and key management, on your platform](#integrate-with-custom-jwt-crypto-provider)
 
@@ -46,6 +47,7 @@ verifiable credentials according to the **SD-JWT-VC** specification:
     * Create digests for SD fields and insert into JWT body payload
     * Create and append encoded disclosure strings for SD fields to JWT token
     * Add random or fixed number of **decoy digests** on each nested object property
+* **Array-element selective disclosure** — disclose individual elements of an array independently (RFC 9901 §4.2.2)
 * **Present** SD-JWT tokens
     * Selection of fields to be disclosed
     * Support for appending optional holder binding
@@ -199,6 +201,71 @@ eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVp
 eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~
 eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~
 eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0NTYiLCJfc2QiOlsiaGx6ZmpmMDRvNVpzTFIyNWhhNGMtWS05SFcyRFVseGNnaU1ZZDMyNE5nWSJdfQ.2fsLqzujWt0hS0peLS8JLHyyo3D5KCDkNnHcBYqQwVo~WyJ4RFk5VjBtOG43am82ZURIUGtNZ1J3Iiwic3ViIiwiMTIzIl0~
+```
+
+#### Array-element selective disclosure
+
+The library supports disclosing individual array elements independently, per RFC 9901 §4.2.2.
+Each disclosable element is replaced on the wire with a `{"...": "<digest>"}` wrapper; a holder
+chooses which elements to reveal.
+
+**Path-DSL** — index, wildcard, and nested forms:
+
+| Path | Selects |
+| --- | --- |
+| `nationalities.[0]` | logical index 0 |
+| `nationalities.[]` | every logical index (wildcard) |
+| `cars.[].make` | the `make` property of every entry |
+| `contacts.[0].[2]` | element `[2]` of nested array under index 0 |
+
+`[N]` refers to **logical** position in the original payload — decoys interleaved on the wire
+do not advance the index.
+
+```kotlin
+val sharedSecret = "ef23f749-7238-481a-815c-f0c2157dfa8e"
+
+fun arrayDisclosureExample() {
+    val cryptoProvider = SimpleJWTCryptoProvider(JWSAlgorithm.HS256, MACSigner(sharedSecret), MACVerifier(sharedSecret))
+
+    // Issuer payload: each element of `nationalities` is independently disclosable.
+    val fullPayload = buildJsonObject {
+        put("sub", "123")
+        put("nationalities", buildJsonArray { add("US"); add("DE") })
+    }
+    val issuanceMap = SDMap.generateSDMap(listOf("nationalities.[]"))
+    val sdPayload = SDPayload.createSDPayload(fullPayload, issuanceMap)
+    val sdJwt = SDJwt.sign(sdPayload, cryptoProvider)
+
+    // Holder presents only nationalities[0] = "US".
+    val presentationMap = SDMap.generateSDMap(listOf("nationalities.[0]"))
+    val presented = sdJwt.present(presentationMap)
+
+    // Verifier sees `sub` (plain) and `nationalities = ["US"]`.
+    val verified = SDJwt.verifyAndParse(presented.toString(), cryptoProvider)
+    println(verified.sdJwt.fullPayload)
+}
+```
+
+_Example output_
+
+```json
+{"sub":"123","nationalities":["US"]}
+```
+
+The same flow works with manually-constructed `SDMap`s when more control is needed (e.g. mixing
+disclosable and non-disclosable indices, or attaching decoys per array level):
+
+```kotlin
+val issuanceMap = SDMap(mapOf(
+    "nationalities" to SDField(
+        sd = false,
+        arrayChildren = SDArray(
+            elements = listOf(SDField(sd = true), SDField(sd = true)),
+            decoyMode = DecoyMode.FIXED,
+            decoys = 2,
+        )
+    )
+))
 ```
 
 #### Parse and verify an SD-JWT using the NimbusDS-based JWT crypto provider

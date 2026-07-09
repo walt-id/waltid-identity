@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.test.integration.tests
 
@@ -25,7 +24,6 @@ import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestMethodOrder
 import kotlin.test.*
-import kotlin.uuid.ExperimentalUuidApi
 
 private const val testOrderOfferUrlErrorMessage = "The offer URL should be set - test order?"
 private const val testOrderCredentialIdErrorMessage = "Credential ID should be set - test order?"

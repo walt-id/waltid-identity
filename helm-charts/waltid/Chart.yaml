@@ -24,17 +24,40 @@ version: 0.1.0
 appVersion: "1.16.0"
 
 dependencies:
-  - name: issuer
+  - name: common
+    alias: issuer
     version: 0.1.0
-    repository: "file://../issuer"
+    repository: "file://../common"
 
-  - name: verifier
+  - name: common
+    alias: issuer2
     version: 0.1.0
-    repository: "file://../verifier"
+    repository: "file://../common"
 
-  - name: portal
+  - name: common
+    alias: verifier
     version: 0.1.0
-    repository: "file://../portal"
+    repository: "file://../common"
+
+  - name: common
+    alias: verifier2
+    version: 0.1.0
+    repository: "file://../common"
+
+  - name: common
+    alias: wallet-api2
+    version: 0.1.0
+    repository: "file://../common"
+
+  - name: common
+    alias: portal
+    version: 0.1.0
+    repository: "file://../common"
+
+  - name: common
+    alias: portal2
+    version: 0.1.0
+    repository: "file://../common"
 
   - name: web-wallet
     version: 0.1.0

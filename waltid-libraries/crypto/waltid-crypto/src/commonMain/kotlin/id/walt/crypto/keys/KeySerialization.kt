@@ -1,5 +1,6 @@
 package id.walt.crypto.keys
 
+import id.walt.crypto.exceptions.KeySerializationException
 import id.walt.crypto.keys.aws.AWSKeyRestAPI
 import id.walt.crypto.keys.azure.AzureKeyRestApi
 import id.walt.crypto.keys.jwk.JWKKey
@@ -8,6 +9,7 @@ import id.walt.crypto.keys.tse.TSEKey
 import id.walt.crypto.utils.JsonUtils.toJsonElement
 import kotlinx.serialization.InternalSerializationApi
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
@@ -71,10 +73,24 @@ object KeySerialization {
         updateKeySerialization()
     }
 
-    fun serializeKey(key: Key): String = keySerializationJson.encodeToString(key)
+    fun serializeKey(key: Key): String = try {
+        keySerializationJson.encodeToString(key)
+    } catch (e: SerializationException) {
+        throw KeySerializationException(
+            keyType = key::class.simpleName ?: "Unknown",
+            cause = e
+        )
+    }
 
     @Suppress("NON_EXPORTABLE_TYPE")
-    fun serializeKeyToJson(key: Key): JsonElement = keySerializationJson.encodeToJsonElement(key)
+    fun serializeKeyToJson(key: Key): JsonElement = try {
+        keySerializationJson.encodeToJsonElement(key)
+    } catch (e: SerializationException) {
+        throw KeySerializationException(
+            keyType = key::class.simpleName ?: "Unknown",
+            cause = e
+        )
+    }
 
     @Deprecated("Will not handle externally implemented Keys, replace with KeyManager.resolveSerializedKey")
     @JvmBlocking

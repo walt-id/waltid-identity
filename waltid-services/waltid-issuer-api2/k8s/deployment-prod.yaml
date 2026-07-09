@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: issuer2-web-config
+data:
+  _features.conf: |
+    enabledFeatures = [
+        entra
+    ]
+  web.conf: |
+    webHost = "0.0.0.0"
+    webPort = 3000
+  issuer-service.conf: |
+    baseUrl = "https://issuer2.demo.walt.id"
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: issuer2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: issuer2
+  template:
+    metadata:
+      labels:
+        app: issuer2
+      annotations:
+        deployment/id: "_DEFAULT_DEPLOYMENT_"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: issuer2
+          image: waltid/issuer-api2:__DEFAULT_IMAGE_TAG__
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: issuer2-web-config
+              mountPath: "/waltid-issuer-api2/config/_features.conf"
+              subPath: "_features.conf"
+              readOnly: true
+            - name: issuer2-web-config
+              mountPath: "/waltid-issuer-api2/config/web.conf"
+              subPath: "web.conf"
+              readOnly: true
+            - name: issuer2-web-config
+              mountPath: "/waltid-issuer-api2/config/issuer-service.conf"
+              subPath: "issuer-service.conf"
+              readOnly: true
+          ports:
+            - containerPort: 3000
+              name: http-api
+      volumes:
+        - name: issuer2-web-config
+          configMap:
+            name: issuer2-web-config
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: issuer2
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http-api
+      protocol: TCP
+  selector:
+    app: issuer2
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: issuer2
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - issuer2.demo.walt.id
+      secretName: issuer2-tls-secret
+  rules:
+    - host: issuer2.demo.walt.id
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: issuer2
+                port:
+                  name: http

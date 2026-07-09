@@ -6,11 +6,7 @@ plugins {
 group = "id.walt.did"
 
 
-fun getSetting(name: String) = providers.gradleProperty(name).orNull.toBoolean()
-val enableIosBuild = getSetting("enableIosBuild")
-
 kotlin {
-    applyDefaultHierarchyTemplate()
 
     js(IR) {
         outputModuleName = "dids"
@@ -29,6 +25,9 @@ kotlin {
             // Ktor client
             implementation(identityLibs.bundles.waltid.ktor.client)
 
+            // Web data fetching (provides platform-correct HTTP engine selection + TLS 1.3 on JVM)
+            implementation(project(":waltid-libraries:web:waltid-web-data-fetching"))
+
             // Coroutines
             implementation(identityLibs.kotlinx.coroutines.core)
 
@@ -39,7 +38,7 @@ kotlin {
             api(project(":waltid-libraries:crypto:waltid-crypto"))
 
             // Encodings
-            implementation("net.thauvin.erik.urlencoder:urlencoder-lib:1.6.0")
+            implementation(identityLibs.url.encoder)
 
             // Logging
             implementation(identityLibs.oshai.kotlinlogging)
@@ -53,7 +52,7 @@ kotlin {
             implementation(identityLibs.ktor.client.java)
 
             // Json canonicalization
-            implementation("io.github.erdtman:java-json-canonicalization:1.1")
+            implementation(identityLibs.java.json.canonicalization)
 
             // Multiformat
             // implementation("com.github.multiformats:java-multibase:v1.1.1")
@@ -75,9 +74,6 @@ kotlin {
 
             implementation(npm("canonicalize", "2.0.0"))
             implementation(npm("uuid", "9.0.1"))
-        }
-        if (enableIosBuild) {
-            iosMain.dependencies { }
         }
     }
 }

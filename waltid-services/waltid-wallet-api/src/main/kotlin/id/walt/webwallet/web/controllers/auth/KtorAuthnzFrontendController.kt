@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers.auth
 
@@ -38,7 +37,6 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 private val logger = logger("AuthnzFrontendController")
@@ -121,11 +119,17 @@ fun Application.ktorAuthnzFrontendRoutes() {
 
                     if (accountId == null) {
                         // Have to create account (first login with this OIDC issuer/subject combination)
+                        val claims = oidcData.userInfoClaims ?: oidcData.idTokenClaims
+                        val displayName = claims?.let {
+                            it["preferred_username"]?.jsonPrimitive?.contentOrNull
+                                ?: it["name"]?.jsonPrimitive?.contentOrNull
+                        } ?: oidcIdentifier.subject
+                        val email = claims?.get("email")?.jsonPrimitive?.contentOrNull
                         val createdAccountId = ktorAuthnzCreateAccount(
                             method = "email",
                             identifier = oidcIdentifier,
-                            name = oidcIdentifier.subject,
-                            email = null
+                            name = displayName,
+                            email = email
                         )
                         session.accountId = createdAccountId.toString()
                         SessionManager.updateSession(session)

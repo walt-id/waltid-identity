@@ -141,8 +141,9 @@ actual class OCIKey actual constructor(
         return response.signedData.signature.decodeFromBase64()
     }
 
-    private val _internalJwsAlgorithm by lazy { JWSAlgorithm.parse(keyType.jwsAlg) }
-
+    private val _internalJwsAlgorithm by lazy {
+        JWSAlgorithm.parse(keyType.jwsAlg)
+    }
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         val jwsObject = JWSObject(
             JWSHeader.Builder(_internalJwsAlgorithm).customParams(headers).build(),

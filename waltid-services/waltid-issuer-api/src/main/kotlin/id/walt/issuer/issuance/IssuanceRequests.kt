@@ -122,6 +122,12 @@ data class IssuanceRequest(
      * When null, the credential does not support transaction data.
      */
     val authorizedTransactionDataTypes: List<String>? = null,
+
+    /**
+     * Validity period for mdoc credentials in days. Defaults to 365 days.
+     * Used to set the `validUntil` field in the MSO ValidityInfo.
+     */
+    val mdocValidityDays: Int? = null,
 ) {
 
     init {

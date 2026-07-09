@@ -3,10 +3,8 @@ package id.walt.webwallet.usecase.claim
 import id.walt.entrawallet.core.service.exchange.CredentialDataResult
 import id.walt.entrawallet.core.utils.WalletCredential
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object ClaimCommons {
 
     fun convertCredentialDataResultToWalletCredential(

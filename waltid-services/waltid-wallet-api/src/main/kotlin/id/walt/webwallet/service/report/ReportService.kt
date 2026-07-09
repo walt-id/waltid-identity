@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.service.report
 
@@ -6,15 +5,13 @@ import id.walt.webwallet.db.models.WalletCredential
 import id.walt.webwallet.service.credentials.CredentialsService
 import id.walt.webwallet.service.events.EventService
 import id.walt.webwallet.service.events.EventType
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 
 interface ReportService<T> {
     fun frequent(parameter: ReportRequestParameter): List<T>
 
-    @OptIn(ExperimentalUuidApi::class)
-    class Credentials(private val credentialService: CredentialsService, private val eventService: EventService) :
+        class Credentials(private val credentialService: CredentialsService, private val eventService: EventService) :
         ReportService<WalletCredential> {
 
         override fun frequent(parameter: ReportRequestParameter): List<WalletCredential> =

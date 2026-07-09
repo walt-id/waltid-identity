@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.web.controllers.auth
 
@@ -17,7 +16,6 @@ import io.ktor.server.response.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 const val defaultAuthPath = "auth"
@@ -47,8 +45,8 @@ fun Application.defaultAuthRoutes() = webWalletRoute {
                 call.respond(mapOf("token" to mapOf("accessToken" to token)))
             }
         }
+        object : RegisterControllerBase() {}.routes("register")(this)
+        object : LoginControllerBase() {}.routes("login")(this)
+        object : LogoutControllerBase() {}.routes("logout")(this)
     }
-    object : RegisterControllerBase() {}.routes("register")(this)
-    object : LoginControllerBase() {}.routes("login")(this)
-    object : LogoutControllerBase() {}.routes("logout")(this)
 }

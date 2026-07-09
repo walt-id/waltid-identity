@@ -6,6 +6,7 @@ plugins {
 group = "id.walt.credentials"
 
 kotlin {
+
     sourceSets {
         commonMain.dependencies {
             // Serialization
@@ -28,13 +29,19 @@ kotlin {
             implementation(identityLibs.ktor.client.okhttp)
         }
 
+        if (enableIosBuild) {
+            iosMain.dependencies {
+                implementation(identityLibs.ktor.client.darwin)
+            }
+        }
+
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
 
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
         }
     }
 }

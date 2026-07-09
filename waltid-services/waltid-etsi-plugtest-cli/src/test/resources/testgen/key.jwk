@@ -1,0 +1,10 @@
+{
+  "type": "jwk",
+  "jwk": {
+    "kty": "EC",
+    "crv": "P-256",
+    "x": "sx4YWIKGlPdoLFxrRn4O8PvoKyO7p4ks3GC5a9G4cQw",
+    "y": "oOixXVqpi346blwopI5u9LIareTpwSaOr6KPbeV32-E",
+    "d": "q4mwZ1UxF-T1A3sEgb4sDdPx5PhAFQB7DXPAfzjQDDQ"
+  }
+}

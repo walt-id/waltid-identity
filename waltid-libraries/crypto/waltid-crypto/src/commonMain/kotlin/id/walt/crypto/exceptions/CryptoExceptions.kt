@@ -31,9 +31,23 @@ class MissingSignatureException(message: String, cause: Throwable? = null) :
 class KeyCreationFailed(message: String, cause: Throwable? = null) :
     CryptoStateException(message, cause)
 
+class KeyAlreadyExistsException(
+    keyName: String,
+    message: String = "A key with name '$keyName' already exists.",
+    cause: Throwable? = null,
+) : CryptoArgumentException(message, cause)
+
 class UnauthorizedKeyAccess(message: String, cause: Throwable? = null) :
     CryptoStateException(message, cause)
 
 class KeyVaultUnavailable(message: String, cause: Throwable? = null) :
     CryptoStateException(message, cause)
+
+class KeySerializationException(
+    keyType: String,
+    message: String = "Failed to serialize key of type '$keyType'. " +
+            "This usually means the key type is not registered with KeySerialization. " +
+            "Ensure the corresponding feature is enabled (e.g., 'crypto-aws' for AWS keys, 'crypto-azure' for Azure keys).",
+    cause: Throwable? = null,
+) : CryptoStateException(message, cause)
 

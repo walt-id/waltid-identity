@@ -15,21 +15,21 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("dev.whyoleg.cryptography:cryptography-random:0.5.0")
+            implementation(identityLibs.whyoleg.cryptography.random)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.coroutines.core)
             implementation(identityLibs.kotlinx.datetime)
             implementation(identityLibs.kotlincrypto.hash.sha2)
             implementation(identityLibs.kotlincrypto.random)
-            implementation("com.soywiz:korlibs-encoding:6.0.0")
+            implementation(identityLibs.korlibs.encoding)
             implementation(identityLibs.oshai.kotlinlogging)
+            api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
         }
         jvmMain.dependencies {
             implementation(identityLibs.nimbus.jose.jwt)
-            api(project(":waltid-libraries:crypto:waltid-crypto"))
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
@@ -39,7 +39,6 @@ kotlin {
         }
     }
 
-    applyDefaultHierarchyTemplate()
 }
 
 tasks.named("jsBrowserTest") {

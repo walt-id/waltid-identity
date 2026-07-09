@@ -19,10 +19,8 @@ import id.walt.webwallet.web.parameter.CredentialRequestParameter
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 abstract class WalletService(val tenant: String, val accountId: Uuid, val walletId: Uuid) {
 
     // WalletCredentials

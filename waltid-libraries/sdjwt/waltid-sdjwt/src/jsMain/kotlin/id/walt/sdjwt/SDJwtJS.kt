@@ -23,7 +23,7 @@ class SDJwtJS(
             JSON.parse<dynamic>(buildJsonObject {
                 put("disclosure", it.disclosure)
                 put("salt", it.salt)
-                put("key", it.key)
+                put("key", (it as? ObjectPropertyDisclosure)?.key)
                 put("value", it.value)
             }.toString())
         }.toTypedArray()

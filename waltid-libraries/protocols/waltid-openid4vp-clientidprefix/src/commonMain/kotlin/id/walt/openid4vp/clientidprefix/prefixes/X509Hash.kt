@@ -7,6 +7,8 @@ import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.x509.CertificateDer
+import id.walt.x509.verifyOrderedCertificateChainSignatures
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
@@ -33,13 +35,20 @@ data class X509Hash(val hash: String, override val rawValue: String) : ClientId 
 
             val leafCertDer = x5cHeader.first().jsonPrimitive.content.decodeFromBase64()
 
-            // 1. Verify JWS signature.
+            // 1. Verify the certificate chain signatures when more than one cert is present.
+            if (x5cHeader.size > 1) {
+                verifyOrderedCertificateChainSignatures(
+                    x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
+                )
+            }
+
+            // 2. Verify JWS signature with the leaf certificate's public key.
             JWKKey.importFromDerCertificate(leafCertDer).getOrThrow().verifyJws(jws).getOrThrow()
 
-            // 2. Calculate the certificate hash using the isolated JCA utility function.
+            // 3. Calculate the certificate hash using the isolated JCA utility function.
             val calculatedHash = SHA256().digest(leafCertDer).encodeToBase64Url()
 
-            // 3. Compare with the hash from the client_id.
+            // 4. Compare with the hash from the client_id.
             if (clientId.hash != calculatedHash) {
                 throw IllegalArgumentException("Provided hash does not match certificate hash.")
             }

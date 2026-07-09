@@ -34,11 +34,13 @@ kotlin {
             // walt.id
             api(project(":waltid-libraries:crypto:waltid-crypto"))
             api(project(":waltid-libraries:credentials:waltid-w3c-credentials"))
+            api(project(":waltid-libraries:credentials:waltid-credential-key-resolver"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials"))
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
             api(project(":waltid-libraries:credentials:waltid-dcql"))
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
 
 
             implementation(identityLibs.kotlincrypto.hash.sha2)
@@ -46,14 +48,10 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
-        }
-        jvmMain.dependencies {
-            // Ktor client
-            // implementation("io.ktor:ktor-client-okhttp:$ktor_version")
+            implementation(identityLibs.kotlinx.coroutines.test)
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
 
             implementation(identityLibs.junit.jupiter.api)
             implementation(identityLibs.junit.jupiter.params)

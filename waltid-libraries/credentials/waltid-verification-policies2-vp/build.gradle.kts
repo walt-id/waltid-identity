@@ -27,7 +27,7 @@ kotlin {
             implementation(identityLibs.kotlinx.serialization.json)
 
             implementation(identityLibs.optimumcode.jsonschemavalidator)
-            implementation("com.eygraber:jsonpathkt-kotlinx:3.0.2")
+            implementation(identityLibs.jsonpathkt)
 
             /*
              * walt.id:
@@ -36,23 +36,24 @@ kotlin {
             implementation(project(":waltid-libraries:credentials:waltid-dcql"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials"))
             implementation(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
 
-            implementation("com.soywiz:korlibs-io:6.0.2")
+            implementation(identityLibs.korlibs.io)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+            implementation(identityLibs.kotlinx.coroutines.test)
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
         }
         jvmTest.dependencies {
-            implementation("org.slf4j:slf4j-simple:2.0.17")
+            implementation(identityLibs.slf4j.simple)
             implementation(identityLibs.kotlinx.serialization.json)
             implementation(identityLibs.kotlinx.serialization.cbor)
             implementation(identityLibs.junit.jupiter.params)
             implementation(identityLibs.ktor.server.test.host)
             implementation(identityLibs.ktor.server.content.negotiation)
             implementation(identityLibs.ktor.server.netty)
-            implementation("io.mockk:mockk:1.14.9")
+            implementation(identityLibs.mockk)
         }
     }
 }

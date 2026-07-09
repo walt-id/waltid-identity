@@ -50,7 +50,17 @@ object MdocIssuer {
         validFrom: Instant? = null,
         validUntil: Instant = Clock.System.now().plus(1.days * 365 * 10),
         status: Status? = null,
-        digestAlgorithm: String = "SHA-256"
+        digestAlgorithm: String = "SHA-256",
+        /**
+         * Optional `x5u` (RFC 9360 label 35) to place in the protected header.
+         * Required for ETSI TS 119 472-1 ISO-mdoc QEAA/PuB-EAA (QEAA-6.6.2-02 / PuB-EAA-6.6.3-02).
+         */
+        protectedHeaderX5u: String? = null,
+        /**
+         * Optional `x5t` (RFC 9360 label 34) certificate hash to place in the protected header.
+         * Required alongside [protectedHeaderX5u] for QEAA/PuB-EAA; digest SHALL be SHA-256.
+         */
+        protectedHeaderX5t: CoseCertHash? = null
     ): IssuerSigned {
         val coseSigner = issuerKey.toCoseSigner()
 
@@ -89,10 +99,19 @@ object MdocIssuer {
         val msoPayload = byteArrayOf(0xd8.toByte(), 24.toByte()) + coseCompliantCbor.encodeToByteArray(ByteArraySerializer(), msoBytes)
 
 
-        // Create the CoseSign1 object (issuerAuth) with a signature
+        // Create the CoseSign1 object (issuerAuth) with a signature.
+        // Per ISO 18013-5 §9.1.2.4 x5chain is carried in the unprotected header. For ETSI QEAA/PuB-EAA
+        // (QEAA-6.6.2-02 / PuB-EAA-6.6.3-02) the protected header SHALL additionally carry x5u and x5t,
+        // and SHOULD carry x5chain (QEAA-6.6.2-04); we include it in the protected header in that case.
+        val hasQualifiedHeaders = protectedHeaderX5u != null || protectedHeaderX5t != null
         val issuerAuth = CoseSign1.createAndSign(
-            protectedHeaders = CoseHeaders(algorithm = issuerKey.keyType.toCoseAlgorithm()),
-            unprotectedHeaders = CoseHeaders(x5chain = issuerCertificate), // Placeholder for cert chain
+            protectedHeaders = CoseHeaders(
+                algorithm = issuerKey.keyType.toCoseAlgorithm(),
+                x5u = protectedHeaderX5u,
+                x5t = protectedHeaderX5t,
+                x5chain = if (hasQualifiedHeaders) issuerCertificate else null
+            ),
+            unprotectedHeaders = CoseHeaders(x5chain = issuerCertificate),
             payload = msoPayload,
             signer = coseSigner
         )
@@ -133,6 +152,11 @@ object MdocIssuer {
         status: Status? = null,
         digestAlgorithm: String = "SHA-256",
 
+        /** Optional x5u (RFC 9360) for the protected header (ETSI QEAA/PuB-EAA). */
+        protectedHeaderX5u: String? = null,
+        /** Optional x5t (RFC 9360) cert hash for the protected header (ETSI QEAA/PuB-EAA). */
+        protectedHeaderX5t: CoseCertHash? = null,
+
         /** Custom value serialization (null returns are explicitly NOT mapped) */
         valueMappingFunction: (
             docType: String,
@@ -160,7 +184,9 @@ object MdocIssuer {
             validFrom = validFrom,
             validUntil = validUntil,
             status = status,
-            digestAlgorithm = digestAlgorithm
+            digestAlgorithm = digestAlgorithm,
+            protectedHeaderX5u = protectedHeaderX5u,
+            protectedHeaderX5t = protectedHeaderX5t
         )
     }
 

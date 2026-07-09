@@ -1,4 +1,3 @@
-@file:OptIn(ExperimentalUuidApi::class)
 
 package id.walt.webwallet.service.events
 
@@ -13,7 +12,6 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 const val EventDataNotAvailable = "n/a"

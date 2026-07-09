@@ -12,7 +12,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.kotlincrypto.hash.sha2.SHA256
 import java.security.cert.X509Certificate
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger {}
@@ -232,8 +231,6 @@ object TslXmlParser {
             .joinToString("") { "%02x".format(it) }
         return "tsp-$hash"
     }
-
-    @OptIn(ExperimentalEncodingApi::class)
     private fun computeCertSha256(base64Cert: String): String? {
         return runCatching {
             val decoded = Base64.decode(base64Cert.replace("\\s".toRegex(), ""))

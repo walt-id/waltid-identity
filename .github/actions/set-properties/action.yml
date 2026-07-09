@@ -1,0 +1,73 @@
+name: set-properties
+description: Set or update properties in a .properties file (platform-independent)
+inputs:
+  file:
+    description: 'Path to the .properties file'
+    required: true
+  properties:
+    description: 'Properties to set in key=value format, one per line or comma-separated'
+    required: true
+runs:
+  using: "composite"
+  steps:
+    - name: Set properties
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        PROPERTIES_FILE="${{ inputs.file }}"
+        PROPERTIES_INPUT="${{ inputs.properties }}"
+
+        if [[ ! -f "$PROPERTIES_FILE" ]]; then
+          echo "::error::Properties file not found at $PROPERTIES_FILE"
+          exit 1
+        fi
+
+        # Create backup
+        cp "$PROPERTIES_FILE" "$PROPERTIES_FILE.backup"
+
+        # Detect sed variant (BSD on macOS, GNU on Linux)
+        if sed --version >/dev/null 2>&1; then
+          # GNU sed (Linux)
+          SED_INPLACE="sed -i"
+        else
+          # BSD sed (macOS)
+          SED_INPLACE="sed -i ''"
+        fi
+
+        # Parse properties input (support both newline and comma-separated)
+        # Replace commas with newlines if input uses comma separation
+        PROPERTIES=$(echo "$PROPERTIES_INPUT" | tr ',' '\n')
+
+        echo "Setting properties in $PROPERTIES_FILE:"
+
+        # Process each property
+        while IFS='=' read -r key value; do
+          # Skip empty lines and comments
+          [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+
+          # Trim whitespace
+          key=$(echo "$key" | xargs)
+          value=$(echo "$value" | xargs)
+
+          if [[ -z "$key" ]]; then
+            continue
+          fi
+
+          echo "  $key=$value"
+
+          # Check if property exists
+          if grep -q "^[[:space:]]*$key[[:space:]]*=" "$PROPERTIES_FILE"; then
+            # Update existing property (escape special characters for sed)
+            # We need to escape forward slashes and ampersands in the value
+            escaped_value=$(echo "$value" | sed 's/[\/&]/\\&/g')
+            eval "$SED_INPLACE 's|^[[:space:]]*$key[[:space:]]*=.*|$key=$escaped_value|g' '$PROPERTIES_FILE'"
+            echo "    ✓ Updated existing property"
+          else
+            # Append new property
+            echo "$key=$value" >> "$PROPERTIES_FILE"
+            echo "    ✓ Added new property"
+          fi
+        done <<< "$PROPERTIES"
+
+        echo "✅ Properties updated successfully"

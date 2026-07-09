@@ -29,10 +29,8 @@ import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import kotlin.time.Clock
 import kotlin.time.toJavaInstant
-import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-@OptIn(ExperimentalUuidApi::class)
 object KeycloakAccountStrategy : PasswordAccountStrategy<KeycloakAccountRequest>() {
     val http = HttpClient {
         install(ContentNegotiation) { json() }

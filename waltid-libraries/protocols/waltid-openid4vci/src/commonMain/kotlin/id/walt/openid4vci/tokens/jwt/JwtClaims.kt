@@ -1,5 +1,6 @@
 package id.walt.openid4vci.tokens.jwt
 
+import id.walt.openid4vci.DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
@@ -13,7 +14,7 @@ fun defaultAccessTokenClaims(
     audience: String? = null,
     scopes: Set<String> = emptySet(),
     issuedAt: Instant = Clock.System.now(),
-    expiresAt: Instant = issuedAt + 3600.seconds,
+    expiresAt: Instant = issuedAt + DEFAULT_ACCESS_TOKEN_LIFETIME_SECONDS.seconds,
     additional: Map<String, Any?> = emptyMap(),
 ): Map<String, Any?> {
     val reserved = setOf(
@@ -39,7 +40,7 @@ fun defaultAccessTokenClaims(
 }
 
 /**
- * Common JWT claim names for access tokens.
+ * Common JWT claim names used by token implementations.
  */
 object JwtPayloadClaims {
     const val SUBJECT = "sub"
@@ -50,6 +51,9 @@ object JwtPayloadClaims {
     const val SCOPE = "scope"
     const val CLIENT_ID = "client_id"
     const val JWT_ID = "jti"
+    const val TYPE = "typ"
+    const val AUTHORIZED_PARTY = "azp"
+    const val SESSION_ID = "sid"
 }
 
 /**
