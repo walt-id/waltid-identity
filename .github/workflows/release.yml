@@ -46,10 +46,18 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       tags: '["stable", "latest"]'
       publish: true
+  sdk-docs:
+    uses: walt-id/waltid-identity/.github/workflows/mobile-sdk-docs.yml@main
+    secrets: inherit
+    needs: version
+    with:
+      deploy: true
+      version: ${{ needs.version.outputs.release_version }}
+      tags: '["stable", "latest"]'
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/deployment.yml@main
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, sdk-docs ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
