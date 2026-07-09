@@ -34,6 +34,7 @@ import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
 import id.waltid.openid4vp.wallet.presentation.SelfIssuedIdTokenBuilder
 import id.waltid.openid4vp.wallet.presentation.W3CPresenter
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -177,6 +178,14 @@ object WalletPresentFunctionality2 {
         INVALID_REQUEST_URI_METHOD("invalid_request_uri_method"),
         INVALID_TRANSACTION_DATA("invalid_transaction_data"),
         WALLET_UNAVAILABLE("wallet_unavailable"),
+        
+        // Encryption-specific error codes (WAL-896)
+        /** Encryption is required but cannot be performed. */
+        ENCRYPTION_REQUIRED("encryption_required"),
+        /** Invalid encryption parameters in client_metadata. */
+        INVALID_ENCRYPTION_PARAMETERS("invalid_encryption_parameters"),
+        /** Failed to encrypt the authorization response. */
+        ENCRYPTION_FAILURE("encryption_failure"),
     }
 
     /**
@@ -667,46 +676,47 @@ object WalletPresentFunctionality2 {
                 val responseUri = authorizationRequest.responseUri
                 requireNotNull(responseUri) { "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post.jwt'." }
 
-                // 1. Get Encryption Metadata
-                val clientMetadata = authorizationRequest.clientMetadata
-                    ?: throw IllegalArgumentException("client_metadata is required for direct_post.jwt to obtain encryption keys")
+                // Extract encryption configuration using ResponseEncryptionHandler
+                val encryptionConfig = ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest)
+                    .getOrElse { error ->
+                        return walletRejectHandling(
+                            authorizationRequest,
+                            OID4VPErrorCode.INVALID_ENCRYPTION_PARAMETERS,
+                            "Encryption configuration error: ${error.message}"
+                        )
+                    }
+                    ?: return walletRejectHandling(
+                        authorizationRequest,
+                        OID4VPErrorCode.ENCRYPTION_REQUIRED,
+                        "Encryption required for direct_post.jwt but no encryption config available"
+                    )
 
-                // 2. Select Verifier's Public Key
-                // We prefer a key explicitly marked for encryption ('use': 'enc'), otherwise fall back to the first available key.
-                val verifierJwkData = clientMetadata.jwks?.keys?.firstOrNull { it["use"]?.jsonPrimitive?.content == "enc" }
-                    ?: clientMetadata.jwks?.keys?.firstOrNull()
-                    ?: throw IllegalArgumentException("No suitable encryption key found in client_metadata jwks")
-
-                // Import into JWKKey
-                val verifierKey = JWKKey.importJWK(verifierJwkData.toString()).getOrThrow()
-
-                // 3. Select Encryption Algorithm (enc)
-                // Spec says default is A128GCM if not specified
-                val encAlg = clientMetadata.encryptedResponseEncValuesSupported?.firstOrNull() ?: "A128GCM"
-
-                // 4. Construct Payload
-                // 'vpToken' is currently a JSON String. We parse it to JsonElement to embed it correctly in the JSON Object.
+                // Construct Payload
                 val vpTokenElement = Json.parseToJsonElement(vpToken)
-
                 val payloadJson = buildJsonObject {
                     put("vp_token", vpTokenElement)
                     idToken?.let { put("id_token", it) }
                     authorizationRequest.state?.let { put("state", JsonPrimitive(it)) }
                 }
 
-                // 5. Encrypt
-                // Uses the Verifier's public key to encrypt the payload
-                val jweString = verifierKey.encryptJwe(payloadJson.toString().encodeToByteArray(), encAlg)
+                // Encrypt using ResponseEncryptionHandler
+                val jweString = runCatching {
+                    ResponseEncryptionHandler.encryptResponse(payloadJson, encryptionConfig)
+                }.getOrElse { error ->
+                    return walletRejectHandling(
+                        authorizationRequest,
+                        OID4VPErrorCode.ENCRYPTION_FAILURE,
+                        "Failed to encrypt authorization response: ${error.message}"
+                    )
+                }
 
-                // 6. Send Response
-                // The body contains a single 'response' parameter with the JWE
+                // Send Response
                 val parameters = ParametersBuilder().apply {
                     append("response", jweString)
                 }.build()
 
                 log.trace { "Submitting direct_post.jwt (encrypted) to Verifier: $responseUri" }
                 return Result.success(postFormResponse(responseUri, parameters))
-
             }
 
             // DC API

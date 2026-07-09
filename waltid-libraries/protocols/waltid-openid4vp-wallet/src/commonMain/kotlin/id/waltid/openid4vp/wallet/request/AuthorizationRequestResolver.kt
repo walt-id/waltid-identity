@@ -18,11 +18,32 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+
+/**
+ * Wallet capabilities advertised in `wallet_metadata` for request_uri_method=post.
+ *
+ * Per OID4VP 1.0 §5.1, when the wallet fetches a signed request via POST,
+ * it SHOULD include `wallet_metadata` with its supported VP formats and
+ * encryption algorithms.
+ *
+ * @property vpFormatsSupported Supported VP formats (e.g., jwt_vc_json, vc+sd-jwt, mso_mdoc).
+ * @property encryptedResponseAlgValuesSupported Key agreement algorithms (default: ECDH-ES).
+ * @property encryptedResponseEncValuesSupported Content encryption algorithms (default: A128GCM, A256GCM).
+ */
+@Serializable
+data class WalletCapabilities(
+    val vpFormatsSupported: JsonObject = WalletPresentationFormatRegistry.buildVpFormatsSupported(),
+    val encryptedResponseAlgValuesSupported: List<String> = listOf("ECDH-ES"),
+    val encryptedResponseEncValuesSupported: List<String> = listOf("A128GCM", "A256GCM"),
+)
 
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
@@ -54,16 +75,40 @@ object AuthorizationRequestResolver {
     class UnsignedAuthorizationRequestNotAllowedException :
         IllegalArgumentException("Unsigned AuthorizationRequest object (alg=none) is not allowed")
 
-    private val defaultRequestUriPostWalletMetadata = buildRequestUriPostWalletMetadata(
-        vpFormatsSupported = WalletPresentationFormatRegistry.buildVpFormatsSupported(),
-    )
+    private val defaultWalletCapabilities = WalletCapabilities()
 
-    fun buildRequestUriPostWalletMetadata(vpFormatsSupported: JsonObject): String = json.encodeToString(
+    private val defaultRequestUriPostWalletMetadata = buildRequestUriPostWalletMetadata(defaultWalletCapabilities)
+
+    /**
+     * Builds wallet_metadata JSON for request_uri_method=post requests.
+     *
+     * @param capabilities Wallet capabilities to advertise.
+     * @return JSON-encoded wallet_metadata string.
+     */
+    fun buildRequestUriPostWalletMetadata(capabilities: WalletCapabilities): String = json.encodeToString(
         JsonObject.serializer(),
         buildJsonObject {
-            put("vp_formats_supported", vpFormatsSupported)
+            put("vp_formats_supported", capabilities.vpFormatsSupported)
+            put(
+                "encrypted_response_alg_values_supported",
+                JsonArray(capabilities.encryptedResponseAlgValuesSupported.map { JsonPrimitive(it) })
+            )
+            put(
+                "encrypted_response_enc_values_supported",
+                JsonArray(capabilities.encryptedResponseEncValuesSupported.map { JsonPrimitive(it) })
+            )
         },
     )
+
+    /**
+     * Legacy overload for backward compatibility.
+     */
+    @Deprecated(
+        "Use buildRequestUriPostWalletMetadata(WalletCapabilities) instead",
+        ReplaceWith("buildRequestUriPostWalletMetadata(WalletCapabilities(vpFormatsSupported = vpFormatsSupported))")
+    )
+    fun buildRequestUriPostWalletMetadata(vpFormatsSupported: JsonObject): String =
+        buildRequestUriPostWalletMetadata(WalletCapabilities(vpFormatsSupported = vpFormatsSupported))
 
     /**
      * Shared transport mapping for retrieving Authorization Requests via `request_uri`.
