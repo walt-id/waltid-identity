@@ -9,26 +9,13 @@ import id.walt.mobile.test.backend.EnterpriseMobileScenario
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.WalletAttestationConfig
-import id.walt.webdatafetching.WebDataFetcherManager
-import id.walt.webdatafetching.WebDataFetchingConfiguration
-import id.walt.webdatafetching.config.HttpEngine
 import kotlinx.coroutines.runBlocking
-import org.junit.BeforeClass
 import org.junit.Test
 import java.util.UUID
 import kotlin.test.assertTrue
 
 @EnterpriseMobileTest
 class EnterpriseMobileWalletIntegrationTest {
-
-    companion object {
-        @JvmStatic
-        @BeforeClass
-        fun setupEngine() {
-            WebDataFetcherManager.globalDefaultConfiguration =
-                WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
-        }
-    }
 
     private val context: Context
         get() = InstrumentationRegistry.getInstrumentation().targetContext
@@ -140,7 +127,7 @@ class EnterpriseMobileWalletIntegrationTest {
     ): EnterpriseMobileScenario =
         fixture.scenarios().first { it.id == scenarioId }
 
-    private fun createWallet(
+    private suspend fun createWallet(
         walletId: String,
         attestation: EnterpriseMobileAttestationConfig?,
     ) = MobileWalletFactory(context).create(
