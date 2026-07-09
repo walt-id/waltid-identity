@@ -12,6 +12,14 @@ on:
         required: false
         type: string
         default: ${{ github.repository }}
+      ref:
+        description: |
+          Branch to tag. If it exists in the target repository it is used,
+          otherwise the tag is created on the repository's default branch.
+          When empty (default) the repository's default branch is used.
+        required: false
+        type: string
+        default: ""
     outputs:
       tag:
         description: "The tag"
@@ -24,14 +32,29 @@ jobs:
     outputs:
       result: ${{ steps.tag.outputs.tag }}
     steps:
+      - name: Determine ref to tag
+        id: ref
+        env:
+          REF: ${{ inputs.ref }}
+          REPO: ${{ inputs.repository }}
+          TOKEN: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+        run: |
+          if [ -n "$REF" ] && git ls-remote --exit-code --heads "https://${TOKEN}@github.com/${REPO}.git" "$REF"; then
+            echo "Branch '$REF' found in $REPO, tagging it."
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          else
+            echo "Branch '$REF' not found in $REPO, using default branch."
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/checkout@v6
         with:
           repository: ${{ inputs.repository }}
+          ref: ${{ steps.ref.outputs.ref }}
           token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
       - name: Create and push the git tag
         id: tag
         run: |
           tag=v${{ inputs.version }}
           git tag $tag
-          git push --tags
+          git push origin "$tag"
           echo "tag=${tag}" >> $GITHUB_OUTPUT
