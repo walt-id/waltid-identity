@@ -13,12 +13,12 @@ import id.walt.webdatafetching.WebDataFetcherManager
 import id.walt.webdatafetching.WebDataFetchingConfiguration
 import id.walt.webdatafetching.config.HttpEngine
 import kotlinx.coroutines.runBlocking
-import org.junit.Assume.assumeTrue
 import org.junit.BeforeClass
 import org.junit.Test
 import java.util.UUID
 import kotlin.test.assertTrue
 
+@EnterpriseMobileTest
 class EnterpriseMobileWalletIntegrationTest {
 
     companion object {
@@ -128,8 +128,10 @@ class EnterpriseMobileWalletIntegrationTest {
 
     private fun requireFixture(): EnterpriseMobileFixtureClient {
         val baseUrl = fixtureBaseUrl
-        assumeTrue("Set enterprise_fixture_base_url to run Enterprise mobile integration tests", !baseUrl.isNullOrBlank())
-        return EnterpriseMobileFixtureClient(baseUrl!!)
+        require(!baseUrl.isNullOrBlank()) {
+            "Set enterprise_fixture_base_url to run Enterprise mobile integration tests"
+        }
+        return EnterpriseMobileFixtureClient(baseUrl)
     }
 
     private suspend fun enterpriseScenario(
