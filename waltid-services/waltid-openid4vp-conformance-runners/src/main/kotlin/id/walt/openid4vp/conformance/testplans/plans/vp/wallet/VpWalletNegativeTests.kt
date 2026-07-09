@@ -50,7 +50,7 @@ class VpWalletNegativeTests(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "VP Wallet - Negative Tests (HAIP)",
+            "alias": "vp_wallet_negative_tests_haip",
             "description": "VP Wallet: Negative Tests - Security Validation (HAIP)",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"

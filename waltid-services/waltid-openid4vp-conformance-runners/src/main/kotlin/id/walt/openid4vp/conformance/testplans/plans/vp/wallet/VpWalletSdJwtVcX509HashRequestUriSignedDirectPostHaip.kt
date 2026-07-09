@@ -58,7 +58,7 @@ class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "VP Wallet - SD-JWT VC (HAIP x509_hash)",
+            "alias": "vp_wallet_sd_jwt_vc_haip_x509_hash",
             "description": "VP Wallet: SD-JWT VC + x509_hash + request_uri_signed + direct_post.jwt (HAIP Strict)",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"

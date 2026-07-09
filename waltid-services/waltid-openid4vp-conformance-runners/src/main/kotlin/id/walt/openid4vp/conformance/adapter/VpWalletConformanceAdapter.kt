@@ -34,7 +34,7 @@ import kotlinx.serialization.json.*
 class VpWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
     private val adapterPort: Int = 7006,
-    private val walletId: String = "conformance-test-wallet"
+    private val walletId: String = System.getenv("CONFORMANCE_WALLET_ID") ?: "conformance-test-wallet"
 ) {
     
     private var server: EmbeddedServer<*, *>? = null

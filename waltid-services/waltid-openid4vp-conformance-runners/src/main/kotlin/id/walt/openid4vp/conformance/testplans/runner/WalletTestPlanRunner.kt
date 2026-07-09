@@ -87,27 +87,24 @@ class WalletTestPlanRunner(
         println("DEBUG: Creating test plan...")
         println("DEBUG: Plan name: ${testPlan.planName}")
         println("DEBUG: Variant JSON: $variantJson")
+        println("DEBUG: Configuration: ${testPlan.configuration}")
         
-        val response = httpClient.post("https://$conformanceHost:$conformancePort/api/plan") {
-            url {
-                parameters.append("planName", testPlan.planName)
-                parameters.append("variant", variantJson)  // Ktor auto-encodes
-            }
-            contentType(ContentType.Application.Json)
-            setBody(buildJsonObject {
-                put("configuration", testPlan.configuration)
-            })
+        // Build URL using same helper as working verifier tests
+        val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
+            append("planName", testPlan.planName)
+            append("variant", variantJson)
         }
-
-        if (!response.status.isSuccess()) {
-            val errorBody = response.body<String>()
-            error("Failed to create test plan: ${response.status}\nError: $errorBody")
+        
+        println("DEBUG: URL: $createTestPlanUrl")
+        println("DEBUG: About to make HTTP POST request...")
+        
+        // Use same createTestPlan method as working verifier tests
+        val body = buildJsonObject {
+            put("configuration", testPlan.configuration)
         }
+        val createTestPlanResponse = conformance.createTestPlan(createTestPlanUrl, body)
 
-        val responseBody = response.body<JsonObject>()
-        val planId = responseBody["id"]?.jsonPrimitive?.content
-            ?: error("No test plan ID in response")
-            
+        val planId = createTestPlanResponse.id
         println("Created test plan: $planId")
         return planId
     }
@@ -116,7 +113,7 @@ class WalletTestPlanRunner(
      * Get list of test modules for the plan
      */
     private suspend fun getTestModules(testPlanId: String): List<String> {
-        val response = httpClient.get("https://$conformanceHost:$conformancePort/api/plan/$testPlanId/modules")
+        val response = conformance.conformanceHttp.get("/api/plan/$testPlanId/modules")
 
         if (!response.status.isSuccess()) {
             error("Failed to get test modules: ${response.status}")
@@ -137,7 +134,7 @@ class WalletTestPlanRunner(
      */
     private suspend fun runModule(testPlanId: String, moduleId: String): TestPlanResult {
         // Start module
-        val startResponse = httpClient.post("https://$conformanceHost:$conformancePort/api/plan/$testPlanId/module/$moduleId/start") {
+        val startResponse = conformance.conformanceHttp.post("/api/plan/$testPlanId/module/$moduleId/start") {
             contentType(ContentType.Application.Json)
         }
 
@@ -158,7 +155,7 @@ class WalletTestPlanRunner(
             delay(500)
             attempts++
 
-            val resultResponse = httpClient.get("https://$conformanceHost:$conformancePort/api/plan/$testPlanId/module/$moduleId/result")
+            val resultResponse = conformance.conformanceHttp.get("/api/plan/$testPlanId/module/$moduleId/result")
 
             if (resultResponse.status.isSuccess()) {
                 val resultBody = resultResponse.body<JsonObject>()

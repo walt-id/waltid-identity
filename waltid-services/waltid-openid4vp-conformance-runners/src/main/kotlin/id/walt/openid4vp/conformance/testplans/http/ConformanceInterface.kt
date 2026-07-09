@@ -25,6 +25,8 @@ class ConformanceInterface(
     val conformancePort: Int
 ) {
 
+    // Use simple HttpClient - relies on javax.net.ssl.trustStore system property
+    // set in build.gradle.kts for SSL certificate trust
     val conformanceHttp = HttpClient() {
         followRedirects = false
 
@@ -37,7 +39,11 @@ class ConformanceInterface(
             json()
         }
         install(Logging) {
-            level = LogLevel.ALL
+            level = LogLevel.INFO
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 60_000
+            connectTimeoutMillis = 30_000
         }
     }
 

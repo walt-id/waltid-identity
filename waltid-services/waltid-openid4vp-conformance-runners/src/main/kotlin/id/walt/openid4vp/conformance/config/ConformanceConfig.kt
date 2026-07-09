@@ -68,9 +68,10 @@ object ConformanceConfig {
     
     /**
      * Wallet adapter authorization endpoint URL.
+     * Uses host.docker.internal so conformance suite in Docker can reach host.
      */
     val WALLET_ADAPTER_URL: String
-        get() = "http://127.0.0.1:$WALLET_ADAPTER_PORT/openid4vp/authorize"
+        get() = "http://host.docker.internal:$WALLET_ADAPTER_PORT/openid4vp/authorize"
     
     // ================================
     // Issuer Settings
