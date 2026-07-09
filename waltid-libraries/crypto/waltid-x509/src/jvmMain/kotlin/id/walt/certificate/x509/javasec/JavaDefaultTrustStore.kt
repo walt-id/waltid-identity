@@ -12,7 +12,7 @@ class JavaDefaultTrustStore(private val parser: X509CertificateParser) : X509Cer
 
     private val trustManagers: Collection<X509TrustManager> = loadTrustManagers()
 
-    override suspend fun findCertificateBySubjectDn(
+    override fun findCertificateBySubjectDn(
         subjectDn: String
     ): List<X509Certificate> {
         val trusted = trustManagers.flatMap { trustManager ->

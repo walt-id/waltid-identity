@@ -31,7 +31,7 @@ class ValidationContext(trustStore: X509CertificateTrustStore) : X509Certificate
     val certificateSubjectDn: String
         get() = current.certificateSubjectDn
 
-    override suspend fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
+    override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
         internalTrustStore.findCertificateBySubjectDn(subjectDn)
 
     fun addTrustedCertificate(certificate: X509Certificate) {

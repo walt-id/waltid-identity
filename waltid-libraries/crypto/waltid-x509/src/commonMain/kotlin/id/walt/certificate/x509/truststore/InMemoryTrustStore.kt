@@ -6,15 +6,15 @@ import kotlinx.io.bytestring.ByteString
 
 class InMemoryTrustStore(trustedCertificates: List<X509Certificate> = emptyList()) : X509CertificateTrustStore {
 
+    private val internalSubjectDnMap: MutableMap<String, MutableMap<ByteString, X509Certificate>> = mutableMapOf()
+
     init {
         trustedCertificates.forEach {
             addCertificate(it)
         }
     }
 
-    val internalSubjectDnMap: MutableMap<String, MutableMap<ByteString, X509Certificate>> = mutableMapOf()
-
-    override suspend fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
+    override fun findCertificateBySubjectDn(subjectDn: String): List<X509Certificate> =
         internalSubjectDnMap[subjectDn]?.values?.toList()
             ?: emptyList()
 
