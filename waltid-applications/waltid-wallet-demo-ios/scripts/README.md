@@ -85,7 +85,7 @@ Non-attested issuer/profile setup is shared with the Compose app runners through
    ./e2e-local-enterprise.sh
    ```
 
-The normal script validates the quickstart-owned resources and the mobile-only helper resources before launching the UI test, runs `pod install`, and then runs only the local Enterprise UI tests. Set `SKIP_IOS_APP_SETUP=true` only if the CocoaPods sandbox is already in sync. It does not create resources; rerun `--prepare-only` when you intentionally want to create or refresh the mobile helper resources.
+The normal script validates the quickstart-owned resources and the mobile-only helper resources before launching the UI test, then runs only the local Enterprise UI tests. It does not create resources; rerun `--prepare-only` when you intentionally want to create or refresh the mobile helper resources.
 
 ## What Gets Tested
 

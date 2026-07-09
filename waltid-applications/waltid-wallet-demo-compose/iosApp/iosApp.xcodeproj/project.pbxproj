@@ -7,8 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0B7D5EDE2C102E5E022C2BE6 /* Pods_iosApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BB6C498560A5F36823DF4469 /* Pods_iosApp.framework */; };
-		B33B17EA2C2C394F001A32F7 /* iosAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* iosAppApp.swift */; };
+		B33B17EA2C2C394F001A32F7 /* ComposeWalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
 		C0DE00000000000000000101 /* LocalEnterpriseBackendE2ETests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000001 /* LocalEnterpriseBackendE2ETests.swift */; };
@@ -19,6 +18,7 @@
 		C0DE00000000000000000106 /* WalletE2EClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000007 /* WalletE2EClient.swift */; };
 		C0DE00000000000000000107 /* EudiPublicBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000008 /* EudiPublicBackend.swift */; };
 		C0DE00000000000000000108 /* LocalEnterpriseBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000009 /* LocalEnterpriseBackend.swift */; };
+		CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,14 +32,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		5E74965B4EAF6C908029258B /* Pods-iosApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.debug.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.debug.xcconfig"; sourceTree = "<group>"; };
-		81E504906E5C84985CB567E3 /* Pods-iosApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.release.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.release.xcconfig"; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		B33B17E92C2C394F001A32F7 /* iosAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosAppApp.swift; sourceTree = "<group>"; };
+		B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComposeWalletDemoApp.swift; sourceTree = "<group>"; };
 		B33B17EB2C2C394F001A32F7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B33B17ED2C2C3957001A32F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		BB6C498560A5F36823DF4469 /* Pods_iosApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_iosApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		C0DE00000000000000000001 /* LocalEnterpriseBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalEnterpriseBackendE2ETests.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000002 /* EudiPublicBackendE2ETests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EudiPublicBackendE2ETests.swift; sourceTree = "<group>"; };
 		C0DE00000000000000000003 /* WalletE2EHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletE2EHelpers.swift; sourceTree = "<group>"; };
@@ -49,7 +46,6 @@
 		C0DE00000000000000000007 /* WalletE2EClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WalletE2EClient.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/WalletE2EClient.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000008 /* EudiPublicBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = EudiPublicBackend.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/EudiPublicBackend.swift"; sourceTree = "<group>"; };
 		C0DE00000000000000000009 /* LocalEnterpriseBackend.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LocalEnterpriseBackend.swift; path = "../../../mobile-e2e-fixtures/ios/TestHelpers/LocalEnterpriseBackend.swift"; sourceTree = "<group>"; };
-		D6B7A3532FD94CC5009C69E7 /* sharedUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = sharedUI.framework; path = ../sharedUI/build/cocoapods/framework/sharedUI.framework; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,7 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0B7D5EDE2C102E5E022C2BE6 /* Pods_iosApp.framework in Frameworks */,
+				CEB46067C0B18C64C703CB04 /* KotlinMultiplatformLinkedPackage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,23 +67,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		76E29D6CBD9A178AFD844515 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				BB6C498560A5F36823DF4469 /* Pods_iosApp.framework */,
-				D6B7A3532FD94CC5009C69E7 /* sharedUI.framework */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		B33B17DD2C2C394F001A32F7 = {
 			isa = PBXGroup;
 			children = (
 				B33B17E82C2C394F001A32F7 /* iosApp */,
 				C0DE00000000000000000401 /* iosAppUITests */,
 				B33B17E72C2C394F001A32F7 /* Products */,
-				C7F7791DA2DDDF41CE0CB49F /* Pods */,
-				76E29D6CBD9A178AFD844515 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -104,7 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				B30E22802C2D8AD700D4781C /* Info.plist */,
-				B33B17E92C2C394F001A32F7 /* iosAppApp.swift */,
+				B33B17E92C2C394F001A32F7 /* ComposeWalletDemoApp.swift */,
 				B33B17EB2C2C394F001A32F7 /* ContentView.swift */,
 				B33B17ED2C2C3957001A32F7 /* Assets.xcassets */,
 			);
@@ -126,15 +111,6 @@
 			path = iosAppUITests;
 			sourceTree = "<group>";
 		};
-		C7F7791DA2DDDF41CE0CB49F /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				5E74965B4EAF6C908029258B /* Pods-iosApp.debug.xcconfig */,
-				81E504906E5C84985CB567E3 /* Pods-iosApp.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -142,17 +118,19 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = B33B17F42C2C3957001A32F7 /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
-				FBEF9ED8794E31C63F399D7B /* [CP] Check Pods Manifest.lock */,
+				D9F4CF37D2CB26BE6E1CECF4 /* Build sharedUI framework */,
 				B33B17E22C2C394F001A32F7 /* Sources */,
 				B33B17E32C2C394F001A32F7 /* Frameworks */,
 				B33B17E42C2C394F001A32F7 /* Resources */,
-				3AD1D6FE8B29711C80EF4D52 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
 			name = iosApp;
+			packageProductDependencies = (
+				048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */,
+			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
 			productType = "com.apple.product-type.application";
@@ -202,6 +180,9 @@
 				Base,
 			);
 			mainGroup = B33B17DD2C2C394F001A32F7;
+			packageReferences = (
+				661FF34B0F28C2C4230F5951 /* XCLocalSwiftPackageReference "KotlinMultiplatformLinkedPackage" */,
+			);
 			productRefGroup = B33B17E72C2C394F001A32F7 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -224,44 +205,24 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		3AD1D6FE8B29711C80EF4D52 /* [CP] Copy Pods Resources */ = {
+		D9F4CF37D2CB26BE6E1CECF4 /* Build sharedUI framework */ = {
 			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-resources-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Copy Pods Resources";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		FBEF9ED8794E31C63F399D7B /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			inputFileListPaths = (
 			);
 			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
 			);
-			name = "[CP] Check Pods Manifest.lock";
+			name = "Build sharedUI framework";
 			outputFileListPaths = (
 			);
 			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-iosApp-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/../../..\"\n./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:embedAndSignAppleFrameworkForXcode -PenableIosBuild=true -i\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -271,7 +232,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */,
-				B33B17EA2C2C394F001A32F7 /* iosAppApp.swift in Sources */,
+				B33B17EA2C2C394F001A32F7 /* ComposeWalletDemoApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -422,7 +383,6 @@
 		};
 		B33B17F52C2C3957001A32F7 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5E74965B4EAF6C908029258B /* Pods-iosApp.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -452,7 +412,6 @@
 		};
 		B33B17F62C2C3957001A32F7 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 81E504906E5C84985CB567E3 /* Pods-iosApp.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -553,6 +512,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		661FF34B0F28C2C4230F5951 /* XCLocalSwiftPackageReference "KotlinMultiplatformLinkedPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = KotlinMultiplatformLinkedPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		048F7E5AEC614F5A89E08F1D /* KotlinMultiplatformLinkedPackage */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = KotlinMultiplatformLinkedPackage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = B33B17DE2C2C394F001A32F7 /* Project object */;
 }
