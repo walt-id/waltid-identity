@@ -17,7 +17,7 @@ data class TestRunInfo(
     val started: Instant, // 2025-10-20T01:46:42.719257027Z
 
     val config: JsonObject,
-    val description: String, // Verifier - iso_mdl + x509_san_dns + request_uri_signed + direct_post
+    val description: String? = null, // Verifier - iso_mdl + x509_san_dns + request_uri_signed + direct_post
     val alias: String = "",
 
     val owner: Owner,
