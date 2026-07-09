@@ -92,7 +92,7 @@ jobs:
 
   publish:
     if: ${{ inputs.deploy }}
-    needs: dokka
+    needs: mobile-sdk-docs
     runs-on: ubuntu-latest
     steps:
       - name: Checkout all repos with ref fallback
@@ -132,4 +132,3 @@ jobs:
           file: waltid-identity/docs/mobile-sdk-api/Dockerfile
           context: waltid-identity/docs/mobile-sdk-api
           tags: ${{ steps.tags.outputs.tags }}
-
