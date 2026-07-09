@@ -17,17 +17,6 @@ runs:
           konan-${{ runner.os }}-${{ runner.arch }}-
           konan-${{ runner.os }}-
 
-    - name: Cache CocoaPods
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cocoapods/repos
-          ./Pods
-          ~/Library/Caches/CocoaPods
-        key: pods-${{ runner.os }}-${{ hashFiles('**/Podfile.lock', '**/Podfile') }}
-        restore-keys: |
-          pods-${{ runner.os }}-
-
     - name: Cache Homebrew
       uses: actions/cache@v4
       with:
@@ -37,9 +26,6 @@ runs:
         key: brew-${{ runner.os }}-${{ runner.arch }}-kdoctor
         restore-keys: |
           brew-${{ runner.os }}-${{ runner.arch }}-
-
-    - name: Update CocoaPods
-      uses: walt-id/waltid-identity/.github/actions/cocoapods-setup@5706657d371fa2ce46d7b2dae485b3aaba96dc30
 
     - name: Install and run KDoctor
       uses: walt-id/waltid-identity/.github/actions/install-and-run-kdoctor@94f207f4e29487705df200318f624842efcc8d95

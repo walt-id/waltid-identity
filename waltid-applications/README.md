@@ -88,7 +88,7 @@ Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates creden
 **Use when:** You need the current cross-platform mobile wallet demo, Android or iOS E2E scripts, or a reference for wallet SDK integration in a mobile app.
 
 ### [🟢 waltid-wallet-demo-ios](./waltid-wallet-demo-ios)
-Native iOS wallet demo app. SwiftUI application backed by Kotlin Multiplatform wallet SDK components, with iOS Keychain / Secure Enclave-backed keys and E2E scripts for public EUDI and local Enterprise flows.
+Native iOS wallet demo app. SwiftUI application using the `WalletSDK` Swift package backed by Kotlin Multiplatform wallet SDK components, with iOS Keychain / Secure Enclave-backed keys and E2E scripts for public EUDI and local Enterprise flows.
 
 **Use when:** You need a native iOS wallet SDK reference implementation, iOS-specific integration patterns, or iOS wallet E2E coverage.
 

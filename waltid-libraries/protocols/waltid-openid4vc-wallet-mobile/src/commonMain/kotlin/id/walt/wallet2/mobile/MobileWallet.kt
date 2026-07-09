@@ -16,7 +16,9 @@ import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
 import io.ktor.http.Url
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -54,12 +56,12 @@ data class MobileWalletCredential(
  *
  * @property success `true` when the wallet transmitted the presentation successfully.
  * @property redirectTo Optional verifier redirect URI returned by the presentation flow.
- * @property verifierResponse Raw verifier response body, when the verifier returns structured JSON.
+ * @property verifierResponseJson Raw verifier response body encoded as JSON, when the verifier returns structured JSON.
  */
 data class MobileWalletPresentationResult(
     val success: Boolean,
     val redirectTo: String?,
-    val verifierResponse: JsonElement? = null,
+    val verifierResponseJson: String? = null,
 )
 
 /**
@@ -68,16 +70,16 @@ data class MobileWalletPresentationResult(
  * The wallet uses this configuration to request a client attestation JWT from the
  * enterprise client-attester service and attach the resulting proof to token requests.
  *
- * @property enterpriseBaseUrl Base URL of the enterprise deployment that hosts the attester service.
- * @property attesterPath Path to the attester endpoint, relative to [enterpriseBaseUrl].
+ * @property baseUrl Base URL of the deployment that hosts the attester service.
+ * @property attesterPath Path to the attester endpoint, relative to [baseUrl].
  * @property bearerToken Optional bearer token for protected attester endpoints.
- * @property enterpriseHostHeader Optional `Host` header override for tunneled local enterprise tests.
+ * @property hostHeader Optional `Host` header override for tunneled local tests.
  */
 data class WalletAttestationConfig(
-    val enterpriseBaseUrl: String,
+    val baseUrl: String,
     val attesterPath: String,
     val bearerToken: String = "",
-    val enterpriseHostHeader: String = "",
+    val hostHeader: String = "",
 )
 
 /**
@@ -93,17 +95,24 @@ class MobileWallet(
     private val didStore: WalletDidStore,
     credentialStore: WalletCredentialStore,
     private val keyGenerator: suspend (KeyType) -> Key,
-    private val defaultKeyType: KeyType = KeyType.secp256r1,
+    private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
-    private val onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
 ) {
+    private val eventStream = MobileWalletEventStream()
+
+    /**
+     * Buffered stream of recent issuance and presentation events emitted by this wallet.
+     */
+    val events: Flow<MobileWalletEvent> = eventStream.events
+
     private val attestationAssembler: ClientAttestationAssembler? = attestationConfig?.let { config ->
         ClientAttestationAssembler(
             HttpWalletAttestationProvider(
-                enterpriseBaseUrl = config.enterpriseBaseUrl,
+                baseUrl = config.baseUrl,
                 attesterPath = config.attesterPath,
                 bearerToken = config.bearerToken,
-                enterpriseHostHeader = config.enterpriseHostHeader,
+                hostHeader = config.hostHeader,
             )
         )
     }
@@ -126,7 +135,7 @@ class MobileWallet(
      * @throws IllegalArgumentException When persisted DID state exists without a persisted key.
      */
     suspend fun bootstrap(
-        keyType: KeyType? = null,
+        keyType: MobileWalletKeyType? = null,
         didMethod: String = "key",
     ): MobileWalletBootstrapResult {
         DidService.minimalInit()
@@ -144,7 +153,7 @@ class MobileWallet(
         }
 
         val effectiveKeyType = keyType ?: defaultKeyType
-        val key = keyGenerator(effectiveKeyType)
+        val key = keyGenerator(effectiveKeyType.toKeyType())
         val keyId = keyStore.addKey(key)
         val didResult = DidService.registerByKey(didMethod, key)
 
@@ -182,7 +191,7 @@ class MobileWallet(
                 clientId = clientId,
             ),
             attestationAssembler = attestationAssembler,
-            onEvent = onEvent,
+            onEvent = ::emitSessionEvent,
         ).credentialIds
 
     /**
@@ -223,13 +232,21 @@ class MobileWallet(
                 did = did,
                 runPolicies = runPolicies,
             ),
-            onEvent = onEvent,
+            onEvent = ::emitSessionEvent,
         )
 
         return MobileWalletPresentationResult(
             success = result.transmissionSuccess ?: false,
             redirectTo = result.redirectTo,
-            verifierResponse = result.verifierResponse,
+            verifierResponseJson = result.verifierResponse?.let {
+                Json.encodeToString(JsonElement.serializer(), it)
+            },
         )
+    }
+
+    private suspend fun emitSessionEvent(event: WalletSessionEvent) {
+        val mobileEvent = event.toMobileWalletEvent()
+        eventStream.tryEmit(mobileEvent)
+        onEvent(mobileEvent)
     }
 }

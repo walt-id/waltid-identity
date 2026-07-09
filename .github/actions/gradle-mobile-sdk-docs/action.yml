@@ -1,5 +1,5 @@
 name: gradle-mobile-sdk-docs
-description: Generate Dokka API docs for the mobile wallet SDK modules
+description: Generate Dokka and DocC API docs for the mobile wallet SDK modules
 inputs:
   waltid-directory:
     description: 'Path to the waltid-identity directory'
@@ -34,7 +34,7 @@ runs:
         xcodebuild -version
 
     - name: Configure iOS build environment
-      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@3a27209fa9aedded85f0505ae9eb43b417e3547a
+      uses: walt-id/waltid-identity/.github/actions/ios-build-setup@e7889e25f7e3f7c98db9d0c8e5bf905e6dd538ec
       with:
         gradle-properties-path: '${{ inputs.waltid-directory }}/gradle.properties'
 
@@ -50,3 +50,19 @@ runs:
           --no-daemon \
           --console=plain \
           --warning-mode=summary
+
+    - name: Assemble Swift wallet SDK core XCFramework
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: |
+        ./gradlew \
+          :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework \
+          -PenableIosBuild=true \
+          --no-daemon \
+          --console=plain \
+          --warning-mode=summary
+
+    - name: Generate Swift WalletSDK DocC archive
+      working-directory: ${{ inputs.waltid-directory }}
+      shell: bash
+      run: waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/generate-docc.sh

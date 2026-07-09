@@ -24,6 +24,8 @@ Compose Multiplatform demo app for the mobile wallet SDK. It demonstrates OpenID
 
 For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
+The Compose iOS demo uses Kotlin direct Xcode integration and a local SwiftPM linkage package for native iOS linkage.
+
 ## Target status
 
 - Android and iOS are the supported mobile demo targets for wallet SDK issuance, presentation, platform-backed keys, and persistence.
