@@ -6,6 +6,7 @@ import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.DcqlQuery
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
@@ -14,6 +15,7 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -110,7 +112,11 @@ data class ResolveVpRequestResult(
     val nonce: String?,
     val clientId: String?,
     val responseUri: Url?,
-    val hasRequestUri: Boolean
+    val hasRequestUri: Boolean,
+    /** Response mode from the authorization request (e.g., direct_post, direct_post.jwt). */
+    val responseMode: String? = null,
+    /** True if the verifier requires encrypted responses (direct_post.jwt or dc_api.jwt). */
+    val requiresEncryptedResponse: Boolean = false
 )
 
 @Serializable
@@ -136,6 +142,25 @@ data class MatchCredentialsResult(
     val matchCount: Int,
     /** For each matched query ID, the wallet-assigned IDs of matching credentials. */
     val matchedCredentialIds: Map<String, List<String>>
+)
+
+/**
+ * Result of inspecting encryption requirements for a VP request.
+ *
+ * Per OID4VP 1.0 §6, encrypted responses are required when response_mode
+ * is `direct_post.jwt` or `dc_api.jwt`. This result allows mobile UIs to
+ * show encryption status in consent screens before presenting.
+ */
+@Serializable
+data class EncryptionRequirementsResult(
+    /** True if the verifier requires encrypted responses. */
+    val isEncryptionRequired: Boolean,
+    /** Content encryption algorithm that will be used (e.g., "A128GCM"). */
+    val encAlgorithm: String?,
+    /** Key agreement algorithm (always "ECDH-ES" per spec). */
+    val algAlgorithm: String?,
+    /** Thumbprint of verifier's encryption key for display/audit purposes. */
+    val verifierKeyThumbprint: String?
 )
 
 // ---------------------------------------------------------------------------
@@ -293,7 +318,9 @@ object WalletPresentationHandler {
             nonce = authRequest.nonce,
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
-            hasRequestUri = url.parameters.contains("request_uri")
+            hasRequestUri = url.parameters.contains("request_uri"),
+            responseMode = authRequest.responseMode?.name,
+            requiresEncryptedResponse = authRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
         )
     }
 
@@ -319,6 +346,69 @@ object WalletPresentationHandler {
             matchedQueryIds = matched.keys.toList(),
             matchCount = matched.values.sumOf { it.size },
             matchedCredentialIds = matchedCredentialIds
+        )
+    }
+
+    /**
+     * Inspects a resolved authorization request to determine encryption requirements.
+     *
+     * Per OID4VP 1.0 §6, when response_mode is `direct_post.jwt` or `dc_api.jwt`,
+     * the wallet must encrypt the authorization response. This method extracts
+     * and validates the encryption parameters from the request's client_metadata.
+     *
+     * Use this for consent screens to show users whether their response will be encrypted.
+     *
+     * @param authorizationRequest The resolved authorization request to inspect.
+     * @return Encryption requirements including algorithm details and verifier key info.
+     */
+    suspend fun inspectEncryptionRequirements(
+        authorizationRequest: AuthorizationRequest
+    ): EncryptionRequirementsResult {
+        val responseMode = authorizationRequest.responseMode
+        
+        // Check if encryption is required based on response_mode
+        val requiresEncryption = responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
+        
+        if (!requiresEncryption) {
+            return EncryptionRequirementsResult(
+                isEncryptionRequired = false,
+                encAlgorithm = null,
+                algAlgorithm = null,
+                verifierKeyThumbprint = null
+            )
+        }
+        
+        // Extract encryption config from client_metadata
+        val encryptionConfig = ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest)
+            .getOrElse { error ->
+                log.warn { "Failed to extract encryption config: ${error.message}" }
+                return EncryptionRequirementsResult(
+                    isEncryptionRequired = true,
+                    encAlgorithm = null,
+                    algAlgorithm = null,
+                    verifierKeyThumbprint = null
+                )
+            }
+        
+        if (encryptionConfig == null) {
+            return EncryptionRequirementsResult(
+                isEncryptionRequired = true,
+                encAlgorithm = null,
+                algAlgorithm = null,
+                verifierKeyThumbprint = null
+            )
+        }
+        
+        // Get verifier key thumbprint for audit/display
+        val thumbprint = runCatching {
+            encryptionConfig.verifierKey.getThumbprint()
+        }.getOrNull()
+        
+        return EncryptionRequirementsResult(
+            isEncryptionRequired = true,
+            encAlgorithm = encryptionConfig.encAlgorithm,
+            algAlgorithm = encryptionConfig.algAlgorithm,
+            verifierKeyThumbprint = thumbprint
         )
     }
 
