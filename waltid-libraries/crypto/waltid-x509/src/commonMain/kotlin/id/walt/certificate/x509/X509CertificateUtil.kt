@@ -3,6 +3,7 @@ package id.walt.certificate.x509
 import id.walt.certificate.x509.builder.Pkcs10CertificateSigningRequestBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo
+import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.crypto.keys.Key
 
 object X509CertificateUtil {
@@ -72,4 +73,26 @@ object X509CertificateUtil {
         require(builder.subjectPublicKeyInfo !is SelfSignedSubjectPublicKeyInfo) { "Certificate subject public key missing" }
         return certificateServices.certificateSigner.signCertificate(issuerKey, builder)
     }
+
+    suspend fun validatePemCertificateChain(certificateChainPem: String) =
+        validatePemCertificateChain(X509CertificateUtilDefaults, certificateChainPem)
+
+    val CERTIFICATE_CHAIN_PEM_REGEX = "-----BEGIN CERTIFICATE-----[\\s\\S]*?-----END CERTIFICATE-----".toRegex()
+
+    suspend fun validatePemCertificateChain(
+        certificateServices: X509CertificateServices,
+        certificateChainPem: String
+    ): ValidationResult {
+        val certificates = CERTIFICATE_CHAIN_PEM_REGEX.findAll(certificateChainPem)
+            .map { it.value.trim() } // Clean up trailing line breaks
+            .map { certificateServices.certificateParser.parseCertificatePem(it) }
+            .toList()
+        return validateCertificateChain(certificateServices, certificates)
+    }
+
+    suspend fun validateCertificateChain(
+        certificateServices: X509CertificateServices,
+        certificateChain: Collection<X509Certificate>
+    ): ValidationResult =
+        certificateServices.certificateChainValidator.validate(certificateChain)
 }
