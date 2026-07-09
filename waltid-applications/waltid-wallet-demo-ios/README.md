@@ -22,7 +22,7 @@
 
 Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletSDK` Swift package and demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
 
-For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
 ## Local wallet data
 
@@ -37,7 +37,8 @@ cd waltid-applications/waltid-wallet-demo-ios/iosApp
 open iosApp.xcodeproj
 ```
 
-E2E scripts live in [scripts](scripts/README.md).
+Mobile integration tests run through XCTest and the self-contained Enterprise
+fixture Gradle tasks documented in the mobile guide.
 
 ## Related modules
 

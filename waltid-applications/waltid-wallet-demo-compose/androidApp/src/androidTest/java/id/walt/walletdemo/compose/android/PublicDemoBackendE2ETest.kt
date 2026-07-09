@@ -1,11 +1,10 @@
 package id.walt.walletdemo.compose.android
 
-import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import id.walt.mobile.test.backend.EudiTestBackend
+import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.POST_PRESENT_DELAY
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.QUICK_STATUS_CHECK_TIMEOUT
@@ -23,16 +22,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class EudiPublicBackendE2ETest {
+class PublicDemoBackendE2ETest {
 
     @Test
-    fun receiveAndPresentAgainstEudiPublicBackends() = runBlocking {
-        val args = InstrumentationRegistry.getArguments()
-        val requestedCredentialId = args.getString("e2e_credential_id") ?: DEFAULT_CREDENTIAL_ID
-        val offerUrlArg = args.getString("e2e_offer_url")
-            ?: args.getString("e2e_offer_url_b64")?.let(::decodeBase64)
-        val generatedOffer = if (offerUrlArg == null) EudiTestBackend.generateOffer(requestedCredentialId) else null
-        val offerUrl = offerUrlArg ?: generatedOffer!!.offerUrl
+    fun receiveAndPresentAgainstPublicDemoIssuer2Verifier2() = runBlocking {
+        val scenario = DemoTestBackend.presentationScenarios.first { it.id == "eudi-pid-mdoc" }
+        val offer = DemoTestBackend.createOffer(scenario)
 
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
@@ -40,10 +35,10 @@ class EudiPublicBackendE2ETest {
 
         launchAndUnlock(context, device)
 
-        sendDeepLink(context, offerUrl)
+        sendDeepLink(context, offer.offerUrl)
         assertTrue(
             "Offer URL did not appear in UI after deep link",
-            waitForResource(device, "wallet.offerInput", UI_ELEMENT_TIMEOUT)?.text == offerUrl
+            waitForResource(device, "wallet.offerInput", UI_ELEMENT_TIMEOUT)?.text == offer.offerUrl
         )
 
         clickByTag(device, "wallet.receiveButton")
@@ -56,10 +51,8 @@ class EudiPublicBackendE2ETest {
         assertTrue("Receive did not complete successfully. Latest status: ${latestStatus(device)}", receiveSuccess)
         assertTrue("No credentials were shown in UI", device.findObject(By.text("No credentials")) == null)
 
-        val credentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offerUrl)
-        val verifierTx = EudiTestBackend.createVerifierTransaction(credentialId)
-
-        sendDeepLink(context, verifierTx.authorizationRequestUri)
+        val session = DemoTestBackend.createVerifierSession(scenario)
+        sendDeepLink(context, session.authorizationRequestUri)
 
         val startedWithoutTap = waitForStatus(
             device = device,
@@ -88,13 +81,6 @@ class EudiPublicBackendE2ETest {
             device.currentPackageName == context.packageName
         )
 
-        EudiTestBackend.waitForVerifierSuccess(verifierTx.transactionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
-    }
-
-    private fun decodeBase64(value: String): String =
-        String(Base64.decode(value, Base64.DEFAULT), Charsets.UTF_8)
-
-    private companion object {
-        const val DEFAULT_CREDENTIAL_ID = "eu.europa.ec.eudi.pid_vc_sd_jwt"
+        DemoTestBackend.waitForVerifierSuccess(session.sessionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
     }
 }

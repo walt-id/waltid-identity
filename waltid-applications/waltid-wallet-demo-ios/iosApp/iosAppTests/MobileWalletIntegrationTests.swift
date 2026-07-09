@@ -25,11 +25,11 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         // Clean up test state before each test to ensure isolation
         // This prevents flakiness from state bleed between tests
-        await clearTestData()
+        await clearTestData(walletId: testWalletId)
     }
 
     /// Clears all test data (database only) to ensure test isolation
-    private func clearTestData() async {
+    private func clearTestData(walletId: String) async {
         let fileManager = FileManager.default
         if let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             let databaseDirectories = [
@@ -37,9 +37,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
                 appSupport.appendingPathComponent("databases", isDirectory: true)
             ]
             let dbFiles = [
-                "wallet_\(testWalletId).db",
-                "wallet_\(testWalletId).db-shm",
-                "wallet_\(testWalletId).db-wal"
+                "wallet_\(walletId).db",
+                "wallet_\(walletId).db-shm",
+                "wallet_\(walletId).db-wal"
             ]
             for directory in databaseDirectories {
                 for dbFile in dbFiles {
@@ -56,9 +56,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
         // This is acceptable for tests (keychain clears between simulator resets).
     }
 
-    private func makeWallet() async throws -> Wallet {
+    private func makeWallet(walletId: String? = nil) async throws -> Wallet {
         try await Wallet(
-            configuration: WalletConfiguration(walletID: testWalletId)
+            configuration: WalletConfiguration(walletID: walletId ?? testWalletId)
         )
     }
 
@@ -169,6 +169,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
     }
 
+    func testReceiveEudiPidSdJwtCredentialFromDemoIssuer2() async throws {
+        try await receiveCredentialFromDemoIssuer2(scenarioID: "eudi-pid-sdjwt")
+    }
+
+    func testReceiveEudiPidMdocCredentialFromDemoIssuer2() async throws {
+        try await receiveCredentialFromDemoIssuer2(scenarioID: "eudi-pid-mdoc")
+    }
+
+    func testReceiveIsoMdlCredentialFromDemoIssuer2() async throws {
+        try await receiveCredentialFromDemoIssuer2(scenarioID: "iso-mdl")
+    }
+
     func testReceiveAndPresentFullFlow() async throws {
         let wallet = try await makeWallet()
 
@@ -199,6 +211,18 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         // Wait for verifier to confirm receipt
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
+    }
+
+    func testReceiveAndPresentEudiPidSdJwtAgainstDemoIssuer2AndVerifier2() async throws {
+        try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-sdjwt")
+    }
+
+    func testReceiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() async throws {
+        try await receiveAndPresentDemoCredential(scenarioID: "eudi-pid-mdoc")
+    }
+
+    func testReceiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() async throws {
+        try await receiveAndPresentDemoCredential(scenarioID: "iso-mdl")
     }
 
     func testCredentialPersistsAcrossControllerRecreation() async throws {
@@ -234,6 +258,110 @@ final class MobileWalletIntegrationTests: XCTestCase {
         )
 
         try await TestHelpers.waitForVerifierSuccess(transactionID: transaction.transactionId, timeoutSeconds: verifierPollingTimeout)
+    }
+
+    func testDemoCredentialPersistsAcrossControllerRecreation() async throws {
+        let scenario = DemoBackend.persistenceScenario
+        let walletId = "ios-demo-persist-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet1 = try await makeWallet(walletId: walletId)
+        let bootstrapResult = try await wallet1.bootstrap()
+        let did = bootstrapResult.did
+
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet1.receive(offer: offerURL)
+        XCTAssertFalse(
+            credentialIDs.isEmpty,
+            "Should receive \(scenario.displayName) from public demo issuer2"
+        )
+
+        let wallet2 = try await makeWallet(walletId: walletId)
+        _ = try await wallet2.bootstrap()
+        let credentials = try await wallet2.credentials()
+        XCTAssertFalse(credentials.isEmpty, "public demo credential should persist across controller recreation")
+
+        let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        let presentResult = try await wallet2.present(
+            request: presentationURL,
+            did: did
+        )
+
+        XCTAssertTrue(
+            presentResult.success,
+            "Should present persisted public demo credential for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
+        )
+
+        try await DemoBackend.shared.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func receiveCredentialFromDemoIssuer2(scenarioID: String) async throws {
+        let scenario = try demoScenario(scenarioID)
+        let walletId = "ios-demo-receive-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId)
+        _ = try await wallet.bootstrap()
+
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL)
+
+        XCTAssertFalse(
+            credentialIDs.isEmpty,
+            "Should receive \(scenario.displayName) from public demo issuer2"
+        )
+    }
+
+    private func receiveAndPresentDemoCredential(scenarioID: String) async throws {
+        let scenario = try demoPresentationScenario(scenarioID)
+        let walletId = "ios-demo-present-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId)
+        let bootstrapResult = try await wallet.bootstrap()
+        let did = bootstrapResult.did
+
+        let offer = try await DemoBackend.shared.createOffer(scenario: scenario)
+        let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
+        let credentialIDs = try await wallet.receive(offer: offerURL)
+        XCTAssertFalse(
+            credentialIDs.isEmpty,
+            "Should receive \(scenario.displayName) from public demo issuer2"
+        )
+
+        let credentials = try await wallet.credentials()
+        XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
+
+        let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        let presentResult = try await wallet.present(
+            request: presentationURL,
+            did: did
+        )
+
+        XCTAssertTrue(
+            presentResult.success,
+            "public demo verifier2 presentation should succeed for \(scenario.displayName). Credentials: \(credentials), Result: \(presentResult)"
+        )
+
+        try await DemoBackend.shared.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: verifierPollingTimeout
+        )
+    }
+
+    private func demoScenario(_ id: String) throws -> DemoCredentialScenario {
+        try XCTUnwrap(DemoBackend.scenarios.first { $0.id == id })
+    }
+
+    private func demoPresentationScenario(_ id: String) throws -> DemoCredentialScenario {
+        try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == id })
     }
 }
 
