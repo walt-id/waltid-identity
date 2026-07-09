@@ -7,11 +7,11 @@ This guide is for contributors working on the native mobile wallet SDK, demo app
 | Goal | Start here |
 |------|------------|
 | Shared mobile wallet API | [waltid-openid4vc-wallet-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md) |
+| Native iOS Swift API | [WalletSDK](../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md) |
 | Mobile persistence | [waltid-openid4vc-wallet-persistence-mobile](../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md) |
 | Compose demo app | [waltid-wallet-demo-compose](../waltid-applications/waltid-wallet-demo-compose/README.md) |
 | iOS demo app | [waltid-wallet-demo-ios](../waltid-applications/waltid-wallet-demo-ios/README.md) |
-| Android key storage | [waltid-crypto-android](../waltid-libraries/crypto/waltid-crypto-android/README.md) |
-| iOS key storage | [waltid-crypto-ios](../waltid-libraries/crypto/waltid-crypto-ios/README.md) |
+| Mobile key storage | [waltid-crypto](../waltid-libraries/crypto/waltid-crypto/README.md) |
 
 ## IDE guidance
 
@@ -33,7 +33,6 @@ Configure machine-local paths and platform flags in `local.properties`:
 
 ```properties
 sdk.dir=/path/to/android-sdk
-kotlin.apple.cocoapods.bin=/path/to/pod
 
 enableAndroidBuild=true
 enableIosBuild=true
@@ -43,7 +42,7 @@ enableIosBuild=true
 
 `local.properties` is ignored by Git and overrides the tracked defaults in `gradle.properties`. Command-line `-P` flags still take highest precedence for CI and one-off overrides.
 
-Enable only the platform builds your machine can support. Android requires an Android SDK; iOS requires macOS, Xcode, and CocoaPods. The Web/Wasm flag only enables the mock Compose preview module.
+Enable only the platform builds your machine can support. Android requires an Android SDK; native iOS requires macOS and Xcode. The Web/Wasm flag only enables the mock Compose preview module.
 
 ## Common checks
 
@@ -56,18 +55,14 @@ Android:
 
 iOS (Compose):
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-compose:shared:generateDummyFramework
 cd waltid-applications/waltid-wallet-demo-compose/iosApp
-pod install
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
 iOS (Native)
 ```bash
-./gradlew :waltid-applications:waltid-wallet-demo-ios:shared:generateDummyFramework
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
-pod install
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
 Public EUDI and local Enterprise E2E scripts live under:
@@ -103,14 +98,34 @@ From either platform scripts directory, create the mobile-only helper resources 
 ./e2e-local-enterprise.sh --prepare-only
 ```
 
-This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart. The iOS local Enterprise script runs `pod install` by default so the CocoaPods sandbox is in sync before Xcode starts.
+This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart.
+
+## API documentation checks
+
+The SDK-facing Kotlin mobile modules use KDoc and Dokka for Kotlin API
+reference docs. Dokka is configured to fail on warnings and undocumented public
+API for these modules:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+The native iOS Swift facade uses DocC. Generate and validate the Swift archive
+after assembling the local `WalletCore.xcframework`:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:assembleWalletCoreReleaseXCFramework -PenableIosBuild=true
+waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/generate-docc.sh
+```
+
+The mobile SDK docs CI workflow runs both documentation paths.
 
 ## Troubleshooting
 
 - **Android modules missing:** set `enableAndroidBuild=true` in `local.properties`, or pass `-PenableAndroidBuild=true`, then reload Gradle.
-- **iOS modules missing:** set `enableIosBuild=true` in `local.properties`, configure `kotlin.apple.cocoapods.bin`, or pass `-PenableIosBuild=true`, then reload Gradle.
+- **iOS modules missing:** set `enableIosBuild=true` in `local.properties`, or pass `-PenableIosBuild=true`, then reload Gradle.
 - **Web/Wasm preview module missing:** set `enableWalletDemoComposeWeb=true` in `local.properties`, or pass `-PenableWalletDemoComposeWeb=true`, then reload Gradle.
 - **Android SDK not found:** check `sdk.dir` in `local.properties`.
-- **CocoaPods not found:** check `kotlin.apple.cocoapods.bin` in `local.properties`.
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
 - **Local Enterprise E2E cannot reach services:** check `HOST_ALIAS_DOMAIN`, the running Enterprise stack, `baseSsl=true`, and omitted `basePort`.

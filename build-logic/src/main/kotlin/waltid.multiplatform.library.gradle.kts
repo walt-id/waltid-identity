@@ -1,6 +1,3 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
-
 plugins {
     id("waltid.multiplatform.library.common")
 
@@ -29,26 +26,6 @@ kotlin {
     if (enableIosBuild) {
         iosArm64()
         iosSimulatorArm64()
-    }
-}
-
-if (enableIosBuild) {
-    kotlin.targets.withType<KotlinNativeTarget>().configureEach {
-        val sdk = when (name) {
-            "iosArm64" -> "iphoneos"
-            else -> "iphonesimulator"
-        }
-
-        binaries.withType<TestExecutable>().configureEach {
-            val targetIosProject = project(":waltid-libraries:crypto:waltid-target-ios")
-            val frameworkPath = targetIosProject.layout.buildDirectory
-                .dir("cocoapods/synthetic/ios/build/Debug-$sdk/JOSESwift")
-                .get()
-                .asFile
-                .absolutePath
-
-            linkerOpts("-F$frameworkPath", "-framework", "JOSESwift", "-rpath", frameworkPath, "-lsqlite3")
-        }
     }
 }
 

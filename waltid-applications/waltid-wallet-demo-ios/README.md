@@ -20,7 +20,7 @@
 
 ## Overview
 
-Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with a Kotlin Multiplatform shared bridge and demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
+Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletSDK` Swift package and demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
 
 For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
@@ -28,14 +28,14 @@ For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Dev
 
 ```bash
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
-pod install
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
 E2E scripts live in [scripts](scripts/README.md).
 
 ## Related modules
 
+- [WalletSDK](../../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md)
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
-- [waltid-crypto-ios](../../waltid-libraries/crypto/waltid-crypto-ios/README.md)
+- [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)

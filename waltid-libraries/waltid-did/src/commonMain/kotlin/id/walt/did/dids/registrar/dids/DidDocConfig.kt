@@ -58,7 +58,7 @@ data class DidDocConfig(
 
     companion object {
         private val reservedKeys = listOf(
-            "context",
+            "@context",
             "id",
             "verificationMethod",
             "service",
@@ -179,7 +179,7 @@ data class DidDocConfig(
     @JsPromise
     @JsExport.Ignore
     suspend fun toDidDocument(did: String) = DidDocument(buildMap {
-        put("context", Json.encodeToJsonElement(context))
+        put("@context", Json.encodeToJsonElement(context))
         put("id", Json.encodeToJsonElement(did))
         createVerificationMethodSet(did).takeIf { it.isNotEmpty() }?.let {
             put("verificationMethod", Json.encodeToJsonElement(it))

@@ -88,7 +88,7 @@ Compose Multiplatform wallet demo for the mobile wallet SDK. Demonstrates creden
 **Use when:** You need the current cross-platform mobile wallet demo, Android or iOS E2E scripts, or a reference for wallet SDK integration in a mobile app.
 
 ### [🟢 waltid-wallet-demo-ios](./waltid-wallet-demo-ios)
-Native iOS wallet demo app. SwiftUI application backed by Kotlin Multiplatform wallet SDK components, with iOS Keychain / Secure Enclave-backed keys and E2E scripts for public EUDI and local Enterprise flows.
+Native iOS wallet demo app. SwiftUI application using the `WalletSDK` Swift package backed by Kotlin Multiplatform wallet SDK components, with iOS Keychain / Secure Enclave-backed keys and E2E scripts for public EUDI and local Enterprise flows.
 
 **Use when:** You need a native iOS wallet SDK reference implementation, iOS-specific integration patterns, or iOS wallet E2E coverage.
 
@@ -97,17 +97,10 @@ Android sample project for key generation, DID creation, signing, and verificati
 
 **Use when:** You need the legacy Android crypto/sample app while it is still available, or you are migrating existing Android sample usage to the Compose wallet demo.
 
+<br />
+<br />
+
 ### Test Applications
-
-### [🟡 waltid-crypto-ios-testApp](./waltid-crypto-ios-testApp)
-iOS test application for crypto library. Demonstrates cryptographic operations and key management on iOS.
-
-**Use when:** You need to test iOS cryptographic functionality or understand iOS crypto integration.
-
-### [🟡 waltid-openid4vc-ios-testApp](./waltid-openid4vc-ios-testApp)
-iOS test application for OpenID4VC library. Demonstrates OpenID4VC flows and credential operations on iOS.
-
-**Use when:** You need to test OpenID4VC functionality on iOS or understand iOS protocol integration.
 
 ### [🟢 waltid-digital-credentials](./waltid-digital-credentials)
 Standalone web test app for validating the Digital Credentials API flow directly against verifier endpoints. Provides a user-friendly interface for testing and debugging DC API verification flows.

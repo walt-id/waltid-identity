@@ -1,5 +1,5 @@
 plugins {
-    id("waltid.multiplatform.library")
+    id("waltid.full.library")
     id("waltid.publish.maven")
 }
 
@@ -44,13 +44,12 @@ kotlin {
             //implementation(identityLibs.ktor.client.jetty)
         }
 
-        /* To do:
-        androidMain.dependencies {
-            implementation(identityLibs.ktor.client.android)
-            implementation(identityLibs.ktor.client.okhttp)
+        if (enableAndroidBuild) {
+            androidMain.dependencies {
+                implementation(identityLibs.ktor.client.android)
+                implementation(identityLibs.ktor.client.okhttp)
+            }
         }
-         */
-
 
         macosMain.dependencies {
             implementation(identityLibs.ktor.client.cio)

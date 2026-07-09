@@ -5,11 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletFactory
-import id.walt.webdatafetching.WebDataFetcherManager
-import id.walt.webdatafetching.WebDataFetchingConfiguration
-import id.walt.webdatafetching.config.HttpEngine
 import kotlinx.coroutines.runBlocking
-import org.junit.BeforeClass
 import org.junit.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -30,13 +26,6 @@ class MobileWalletIntegrationTest {
 
     companion object {
         private const val TEST_WALLET_ID = "android-device-test-wallet"
-
-        @JvmStatic
-        @BeforeClass
-        fun setupEngine() {
-            WebDataFetcherManager.globalDefaultConfiguration =
-                WebDataFetchingConfiguration(http = HttpEngine.OkHttp)
-        }
     }
 
     private val context: Context

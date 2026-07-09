@@ -65,6 +65,17 @@ configure<JibExtension> {
             password = pass
         }
     }
+    // Bake the service's config/ directory into the image so the defaults always match the implementation.
+    if (file("config").isDirectory) {
+        extraDirectories {
+            paths {
+                path {
+                    setFrom("config")
+                    into = "/${project.name}/config"
+                }
+            }
+        }
+    }
 }
 
 // Required for hoplite to run correctly with buildFatJar task

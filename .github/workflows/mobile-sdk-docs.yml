@@ -1,0 +1,41 @@
+name: Mobile SDK API docs
+
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  mobile-sdk-docs:
+    runs-on: macos-26
+    env:
+      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Generate mobile SDK API docs
+        timeout-minutes: 45
+        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@108ad19bd20ff41d0adf823457adf6b017e9d91e
+        with:
+          waltid-directory: 'waltid-identity'
+          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+
+      - name: Package Swift WalletSDK DocC archive
+        working-directory: waltid-identity
+        run: |
+          tar -czf \
+            waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz \
+            -C waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc \
+            WalletSDK.doccarchive
+
+      - name: Upload Swift WalletSDK DocC archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: walletsdk-doccarchive
+          path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
+          if-no-files-found: error

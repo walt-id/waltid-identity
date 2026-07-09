@@ -44,7 +44,7 @@ import kotlin.test.assertNull
 class Issuer2CredentialStatusIntegrationTest {
 
     companion object {
-        const val JWT_VC_PROFILE_ID = "universityDegree"
+        const val JWT_VC_PROFILE_ID = "openBadgeCredential"
         const val SD_JWT_PROFILE_ID = "identityCredentialSdJwt"
         const val MDOC_PROFILE_ID = "isoPhotoId"
     }
@@ -103,7 +103,7 @@ class Issuer2CredentialStatusIntegrationTest {
         val jwtCredential = extractJwtCredential(responseBody)
         val vcPayload = decodeJwtPayload(jwtCredential)
 
-        val embeddedStatus = vcPayload["vc"]?.jsonObject?.get("credentialStatus")?.jsonObject
+        val embeddedStatus = jwtVcPayload(vcPayload)["credentialStatus"]?.jsonObject
         assertNotNull(embeddedStatus, "Credential should contain credentialStatus")
         assertEquals("BitstringStatusListEntry", embeddedStatus["type"]?.jsonPrimitive?.content)
         assertEquals("revocation", embeddedStatus["statusPurpose"]?.jsonPrimitive?.content)
@@ -157,7 +157,7 @@ class Issuer2CredentialStatusIntegrationTest {
         val jwtCredential = extractJwtCredential(responseBody)
         val vcPayload = decodeJwtPayload(jwtCredential)
 
-        val embeddedStatus = vcPayload["vc"]?.jsonObject?.get("credentialStatus")?.jsonObject
+        val embeddedStatus = jwtVcPayload(vcPayload)["credentialStatus"]?.jsonObject
         assertNotNull(embeddedStatus, "Credential should contain credentialStatus")
         assertEquals("StatusList2021Entry", embeddedStatus["type"]?.jsonPrimitive?.content)
         assertEquals("suspension", embeddedStatus["statusPurpose"]?.jsonPrimitive?.content)
@@ -198,7 +198,7 @@ class Issuer2CredentialStatusIntegrationTest {
         val jwtCredential = extractJwtCredential(responseBody)
         val vcPayload = decodeJwtPayload(jwtCredential)
 
-        val embeddedStatus = vcPayload["vc"]?.jsonObject?.get("credentialStatus")
+        val embeddedStatus = jwtVcPayload(vcPayload)["credentialStatus"]
         assertNull(embeddedStatus, "Credential should not contain credentialStatus when not configured")
     }
 
@@ -247,7 +247,7 @@ class Issuer2CredentialStatusIntegrationTest {
         val jwtCredential = extractJwtCredential(responseBody)
         val vcPayload = decodeJwtPayload(jwtCredential)
 
-        val embeddedStatus = vcPayload["vc"]?.jsonObject?.get("credentialStatus")?.jsonObject
+        val embeddedStatus = jwtVcPayload(vcPayload)["credentialStatus"]?.jsonObject
         assertNotNull(embeddedStatus)
         assertEquals("999", embeddedStatus["statusListIndex"]?.jsonPrimitive?.content)
         assertEquals("suspension", embeddedStatus["statusPurpose"]?.jsonPrimitive?.content)
@@ -467,6 +467,9 @@ class Issuer2CredentialStatusIntegrationTest {
     }
 
     private fun decodeJwtPayload(jwt: String): JsonObject = JwtUtils.parseJWTPayload(jwt)
+
+    private fun jwtVcPayload(jwtPayload: JsonObject): JsonObject =
+        jwtPayload["vc"]?.jsonObject ?: jwtPayload
 
     private fun decodeSdJwtPayload(sdJwt: String): JsonObject = SDJwt.parse(sdJwt).fullPayload
 }

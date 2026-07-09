@@ -22,6 +22,8 @@
 
 Mobile facade for the walt.id wallet SDK. This module exposes the Android/iOS-facing wallet API used by the native demo apps while delegating protocol behavior to [waltid-openid4vc-wallet](../waltid-openid4vc-wallet/README.md) and persistence to [waltid-openid4vc-wallet-persistence-mobile](../waltid-openid4vc-wallet-persistence-mobile/README.md).
 
+Native iOS apps should consume the Swift [WalletSDK](../waltid-wallet-sdk-ios/README.md) package, which wraps this KMP module behind Swift-owned types, `async`/`await`, and DocC documentation.
+
 For local setup and platform build flags, see the [Mobile Wallet Development Guide](../../../docs/mobile-wallet-development.md).
 
 ## Capabilities
@@ -36,3 +38,15 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 - [Compose Wallet Demo](../../../waltid-applications/waltid-wallet-demo-compose/README.md)
 - [iOS Wallet Demo](../../../waltid-applications/waltid-wallet-demo-ios/README.md)
+
+## API documentation
+
+Generate the SDK facade API reference with Dokka:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dokkaGeneratePublicationHtml -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+The generated HTML is written to `build/dokka/html`.
+
+The native Swift iOS facade has a separate DocC catalog in [WalletSDK](../waltid-wallet-sdk-ios/README.md).

@@ -1,5 +1,6 @@
 package id.walt.crypto.keys.azure
 
+import id.walt.crypto.exceptions.*
 import id.walt.crypto.keys.*
 import id.walt.crypto.keys.KeyUtils.rawSignaturePayloadForJws
 import id.walt.crypto.keys.KeyUtils.signJwsWithRawSignature
@@ -35,6 +36,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger { }
+private const val AZURE_KEY_VAULT_PROVIDER = "Azure Key Vault"
 
 @OptIn(ExperimentalJsExport::class)
 @JsExport
@@ -277,10 +279,15 @@ class AzureKeyRestApi(
     }
 
     object AzureKeyFunctions {
+        private val responseJson = Json { ignoreUnknownKeys = true }
+
         // See: https://docs.azure.cn/en-us/key-vault/keys/about-keys-details
         internal fun keyTypeToAzureKeyMapping(type: KeyType): Pair<String, String?> =
-            if (type == KeyType.secp256k1) "EC" to "P-256K" // Azure uses old "P-256K" instead of modern "secp256k1"
-            else type.jwkKty to type.jwkCurve
+            when (type) {
+                KeyType.Ed25519 -> throw KeyTypeNotSupportedException(type.name)
+                KeyType.secp256k1 -> "EC" to "P-256K" // Azure uses old "P-256K" instead of modern "secp256k1"
+                else -> type.jwkKty to type.jwkCurve
+            }
 
         internal fun azureKeyToKeyTypeMapping(crv: String, kty: String): KeyType = KeyTypes.getKeyTypeByJwkId(jwkKty = kty, jwkCrv = crv)
 
@@ -324,29 +331,47 @@ class AzureKeyRestApi(
                         "scope" to "https://vault.azure.net/.default"
                     ).formUrlEncode()
                 )
-            }.run {
-                runCatching { body<AzureTokenResponse>() }.getOrElse { ex ->
-                    throw IllegalArgumentException("Could not retrieve access token: ${bodyAsText()}", ex)
-                }
+            }
+            val bodyStr = response.bodyAsText()
+
+            if (!response.status.isSuccess()) ExternalKmsError.requestFailed(
+                provider = AZURE_KEY_VAULT_PROVIDER,
+                operation = "access token retrieval",
+                message = "returned HTTP ${response.status.value} ${response.status.description}: ${bodyStr.ifBlank { "empty response" }}",
+            )
+
+            val parsedResponse = runCatching { responseJson.decodeFromString<AzureTokenResponse>(bodyStr) }.getOrElse { ex ->
+                ExternalKmsError.requestFailed(
+                    provider = AZURE_KEY_VAULT_PROVIDER,
+                    operation = "access token retrieval",
+                    message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
+                    cause = ex,
+                )
             }
 
-            check(response.tokenType.lowercase() == "bearer") { "Can only handle bearer access tokens!" }
+            check(parsedResponse.tokenType.lowercase() == "bearer") { "Can only handle bearer access tokens!" }
 
             return AzureTokenResponseParsed(
-                accessToken = response.accessToken,
-                expiration = time + response.expiresIn.seconds
+                accessToken = parsedResponse.accessToken,
+                expiration = time + parsedResponse.expiresIn.seconds
             )
         }
 
-        internal suspend fun HttpResponse.azureJsonDataBody(): JsonObject {
-            val baseMsg = { "Azure server (URL: ${this.request.url}) returned an invalid response: " }
+        internal suspend fun HttpResponse.azureJsonDataBody(operation: String = "request"): JsonObject {
+            val bodyStr = bodyAsText()
 
-            return runCatching { body<JsonObject>() }.getOrElse {
-                val bodyStr = this.bodyAsText() // Get the body in case of an exception
-                throw IllegalArgumentException(
-                    baseMsg.invoke() + if (bodyStr.isEmpty()) "empty response (instead of JSON data)"
-                    else "invalid response: $bodyStr",
-                    it
+            if (!status.isSuccess()) ExternalKmsError.requestFailed(
+                provider = AZURE_KEY_VAULT_PROVIDER,
+                operation = operation,
+                message = "returned HTTP ${status.value} ${status.description}: ${bodyStr.ifBlank { "empty response" }}",
+            )
+
+            return runCatching { responseJson.parseToJsonElement(bodyStr).jsonObject }.getOrElse {
+                ExternalKmsError.requestFailed(
+                    provider = AZURE_KEY_VAULT_PROVIDER,
+                    operation = operation,
+                    message = if (bodyStr.isBlank()) "returned an empty response instead of JSON" else "returned invalid JSON: $bodyStr",
+                    cause = it,
                 )
             }
         }
@@ -385,40 +410,44 @@ class AzureKeyRestApi(
 
         @JsExport.Ignore
         override suspend fun generate(type: KeyType, metadata: AzureKeyMetadata): AzureKeyRestApi {
-            val keyName = metadata.name ?: Random.nextInt().toString()
+            return runCatching {
+                val keyName = metadata.name ?: Random.nextInt().toString()
 
-            val accessTokenResponse = fetchAccessToken(metadata.auth)
-            val (kty, crv) = keyTypeToAzureKeyMapping(type)
-            val keyRequestBody = if (kty == "RSA") {
-                KeyCreateRequest(
-                    kty = kty,
-                    keySize = 2048
+                val accessTokenResponse = fetchAccessToken(metadata.auth)
+                val (kty, crv) = keyTypeToAzureKeyMapping(type)
+                val keyRequestBody = if (kty == "RSA") {
+                    KeyCreateRequest(
+                        kty = kty,
+                        keySize = 2048
+                    )
+                } else {
+                    KeyCreateRequest(
+                        kty = kty,
+                        crv = crv!!
+                    )
+                }
+                val response = client.post("${metadata.auth.keyVaultUrl}/keys/$keyName/create?api-version=7.4") {
+                    contentType(ContentType.Application.Json)
+                    bearerAuth(accessTokenResponse.accessToken)
+                    setBody(keyRequestBody)
+                }.azureJsonDataBody("key generation")
+
+                val parsedAzurePublicKey = parseAzurePublicKey(response.jsonObject["key"]?.jsonObject!!)
+
+                val keyId = parsedAzurePublicKey.kid
+
+                val createdKey = AzureKeyRestApi(
+                    id = keyId,
+                    auth = metadata.auth,
+                    _keyType = parsedAzurePublicKey.keyType,
+                    _publicKey = DirectSerializedKey(parsedAzurePublicKey.publicKey)
                 )
-            } else {
-                KeyCreateRequest(
-                    kty = kty,
-                    crv = crv!!
-                )
+                createdKey.auth?.clientSecret = metadata.auth.clientSecret
+
+                createdKey
+            }.getOrElse {
+                ExternalKmsError.generationFailed(AZURE_KEY_VAULT_PROVIDER, type.name, it)
             }
-            val response = client.post("${metadata.auth.keyVaultUrl}/keys/$keyName/create?api-version=7.4") {
-                contentType(ContentType.Application.Json)
-                bearerAuth(accessTokenResponse.accessToken)
-                setBody(keyRequestBody)
-            }.azureJsonDataBody()
-
-            val parsedAzurePublicKey = parseAzurePublicKey(response.jsonObject["key"]?.jsonObject!!)
-
-            val keyId = parsedAzurePublicKey.kid
-
-            val createdKey = AzureKeyRestApi(
-                id = keyId,
-                auth = metadata.auth,
-                _keyType = parsedAzurePublicKey.keyType,
-                _publicKey = DirectSerializedKey(parsedAzurePublicKey.publicKey)
-            )
-            createdKey.auth?.clientSecret = metadata.auth.clientSecret
-
-            return createdKey
         }
     }
 }

@@ -40,6 +40,7 @@ kotlin {
             api(project(":waltid-libraries:credentials:waltid-dcql"))
             api(project(":waltid-libraries:sdjwt:waltid-sdjwt"))
             api(project(":waltid-libraries:waltid-did"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
 
 
             implementation(identityLibs.kotlincrypto.hash.sha2)
@@ -48,10 +49,6 @@ kotlin {
             implementation(kotlin("test"))
             implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
             implementation(identityLibs.kotlinx.coroutines.test)
-        }
-        jvmMain.dependencies {
-            // X.509 certificate extensions (AKI etc.) for trusted_authorities DCQL matching
-            implementation(project(":waltid-libraries:crypto:waltid-x509"))
         }
         jvmTest.dependencies {
             implementation(identityLibs.slf4j.simple)
