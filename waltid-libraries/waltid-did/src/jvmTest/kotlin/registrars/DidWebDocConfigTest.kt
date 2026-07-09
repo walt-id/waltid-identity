@@ -33,7 +33,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
             )
             assertEquals(
@@ -65,7 +65,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
             ) + rootDocCustomProperties.keys
             assertEquals(
@@ -197,7 +197,7 @@ class DidWebDocConfigTest {
             )
         ).let { result ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "verificationMethod",
                 "authentication",
@@ -287,7 +287,7 @@ class DidWebDocConfigTest {
                     ),
                 )
             ).didDocument.let { document ->
-                val expectedKeys = listOf("context", "id", "verificationMethod", verRelType.toString())
+                val expectedKeys = listOf("@context", "id", "verificationMethod", verRelType.toString())
                 assertEquals(
                     expected = expectedKeys.size,
                     actual = document.keys.size,
@@ -305,7 +305,7 @@ class DidWebDocConfigTest {
     @Test
     fun testRootDocCustomPropertyInvalidOverrideAttempt() = runTest {
         val rootDocReservedKeys = listOf(
-            "context",
+            "@context",
             "id",
             "verificationMethod",
             "service",
@@ -335,7 +335,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
             )
             assertEquals(
@@ -360,7 +360,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "verificationMethod",
             ) + VerificationRelationshipType.entries.map { it.toString() }
@@ -394,7 +394,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "verificationMethod"
             ) + VerificationRelationshipType.entries.map { it.toString() }
@@ -424,7 +424,7 @@ class DidWebDocConfigTest {
                 didDocConfig = DidDocConfig.buildFromPublicKeySetVerificationConfiguration(),
             )
         ).didDocument.let { document ->
-            val expectedKeys = listOf("context", "id")
+            val expectedKeys = listOf("@context", "id")
             assertEquals(
                 expected = expectedKeys.size,
                 actual = document.keys.size,
@@ -456,7 +456,7 @@ class DidWebDocConfigTest {
                         )
                 )
             ).didDocument.let { document ->
-                val expectedKeys = listOf("context", "id", "verificationMethod", verRelType.toString())
+                val expectedKeys = listOf("@context", "id", "verificationMethod", verRelType.toString())
                 assertEquals(
                     expected = expectedKeys.size,
                     actual = document.keys.size,
@@ -491,7 +491,7 @@ class DidWebDocConfigTest {
                     )
             )
         ).didDocument.let { document ->
-            val expectedKeys = listOf("context", "id", "verificationMethod") + verRelTypeList.map { it.toString() }
+            val expectedKeys = listOf("@context", "id", "verificationMethod") + verRelTypeList.map { it.toString() }
             assertEquals(
                 expected = expectedKeys.size,
                 actual = document.keys.size,
@@ -530,7 +530,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "verificationMethod"
             ) + VerificationRelationshipType.entries.map { it.toString() }
@@ -575,7 +575,7 @@ class DidWebDocConfigTest {
                         )
                 )
             ).didDocument.let { document ->
-                val expectedKeys = listOf("context", "id", "verificationMethod", verRelType.toString())
+                val expectedKeys = listOf("@context", "id", "verificationMethod", verRelType.toString())
                 assertEquals(
                     expected = expectedKeys.size,
                     actual = document.keys.size,
@@ -610,7 +610,7 @@ class DidWebDocConfigTest {
                     )
             )
         ).didDocument.let { document ->
-            val expectedKeys = listOf("context", "id", "verificationMethod") + verRelTypeList.map { it.toString() }
+            val expectedKeys = listOf("@context", "id", "verificationMethod") + verRelTypeList.map { it.toString() }
             assertEquals(
                 expected = expectedKeys.size,
                 actual = document.keys.size,
@@ -649,7 +649,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "verificationMethod"
             ) + VerificationRelationshipType.entries.map { it.toString() }
@@ -698,7 +698,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "service",
             )
@@ -743,7 +743,7 @@ class DidWebDocConfigTest {
             )
         ).didDocument.let { document ->
             val expectedKeys = listOf(
-                "context",
+                "@context",
                 "id",
                 "service",
             )

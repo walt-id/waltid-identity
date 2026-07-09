@@ -6,7 +6,6 @@ IOSAPP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 IDENTITY_DIR="${IDENTITY_DIR:-$(cd "$SCRIPT_DIR/../../../.." && pwd)}"
 CREDENTIAL_ID="${EUDI_CREDENTIAL_ID:-eu.europa.ec.eudi.pid_vc_sd_jwt}"
 SIMULATOR_ID="${IOS_SIMULATOR_ID:-}"
-IOS_SIMULATOR_ARCHS="${IOS_SIMULATOR_ARCHS:-arm64}"
 RESULT_BUNDLE_PATH="${RESULT_BUNDLE_PATH:-$IOSAPP_DIR/build/compose-eudi-e2e.xcresult}"
 DERIVED_DATA_PATH="${DERIVED_DATA_PATH:-$IOSAPP_DIR/build/xcode-derived-compose-eudi}"
 SKIP_IOS_APP_SETUP="${SKIP_IOS_APP_SETUP:-false}"
@@ -28,22 +27,16 @@ raise SystemExit(1)
 fi
 
 [ -f "$IDENTITY_DIR/gradlew" ] || err "gradlew not found at $IDENTITY_DIR"
-[ -f "$IOSAPP_DIR/iosApp.xcworkspace/contents.xcworkspacedata" ] || err "iosApp workspace not found"
+[ -d "$IOSAPP_DIR/iosApp.xcodeproj" ] || err "iosApp project not found"
 
 if [ "$SKIP_IOS_APP_SETUP" != "true" ]; then
-  log "BUILD" "Syncing Compose iOS framework and CocoaPods"
+  log "BUILD" "Resolving Compose iOS SwiftPM linkage package"
   (
     cd "$IDENTITY_DIR"
-    PLATFORM_NAME=iphonesimulator \
-    SDK_NAME=iphonesimulator \
-    ARCHS="$IOS_SIMULATOR_ARCHS" \
-    CONFIGURATION=Debug \
-      ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:syncFramework \
-        -Pkotlin.native.cocoapods.platform=iphonesimulator \
-        -Pkotlin.native.cocoapods.archs="$IOS_SIMULATOR_ARCHS" \
-        -Pkotlin.native.cocoapods.configuration=Debug
+    XCODEPROJ_PATH="$IOSAPP_DIR/iosApp.xcodeproj" \
+      ./gradlew :waltid-applications:waltid-wallet-demo-compose:sharedUI:integrateLinkagePackage \
+        -PenableIosBuild=true
   )
-  (cd "$IOSAPP_DIR" && pod install)
 fi
 
 log "CHECK" "Simulator: $SIMULATOR_ID"
@@ -57,13 +50,12 @@ mkdir -p "$(dirname "$RESULT_BUNDLE_PATH")" "$DERIVED_DATA_PATH"
 env \
   E2E_CREDENTIAL_ID="$CREDENTIAL_ID" \
   xcodebuild \
-    -workspace "$IOSAPP_DIR/iosApp.xcworkspace" \
+    -project "$IOSAPP_DIR/iosApp.xcodeproj" \
     -scheme iosApp \
     -destination "id=$SIMULATOR_ID" \
     -resultBundlePath "$RESULT_BUNDLE_PATH" \
     -derivedDataPath "$DERIVED_DATA_PATH" \
     test \
-    -only-testing:iosAppUITests/EudiPublicBackendE2ETests/testReceiveAndPresentAgainstEudiPublicBackends \
-    OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES
+    -only-testing:iosAppUITests/EudiPublicBackendE2ETests/testReceiveAndPresentAgainstEudiPublicBackends
 
 log "DONE" "Compose iOS public EUDI UI E2E completed"
