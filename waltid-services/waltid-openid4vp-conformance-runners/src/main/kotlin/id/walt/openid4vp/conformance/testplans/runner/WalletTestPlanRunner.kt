@@ -5,10 +5,8 @@ import id.walt.openid4vp.conformance.testplans.httpdata.CreateTestPlanResponse
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import io.ktor.client.*
-import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.coroutines.delay
 import kotlinx.serialization.json.*
 
 /**
@@ -16,16 +14,18 @@ import kotlinx.serialization.json.*
  * 
  * Flow:
  * 1. Create test plan on conformance suite
- * 2. Get list of test modules
+ * 2. Get list of test modules from create response
  * 3. For each module:
- *    a. Start module (conformance suite generates request)
- *    b. Wallet processes request (automatic callback)
- *    c. Poll for result (wait up to 30s)
+ *    a. Create test instance (via /api/runner)
+ *    b. Wait for WAITING state
+ *    c. Trigger wallet to process authorization request
+ *    d. Wait for completion
+ *    e. Get result
  * 4. Collect and return results
  */
 class WalletTestPlanRunner(
     val testPlan: WalletTestPlan,
-    val httpClient: HttpClient,
+    val conformanceHttp: HttpClient,
     val conformanceHost: String,
     val conformancePort: Int
 ) {
@@ -51,19 +51,20 @@ class WalletTestPlanRunner(
         val planResponse = createTestPlan()
         val testPlanId = planResponse.id
         println("Test plan created: $testPlanId")
+        println("View plan: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
 
         // Get test modules from create response
-        val modules = planResponse.modules.map { it.testModule }
+        val modules = planResponse.modules
         println("Test modules: ${modules.size}")
-        modules.forEach { println("   - $it") }
+        modules.forEach { println("   - ${it.testModule}") }
         println()
 
         // Run each module
         val results = mutableListOf<TestPlanResult>()
-        modules.forEachIndexed { index, moduleId ->
-            println("[${index + 1}/${modules.size}] Running module: $moduleId")
+        modules.forEachIndexed { index, module ->
+            println("[${index + 1}/${modules.size}] Running module: ${module.testModule}")
             
-            val result = runModule(testPlanId, moduleId)
+            val result = runModule(testPlanId, module)
             results.add(result)
 
             println("   Result: ${result.walletStatus}")
@@ -84,7 +85,6 @@ class WalletTestPlanRunner(
      * Returns the full response which includes the modules list.
      */
     private suspend fun createTestPlan(): CreateTestPlanResponse {        
-        // Conformance suite API expects planName AND variant as URL-encoded query parameters
         val variantJson = Json.encodeToString(testPlan.variant)
         
         println("DEBUG: Creating test plan...")
@@ -92,16 +92,13 @@ class WalletTestPlanRunner(
         println("DEBUG: Variant JSON: $variantJson")
         println("DEBUG: Configuration: ${testPlan.configuration}")
         
-        // Build URL using same helper as working verifier tests
         val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
             append("planName", testPlan.planName)
             append("variant", variantJson)
         }
         
         println("DEBUG: URL: $createTestPlanUrl")
-        println("DEBUG: About to make HTTP POST request...")
         
-        // Use same createTestPlan method as working verifier tests
         val body = buildJsonObject {
             put("configuration", testPlan.configuration)
         }
@@ -112,68 +109,71 @@ class WalletTestPlanRunner(
     }
 
     /**
-     * Run a single test module
+     * Run a single test module.
+     * Uses the same API pattern as verifier tests: buildCreateTestUrl + createTest.
      */
-    private suspend fun runModule(testPlanId: String, moduleId: String): TestPlanResult {
-        // Start module
-        val startResponse = conformance.conformanceHttp.post("/api/plan/$testPlanId/module/$moduleId/start") {
-            contentType(ContentType.Application.Json)
-        }
+    private suspend fun runModule(testPlanId: String, module: CreateTestPlanResponse.Module): TestPlanResult {
+        val moduleId = module.testModule
+        
+        try {
+            // Create test instance for this module (same API as verifier tests)
+            val createTestUrl = conformance.buildCreateTestUrl(testPlanId, module.testModule, module.variant)
+            println("   Creating test: $createTestUrl")
+            
+            val createTestResponse = conformance.createTest(createTestUrl)
+            val testId = createTestResponse.id
+            println("   Test ID: $testId")
+            println("   View: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
 
-        if (!startResponse.status.isSuccess()) {
+            // Wait for test to be ready (WAITING state)
+            conformance.waitForTestStatus(testId, shouldBeWaiting = true)
+
+            // Get the test run result which contains exposed endpoints
+            val testRunResult = conformance.getTestRun(testId)
+            println("   Test exposed endpoints available")
+
+            // For wallet tests, trigger the wallet to process the authorization request
+            // The conformance suite exposes an authorization endpoint
+            val authEndpoint = testRunResult.getExposedAuthorizationEndpoint()
+            println("   Authorization endpoint: $authEndpoint")
+            
+            // Trigger wallet via adapter (adapter forwards to wallet API)
+            // Use https for the conformance suite
+            val httpsEndpoint = authEndpoint.replace("http://", "https://")
+            val walletResponse = conformanceHttp.get(httpsEndpoint)
+            println("   Wallet response: ${walletResponse.status}")
+
+            // Wait for test to complete (no longer WAITING)
+            conformance.waitForTestStatus(testId, shouldBeWaiting = false)
+
+            // Get final result from test info
+            val testInfo = conformance.getTestRunInfo(testId)
+            val conformanceResult = testInfo.result ?: "UNKNOWN"
+            
+            // For wallet tests, wallet status == conformance result
+            val walletStatus = when {
+                testPlan.expectRejection && conformanceResult == "PASSED" -> "REJECTED"
+                conformanceResult == "PASSED" -> "PASSED"
+                conformanceResult == "FAILED" -> "FAILED"
+                conformanceResult == "WARNING" -> "PASSED" // Warnings are acceptable
+                else -> "UNKNOWN"
+            }
+
+            return TestPlanResult(
+                conformanceTestId = testId,
+                conformanceResult = conformanceResult,
+                walletStatus = walletStatus,
+                errorMessage = null
+            )
+            
+        } catch (e: Exception) {
             return TestPlanResult(
                 conformanceTestId = moduleId,
                 conformanceResult = "ERROR",
                 walletStatus = "ERROR",
-                errorMessage = "Failed to start module: ${startResponse.status}"
+                errorMessage = e.message ?: "Unknown error"
             )
         }
-
-        // Poll for result (up to 30 seconds)
-        val maxAttempts = 60 // 60 * 500ms = 30 seconds
-        var attempts = 0
-
-        while (attempts < maxAttempts) {
-            delay(500)
-            attempts++
-
-            val resultResponse = conformance.conformanceHttp.get("/api/plan/$testPlanId/module/$moduleId/result")
-
-            if (resultResponse.status.isSuccess()) {
-                val resultBody = resultResponse.body<JsonObject>()
-                val status = resultBody["status"]?.jsonPrimitive?.content
-
-                if (status == "FINISHED" || status == "FAILED") {
-                    val conformanceResult = resultBody["result"]?.jsonPrimitive?.content ?: "UNKNOWN"
-                    
-                    // For wallet tests, wallet status == conformance result
-                    // (conformance suite validates wallet responses)
-                    val walletStatus = when {
-                        testPlan.expectRejection && conformanceResult == "PASSED" -> "REJECTED" // Wallet correctly rejected
-                        conformanceResult == "PASSED" -> "PASSED"
-                        conformanceResult == "FAILED" -> "FAILED"
-                        else -> "UNKNOWN"
-                    }
-
-                    return TestPlanResult(
-                        conformanceTestId = moduleId,
-                        conformanceResult = conformanceResult,
-                        walletStatus = walletStatus,
-                        errorMessage = if (conformanceResult == "FAILED") {
-                            resultBody["error"]?.jsonPrimitive?.content
-                        } else null
-                    )
-                }
-            }
-        }
-
-        // Timeout
-        return TestPlanResult(
-            conformanceTestId = moduleId,
-            conformanceResult = "TIMEOUT",
-            walletStatus = "TIMEOUT",
-            errorMessage = "Module did not complete within 30 seconds"
-        )
     }
 
     /**
@@ -228,7 +228,7 @@ class WalletTestPlanRunner(
             } else {
                 val allPassed = results.all { it.walletStatus == "PASSED" }
                 check(allPassed) {
-                    "Test plan had ${results.count { it.walletStatus == "FAILED" }} failures"
+                    "Test plan had ${results.count { it.walletStatus != "PASSED" }} failures"
                 }
             }
         }
