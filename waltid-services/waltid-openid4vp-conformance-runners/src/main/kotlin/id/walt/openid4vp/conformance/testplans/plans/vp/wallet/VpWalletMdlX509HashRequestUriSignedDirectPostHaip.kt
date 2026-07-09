@@ -62,7 +62,7 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
                 "authorization_encrypted_response_alg": "ECDH-ES",
                 "authorization_encrypted_response_enc": "A256GCM"
             },
-            "publish": "no"
+            "publish": "everything"
         }
         """.trimIndent()
     )

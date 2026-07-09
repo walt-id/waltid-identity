@@ -61,7 +61,7 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
                 "authorization_encrypted_response_alg": "ECDH-ES",
                 "authorization_encrypted_response_enc": "A256GCM"
             },
-            "publish": "no"
+            "publish": "everything"
         }
         """.trimIndent()
     )

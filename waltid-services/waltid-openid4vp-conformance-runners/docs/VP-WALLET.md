@@ -1,103 +1,241 @@
 # VP Wallet Conformance Tests
 
-This document covers setup, execution, and status of OpenID4VP Wallet conformance tests.
+Complete guide for running OpenID4VP Wallet conformance tests against the OpenID Foundation conformance suite.
 
 ## Current Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| Test plan creation | ✅ Working | Verified via `IsolatedWalletConformanceTest` |
-| Test module fetching | ❌ 404 Error | API path needs investigation |
-| Full test execution | 🔄 Blocked | Waiting on module fetch fix |
+| Test plan creation | ✅ Working | Plans created with 12 modules |
+| Module extraction | ✅ Working | Modules from create response |
+| Full test execution | 🔄 Ready | Needs wallet API + adapter running |
 
 **Last tested:** 2026-07-09
 
-### Known Issues
-
-1. **Test module 404**: After test plan creation succeeds, `getTestModules()` returns 404
-2. **Timeout in main test class**: `VpWalletConformanceTests` has mysterious HTTP timeouts;
-   use `IsolatedWalletConformanceTest` for now
-
 ---
 
-## Quick Start
+## Quick Start — Full Test Run
 
-### Prerequisites
+### Step 1: Start Conformance Suite
 
-1. **Conformance Suite** running:
-   ```bash
-   cd ~/dev/openid/conformance-suite
-   docker compose -f docker-compose-walt.yml up -d
-   ```
+```bash
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-walt.yml up -d
 
-2. **Hosts entry**: `/etc/hosts` must contain:
-   ```
-   127.0.0.1 localhost.emobix.co.uk
-   ```
+# Wait ~30s for startup, then verify:
+curl -k https://localhost.emobix.co.uk:8443/api/runner/available
+```
 
-3. Verify conformance suite is up:
-   ```bash
-   curl -k https://localhost.emobix.co.uk:8443/api/runner/available
-   ```
+### Step 2: Start Wallet API2
 
-### Running Tests
+In a **new terminal**:
 
 ```bash
 cd ~/dev/walt-id/waltid-unified-build
 
-# Run the working isolated test (RECOMMENDED)
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "IsolatedWalletConformanceTest"
-
-# Run full test suite (may timeout - use for debugging)
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "VpWalletConformanceTests"
+# Start wallet-api2 on port 7001
+./gradlew :waltid-services:waltid-wallet-api2:run
 ```
+
+Wait until you see: `Application started` or similar.
+
+### Step 3: Run Full Conformance Tests
+
+In a **new terminal**:
+
+```bash
+cd ~/dev/walt-id/waltid-unified-build
+
+# Run ALL wallet conformance tests (starts adapter automatically)
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests" --rerun-tasks --info
+```
+
+### Step 4: View Logs
+
+Open: <https://localhost.emobix.co.uk:8443/logs.html>
+
+Note: Tests use `"publish":"no"` by default. To see them in logs, either:
+- Change `publish` to `"summary"` in test plan configuration, OR
+- Query directly: `curl -sk https://localhost.emobix.co.uk:8443/api/plan/<PLAN_ID>`
+
+---
+
+## Individual Test Commands
+
+### Validate Setup Only (No Wallet Required)
+
+```bash
+# Just creates test plan, doesn't run modules
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "IsolatedWalletConformanceTest" --rerun-tasks
+```
+
+### Run SD-JWT VC Tests Only
+
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests.VP Wallet - SD-JWT VC" --rerun-tasks
+```
+
+### Run mDL Tests Only
+
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests.VP Wallet - mDL" --rerun-tasks
+```
+
+### Run Negative/Security Tests Only
+
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests.VP Wallet - Negative Tests" --rerun-tasks
+```
+
+---
+
+## Prerequisites Checklist
+
+- [ ] **Hosts entry**: `/etc/hosts` contains `127.0.0.1 localhost.emobix.co.uk`
+- [ ] **Conformance suite running**: `docker ps | grep conformance`
+- [ ] **Wallet API2 running**: `curl http://127.0.0.1:7001/wallet-api/health` (or check terminal)
+- [ ] **Truststore configured**: Handled by `build.gradle.kts` automatically
 
 ---
 
 ## Test Profiles
 
-### HAIP-Compliant Profiles (Recommended)
+### SD-JWT VC (HAIP-Compliant)
 
-| Profile | Format | Client ID | Response Mode | Status |
-|---------|--------|-----------|---------------|--------|
-| SD-JWT VC HAIP | SD-JWT VC | **x509_hash** | direct_post.jwt | 🔄 Pending |
-| mDL HAIP | ISO mDL | **x509_hash** | direct_post.jwt | 🔄 Pending |
-| Negative Security | SD-JWT VC | **x509_hash** | direct_post.jwt | 🔄 Pending |
+| Module | Description |
+|--------|-------------|
+| `wallet-happy-flow` | Basic presentation flow |
+| `wallet-alternate-happy-flow` | With optional state, longer nonce |
+| `wallet-request-uri-method-post` | POST for request_uri |
+| `wallet-fewer-claims-than-available` | Data minimization |
+| `wallet-optional-credential-set` | Credential sets handling |
+| `wallet-no-claims-in-dcql-query` | No selective disclosure |
+| `wallet-negative-test-*` | Security validation (6 tests) |
 
-### Baseline Profiles (Non-HAIP)
-
-| Profile | Format | Client ID | Response Mode | Status |
-|---------|--------|-----------|---------------|--------|
-| SD-JWT VC Baseline | SD-JWT VC | x509_san_dns | direct_post.jwt | ✅ Plan created |
-| mDL Baseline | ISO mDL | x509_san_dns | direct_post.jwt | 🔄 Pending |
-
-> ⚠️ **HAIP Requirement P-02**: For full HAIP compliance, `x509_hash` MUST be used.
+**Total: 12 test modules**
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Conformance     │    │ Wallet Adapter  │    │ Wallet API2     │
-│ Suite (Verifier)│───▶│ (port 7006)     │───▶│ (port 7001)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────────┐
+│ Conformance Suite   │
+│ (Verifier Role)     │
+│ port 8443           │
+└─────────┬───────────┘
+          │ 1. Sends authorization request
+          ▼
+┌─────────────────────┐
+│ Wallet Adapter      │
+│ port 7006           │
+│ (bridges protocol)  │
+└─────────┬───────────┘
+          │ 2. Forwards to wallet API
+          ▼
+┌─────────────────────┐
+│ Wallet API2         │
+│ port 7001           │
+│ (processes request) │
+└─────────────────────┘
+          │ 3. Returns VP response
+          ▼
+    Back to Conformance Suite
 ```
 
-The **VpWalletConformanceAdapter** bridges the conformance suite with the walt.id wallet API.
+The test runner:
+1. Creates a test plan on conformance suite
+2. Starts the wallet adapter (Ktor server on port 7006)
+3. Runs each test module
+4. Adapter proxies conformance ↔ wallet communication
+5. Reports results
 
 ---
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `WALLET_API_URL` | Wallet API2 base URL | `http://127.0.0.1:7001` |
-| `WALLET_ADAPTER_PORT` | Adapter port | `7006` |
-| `CONFORMANCE_HOST` | Conformance suite host | `localhost.emobix.co.uk` |
-| `CONFORMANCE_PORT` | Conformance suite port | `8443` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WALLET_API_URL` | `http://127.0.0.1:7001` | Wallet API2 base URL |
+| `WALLET_ADAPTER_PORT` | `7006` | Adapter listens here |
+| `CONFORMANCE_HOST` | `localhost.emobix.co.uk` | Conformance suite hostname |
+| `CONFORMANCE_PORT` | `8443` | Conformance suite HTTPS port |
+| `CONFORMANCE_WALLET_ID` | (auto) | Wallet ID for testing |
+
+---
+
+## Troubleshooting
+
+### Tests timeout immediately
+
+**Cause**: Wallet API2 not running or wrong port.
+
+**Fix**:
+```bash
+# Check wallet is running
+curl http://127.0.0.1:7001/wallet-api/health
+
+# If not, start it:
+./gradlew :waltid-services:waltid-wallet-api2:run
+```
+
+### "Connection refused" to conformance suite
+
+**Cause**: Conformance suite not running or hosts entry missing.
+
+**Fix**:
+```bash
+# Check hosts
+grep emobix /etc/hosts
+# Should show: 127.0.0.1 localhost.emobix.co.uk
+
+# Check Docker
+docker ps | grep conformance
+
+# Restart if needed
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-walt.yml restart
+```
+
+### SSL certificate errors
+
+**Cause**: JVM truststore not configured.
+
+**Fix**: The `build.gradle.kts` sets this automatically. If issues persist:
+```bash
+# Verify truststore exists
+ls -la ~/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
+```
+
+### Tests pass but no logs visible
+
+**Cause**: `publish` is set to `"no"`.
+
+**Fix**: Query the plan directly:
+```bash
+# Get plan ID from test output, then:
+curl -sk "https://localhost.emobix.co.uk:8443/api/plan/<PLAN_ID>" | jq .
+```
+
+Or change the test configuration to `"publish": "summary"`.
+
+---
+
+## HAIP Compliance Requirements
+
+| Req ID | Requirement | Implementation |
+|--------|-------------|----------------|
+| P-02 | x509_hash client identification | ✅ Test plans use `x509_hash` variant |
+| W-27 | JAR with request_uri | ✅ `request_uri_signed` mode |
+| W-28 | direct_post.jwt response mode | ✅ Configured in variant |
+| W-29 | Response encryption (ECDH-ES) | ✅ `authorization_encrypted_response_alg` |
+| W-36 | KB-JWT holder binding | 🔄 Wallet implementation |
+| CF-02 | P-256 + SHA-256 | ✅ Default curve |
 
 ---
 
@@ -105,54 +243,22 @@ The **VpWalletConformanceAdapter** bridges the conformance suite with the walt.i
 
 ```
 waltid-openid4vp-conformance-runners/
+├── docs/
+│   └── VP-WALLET.md              # This file
 ├── src/main/kotlin/.../
 │   ├── adapter/
-│   │   └── VpWalletConformanceAdapter.kt
-│   ├── testplans/
-│   │   ├── http/ConformanceInterface.kt
-│   │   ├── runner/WalletTestPlanRunner.kt
-│   │   └── plans/vp/wallet/
-│   │       ├── WalletTestPlan.kt
-│   │       ├── VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost.kt
-│   │       ├── VpWalletMdlX509SanDnsRequestUriSignedDirectPost.kt
-│   │       └── VpWalletNegativeTests.kt
+│   │   └── VpWalletConformanceAdapter.kt  # HTTP bridge
+│   ├── config/
+│   │   └── ConformanceConfig.kt           # Environment config
+│   └── testplans/
+│       ├── http/ConformanceInterface.kt   # Conformance API client
+│       ├── runner/WalletTestPlanRunner.kt # Test orchestration
+│       └── plans/vp/wallet/
+│           ├── WalletTestPlan.kt                              # Base class
+│           ├── VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost.kt
+│           ├── VpWalletMdlX509SanDnsRequestUriSignedDirectPost.kt
+│           └── VpWalletNegativeTests.kt
 └── src/test/kotlin/.../
-    ├── IsolatedWalletConformanceTest.kt  # ← Working test (use this)
-    └── VpWalletConformanceTests.kt       # Full suite (timeout issues)
+    ├── IsolatedWalletConformanceTest.kt  # Setup validation only
+    └── VpWalletConformanceTests.kt       # Full test suite
 ```
-
----
-
-## Troubleshooting
-
-### "Failed to get test modules: 404"
-
-The test plan was created but the API path for modules is incorrect. Investigation needed.
-
-### HTTP Timeout in VpWalletConformanceTests
-
-The main test class has timeout issues due to class initialization. Use `IsolatedWalletConformanceTest` instead:
-
-```bash
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "IsolatedWalletConformanceTest"
-```
-
-### Conformance suite not available
-
-1. Check Docker is running: `docker ps | grep conformance`
-2. Verify hosts entry: `ping localhost.emobix.co.uk`
-3. Test HTTPS: `curl -k https://localhost.emobix.co.uk:8443/`
-
----
-
-## HAIP Requirements
-
-| Req | Description | Status |
-|-----|-------------|--------|
-| P-02 | x509_hash client identification | 🔄 Pending |
-| W-27 | JAR with request_uri | 🔄 Pending |
-| W-28 | direct_post.jwt response mode | 🔄 Pending |
-| W-29 | Response encryption (ECDH-ES + P-256) | 🔄 Pending |
-| W-36 | KB-JWT holder binding | 🔄 Pending |
-| CF-02 | P-256 + SHA-256 | 🔄 Pending |
