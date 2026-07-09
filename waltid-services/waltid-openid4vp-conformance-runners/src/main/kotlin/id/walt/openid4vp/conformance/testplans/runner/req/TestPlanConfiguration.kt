@@ -9,5 +9,7 @@ import kotlinx.serialization.json.JsonObject
 data class TestPlanConfiguration(
     val testPlanCreationUrl: ParametersBuilder.() -> Unit,
     val testPlanCreationConfiguration: JsonObject,
+    val moduleVariant: String? = null,
+    val moduleOutcomes: Map<String, ExpectedVerifierOutcome> = emptyMap(),
     val verificationSessionSetup: VerificationSessionSetup
 )
