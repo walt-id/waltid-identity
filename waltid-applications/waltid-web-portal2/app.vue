@@ -83,7 +83,7 @@ const hasResult = computed(() =>
       Issue and verify digital credentials using the issuer2 &amp; verifier2 APIs.
     </p>
 
-    <div class="flex gap-5 items-stretch mb-5">
+    <div class="flex gap-5 items-start mb-5">
       <!-- Left card: editor -->
       <div class="card flex-1 min-w-0 flex flex-col">
         <div class="flex items-center border-b border-[--color-border]">
@@ -161,7 +161,7 @@ const hasResult = computed(() =>
       </div>
 
       <!-- Right card: QR + buttons -->
-      <div class="card w-[340px] shrink-0 p-5 flex flex-col justify-center min-h-[340px]">
+      <div class="card w-[340px] h-[440px] shrink-0 p-5 flex flex-col justify-center sticky top-5">
         <IssueResult v-if="activeTab === 'issue'" :session="issuerSession" />
         <VerifyResult v-else :session="verifierSession" />
       </div>
