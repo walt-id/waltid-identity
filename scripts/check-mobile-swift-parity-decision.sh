@@ -130,6 +130,11 @@ fi
 mobile_abi_changed=false
 swift_parity_evidence=false
 
+if (( ${#changed_files[@]} == 0 )); then
+  echo "No changed files detected; Swift parity gate skipped."
+  exit 0
+fi
+
 for changed_file in "${changed_files[@]}"; do
   case "$changed_file" in
     waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/api/*|\
