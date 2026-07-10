@@ -71,12 +71,10 @@ class ConformanceTestRunner(
                 val planName = plan::class.simpleName ?: plan::class.jvmName
 
                 test(planName) {
-                    val results = TestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
-                    println("Plan $planName completed: ${results.size} modules run")
-                    results.forEachIndexed { i, r ->
-                        println("  [$i] ${r.conformanceTestId}: conformance=${r.conformanceResult}, verifier=${r.verifierStatus}")
-                    }
-                    results
+                    val result = TestPlanRunner(plan.config, http, conformanceHost, conformancePort).test()
+                    println("Plan $planName completed: ${result.conformanceTestId}")
+                    println("  conformance=${result.conformanceResult}, verifier=${result.verifierStatus}")
+                    result
                 }
             }
         }

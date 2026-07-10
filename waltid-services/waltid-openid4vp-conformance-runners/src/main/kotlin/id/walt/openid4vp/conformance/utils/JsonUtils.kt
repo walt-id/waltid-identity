@@ -4,6 +4,10 @@ import kotlinx.serialization.json.Json
 
 object JsonUtils {
 
-    inline fun <reified T> String.fromJson() = Json.decodeFromString<T>(this)
+    val lenientJson = Json {
+        ignoreUnknownKeys = true
+    }
+
+    inline fun <reified T> String.fromJson() = lenientJson.decodeFromString<T>(this)
 
 }
