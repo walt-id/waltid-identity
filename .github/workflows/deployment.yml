@@ -68,6 +68,9 @@ jobs:
           - k8s: waltid-identity/waltid-services/waltid-verifier-api/k8s/opa
             name: opa
             namespace: ${{ inputs.oss }}
+          - k8s: waltid-identity/docs/mobile-sdk-api/k8s
+            name: sdk-docs
+            namespace: ${{ inputs.oss }}
           - k8s: waltid-identity-enterprise/k8s
             name: waltid-enterprise
             namespace: ${{ inputs.enterprise }}
