@@ -81,6 +81,7 @@ jobs:
               ".github/actions/gradle-setup-action/*"
               ".github/actions/ios-build-setup/*"
               ".github/actions/set-properties/*"
+              "scripts/check-mobile-swift-parity-decision.sh"
               "build-logic/*"
               "build.gradle.kts"
               "gradle/*"
