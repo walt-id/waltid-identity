@@ -1,0 +1,49 @@
+package id.walt.walletdemo.compose.ui
+
+internal object WalletUiTestTags {
+    val Status = tag("status")
+    val CredentialsEmpty = tag("credentials", "empty")
+    val CredentialDetailsScreen = tag("credentialDetailsScreen")
+    val DetailsBack = tag("detailsBack")
+    val Did = tag("did")
+    val OfferInput = tag("offerInput")
+    val ReceiveButton = tag("receiveButton")
+    val ReceiveNewButton = tag("receiveNewButton")
+    val ReceiveTabContent = tag("receiveTabContent")
+    val PresentationInput = tag("presentationInput")
+    val PresentButton = tag("presentButton")
+    val PresentationNewButton = tag("presentationNewButton")
+    val PresentTabContent = tag("presentTabContent")
+    val PresentationReview = tag("presentationReview")
+    val PresentationActions = tag("presentationActions")
+    val PresentationSubmitButton = tag("presentationSubmitButton")
+    val PresentationCancelButton = tag("presentationCancelButton")
+    val PresentationVerifier = tag("presentationVerifier")
+    val VerifierTechnicalDetailsToggle = tag("verifierTechnicalDetailsToggle")
+    val VerifierTechnicalDetails = tag("verifierTechnicalDetails")
+    val PinInput = tag("pinInput")
+    val PinConfirmationInput = tag("pinConfirmationInput")
+    val PinSubmitButton = tag("pinSubmitButton")
+    val CredentialsTab = tag("tab", "credentials")
+    val ReceiveTab = tag("tab", "receive")
+    val PresentTab = tag("tab", "present")
+
+    fun claim(path: String): String = dynamicTag("claim", path)
+    fun claimImage(path: String): String = dynamicTag("claimImage", path)
+    fun claimGroup(title: String): String = dynamicTag("claimGroup", title)
+    fun credentialCard(id: String): String = tag("credentialCard", id)
+    fun credentialDetails(id: String): String = tag("credentialDetails", id)
+    fun credentialOverview(id: String): String = tag("credentialOverview", id)
+    fun presentationCredential(id: String): String = tag("presentationCredential", id)
+
+    private fun tag(vararg segments: String): String =
+        (listOf(Namespace) + segments).joinToString(separator = ".")
+
+    private fun dynamicTag(kind: String, rawValue: String): String =
+        tag(kind, rawValue.toTestTagSegment())
+
+    private const val Namespace = "wallet"
+}
+
+private fun String.toTestTagSegment(): String =
+    map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")

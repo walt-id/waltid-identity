@@ -21,6 +21,7 @@ internal fun UrlActionSection(
     label: String,
     buttonText: String,
     enabled: Boolean,
+    inputEnabled: Boolean = true,
     inputTestTag: String,
     buttonTestTag: String,
     onClick: () -> Unit,
@@ -34,8 +35,9 @@ internal fun UrlActionSection(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag(inputTestTag),
-            minLines = 3,
-            maxLines = 3,
+            enabled = inputEnabled,
+            minLines = 1,
+            maxLines = 2,
         )
         Button(
             enabled = enabled,

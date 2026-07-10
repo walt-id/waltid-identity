@@ -40,6 +40,9 @@ kotlin {
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
             implementation(identityLibs.compose.material3)
+            implementation(identityLibs.compose.material.icons.core)
+            implementation(identityLibs.compose.navigation3.ui)
+            implementation(identityLibs.coil.compose)
         }
 
         commonTest.dependencies {

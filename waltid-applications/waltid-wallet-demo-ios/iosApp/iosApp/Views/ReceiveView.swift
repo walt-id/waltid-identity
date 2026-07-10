@@ -2,30 +2,63 @@ import SwiftUI
 
 struct ReceiveView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @Binding var path: [String]
+
+    private var receivedDetails: [CredentialDetails] {
+        viewModel.receivedCredentials.map(CredentialDisplayNormalizer.details(for:))
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Receive")
-                .font(.headline)
+        NavigationStack(path: $path) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    UrlEditor(
+                        title: "Receive",
+                        label: "Credential offer URL",
+                        text: $viewModel.offerUrl,
+                        inputIdentifier: WalletAccessibilityID.offerInput,
+                        isEnabled: viewModel.receiveUrlEntryEnabled
+                    )
 
-            TextEditor(text: $viewModel.offerUrl)
-                .font(.footnote.monospaced())
-                .frame(minHeight: 72, maxHeight: 96)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(.separator), lineWidth: 1)
-                )
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .accessibilityIdentifier("wallet.offerInput")
+                    Button("Receive") {
+                        viewModel.receiveCredential()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.waltBlue)
+                    .disabled(!viewModel.receiveActionEnabled)
+                    .accessibilityIdentifier(WalletAccessibilityID.receiveButton)
 
-            Button("Receive") {
-                viewModel.receiveCredential()
+                    StatusBannerView(
+                        message: viewModel.statusMessage(for: .receive),
+                        isLoading: viewModel.statusIsLoading(for: .receive),
+                        isError: viewModel.statusIsError(for: .receive)
+                    )
+
+                    if viewModel.receiveCompleted {
+                        Button("New receive", action: viewModel.startNewReceiveFlow)
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier(WalletAccessibilityID.receiveNewButton)
+
+                        Text("Received credentials")
+                            .font(.subheadline.weight(.semibold))
+
+                        ForEach(receivedDetails) { item in
+                            CredentialCardButton(details: item) {
+                                path.append(item.id)
+                            }
+                        }
+                    }
+                }
+                .padding()
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.waltBlue)
-            .disabled(!viewModel.isReady || viewModel.offerUrl.isEmpty || viewModel.isLoading)
-            .accessibilityIdentifier("wallet.receiveButton")
+            .navigationTitle("Receive")
+            .navigationDestination(for: String.self) { credentialID in
+                CredentialDetailsDestination(
+                    credentialID: credentialID,
+                    details: receivedDetails
+                )
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.receiveTabContent)
         }
     }
 }

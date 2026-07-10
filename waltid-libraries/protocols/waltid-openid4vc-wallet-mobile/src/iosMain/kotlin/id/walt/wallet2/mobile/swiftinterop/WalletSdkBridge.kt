@@ -5,6 +5,7 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
+import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
@@ -104,6 +105,34 @@ public class WalletSdkBridge private constructor(
             )
         }
 
+    /**
+     * Resolves and previews an OpenID4VP presentation request without submitting credentials.
+     */
+    public suspend fun previewPresentation(
+        requestUrl: String,
+    ): WalletBridgeResult<MobileWalletPresentationPreview> =
+        walletBridgeCall {
+            operations.previewPresentation(requestUrl = requestUrl)
+        }
+
+    /**
+     * Submits a presentation using user-selected wallet credential IDs.
+     */
+    public suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialIds: List<String>,
+        did: String? = null,
+        runPolicies: Boolean? = null,
+    ): WalletBridgeResult<MobileWalletPresentationResult> =
+        walletBridgeCall {
+            operations.submitPresentation(
+                requestUrl = requestUrl,
+                selectedCredentialIds = selectedCredentialIds,
+                did = did,
+                runPolicies = runPolicies,
+            )
+        }
+
     internal companion object {
         internal fun forOperations(
             operations: WalletSdkBridgeOperations,
@@ -136,6 +165,18 @@ internal interface WalletSdkBridgeOperations {
         did: String?,
         runPolicies: Boolean?,
     ): MobileWalletPresentationResult
+
+    suspend fun previewPresentation(
+        requestUrl: String,
+    ): MobileWalletPresentationPreview
+
+    suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialIds: List<String>,
+        did: String?,
+        runPolicies: Boolean?,
+    ): MobileWalletPresentationResult
+
 }
 
 internal class MobileWalletSdkBridgeOperations(
@@ -177,4 +218,23 @@ internal class MobileWalletSdkBridgeOperations(
             did = did,
             runPolicies = runPolicies,
         )
+
+    override suspend fun previewPresentation(
+        requestUrl: String,
+    ): MobileWalletPresentationPreview =
+        wallet.previewPresentation(requestUrl = requestUrl)
+
+    override suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialIds: List<String>,
+        did: String?,
+        runPolicies: Boolean?,
+    ): MobileWalletPresentationResult =
+        wallet.submitPresentation(
+            requestUrl = requestUrl,
+            selectedCredentialIds = selectedCredentialIds,
+            did = did,
+            runPolicies = runPolicies,
+        )
+
 }

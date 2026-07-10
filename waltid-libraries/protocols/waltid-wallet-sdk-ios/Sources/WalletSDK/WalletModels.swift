@@ -468,6 +468,9 @@ public struct Credential: Equatable, Identifiable, Sendable {
     /// Date the credential was added to the wallet when available.
     public let addedAt: Date?
 
+    /// Raw parsed credential data encoded as JSON, when available.
+    public let credentialDataJSON: String?
+
     /// Creates credential metadata visible to SDK consumers.
     ///
     /// - Parameters:
@@ -479,13 +482,16 @@ public struct Credential: Equatable, Identifiable, Sendable {
     ///   - label: User-facing credential label when available.
     ///   - addedAt: Date the credential was added to the wallet when
     ///     available.
+    ///   - credentialDataJSON: Raw parsed credential data encoded as JSON,
+    ///     when available.
     public init(
         id: String,
         format: String,
         issuer: String?,
         subject: String?,
         label: String?,
-        addedAt: Date?
+        addedAt: Date?,
+        credentialDataJSON: String? = nil
     ) {
         self.id = id
         self.format = format
@@ -493,6 +499,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
         self.subject = subject
         self.label = label
         self.addedAt = addedAt
+        self.credentialDataJSON = credentialDataJSON
     }
 }
 
@@ -541,6 +548,177 @@ public struct PresentationResult: Equatable, Sendable {
         self.success = success
         self.redirectTo = redirectTo
         self.verifierResponseJSON = verifierResponseJSON
+    }
+}
+
+/// Preview of an OpenID4VP presentation request before the wallet submits a VP token.
+public struct PresentationPreview: Equatable, Sendable {
+    /// Verifier/request information shown to the user.
+    public let request: PresentationRequestInfo
+
+    /// Credentials that satisfy the request's DCQL queries.
+    public let credentialOptions: [PresentationCredentialOption]
+
+    /// Creates a presentation preview.
+    ///
+    /// - Parameters:
+    ///   - request: Verifier and request metadata extracted from the
+    ///     presentation request.
+    ///   - credentialOptions: Wallet credentials that can satisfy the
+    ///     requested credential queries.
+    public init(
+        request: PresentationRequestInfo,
+        credentialOptions: [PresentationCredentialOption]
+    ) {
+        self.request = request
+        self.credentialOptions = credentialOptions
+    }
+}
+
+/// Verifier metadata extracted from a presentation request.
+public struct PresentationRequestInfo: Equatable, Sendable {
+    /// OpenID4VP client identifier.
+    public let clientID: String?
+
+    /// Human-readable verifier name from client metadata when available.
+    public let verifierName: String?
+
+    /// Response URI used for direct-post responses when available.
+    public let responseURI: URL?
+
+    /// OpenID state value.
+    public let state: String?
+
+    /// OpenID nonce value.
+    public let nonce: String?
+
+    /// Creates presentation request information.
+    ///
+    /// - Parameters:
+    ///   - clientID: OpenID4VP client identifier from the request.
+    ///   - verifierName: Human-readable verifier name from client metadata
+    ///     when available.
+    ///   - responseURI: Direct-post response URI when available.
+    ///   - state: OpenID state value from the request.
+    ///   - nonce: OpenID nonce value from the request.
+    public init(
+        clientID: String? = nil,
+        verifierName: String? = nil,
+        responseURI: URL? = nil,
+        state: String? = nil,
+        nonce: String? = nil
+    ) {
+        self.clientID = clientID
+        self.verifierName = verifierName
+        self.responseURI = responseURI
+        self.state = state
+        self.nonce = nonce
+    }
+}
+
+/// A wallet credential that satisfies one presentation credential query.
+public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
+    /// Stable UI identifier made from query and credential IDs.
+    public var id: String { "\(queryID):\(credentialID)" }
+
+    /// DCQL credential query identifier.
+    public let queryID: String
+
+    /// Wallet-local credential identifier.
+    public let credentialID: String
+
+    /// Credential format.
+    public let format: String
+
+    /// Issuer identifier when available.
+    public let issuer: String?
+
+    /// Subject identifier when available.
+    public let subject: String?
+
+    /// User-facing label when available.
+    public let label: String?
+
+    /// Raw credential data encoded as JSON, when available.
+    public let credentialDataJSON: String?
+
+    /// Requested credential values shown for informed consent.
+    public let disclosures: [PresentationDisclosure]
+
+    /// Creates a presentation credential option.
+    ///
+    /// - Parameters:
+    ///   - queryID: DCQL credential query identifier this option satisfies.
+    ///   - credentialID: Wallet-local credential identifier.
+    ///   - format: Credential format.
+    ///   - issuer: Issuer identifier when available.
+    ///   - subject: Subject identifier when available.
+    ///   - label: User-facing credential label when available.
+    ///   - credentialDataJSON: Raw credential data encoded as JSON, when
+    ///     available.
+    ///   - disclosures: Credential values requested from this credential.
+    public init(
+        queryID: String,
+        credentialID: String,
+        format: String,
+        issuer: String?,
+        subject: String?,
+        label: String?,
+        credentialDataJSON: String?,
+        disclosures: [PresentationDisclosure] = []
+    ) {
+        self.queryID = queryID
+        self.credentialID = credentialID
+        self.format = format
+        self.issuer = issuer
+        self.subject = subject
+        self.label = label
+        self.credentialDataJSON = credentialDataJSON
+        self.disclosures = disclosures
+    }
+}
+
+/// Credential value that may be shared.
+public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
+    /// Stable display identifier.
+    public var id: String { path }
+
+    /// JSON-path-like claim path.
+    public let path: String
+
+    /// Claim name when known.
+    public let name: String?
+
+    /// Raw claim value encoded as JSON.
+    public let valueJSON: String
+
+    /// Human-readable value when trivially available.
+    public let displayValue: String?
+
+    /// Whether this value comes from a selectively disclosable claim.
+    public let selectivelyDisclosable: Bool
+
+    /// Creates a presentation disclosure.
+    ///
+    /// - Parameters:
+    ///   - path: JSON-path-like claim path.
+    ///   - name: Claim name when known.
+    ///   - valueJSON: Raw claim value encoded as JSON.
+    ///   - displayValue: Human-readable value when trivially available.
+    ///   - selectivelyDisclosable: Whether this value comes from a
+    ///     selectively disclosable claim.
+    public init(
+        path: String,
+        name: String?,
+        valueJSON: String,
+        displayValue: String?,
+        selectivelyDisclosable: Bool
+    ) {
+        self.path = path
+        self.name = name
+        self.valueJSON = valueJSON
+        self.displayValue = displayValue
+        self.selectivelyDisclosable = selectivelyDisclosable
     }
 }
 

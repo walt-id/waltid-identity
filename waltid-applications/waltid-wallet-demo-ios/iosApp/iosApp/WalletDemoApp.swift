@@ -6,6 +6,16 @@ struct WalletDemoApp: App {
         let env = ProcessInfo.processInfo.environment
         let defaults = UserDefaults.standard
         let walletID = env["E2E_WALLET_ID"] ?? defaults.string(forKey: "E2E_WALLET_ID") ?? "default"
+        if env["E2E_MOCK_WALLET"] == "1" {
+            let delayMilliseconds = UInt64(env["E2E_MOCK_WALLET_DELAY_MS"] ?? "") ?? 0
+            return WalletViewModel(
+                walletID: walletID,
+                walletClient: MockWalletClient(
+                    operationDelayMilliseconds: delayMilliseconds,
+                    verifierStyle: Self.mockVerifierStyle(environment: env)
+                )
+            )
+        }
         let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL")
         if let baseUrl, !baseUrl.isEmpty {
             return WalletViewModel(
@@ -21,15 +31,21 @@ struct WalletDemoApp: App {
 
     var body: some Scene {
         WindowGroup {
-            NavigationView {
-                ContentView(viewModel: viewModel)
-                    .navigationTitle("walt.id Wallet")
-            }
-            .navigationViewStyle(.stack)
+            ContentView(viewModel: viewModel)
             .tint(.waltBlue)
             .onOpenURL { url in
                 viewModel.handleDeepLink(url)
             }
         }
+    }
+
+    private static func mockVerifierStyle(environment: [String: String]) -> MockWalletClient.VerifierStyle {
+        if environment["E2E_MOCK_DNS_VERIFIER"] == "1" {
+            return .x509SanDns
+        }
+        if environment["E2E_MOCK_DID_VERIFIER"] == "1" {
+            return .did
+        }
+        return .named
     }
 }

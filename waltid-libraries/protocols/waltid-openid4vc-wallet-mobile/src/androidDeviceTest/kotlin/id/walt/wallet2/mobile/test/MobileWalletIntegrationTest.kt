@@ -100,6 +100,43 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
+    fun previewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = demoPresentationScenario("eudi-pid-mdoc")
+        val client = MobileWalletFactory(context).create(walletConfig("preview-submit-${scenario.id}"))
+        val bootstrapResult = client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive ${scenario.displayName} from public demo issuer2",
+        )
+
+        val session = DemoTestBackend.createVerifierSession(scenario)
+        val preview = client.previewPresentation(session.authorizationRequestUri)
+        assertTrue(
+            preview.credentialOptions.isNotEmpty(),
+            "Should preview at least one matching credential for ${scenario.displayName}: preview=$preview",
+        )
+        assertTrue(
+            preview.credentialOptions.all { it.credentialId in credentialIds },
+            "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
+        )
+
+        val result = client.submitPresentation(
+            requestUrl = session.authorizationRequestUri,
+            selectedCredentialIds = preview.credentialOptions.map { it.credentialId },
+            did = bootstrapResult.did,
+        )
+        assertTrue(
+            result.success,
+            "public demo verifier2 stepwise presentation should succeed for ${scenario.displayName}: preview=$preview, result=$result",
+        )
+
+        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+    }
+
+    @Test
     fun receiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() = runBlocking {
         receiveAndPresentDemoCredential("iso-mdl")
     }

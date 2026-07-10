@@ -153,6 +153,58 @@ class MobileWalletTest {
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
     }
 
+    @Test
+    fun credentialSummaryCanExposeParsedCredentialDataJson() {
+        val credential = MobileWalletCredential(
+            id = "credential-1",
+            format = "vc+sd-jwt",
+            issuer = "https://issuer.example",
+            subject = "did:key:subject",
+            label = "PID",
+            addedAt = null,
+            credentialDataJson = """{"given_name":"Ada"}""",
+        )
+
+        assertEquals("""{"given_name":"Ada"}""", credential.credentialDataJson)
+    }
+
+    @Test
+    fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
+        val preview = MobileWalletPresentationPreview(
+            request = MobileWalletPresentationRequestInfo(
+                clientId = "https://verifier.example",
+                verifierName = "Example Verifier",
+                responseUri = "https://verifier.example/direct-post",
+                state = "state-1",
+                nonce = "nonce-1",
+            ),
+            credentialOptions = listOf(
+                MobileWalletPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "credential-1",
+                    format = "vc+sd-jwt",
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    label = "PID",
+                    credentialDataJson = """{"given_name":"Ada"}""",
+                    disclosures = listOf(
+                        MobileWalletPresentationDisclosure(
+                            path = "$.given_name",
+                            name = "given_name",
+                            valueJson = """"Ada"""",
+                            displayValue = "Ada",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                )
+            ),
+        )
+
+        assertEquals("https://verifier.example", preview.request.clientId)
+        assertEquals("credential-1", preview.credentialOptions.single().credentialId)
+        assertEquals("Ada", preview.credentialOptions.single().disclosures.single().displayValue)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun mobileWalletEventStreamDoesNotBackpressureSlowCollectors() = runTest {

@@ -12,6 +12,9 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption
+import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -108,6 +111,7 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(result)
         assertEquals("credential-1", result.value.single().id)
         assertEquals("https://issuer.example", result.value.single().issuer)
+        assertEquals("""{"given_name":"Ada"}""", result.value.single().credentialDataJson)
     }
 
     @Test
@@ -139,6 +143,38 @@ class WalletSdkBridgeTest {
         assertEquals("openid4vp://request", operations.presentationRequestUrl)
         assertEquals("did:jwk:issuer", operations.presentationDid)
         assertEquals(true, operations.presentationRunPolicies)
+    }
+
+    @Test
+    fun bridgePresentationPreviewReturnsSwiftSafeDtos() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.previewPresentation("openid4vp://request")
+
+        assertIs<WalletBridgeResult.Success<MobileWalletPresentationPreview>>(result)
+        assertEquals("https://verifier.example", result.value.request.clientId)
+        assertEquals("credential-1", result.value.credentialOptions.single().credentialId)
+        assertEquals("openid4vp://request", operations.previewRequestUrl)
+    }
+
+    @Test
+    fun bridgeSubmitPresentationForwardsSelectedCredentialIds() = runTest {
+        val operations = FakeWalletSdkBridgeOperations()
+        val bridge = WalletSdkBridge.forOperations(operations)
+
+        val result = bridge.submitPresentation(
+            requestUrl = "openid4vp://request",
+            selectedCredentialIds = listOf("credential-1"),
+            did = "did:jwk:issuer",
+            runPolicies = false,
+        )
+
+        assertIs<WalletBridgeResult.Success<MobileWalletPresentationResult>>(result)
+        assertEquals(listOf("credential-1"), operations.submittedCredentialIds)
+        assertEquals("openid4vp://request", operations.submittedRequestUrl)
+        assertEquals("did:jwk:issuer", operations.submittedDid)
+        assertEquals(false, operations.submittedRunPolicies)
     }
 
     @Test
@@ -428,7 +464,16 @@ class WalletSdkBridgeTest {
             private set
         var deleteWalletCalls = 0
             private set
-
+        var previewRequestUrl: String? = null
+            private set
+        var submittedRequestUrl: String? = null
+            private set
+        var submittedCredentialIds: List<String>? = null
+            private set
+        var submittedDid: String? = null
+            private set
+        var submittedRunPolicies: Boolean? = null
+            private set
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
             didMethod: String,
@@ -459,6 +504,7 @@ class WalletSdkBridgeTest {
                     subject = null,
                     label = "PID",
                     addedAt = null,
+                    credentialDataJson = """{"given_name":"Ada"}""",
                 )
             )
 
@@ -474,6 +520,48 @@ class WalletSdkBridgeTest {
             presentationRequestUrl = requestUrl
             presentationDid = did
             presentationRunPolicies = runPolicies
+            return MobileWalletPresentationResult(
+                success = true,
+                redirectTo = "wallet://return",
+                verifierResponseJson = """{"accepted":true}""",
+            )
+        }
+
+        override suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreview {
+            previewRequestUrl = requestUrl
+            return MobileWalletPresentationPreview(
+                request = MobileWalletPresentationRequestInfo(
+                    clientId = "https://verifier.example",
+                    verifierName = "Example Verifier",
+                    responseUri = "https://verifier.example/direct-post",
+                    state = "state-1",
+                    nonce = "nonce-1",
+                ),
+                credentialOptions = listOf(
+                    MobileWalletPresentationCredentialOption(
+                        queryId = "pid",
+                        credentialId = "credential-1",
+                        format = "vc+sd-jwt",
+                        issuer = "https://issuer.example",
+                        subject = null,
+                        label = "PID",
+                        credentialDataJson = """{"given_name":"Ada"}""",
+                        disclosures = emptyList(),
+                    )
+                ),
+            )
+        }
+
+        override suspend fun submitPresentation(
+            requestUrl: String,
+            selectedCredentialIds: List<String>,
+            did: String?,
+            runPolicies: Boolean?,
+        ): MobileWalletPresentationResult {
+            submittedRequestUrl = requestUrl
+            submittedCredentialIds = selectedCredentialIds
+            submittedDid = did
+            submittedRunPolicies = runPolicies
             return MobileWalletPresentationResult(
                 success = true,
                 redirectTo = "wallet://return",

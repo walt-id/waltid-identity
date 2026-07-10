@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.mobile
 
 import id.walt.crypto.keys.Key
@@ -12,16 +14,23 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
+import id.walt.wallet2.handlers.PresentationCredentialOption
+import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import id.waltid.openid4vci.wallet.attestation.HttpWalletAttestationProvider
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.ktor.http.Url
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -43,6 +52,7 @@ public data class MobileWalletBootstrapResult(
  * @property subject Subject identifier extracted from the credential when available.
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
+ * @property credentialDataJson Parsed credential data encoded as JSON for app-side display, when available.
  */
 public data class MobileWalletCredential(
     public val id: String,
@@ -51,6 +61,7 @@ public data class MobileWalletCredential(
     public val subject: String?,
     public val label: String?,
     public val addedAt: String?,
+    public val credentialDataJson: String? = null,
 )
 
 /**
@@ -219,6 +230,7 @@ public class MobileWallet internal constructor(
                 subject = meta.subject,
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
+                credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
             )
         }
 
@@ -255,6 +267,50 @@ public class MobileWallet internal constructor(
     }
 
     /**
+     * Resolves and previews an OpenID4VP presentation request without submitting credentials.
+     */
+    public suspend fun previewPresentation(requestUrl: String): MobileWalletPresentationPreview {
+        val result = WalletPresentationHandler.previewPresentation(
+            wallet = wallet,
+            request = PreviewPresentationRequest(
+                requestUrl = Url(requestUrl.trim()),
+            ),
+            onEvent = ::emitSessionEvent,
+        )
+
+        return MobileWalletPresentationPreview(
+            request = MobileWalletPresentationRequestInfo(
+                clientId = result.authorizationRequest.clientId,
+                verifierName = result.authorizationRequest.clientMetadata?.clientName,
+                responseUri = result.authorizationRequest.responseUri,
+                state = result.authorizationRequest.state,
+                nonce = result.authorizationRequest.nonce,
+            ),
+            credentialOptions = result.credentialOptions.map { it.toMobileCredentialOption() },
+        )
+    }
+
+    /**
+     * Submits a presentation using the credential IDs selected by the user from [previewPresentation].
+     */
+    public suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialIds: List<String>,
+        did: String? = null,
+        runPolicies: Boolean? = null,
+    ): MobileWalletPresentationResult =
+        WalletPresentationHandler.submitPresentation(
+            wallet = wallet,
+            request = SubmitPresentationRequest(
+                requestUrl = Url(requestUrl.trim()),
+                selectedCredentialIds = selectedCredentialIds,
+                did = did,
+                runPolicies = runPolicies,
+            ),
+            onEvent = ::emitSessionEvent,
+        ).toMobilePresentationResult()
+
+    /**
      * Deletes local wallet material owned by this mobile wallet instance.
      *
      * The active key, credential, and DID stores receive store-level remove calls. The wallet then closes
@@ -278,4 +334,42 @@ public class MobileWallet internal constructor(
         eventStream.tryEmit(mobileEvent)
         onEvent(mobileEvent)
     }
+
+    private fun PresentationCredentialOption.toMobileCredentialOption(): MobileWalletPresentationCredentialOption =
+        MobileWalletPresentationCredentialOption(
+            queryId = queryId,
+            credentialId = credentialId,
+            format = format,
+            issuer = issuer,
+            subject = subject,
+            label = label,
+            credentialDataJson = credentialData.encodeJsonObject(),
+            disclosures = disclosures.map { disclosure ->
+                MobileWalletPresentationDisclosure(
+                    path = disclosure.path,
+                    name = disclosure.name,
+                    valueJson = Json.encodeToString(JsonElement.serializer(), disclosure.value),
+                    displayValue = disclosure.value.displayValue(),
+                    selectivelyDisclosable = disclosure.selectivelyDisclosable,
+                )
+            },
+        )
+
+    private fun WalletPresentResult.toMobilePresentationResult(): MobileWalletPresentationResult =
+        MobileWalletPresentationResult(
+            success = transmissionSuccess ?: false,
+            redirectTo = redirectTo,
+            verifierResponseJson = verifierResponse?.let {
+                Json.encodeToString(JsonElement.serializer(), it)
+            },
+        )
+
+    private fun JsonObject.encodeJsonObject(): String =
+        Json.encodeToString(JsonObject.serializer(), this)
+
+    private fun JsonElement.displayValue(): String? =
+        when (this) {
+            is JsonPrimitive -> contentOrNull
+            else -> toString()
+        }
 }

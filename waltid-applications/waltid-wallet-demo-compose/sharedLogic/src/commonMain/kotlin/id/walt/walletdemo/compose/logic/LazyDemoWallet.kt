@@ -25,4 +25,14 @@ internal class LazyDemoWallet(
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         wallet().present(requestUrl, did)
+
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview =
+        wallet().previewPresentation(requestUrl)
+
+    override suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialIds: List<String>,
+        did: String?,
+    ): WalletDemoOperationResult =
+        wallet().submitPresentation(requestUrl, selectedCredentialIds, did)
 }

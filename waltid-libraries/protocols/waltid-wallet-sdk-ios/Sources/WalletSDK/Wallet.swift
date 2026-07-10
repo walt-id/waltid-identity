@@ -108,4 +108,38 @@ public actor Wallet {
     ) async throws -> PresentationResult {
         try await bridge.present(request: request, did: did, runPolicies: runPolicies)
     }
+
+    /// Resolves and previews an OpenID4VP presentation request without submitting credentials.
+    ///
+    /// - Parameter request: OpenID4VP authorization request URL received by the app.
+    /// - Returns: Verifier metadata and matching credential options.
+    /// - Throws: ``WalletError`` when the request cannot be resolved or matched.
+    public func previewPresentation(request: URL) async throws -> PresentationPreview {
+        try await bridge.previewPresentation(request: request)
+    }
+
+    /// Submits a presentation with user-selected credential identifiers.
+    ///
+    /// - Parameters:
+    ///   - request: OpenID4VP authorization request URL received by the app.
+    ///   - selectedCredentialIDs: Wallet credential identifiers selected from
+    ///     ``previewPresentation(request:)``.
+    ///   - did: Optional wallet DID to use for presentation.
+    ///   - runPolicies: Optional policy execution override for presentation.
+    /// - Returns: Presentation outcome.
+    /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
+    public func submitPresentation(
+        request: URL,
+        selectedCredentialIDs: [String],
+        did: String? = nil,
+        runPolicies: Bool? = nil
+    ) async throws -> PresentationResult {
+        try await bridge.submitPresentation(
+            request: request,
+            selectedCredentialIDs: selectedCredentialIDs,
+            did: did,
+            runPolicies: runPolicies
+        )
+    }
+
 }

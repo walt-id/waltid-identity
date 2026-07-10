@@ -2,30 +2,73 @@ import SwiftUI
 
 struct PresentView: View {
     @ObservedObject var viewModel: WalletViewModel
+    @Binding var path: [String]
+
+    private var presentationDetails: [CredentialDetails] {
+        viewModel.presentationPreview?.credentialOptions.map(CredentialDisplayNormalizer.details(for:)) ?? []
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Present")
-                .font(.headline)
+        NavigationStack(path: $path) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    UrlEditor(
+                        title: "Present",
+                        label: "OpenID4VP request URL",
+                        text: $viewModel.presentationRequestUrl,
+                        inputIdentifier: WalletAccessibilityID.presentationInput,
+                        isEnabled: viewModel.presentationUrlEntryEnabled
+                    )
 
-            TextEditor(text: $viewModel.presentationRequestUrl)
-                .font(.footnote.monospaced())
-                .frame(minHeight: 72, maxHeight: 96)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(.separator), lineWidth: 1)
-                )
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-                .accessibilityIdentifier("wallet.presentationInput")
+                    Button("Preview") {
+                        viewModel.previewPresentation()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.waltBlue)
+                    .disabled(!viewModel.presentationPreviewActionEnabled)
+                    .accessibilityIdentifier(WalletAccessibilityID.presentButton)
 
-            Button("Present") {
-                viewModel.presentCredential()
+                    if viewModel.credentials.isEmpty {
+                        Text("No credentials available")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    StatusBannerView(
+                        message: viewModel.statusMessage(for: .present),
+                        isLoading: viewModel.statusIsLoading(for: .present),
+                        isError: viewModel.statusIsError(for: .present)
+                    )
+
+                    if viewModel.presentationCompleted {
+                        Button("New presentation", action: viewModel.startNewPresentationFlow)
+                            .buttonStyle(.bordered)
+                            .accessibilityIdentifier(WalletAccessibilityID.presentationNewButton)
+                    }
+
+                    if let preview = viewModel.presentationPreview {
+                        PresentationReviewView(
+                            preview: preview,
+                            selectedCredentialIDs: viewModel.selectedPresentationCredentialIDs,
+                            isLoading: !viewModel.presentationReviewEnabled,
+                            isReadOnly: viewModel.presentationCompleted,
+                            onToggleCredential: viewModel.togglePresentationCredential,
+                            onCredentialSelected: { credentialID in path.append(credentialID) },
+                            onSubmit: viewModel.submitPresentation,
+                            onCancel: viewModel.cancelPresentationReview
+                        )
+                    }
+                }
+                .padding()
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.waltBlue)
-            .disabled(!viewModel.isReady || viewModel.presentationRequestUrl.isEmpty || viewModel.credentials.isEmpty || viewModel.isLoading)
-            .accessibilityIdentifier("wallet.presentButton")
+            .navigationTitle("Present")
+            .navigationDestination(for: String.self) { credentialID in
+                CredentialDetailsDestination(
+                    credentialID: credentialID,
+                    details: presentationDetails
+                )
+            }
+            .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
     }
 }

@@ -16,7 +16,10 @@ gradle-shadow = "9.4.2"
 buildconfig = "6.0.10"
 compose-multiplatform = "1.11.1"
 compose-material3 = "1.11.0-alpha07"
+compose-material-icons = "1.7.3"
+compose-navigation3 = "1.1.1"
 dokka = "2.2.0"
+coil = "3.5.0"
 
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -261,6 +264,9 @@ compose-ui-test = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "
 compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
 compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
+compose-material-icons-core = { module = "org.jetbrains.compose.material:material-icons-core", version.ref = "compose-material-icons" }
+compose-navigation3-ui = { module = "org.jetbrains.androidx.navigation3:navigation3-ui", version.ref = "compose-navigation3" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext-junit" }
 androidx-test-rules = { module = "androidx.test:rules", version.ref = "androidx-test-rules" }

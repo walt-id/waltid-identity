@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+
 package id.walt.wallet2.handlers
 
 import id.walt.credentials.formats.DigitalCredential
@@ -14,12 +16,17 @@ import id.walt.webdatafetching.WebDataFetcherId
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.put
@@ -138,6 +145,42 @@ data class MatchCredentialsResult(
     val matchedCredentialIds: Map<String, List<String>>
 )
 
+@Serializable
+data class PreviewPresentationRequest(
+    val requestUrl: Url
+)
+
+data class PreviewPresentationResult(
+    val authorizationRequest: AuthorizationRequest,
+    val credentialOptions: List<PresentationCredentialOption>,
+)
+
+data class PresentationCredentialOption(
+    val queryId: String,
+    val credentialId: String,
+    val format: String,
+    val issuer: String?,
+    val subject: String?,
+    val label: String?,
+    val credentialData: JsonObject,
+    val disclosures: List<PresentationDisclosure>,
+)
+
+data class PresentationDisclosure(
+    val path: String,
+    val name: String?,
+    val value: JsonElement,
+    val selectivelyDisclosable: Boolean,
+)
+
+@Serializable
+data class SubmitPresentationRequest(
+    val requestUrl: Url,
+    val selectedCredentialIds: List<String>,
+    val did: String? = null,
+    val runPolicies: Boolean? = null,
+)
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -239,6 +282,81 @@ object WalletPresentationHandler {
         return result.getOrThrow()
     }
 
+    suspend fun previewPresentation(
+        wallet: Wallet,
+        request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+    ): PreviewPresentationResult {
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+        val authorizationRequest = resolveAuthorizationRequest(request.requestUrl)
+        val query = authorizationRequest.dcqlQuery ?: error("Missing dcql_query for AuthorizationRequest")
+        val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
+        val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
+        onEvent(WalletSessionEvent.presentation_credentials_selected)
+
+        return PreviewPresentationResult(
+            authorizationRequest = authorizationRequest,
+            credentialOptions = matched.flatMap { (queryId, results) ->
+                results.map { result ->
+                    val raw = result.credential as RawDcqlCredential
+                    val stored = storedById[raw.id] ?: error("Credential '${raw.id}' disappeared while building presentation preview")
+                    val credential = stored.credential
+                    PresentationCredentialOption(
+                        queryId = queryId,
+                        credentialId = stored.id,
+                        format = credential.format,
+                        issuer = credential.issuer,
+                        subject = credential.subject,
+                        label = stored.label,
+                        credentialData = credential.credentialData,
+                        disclosures = result.toPresentationDisclosures(),
+                    )
+                }
+            },
+        )
+    }
+
+    suspend fun submitPresentation(
+        wallet: Wallet,
+        request: SubmitPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {}
+    ): WalletPresentResult {
+        require(request.selectedCredentialIds.isNotEmpty()) {
+            "At least one credential must be selected for presentation"
+        }
+        val key = resolveKey(wallet, null)
+            ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
+        val did = request.did ?: wallet.defaultDid()
+        val selectedCredentialIds = request.selectedCredentialIds.toSet()
+
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+
+        val result = WalletPresentFunctionality2.walletPresentHandling(
+            holderKey = key,
+            holderDid = did,
+            presentationRequestUrl = request.requestUrl,
+            selectCredentialsForQuery = { query ->
+                selectFromStores(
+                    wallet = wallet,
+                    query = query,
+                    walletCredentialIds = selectedCredentialIds,
+                    useWalletCredentialIds = true,
+                ).also {
+                    onEvent(WalletSessionEvent.presentation_credentials_selected)
+                }
+            },
+            holderPoliciesToRun = null,
+            runPolicies = request.runPolicies,
+        )
+
+        if (result.isSuccess) {
+            onEvent(WalletSessionEvent.presentation_completed)
+        } else {
+            onEvent(WalletSessionEvent.presentation_failed)
+        }
+
+        return result.getOrThrow()
+    }
     // ---------------------------------------------------------------------------
     // Isolated step handlers
     // ---------------------------------------------------------------------------
@@ -362,7 +480,9 @@ object WalletPresentationHandler {
      */
     internal suspend fun selectFromStores(
         wallet: Wallet,
-        query: DcqlQuery
+        query: DcqlQuery,
+        walletCredentialIds: Set<String>? = null,
+        useWalletCredentialIds: Boolean = false,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> {
         if (wallet.credentialStores.isEmpty()) {
             error("Wallet has no credential stores — use presentCredentialIsolated to present inline credentials")
@@ -371,8 +491,12 @@ object WalletPresentationHandler {
         val rawCredentials = mutableListOf<RawDcqlCredential>()
         var idx = 0
         wallet.streamAllCredentials().collect { stored ->
-            log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
-            rawCredentials += stored.credential.toRawDcqlCredential(idx.toString())
+            if (walletCredentialIds == null || stored.id in walletCredentialIds) {
+                log.trace { "  credential[$idx]: id=${stored.id}, format=${stored.credential.format}, issuer=${stored.credential.issuer}" }
+                rawCredentials += stored.credential.toRawDcqlCredential(
+                    id = if (useWalletCredentialIds) stored.id else idx.toString(),
+                )
+            }
             idx++
         }
 
@@ -381,6 +505,45 @@ object WalletPresentationHandler {
         log.trace { "DCQL match result: matchedQueryIds=${matched.keys}, matchCounts=${matched.mapValues { it.value.size }}" }
         return matched
     }
+
+    private suspend fun resolveAuthorizationRequest(requestUrl: Url): AuthorizationRequest {
+        val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+        return AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            fetchRequestUri = { requestUri, requestUriMethod ->
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                    webResolveAuthReq = fetcher,
+                    requestUri = requestUri,
+                    requestUriMethod = requestUriMethod,
+                )
+            },
+        ).authorizationRequest
+    }
+
+    private fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> =
+        selectedDisclosures.orEmpty().map { (path, value) ->
+            when (value) {
+                is DcqlDisclosure -> PresentationDisclosure(
+                    path = path,
+                    name = value.name,
+                    value = value.value,
+                    selectivelyDisclosable = true,
+                )
+                is JsonElement -> PresentationDisclosure(
+                    path = path,
+                    name = path.substringAfterLast('.', path),
+                    value = value,
+                    selectivelyDisclosable = false,
+                )
+                else -> PresentationDisclosure(
+                    path = path,
+                    name = path.substringAfterLast('.', path),
+                    value = JsonPrimitive(value.toString()),
+                    selectivelyDisclosable = false,
+                )
+            }
+        }
 
     private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
         val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
