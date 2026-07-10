@@ -7,7 +7,7 @@ on:
 jobs:
   android-device-test-phase:
     name: android-device-tests (${{ matrix.phase }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -46,6 +46,32 @@ jobs:
         id: android-device-phase
         run: ./waltid-identity/.github/scripts/mobile-ci/configure-android-device-phase.sh "${{ matrix.phase }}"
 
+      - name: Preinstall Android emulator SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          retry_sdkmanager_install() {
+            local attempt
+            for attempt in 1 2 3; do
+              echo "sdkmanager install attempt ${attempt}: $*"
+              if "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "$@" --channel=0; then
+                return 0
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                return 1
+              fi
+
+              sleep $((attempt * 20))
+            done
+          }
+
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          retry_sdkmanager_install 'build-tools;37.0.0' platform-tools 'platforms;android-34'
+          retry_sdkmanager_install emulator
+          retry_sdkmanager_install 'system-images;android-34;default;x86_64'
+
       - name: Build Enterprise Android mobile test artifacts
         if: matrix.phase == 'enterprise-mobile'
         run: ./waltid-identity/.github/scripts/mobile-ci/prepare-enterprise-android-mobile-tests.sh
@@ -81,7 +107,7 @@ jobs:
           retention-days: 30
 
   android-device-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: android-device-test-phase
     if: always()
     steps:
