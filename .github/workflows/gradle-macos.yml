@@ -4,11 +4,13 @@ on:
   workflow_dispatch:
   push:
 
+env:
+  XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+  IOS_SIMULATOR_DESTINATION: platform=iOS Simulator,name=iPhone 17,OS=latest
+
 jobs:
-  gradle:
+  ios-simulator-tests:
     runs-on: macos-26
-    env:
-      XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
         uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
@@ -18,10 +20,103 @@ jobs:
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
 
-      - name: Build and test iOS
-        timeout-minutes: 60
-        uses: walt-id/waltid-identity/.github/actions/gradle-ios@884b737775f5aa363a6fcb30f0b8aacf7eb4ac04
+      - name: Compile iOS targets and run Kotlin iOS simulator tests
+        timeout-minutes: 40
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@9ae856e6a70023700540878faab74e2939773614
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
-          simulator-destination: 'platform=iOS Simulator,name=iPhone 17,OS=latest'
+          simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
+          run-compile-smoke: 'true'
+          run-ios-simulator-tests: 'true'
+          run-wallet-core-xcframework: 'false'
+          run-native-demo-tests: 'false'
+          run-compose-demo-tests: 'false'
+          test-report-job-name: ios-simulator-tests
+          test-report-check-name: iOS Simulator Test Report
+          test-result-artifact-name: ios-simulator-test-results
+
+  wallet-core-native-ios-demo-tests:
+    runs-on: macos-26
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Build WalletCore and run native iOS demo tests
+        timeout-minutes: 35
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@9ae856e6a70023700540878faab74e2939773614
+        with:
+          waltid-directory: 'waltid-identity'
+          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+          simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
+          run-compile-smoke: 'false'
+          run-ios-simulator-tests: 'false'
+          run-wallet-core-xcframework: 'true'
+          run-native-demo-tests: 'true'
+          run-compose-demo-tests: 'false'
+          test-report-job-name: wallet-core-native-ios-demo-tests
+          test-report-check-name: Native iOS Demo Test Report
+          test-result-artifact-name: native-ios-demo-test-results
+
+  compose-ios-demo-tests:
+    runs-on: macos-26
+    steps:
+      - name: Checkout all repos with ref fallback
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
+
+      - name: Configure gradle
+        uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
+
+      - name: Run Compose iOS demo tests
+        timeout-minutes: 25
+        uses: walt-id/waltid-identity/.github/actions/gradle-ios@9ae856e6a70023700540878faab74e2939773614
+        with:
+          waltid-directory: 'waltid-identity'
+          xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
+          simulator-destination: ${{ env.IOS_SIMULATOR_DESTINATION }}
+          run-compile-smoke: 'false'
+          run-ios-simulator-tests: 'false'
+          run-wallet-core-xcframework: 'false'
+          run-native-demo-tests: 'false'
+          run-compose-demo-tests: 'true'
+          test-report-job-name: compose-ios-demo-tests
+          test-report-check-name: Compose iOS Demo Test Report
+          test-report-require-tests: 'false'
+          test-result-artifact-name: compose-ios-demo-test-results
+
+  gradle:
+    runs-on: ubuntu-22.04
+    needs:
+      - ios-simulator-tests
+      - wallet-core-native-ios-demo-tests
+      - compose-ios-demo-tests
+    if: always()
+    steps:
+      - name: Verify iOS workflow jobs
+        run: |
+          set -euo pipefail
+          failed=()
+
+          if [[ "${{ needs.ios-simulator-tests.result }}" != "success" ]]; then
+            failed+=("ios-simulator-tests=${{ needs.ios-simulator-tests.result }}")
+          fi
+          if [[ "${{ needs.wallet-core-native-ios-demo-tests.result }}" != "success" ]]; then
+            failed+=("wallet-core-native-ios-demo-tests=${{ needs.wallet-core-native-ios-demo-tests.result }}")
+          fi
+          if [[ "${{ needs.compose-ios-demo-tests.result }}" != "success" ]]; then
+            failed+=("compose-ios-demo-tests=${{ needs.compose-ios-demo-tests.result }}")
+          fi
+
+          if (( ${#failed[@]} > 0 )); then
+            printf '::error::iOS workflow job(s) failed: %s\n' "${failed[*]}"
+            exit 1
+          fi
+
+          echo "All iOS workflow jobs succeeded."

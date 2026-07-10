@@ -1,235 +1,133 @@
-# walt.id OpenID4VP/VCI Conformance Runners
+# OpenID4VC Conformance Tests
 
-Conformance test infrastructure for validating walt.id services against the OpenID Foundation conformance suite.
-
-## HAIP Compliance
-
-All test suites include HAIP (High Assurance Interoperability Profile) validation for eIDAS 2.0 compliance.
-
-HAIP requirements validated across all components:
-- Signed authorization requests (MANDATORY)
-- Encrypted responses (MANDATORY)
-- P-256 key curve enforcement (MANDATORY)
-- SHA-256 hash algorithm (MANDATORY)
-- Holder binding validation
-
-## Supported Tests
-
-| Test Suite | Description | Status | Documentation |
-|------------|-------------|--------|---------------|
-| **Verifier** | OpenID4VP verifier compliance | Working | [VERIFIER-TESTS.md](VERIFIER-TESTS.md) |
-| **Wallet** | OpenID4VP wallet compliance | Infrastructure ready | [WALLET-TESTS.md](WALLET-TESTS.md) |
-| **Issuer** | OID4VCI issuer compliance | Working | [ISSUER-TESTS.md](ISSUER-TESTS.md) |
+Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Foundation Conformance Suite](https://www.certification.openid.net/).
 
 ## Quick Start
 
-See [QUICKSTART.md](QUICKSTART.md) for step-by-step setup instructions.
-
 ### Prerequisites
 
-- Docker and Docker Compose
-- Java 21+
-- ngrok (for Verifier tests)
-- `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
+1. **Conformance Suite** running locally:
+   ```bash
+   cd ~/dev/openid/conformance-suite
+   docker compose -f docker-compose-walt.yml up -d
+   ```
+   Verify: https://localhost.emobix.co.uk:8443/
 
-### Run Verifier Tests
+2. **ngrok** for exposing local services
+
+3. **Keycloak** at `http://keycloak.localhost:8080` (for authorization_code flows)
+
+### Running Tests
 
 ```bash
-# 1. Start conformance suite
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-walt.yml up -d
+cd ~/dev/walt-id/waltid-unified-build
 
-# 2. Start ngrok tunnel (in separate terminal)
-ngrok http 7003
-# Note the HTTPS URL
+# VCI Issuer tests
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vci"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
 
-# 3. Run tests
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-export VERIFIER_NGROK_URL="https://your-ngrok-url.ngrok-free.app"
+# VP Verifier tests
+export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
 ```
 
-### Run Issuer Tests
+---
 
-```bash
-# 1. Start conformance suite (if not already running)
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-walt.yml up -d
+## Test Status Summary
 
-# 2. Start issuer service
-# (Option A: OSS issuer on port 7002)
-# (Option B: Enterprise issuer)
+### VCI Issuer (2026-07-08)
 
-# 3. Configure and run tests
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://localhost:7002"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
-```
+| Test | Result | Notes |
+|------|--------|-------|
+| `oid4vci-1_0-issuer-metadata-test` | ✅ PASSED | Metadata endpoint compliant |
+| `oid4vci-1_0-issuer-happy-flow` | ❌ FAILED | Missing RFC 9207 `iss` parameter |
+| `oid4vci-1_0-issuer-metadata-test-signed` | ❌ FAILED | Test environment issue |
 
-### Run Wallet Tests
+**Pass rate: 1/3 (33%)**
 
-```bash
-cd ~/dev/walt-id/waltid-unified-build/waltid-identity
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "WalletConformanceTests"
-```
+📄 **Details:** [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
-## Test Plans Overview
+### VP Verifier (2026-07-08)
 
-### Verifier Test Plans
+| Test | Result | Notes |
+|------|--------|-------|
+| mDL Baseline (`plain_vp`) | ✅ PASSED | x509_san_dns, direct_post |
+| SD-JWT HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
+| mDL HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
+| SD-JWT x509_hash HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
 
-| Plan | Format | Client ID | Response Mode | HAIP |
-|------|--------|-----------|---------------|------|
-| Plan 1 | ISO mDL | x509_san_dns | direct_post | No |
-| Plan 2 | SD-JWT VC | x509_hash | direct_post.jwt | Yes |
+**Pass rate: 1/4 (25%)**
 
-See [VERIFIER-TESTS.md](VERIFIER-TESTS.md) for detailed test module descriptions.
+**Blocking Issue:** HAIP tests fail because the verifier's `AudienceCheckSdJwtVPPolicy` doesn't support `x509_hash:<sha256>` audience format required by HAIP.
 
-### Issuer Test Plans
+📄 **Details:** [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md)
 
-| Plan | Grant Type | Client Auth | Sender Constraint | HAIP |
-|------|------------|-------------|-------------------|------|
-| Plan 1 | authorization_code | client_attestation | DPoP | Yes |
-| Plan 2 | pre_authorization_code | client_attestation | DPoP | Yes |
+### VCI Wallet
 
-See [ISSUER-TESTS.md](ISSUER-TESTS.md) for detailed test module descriptions.
+📄 **Details:** [docs/VCI-WALLET.md](docs/VCI-WALLET.md)
 
-### Wallet Test Plans
+### VP Wallet
 
-| Plan | Format | Description | HAIP | Modules |
-|------|--------|-------------|------|---------|
-| Plan 1 | SD-JWT VC | Baseline validation | Yes | 14 |
-| Plan 2 | mDL | Mobile driving license | Yes | 6 |
-| Plan 7 | SD-JWT VC | Negative security tests | Yes | 9 |
+📄 **Details:** [docs/VP-WALLET.md](docs/VP-WALLET.md)
 
-See [WALLET-TESTS.md](WALLET-TESTS.md) for detailed test module descriptions.
+---
+
+## Test Profiles
+
+| Interface | Baseline | HAIP | Key Difference |
+|-----------|----------|------|----------------|
+| **VCI Issuer** | `pre-authorized_code` | `authorization_code` | Grant type |
+| **VP Verifier** | `x509_san_dns` | `x509_hash` | Client ID scheme |
+
+**Baseline:** Automated functional testing  
+**HAIP:** Strict [HAIP 1.0](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0-final.html) compliance
+
+---
 
 ## Project Structure
 
 ```
-src/
-  main/kotlin/id/walt/openid4vp/conformance/
-    config/
-      ConformanceConfig.kt          # Central configuration
-    plans/
-      ConformanceTestPlan.kt        # Base interfaces
-    adapter/
-      WalletConformanceAdapter.kt   # Wallet test adapter
-    testplans/
-      ConformanceTestRunner.kt      # Verifier test runner
-      IssuerConformanceTestRunner.kt # Issuer test runner
-      keys/
-        TestKeyMaterial.kt          # Test certificates/keys
-      http/
-        ConformanceInterface.kt     # Conformance suite API client
-        VerifierInterface.kt        # Verifier API client
-      plans/
-        IssuerTestPlan.kt           # Issuer test plan interface
-        Oid4vciIssuer...kt          # Issuer test plans
-        MdlX509SanDns...kt          # Verifier test plan: mDL
-        SdJwtVcX509...kt            # Verifier test plan: SD-JWT VC
-      wallet/
-        WalletPlan1.kt              # Wallet test plans
-        WalletPlan2.kt
-        WalletPlan7.kt
-      runner/
-        TestPlanRunner.kt           # Verifier test execution
-        IssuerTestPlanRunner.kt     # Issuer test execution
-        WalletTestPlanRunner.kt     # Wallet test execution
-  test/kotlin/id/walt/openid4vp/conformance/
-    VerifierConformanceTests.kt     # Main verifier tests
-    IssuerConformanceTests.kt       # Issuer conformance tests
-    WalletConformanceTests.kt       # Wallet tests
-    ConformanceTests.kt             # Deprecated alias
+waltid-openid4vp-conformance-runners/
+├── src/main/kotlin/.../testplans/
+│   ├── IssuerConformanceTestRunner.kt
+│   ├── VerifierConformanceTestRunner.kt
+│   └── plans/
+│       ├── vci/issuer/          # VCI Issuer test plans
+│       ├── vci/wallet/          # VCI Wallet test plans
+│       └── vp/verifier/         # VP Verifier test plans
+├── src/test/kotlin/.../
+│   ├── IssuerConformanceTests.kt
+│   ├── VerifierConformanceTests.kt
+│   ├── VciWalletConformanceTests.kt
+│   └── VpWalletConformanceTests.kt
+└── docs/
+    ├── VCI-ISSUER.md            # ← Issuer setup & status
+    ├── VP-VERIFIER.md           # ← Verifier setup & status
+    ├── VCI-WALLET.md
+    └── VP-WALLET.md
 ```
 
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Required For |
-|----------|-------------|--------------|
-| `VERIFIER_NGROK_URL` | ngrok tunnel URL for verifier | Verifier tests |
-| `OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL` | Issuer URL | Issuer tests |
-| `OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET` | Enterprise target | Issuer tests (Enterprise) |
-
-### ConformanceConfig.kt
-
-Central configuration object:
-
-```kotlin
-object ConformanceConfig {
-    const val CONFORMANCE_HOST = "localhost.emobix.co.uk"
-    const val CONFORMANCE_PORT = 8443
-    const val VERIFIER_LOCAL_HOST = "0.0.0.0"
-    const val VERIFIER_LOCAL_PORT = 7003
-    const val WALLET_API_URL = "http://127.0.0.1:7005"
-    const val WALLET_ADAPTER_PORT = 7006
-}
-```
-
-## SSL Configuration
-
-The project includes `conformance-truststore.jks` with the conformance suite's self-signed certificate.
-Gradle automatically configures this truststore when running tests.
-
-### IntelliJ Run Configuration
-
-Add VM options:
-```
--Djavax.net.ssl.trustStore=/path/to/conformance-truststore.jks
--Djavax.net.ssl.trustStorePassword=changeit
-```
-
-### Update Certificate (if needed)
-
-```bash
-openssl s_client -connect localhost.emobix.co.uk:8443 </dev/null 2>/dev/null | \
-  openssl x509 -outform PEM > conformance-test.pem
-
-keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks \
-  -storepass changeit 2>/dev/null || true
-keytool -importcert -trustcacerts -alias conformance-test-localhost \
-  -file conformance-test.pem -keystore conformance-truststore.jks \
-  -storepass changeit -noprompt
-```
-
-## Troubleshooting
-
-### Tests Skip
-
-- Conformance suite not running: `curl -k https://localhost.emobix.co.uk:8443/`
-- ngrok URL not set (Verifier tests): `export VERIFIER_NGROK_URL="https://..."`
-- Issuer URL not set: `export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://..."`
-
-### Connection Refused
-
-- Use ngrok for Verifier tests (Docker cannot reach host localhost)
-- Verify port: ngrok must tunnel to port 7003
-
-### SSL Errors
-
-- Rebuild nginx: `docker compose -f docker-compose-walt.yml build nginx`
-- Update truststore (see SSL Configuration above)
-
-### Address Already in Use
-
-- Kill existing process: `sudo lsof -i :7003` then `kill <PID>`
-- Tests start their own embedded verifier
+---
 
 ## Documentation
 
-- [QUICKSTART.md](QUICKSTART.md) - Quick setup guide
-- [VERIFIER-TESTS.md](VERIFIER-TESTS.md) - Verifier test plan details
-- [ISSUER-TESTS.md](ISSUER-TESTS.md) - Issuer test plan details
-- [WALLET-TESTS.md](WALLET-TESTS.md) - Wallet test plan details
+| Document | Description |
+|----------|-------------|
+| [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md) | VCI Issuer test setup, status, troubleshooting |
+| [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) | VP Verifier test setup, status, troubleshooting |
+| [docs/VCI-WALLET.md](docs/VCI-WALLET.md) | VCI Wallet test documentation |
+| [docs/VP-WALLET.md](docs/VP-WALLET.md) | VP Wallet test documentation |
+| [TEST-PLANS-AND-PROFILES.md](TEST-PLANS-AND-PROFILES.md) | Detailed test plan specifications |
 
-## External Resources
+---
 
-- [OpenID4VP Specification](https://openid.net/specs/openid-4-verifiable-presentations-1_0.html)
-- [OpenID4VCI Specification](https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0.html)
-- [HAIP Specification](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0.html)
-- [Conformance Suite](https://gitlab.com/openid/conformance-suite)
+## Troubleshooting
 
-## License
+| Issue | Solution |
+|-------|----------|
+| "Connect timed out" | Use ngrok URL, not localhost (Docker can't reach host) |
+| "Invalid redirect_uri" | Add ngrok URL to Keycloak client redirect URIs |
+| Tests stuck in WAITING | Manual OAuth login required for authorization_code flows |
+| Metadata 404 | Check path: `/.well-known/openid-credential-issuer/<path>` |
 
-[Apache License 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
+See individual docs for detailed troubleshooting.

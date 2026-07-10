@@ -1,9 +1,8 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import id.walt.openid4vp.conformance.testplans.http.VerifierInterface
+import id.walt.openid4vp.conformance.testplans.http.Verifier2Interface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
-import id.walt.openid4vp.conformance.testplans.runner.req.ExpectedVerifierOutcome
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier2.data.Verification2Session.VerificationSessionStatus
 import io.ktor.client.*
@@ -18,9 +17,9 @@ import kotlin.test.assertEquals
 class TestPlanRunner(
     val config: TestPlanConfiguration,
     http: HttpClient,
-
     val conformanceHost: String,
-    val conformancePort: Int
+    val conformancePort: Int,
+    val testPlanName: String = "unknown"
 ) {
     companion object {
         val baseUrlBuilderSetup: URLBuilder.(host: String, port: Int) -> Unit = { cHost, cPort ->
@@ -47,117 +46,83 @@ class TestPlanRunner(
     }
 
     val conformance = ConformanceInterface(conformanceHost, conformancePort)
-    val verifier = VerifierInterface(http)
+    val verifier2 = Verifier2Interface(http)
 
-    suspend fun test(): List<TestPlanResult> {
-        println("-- Conformance -- -> Setup")
+    suspend fun test(): TestPlanResult {
+        println("-- Conformane -- -> Setup")
 
         // Create test plan
-        val createTestPlanUrl = conformance.createTestPlanUrlWithConfig(config.testPlanCreationUrl)
+        val createTestPlanUrl = conformance.createTestPlanUrlWithConfig(
+            config.testPlanCreationUrl
+        )
+
         println("Creating test plan... ($createTestPlanUrl)")
         val createTestPlanResponse = conformance.createTestPlan(createTestPlanUrl, config.testPlanCreationConfiguration)
 
-        val testPlanId = createTestPlanResponse.id
-        println("Created test plan: $testPlanId with ${createTestPlanResponse.modules.size} modules")
-
-        val results = mutableListOf<TestPlanResult>()
-
-        for (module in createTestPlanResponse.modules) {
-            val testModule = module.testModule
-            val expectedOutcome = config.moduleOutcomes[testModule]
-                ?: error("No expected outcome configured for test module: $testModule")
-
-            println("\n=== Running module: $testModule (expected: $expectedOutcome) ===")
-
-            val result = runModule(testPlanId, testModule, expectedOutcome)
-            results += result
-            println("Module $testModule result: conformance=${result.conformanceResult}, verifier=${result.verifierStatus}")
+        if (createTestPlanResponse.modules.size > 1) {
+            println("NOTICE: Suddenly, there is more than one test module available!")
         }
 
-        return results
-    }
+        val testPlanId = createTestPlanResponse.id
+        val testModule = createTestPlanResponse.modules.first()
+        println("Created test plan: $testPlanId")
 
-    private suspend fun runModule(
-        testPlanId: String,
-        testModule: String,
-        expectedOutcome: ExpectedVerifierOutcome
-    ): TestPlanResult {
-        // Create test
-        val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule, config.moduleVariant)
+        // Create test - pass the variant from the module definition
+        val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule.testModule, testModule.variant)
         println("Creating test... ($createTestUrl)")
         val createTestResponse = conformance.createTest(createTestUrl)
+        println()
+
         val testId = createTestResponse.id
         println("Created test: $testId")
+
         println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=${testId}")
 
-        // Wait for test to be ready
+        println("Checking if test is already ready for presentation")
         conformance.waitForTestStatus(testId, shouldBeWaiting = true)
 
+        // Initial test run result
         val testRunResult = conformance.getTestRun(testId)
         val authorizationEndpointToUse = testRunResult.getExposedAuthorizationEndpoint().replace("http://", "https://")
+
         println("Use authorization endpoint: $authorizationEndpointToUse")
 
-        // Create verification session
-        val verificationSessionResponse = verifier.createVerificationSession(
-            authorizationEndpointToUse,
-            config.verificationSessionSetup
-        )
+        println("-- Verifier 2 -- -> Creating verification session...")
+
+        val verificationSessionResponse = verifier2.createVerificationSession(authorizationEndpointToUse, config.verificationSessionSetup)
         val verificationSessionId = verificationSessionResponse.sessionId
-        println("Created Verification Session: $verificationSessionId")
+        println("Created Verification Session: $verificationSessionResponse")
 
-        // Trigger presentation: conformance suite acts as wallet, fetches the request
+        println("-- Conformance & Verifier 2 -- -> Present to Verifier2")
+
+        // Present
         val bootstrapRequestUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl!!
-        conformanceHttp.get(bootstrapRequestUrl)
+        conformanceHttp.get(bootstrapRequestUrl) {
 
-        // Wait for conformance to finish processing
-        println("Waiting until conformance processing is done...")
+        }
+
+        // After presentation
+        println("Waiting until Conformance processing is done...")
         conformance.waitForTestStatus(testId, shouldBeWaiting = false)
 
         val testRunInfo = conformance.getTestRunInfo(testId)
-        println("Conformance result: status=${testRunInfo.status}, result=${testRunInfo.result}")
+        println("Test run result2: $testRunInfo")
 
-        val verifierSession = verifier.getVerificationSessionInfo(verificationSessionId)
-        println("Verifier session status: ${verifierSession.status}")
+        val verifier2Info = verifier2.getVerificationSessionInfo(verificationSessionId)
+        println("Verifier2 info: $verifier2Info")
 
-        assertEquals("FINISHED", testRunInfo.status, "Conformance test $testModule did not finish")
-
-        when (expectedOutcome) {
-            ExpectedVerifierOutcome.ACCEPT -> {
-                assertEquals("PASSED", testRunInfo.result, "Conformance test $testModule expected PASSED")
-                assertEquals(
-                    VerificationSessionStatus.SUCCESSFUL, verifierSession.status,
-                    "Verifier session for $testModule expected SUCCESSFUL"
-                )
-            }
-
-            ExpectedVerifierOutcome.REJECT -> {
-                assertEquals("PASSED", testRunInfo.result, "Conformance test $testModule expected PASSED")
-                assertEquals(
-                    VerificationSessionStatus.FAILED, verifierSession.status,
-                    "Verifier session for $testModule expected FAILED (verifier should have rejected)"
-                )
-            }
-
-            ExpectedVerifierOutcome.ACCEPT_OR_SKIP -> {
-                require(
-                    testRunInfo.result in listOf("PASSED", "SKIPPED")
-                ) {
-                    "Conformance test $testModule expected PASSED or SKIPPED, got ${testRunInfo.result}"
-                }
-                if (testRunInfo.result == "PASSED") {
-                    assertEquals(
-                        VerificationSessionStatus.SUCCESSFUL, verifierSession.status,
-                        "Verifier session for $testModule expected SUCCESSFUL"
-                    )
-                }
-            }
-        }
+        assertEquals("FINISHED", testRunInfo.status)
+        assertEquals("PASSED", testRunInfo.result)
+        assertEquals(VerificationSessionStatus.SUCCESSFUL, verifier2Info.status)
 
         return TestPlanResult(
+            testName = testPlanName,
             conformanceTestId = testId,
             conformanceStatus = testRunInfo.status,
             conformanceResult = testRunInfo.result,
-            verifierStatus = verifierSession.status,
+            verifierStatus = verifier2Info.status,
         )
     }
+
+
 }

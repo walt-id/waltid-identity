@@ -3,104 +3,132 @@ package id.walt.openid4vp.conformance
 import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import org.junit.jupiter.api.condition.EnabledIf
-import kotlin.test.Test
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import org.junit.jupiter.api.Test
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlin.time.Duration.Companion.minutes
 
-/**
- * OpenID4VCI Issuer Conformance Tests
- * 
- * Tests the Issuer implementation against the OpenID Foundation conformance suite.
- * The conformance suite acts as a wallet testing our issuer endpoints.
- * 
- * Prerequisites:
- * 1. Conformance suite running at localhost.emobix.co.uk:8443
- * 2. Issuer service running and accessible
- * 
- * Configuration (environment variables):
- * - OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL: Direct issuer URL
- * - OPENID4VCI_CONFORMANCE_ENTERPRISE_BASE_URL: Enterprise base URL (default: http://waltid.enterprise.localhost:3000)
- * - OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET: Enterprise target for URL construction
- * 
- * Example configurations:
- * 
- * 1. Direct issuer URL:
- *    export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="http://localhost:7002"
- * 
- * 2. Enterprise issuer:
- *    export OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET="my-org"
- *    # Results in: http://waltid.enterprise.localhost:3000/v2/my-org/issuer-service-api/openid4vci
- * 
- * Run:
- * ```bash
- * ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
- * ```
- */
 class IssuerConformanceTests {
 
     companion object {
-        private const val CREDENTIAL_ISSUER_URL_PROP = "openid4vci.conformance.credential-issuer-url"
-        private const val CREDENTIAL_ISSUER_URL_ENV = "OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL"
-        private const val ENTERPRISE_BASE_URL_PROP = "openid4vci.conformance.enterprise-base-url"
-        private const val ENTERPRISE_BASE_URL_ENV = "OPENID4VCI_CONFORMANCE_ENTERPRISE_BASE_URL"
-        private const val ENTERPRISE_TARGET_PROP = "openid4vci.conformance.enterprise-target"
-        private const val ENTERPRISE_TARGET_ENV = "OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET"
-        private const val SD_JWT_CREDENTIAL_ID_PROP = "openid4vci.conformance.sd-jwt-credential-configuration-id"
-        private const val SD_JWT_CREDENTIAL_ID_ENV = "OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID"
-        private const val MDOC_CREDENTIAL_ID_PROP = "openid4vci.conformance.mdoc-credential-configuration-id"
-        private const val MDOC_CREDENTIAL_ID_ENV = "OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID"
-        private const val CLIENT_ATTESTATION_ISSUER_PROP = "openid4vci.conformance.client-attestation-issuer"
-        private const val CLIENT_ATTESTATION_ISSUER_ENV = "OPENID4VCI_CONFORMANCE_CLIENT_ATTESTATION_ISSUER"
-        private const val CLIENT_ATTESTER_JWKS_FILE_PROP = "openid4vci.conformance.client-attester-jwks-file"
-        private const val CLIENT_ATTESTER_JWKS_FILE_ENV = "OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE"
-        private const val AUTHORIZATION_SERVER_PROP = "openid4vci.conformance.authorization-server"
-        private const val AUTHORIZATION_SERVER_ENV = "OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER"
-        private const val CREDENTIAL_PROOF_TYPE_HINT_PROP = "openid4vci.conformance.credential-proof-type-hint"
-        private const val CREDENTIAL_PROOF_TYPE_HINT_ENV = "OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT"
+        private const val defaultClientAttesterJwkResource = "/keys/attester-key.json"
+        private const val credentialIssuerUrlProperty = "openid4vci.conformance.credential-issuer-url"
+        private const val credentialIssuerUrlEnv = "OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL"
+        private const val enterpriseBaseUrlProperty = "openid4vci.conformance.enterprise-base-url"
+        private const val enterpriseBaseUrlEnv = "OPENID4VCI_CONFORMANCE_ENTERPRISE_BASE_URL"
+        private const val enterpriseTargetProperty = "openid4vci.conformance.enterprise-target"
+        private const val enterpriseTargetEnv = "OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET"
+        private const val sdJwtCredentialConfigurationIdProperty = "openid4vci.conformance.sd-jwt-credential-configuration-id"
+        private const val sdJwtCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_SD_JWT_CREDENTIAL_CONFIGURATION_ID"
+        private const val mdocCredentialConfigurationIdProperty = "openid4vci.conformance.mdoc-credential-configuration-id"
+        private const val mdocCredentialConfigurationIdEnv = "OPENID4VCI_CONFORMANCE_MDOC_CREDENTIAL_CONFIGURATION_ID"
+        private const val clientAttestationIssuerProperty = "openid4vci.conformance.client-attestation-issuer"
+        private const val clientAttestationIssuerEnv = "OPENID4VCI_CONFORMANCE_CLIENT_ATTESTATION_ISSUER"
+        private const val clientAttesterJwksFileProperty = "openid4vci.conformance.client-attester-jwks-file"
+        private const val clientAttesterJwksFileEnv = "OPENID4VCI_CONFORMANCE_CLIENT_ATTESTER_JWKS_FILE"
+        private const val authorizationServerProperty = "openid4vci.conformance.authorization-server"
+        private const val authorizationServerEnv = "OPENID4VCI_CONFORMANCE_AUTHORIZATION_SERVER"
+        private const val credentialProofTypeHintProperty = "openid4vci.conformance.credential-proof-type-hint"
+        private const val credentialProofTypeHintEnv = "OPENID4VCI_CONFORMANCE_CREDENTIAL_PROOF_TYPE_HINT"
 
         private fun propertyOrEnv(property: String, env: String): String? =
             System.getProperty(property) ?: System.getenv(env)
 
-        val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST
-        val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT
+        private fun normalizeAttesterJwk(jwk: JsonObject): JsonObject = buildJsonObject {
+            jwk.forEach { (key, value) -> put(key, value) }
+
+            if (jwk["alg"] == null) {
+                val curve = jwk["crv"]?.jsonPrimitive?.content
+                val algorithm = when (curve) {
+                    "P-256" -> "ES256"
+                    "P-384" -> "ES384"
+                    "P-521" -> "ES512"
+                    else -> null
+                }
+                algorithm?.let { put("alg", it) }
+            }
+
+            if (jwk["use"] == null) {
+                put("use", "sig")
+            }
+        }
+
+        private fun loadClientAttesterJwks(): JsonObject {
+            val configuredPath = propertyOrEnv(clientAttesterJwksFileProperty, clientAttesterJwksFileEnv)
+            
+            val jwkJson = if (configuredPath != null) {
+                // Load from file path if explicitly configured
+                Files.readString(Path.of(configuredPath))
+            } else {
+                // Load from classpath resource
+                IssuerConformanceTests::class.java.getResourceAsStream(defaultClientAttesterJwkResource)
+                    ?.bufferedReader()?.readText()
+                    ?: error("Default client attester key not found in classpath: $defaultClientAttesterJwkResource")
+            }
+            
+            val parsed = Json.parseToJsonElement(jwkJson)
+            val source = configuredPath ?: "classpath:$defaultClientAttesterJwkResource"
+            return when (parsed) {
+                is JsonObject -> {
+                    if ("keys" in parsed) {
+                        buildJsonObject {
+                            put("keys", JsonArray(parsed["keys"]!!.jsonArray.map { normalizeAttesterJwk(it.jsonObject) }))
+                        }
+                    } else {
+                        buildJsonObject {
+                            put("keys", JsonArray(listOf(normalizeAttesterJwk(parsed))))
+                        }
+                    }
+                }
+
+                else -> error("Client attester key file must contain a JWK object or JWKS object: $source")
+            }
+        }
 
         private val enterpriseBaseUrl: String =
-            propertyOrEnv(ENTERPRISE_BASE_URL_PROP, ENTERPRISE_BASE_URL_ENV)
+            propertyOrEnv(enterpriseBaseUrlProperty, enterpriseBaseUrlEnv)
                 ?: "http://waltid.enterprise.localhost:3000"
 
         val credentialIssuerUrl: String? =
-            propertyOrEnv(CREDENTIAL_ISSUER_URL_PROP, CREDENTIAL_ISSUER_URL_ENV)
-                ?: propertyOrEnv(ENTERPRISE_TARGET_PROP, ENTERPRISE_TARGET_ENV)?.let {
+            propertyOrEnv(credentialIssuerUrlProperty, credentialIssuerUrlEnv)
+                ?: propertyOrEnv(enterpriseTargetProperty, enterpriseTargetEnv)?.let {
                     "$enterpriseBaseUrl/v2/$it/issuer-service-api/openid4vci"
                 }
 
         val sdJwtCredentialConfigurationId: String? =
-            propertyOrEnv(SD_JWT_CREDENTIAL_ID_PROP, SD_JWT_CREDENTIAL_ID_ENV)
+            propertyOrEnv(sdJwtCredentialConfigurationIdProperty, sdJwtCredentialConfigurationIdEnv)
 
         val mdocCredentialConfigurationId: String? =
-            propertyOrEnv(MDOC_CREDENTIAL_ID_PROP, MDOC_CREDENTIAL_ID_ENV)
+            propertyOrEnv(mdocCredentialConfigurationIdProperty, mdocCredentialConfigurationIdEnv)
 
         val clientAttestationIssuer: String =
-            propertyOrEnv(CLIENT_ATTESTATION_ISSUER_PROP, CLIENT_ATTESTATION_ISSUER_ENV)
+            propertyOrEnv(clientAttestationIssuerProperty, clientAttestationIssuerEnv)
                 ?: "https://client-attestation.example.com"
 
-        val clientAttesterJwksFile: String? =
-            propertyOrEnv(CLIENT_ATTESTER_JWKS_FILE_PROP, CLIENT_ATTESTER_JWKS_FILE_ENV)
+        val clientAttesterJwks: JsonObject = loadClientAttesterJwks()
 
         val authorizationServer: String? =
-            propertyOrEnv(AUTHORIZATION_SERVER_PROP, AUTHORIZATION_SERVER_ENV)
+            propertyOrEnv(authorizationServerProperty, authorizationServerEnv)
 
         val credentialProofTypeHint: String? =
-            propertyOrEnv(CREDENTIAL_PROOF_TYPE_HINT_PROP, CREDENTIAL_PROOF_TYPE_HINT_ENV)
+            propertyOrEnv(credentialProofTypeHintProperty, credentialProofTypeHintEnv)
 
         val conformanceServerVersionResult = runBlocking {
             runCatching {
-                ConformanceInterface(conformanceHost, conformancePort).getServerVersion()
+                ConformanceInterface(ConformanceConfig.CONFORMANCE_HOST, ConformanceConfig.CONFORMANCE_PORT).getServerVersion()
             }.onFailure {
-                println("Conformance suite not available at $conformanceHost:$conformancePort")
+                println("Error getting server version: $it")
             }
         }
 
@@ -109,59 +137,17 @@ class IssuerConformanceTests {
 
         @JvmStatic
         val isIssuerConfigured = credentialIssuerUrl != null
-
-        @JvmStatic
-        fun canRunTests(): Boolean = isConformanceAvailable && isIssuerConfigured
-
-        init {
-            println()
-            println("=" .repeat(80))
-            println("OpenID4VCI Issuer Conformance Tests")
-            println("=" .repeat(80))
-            println()
-            println("Conformance suite: $conformanceHost:$conformancePort")
-            println("Conformance available: $isConformanceAvailable")
-            println("Issuer URL: ${credentialIssuerUrl ?: "<not configured>"}")
-            println("Issuer configured: $isIssuerConfigured")
-            println()
-
-            if (!isConformanceAvailable) {
-                println("To start conformance suite:")
-                println("  cd ~/dev/openid/conformance-suite")
-                println("  docker compose -f docker-compose-walt.yml up -d")
-                println()
-            }
-
-            if (!isIssuerConfigured) {
-                println("To configure issuer URL (choose one):")
-                println()
-                println("  1. Direct issuer URL:")
-                println("     export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL=\"http://localhost:7002\"")
-                println()
-                println("  2. Enterprise issuer:")
-                println("     export OPENID4VCI_CONFORMANCE_ENTERPRISE_TARGET=\"my-org\"")
-                println()
-            }
-
-            println("=" .repeat(80))
-            println()
-        }
     }
 
     @Test
-    @EnabledIf("canRunTests")
-    fun runIssuerConformanceTests() = runTest(timeout = 30.minutes) {
+    fun runIssuerConformanceTests() = runTest(timeout = 10.minutes) {
         assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable")
-        assumeTrue(isIssuerConfigured, "No credential issuer URL configured")
+        assumeTrue(isIssuerConfigured, "No credential issuer URL / enterprise issuer target configured")
 
-        val clientAttesterJwks = clientAttesterJwksFile?.let {
-            IssuerConformanceTestRunner.loadClientAttesterJwks(it)
-        } ?: IssuerConformanceTestRunner.loadClientAttesterJwks()
-
-        val results = IssuerConformanceTestRunner(
+        IssuerConformanceTestRunner(
             credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
-            conformanceHost = conformanceHost,
-            conformancePort = conformancePort,
+            conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
+            conformancePort = ConformanceConfig.CONFORMANCE_PORT,
             sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
             mdocCredentialConfigurationId = mdocCredentialConfigurationId,
             clientAttestationIssuer = clientAttestationIssuer,
@@ -169,17 +155,5 @@ class IssuerConformanceTests {
             authorizationServer = authorizationServer,
             credentialProofTypeHint = credentialProofTypeHint,
         ).run()
-
-        println()
-        println("=" .repeat(80))
-        println("Issuer Conformance Test Results")
-        println("=" .repeat(80))
-        results.forEachIndexed { i, r ->
-            println("  [$i] ${r.conformanceTestId}: status=${r.conformanceStatus}, result=${r.conformanceResult}")
-        }
-        println()
-        println("Total: ${results.size} modules")
-        println("Passed: ${results.count { it.conformanceResult == "PASSED" }}")
-        println("=" .repeat(80))
     }
 }

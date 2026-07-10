@@ -1,8 +1,10 @@
 package id.walt.openid4vp.conformance.testplans.runner
 
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
+import id.walt.openid4vp.conformance.testplans.http.IssuerInterface
 import id.walt.openid4vp.conformance.testplans.plans.TestPlanResult
 import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfiguration
+import kotlin.test.assertEquals
 
 /**
  * Runner for OpenID4VCI Issuer conformance tests.
@@ -15,12 +17,24 @@ import id.walt.openid4vp.conformance.testplans.runner.req.IssuerTestPlanConfigur
 class IssuerTestPlanRunner(
     val config: IssuerTestPlanConfiguration,
     val conformanceHost: String,
-    val conformancePort: Int
+    val conformancePort: Int,
+    val issuerInterface: IssuerInterface? = null
 ) {
     val conformance = ConformanceInterface(conformanceHost, conformancePort)
 
     suspend fun test(): List<TestPlanResult> {
         println("-- Conformance OID4VCI Issuer Test -- -> Setup")
+
+        // For pre-authorized code flow, create a credential offer first
+        val credentialOfferUri = if (config.requiresPreAuthorizedOffer && issuerInterface != null) {
+            println("Creating pre-authorized credential offer...")
+            val offerResponse = issuerInterface.createCredentialOffer(config.credentialProfileId)
+            println("Created credential offer: ${offerResponse.offerId}")
+            println("Credential offer URI: ${offerResponse.credentialOffer}")
+            offerResponse.credentialOffer
+        } else {
+            null
+        }
 
         // Create test plan
         val createTestPlanUrl = conformance.createTestPlanUrlWithConfig(
@@ -28,7 +42,14 @@ class IssuerTestPlanRunner(
         )
 
         println("Creating issuer test plan... ($createTestPlanUrl)")
-        val createTestPlanResponse = conformance.createTestPlan(createTestPlanUrl, config.testPlanCreationConfiguration)
+        val testPlanConfig = if (credentialOfferUri != null) {
+            val configWithOffer = config.withCredentialOffer(credentialOfferUri)
+            println("Test plan configuration with credential offer: $configWithOffer")
+            configWithOffer
+        } else {
+            config.testPlanCreationConfiguration
+        }
+        val createTestPlanResponse = conformance.createTestPlan(createTestPlanUrl, testPlanConfig)
 
         if (createTestPlanResponse.modules.isEmpty()) {
             throw IllegalStateException("No test modules available for the specified variant. Check your configuration.")
@@ -37,29 +58,28 @@ class IssuerTestPlanRunner(
         val testPlanId = createTestPlanResponse.id
         println("Created test plan: $testPlanId")
         println("The conformance suite will call issuer: ${config.issuerUrl}")
-        println("Modules to run: ${createTestPlanResponse.modules.size}")
+        if (credentialOfferUri != null) {
+            println("Using credential offer: $credentialOfferUri")
+        }
 
-        return createTestPlanResponse.modules.mapIndexed { index, module ->
+        return createTestPlanResponse.modules.map { module ->
             val testModule = module.testModule
-            println()
-            println("[${index + 1}/${createTestPlanResponse.modules.size}] Running module: $testModule")
-            
-            val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule, config.moduleVariant)
+            val createTestUrl = conformance.buildCreateTestUrl(testPlanId, testModule)
+            println("Creating test for module $testModule... ($createTestUrl)")
             val createTestResponse = conformance.createTest(createTestUrl)
             val testId = createTestResponse.id
 
-            println("  Test ID: $testId")
-            println("  View at: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
-            println("  Waiting for conformance suite to complete...")
+            println("Created test: $testId")
+            println("View test run at: https://$conformanceHost:$conformancePort/log-detail.html?log=$testId")
+            println("Waiting for conformance suite to complete issuer test...")
 
             waitForIssuerTestCompletion(testId)
 
             val testRunInfo = conformance.getTestRunInfo(testId)
-            println("  Status: ${testRunInfo.status}, Result: ${testRunInfo.result}")
+            println("Module $testModule finished with status=${testRunInfo.status}, result=${testRunInfo.result}")
 
             // For skippable modules, accept INTERRUPTED status (feature not supported by issuer)
-            val skippableModules = config.skippableModules ?: emptySet()
-            val acceptedStatuses = if (testModule in skippableModules) {
+            val acceptedStatuses = if (testModule in config.skippableModules) {
                 setOf("FINISHED", "INTERRUPTED")
             } else {
                 setOf("FINISHED")
@@ -70,9 +90,9 @@ class IssuerTestPlanRunner(
             }
 
             // For skippable modules that interrupted, accept FAILED (feature not implemented)
-            val acceptedResults = if (testModule in skippableModules) {
+            val acceptedResults = if (testModule in config.skippableModules) {
                 if (testRunInfo.status == "INTERRUPTED") {
-                    setOf("PASSED", "SKIPPED", "FAILED")
+                    setOf("PASSED", "SKIPPED", "FAILED")  // INTERRUPTED tests may have FAILED result
                 } else {
                     setOf("PASSED", "SKIPPED")
                 }
@@ -98,6 +118,7 @@ class IssuerTestPlanRunner(
         while (true) {
             counter++
             val testRunInfo = conformance.getTestRunInfo(testId)
+            println("Current conformance test status: ${testRunInfo.status}")
 
             if (testRunInfo.status in setOf("FINISHED", "INTERRUPTED")) {
                 return
@@ -106,7 +127,7 @@ class IssuerTestPlanRunner(
             // OAuth authorization_code tests will be stuck in WAITING status when they need
             // user interaction (browser login). These tests must be completed manually in the
             // conformance suite UI. For automated tests, use pre-authorized_code grant type.
-            if (counter > 120) {
+            if (counter > 60) {
                 if (testRunInfo.status == "WAITING") {
                     throw IllegalStateException(
                         "Test $testId is stuck in WAITING status after ${counter - 1} seconds. " +

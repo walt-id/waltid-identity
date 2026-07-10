@@ -13,6 +13,6 @@ data class CreateTestPlanResponse(
     data class Module(
         val testModule: String, // oid4vp-1final-verifier-happy-flow
         val instances: List<String?> = listOf(),
-        val variant: JsonObject? = null // Dynamic variant fields differ per plan
+        val variant: JsonObject = JsonObject(emptyMap())
     )
 }
