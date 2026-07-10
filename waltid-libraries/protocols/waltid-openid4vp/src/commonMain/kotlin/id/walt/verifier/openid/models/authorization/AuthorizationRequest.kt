@@ -155,6 +155,13 @@ data class AuthorizationRequest(
      */
     @SerialName("expected_origins")
     val expectedOrigins: List<String>? = null,
+
+    /**
+     * REQUIRED in signed Authorization Request Objects. Per JAR/OID4VP, this
+     * identifies the Verifier issuing the request object and matches client_id.
+     */
+    @SerialName("iss")
+    val issuer: String? = null,
 ) {
 
     fun toHttpUrl(url: URLBuilder = URLBuilder("openid4vp://authorize")): Url {

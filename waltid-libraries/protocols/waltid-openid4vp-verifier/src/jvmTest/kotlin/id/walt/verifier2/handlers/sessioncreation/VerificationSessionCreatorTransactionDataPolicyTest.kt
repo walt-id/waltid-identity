@@ -2,6 +2,8 @@
 
 package id.walt.verifier2.handlers.sessioncreation
 
+import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.KeyManager
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.DcqlQuery
@@ -16,16 +18,57 @@ import id.walt.verifier2.data.GeneralFlowConfig
 import id.walt.verifier2.data.OpenId4VPConfig
 import id.walt.verifier2.data.Verification2Session
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 private const val DEMO_TRANSACTION_DATA_TYPE = "org.waltid.transaction-data.payment-authorization"
 
 class VerificationSessionCreatorTransactionDataPolicyTest {
+
+    @Test
+    fun `signed authorization request payload includes issuer matching client id`() = runTest {
+        val clientId = "x509_san_dns:verifier.example.com"
+        val signingKey = testSigningKey()
+        val session = VerificationSessionCreator.createVerificationSession(
+            setup = CrossDeviceFlowSetup(
+                core = GeneralFlowConfig(
+                    dcqlQuery = DcqlQuery(
+                        credentials = listOf(
+                            CredentialQuery(
+                                id = "pid",
+                                format = CredentialFormat.DC_SD_JWT,
+                                meta = NoMeta,
+                            )
+                        )
+                    ),
+                    signedRequest = true,
+                    clientId = clientId,
+                    key = signingKey,
+                )
+            ),
+            clientId = clientId,
+            urlPrefix = "https://verifier.example.com/verification-session",
+            urlHost = "openid4vp://authorize",
+            key = signingKey.key,
+        )
+
+        val jwt = assertNotNull(session.signedAuthorizationRequestJwt)
+        val payload = Json.parseToJsonElement(
+            Base64.getUrlDecoder().decode(jwt.split(".")[1]).decodeToString()
+        ).jsonObject
+
+        assertEquals(clientId, payload["client_id"]?.jsonPrimitive?.content)
+        assertEquals(clientId, payload["iss"]?.jsonPrimitive?.content)
+    }
 
     @Test
     fun `transaction data policies are mandatory when custom vp policies are supplied`() = runTest {
@@ -154,4 +197,10 @@ class VerificationSessionCreatorTransactionDataPolicyTest {
         put("require_cryptographic_holder_binding", JsonPrimitive(true))
         put("transaction_data_hashes_alg", JsonArray(listOf(JsonPrimitive("sha-256"))))
     }
+
+    private fun testSigningKey() = DirectSerializedKey(
+        KeyManager.resolveSerializedKeyBlocking(
+            """{"type":"jwk","jwk":{"kty":"EC","d":"AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA","crv":"P-256","kid":"_nd-T2YRYLSmuKkJZlRI641zrCIJLTpiHeqMwXuvdug","x":"G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0","y":"VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4"}}"""
+        )
+    )
 }
