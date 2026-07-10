@@ -48,7 +48,7 @@ function removeX5cInput(index: number) {
   if (x5cValues.value.length === 0) x5cValues.value.push('')
 }
 
-function applySecurityOverridesToJson() {
+async function applySecurityOverridesToJson() {
   optionsError.value = null
 
   let payload: Record<string, unknown>
@@ -78,11 +78,13 @@ function applySecurityOverridesToJson() {
     const x5c = parseVerifierX5c(x5cValues.value)
     if (x5c.length > 0) {
       coreFlow.x5c = x5c
+      coreFlow.clientId = await computeX509HashClientId(x5c[0]!)
     } else {
       delete coreFlow.x5c
+      delete coreFlow.clientId
     }
   } catch (e) {
-    optionsError.value = e instanceof Error ? e.message : 'Invalid x5c certificate.'
+    optionsError.value = e instanceof Error ? e.message : 'Invalid x5c certificate or clientId hash.'
     return null
   }
 
@@ -91,13 +93,15 @@ function applySecurityOverridesToJson() {
 }
 
 watch([keyJson, x5cValues, signedRequest, encryptedResponse], () => {
-  applySecurityOverridesToJson()
+  void applySecurityOverridesToJson()
 }, { deep: true })
 
-watch(selectedIndex, () => nextTick(applySecurityOverridesToJson))
+watch(selectedIndex, () => nextTick(() => {
+  void applySecurityOverridesToJson()
+}))
 
 async function submit() {
-  const payload = applySecurityOverridesToJson()
+  const payload = await applySecurityOverridesToJson()
   if (!payload) return
 
   await props.session.createSession(payload)

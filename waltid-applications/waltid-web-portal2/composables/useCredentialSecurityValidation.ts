@@ -40,6 +40,38 @@ export function parseVerifierX5c(values: string[]): string[] {
   })
 }
 
+function decodeBase64Certificate(certificate: string): Uint8Array {
+  const base64 = certificate
+    .replace(/-----BEGIN CERTIFICATE-----/g, '')
+    .replace(/-----END CERTIFICATE-----/g, '')
+    .replace(/\s+/g, '')
+
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
+function encodeBase64Url(bytes: Uint8Array): string {
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+export async function computeX509HashClientId(certificate: string): Promise<string> {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('Web Crypto API is not available to compute x509_hash.')
+  }
+
+  const der = decodeBase64Certificate(certificate)
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', der)
+  return `x509_hash:${encodeBase64Url(new Uint8Array(digest))}`
+}
+
 export function parseIssuerPemCertificates(values: string[]): string[] {
   return values.map(value => value.trim()).filter(Boolean).map((value, index) => {
     if (!value.includes('-----BEGIN CERTIFICATE-----') || !value.includes('-----END CERTIFICATE-----')) {
