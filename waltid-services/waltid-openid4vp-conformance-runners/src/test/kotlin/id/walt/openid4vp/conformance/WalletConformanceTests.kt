@@ -6,7 +6,7 @@ import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import id.walt.openid4vp.conformance.testplans.wallet.WalletPlan1
 import id.walt.openid4vp.conformance.testplans.wallet.WalletPlan2
 import id.walt.openid4vp.conformance.testplans.wallet.WalletPlan7
-import id.walt.openid4vp.conformance.testplans.wallet.WalletTestPlan
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import id.walt.openid4vp.conformance.testplans.runner.WalletTestPlanRunner
 import io.ktor.client.*
 import io.ktor.client.engine.java.*

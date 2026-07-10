@@ -4,10 +4,10 @@ import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.VerifierConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Timeout
 import kotlin.test.Test
-import kotlin.time.Duration.Companion.minutes
+import java.util.concurrent.TimeUnit
 
 /**
  * Verifier Conformance Tests
@@ -106,7 +106,8 @@ open class VerifierConformanceTests {
     }
 
     @Test
-    fun runVerifierConformanceTests() = runTest(timeout = 10.minutes) {
+    @Timeout(value = 10, unit = TimeUnit.MINUTES)
+    fun runVerifierConformanceTests() = runBlocking {
         assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable at $conformanceHost:$conformancePort")
         assumeTrue(isVerifierUrlConfigured, "VERIFIER_NGROK_URL environment variable not set")
 

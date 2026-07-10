@@ -229,7 +229,7 @@ object DcqlMatcher {
                 val matchResult = claimExistsAndMatchesValue(credential, cq, isPotentiallySelectivelyDisclosable)
                 if (matchResult.isSuccess) {
                     matchResult.getOrNull()?.let { // getOrNull because success can be with null value (existence check)
-                        currentSetSelectedClaims[cq.path.joinToString(".")] = it
+                        currentSetSelectedClaims[cq.pathKey()] = it
                     }
                 } else {
                     allCurrentSetMatch = false
@@ -300,7 +300,8 @@ object DcqlMatcher {
         if (isCredentialPotentiallySD && credential.disclosures != null) {
             // Match on the claim name (path.last()). The disclosure's full Claim Path is available
             // via it.location (SD-JWT VC §4.6.1) for stricter matching if needed in the future.
-            val targetClaimName = claimQuery.path.lastOrNull {
+            val effectivePath = claimQuery.effectivePath()
+            val targetClaimName = claimQuery.claimName ?: effectivePath?.lastOrNull {
                 it is JsonPrimitive && it.isString
             }?.jsonPrimitive?.content
             val matchingDisclosure =
@@ -320,22 +321,24 @@ object DcqlMatcher {
             } else {
                 // If path not found as a disclosure, it might be an always-visible claim in the SD-JWT core.
                 // Fall through to generic path resolution for such cases.
-                log.trace { "Claim path ${claimQuery.path} not found among SD disclosures for ${credential.id}. Checking core JWT." }
+                log.trace { "Claim path ${claimQuery.pathKey()} not found among SD disclosures for ${credential.id}. Checking core JWT." }
             }
         }
 
         // Generic path resolution for non-SD claims or core claims of an SD-JWT
-        val claimJsonElement = resolveClaimPath(credential.data, claimQuery.path)
-            ?: return Result.failure(DcqlMatchException("Claim path ${claimQuery.path} not found in ${credential.id}"))
+        val pathToResolve = claimQuery.effectivePath()
+            ?: return Result.failure(DcqlMatchException("No path available for claim query in ${credential.id}"))
+        val claimJsonElement = resolveClaimPath(credential.data, pathToResolve)
+            ?: return Result.failure(DcqlMatchException("Claim path ${claimQuery.pathKey()} not found in ${credential.id}"))
 
         if (!claimQuery.values.isNullOrEmpty()) {
             val matchesValue = claimQuery.values.any { queryValue -> queryValue == claimJsonElement }
             if (!matchesValue) {
-                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.path} value '$claimJsonElement' does not match required values ${claimQuery.values} in ${credential.id} " }
-                return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.path}"))
+                log.trace { "claimExistsAndMatchesValue: Claim path ${claimQuery.pathKey()} value '$claimJsonElement' does not match required values ${claimQuery.values} in ${credential.id} " }
+                return Result.failure(DcqlMatchException("Claim value mismatch for ${claimQuery.pathKey()}"))
             }
         }
-        log.trace { "Claim path ${claimQuery.path} exists and matches criteria in ${credential.id}" }
+        log.trace { "Claim path ${claimQuery.pathKey()} exists and matches criteria in ${credential.id}" }
         // If values were specified and matched, or if no values were specified (existence check), return the element.
         return Result.success(claimJsonElement)
     }
@@ -491,9 +494,14 @@ object DcqlMatcher {
 
     /** Check if a single claim exists at the path and matches optional values. */
     private fun claimExistsAndMatches(credential: DcqlCredential, claimQuery: ClaimsQuery): Boolean {
-        val claimValue = resolveClaimPath(credential.data, claimQuery.path)
+        val pathToResolve = claimQuery.effectivePath()
+        if (pathToResolve == null) {
+            log.trace { "No path available for claim query in credential ${credential.id}" }
+            return false
+        }
+        val claimValue = resolveClaimPath(credential.data, pathToResolve)
         if (claimValue == null) {
-            log.trace { "Claim path ${claimQuery.path} not found in credential ${credential.id}" }
+            log.trace { "Claim path ${claimQuery.pathKey()} not found in credential ${credential.id}" }
             return false // Claim must exist at the path
         }
 
@@ -505,11 +513,11 @@ object DcqlMatcher {
                 queryValue == claimValue
             }
             if (!matchesValue) {
-                log.trace { "claimExistsAndMatches: Claim path ${claimQuery.path} value '$claimValue' does not match required values ${claimQuery.values} in credential ${credential.id}" }
+                log.trace { "claimExistsAndMatches: Claim path ${claimQuery.pathKey()} value '$claimValue' does not match required values ${claimQuery.values} in credential ${credential.id}" }
                 return false
             }
         }
-        log.trace { "Claim path ${claimQuery.path} exists and matches criteria in credential ${credential.id}" }
+        log.trace { "Claim path ${claimQuery.pathKey()} exists and matches criteria in credential ${credential.id}" }
         return true // Claim exists and matches value constraints (if any)
     }
 

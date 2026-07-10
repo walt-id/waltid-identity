@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.wallet
 
+import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 

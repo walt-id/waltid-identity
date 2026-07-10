@@ -1,0 +1,38 @@
+package id.walt.openid4vp.conformance.testplans.http
+
+import id.walt.verifier2.data.CrossDeviceFlowSetup
+import id.walt.verifier2.data.Verification2Session
+import id.walt.verifier2.data.VerificationSessionSetup
+import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreationResponse
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+
+class Verifier2Interface(
+    val http: HttpClient
+) {
+
+    /** Create verification session at Verifier2 */
+    suspend fun createVerificationSession(
+        authorizationEndpointToUse: String,
+        verificationSessionSetup: VerificationSessionSetup
+    ) =
+        http.post("/verification-session/create") {
+            setBody(
+                if (verificationSessionSetup is CrossDeviceFlowSetup)
+                    verificationSessionSetup.copy(
+                        urlConfig = verificationSessionSetup.urlConfig.copy(
+                            urlHost = authorizationEndpointToUse
+                        )
+                    )
+                else verificationSessionSetup
+            )
+        }.body<VerificationSessionCreationResponse>()
+
+    /** Create verification session information from Verifier2 */
+    suspend fun getVerificationSessionInfo(sessionId: String) =
+        http.get("/verification-session/$sessionId/info")
+            .body<Verification2Session>()
+
+
+}
