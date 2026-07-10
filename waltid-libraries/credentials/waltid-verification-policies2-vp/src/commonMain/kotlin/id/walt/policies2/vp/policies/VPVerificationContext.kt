@@ -27,6 +27,14 @@ data class VerificationSessionContext(
     val isAnnexC: Boolean,
 
     /**
+     * Alternative audience derived from the x509 certificate hash when the authorization request
+     * was signed (JAR with x5c). Per HAIP, when using `x509_san_dns` client identification with
+     * signed requests, the wallet MAY use `x509_hash:<base64url-sha256-of-der-cert>` as the
+     * KB-JWT audience instead of the original client_id.
+     */
+    val x509HashAudience: String? = null,
+
+    /**
      * Base64url-encoded transaction data items from the authorization request's `transaction_data`
      * parameter (OID4VP 1.0 §5.5.1). When non-null, the KB-JWT MUST contain `transaction_data_hashes`
      * and the verifier MUST validate them against these values.

@@ -19,6 +19,7 @@ import id.walt.verifier2.data.Verification2Session
 import id.walt.verifier2.handlers.vpresponse.ParsedVpToken
 import id.walt.verifier2.handlers.vpresponse.Verifier2SessionCredentialPolicyValidation
 import id.walt.verifier2.handlers.vpresponse.Verifier2VPDirectPostHandler.PresentationRejectionException
+import id.walt.verifier2.utils.computeX509HashAudience
 import id.walt.verifier2.verification.DcqlFulfillmentChecker
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.JsonObject
@@ -73,6 +74,16 @@ object PresentationVerificationEngine {
         val expectedAudience = if (isDcApi) "origin:$expectedOrigin" else authorizationRequest.clientId
         val isEncrypted = authorizationRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
         val jwkThumbprint = session.jwkThumbprint
+        val isSigned = session.signedAuthorizationRequestJwt != null
+
+        // Compute x509_hash audience from x5c certificate if the request was signed.
+        // Per HAIP, when using x509_san_dns with signed requests, the wallet MAY use
+        // x509_hash:<base64url-sha256-of-der-cert> as the KB-JWT audience.
+        val x509HashAudience = if (isSigned) {
+            session.setup.core.x5c?.firstOrNull()?.let { x5cCert ->
+                runCatching { computeX509HashAudience(x5cCert) }.getOrNull()
+            }
+        } else null
 
         val verificationContext = VerificationSessionContext(
             vpToken = presentationString,
@@ -82,12 +93,13 @@ object PresentationVerificationEngine {
             expectedTransactionData = expectedTransactionData,
             responseUri = authorizationRequest.responseUri,
             responseMode = responseMode!!,
-            isSigned = session.signedAuthorizationRequestJwt != null,
+            isSigned = isSigned,
             isEncrypted = isEncrypted,
             jwkThumbprint = jwkThumbprint,
             isAnnexC = session.setup is DcApiAnnexCFlowSetup,
             customData = session.data as? JsonObject,
-            transactionData = authorizationRequest.transactionData
+            transactionData = authorizationRequest.transactionData,
+            x509HashAudience = x509HashAudience
         )
 
         return VPPolicyRunner.verifyPresentation(

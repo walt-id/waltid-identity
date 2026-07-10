@@ -6,6 +6,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.crypto.keys.KeyManager
 import id.walt.verifier2.data.*
 import id.walt.verifier2.handlers.sessioncreation.VerificationSessionCreator
+import id.walt.verifier2.utils.computeX509HashAudience
 import kotlinx.serialization.ExperimentalSerializationApi
 
 object OSSVerifier2Manager {
@@ -15,9 +16,13 @@ object OSSVerifier2Manager {
     suspend fun createVerificationSession(
         setup: VerificationSessionSetup,
     ): Verification2Session {
+        val effectiveClientId = setup.core.clientId
+            ?: setup.core.x5c?.firstOrNull()?.let(::computeX509HashAudience)
+            ?: config.clientId
+
         val newSession = VerificationSessionCreator.createVerificationSession(
             setup = setup,
-            clientId = setup.core.clientId ?: config.clientId,
+            clientId = effectiveClientId,
             clientMetadata = setup.core.clientMetadata ?: config.clientMetadata,
             urlPrefix = if (setup is UrlBearingDeviceFlowSetup) setup.urlConfig.urlPrefix ?: config.urlPrefix else null,
             urlHost = when (setup) {

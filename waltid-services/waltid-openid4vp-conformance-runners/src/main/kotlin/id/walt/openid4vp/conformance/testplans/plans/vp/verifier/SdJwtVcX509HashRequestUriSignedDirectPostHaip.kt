@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -121,7 +122,8 @@ class SdJwtVcX509HashRequestUriSignedDirectPostHaip(
                     "signing_jwk": $signerJwk
                 },
                 "client": {
-                    "x509_certificate_chain": ${Json.encodeToString(verifierCertificateChain)}
+                    "x509_certificate_chain": ${Json.encodeToString(verifierCertificateChain)},
+                    "request_object_trust_anchor_pem": ${TestKeyMaterial.VERIFIER_ROOT_CA_PEM_JSON}
                 },
                 "description": "HAIP Verifier - SD-JWT VC + x509_hash + JAR + direct_post.jwt + P-256 + SHA-256",
                 "server": {

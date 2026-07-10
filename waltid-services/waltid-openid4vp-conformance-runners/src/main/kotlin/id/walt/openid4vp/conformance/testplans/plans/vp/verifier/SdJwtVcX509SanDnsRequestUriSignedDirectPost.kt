@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -91,13 +92,16 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
 
     override val config = TestPlanConfiguration(
         testPlanCreationUrl = {
-            // Use HAIP test plan for SD-JWT VC
-            // Note: The HAIP plan sets request_method internally, so don't include it
-            append("planName", "oid4vp-1final-verifier-haip-test-plan")
+            // Use the standard verifier test plan (not HAIP) since we need to control the variant
+            // HAIP test plan doesn't allow overriding client_id_prefix
+            append("planName", "oid4vp-1final-verifier-test-plan")
             append(
                 "variant", /* language=json*/
                 """{
                     "credential_format": "sd_jwt_vc",
+                    "client_id_prefix": "x509_san_dns",
+                    "request_method": "request_uri_signed",
+                    "vp_profile": "haip",
                     "response_mode": "direct_post.jwt"
                 }""".trimIndent()
             )
@@ -110,7 +114,8 @@ class SdJwtVcX509SanDnsRequestUriSignedDirectPost(
                     "signing_jwk": $signerJwk
                 },
                 "client": {
-                    "client_id": "verifier.example.com"
+                    "client_id": "verifier.example.com",
+                    "request_object_trust_anchor_pem": ${TestKeyMaterial.VERIFIER_ROOT_CA_PEM_JSON}
                 },
                 "description": "HAIP Verifier - sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt",
                 "server": {

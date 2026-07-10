@@ -1,6 +1,7 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.verifier
 
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import id.walt.openid4vp.conformance.testplans.plans.TestPlan
 import id.walt.openid4vp.conformance.testplans.runner.req.TestPlanConfiguration
 import id.walt.verifier.openid.models.authorization.ClientMetadata
@@ -44,6 +45,7 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
     conformanceHost: String = "localhost.emobix.co.uk",
     conformancePort: Int = 8443
 ) : TestPlan {
+    private val x509HashClientId = "x509_hash:L8zOHpvIslIfw3enc7DpZtmZhBUh9OY3DPCdEUz9KPc"
 
     // Verifier key (P-256 as required by HAIP §7)
     val verifierKey = Json.decodeFromString<DirectSerializedKey>(
@@ -85,17 +87,16 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
 
     override val config = TestPlanConfiguration(
         testPlanCreationUrl = {
-            // Use the regular verifier test plan with mdoc credential format
-            // The conformance suite doesn't have a separate mDL HAIP plan
+            // Use the regular verifier test plan with an explicit HAIP variant for mDL.
             append("planName", "oid4vp-1final-verifier-test-plan")
             append(
                 "variant", /* language=json*/
                 """{
                     "credential_format": "iso_mdl",
-                    "client_id_prefix": "x509_san_dns",
+                    "client_id_prefix": "x509_hash",
                     "request_method": "request_uri_signed",
-                    "vp_profile": "plain_vp",
-                    "response_mode": "direct_post"
+                    "vp_profile": "haip",
+                    "response_mode": "direct_post.jwt"
                 }""".trimIndent()
             )
         },
@@ -104,7 +105,9 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
             """
             {
                 "client": {
-                    "x509_certificate_chain": ${Json.encodeToString(verifierCertificateChain)}
+                    "client_id": "$x509HashClientId",
+                    "x509_certificate_chain": ${Json.encodeToString(verifierCertificateChain)},
+                    "request_object_trust_anchor_pem": ${TestKeyMaterial.VERIFIER_ROOT_CA_PEM_JSON}
                 },
                 "description": "HAIP Verifier - mDL + x509_hash + JAR + direct_post.jwt + P-256 + SHA-256",
                 "server": {

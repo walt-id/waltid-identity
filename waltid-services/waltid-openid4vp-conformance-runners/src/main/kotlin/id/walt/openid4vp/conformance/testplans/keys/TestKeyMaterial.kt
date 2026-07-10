@@ -52,6 +52,26 @@ xtEgGXjHNMaUj7FOpC4tJyGlg2DSpXSOlCkl
     val VERIFIER_CA_PEM_JSON: String
         get() = "\"${VERIFIER_CA_PEM.replace("\n", "\\n")}\""
 
+    /**
+     * Root CA certificate for the newer verifier chain:
+     * verifier leaf -> verifier intermediate -> verifier root.
+     */
+    const val VERIFIER_ROOT_CA_PEM = """-----BEGIN CERTIFICATE-----
+MIIBvzCCAWWgAwIBAgIUfwihQAhmEdaEwBYsG+ejcHcFjTwwCgYIKoZIzj0EAwIw
+NTEhMB8GA1UEAwwYd2FsdC5pZCBWZXJpZmllciBSb290IENBMRAwDgYDVQQKDAd3
+YWx0LmlkMB4XDTI2MDcwMTEwMDUyNVoXDTM2MDYyODEwMDUyNVowNTEhMB8GA1UE
+AwwYd2FsdC5pZCBWZXJpZmllciBSb290IENBMRAwDgYDVQQKDAd3YWx0LmlkMFkw
+EwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEXBk/JIOavtCGTtnheu6Ow3KEUzrXANwX
+P2XfbZQ+MG8jwJy37glKsQdJqs2t+l4AnlU10881D27TFUm5aq5286NTMFEwHQYD
+VR0OBBYEFNEEQtfaftObiHN0R3y3rMCfAONHMB8GA1UdIwQYMBaAFNEEQtfaftOb
+iHN0R3y3rMCfAONHMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwIDSAAwRQIh
+AMDtiBAc264oLWmkjWbckhhZ/XbC9rCdBV5Lu3M/aWCAAiBKUMq7gaf7i9iKNT30
+gw4g1u9yPw6wqf/QCx3ODl3BJg==
+-----END CERTIFICATE-----"""
+
+    val VERIFIER_ROOT_CA_PEM_JSON: String
+        get() = "\"${VERIFIER_ROOT_CA_PEM.replace("\n", "\\n")}\""
+
     // ================================
     // mDOC Issuer Certificates
     // ================================
