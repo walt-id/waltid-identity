@@ -74,7 +74,7 @@ jobs:
 
       - name: Upload Android device test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-device-test-reports-${{ matrix.phase }}
           path: ${{ steps.android-device-phase.outputs.artifact_paths }}
