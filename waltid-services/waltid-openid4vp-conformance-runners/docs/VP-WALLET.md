@@ -2,7 +2,7 @@
 
 Complete guide for running OpenID4VP Wallet conformance tests against the OpenID Foundation conformance suite.
 
-## Current Status (2026-07-09)
+## Current Status (2026-07-10)
 
 | Component | Status | Notes |
 |-----------|--------|-------|
@@ -12,7 +12,76 @@ Complete guide for running OpenID4VP Wallet conformance tests against the OpenID
 | Conformance logs | ✅ Working | Tests visible at `logs.html` |
 | Wallet integration | ⏳ Pending | **Awaiting wallet-side HAIP implementation** |
 
-**What the test runner does:**
+---
+
+## VP-Verifier Conformance Status (WAL-896)
+
+### Test Results (2026-07-10)
+
+| Test Plan | Format | Status | Notes |
+|-----------|--------|--------|-------|
+| MdlX509SanDnsRequestUriSignedDirectPost | mdoc | ✅ **PASS** | Validates WAL-896 core |
+| SdJwtVcX509SanDnsRequestUriSignedDirectPost | SD-JWT | ❌ FAIL | Audience policy issue* |
+| MdlX509HashRequestUriSignedDirectPostHaip | mdoc | ⏳ Pending | HAIP variant |
+| SdJwtVcX509HashRequestUriSignedDirectPostHaip | SD-JWT | ⏳ Pending | HAIP variant |
+
+*The SD-JWT test fails due to audience validation - conformance suite sends `x509_hash:...` as KB-JWT audience (per HAIP spec), but `AudienceCheckSdJwtVPPolicy` expects exact match with original `client_id`. This is a policy enhancement, not WAL-896 scope.
+
+### WAL-896 Implementation Fixes Applied
+
+1. **ClaimsQuery model** (`waltid-dcql/models/ClaimsQuery.kt`)
+   - Added `namespace: String?` and `claimName: String?` for mdoc credentials
+   - Added `effectivePath()` - returns path or constructs from namespace/claimName
+   - Added `pathKey()` - returns string for logging/grouping
+   - Made `path` nullable to support mdoc-only queries
+
+2. **DcqlMatcher** (`waltid-dcql/DcqlMatcher.kt`)
+   - Updated to use `effectivePath()` instead of direct `path` access
+
+3. **DcSdJwtPresentation** (`waltid-digital-credentials/DcSdJwtPresentation.kt`)
+   - Updated `validateClaimsAgainstCredential()` to use `effectivePath()` and `pathKey()`
+
+4. **MdocPresenter** (`waltid-openid4vp-wallet/MdocPresenter.kt`)
+   - Added dual-mode support for both `namespace/claimName` (new) and `path` (legacy)
+
+5. **Test infrastructure**
+   - Restored `Verifier2Interface.kt` for verifier-api2 communication
+   - Fixed test runner to use `runBlocking` for real network calls
+
+### Running VP-Verifier Conformance Tests
+
+```bash
+# Terminal 1: Start verifier-api2
+cd ~/dev/walt-id/waltid-unified-build
+./gradlew :waltid-services:waltid-verifier-api2:run
+
+# Terminal 2: Start ngrok tunnel
+ngrok http 7003
+# Note the URL (e.g., https://xxxx.ngrok-free.app)
+
+# Terminal 3: Run tests
+cd ~/dev/walt-id/waltid-unified-build
+export VERIFIER_CALLBACK_URL="https://your-ngrok-url.ngrok-free.app"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "id.walt.openid4vp.conformance.VerifierConformanceTests" --info
+```
+
+### Validation Checklist
+
+For mdoc test (MdlX509SanDnsRequestUriSignedDirectPost):
+- [ ] `POST /response` returns `200 OK`
+- [ ] `mso_mdoc/device-auth`: success=true
+- [ ] `mso_mdoc/device_key_auth`: success=true
+- [ ] `mso_mdoc/issuer_auth`: success=true
+- [ ] `mso_mdoc/issuer_signed_integrity`: success=true
+- [ ] `mso_mdoc/mso`: success=true
+
+See `WAL-896-VALIDATION.md` in repo root for detailed validation guide.
+
+---
+
+## What the test runner does (VP-Wallet)
+
 1. Creates test plan on conformance suite
 2. Starts wallet adapter (HTTP bridge on port 7006)
 3. For each module: creates test instance, waits for WAITING state, triggers wallet, waits for result
@@ -219,23 +288,31 @@ curl -sk "https://localhost.emobix.co.uk:8443/api/plan?length=5" | jq '.data[] |
 ```
 waltid-openid4vp-conformance-runners/
 ├── docs/
-│   └── VP-WALLET.md                       # This file
+│   ├── VP-WALLET.md                       # This file
+│   └── VP-VERIFIER.md                     # Verifier conformance docs
 ├── src/main/kotlin/.../
 │   ├── adapter/
 │   │   └── VpWalletConformanceAdapter.kt  # HTTP bridge
 │   ├── config/
 │   │   └── ConformanceConfig.kt           # Environment config
 │   └── testplans/
-│       ├── http/ConformanceInterface.kt   # Conformance API client
+│       ├── http/
+│       │   ├── ConformanceInterface.kt    # Conformance API client
+│       │   └── Verifier2Interface.kt      # Verifier-api2 client
 │       ├── httpdata/*.kt                  # API response DTOs
-│       ├── runner/WalletTestPlanRunner.kt # Test orchestration
-│       └── plans/vp/wallet/
-│           ├── WalletTestPlan.kt          # Base interface
-│           ├── Vp*X509Hash*.kt            # HAIP-strict plans
-│           └── Vp*X509SanDns*.kt          # Baseline plans
+│       ├── runner/
+│       │   ├── WalletTestPlanRunner.kt    # Wallet test orchestration
+│       │   └── VerifierConformanceTestRunner.kt # Verifier test orchestration
+│       └── plans/vp/
+│           ├── wallet/
+│           │   ├── WalletTestPlan.kt      # Base interface
+│           │   └── Vp*.kt                 # Wallet test plans
+│           └── verifier/
+│               └── *.kt                   # Verifier test plans
 └── src/test/kotlin/.../
     ├── IsolatedWalletConformanceTest.kt   # Framework validation
-    └── VpWalletConformanceTests.kt        # Full test suite
+    ├── VpWalletConformanceTests.kt        # Full wallet test suite
+    └── VerifierConformanceTests.kt        # Full verifier test suite
 ```
 
 ---
@@ -256,3 +333,14 @@ Once implemented, run:
 ```
 
 All 12 modules should pass for HAIP certification.
+
+---
+
+## Known Issues / Future Work
+
+1. **Audience Policy Enhancement** (not WAL-896 scope)
+   - `AudienceCheckSdJwtVPPolicy` needs to accept both `x509_san_dns:...` and `x509_hash:...`
+   - Per HAIP spec, wallet may use certificate hash as audience for encrypted responses
+
+2. **HAIP Test Plans** (MdlX509Hash*, SdJwtVcX509Hash*)
+   - Pending validation after audience policy fix
