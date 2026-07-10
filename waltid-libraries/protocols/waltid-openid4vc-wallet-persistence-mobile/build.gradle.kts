@@ -1,3 +1,11 @@
+@file:OptIn(
+    ExperimentalAbiValidation::class,
+    org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi::class,
+)
+
+import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+
 plugins {
     id("waltid.mobile.library")
     id("waltid.mobile.sdk.documentation")
@@ -11,6 +19,29 @@ waltidMobile {
 }
 
 kotlin {
+    explicitApi()
+
+    abiValidation {
+        binariesSource.set(BinariesSource.MAIN_COMPILATION)
+    }
+
+    if (enableIosBuild) {
+        swiftPMDependencies {
+            iosMinimumDeploymentTarget.set("15.4")
+            swiftPackage(
+                url = url("https://github.com/sqlcipher/SQLCipher.swift.git"),
+                version = exact("4.16.0"),
+                products = listOf(
+                    product(
+                        "SQLCipher",
+                        platforms = setOf(iOS()),
+                        importedClangModules = setOf("SQLCipher"),
+                    ),
+                ),
+            )
+        }
+    }
+
     sourceSets {
         commonMain.dependencies {
             api(project(":waltid-libraries:protocols:waltid-openid4vc-wallet"))
@@ -29,6 +60,7 @@ kotlin {
         if (enableAndroidBuild) {
             androidMain.dependencies {
                 implementation(identityLibs.sqldelight.android.driver)
+                implementation(identityLibs.sqlcipher.android)
             }
         }
         if (enableIosBuild) {
@@ -40,6 +72,8 @@ kotlin {
 }
 
 sqldelight {
+    linkSqlite.set(false)
+
     databases {
         create("WalletPersistenceDatabase") {
             packageName.set("id.walt.wallet2.persistence.db")

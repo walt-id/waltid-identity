@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonObject
  *
  * @param queries SQLDelight queries for wallet persistence tables.
  */
-class SqlDelightDidStore(
+public class SqlDelightDidStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletDidStore {
 
