@@ -1,4 +1,7 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
 import io.ktor.plugin.features.*
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 
 object Versions {
@@ -41,6 +44,7 @@ dependencies {
     implementation(identityLibs.ktor.client.content.negotiation)
     implementation(identityLibs.ktor.client.json)
     implementation(identityLibs.ktor.client.java)
+    implementation(identityLibs.ktor.client.cio)
     implementation(identityLibs.ktor.client.logging)
 
 
@@ -78,12 +82,7 @@ dependencies {
     implementation(project(":waltid-libraries:credentials:waltid-holder-policies"))
 
     implementation(project(":waltid-services:waltid-service-commons-test"))
-    implementation(project(":waltid-services:waltid-verifier-api2")) {
-        exclude(group = "id.walt.crypto", module = "waltid-crypto-azure")
-    }
-    implementation(project(":waltid-services:waltid-issuer-api")) {
-        exclude(group = "id.walt.crypto", module = "waltid-crypto-azure")
-    }
+    implementation(project(":waltid-services:waltid-verifier-api2"))
 
     api(project(":waltid-libraries:credentials:waltid-dcql"))
     api(project(":waltid-libraries:credentials:waltid-digital-credentials"))
@@ -107,3 +106,47 @@ ktor {
         )
     }
 }
+
+tasks.test {
+    // Configure SSL truststore for conformance suite tests
+    val truststorePath = file("conformance-truststore.jks").absolutePath
+    systemProperty("javax.net.ssl.trustStore", truststorePath)
+    systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+}
+
+fun registerWalletProfileTestTask(taskName: String, testFilter: String, descriptionText: String) {
+    tasks.register<Test>(taskName) {
+        group = "verification"
+        description = descriptionText
+
+        testClassesDirs = tasks.test.get().testClassesDirs
+        classpath = tasks.test.get().classpath
+
+        val truststorePath = file("conformance-truststore.jks").absolutePath
+        systemProperty("javax.net.ssl.trustStore", truststorePath)
+        systemProperty("javax.net.ssl.trustStorePassword", "changeit")
+
+        useJUnitPlatform()
+        filter {
+            includeTestsMatching(testFilter)
+        }
+    }
+}
+
+registerWalletProfileTestTask(
+    taskName = "vciWalletSdJwtVcDpopAuthorizationCode",
+    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcDpopAuthorizationCode",
+    descriptionText = "Run the SD-JWT VC + DPoP + authorization_code VCI wallet conformance profile."
+)
+
+registerWalletProfileTestTask(
+    taskName = "vciWalletIsoMdocDpopAuthorizationCode",
+    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletIsoMdocDpopAuthorizationCode",
+    descriptionText = "Run the ISO mdoc + DPoP + authorization_code VCI wallet conformance profile."
+)
+
+registerWalletProfileTestTask(
+    taskName = "vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
+    testFilter = "id.walt.openid4vp.conformance.VciWalletConformanceTests.vciWalletSdJwtVcAuthorizationCodeHaipFullTarget",
+    descriptionText = "Run the HAIP full-target VCI wallet conformance profile."
+)

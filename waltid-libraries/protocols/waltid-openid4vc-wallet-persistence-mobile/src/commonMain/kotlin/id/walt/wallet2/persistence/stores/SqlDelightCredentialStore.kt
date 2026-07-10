@@ -15,7 +15,7 @@ import kotlin.time.Instant
  *
  * @param queries SQLDelight queries for wallet persistence tables.
  */
-class SqlDelightCredentialStore(
+public class SqlDelightCredentialStore(
     private val queries: WalletPersistenceQueries,
 ) : WalletCredentialStore {
 

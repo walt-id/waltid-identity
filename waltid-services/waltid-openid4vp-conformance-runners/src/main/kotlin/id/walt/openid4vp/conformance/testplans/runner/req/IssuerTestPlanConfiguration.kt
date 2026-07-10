@@ -23,9 +23,44 @@ data class IssuerTestPlanConfiguration(
      * Includes issuer URL, client credentials, etc.
      */
     val testPlanCreationConfiguration: JsonObject,
-    
+
+    /**
+     * Variant JSON string shared by all test modules in this plan.
+     */
+    val moduleVariant: String = "",
+
     /**
      * The URL of the issuer being tested.
      */
-    val issuerUrl: String
-)
+    val issuerUrl: String,
+
+    /**
+     * Modules that may legitimately return SKIPPED instead of PASSED.
+     * Used for optional suite checks like signed metadata.
+     */
+    val skippableModules: Set<String> = emptySet(),
+
+    /**
+     * Whether this test plan requires a pre-authorized credential offer.
+     */
+    val requiresPreAuthorizedOffer: Boolean = false,
+
+    /**
+     * Profile ID to use when creating credential offers.
+     */
+    val credentialProfileId: String = ""
+) {
+    /**
+     * Create a new configuration with a credential offer URI added.
+     */
+    fun withCredentialOffer(credentialOfferUri: String): JsonObject {
+        val mutableConfig = testPlanCreationConfiguration.toMutableMap()
+        
+        // Add credential_offer_uri to the vci configuration
+        val vciConfig = (mutableConfig["vci"] as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        vciConfig["credential_offer_uri"] = kotlinx.serialization.json.JsonPrimitive(credentialOfferUri)
+        mutableConfig["vci"] = kotlinx.serialization.json.JsonObject(vciConfig)
+        
+        return kotlinx.serialization.json.JsonObject(mutableConfig)
+    }
+}

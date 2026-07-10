@@ -1,194 +1,133 @@
-<div align="center">
-<h1>walt.id OpenID4VP Conformance Runners</h1>
- <span>by </span><a href="https://walt.id">walt.id</a>
- <p>Utilities and instructions to run OpenID4VP 1.0 conformance tests against walt.id services</p>
+# OpenID4VC Conformance Tests
 
-<a href="https://walt.id/community">
-<img src="https://img.shields.io/badge/Join-The Community-blue.svg?style=flat" alt="Join community!" />
-</a>
-<a href="https://www.linkedin.com/company/walt-id/">
-<img src="https://img.shields.io/badge/-LinkedIn-0072b1?style=flat&logo=linkedin" alt="Follow walt_id" />
-</a>
-  
-  <h2>Status</h2>
-  <p align="center">
-    <img src="https://img.shields.io/badge/🟢%20Actively%20Maintained-success?style=for-the-badge&logo=check-circle" alt="Status: Actively Maintained" />
-    <br/>
-    <em>This project is being actively maintained by the development team at walt.id.<br />Regular updates, bug fixes, and new features are being added.</em>
-  </p>
-</div>
+Conformance test runners for OpenID4VCI and OpenID4VP against the [OpenID Foundation Conformance Suite](https://www.certification.openid.net/).
 
-## Quick Start (Docker)
-
-The fastest way to run conformance tests locally:
+## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Java 21+
-- `/etc/hosts` entry: `127.0.0.1 localhost.emobix.co.uk`
 
-Add the hosts entry:
-```shell
-echo "127.0.0.1 localhost.emobix.co.uk" | sudo tee -a /etc/hosts
-```
+1. **Conformance Suite** running locally:
+   ```bash
+   cd ~/dev/openid/conformance-suite
+   docker compose -f docker-compose-walt.yml up -d
+   ```
+   Verify: https://localhost.emobix.co.uk:8443/
 
-### 1. Clone and Start the Conformance Suite
+2. **ngrok** for exposing local services
 
-```shell
-# Clone the conformance suite (if not already done)
-git clone https://gitlab.com/openid/conformance-suite.git ~/dev/openid/conformance-suite
+3. **Keycloak** at `http://keycloak.localhost:8080` (for authorization_code flows)
 
-# Start with Docker
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml up -d
-```
+### Running Tests
 
-Wait ~30 seconds for the server to start, then verify:
-```shell
-curl -k https://localhost.emobix.co.uk:8443/
-```
-
-### 2. Run the Conformance Tests
-
-```shell
-# From the waltid-unified-build directory
+```bash
 cd ~/dev/walt-id/waltid-unified-build
 
-# Run tests
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "id.walt.openid4vp.conformance.ConformanceTests"
-```
+# VCI Issuer tests
+export OPENID4VCI_CONFORMANCE_CREDENTIAL_ISSUER_URL="https://YOUR-NGROK.ngrok-free.app/openid4vci"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "IssuerConformanceTests"
 
-Or run the main application:
-```shell
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:run
-```
-
-### 3. Stop the Conformance Suite
-
-```shell
-cp ./docker-compose-walt.yml cd ~/dev/openid/conformance-suite
-cd ~/dev/openid/conformance-suite
-docker compose -f docker-compose-local.yml down
-```
-
-## SSL Certificate (Already Configured)
-
-This project includes a bundled truststore (`conformance-truststore.jks`) with the conformance suite's self-signed certificate. It's automatically used when running via Gradle.
-
-### Updating the Certificate
-
-If you rebuild the conformance suite's nginx container, extract and import the new certificate:
-
-```shell
-# Extract certificate from running server
-openssl s_client -connect localhost.emobix.co.uk:8443 -servername localhost.emobix.co.uk </dev/null 2>/dev/null | \
-  openssl x509 -outform PEM > conformance-test.pem
-
-# Update truststore
-keytool -delete -alias conformance-test-localhost -keystore conformance-truststore.jks -storepass changeit 2>/dev/null || true
-keytool -importcert -trustcacerts -alias conformance-test-localhost \
-  -file conformance-test.pem -keystore conformance-truststore.jks \
-  -storepass changeit -noprompt
-```
-
-### Running from IntelliJ
-
-Add these VM options to your run configuration:
-```
--Djavax.net.ssl.trustStore=/home/pp/dev/walt-id/waltid-unified-build/waltid-identity/waltid-services/waltid-openid4vp-conformance-runners/conformance-truststore.jks
--Djavax.net.ssl.trustStorePassword=changeit
+# VP Verifier tests
+export VERIFIER_NGROK_URL="https://YOUR-NGROK.ngrok-free.app"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
 ```
 
 ---
 
-## Alternative: Setup with Devenv (Nix)
+## Test Status Summary
 
-For the full nix/devenv setup (creates CA, manages hosts file automatically):
+### VCI Issuer (2026-07-08)
 
-### Install Nix
+| Test | Result | Notes |
+|------|--------|-------|
+| `oid4vci-1_0-issuer-metadata-test` | ✅ PASSED | Metadata endpoint compliant |
+| `oid4vci-1_0-issuer-happy-flow` | ❌ FAILED | Missing RFC 9207 `iss` parameter |
+| `oid4vci-1_0-issuer-metadata-test-signed` | ❌ FAILED | Test environment issue |
 
-```shell
-# Option 1: Native package manager (if available)
-sudo pacman -S nix  # Arch
-# or
-sudo apt install nix  # Debian/Ubuntu
+**Pass rate: 1/3 (33%)**
 
-# Option 2: Official installer
-sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) --daemon
-```
+📄 **Details:** [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md)
 
-Enable and start the nix daemon:
-```shell
-sudo systemctl enable --now nix-daemon.service
-```
+### VP Verifier (2026-07-08)
 
-### Install Devenv
+| Test | Result | Notes |
+|------|--------|-------|
+| mDL Baseline (`plain_vp`) | ✅ PASSED | x509_san_dns, direct_post |
+| SD-JWT HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
+| mDL HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
+| SD-JWT x509_hash HAIP | ❌ FAILED | Audience mismatch (x509_hash) |
 
-```shell
-nix-env --install --attr devenv -f https://github.com/NixOS/nixpkgs/tarball/nixpkgs-unstable
-```
+**Pass rate: 1/4 (25%)**
 
-### Run Conformance Suite with Devenv
+**Blocking Issue:** HAIP tests fail because the verifier's `AudienceCheckSdJwtVPPolicy` doesn't support `x509_hash:<sha256>` audience format required by HAIP.
 
-```shell
-cd ~/dev/openid/conformance-suite
-devenv up
-```
+📄 **Details:** [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md)
 
-In another terminal:
-```shell
-cd ~/dev/openid/conformance-suite
-mvn spring-boot:run
-```
+### VCI Wallet
 
-Visit: https://localhost.emobix.co.uk:8443/
+📄 **Details:** [docs/VCI-WALLET.md](docs/VCI-WALLET.md)
+
+### VP Wallet
+
+📄 **Details:** [docs/VP-WALLET.md](docs/VP-WALLET.md)
 
 ---
 
-## Test Plans
+## Test Profiles
 
-OpenID4VP 1.0 test coverage:
+| Interface | Baseline | HAIP | Key Difference |
+|-----------|----------|------|----------------|
+| **VCI Issuer** | `pre-authorized_code` | `authorization_code` | Grant type |
+| **VP Verifier** | `x509_san_dns` | `x509_hash` | Client ID scheme |
 
-**Verifier Tests**
-- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post
-- sd_jwt_vc + x509_san_dns + request_uri_signed + direct_post.jwt
-- iso_mdl + x509_san_dns + request_uri_signed + direct_post
-- iso_mdl + x509_san_dns + request_uri_signed + direct_post.jwt
+**Baseline:** Automated functional testing  
+**HAIP:** Strict [HAIP 1.0](https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0-final.html) compliance
 
-**Wallet Tests** (unsigned/signed + direct_post/direct_post.jwt)
-- sd_jwt_vc: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
-- iso_mdl: `did`, `pre_registered`, `redirect_uri`, `web-origin`, `x509_san_dns`
+---
 
-See `config/` for example configuration files.
+## Project Structure
+
+```
+waltid-openid4vp-conformance-runners/
+├── src/main/kotlin/.../testplans/
+│   ├── IssuerConformanceTestRunner.kt
+│   ├── VerifierConformanceTestRunner.kt
+│   └── plans/
+│       ├── vci/issuer/          # VCI Issuer test plans
+│       ├── vci/wallet/          # VCI Wallet test plans
+│       └── vp/verifier/         # VP Verifier test plans
+├── src/test/kotlin/.../
+│   ├── IssuerConformanceTests.kt
+│   ├── VerifierConformanceTests.kt
+│   ├── VciWalletConformanceTests.kt
+│   └── VpWalletConformanceTests.kt
+└── docs/
+    ├── VCI-ISSUER.md            # ← Issuer setup & status
+    ├── VP-VERIFIER.md           # ← Verifier setup & status
+    ├── VCI-WALLET.md
+    └── VP-WALLET.md
+```
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/VCI-ISSUER.md](docs/VCI-ISSUER.md) | VCI Issuer test setup, status, troubleshooting |
+| [docs/VP-VERIFIER.md](docs/VP-VERIFIER.md) | VP Verifier test setup, status, troubleshooting |
+| [docs/VCI-WALLET.md](docs/VCI-WALLET.md) | VCI Wallet test documentation |
+| [docs/VP-WALLET.md](docs/VP-WALLET.md) | VP Wallet test documentation |
+| [TEST-PLANS-AND-PROFILES.md](TEST-PLANS-AND-PROFILES.md) | Detailed test plan specifications |
 
 ---
 
 ## Troubleshooting
 
-### SSL Handshake Errors
-If you see `SSLHandshakeException` or certificate errors:
-1. Ensure `docker-compose-walt.yml` was used (builds nginx with proper cert)
-2. Verify truststore is being used (check Gradle output for JVM args)
-3. Try rebuilding: `docker compose -f docker-compose-walt.yml build nginx`
+| Issue | Solution |
+|-------|----------|
+| "Connect timed out" | Use ngrok URL, not localhost (Docker can't reach host) |
+| "Invalid redirect_uri" | Add ngrok URL to Keycloak client redirect URIs |
+| Tests stuck in WAITING | Manual OAuth login required for authorization_code flows |
+| Metadata 404 | Check path: `/.well-known/openid-credential-issuer/<path>` |
 
-### Conformance Suite Not Starting
-Check container logs:
-```shell
-docker logs conformance-suite-server-1
-docker logs conformance-suite-nginx-1
-```
-
----
-
-## Join the community
-
-* Connect and get the latest updates: [Discord](https://discord.gg/AW8AgqJthZ) | [Newsletter](https://walt.id/newsletter) | [YouTube](https://www.youtube.com/channel/UCXfOzrv3PIvmur_CmwwmdLA) | [LinkedIn](https://www.linkedin.com/company/walt-id/)
-* Get help, request features and report bugs: [GitHub Issues](https://github.com/walt-id/waltid-identity/issues)
-* Find more indepth documentation on our [docs site](https://docs.walt.id)
-
-## License
-
-Licensed under the [Apache License, Version 2.0](https://github.com/walt-id/waltid-identity/blob/main/LICENSE)
-<div align="center">
-<img src="../../assets/walt-banner.png" alt="walt.id banner" />
-</div>
+See individual docs for detailed troubleshooting.
