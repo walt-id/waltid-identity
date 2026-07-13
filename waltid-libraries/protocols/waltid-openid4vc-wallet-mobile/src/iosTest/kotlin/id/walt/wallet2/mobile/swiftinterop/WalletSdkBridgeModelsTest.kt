@@ -1,5 +1,6 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.wallet2.persistence.encryption.WalletPersistenceException
 import kotlinx.coroutines.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,6 +23,17 @@ class WalletSdkBridgeModelsTest {
 
         assertEquals(WalletBridgeErrorCategory.internalFailure, unknown.category)
         assertEquals("boom", unknown.message)
+    }
+
+    @Test
+    fun mapsPersistenceFailuresToStorageCategory() {
+        val error = WalletBridgeError.fromThrowable(
+            WalletPersistenceException.DatabaseUnlockFailed(walletId = "wallet-1")
+        )
+
+        assertEquals(WalletBridgeErrorCategory.storage, error.category)
+        assertEquals("Wallet 'wallet-1' database could not be unlocked", error.message)
+        assertEquals("DatabaseUnlockFailed", error.causeClass)
     }
 
     @Test
