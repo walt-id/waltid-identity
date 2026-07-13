@@ -4,10 +4,13 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
 import id.walt.wallet2.auth.OSSWallet2AccountStore
-import id.walt.wallet2.OSSWallet2Service.walletStore
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.persistence.ExposedCredentialStore
+import id.walt.wallet2.persistence.ExposedDidStore
+import id.walt.wallet2.persistence.ExposedKeyStore
+import id.walt.wallet2.persistence.ExposedWalletStore
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.stores.WalletStore
@@ -17,18 +20,20 @@ import io.ktor.server.auth.*
 import io.ktor.server.routing.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.asFlow
+import org.jetbrains.exposed.v1.jdbc.Database
 
 /**
  * OSS [WalletResolver] and route registration.
  *
- * Uses [InMemoryWalletStore] by default. To add persistence, replace
- * [walletStore] with your own [WalletStore] implementation before the
- * service starts — no other changes needed.
+ * Uses [InMemoryWalletStore] by default. When the `wallet2-persistence` feature is
+ * enabled, [main] replaces [walletStore] with [ExposedWalletStore] AND calls
+ * [initPersistentStoreRegistry] with the same [Database] so that named store lookups
+ * ([resolveKeyStore] etc.) also return persistent [ExposedKeyStore]/[ExposedCredentialStore]/
+ * [ExposedDidStore] instances backed by the same database.
  *
- * All route-handler logic lives in [Wallet2RouteHandler] inside
- * waltid-openid4vc-wallet-server. The Enterprise service provides its own
- * [WalletResolver] backed by the MongoDB resource tree without changing any
- * handler logic.
+ * Without [initPersistentStoreRegistry], keys and credentials generated after wallet
+ * creation would only live in the in-memory maps and be lost on restart, even though
+ * the wallet descriptor itself was persisted to SQL.
  */
 object OSSWallet2Service {
 
@@ -41,9 +46,26 @@ object OSSWallet2Service {
      */
     var walletStore: WalletStore = InMemoryWalletStore()
 
+    // Named store caches. When persistence is active these hold Exposed-backed instances;
+    // otherwise InMemory stores are placed here at wallet-creation time.
     private val namedKeyStores = ConcurrentHashMap<String, WalletKeyStore>()
     private val namedCredentialStores = ConcurrentHashMap<String, WalletCredentialStore>()
     private val namedDidStores = ConcurrentHashMap<String, WalletDidStore>()
+
+    // Non-null when the wallet2-persistence feature is enabled. Used to create
+    // Exposed-backed store instances on demand for any store ID not yet in the cache.
+    private var persistenceDb: Database? = null
+
+    /**
+     * Call this at startup (after [walletStore] is set to [ExposedWalletStore]) with the
+     * same [Database] instance so that named store lookups return persistent stores.
+     *
+     * Idempotent: calling again with a different database replaces the reference,
+     * which is useful in tests that spin up isolated databases.
+     */
+    fun initPersistentStoreRegistry(db: Database) {
+        persistenceDb = db
+    }
 
     val resolver: WalletResolver = object : WalletResolver {
 
@@ -55,26 +77,59 @@ object OSSWallet2Service {
         override val walletStore: WalletStore
             get() = OSSWallet2Service.walletStore
 
-        override suspend fun resolveKeyStore(storeId: String) = namedKeyStores[storeId]
-        override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) { namedKeyStores[storeId] = store }
-        override fun listKeyStoreIds() = namedKeyStores.keys.asFlow()
+        // Named store resolution.
+        //
+        // When persistence is enabled:
+        //   - Return the cached instance if present (fast path).
+        //   - Otherwise create a new Exposed-backed store for that ID, cache it, and
+        //     return it. This handles wallets that were created in a previous process
+        //     run: their store IDs exist in the DB but are not yet in the in-process cache.
+        //
+        // When persistence is NOT enabled, only entries registered via storeKeyStore
+        // at wallet-creation time are returned (original in-memory behaviour).
 
-        override suspend fun resolveCredentialStore(storeId: String) = namedCredentialStores[storeId]
-        override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) { namedCredentialStores[storeId] = store }
-        override fun listCredentialStoreIds() = namedCredentialStores.keys.asFlow()
+        override suspend fun resolveKeyStore(storeId: String): WalletKeyStore? {
+            namedKeyStores[storeId]?.let { return it }
+            val db = persistenceDb ?: return null
+            val store = ExposedKeyStore(storeId, db)
+            namedKeyStores[storeId] = store
+            return store
+        }
 
-        override suspend fun resolveDidStore(storeId: String) = namedDidStores[storeId]
-        override suspend fun storeDidStore(storeId: String, store: WalletDidStore) { namedDidStores[storeId] = store }
-        override fun listDidStoreIds() = namedDidStores.keys.asFlow()
+        override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {
+            namedKeyStores[storeId] = store
+        }
 
-        /**
-         * Reverse lookup: maps a registered store instance back to its store ID.
-         *
-         * Required so [storeWallet] can serialize a [Wallet] into a [WalletDescriptor] that
-         * actually records its attached stores. Without this override (the default returns null),
-         * persisted wallets would have no attached stores. Matches by reference identity since
-         * store instances are registered (named or auto-created) via the store* methods above.
-         */
+        override fun listKeyStoreIds() = namedKeyStores.keys.toList().asFlow()
+
+        override suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore? {
+            namedCredentialStores[storeId]?.let { return it }
+            val db = persistenceDb ?: return null
+            val store = ExposedCredentialStore(storeId, db)
+            namedCredentialStores[storeId] = store
+            return store
+        }
+
+        override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {
+            namedCredentialStores[storeId] = store
+        }
+
+        override fun listCredentialStoreIds() = namedCredentialStores.keys.toList().asFlow()
+
+        override suspend fun resolveDidStore(storeId: String): WalletDidStore? {
+            namedDidStores[storeId]?.let { return it }
+            val db = persistenceDb ?: return null
+            val store = ExposedDidStore(storeId, db)
+            namedDidStores[storeId] = store
+            return store
+        }
+
+        override suspend fun storeDidStore(storeId: String, store: WalletDidStore) {
+            namedDidStores[storeId] = store
+        }
+
+        override fun listDidStoreIds() = namedDidStores.keys.toList().asFlow()
+
         override suspend fun resolveStoreId(store: Any): String? =
             namedKeyStores.entries.firstOrNull { it.value === store }?.key
                 ?: namedCredentialStores.entries.firstOrNull { it.value === store }?.key

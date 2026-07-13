@@ -39,6 +39,10 @@ suspend fun main(args: Array<String>) {
                     val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
                     val db = initWallet2Database(config)
                     OSSWallet2Service.walletStore = ExposedWalletStore(db)
+                    // Wire persistent store registry so resolveKeyStore/resolveCredentialStore/
+                    // resolveDidStore return Exposed-backed stores for any store ID - including
+                    // IDs that exist in the DB from previous runs but are not yet in-process.
+                    OSSWallet2Service.initPersistentStoreRegistry(db)
                 }
             },
             run = WebService {
