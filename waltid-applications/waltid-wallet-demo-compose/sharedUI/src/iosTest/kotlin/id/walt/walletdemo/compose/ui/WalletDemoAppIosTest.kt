@@ -18,10 +18,26 @@ class WalletDemoAppIosTest {
         scenarios.presentFlowUpdatesStatus()
 
     @Test
-    fun deepLinkReceiveAndPresentFlowUpdatesStatus() =
-        scenarios.deepLinkReceiveAndPresentFlowUpdatesStatus()
+    fun deepLinkOfferAutoNavigatesToReceiveAndCompletes() =
+        scenarios.deepLinkOfferAutoNavigatesToReceiveAndCompletes()
+
+    @Test
+    fun deepLinkPresentationPopulatesInputField() =
+        scenarios.deepLinkPresentationPopulatesInputField()
 
     @Test
     fun credentialsPersistAcrossControllerRecreation() =
         scenarios.credentialsPersistAcrossControllerRecreation()
+
+    @Test
+    fun receiveWithoutTxCodeSucceeds() =
+        scenarios.receiveWithoutTxCodeSucceeds()
+
+    @Test
+    fun manualEntryWithTxCodeRequiredShowsPromptThenReceives() =
+        scenarios.manualEntryWithTxCodeRequiredShowsPromptThenReceives()
+
+    @Test
+    fun qrScanWithTxCodeRequiredShowsPincodePrompt() =
+        scenarios.qrScanWithTxCodeRequiredShowsPincodePrompt()
 }

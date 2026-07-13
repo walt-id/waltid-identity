@@ -17,18 +17,13 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.DemoWallet
+import id.walt.walletdemo.compose.logic.DemoOfferResolution
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
+import id.walt.walletdemo.compose.logic.WalletDemoCredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.statusText
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
@@ -90,11 +85,26 @@ class WalletDemoAppTestScenarios {
         assertEquals("openid4vp://example", wallet.presentedRequestUrl)
     }
 
-    fun deepLinkReceiveAndPresentFlowUpdatesStatus() = runComposeUiTest {
+    fun deepLinkOfferAutoNavigatesToReceiveAndCompletes() = runComposeUiTest {
         val offerUrl = "openid-credential-offer://example"
+        val wallet = FakeDemoWallet(credentialsAfterReceive = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        controller.handleDeepLink(offerUrl)
+
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
+        onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
+        assertEquals(offerUrl, wallet.receivedOfferUrl)
+    }
+
+    fun deepLinkPresentationPopulatesInputField() = runComposeUiTest {
         val requestUrl = "openid4vp://example"
         val wallet = FakeDemoWallet(
-            credentialsAfterReceive = listOf(sampleCredential),
+            credentials = listOf(sampleCredential),
             presentationResult = WalletDemoOperationResult.Success("Presentation sent"),
         )
         val controller = WalletDemoController(wallet)
@@ -103,16 +113,6 @@ class WalletDemoAppTestScenarios {
         unlockWithPin()
         waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
 
-        controller.handleDeepLink(offerUrl)
-        waitForIdle()
-        openReceiveScreenAndSelectManual()
-        onNodeWithTag("wallet.offerInput").performScrollTo().assertTextContains(offerUrl)
-
-        onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
-        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
-        onNodeWithTag("wallet.status").assertTextContains("Received 1 credential(s)")
-        onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
-
         controller.handleDeepLink(requestUrl)
         waitForIdle()
         onNodeWithTag("wallet.presentationInput").performScrollTo().assertTextContains(requestUrl)
@@ -120,8 +120,75 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.presentButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation sent" }
         onNodeWithTag("wallet.status").assertTextContains("Presentation sent")
-        assertEquals(offerUrl, wallet.receivedOfferUrl)
         assertEquals(requestUrl, wallet.presentedRequestUrl)
+    }
+
+    fun receiveWithoutTxCodeSucceeds() = runComposeUiTest {
+        val wallet = FakeDemoWallet(credentialsAfterReceive = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        openReceiveScreenAndSelectManual()
+        onNodeWithTag("wallet.offerInput").performScrollTo().performTextInput("openid-credential-offer://example")
+        onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals(null, wallet.receivedTxCode)
+    }
+
+    fun manualEntryWithTxCodeRequiredShowsPromptThenReceives() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            offerTxCodeRequired = true,
+            credentialsAfterReceive = listOf(sampleCredential),
+        )
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        openReceiveScreenAndSelectManual()
+        onNodeWithTag("wallet.offerInput").performScrollTo().performTextInput("openid-credential-offer://example")
+        onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.requestDrafts.txCodeRequired }
+        onNodeWithText("This offer requires a pincode").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.txCodeInput").performScrollTo().performTextInput("5678")
+        onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals("5678", wallet.receivedTxCode)
+    }
+
+    fun qrScanWithTxCodeRequiredShowsPincodePrompt() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            offerTxCodeRequired = true,
+            credentialsAfterReceive = listOf(sampleCredential),
+        )
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag("wallet.openReceiveButton").performScrollTo().performClick()
+        waitForIdle()
+
+        controller.resolveAndReceive("openid-credential-offer://qr-example")
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.requestDrafts.txCodeRequired }
+
+        onNodeWithText("This offer requires a pincode").performScrollTo().assertIsDisplayed()
+        onNodeWithTag("wallet.txCodeInput").performScrollTo().performTextInput("4321")
+        onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
+
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
+        assertEquals("openid-credential-offer://qr-example", wallet.receivedOfferUrl)
+        assertEquals("4321", wallet.receivedTxCode)
     }
 
     fun credentialsPersistAcrossControllerRecreation() = runComposeUiTest {
@@ -134,8 +201,6 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.session is WalletSessionState.Ready }
 
         firstController.handleDeepLink("openid-credential-offer://example")
-        openReceiveScreenAndSelectManual()
-        onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
 
@@ -172,50 +237,6 @@ class WalletDemoAppTestScenarios {
             subject = "did:key:subject",
             label = "Example Credential",
             addedAt = "2026-06-17",
-            credentialData = JsonObject(
-                mapOf(
-                    "name" to JsonPrimitive("Introduction to Decentralized Identity"),
-                    "description" to JsonPrimitive(
-                        "Awarded for completing the foundational course on verifiable credentials and DIDs."
-                    ),
-                    "type" to buildJsonArray {
-                        add(JsonPrimitive("VerifiableCredential"))
-                        add(JsonPrimitive("OpenBadgeCredential"))
-                    },
-                    "issuanceDate" to JsonPrimitive("2026-06-15T09:30:00Z"),
-                    "expirationDate" to JsonNull,
-                    "achievement" to buildJsonObject {
-                        put("name", JsonPrimitive("Decentralized Identity Fundamentals"),)
-                        put("achievementType", JsonPrimitive("Certificate"))
-                        put("criteria", buildJsonObject {
-                            put("narrative", JsonPrimitive("Completed all modules and passed the final assessment."))
-                        })
-                    },
-                    "alignment" to buildJsonArray {
-                        add(buildJsonObject {
-                            put("targetName", JsonPrimitive("Information Security Analyst"))
-                            put("targetFramework", JsonPrimitive("O*NET"))
-                            put("targetCode", JsonPrimitive("15-1212.00"))
-                        })
-                        add(buildJsonObject {
-                            put("targetName", JsonPrimitive("Digital Identity Management"))
-                            put("targetFramework", JsonPrimitive("ESCO"))
-                            put("targetCode", JsonPrimitive("S1.2.3"))
-                        })
-                    },
-                    "evidence" to buildJsonArray {
-                        add(buildJsonObject {
-                            put("type", JsonPrimitive("Evidence"))
-                            put("name", JsonPrimitive("Final Project Submission"))
-                            put("description", JsonPrimitive("Implemented an OID4VCI issuer demo."))
-                        })
-                    },
-                    "recipient" to buildJsonObject {
-                        put("identity", JsonPrimitive("did:key:subject"))
-                        put("type", JsonPrimitive("DID"))
-                    },
-                )
-            ),
         )
     }
 }
@@ -225,9 +246,11 @@ private class FakeDemoWallet(
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val credentialsAfterReceive: List<WalletDemoCredential>? = null,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
+    private val offerTxCodeRequired: Boolean = false,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
+    var receivedTxCode: String? = null
     var presentedRequestUrl: String? = null
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
@@ -237,8 +260,15 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun receive(offerUrl: String): List<String> {
+    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+        credentials.firstOrNull { it.id == id }?.let { WalletDemoCredentialDetails(id = it.id, credentialDataJson = "{}") }
+
+    override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution =
+        DemoOfferResolution(txCodeRequired = offerTxCodeRequired)
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         receivedOfferUrl = offerUrl
+        receivedTxCode = txCode
         credentialsAfterReceive?.let { credentials = it }
         return receivedCredentialIds
     }

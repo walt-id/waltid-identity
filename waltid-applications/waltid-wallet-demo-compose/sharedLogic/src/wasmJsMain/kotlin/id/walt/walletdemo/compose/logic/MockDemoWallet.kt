@@ -13,7 +13,15 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun receive(offerUrl: String): List<String> {
+    override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution =
+        DemoOfferResolution(txCodeRequired = false)
+
+    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+        credentials.firstOrNull { it.id == id }?.let {
+            WalletDemoCredentialDetails(id = it.id, credentialDataJson = "{}")
+        }
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         credentials = listOf(
             WalletDemoCredential(
                 id = "mock-credential",

@@ -8,6 +8,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletCredentialDetails
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
@@ -241,6 +242,8 @@ class WalletSdkBridgeTest {
                     addedAt = null,
                 )
             )
+
+        override suspend fun credentialDetails(id: String): MobileWalletCredentialDetails? = null
 
         override suspend fun present(
             requestUrl: String,

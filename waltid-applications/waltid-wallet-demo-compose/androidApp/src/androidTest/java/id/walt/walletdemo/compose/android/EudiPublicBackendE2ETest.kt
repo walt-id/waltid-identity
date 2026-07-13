@@ -5,6 +5,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.POST_PRESENT_DELAY
@@ -39,8 +40,15 @@ class EudiPublicBackendE2ETest {
         val device = UiDevice.getInstance(instrumentation)
 
         launchAndUnlock(context, device)
+        clickByTag(device, "wallet.openReceiveButton")
 
         sendDeepLink(context, offerUrl)
+        assertTrue(
+            "Could not find 'Enter link' toggle to switch to manual entry mode",
+            device.wait(Until.hasObject(By.text("Enter link")), UI_ELEMENT_TIMEOUT)
+        )
+        device.findObject(By.text("Enter link")).click()
+
         assertTrue(
             "Offer URL did not appear in UI after deep link",
             waitForResource(device, "wallet.offerInput", UI_ELEMENT_TIMEOUT)?.text == offerUrl
@@ -66,8 +74,8 @@ class EudiPublicBackendE2ETest {
             timeoutMs = QUICK_STATUS_CHECK_TIMEOUT,
             matcher = {
                 it.startsWith("Presenting credential") ||
-                    it.startsWith("Presentation sent") ||
-                    it.startsWith("Presentation finished")
+                        it.startsWith("Presentation sent") ||
+                        it.startsWith("Presentation finished")
             },
             failurePrefixes = listOf("Present failed", "Receive failed", "Bootstrap failed")
         )
@@ -80,8 +88,8 @@ class EudiPublicBackendE2ETest {
         assertTrue(
             "Presentation failed in app. Latest status: $statusAfterPresent",
             !statusAfterPresent.startsWith("Present failed") &&
-                !statusAfterPresent.startsWith("Receive failed") &&
-                !statusAfterPresent.startsWith("Bootstrap failed")
+                    !statusAfterPresent.startsWith("Receive failed") &&
+                    !statusAfterPresent.startsWith("Bootstrap failed")
         )
         assertTrue(
             "Wallet app is no longer in foreground after presentation flow",

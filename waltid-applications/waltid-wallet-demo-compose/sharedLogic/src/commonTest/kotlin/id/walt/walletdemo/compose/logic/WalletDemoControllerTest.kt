@@ -5,12 +5,8 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -122,6 +118,160 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun receiveWithoutTxCodePassesNull() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.receive()
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals(null, wallet.receivedTxCode)
+    }
+
+    @Test
+    fun receiveWithTxCodeForwardsCode() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.updateTxCode("1234")
+        controller.receive()
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals("1234", wallet.receivedTxCode)
+    }
+
+    @Test
+    fun deepLinkWhileReadyImmediatelyReceives() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = false)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.handleDeepLink("openid-credential-offer://example")
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertTrue(controller.state.value.requestDrafts.offerFromDeepLink.not())
+    }
+
+    @Test
+    fun deepLinkBeforeBootstrapReceivesAfterUnlock() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = false)
+        val controller = controllerWith(wallet, this)
+
+        controller.handleDeepLink("openid-credential-offer://example")
+        assertEquals("openid-credential-offer://example", controller.state.value.requestDrafts.offerUrl)
+        assertTrue(controller.state.value.requestDrafts.offerFromDeepLink)
+        assertEquals(null, wallet.receivedOfferUrl)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+    }
+
+    @Test
+    fun resolveAndReceiveWithoutTxCodeReceivesDirectly() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = false)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.resolveAndReceive("openid-credential-offer://example")
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals(null, wallet.receivedTxCode)
+        assertFalse(controller.state.value.requestDrafts.txCodeRequired)
+    }
+
+    @Test
+    fun resolveAndReceiveWithTxCodePromptsThenReceives() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = true)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.resolveAndReceive("openid-credential-offer://example")
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
+        assertEquals(null, wallet.receivedOfferUrl)
+        assertTrue(controller.state.value.requestDrafts.txCodeRequired)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+
+        controller.updateTxCode("9876")
+        controller.receive()
+        runCurrent()
+
+        assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals("9876", wallet.receivedTxCode)
+        assertFalse(controller.state.value.requestDrafts.txCodeRequired)
+    }
+
+    @Test
+    fun manualEntryResolveWithoutTxCodeReceivesDirectly() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = false)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://manual")
+        controller.resolveAndReceive(controller.state.value.requestDrafts.offerUrl)
+        runCurrent()
+
+        assertEquals("openid-credential-offer://manual", wallet.receivedOfferUrl)
+        assertEquals(null, wallet.receivedTxCode)
+        assertFalse(controller.state.value.requestDrafts.txCodeRequired)
+    }
+
+    @Test
+    fun manualEntryResolveWithTxCodePromptsThenReceives() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = true)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://manual")
+        controller.resolveAndReceive(controller.state.value.requestDrafts.offerUrl)
+        runCurrent()
+
+        assertTrue(controller.state.value.requestDrafts.txCodeRequired)
+        assertEquals(null, wallet.receivedOfferUrl)
+
+        controller.updateTxCode("5555")
+        controller.receive()
+        runCurrent()
+
+        assertEquals("openid-credential-offer://manual", wallet.receivedOfferUrl)
+        assertEquals("5555", wallet.receivedTxCode)
+    }
+
+    @Test
+    fun updateOfferUrlClearsTxCodeRequired() = runTest {
+        val wallet = FakeDemoWallet(offerTxCodeRequired = true)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://first")
+        controller.resolveAndReceive(controller.state.value.requestDrafts.offerUrl)
+        runCurrent()
+        assertTrue(controller.state.value.requestDrafts.txCodeRequired)
+
+        controller.updateOfferUrl("openid-credential-offer://second")
+        assertFalse(controller.state.value.requestDrafts.txCodeRequired)
+    }
+
+    @Test
+    fun receiveWithBlankTxCodePassesNull() = runTest {
+        val wallet = FakeDemoWallet()
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.updateTxCode("   ")
+        controller.receive()
+        runCurrent()
+
+        assertEquals(null, wallet.receivedTxCode)
+    }
+
+    @Test
     fun presentUpdatesStatusOnSuccess() = runTest {
         val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult.Success("Presentation sent"))
         val controller = unlockedControllerWith(wallet, this)
@@ -186,50 +336,6 @@ class WalletDemoControllerTest {
             subject = "did:key:subject",
             label = "Example Credential",
             addedAt = "2026-06-17",
-            credentialData = JsonObject(
-                mapOf(
-                    "name" to JsonPrimitive("Introduction to Decentralized Identity"),
-                    "description" to JsonPrimitive(
-                        "Awarded for completing the foundational course on verifiable credentials and DIDs."
-                    ),
-                    "type" to buildJsonArray {
-                        add(JsonPrimitive("VerifiableCredential"))
-                        add(JsonPrimitive("OpenBadgeCredential"))
-                    },
-                    "issuanceDate" to JsonPrimitive("2026-06-15T09:30:00Z"),
-                    "expirationDate" to JsonNull,
-                    "achievement" to buildJsonObject {
-                        put("name", JsonPrimitive("Decentralized Identity Fundamentals"),)
-                        put("achievementType", JsonPrimitive("Certificate"))
-                        put("criteria", buildJsonObject {
-                            put("narrative", JsonPrimitive("Completed all modules and passed the final assessment."))
-                        })
-                    },
-                    "alignment" to buildJsonArray {
-                        add(buildJsonObject {
-                            put("targetName", JsonPrimitive("Information Security Analyst"))
-                            put("targetFramework", JsonPrimitive("O*NET"))
-                            put("targetCode", JsonPrimitive("15-1212.00"))
-                        })
-                        add(buildJsonObject {
-                            put("targetName", JsonPrimitive("Digital Identity Management"))
-                            put("targetFramework", JsonPrimitive("ESCO"))
-                            put("targetCode", JsonPrimitive("S1.2.3"))
-                        })
-                    },
-                    "evidence" to buildJsonArray {
-                        add(buildJsonObject {
-                            put("type", JsonPrimitive("Evidence"))
-                            put("name", JsonPrimitive("Final Project Submission"))
-                            put("description", JsonPrimitive("Implemented an OID4VCI issuer demo."))
-                        })
-                    },
-                    "recipient" to buildJsonObject {
-                        put("identity", JsonPrimitive("did:key:subject"))
-                        put("type", JsonPrimitive("DID"))
-                    },
-                )
-            ),
         )
     }
 }
@@ -238,10 +344,13 @@ private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
+    private val offerTxCodeRequired: Boolean = false,
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
+    var receivedTxCode: String? = null
     var presentedRequestUrl: String? = null
+    var resolvedOfferUrl: String? = null
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
@@ -250,8 +359,17 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun receive(offerUrl: String): List<String> {
+    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+        credentials.firstOrNull { it.id == id }?.let { WalletDemoCredentialDetails(id = it.id, credentialDataJson = "{}") }
+
+    override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution {
+        resolvedOfferUrl = offerUrl
+        return DemoOfferResolution(txCodeRequired = offerTxCodeRequired)
+    }
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         receivedOfferUrl = offerUrl
+        receivedTxCode = txCode
         return receivedCredentialIds
     }
 
