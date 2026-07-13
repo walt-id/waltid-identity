@@ -69,7 +69,9 @@ interface WalletResolver {
             credentialStoreIds = wallet.credentialStores.mapNotNull { resolveStoreId(it) },
             didStoreId = wallet.didStore?.let { resolveStoreId(it) },
             serializedStaticKey = serializedStaticKey,
-            staticDid = wallet.staticDid
+            staticDid = wallet.staticDid,
+            defaultKeyId = wallet.defaultKeyId,
+            defaultDidId = wallet.defaultDidId,
         )
         walletStore.saveDescriptor(descriptor)
     }
@@ -123,10 +125,40 @@ interface WalletResolver {
             credentialStores = credentialStores,
             didStore = didStore,
             staticKey = staticKey,
-            staticDid = descriptor.staticDid
+            staticDid = descriptor.staticDid,
+            defaultKeyId = descriptor.defaultKeyId,
+            defaultDidId = descriptor.defaultDidId,
         )
     }
 
     /** Resolves the registered storeId for a given store instance, if any. */
     suspend fun resolveStoreId(store: Any): String? = null
+
+    /**
+     * Persists updated [defaultKeyId] / [defaultDidId] for an existing wallet.
+     *
+     * For [InMemoryWalletStore] the live [Wallet] object is replaced with a copy
+     * containing the new defaults. For persistent stores the descriptor is loaded,
+     * updated, and saved.
+     */
+    suspend fun setWalletDefaults(walletId: String, defaultKeyId: String?, defaultDidId: String?) {
+        val inMemory = walletStore as? InMemoryWalletStore
+        if (inMemory != null) {
+            val wallet = inMemory.getWallet(walletId) ?: return
+            inMemory.putWallet(
+                wallet.copy(
+                    defaultKeyId = defaultKeyId ?: wallet.defaultKeyId,
+                    defaultDidId = defaultDidId ?: wallet.defaultDidId,
+                )
+            )
+            return
+        }
+        val descriptor = walletStore.loadDescriptor(walletId) ?: return
+        walletStore.saveDescriptor(
+            descriptor.copy(
+                defaultKeyId = defaultKeyId ?: descriptor.defaultKeyId,
+                defaultDidId = defaultDidId ?: descriptor.defaultDidId,
+            )
+        )
+    }
 }

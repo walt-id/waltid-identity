@@ -54,18 +54,36 @@ data class Wallet(
      * Mirrors WalletServiceConfiguration.staticDid in the Enterprise.
      */
     val staticDid: String? = null,
+
+    /**
+     * ID of the preferred default key. When non-null, [defaultKey] returns this key
+     * instead of the first key across the stores.
+     */
+    val defaultKeyId: String? = null,
+
+    /**
+     * Preferred default DID. When non-null, [defaultDid] returns this DID
+     * instead of the first DID in the store.
+     */
+    val defaultDidId: String? = null,
 ) {
     // ---------------------------------------------------------------------------
-    // Aggregate helpers — hide multi-store complexity from handler code
+    // Aggregate helpers
     // ---------------------------------------------------------------------------
 
     /** Finds a key by ID across all key stores; returns the first match. */
     suspend fun findKey(keyId: String): Key? =
         keyStores.firstNotNullOfOrNull { it.getKey(keyId) }
 
-    /** Returns the default key: first key across all stores, or staticKey. */
+    /**
+     * Returns the default key.
+     * If [defaultKeyId] is set, that key is returned (looked up across all stores).
+     * Falls back to the first key across all stores, then to [staticKey].
+     */
     suspend fun defaultKey(): Key? =
-        keyStores.firstNotNullOfOrNull { it.getDefaultKey() } ?: staticKey
+        defaultKeyId?.let { findKey(it) }
+            ?: keyStores.firstNotNullOfOrNull { it.getDefaultKey() }
+            ?: staticKey
 
     /** Lists all keys across all key stores, in store order. */
     suspend fun listAllKeys(): List<WalletKeyInfo> {
@@ -98,7 +116,13 @@ data class Wallet(
         store.addCredential(entry)
     }
 
-    /** Returns the default DID from the DID store, or staticDid. */
+    /**
+     * Returns the default DID.
+     * If [defaultDidId] is set, that DID is returned.
+     * Falls back to the first DID in the store, then to [staticDid].
+     */
     suspend fun defaultDid(): String? =
-        didStore?.getDefaultDid() ?: staticDid
+        defaultDidId
+            ?: didStore?.getDefaultDid()
+            ?: staticDid
 }
