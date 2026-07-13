@@ -258,12 +258,11 @@ class StatusListSignatureVerifierTest {
     private suspend fun createSignedCwt(key: JWKKey, did: String, payload: ByteArray): ByteArray {
         val protectedHeaders = CoseHeaders(
             algorithm = -8, // EdDSA
-            contentType = id.walt.cose.CoseContentType.AsString("statuslist+cwt")
+            contentType = id.walt.cose.CoseContentType.AsString("statuslist+cwt"),
+            kid = "$did#${key.getKeyId()}".encodeToByteArray() // ISO 18013-5 Second Edition: kid in protected headers
         )
         
-        val unprotectedHeaders = CoseHeaders(
-            kid = "$did#${key.getKeyId()}".encodeToByteArray()
-        )
+        val unprotectedHeaders = CoseHeaders()
         
         val signer = key.toCoseSigner()
         

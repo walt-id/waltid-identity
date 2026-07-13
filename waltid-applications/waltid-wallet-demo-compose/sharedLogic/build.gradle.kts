@@ -63,7 +63,7 @@ kotlin {
     }
 }
 
-// iOS test binaries cannot link without CocoaPods framework paths from transitive iOS crypto deps.
+// iOS test binaries do not get the Xcode SwiftPM linkage package used by the demo app.
 // Keep iOS source/test compilation enabled, but skip native test executable linking.
 tasks.matching { it.name.startsWith("linkDebugTestIos") || it.name.startsWith("linkReleaseTestIos") }.configureEach {
     enabled = false

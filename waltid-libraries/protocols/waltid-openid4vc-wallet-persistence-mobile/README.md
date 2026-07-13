@@ -20,13 +20,14 @@
 
 ## Overview
 
-This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, plus platform key stores for non-exportable platform-backed key references.
+This library provides Android/iOS persistence implementations for the wallet store interfaces defined in [waltid-openid4vc-wallet](../waltid-openid4vc-wallet). It uses SQLDelight for credential and DID storage, SQLCipher-capable platform drivers for encrypted wallet databases, plus platform key stores for non-exportable platform-backed key references.
 
 Use this library when you need persistent wallet storage inside a mobile wallet application.
 
 ## Features
 
 - **SQLDelight** — Kotlin Multiplatform database layer for Android and iOS
+- **Encrypted local databases** — SQLCipher-backed Android and iOS drivers
 - **Platform key stores** — Android KeyStore and iOS Keychain / Secure Enclave integration
 - **Credential persistence** — SQL-backed credential storage with metadata
 - **DID persistence** — SQL-backed DID document storage
@@ -50,15 +51,24 @@ dependencies {
 
 ### Constructing Stores
 
+Inside a coroutine:
+
 ```kotlin
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
+import id.walt.wallet2.persistence.encryption.AndroidDatabaseEncryptionKeyProvider
 import id.walt.wallet2.persistence.keys.AndroidPlatformKeyProvider
 import id.walt.wallet2.persistence.stores.DriverFactory
 import id.walt.wallet2.persistence.stores.PlatformKeyStore
 import id.walt.wallet2.persistence.stores.SqlDelightCredentialStore
 import id.walt.wallet2.persistence.stores.SqlDelightDidStore
 
-val driver = DriverFactory(context).createDriver("wallet_wallet-id")
+val databaseName = "wallet_wallet-id"
+val databaseKey = AndroidDatabaseEncryptionKeyProvider(context)
+    .getOrCreateKey(walletId = "wallet-id", databaseName = databaseName)
+val driver = DriverFactory(context).createEncryptedDriver(
+    databaseName = databaseName,
+    encryptionKey = databaseKey,
+)
 val queries = WalletPersistenceDatabase(driver).walletPersistenceQueries
 
 val keyProvider = AndroidPlatformKeyProvider()
@@ -66,6 +76,16 @@ val keyStore = PlatformKeyStore(keyProvider, queries)
 val credentialStore = SqlDelightCredentialStore(queries)
 val didStore = SqlDelightDidStore(queries)
 ```
+
+The higher-level `waltid-openid4vc-wallet-mobile` facade performs this wiring automatically. Use this module directly only when assembling custom platform persistence.
+
+## Encryption and cleanup
+
+The mobile facade opens encrypted databases by default and keeps managed database keys in platform-protected storage. Android stores the wrapped database key with Android KeyStore-backed material and app-private preferences. iOS stores the database key as a Keychain generic-password item using device-local accessibility.
+
+`DatabaseEncryptionKeyProvider` is the boundary for provided database keys. Implement it when an app needs KMS-backed recovery or enterprise key ownership. The SDK will request key material for opening the local SQLCipher database and call `deleteKey(walletId, databaseName)` when `MobileWallet.deleteWallet()` deletes local wallet data. External KMS recovery state remains the app's responsibility.
+
+`DriverFactory.deleteDatabase(databaseName)` removes the database file and SQLite sidecars used by the platform driver. For complete wallet deletion, close the driver first, remove platform signing keys referenced by `PlatformKeyStore`, delete database files, and then delete the database encryption key.
 
 ## Store Implementations
 

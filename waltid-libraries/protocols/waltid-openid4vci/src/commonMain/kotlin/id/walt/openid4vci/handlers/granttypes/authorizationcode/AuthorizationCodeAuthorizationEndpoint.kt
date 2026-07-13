@@ -1,6 +1,7 @@
 
 package id.walt.openid4vci.handlers.granttypes.authorizationcode
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandler
 import id.walt.openid4vci.DEFAULT_AUTHORIZATION_CODE_LIFETIME_SECONDS
 import id.walt.openid4vci.Session
@@ -14,7 +15,6 @@ import id.walt.openid4vci.requests.authorization.AuthorizationRequest
 import id.walt.openid4vci.responses.authorization.AuthorizationResponse
 import id.walt.openid4vci.responses.authorization.AuthorizationResponseResult
 import org.kotlincrypto.random.CryptoRand
-import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -115,7 +115,7 @@ class AuthorizationCodeAuthorizationEndpoint(
     }
 
     private fun generateCode(): String {
-        val bytes = ByteArray(33) //prevent padding
-        return Base64.UrlSafe.encode(CryptoRand.nextBytes(bytes))
+        val bytes = ByteArray(33)
+        return CryptoRand.nextBytes(bytes).encodeToBase64Url()
     }
 }

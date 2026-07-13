@@ -20,22 +20,29 @@
 
 ## Overview
 
-Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with a Kotlin Multiplatform shared bridge and demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
+Native iOS demo app for the mobile wallet SDK. It uses SwiftUI with the `WalletSDK` Swift package and demonstrates OpenID4VCI credential issuance, OpenID4VP credential presentation, iOS Keychain / Secure Enclave-backed keys, and SQLDelight-backed wallet persistence.
 
-For setup, IDE guidance, and local E2E prerequisites, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+For setup, IDE guidance, and mobile integration test commands, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+
+## Local wallet data
+
+The demo uses the default managed encrypted local persistence. Wallet database files are SQLCipher-encrypted, and managed database keys live in iOS Keychain. During local development, reset wallet state by calling `Wallet.deleteLocalData()` from the SDK facade, deleting the app from the simulator/device, or removing the app's local data.
+
+The UI stays focused on the production default. Non-default persistence options, including provided database keys and custom credential stores, are documented and covered by SDK and demo integration tests.
 
 ## Common commands
 
 ```bash
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
-pod install
-open iosApp.xcworkspace
+open iosApp.xcodeproj
 ```
 
-E2E scripts live in [scripts](scripts/README.md).
+Mobile integration tests run through XCTest and the self-contained Enterprise
+fixture Gradle tasks documented in the mobile guide.
 
 ## Related modules
 
+- [WalletSDK](../../waltid-libraries/protocols/waltid-wallet-sdk-ios/README.md)
 - [waltid-openid4vc-wallet-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/README.md)
 - [waltid-openid4vc-wallet-persistence-mobile](../../waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/README.md)
 - [waltid-crypto](../../waltid-libraries/crypto/waltid-crypto/README.md)
