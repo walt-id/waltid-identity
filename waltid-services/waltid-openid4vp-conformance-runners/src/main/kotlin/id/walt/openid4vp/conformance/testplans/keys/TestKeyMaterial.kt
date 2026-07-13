@@ -134,9 +134,10 @@ hqT4+g==
     const val ISSUER_KEY_JWK = """{"type":"jwk","jwk":{"kty":"EC","d":"ZNGqW-fqvLsO_kscAYNecT6LZ2uNUiL8yd591XoE5l0","crv":"P-256","x":"GibjXhCooyI29MCa7z3MZMtCt1e_jSQEDQl-b8Ol2KE","y":"5S-R0_asQ5Dz27kR9_Z0aZUWYa3H4bpJZnSxGAzJhEg"}}"""
 
     /**
-     * SD-JWT VC Issuer certificate chain [leaf, CA] for x5c header
+     * SD-JWT VC Issuer certificate chain for x5c header
+     * HAIP-6.1.1: Only leaf cert - trust anchor must NOT be in x5c
      */
-    fun getIssuerCertificateChain(): List<String> = listOf(ISSUER_LEAF_CERT, ISSUER_CA_CERT)
+    fun getIssuerCertificateChain(): List<String> = listOf(ISSUER_LEAF_CERT)
 
     /**
      * SD-JWT VC issuer key (P-256/ES256) - LEGACY, uses old MDOC ROOT CA
