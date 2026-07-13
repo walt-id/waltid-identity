@@ -9,6 +9,7 @@ import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -143,11 +144,19 @@ object Wallet2RouteHandler {
             //    serializes the Wallet to a WalletDescriptor (otherwise the descriptor would be
             //    persisted with no attached stores — see resolveStoreId default), and
             //  - the same store instance is resolvable later via resolveKeyStore()/etc.
+            // Collect registered store IDs upfront when the user provides explicit IDs,
+            // so we can validate them before calling resolveKeyStore() (which uses computeIfAbsent
+            // and would silently create a new store for any unknown ID instead of rejecting it).
+            val registeredKeyStoreIds = if (req.keyStoreIds != null) resolver.listKeyStoreIds().toList() else emptyList()
+            val registeredCredentialStoreIds = if (req.credentialStoreIds != null) resolver.listCredentialStoreIds().toList() else emptyList()
+            val registeredDidStoreIds = if (req.didStoreId != null) resolver.listDidStoreIds().toList() else emptyList()
+
             val keyStores: List<WalletKeyStore> = when {
                 req.keyStoreIds != null ->
                     req.keyStoreIds.map { storeId ->
-                        resolver.resolveKeyStore(storeId)
-                            ?: throw IllegalArgumentException("Key store '$storeId' not found")
+                        require(storeId in registeredKeyStoreIds) { "Key store '$storeId' not found" }
+                        // Non-null: existence validated above; computeIfAbsent returns the registered instance.
+                        resolver.resolveKeyStore(storeId)!!
                     }
 
                 req.staticKey != null -> emptyList()
@@ -157,8 +166,8 @@ object Wallet2RouteHandler {
             val credentialStores: List<WalletCredentialStore> = when {
                 req.credentialStoreIds != null ->
                     req.credentialStoreIds.map { storeId ->
-                        resolver.resolveCredentialStore(storeId)
-                            ?: throw IllegalArgumentException("Credential store '$storeId' not found")
+                        require(storeId in registeredCredentialStoreIds) { "Credential store '$storeId' not found" }
+                        resolver.resolveCredentialStore(storeId)!!
                     }
 
                 else -> listOf(resolver.credentialStoreFactory.create("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
@@ -166,9 +175,10 @@ object Wallet2RouteHandler {
 
             val didStore: WalletDidStore? = when {
                 req.noDidStore -> null
-                req.didStoreId != null -> resolver.resolveDidStore(req.didStoreId)
-                    ?: throw IllegalArgumentException("DID store '${req.didStoreId}' not found")
-
+                req.didStoreId != null -> {
+                    require(req.didStoreId in registeredDidStoreIds) { "DID store '${req.didStoreId}' not found" }
+                    resolver.resolveDidStore(req.didStoreId)
+                }
                 req.staticDid != null -> null
                 else -> resolver.didStoreFactory.create("$id-dids").also { resolver.storeDidStore("$id-dids", it) }
             }
@@ -671,6 +681,35 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<MatchCredentialsFromStoreRequest>()
                         call.respond(WalletPresentationHandler.matchCredentialsFromStore(wallet, req))
+                    }
+
+                    post("/build-vp-token", {
+                        summary = "Build VP token from selected credentials"
+                        description =
+                            "Step 3 of the manual presentation flow. " +
+                            "Takes the resolved authorization request (from /resolve-request) and the " +
+                            "credential IDs selected by the user (from /match-credentials-from-store), " +
+                            "then builds and signs the vp_token. " +
+                            "Pass the result to /send-response to complete the flow."
+                        request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
+                        response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
+                        val req = call.receive<BuildVpTokenRequest>()
+                        call.respond(WalletPresentationHandler.buildVpToken(wallet, req))
+                    }
+
+                    post("/send-response", {
+                        summary = "Send authorization response to the verifier"
+                        description =
+                            "Step 4 of the manual presentation flow. " +
+                            "Transmits the vp_token (from /build-vp-token) to the verifier " +
+                            "according to the response_mode in the authorization request."
+                        request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
+                        response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
+                    }) {
+                        val req = call.receive<SendAuthorizationResponseRequest>()
+                        call.respond(WalletPresentationHandler.sendAuthorizationResponse(req))
                     }
                 }
             }
