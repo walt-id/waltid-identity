@@ -186,6 +186,7 @@ object Wallet2RouteHandler {
                         resolver.resolveKeyStore(storeId)
                             ?: throw IllegalArgumentException("Key store '$storeId' not found")
                     }
+
                 req.staticKey != null -> emptyList()
                 else -> listOf(InMemoryKeyStore().also { resolver.storeKeyStore("$id-keys", it) })
             }
@@ -196,6 +197,7 @@ object Wallet2RouteHandler {
                         resolver.resolveCredentialStore(storeId)
                             ?: throw IllegalArgumentException("Credential store '$storeId' not found")
                     }
+
                 else -> listOf(InMemoryCredentialStore().also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
@@ -203,6 +205,7 @@ object Wallet2RouteHandler {
                 req.noDidStore -> null
                 req.didStoreId != null -> resolver.resolveDidStore(req.didStoreId)
                     ?: throw IllegalArgumentException("DID store '${req.didStoreId}' not found")
+
                 req.staticDid != null -> null
                 else -> InMemoryDidStore().also { resolver.storeDidStore("$id-dids", it) }
             }
@@ -531,8 +534,8 @@ object Wallet2RouteHandler {
                         summary = "Receive credential(s) - full pre-authorized code flow"
                         description =
                             "Resolves the offer, requests a token, signs proof-of-possession, " +
-                            "fetches the credential(s) and stores them. " +
-                            "Returns a stream of stored credentials as they arrive."
+                                    "fetches the credential(s) and stores them. " +
+                                    "Returns a stream of stored credentials as they arrive."
                         request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest>() }
                         response {
                             HttpStatusCode.OK to { body<ReceiveCredentialResult>() }
@@ -598,7 +601,7 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
-                            "The caller must redirect to this URL and capture the returned code."
+                                    "The caller must redirect to this URL and capture the returned code."
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
@@ -619,7 +622,7 @@ object Wallet2RouteHandler {
                         summary = "Poll deferred credential endpoint"
                         description =
                             "Polls the issuer's deferred credential endpoint for a previously " +
-                            "deferred credential. Returns immediately with empty list if still pending."
+                                    "deferred credential. Returns immediately with empty list if still pending."
                         request { pathParameter<String>("walletId"); body<PollDeferredRequest>() }
                         response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
                     }) {
@@ -640,7 +643,7 @@ object Wallet2RouteHandler {
                         summary = "Present credential(s) — full DCQL flow"
                         description =
                             "Resolves the VP request, DCQL-matches credentials from the wallet " +
-                            "stores, signs the presentation(s) and submits to the verifier."
+                                    "stores, signs the presentation(s) and submits to the verifier."
                         request { pathParameter<String>("walletId"); body<PresentCredentialRequest>() }
                         response { HttpStatusCode.OK to { body<id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult>() } }
                     }) {
@@ -671,7 +674,7 @@ object Wallet2RouteHandler {
                     post("/match-credentials", {
                         summary = "Isolated: DCQL-match supplied credentials against a query"
                         description = "Stateless — caller provides credentials inline. " +
-                            "Use /match-credentials-from-store to match against the wallet's own credential stores."
+                                "Use /match-credentials-from-store to match against the wallet's own credential stores."
                         request { pathParameter<String>("walletId"); body<MatchCredentialsRequest>() }
                         response { HttpStatusCode.OK to { body<MatchCredentialsResult>() } }
                     }) {
@@ -682,8 +685,8 @@ object Wallet2RouteHandler {
                     post("/match-credentials-from-store", {
                         summary = "DCQL-match wallet's stored credentials against a query"
                         description = "Loads credentials from the wallet's credential stores and runs DCQL " +
-                            "matching — no credentials need to be supplied inline. " +
-                            "Use this for consent-preview UIs: show the user what will be shared before calling /present."
+                                "matching — no credentials need to be supplied inline. " +
+                                "Use this for consent-preview UIs: show the user what will be shared before calling /present."
                         request { pathParameter<String>("walletId"); body<MatchCredentialsFromStoreRequest>() }
                         response { HttpStatusCode.OK to { body<MatchCredentialsResult>() } }
                     }) {

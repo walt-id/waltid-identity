@@ -154,7 +154,19 @@ data class ResolveOfferResult(
     val grantType: String?,
     val txCodeRequired: Boolean,
     val credentialEndpoint: Url,
-    val offeredCredentials: List<String>
+    val offeredCredentials: List<String>,
+    /**
+     * Token endpoint URL for the pre-authorized code grant.
+     * Null for auth-code grant offers or when AS metadata has no token endpoint.
+     * Pass directly to [RequestTokenRequest.tokenEndpoint].
+     */
+    val tokenEndpoint: Url?,
+    /**
+     * Pre-authorized code from the offer grant.
+     * Null for auth-code grant offers.
+     * Pass directly to [RequestTokenRequest.preAuthorizedCode].
+     */
+    val preAuthorizedCode: String?,
 )
 
 @Serializable
@@ -500,15 +512,21 @@ object WalletIssuanceHandler {
         }
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
+        val preAuthGrant = offer.grants?.preAuthorizedCode
+        val asMetadata = if (preAuthGrant != null) {
+            runCatching { IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata) }.getOrNull()
+        } else null
         return ResolveOfferResult(
             credentialIssuer = offer.credentialIssuer,
             credentialConfigurationIds = offer.credentialConfigurationIds,
-            grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
+            grantType = preAuthGrant?.let { "pre-authorized_code" }
                 ?: offer.grants?.authorizationCode?.let { "authorization_code" },
-            txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
+            txCodeRequired = preAuthGrant?.txCode != null,
             credentialEndpoint = Url(issuerMetadata.credentialEndpoint
                 ?: error("Issuer metadata contains no credential_endpoint")),
-            offeredCredentials = offeredCredentials.map { it.credentialConfigurationId }
+            offeredCredentials = offeredCredentials.map { it.credentialConfigurationId },
+            tokenEndpoint = asMetadata?.tokenEndpoint?.let { Url(it) },
+            preAuthorizedCode = preAuthGrant?.preAuthorizedCode,
         )
     }
 
