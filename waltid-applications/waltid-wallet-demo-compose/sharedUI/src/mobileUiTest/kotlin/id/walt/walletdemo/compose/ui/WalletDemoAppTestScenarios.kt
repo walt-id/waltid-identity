@@ -42,7 +42,7 @@ class WalletDemoAppTestScenarios {
         assertEquals(1, wallet.bootstrapCalls)
     }
 
-    fun savedCredentialOpensNeutralDetails() = runComposeUiTest {
+    fun savedCredentialOpensCredentialDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
         val controller = WalletDemoController(wallet)
 
