@@ -63,6 +63,7 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
     )
 
     // DCQL Query for ISO mDL (org.iso.18013.5.1.mDL)
+    // Uses path array format per DCQL spec: ["namespace", "claim_name"]
     // language=JSON
     val dcqlQuery = """
         {
@@ -74,10 +75,10 @@ class MdlX509HashRequestUriSignedDirectPostHaip(
                         "doctype_value": "org.iso.18013.5.1.mDL"
                     },
                     "claims": [
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "given_name"},
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "family_name"},
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "birth_date"},
-                        {"namespace": "org.iso.18013.5.1", "claim_name": "age_over_18"}
+                        { "path": ["org.iso.18013.5.1", "given_name"] },
+                        { "path": ["org.iso.18013.5.1", "family_name"] },
+                        { "path": ["org.iso.18013.5.1", "birth_date"] },
+                        { "path": ["org.iso.18013.5.1", "age_over_18"] }
                     ]
                 }
             ]

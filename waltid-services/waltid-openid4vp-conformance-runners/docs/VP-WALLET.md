@@ -16,16 +16,14 @@ Complete guide for running OpenID4VP Wallet conformance tests against the OpenID
 
 ## VP-Verifier Conformance Status (WAL-896)
 
-### Test Results (2026-07-10)
+### Test Results (2026-07-13) ✅ ALL PASSING
 
-| Test Plan | Format | Status | Notes |
-|-----------|--------|--------|-------|
-| MdlX509SanDnsRequestUriSignedDirectPost | mdoc | ✅ **PASS** | Validates WAL-896 core |
-| SdJwtVcX509SanDnsRequestUriSignedDirectPost | SD-JWT | ❌ FAIL | Audience policy issue* |
-| MdlX509HashRequestUriSignedDirectPostHaip | mdoc | ⏳ Pending | HAIP variant |
-| SdJwtVcX509HashRequestUriSignedDirectPostHaip | SD-JWT | ⏳ Pending | HAIP variant |
-
-*The SD-JWT test fails due to audience validation - conformance suite sends `x509_hash:...` as KB-JWT audience (per HAIP spec), but `AudienceCheckSdJwtVPPolicy` expects exact match with original `client_id`. This is a policy enhancement, not WAL-896 scope.
+| Test Plan | Format | Client ID | Response Mode | Status |
+|-----------|--------|-----------|---------------|--------|
+| MdlX509SanDnsRequestUriSignedDirectPost | mDL | x509_san_dns | direct_post | ✅ **PASS** |
+| SdJwtVcX509SanDnsRequestUriSignedDirectPost | SD-JWT | x509_san_dns | direct_post.jwt | ✅ **PASS** |
+| SdJwtVcX509HashRequestUriSignedDirectPostHaip | SD-JWT | x509_hash | direct_post.jwt | ✅ **PASS** |
+| MdlX509HashRequestUriSignedDirectPostHaip | mDL | x509_hash | direct_post.jwt | ✅ **PASS** |
 
 ### WAL-896 Implementation Fixes Applied
 

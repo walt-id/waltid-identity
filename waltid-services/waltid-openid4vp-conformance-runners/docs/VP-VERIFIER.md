@@ -4,72 +4,74 @@
 
 This document covers OpenID4VP Verifier conformance testing against the OpenID Foundation Conformance Suite.
 
-## Test Profiles
+## Scope
 
-| Profile | Plan | Format | Client ID | Response Mode | Status |
-|---------|------|--------|-----------|---------------|--------|
-| MdlX509SanDnsRequestUriSignedDirectPost | `oid4vp-1final-verifier-test-plan` | mDL (mso_mdoc) | x509_san_dns | direct_post | ✅ **PASSED** |
-| SdJwtVcX509SanDnsRequestUriSignedDirectPostPlain | `oid4vp-1final-verifier-test-plan` | SD-JWT VC | x509_san_dns | direct_post | ⏳ Not yet tested |
-| SdJwtVcX509SanDnsRequestUriSignedDirectPost | `oid4vp-1final-verifier-haip-test-plan` | SD-JWT VC | x509_san_dns | direct_post.jwt | ❌ **FAILED** |
-| MdlX509HashRequestUriSignedDirectPostHaip | `oid4vp-1final-verifier-test-plan` | mDL (mso_mdoc) | x509_hash | direct_post.jwt | ❌ **FAILED** |
-| SdJwtVcX509HashRequestUriSignedDirectPostHaip | `oid4vp-1final-verifier-haip-test-plan` | SD-JWT VC | x509_hash | direct_post.jwt | ❌ **FAILED** |
+This document covers **Verifier** conformance testing — validating that our verifier correctly:
+- Issues signed authorization requests (JAR)
+- Accepts encrypted VP responses (direct_post.jwt)
+- Validates x509_san_dns and x509_hash client_id schemes
+- Processes both SD-JWT VC and mDL (mso_mdoc) credentials
+
+> **Note:** For **Wallet** conformance testing (wallet creating presentations), see [VP-WALLET.md](VP-WALLET.md).
 
 ## Current Status
 
-**Summary: 1 passed, 3 failed out of 4 tests (as of 2026-07-08)**
+**Summary: 4 passed, 0 failed out of 4 tests (as of 2026-07-13)** ✅
 
-### ✅ Passing Tests
+### Test Matrix
 
-#### MdlX509SanDnsRequestUriSignedDirectPost
-- **Plan**: `oid4vp-1final-verifier-test-plan`
-- **Variant**: `iso_mdl`, `x509_san_dns`, `request_uri_signed`, `plain_vp`, `direct_post`
-- **Result**: PASSED
-- **Notes**: Non-HAIP baseline test. Proves the mdoc DCQL claims parsing fix works.
+| Test Plan | Credential Format | Client ID Scheme | VP Profile | Response Mode | Signed Request | Encrypted Response | Result |
+|-----------|------------------|------------------|------------|---------------|----------------|-------------------|--------|
+| `MdlX509SanDnsRequestUriSignedDirectPost` | mDL (mso_mdoc) | x509_san_dns | plain_vp | direct_post | ✅ JAR | ❌ None | ✅ PASS |
+| `SdJwtVcX509SanDnsRequestUriSignedDirectPost` | SD-JWT VC | x509_san_dns | haip | direct_post.jwt | ✅ JAR | ✅ JWE | ✅ PASS |
+| `SdJwtVcX509HashRequestUriSignedDirectPostHaip` | SD-JWT VC | x509_hash | haip | direct_post.jwt | ✅ JAR | ✅ JWE | ✅ PASS |
+| `MdlX509HashRequestUriSignedDirectPostHaip` | mDL (mso_mdoc) | x509_hash | haip | direct_post.jwt | ✅ JAR | ✅ JWE | ✅ PASS |
 
-### ❌ Failing Tests
+### What Each Test Validates
 
-All HAIP tests fail with the same root cause: **audience mismatch**.
+#### MdlX509SanDnsRequestUriSignedDirectPost (Baseline)
+- **Purpose**: Non-HAIP baseline mDL verification
+- **Credential**: ISO 18013-5 mobile Driving License (mso_mdoc)
+- **Client ID**: DNS name from certificate SAN (`x509_san_dns:verifier.example.com`)
+- **Request**: Signed (JAR) with X.509 certificate chain in `x5c` header
+- **Response**: Plain `direct_post` (unencrypted)
+- **Validates**: Basic mDL DCQL query parsing, signed request verification, direct_post flow
 
 #### SdJwtVcX509SanDnsRequestUriSignedDirectPost (HAIP)
-- **Plan**: `oid4vp-1final-verifier-haip-test-plan`
-- **Variant**: `sd_jwt_vc`, `response_mode=direct_post.jwt`
-- **Result**: FAILED
-- **Error**: `AUDIENCE_MISMATCH: KB-JWT 'aud' claim mismatch. Expected verifier2, got x509_hash:L8zOHpvIslIfw3enc7DpZtmZhBUh9OY3DPCdEUz9KPc`
+- **Purpose**: HAIP-compliant SD-JWT verification with DNS-based client ID
+- **Credential**: SD-JWT Verifiable Credential
+- **Client ID**: DNS name from certificate SAN
+- **Request**: Signed (JAR)
+- **Response**: Encrypted `direct_post.jwt` (JWE with ECDH-ES + A256GCM)
+- **Validates**: SD-JWT KB-JWT verification, encrypted response decryption, HAIP response mode
 
-#### MdlX509HashRequestUriSignedDirectPostHaip
-- **Plan**: `oid4vp-1final-verifier-test-plan`  
-- **Variant**: `iso_mdl`, `x509_hash`, `request_uri_signed`, `haip`, `direct_post.jwt`
-- **Result**: FAILED (same audience mismatch)
+#### SdJwtVcX509HashRequestUriSignedDirectPostHaip (HAIP + x509_hash)
+- **Purpose**: Full HAIP compliance with certificate hash client ID
+- **Credential**: SD-JWT Verifiable Credential
+- **Client ID**: SHA-256 hash of leaf certificate (`x509_hash:<base64url-hash>`)
+- **Request**: Signed (JAR)
+- **Response**: Encrypted `direct_post.jwt`
+- **Validates**: x509_hash client_id derivation, KB-JWT audience matching hash, HAIP §5 P-02 compliance
 
-#### SdJwtVcX509HashRequestUriSignedDirectPostHaip
-- **Plan**: `oid4vp-1final-verifier-haip-test-plan`
-- **Variant**: `sd_jwt_vc`, `x509_hash`, `direct_post.jwt`
-- **Result**: FAILED (same audience mismatch)
+#### MdlX509HashRequestUriSignedDirectPostHaip (HAIP + mDL + x509_hash)
+- **Purpose**: Full HAIP compliance for mDL with certificate hash client ID
+- **Credential**: ISO 18013-5 mobile Driving License (mso_mdoc)
+- **Client ID**: SHA-256 hash of leaf certificate
+- **Request**: Signed (JAR)
+- **Response**: Encrypted `direct_post.jwt`
+- **Validates**: mDL DeviceAuth verification, x509_hash client_id, encrypted mDL response handling
 
 ## Root Cause Analysis
 
-### Audience Mismatch in HAIP Mode
+### All Issues Resolved ✅
 
-In HAIP profile, the conformance suite's wallet uses the **X.509 certificate hash** as the audience:
-```
-aud: x509_hash:L8zOHpvIslIfw3enc7DpZtmZhBUh9OY3DPCdEUz9KPc
-```
+The following issues were fixed to achieve 100% pass rate:
 
-But the verifier-api2 is validating against a static `client_id`:
-```
-expected: verifier2
-```
+1. **DCQL Claims Format** (mDL tests): Changed from `{"namespace": "...", "claim_name": "..."}` to `{"path": ["namespace", "claim"]}` format per DCQL spec.
 
-**HAIP Requirement**: Per HAIP §5, when using `x509_hash` client_id scheme, the audience in KB-JWT/DeviceAuth must be the SHA-256 hash of the verifier's leaf certificate, prefixed with `x509_hash:`.
+2. **x509_hash Client ID Derivation**: Fixed `OSSVerifier2Manager.kt` to compute `client_id` as SHA-256 hash of leaf certificate when using x509_hash scheme.
 
-### Required Fix
-
-The verifier-api2 `AudienceCheckSdJwtVPPolicy` needs to:
-1. Detect when `x509_hash` client_id scheme is in use
-2. Calculate the expected audience from the verifier's certificate chain
-3. Accept `x509_hash:<hash>` format as valid audience
-
-**Location**: `waltid-libraries/credentials/waltid-verification-policies2-vp/src/commonMain/kotlin/id/walt/policies2/vp/policies/AudienceCheckSdJwtVPPolicy.kt`
+3. **Trust Anchor Configuration**: Added proper root CA PEM for request object signature chain validation.
 
 ## Prerequisites
 
@@ -90,7 +92,7 @@ ngrok http 7003
 
 # Terminal 3: Run tests
 export VERIFIER_NGROK_URL="https://<your-ngrok-url>.ngrok-free.app"
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests"
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test --tests "VerifierConformanceTests" --rerun-tasks
 ```
 
 ## Environment Variables
@@ -172,20 +174,15 @@ https://localhost.emobix.co.uk:8443/log-detail.html?log=<test_id>
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Signed Authorization Request (JAR) | ✅ | Working |
-| x509_san_dns client_id scheme | ✅ | Working in plain_vp mode |
-| x509_hash client_id scheme | ❌ | Audience validation broken |
-| direct_post response mode | ✅ | Working |
-| direct_post.jwt (encrypted) response | ⚠️ | Needs x509_hash fix first |
+| Signed Authorization Request (JAR) | ✅ | All 4 tests use signed requests |
+| x509_san_dns client_id scheme | ✅ | Working in plain_vp and HAIP modes |
+| x509_hash client_id scheme (SD-JWT) | ✅ | Working with correct client_id derivation |
+| x509_hash client_id scheme (mDL) | ✅ | Working with correct DCQL path format |
+| direct_post response mode | ✅ | Working (baseline test) |
+| direct_post.jwt (encrypted) response | ✅ | Working for both SD-JWT and mDL |
 | P-256 key curve | ✅ | Configured correctly |
 | SHA-256 hash algorithm | ✅ | Used for certificate hash |
 
-## Next Steps
-
-1. **Fix audience validation** in `AudienceCheckSdJwtVPPolicy` to support `x509_hash` scheme
-2. **Rerun HAIP tests** after the fix
-3. **Add plain SD-JWT test** to confirm baseline SD-JWT functionality
-4. **Update documentation** with final test results
 
 ## Code Fixes Made (2026-07-08)
 
