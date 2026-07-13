@@ -50,55 +50,69 @@ Android:
 
 ```bash
 ./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:assembleDebug
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:connectedAndroidDeviceTest -PenableAndroidBuild=true
+./gradlew :waltid-applications:waltid-wallet-demo-compose:androidApp:connectedDebugAndroidTest -PenableAndroidBuild=true
 ```
 
 iOS (Compose):
+
 ```bash
 cd waltid-applications/waltid-wallet-demo-compose/iosApp
 open iosApp.xcodeproj
+xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppUITests/PublicDemoBackendE2ETests -parallel-testing-enabled NO
 ```
 
 iOS (Native)
+
 ```bash
 cd waltid-applications/waltid-wallet-demo-ios/iosApp
 open iosApp.xcodeproj
+xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppTests/MobileWalletIntegrationTests -parallel-testing-enabled NO
+xcodebuild test -project iosApp.xcodeproj -scheme iosApp -destination "platform=iOS Simulator,name=iPhone 17" -only-testing:iosAppUITests/PublicDemoBackendE2ETests -parallel-testing-enabled NO
 ```
 
-Public EUDI and local Enterprise E2E scripts live under:
+The public mobile integration tests run through the normal Gradle Android
+instrumentation and Xcode XCTest entry points. The Android commands above run
+the full connected test tasks. The tests cover the EUDI public backend and the
+public OSS issuer2/verifier2 demo backend:
 
 ```text
-waltid-applications/waltid-wallet-demo-compose/androidApp/scripts/
-waltid-applications/waltid-wallet-demo-compose/iosApp/scripts/
-waltid-applications/waltid-wallet-demo-ios/scripts/
+https://issuer2.demo.walt.id/
+https://verifier2.demo.walt.id/
 ```
 
-Local Enterprise E2E is local-only for now and is not self-contained. It requires a provisioned `waltid-enterprise-quickstart` stack. From a clean quickstart checkout, configure `config/enterprise.conf` for public mobile redirects before starting the stack:
+Run public-backend tests serially on iOS. The tests depend on public network
+services, so a transient simulator networking failure should be retried before
+treating it as a product regression.
 
-```hocon
-baseDomain = "enterprise.localhost"
-baseSsl = true
-# basePort = 7500
-```
+## Enterprise mobile platform tests
 
-Start Docker Desktop or another Docker daemon, run `docker compose up`, start `ngrok http 7500`, then provision the baseline resources without running the quickstart's built-in primary use case:
+Enterprise mobile platform coverage is owned by the Enterprise integration test
+module in the coordinated unified-build checkout. These tests are
+self-contained: the Gradle tasks start an Enterprise mobile fixture server,
+provision the required issuer2/verifier2 resources, and run the actual Android
+or iOS mobile wallet calls against that fixture.
+
+Run these commands from the unified-build root, where `waltid-identity` and
+`waltid-identity-enterprise` are sibling checkouts:
 
 ```bash
-cd cli
-npm install
-HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --init-system
-HOST_ALIAS_DOMAIN=<your-ngrok-domain> npx tsx walt.ts --setup-all
+cd ..
+./gradlew :waltid-enterprise-integration-tests:enterpriseAndroidMobileIntegrationTest --no-configuration-cache
+./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest --no-configuration-cache -Penterprise.ios.destination="platform=iOS Simulator,name=iPhone 17"
 ```
 
-Set the same `HOST_ALIAS_DOMAIN` in each platform's `scripts/e2e.env`. The mobile scripts validate that generated credential-offer and verifier URLs use the public ngrok HTTPS origin before launching the app tests. They fail fast if the quickstart baseline resources or the mobile-only helper resources are missing.
-
-From either platform scripts directory, create the mobile-only helper resources once:
+The aggregate task runs both platforms:
 
 ```bash
-./e2e-local-enterprise.sh --prepare-only
+cd ..
+./gradlew :waltid-enterprise-integration-tests:enterpriseMobilePlatformIntegrationTest --no-configuration-cache
 ```
 
-This explicit preparation creates `issuer2-noattest` for non-attested issuance and `verifier2-mobile` for public verifier URLs. The normal test command validates existing resources and does not create them. The baseline organization, tenant, KMS, certificates, VICAL, trust registry, issuer2, verifier2, client attester, and mDL profile still come from quickstart.
+Android requires a booted emulator or device with `adb` available. The Gradle
+task configures the required `adb reverse` ports while the fixture is running.
+iOS requires Xcode and a matching simulator destination. If no destination is
+provided, the Enterprise Gradle task defaults to `platform=iOS Simulator,name=iPhone 16`.
 
 ## API documentation checks
 
@@ -121,6 +135,44 @@ waltid-libraries/protocols/waltid-wallet-sdk-ios/scripts/generate-docc.sh
 
 The mobile SDK docs CI workflow runs both documentation paths.
 
+## API contract checks
+
+The Kotlin mobile SDK modules use explicit API mode. Public and protected
+declarations must name their visibility and public return types, which keeps the
+Android/KMP source API intentional before it reaches generated docs or Swift.
+
+Kotlin ABI validation is enabled for:
+
+- `waltid-openid4vc-wallet-mobile`
+- `waltid-openid4vc-wallet-persistence-mobile`
+
+The Kotlin Gradle plugin writes the tracked KMP/native ABI baselines under each
+module's `api/` directory. Check them with:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:checkKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:checkKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+When the public KMP surface intentionally changes, regenerate the baselines:
+
+```bash
+./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:updateKotlinAbi :waltid-libraries:protocols:waltid-openid4vc-wallet-persistence-mobile:updateKotlinAbi -PenableAndroidBuild=true -PenableIosBuild=true
+```
+
+If those ABI baselines change, reviewers also need evidence that the Swift
+facade was considered. This can be a Swift source/test/docs update, or an entry
+in `waltid-libraries/protocols/waltid-wallet-sdk-ios/SwiftParityDecisions.md`
+explaining why the KMP capability is intentionally not mirrored in Swift.
+
+Run the local parity gate with:
+
+```bash
+scripts/check-mobile-swift-parity-decision.sh
+```
+
+The script resolves the PR base when GitHub metadata is available. For detached
+or non-PR comparisons, pass an explicit base with `--base-ref origin/<base-branch>`.
+
 ## Troubleshooting
 
 - **Android modules missing:** set `enableAndroidBuild=true` in `local.properties`, or pass `-PenableAndroidBuild=true`, then reload Gradle.
@@ -128,4 +180,5 @@ The mobile SDK docs CI workflow runs both documentation paths.
 - **Web/Wasm preview module missing:** set `enableWalletDemoComposeWeb=true` in `local.properties`, or pass `-PenableWalletDemoComposeWeb=true`, then reload Gradle.
 - **Android SDK not found:** check `sdk.dir` in `local.properties`.
 - **IntelliJ Android import fails:** use Android Studio for Android modules, or keep `enableAndroidBuild=false` for shared Kotlin/JVM work.
-- **Local Enterprise E2E cannot reach services:** check `HOST_ALIAS_DOMAIN`, the running Enterprise stack, `baseSsl=true`, and omitted `basePort`.
+- **Enterprise mobile fixture cannot be reached from Android:** make sure an emulator or device is booted and `adb reverse` is available.
+- **Enterprise mobile fixture cannot be reached from iOS:** pass a valid `-Penterprise.ios.destination` value for an installed simulator.

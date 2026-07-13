@@ -6,7 +6,7 @@ import id.walt.crypto.keys.KeyType
 /**
  * Platform abstraction for creating, loading, and deleting mobile wallet signing keys.
  */
-interface PlatformKeyProvider {
+public interface PlatformKeyProvider {
     /**
      * Creates a new key, using platform-backed storage when this provider supports [keyType].
      *
@@ -14,7 +14,7 @@ interface PlatformKeyProvider {
      * @param keyId Optional platform key identifier. When omitted, the provider generates one.
      * @return The created key.
      */
-    suspend fun generateKey(keyType: KeyType, keyId: String? = null): Key
+    public suspend fun generateKey(keyType: KeyType, keyId: String? = null): Key
 
     /**
      * Loads a previously generated key.
@@ -23,7 +23,7 @@ interface PlatformKeyProvider {
      * @param keyType Expected key type for the stored key.
      * @return The loaded key, or `null` when the platform store has no matching key.
      */
-    suspend fun loadKey(keyId: String, keyType: KeyType): Key?
+    public suspend fun loadKey(keyId: String, keyType: KeyType): Key?
 
     /**
      * Loads a serialized software key for platforms that need a non-platform-backed fallback.
@@ -33,7 +33,7 @@ interface PlatformKeyProvider {
      * @param jwkMaterial Serialized JWK key material.
      * @return The loaded software key, or `null` when the material cannot be loaded.
      */
-    suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key?
+    public suspend fun loadSoftwareKey(keyId: String, keyType: KeyType, jwkMaterial: ByteArray): Key?
 
     /**
      * Exports serialized JWK material from a software key.
@@ -41,7 +41,7 @@ interface PlatformKeyProvider {
      * @param key Software key to export.
      * @return Serialized JWK key material.
      */
-    suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray
+    public suspend fun exportSoftwareKeyMaterial(key: Key): ByteArray
 
     /**
      * Deletes a key from the platform key store.
@@ -50,31 +50,31 @@ interface PlatformKeyProvider {
      * @param keyType Key type of the stored key.
      * @return `true` when deletion succeeded or the platform reported success.
      */
-    suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean
+    public suspend fun deleteKey(keyId: String, keyType: KeyType): Boolean
 
     /**
      * Returns whether [keyType] is created with platform-backed storage by this provider.
      */
-    fun isPlatformBacked(keyType: KeyType): Boolean = keyType in supportedPlatformKeyTypes
+    public fun isPlatformBacked(keyType: KeyType): Boolean = keyType in supportedPlatformKeyTypes
 
     /**
      * Key types that this provider can create with platform-backed storage.
      */
-    val supportedPlatformKeyTypes: Set<KeyType>
+    public val supportedPlatformKeyTypes: Set<KeyType>
 
     /**
      * Whether the current device and provider can use platform-backed storage.
      */
-    val isPlatformBackingAvailable: Boolean get() = true
+    public val isPlatformBackingAvailable: Boolean get() = true
 
     /**
      * Shared defaults for platform key providers.
      */
-    companion object {
+    public companion object {
         /**
          * Default platform-backed key types shared by mobile providers.
          */
-        val DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES: Set<KeyType> =
+        public val DEFAULT_SUPPORTED_PLATFORM_KEY_TYPES: Set<KeyType> =
             setOf(KeyType.secp256r1, KeyType.secp384r1, KeyType.secp521r1, KeyType.RSA)
     }
 }

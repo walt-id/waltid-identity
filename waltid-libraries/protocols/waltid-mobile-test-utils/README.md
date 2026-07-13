@@ -1,37 +1,21 @@
 # Mobile Test Utilities
 
-Shared Kotlin test infrastructure for Android mobile wallet tests, paired with the
-Swift `TestHelpers` backend fixtures used by iOS XCTest targets.
+Shared Kotlin test infrastructure for Android mobile wallet tests, paired with
+the Swift `TestHelpers` backend fixtures used by iOS XCTest targets.
 
-## Overview
+## Helpers
 
-This module provides:
-- **EudiTestBackend** - EUDI public backend integration (offer generation, verifier transactions)
-- **LocalEnterpriseTestBackend** - Walt.ID Enterprise backend integration (authentication, offers, verification)
-- **Test utilities** - Common mobile testing helpers
-- **KMP test infrastructure** - Used directly from Android tests; iOS mirrors the same fixture API through Swift `TestHelpers`
+- `EudiTestBackend` targets the public EUDI test backend.
+- `DemoTestBackend` targets the public walt.id issuer2/verifier2 demo endpoints.
+- `EnterpriseMobileFixtureClient` targets the self-contained Enterprise fixture
+  server started by the Enterprise integration-test tasks.
 
-## Module Structure
+Utilities live in `commonMain` so Android device tests in other modules can
+reuse them while still depending on this module only from test source sets.
 
-```
-waltid-mobile-test-utils/
-├── src/
-│   └── commonMain/kotlin/
-│       └── backend/                          # Test backend helpers
-│           ├── EudiTestBackend.kt            # EUDI public backend integration
-│           └── LocalEnterpriseTestBackend.kt # Enterprise backend integration
-```
-
-**Note:** Utilities are in `commonMain` (not `commonTest`) to allow cross-module sharing while remaining test-only via module-level dependency configuration.
-
-## Usage
-
-### Android (Kotlin)
-
-Add dependency to your module's `build.gradle.kts`:
+## Android Usage
 
 ```kotlin
-// For library tests
 sourceSets {
     val androidDeviceTest by getting {
         dependencies {
@@ -39,160 +23,25 @@ sourceSets {
         }
     }
 }
-
-// For demo app E2E tests
-dependencies {
-    androidTestImplementation(project(":waltid-libraries:protocols:waltid-mobile-test-utils"))
-}
 ```
 
-Use in tests:
+The Enterprise fixture client intentionally exposes only mobile-facing test
+operations: list scenarios, create an offer, create a verifier session, and poll
+verification status. Enterprise tenant/service provisioning stays inside the
+Enterprise integration-test module.
 
-```kotlin
-import id.walt.mobile.test.backend.EudiTestBackend
-import id.walt.mobile.test.backend.LocalEnterpriseTestBackend
+## iOS Parity
 
-// EUDI Public Backend
-class EudiIntegrationTest {
-    @Test
-    fun testReceiveCredential() = runBlocking {
-        // Generate offer from EUDI backend
-        val offer = EudiTestBackend.generateOffer()
-        
-        // Use with the mobile wallet
-        val result = walletClient.receive(offer.offerUrl)
-        assertTrue(result.isNotEmpty())
-        
-        // Create verifier transaction
-        val credentialId = EudiTestBackend.extractCredentialIdFromOfferUrl(offer.offerUrl)
-        val verifier = EudiTestBackend.createVerifierTransaction(credentialId)
-        
-        // Present credential
-        val presentResult = walletClient.present(verifier.authorizationRequestUri)
-        assertTrue(presentResult.success)
-        
-        // Wait for verifier confirmation
-        EudiTestBackend.waitForVerifierSuccess(verifier.transactionId)
-    }
-}
+iOS XCTest targets use the Swift helpers in
+`waltid-applications/mobile-e2e-fixtures/ios/TestHelpers/`. Keep Swift and
+Kotlin fixture payloads semantically aligned when adding mobile integration
+coverage.
 
-// Local Enterprise Backend
-class EnterpriseIntegrationTest {
-    private val httpClient = HttpClient(Android)
-    
-    @Test
-    fun testEnterpriseFlow() = runBlocking {
-        val config = LocalEnterpriseTestBackend.BackendConfig(
-            apiBaseUrl = "https://your-ngrok-domain.ngrok.io",
-            ngrokBaseUrl = "https://your-ngrok-domain.ngrok.io",
-            adminEmail = "admin@walt.id",
-            adminPassword = "admin123456",
-            org = "waltid",
-            tenant = "tenant01",
-            issuerProfile = "issuer.mdl-profile",
-            verifier = "verifier"
-        )
-        
-        // Authenticate
-        val token = LocalEnterpriseTestBackend.getAdminToken(config, httpClient)
-        
-        // Create offer
-        val offerUrl = LocalEnterpriseTestBackend.createPreAuthorizedOffer(config, token, httpClient)
-        
-        // Create verifier session
-        val session = LocalEnterpriseTestBackend.createVerifierSession(config, token, httpClient)
-        
-        // ... use with wallet ...
-        
-        // Wait for verification
-        LocalEnterpriseTestBackend.waitForVerifierSuccess(config, session.sessionId, httpClient)
-    }
-}
-```
+## Design Rules
 
-### iOS (Swift)
-
-**Note:** iOS XCTest targets do not import this Kotlin module directly. They use
-the **TestHelpers** fixtures located in
-`waltid-applications/mobile-e2e-fixtures/ios/TestHelpers/`. Keep backend
-payloads and method semantics aligned between this module and `TestHelpers`
-when adding WAL-1097-style E2E flows.
-
-```swift
-import TestHelpers
-
-class EudiIntegrationTests: XCTestCase {
-    func testReceiveCredential() async throws {
-        let backend = EudiPublicBackend()
-        let offerURL = try await backend.generatePreAuthorizedOffer(
-            credentialID: "eu.europa.ec.eudi.pid_vc_sd_jwt"
-        )
-        
-        // Use with wallet controller
-        let result = try await controller.receive(offerURL)
-        XCTAssertTrue(result.success)
-    }
-}
-```
-
-See `TestHelpers/` for the full Swift API, including local Enterprise
-authentication, offer creation, verifier sessions, and verifier polling.
-
-## Test Backends
-
-### EUDI Public Backend
-
-- **URL**: https://issuer.eudiw.dev
-- **Credentials**: PID, mDL (SD-JWT, mDoc formats)
-- **CI Compatible**: Yes (no authentication required)
-- **Local Testing**: Yes
-
-**Functions:**
-- `generateOffer(credentialId)` - Generate pre-authorized credential offer
-- `createVerifierTransaction(credentialId)` - Create verification session
-- `waitForVerifierSuccess(transactionId)` - Poll verifier for presentation confirmation
-
-### Local Enterprise Backend
-
-- **Requirements**: Walt.ID Enterprise + ngrok tunnel
-- **CI Compatible**: No (infrastructure dependencies)
-- **Local Testing**: Yes (with proper setup)
-
-Tests using local enterprise backend should be marked as local-only and excluded from CI.
-
-## Design Principles
-
-1. **Test-only module** - This module should NEVER be added to `commonMain` or production dependencies
-2. **iOS/Android parity** - Keep Kotlin `waltid-mobile-test-utils` and Swift `TestHelpers` fixture APIs semantically aligned
-3. **No production code** - Only test helpers and backend utilities
-4. **CI-compatible** - Tests using public backends should run in CI
-5. **Clear separation** - Local-only tests clearly marked and excluded from CI
-
-## Verification
-
-To ensure this module isn't leaking into production:
-
-```bash
-# Should return nothing - mobile-test-utils should NOT appear in runtime classpath
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dependencies \
-  --configuration runtimeClasspath | grep mobile-test-utils
-
-# Should show mobile-test-utils - OK in test classpath
-./gradlew :waltid-libraries:protocols:waltid-openid4vc-wallet-mobile:dependencies \
-  --configuration testRuntimeClasspath | grep mobile-test-utils
-```
-
-## Contributing
-
-When adding new test utilities:
-
-1. Keep test helpers in `commonTest` when possible (shared across platforms)
-2. Add platform-specific utilities only when necessary
-3. Update this README with usage examples
-
-## Related Modules
-
-- `waltid-openid4vc-wallet-mobile` - Mobile wallet library (uses this for tests)
-- `waltid-openid4vc-wallet-persistence-mobile` - Wallet persistence layer
-- `waltid-wallet-demo-compose` - Compose demo app
-- `waltid-wallet-demo-ios` - iOS demo app
+1. Keep this module test-only; never add it to production source sets.
+2. Keep backend helpers small and declarative.
+3. Do not put Enterprise admin login, tunnel setup, or service provisioning in
+   mobile tests.
+4. Prefer public unauthenticated demo endpoints or self-contained fixture
+   endpoints over local manual setup.
