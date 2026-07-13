@@ -20,14 +20,9 @@ const issuerProfiles = useProfiles(issuerBase);
 const issuerJson = ref("");
 const issuerSelectedIndex = ref(0);
 
-// dc_api examples rely on the W3C Digital Credentials API flow, which the current
-// QR-based logic can't handle. Filter them out until that handling is ported.
 const verifierSwagger = useSwaggerExamples(
   verifierBase,
   "/verification-session/create",
-  {
-    excludeTitle: (title) => title.toLowerCase().includes("dc_api"),
-  },
 );
 const verifierSession = useVerifierSession(verifierBase);
 const verifierJson = ref("");
@@ -174,18 +169,16 @@ const hasResult = computed(() =>
         </div>
 
         <div class="p-5 flex-1">
-          <KeepAlive>
-            <SimpleIssueEditor
-              v-if="mode === 'simple' && activeTab === 'issue'"
-              :session="issuerSession"
-            />
-            <SimpleVerifyEditor
-              v-else-if="mode === 'simple' && activeTab === 'verify'"
-              :session="verifierSession"
-            />
-          </KeepAlive>
+          <SimpleIssueEditor
+            v-if="mode === 'simple' && activeTab === 'issue'"
+            :session="issuerSession"
+          />
+          <SimpleVerifyEditor
+            v-else-if="mode === 'simple'"
+            :session="verifierSession"
+          />
           <IssueEditor
-            v-if="mode === 'advanced' && activeTab === 'issue'"
+            v-else-if="activeTab === 'issue'"
             v-model:json="issuerJson"
             v-model:selected-index="issuerSelectedIndex"
             :swagger="issuerSwagger"
@@ -193,7 +186,7 @@ const hasResult = computed(() =>
             :profiles="issuerProfiles"
           />
           <VerifyEditor
-            v-else-if="mode === 'advanced' && activeTab === 'verify'"
+            v-else
             v-model:json="verifierJson"
             v-model:selected-index="verifierSelectedIndex"
             :swagger="verifierSwagger"
@@ -217,11 +210,6 @@ const hasResult = computed(() =>
         :events="activeSession.sse.events.value"
         :status="activeSession.sse.status.value"
         :is-terminal="activeSession.sse.isTerminal.value"
-        @clear="activeSession.clear()"
-      />
-      <PolicyResults
-        v-if="activeTab === 'verify'"
-        :events="verifierSession.sse.events.value"
       />
     </div>
   </main>
