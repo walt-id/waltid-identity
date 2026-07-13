@@ -40,11 +40,12 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
-
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 
 private fun flattenCredentialValue(key: String, value: Any?): List<Pair<String, String>> {
     return when (value) {
@@ -62,6 +63,7 @@ private fun flattenCredentialValue(key: String, value: Any?): List<Pair<String, 
 @Composable
 internal fun CredentialDetailScreen(
     credential: WalletDemoCredential,
+    credentialDataJson: String?,
     onBack: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
@@ -145,8 +147,11 @@ internal fun CredentialDetailScreen(
                 CredentialDetailRow(label = "Format", value = credential.format)
             }
 
-            if (credential.credentialData.isNotEmpty()) {
-                val rows = credential.credentialData.entries
+            val parsedCredentialData = credentialDataJson?.let {
+                runCatching { Json.parseToJsonElement(it).jsonObject }.getOrNull()
+            }
+            if (parsedCredentialData != null && parsedCredentialData.isNotEmpty()) {
+                val rows = parsedCredentialData.entries
                     .flatMap { (key, value) -> flattenCredentialValue(key, value) }
 
                 DetailSection(title = "Credential Data") {
