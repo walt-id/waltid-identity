@@ -80,7 +80,23 @@ The following issues were fixed to achieve 100% pass rate:
 2. **ngrok** exposing port 7003 to the internet
 3. **Conformance Suite** Docker container running
 
-### Start Commands
+### Hosts Entry
+
+Add to `/etc/hosts`:
+```
+127.0.0.1 localhost.emobix.co.uk
+```
+
+### Conformance Suite
+
+```bash
+cd ~/dev/openid/conformance-suite
+docker compose -f docker-compose-walt.yml up -d
+# Wait 30s, then verify:
+curl -k https://localhost.emobix.co.uk:8443/api/runner/available
+```
+
+### Run Verifier Conformance Tests
 
 ```bash
 # Terminal 1: Start verifier-api2
