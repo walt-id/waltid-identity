@@ -33,11 +33,11 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
 
     override val planName = "oid4vp-1final-wallet-haip-test-plan"
 
+    // Note: client_id_prefix and vp_profile are NOT specified here because the HAIP test plan
+    // (oid4vp-1final-wallet-haip-test-plan) already defines them per-module.
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
-        "client_id_prefix" to "x509_san_dns",
-        "response_mode" to "direct_post.jwt",
-        "vp_profile" to "haip"
+        "response_mode" to "direct_post.jwt"
     )
 
     /**

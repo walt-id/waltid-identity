@@ -43,11 +43,11 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
 
     override val planName = "oid4vp-1final-wallet-haip-test-plan"
 
+    // Note: client_id_prefix is NOT specified here because the HAIP test plan
+    // (oid4vp-1final-wallet-haip-test-plan) already defines it per-module.
     override val variant = mapOf(
         "credential_format" to "iso_mdl",
-        "client_id_prefix" to "x509_hash",  // HAIP §5 P-02 MANDATORY
-        "response_mode" to "direct_post.jwt",
-        "vp_profile" to "haip"
+        "response_mode" to "direct_post.jwt"
     )
 
     /**
