@@ -1,5 +1,6 @@
 package id.walt.openid4vp.conformance.testplans.plans.vp.wallet
 
+import id.walt.openid4vp.conformance.testplans.keys.TestKeyMaterial
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
@@ -55,6 +56,19 @@ class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
         "vp_profile" to "haip"
     )
 
+    /**
+     * Test plan configuration for conformance suite.
+     * 
+     * CRITICAL: Must include `client.jwks` with x5c for x509_hash scheme!
+     * The conformance suite (acting as verifier) needs this to:
+     * 1. Sign the authorization request (JAR) with the certificate
+     * 2. Compute x509_hash client_id from the leaf certificate
+     * 
+     * Per HAIP spec:
+     * - x509_hash = "x509_hash:" + base64url(SHA-256(DER(leaf_cert)))
+     * - Certificate chain must NOT include trust anchor (root CA)
+     * - Leaf certificate must NOT be self-signed
+     */
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
@@ -66,7 +80,21 @@ class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
             "client": {
                 "client_id_scheme": "x509_hash",
                 "authorization_encrypted_response_alg": "ECDH-ES",
-                "authorization_encrypted_response_enc": "A256GCM"
+                "authorization_encrypted_response_enc": "A256GCM",
+                "jwks": {
+                    "keys": [
+                        {
+                            "kty": "EC",
+                            "crv": "P-256",
+                            "alg": "ES256",
+                            "use": "sig",
+                            "d": "AEb4k1BeTR9xt2NxYZggdzkFLLUkhyyWvyUOq3qSiwA",
+                            "x": "G_TgBc0BkmMipiQ_6gkamIn3mmp7hcTrZuyrLTmknP0",
+                            "y": "VkRMZdXYXSMff5AJLrnHiN0x5MV6u_8vrAcytGUe4z4",
+                            "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
+                        }
+                    ]
+                }
             },
             "publish": "everything"
         }
