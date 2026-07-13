@@ -94,7 +94,7 @@ private enum MediaTypeHint {
             .first?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased(),
-            rawMediaType.hasPrefix(ImageMime.prefix) else {
+            ImageMime.isSupported(rawMediaType) else {
             return nil
         }
         return rawMediaType
@@ -137,30 +137,41 @@ private struct Base64Payload {
 }
 
 private enum ImageMime {
-    static let prefix = "image/"
     static let png = "image/png"
     static let jpeg = "image/jpeg"
     static let gif = "image/gif"
     static let webp = "image/webp"
+
+    static func isSupported(_ mimeType: String) -> Bool {
+        [png, jpeg, gif, webp].contains(mimeType)
+    }
 }
 
 private enum ImageBytes {
     static func mimeType(for data: Data, hint: String?) -> String? {
-        if let hint, hint.hasPrefix(ImageMime.prefix) {
-            return hint
-        }
         let bytes = [UInt8](data.prefix(12))
-        if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return ImageMime.png }
-        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return ImageMime.jpeg }
-        if data.count >= 6, let prefix = String(data: data.prefix(6), encoding: .ascii), ["GIF87a", "GIF89a"].contains(prefix) { return ImageMime.gif }
-        if data.count >= 12,
-           let riff = String(data: data.prefix(4), encoding: .ascii),
-           let webp = String(data: data.dropFirst(8).prefix(4), encoding: .ascii),
-           riff == "RIFF",
-           webp == "WEBP" {
-            return ImageMime.webp
+        let detected: String?
+        if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) {
+            detected = ImageMime.png
+        } else if bytes.starts(with: [0xFF, 0xD8, 0xFF]) {
+            detected = ImageMime.jpeg
+        } else if data.count >= 6, let prefix = String(data: data.prefix(6), encoding: .ascii), ["GIF87a", "GIF89a"].contains(prefix) {
+            detected = ImageMime.gif
+        } else if data.count >= 12,
+                  let riff = String(data: data.prefix(4), encoding: .ascii),
+                  let webp = String(data: data.dropFirst(8).prefix(4), encoding: .ascii),
+                  riff == "RIFF",
+                  webp == "WEBP" {
+            detected = ImageMime.webp
+        } else {
+            detected = nil
         }
-        return nil
+
+        guard let detected else {
+            return nil
+        }
+
+        return hint == detected ? hint : detected
     }
 }
 

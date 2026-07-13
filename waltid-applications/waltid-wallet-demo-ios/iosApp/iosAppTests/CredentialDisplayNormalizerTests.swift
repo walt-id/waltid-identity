@@ -89,6 +89,34 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.portraitMimeType, "image/png")
     }
 
+    func testValidatesDataURIImageBytesBeforeUsingMimeHint() throws {
+        let encodedJSON = try XCTUnwrap(#"{"purpose":"age proof"}"#.data(using: .utf8)?.base64EncodedString())
+        let encodedText = try XCTUnwrap("Hello, wallet".data(using: .utf8)?.base64EncodedString())
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "vc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            format: "vc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "json_note": "data:image/png;base64,\(encodedJSON)",
+              "plain_note": "data:image/webp;base64,\(encodedText)",
+              "portrait": "data:image/png;base64,\(Self.onePixelPNGBase64)"
+            }
+            """
+        )
+
+        let claims = details.groups.flatMap(\.items)
+        XCTAssertEqual(claims.first { $0.path.id == "json_note.purpose" }?.value, .text("age proof"))
+        XCTAssertEqual(claims.first { $0.path.id == "plain_note" }?.value, .decodedText("Hello, wallet"))
+        guard case .image(_, _, let mimeType, _) = claims.first(where: { $0.path.id == "portrait" })?.value else {
+            return XCTFail("Expected valid PNG data URI to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+    }
+
     func testBuildsSystemInfoGroupFromCredentialMetadata() throws {
         let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
         let details = CredentialDisplayNormalizer.details(

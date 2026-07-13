@@ -118,6 +118,33 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun validatesDataUriImageBytesBeforeUsingMimeHint() {
+        val encodedJson = Base64.Default.encode("""{"purpose":"age proof"}""".encodeToByteArray())
+        val encodedText = Base64.Default.encode("Hello, wallet".encodeToByteArray())
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "vc+sd-jwt",
+                issuer = null,
+                label = "vc+sd-jwt",
+                credentialDataJson = """
+                    {
+                      "json_note": "data:image/png;base64,$encodedJson",
+                      "plain_note": "data:image/webp;base64,$encodedText",
+                      "portrait": "data:image/png;base64,$onePixelPngBase64"
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val claims = details.groups.flatMap { it.items }
+        val decodedJson = assertIs<DisplayValue.ObjectValue>(claims.first { it.path.id == "json_note" }.value)
+        assertEquals(DisplayValue.Text("age proof"), decodedJson.entries.first { it.label == "Purpose" }.value)
+        assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
+        assertIs<DisplayValue.Image>(claims.first { it.path.id == "portrait" }.value)
+    }
+
+    @Test
     fun classifiesPortraitByteArrayDataAsImageAndUsesItForCards() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(

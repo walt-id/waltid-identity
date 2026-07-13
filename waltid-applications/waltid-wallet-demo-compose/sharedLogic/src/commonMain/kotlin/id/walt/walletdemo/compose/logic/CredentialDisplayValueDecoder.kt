@@ -97,7 +97,7 @@ private data class EncodedPayload(
 private object MediaTypeHint {
     fun imageType(metadata: String): String? {
         val mediaType = metadata.substringBefore(';').trim().lowercase()
-        return mediaType.takeIf { it.startsWith(ImageMime.Prefix) }
+        return mediaType.takeIf { ImageMime.isSupported(it) }
     }
 }
 
@@ -136,23 +136,26 @@ private class Base64Payload private constructor(val value: String) {
 }
 
 private object ImageMime {
-    const val Prefix = "image/"
     const val Png = "image/png"
     const val Jpeg = "image/jpeg"
     const val Gif = "image/gif"
     const val Webp = "image/webp"
+
+    fun isSupported(mimeType: String): Boolean =
+        mimeType in setOf(Png, Jpeg, Gif, Webp)
 }
 
 private object ImageBytes {
-    fun detectMime(bytes: ByteArray, mimeHint: String?): String? =
-        when {
-            mimeHint?.startsWith(ImageMime.Prefix) == true -> mimeHint
+    fun detectMime(bytes: ByteArray, mimeHint: String?): String? {
+        val detected = when {
             bytes.startsWith(0x89, 0x50, 0x4E, 0x47) -> ImageMime.Png
             bytes.startsWith(0xFF, 0xD8, 0xFF) -> ImageMime.Jpeg
             bytes.startsWithAscii("GIF87a") || bytes.startsWithAscii("GIF89a") -> ImageMime.Gif
             bytes.size >= 12 && bytes.startsWithAscii("RIFF") && bytes.copyOfRange(8, 12).decodeToString() == "WEBP" -> ImageMime.Webp
             else -> null
         }
+        return detected?.let { mimeHint.takeIf { it == detected } ?: detected }
+    }
 
     private fun ByteArray.startsWith(vararg prefix: Int): Boolean =
         size >= prefix.size && prefix.indices.all { this[it].toInt() and 0xFF == prefix[it] }
