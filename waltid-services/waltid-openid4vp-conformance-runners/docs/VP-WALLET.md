@@ -17,9 +17,27 @@ This document covers **OpenID4VP Wallet** conformance testing — validating tha
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Test runner framework | ✅ Working | Creates plans, runs modules, reports results |
-| Test plan creation | ✅ Working | Plans created with 12 modules via `/api/plan` |
+| Test plan creation | ✅ Working | Plans created with modules via `/api/plan` |
+| Test plan configuration | ✅ Fixed | JWKS, DCQL, trust anchors now included |
 | Wallet adapter | ✅ Working | HTTP bridge on port 7006 |
-| **Wallet integration** | ⏳ **NOT VALIDATED** | Code implemented, tests not yet run |
+| **Wallet integration** | ⏳ **PENDING VALIDATION** | Config fixed, awaiting test run |
+
+### Configuration Fixes Applied (Jul 13)
+
+The following issues were identified and fixed during testing:
+
+| Issue | Fix | Commit |
+|-------|-----|--------|
+| Missing `client.jwks` | Added JWKS with x5c to wallet test plans | `c10a773fd` |
+| Variant conflict | Removed `client_id_prefix` from variant (plan defines it) | `ed740fb84` |
+| Wrapped config | Send configuration directly without `{"configuration":...}` | `0fffcd212` |
+| Missing DCQL/trust anchors | Added `client.dcql`, `credential.trust_anchor` | `7afae19fa` |
+
+**Next Step:** Re-run wallet conformance tests with fixed configuration:
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests" --rerun-tasks
+```
 
 ---
 
@@ -74,6 +92,28 @@ cd ~/dev/walt-id/waltid-unified-build
 
 **Note:** For official HAIP compliance (P-02), use the `x509_hash` variants.
 
+### Test Plan Configuration
+
+Each wallet test plan now includes the required HAIP configuration:
+
+```json
+{
+  "client": {
+    "client_id_scheme": "x509_hash",
+    "jwks": { "keys": [{ "kty": "EC", "x5c": ["...leaf...", "...ca..."], ... }] },
+    "dcql": {
+      "credentials": [
+        { "id": "pid", "format": "dc+sd-jwt", "claims": [...] }
+      ]
+    }
+  },
+  "credential": {
+    "trust_anchor": "...base64 cert...",
+    "status_list_trust_anchor": "...base64 cert..."
+  }
+}
+```
+
 ### Switching Test Plans
 
 Edit `VpWalletConformanceTests.kt` to use HAIP-strict plans:
@@ -87,22 +127,31 @@ val testPlans: List<WalletTestPlan> = listOf(
 
 ---
 
-## Test Modules (12 total)
+## Test Modules
 
-| Module | Type | HAIP Requirement |
-|--------|------|------------------|
-| `oid4vp-1final-wallet-happy-flow` | Happy path | Basic VP flow |
-| `oid4vp-1final-wallet-alternate-happy-flow` | Happy path | Alternate request claims |
-| `oid4vp-1final-wallet-request-uri-method-post` | Happy path | POST for `request_uri` |
-| `oid4vp-1final-wallet-fewer-claims-than-available` | Happy path | Selective disclosure |
-| `oid4vp-1final-wallet-optional-credential-set` | Happy path | Optional credentials |
-| `oid4vp-1final-wallet-no-claims-in-dcql-query` | Happy path | DCQL without claims |
-| `oid4vp-1final-wallet-negative-test-invalid-request-object-signature` | Negative | MUST reject bad signature |
-| `oid4vp-1final-wallet-negative-test-mismatched-client-id` | Negative | MUST reject mismatch |
-| `oid4vp-1final-wallet-negative-test-redirect-uri-with-direct-post` | Negative | MUST reject redirect_uri |
-| `oid4vp-1final-wallet-negative-test-missing-nonce` | Negative | MUST reject missing nonce |
-| `oid4vp-1final-wallet-negative-test-invalid-client-id-prefix` | Negative | MUST reject invalid prefix |
-| `oid4vp-1final-wallet-negative-test-unknown-transaction-data-type` | Negative | MUST reject unknown type |
+The HAIP wallet test plan includes the following modules:
+
+### Happy Path Tests
+
+| Module | Description |
+|--------|-------------|
+| `oid4vp-1final-wallet-happy-flow` | Baseline VP flow |
+| `oid4vp-1final-wallet-alternate-happy-flow` | Alternate request claims, longer nonce |
+| `oid4vp-1final-wallet-request-uri-method-post` | POST method for `request_uri` |
+| `oid4vp-1final-wallet-fewer-claims-than-available` | Selective disclosure |
+| `oid4vp-1final-wallet-optional-credential-set` | Optional credentials |
+| `oid4vp-1final-wallet-no-claims-in-dcql-query` | DCQL without claims |
+
+### Negative Tests (Wallet MUST Reject)
+
+| Module | Description |
+|--------|-------------|
+| `oid4vp-1final-wallet-negative-test-invalid-request-object-signature` | Invalid JAR signature |
+| `oid4vp-1final-wallet-negative-test-mismatched-client-id` | client_id mismatch |
+| `oid4vp-1final-wallet-negative-test-redirect-uri-with-direct-post` | redirect_uri with direct_post |
+| `oid4vp-1final-wallet-negative-test-missing-nonce` | Missing nonce |
+| `oid4vp-1final-wallet-negative-test-invalid-client-id-prefix` | Invalid client_id prefix |
+| `oid4vp-1final-wallet-negative-test-unknown-transaction-data-type` | Unknown transaction type |
 
 ---
 
@@ -126,7 +175,7 @@ val testPlans: List<WalletTestPlan> = listOf(
 │   Conformance Suite     │  (Acts as Verifier)
 │   port 8443 (HTTPS)     │
 └───────────┬─────────────┘
-            │ 1. Authorization request
+            │ 1. Authorization request (JAR)
             ▼
 ┌─────────────────────────┐
 │   Wallet Adapter        │  (HTTP bridge, started by test)
@@ -138,7 +187,7 @@ val testPlans: List<WalletTestPlan> = listOf(
 │   Wallet API2           │  (Your wallet implementation)
 │   port 7001             │
 └───────────┬─────────────┘
-            │ 3. VP response
+            │ 3. Encrypted VP response (JWE)
             ▼
      Back to Conformance Suite
 ```
@@ -158,30 +207,36 @@ val testPlans: List<WalletTestPlan> = listOf(
 
 ## Troubleshooting
 
-### Tests show ERROR with JSON parsing
+### Test plan creation fails with "Variant already set"
 
-**Symptom:** `Unexpected 'null' value instead of string literal`
+**Symptom:** `Variant 'client_id_prefix' has been set by user, but test plan already sets this variant`
 
-**Cause:** Conformance API response has nullable fields. Fixed in commit `60235fa74`.
+**Cause:** The HAIP test plan defines `client_id_prefix` per-module.
 
-**Fix:** Pull latest code and rebuild.
+**Fix:** Don't include `client_id_prefix` in the variant map. Fixed in commit `ed740fb84`.
 
-### Tests timeout on HTTP calls
+### Tests fail with "client.jwks is missing"
 
-**Symptom:** Tests hang for 60s then fail.
+**Symptom:** `SetClientIdToX509Hash: client.jwks is missing from configuration`
 
-**Cause:** Usually conformance suite not reachable.
+**Cause:** Wallet test plan missing JWKS with x5c certificate chain.
 
-**Fix:**
-```bash
-# Check Docker
-docker ps | grep conformance
+**Fix:** Fixed in commit `c10a773fd`. Ensure test plans include `client.jwks`.
 
-# Check connectivity
-curl -k https://localhost.emobix.co.uk:8443/api/runner/available
-```
+### Tests fail with "dcql not found" or "Trust Anchor missing"
 
-### All tests show INTERRUPTED
+**Symptom:** 
+- `ExtractDCQLQueryFromClientConfiguration: dcql not found`
+- `EnsureCredentialTrustAnchorConfigured: 'Credential Trust Anchor' field is missing`
+
+**Cause:** HAIP requires DCQL query and trust anchors in configuration.
+
+**Fix:** Fixed in commit `7afae19fa`. Test plans now include:
+- `client.dcql` - DCQL query for credential request
+- `credential.trust_anchor` - PEM for credential validation
+- `credential.status_list_trust_anchor` - PEM for status list
+
+### Tests timeout or show INTERRUPTED
 
 **Symptom:** Tests created but status is INTERRUPTED.
 
@@ -190,8 +245,6 @@ curl -k https://localhost.emobix.co.uk:8443/api/runner/available
 **Fix:** Check wallet-api2 logs for errors processing the authorization request.
 
 ### No logs visible on conformance suite
-
-**Symptom:** Tests run but nothing appears at logs.html.
 
 **Fix:** Query the plan directly:
 ```bash
@@ -208,6 +261,7 @@ To pass these tests, the wallet needs:
 2. **JWE encryption** (`direct_post.jwt` → encrypt response with verifier's ephemeral key)
 3. **KB-JWT generation** (for SD-JWT VC presentations, bind to holder key)
 4. **DCQL processing** (parse Digital Credentials Query Language queries)
+5. **x509_hash validation** (compute SHA-256 of DER-encoded leaf certificate)
 
 ### WAL-896 Implementation Status
 
@@ -215,6 +269,7 @@ To pass these tests, the wallet needs:
 |---------|------|--------|
 | JWE Encryption | `ResponseEncryptionHandler.kt` | ✅ Implemented |
 | JAR Validation | `SignedRequestValidator.kt` | ✅ Implemented |
+| x509_hash Computation | `X509HashUtils.kt` | ✅ Implemented |
 | Wallet Metadata | `AuthorizationRequestResolver.kt` | ✅ Implemented |
 | DCQL mdoc support | `ClaimsQuery.kt`, `DcqlMatcher.kt` | ✅ Implemented |
 
@@ -232,12 +287,17 @@ waltid-openid4vp-conformance-runners/
 │   │   └── VpWalletConformanceAdapter.kt  # HTTP bridge
 │   ├── config/
 │   │   └── ConformanceConfig.kt           # Environment config
+│   ├── keys/
+│   │   └── TestKeyMaterial.kt             # Test certificates and keys
 │   └── testplans/
 │       ├── runner/
 │       │   └── WalletTestPlanRunner.kt    # Wallet test orchestration
 │       └── plans/vp/wallet/
 │           ├── WalletTestPlan.kt          # Base interface
-│           └── Vp*.kt                     # Wallet test plans
+│           ├── VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip.kt
+│           ├── VpWalletMdlX509HashRequestUriSignedDirectPostHaip.kt
+│           ├── VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost.kt
+│           └── VpWalletMdlX509SanDnsRequestUriSignedDirectPost.kt
 └── src/test/kotlin/.../
     ├── IsolatedWalletConformanceTest.kt   # Framework validation (no wallet needed)
     └── VpWalletConformanceTests.kt        # Full wallet test suite
