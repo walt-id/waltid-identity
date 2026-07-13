@@ -566,7 +566,8 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
-                            "The caller must redirect to this URL and capture the returned code."
+                            "The caller must redirect to this URL and capture the returned code. " +
+                            "The response includes continuation data for later token and credential requests."
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
@@ -576,6 +577,11 @@ object Wallet2RouteHandler {
 
                     post("/exchange-code", {
                         summary = "Auth-code grant: exchange authorization code for access token"
+                        description =
+                            "Exchanges the authorization code for an access token. " +
+                            "credentialIssuerBaseUrl is used to resolve authorization server metadata. " +
+                            "If attestation is configured and supported by the issuer, the wallet key is used " +
+                            "to create token endpoint client authentication headers."
                         request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
