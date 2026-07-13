@@ -339,6 +339,22 @@ object Wallet2RouteHandler {
                         if (removed) call.respond(HttpStatusCode.NoContent)
                         else call.respond(HttpStatusCode.NotFound, "Key '$keyId' not found")
                     }
+
+                    put("/set-default", {
+                        summary = "Set this key as the default key for the wallet"
+                        description = "After this call, issuance and presentation flows will use this key unless overridden per-request."
+                        request { pathParameter<String>("walletId"); pathParameter<String>("keyId") }
+                        response {
+                            HttpStatusCode.NoContent to { description = "Default updated" }
+                            HttpStatusCode.NotFound to { description = "Key not found in wallet" }
+                        }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@put
+                        val keyId = call.parameters["keyId"]!!
+                        require(wallet.findKey(keyId) != null) { "Key '$keyId' not found in wallet '${wallet.id}'" }
+                        resolver.setWalletDefaults(wallet.id, defaultKeyId = keyId, defaultDidId = null)
+                        call.respond(HttpStatusCode.NoContent)
+                    }
                 }
             }
 
@@ -421,6 +437,22 @@ object Wallet2RouteHandler {
                         val removed = wallet.didStore?.removeDid(did) ?: false
                         if (removed) call.respond(HttpStatusCode.NoContent)
                         else call.respond(HttpStatusCode.NotFound, "DID '$did' not found")
+                    }
+
+                    put("/set-default", {
+                        summary = "Set this DID as the default DID for the wallet"
+                        description = "After this call, issuance and presentation flows will use this DID unless overridden per-request."
+                        request { pathParameter<String>("walletId"); pathParameter<String>("did") }
+                        response {
+                            HttpStatusCode.NoContent to { description = "Default updated" }
+                            HttpStatusCode.NotFound to { description = "DID not found in wallet" }
+                        }
+                    }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@put
+                        val did = call.parameters["did"]!!
+                        require(wallet.didStore?.getDid(did) != null) { "DID '$did' not found in wallet '${wallet.id}'" }
+                        resolver.setWalletDefaults(wallet.id, defaultKeyId = null, defaultDidId = did)
+                        call.respond(HttpStatusCode.NoContent)
                     }
                 }
             }
