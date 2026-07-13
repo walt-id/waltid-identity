@@ -3,7 +3,6 @@ package id.walt.walletdemo.compose.logic
 data class CredentialDetails(
     val summary: CredentialSummary,
     val groups: List<ClaimGroup>,
-    val technicalGroups: List<ClaimGroup> = emptyList(),
 )
 
 data class ClaimGroup(

@@ -43,9 +43,6 @@ private data class NormalizedClaimKey(val value: String) {
 }
 
 internal object CredentialDisplayVocabulary {
-    const val RawCredentialDataTitle = "Raw credential data"
-    const val RawCredentialDataLabel = "Raw credential data"
-    const val CredentialDataJsonLabel = "Credential data JSON"
     const val GenericVerifiableCredentialType = "VerifiableCredential"
 
     private const val GivenNameClaim = "given_name"

@@ -2,8 +2,6 @@ import SwiftUI
 
 struct CredentialDetailsView: View {
     let details: CredentialDetails
-    var includeTechnicalDetails = false
-    @State private var showTechnicalDetails = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -13,7 +11,7 @@ struct CredentialDetailsView: View {
 
             CredentialOverviewView(details: details)
 
-            if details.groups.isEmpty && details.technicalGroups.isEmpty {
+            if details.groups.isEmpty {
                 Text("No credential details available")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -21,19 +19,6 @@ struct CredentialDetailsView: View {
 
             ForEach(details.groups) { group in
                 ClaimGroupView(group: group)
-            }
-
-            if includeTechnicalDetails && !details.technicalGroups.isEmpty {
-                Button(showTechnicalDetails ? "Hide raw credential data" : "Show raw credential data") {
-                    showTechnicalDetails.toggle()
-                }
-                .buttonStyle(.borderless)
-            }
-
-            if showTechnicalDetails {
-                ForEach(details.technicalGroups) { group in
-                    ClaimGroupView(group: group)
-                }
             }
         }
     }

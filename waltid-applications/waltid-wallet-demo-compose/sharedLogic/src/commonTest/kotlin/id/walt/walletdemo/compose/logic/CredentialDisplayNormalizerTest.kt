@@ -48,9 +48,6 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Street address", address.items.first { it.path.id == "resident_address.street_address" }.label)
         assertEquals(DisplayValue.Text("1 Infinite Loop"), address.items.first { it.path.id == "resident_address.street_address" }.value)
         assertEquals("Locality", address.items.first { it.path.id == "resident_address.locality" }.label)
-
-        val technical = assertNotNull(details.technicalGroups.firstOrNull { it.title == "Raw credential data" })
-        assertTrue(technical.items.any { it.path.id == "$" })
     }
 
     @Test
@@ -163,7 +160,7 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
-    fun keepsMalformedCredentialJsonAsRawTechnicalDetails() {
+    fun leavesMalformedCredentialJsonWithoutDisplayGroups() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(
                 id = "cred-1",
@@ -175,9 +172,6 @@ class CredentialDisplayNormalizerTest {
         )
 
         assertEquals(emptyList(), details.groups)
-        val raw = details.technicalGroups.single().items.single()
-        assertEquals("Raw credential data", raw.label)
-        assertEquals(DisplayValue.Raw("{not-json"), raw.value)
     }
 
     @Test

@@ -89,7 +89,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.portraitMimeType, "image/png")
     }
 
-    func testKeepsMalformedCredentialJSONAsRawTechnicalDetails() throws {
+    func testLeavesMalformedCredentialJSONWithoutDisplayGroups() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
             title: "Broken credential",
@@ -101,9 +101,6 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         XCTAssertTrue(details.groups.isEmpty)
-        let raw = try XCTUnwrap(details.technicalGroups.single?.items.single)
-        XCTAssertEqual(raw.label, "Raw credential data")
-        XCTAssertEqual(raw.value, .raw("{not-json"))
     }
 
     private func onePixelPNGByteArrayJSON() -> String {
@@ -116,10 +113,4 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     private static let onePixelPNGBase64 =
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
-}
-
-private extension Array {
-    var single: Element? {
-        count == 1 ? first : nil
-    }
 }

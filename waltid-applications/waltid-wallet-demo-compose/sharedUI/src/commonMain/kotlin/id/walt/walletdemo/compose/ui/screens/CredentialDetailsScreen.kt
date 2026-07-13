@@ -61,7 +61,6 @@ internal fun CredentialDetailsScreen(details: CredentialDetails, onBack: () -> U
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp),
-            includeTechnicalDetails = true,
         )
     }
 }

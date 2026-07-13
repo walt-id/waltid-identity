@@ -33,8 +33,7 @@ enum CredentialDisplayNormalizer {
                 subject: subject,
                 format: format,
                 addedAt: addedAt,
-                groups: [],
-                technicalGroups: []
+                groups: []
             )
         }
 
@@ -46,13 +45,7 @@ enum CredentialDisplayNormalizer {
                 subject: subject,
                 format: format,
                 addedAt: addedAt,
-                groups: [],
-                technicalGroups: [
-                    ClaimGroup(
-                        title: CredentialDisplayVocabulary.rawCredentialDataTitle,
-                        items: [ClaimItem(path: ClaimItemPath.root(), label: CredentialDisplayVocabulary.rawCredentialDataLabel, value: .raw(rawJSON), rawValue: rawJSON, requested: false, shareable: false)]
-                    )
-                ]
+                groups: []
             )
         }
 
@@ -74,13 +67,7 @@ enum CredentialDisplayNormalizer {
             subject: subject,
             format: format,
             addedAt: addedAt,
-            groups: groups,
-            technicalGroups: [
-                ClaimGroup(
-                    title: CredentialDisplayVocabulary.rawCredentialDataTitle,
-                    items: [ClaimItem(path: ClaimItemPath.root(), label: CredentialDisplayVocabulary.credentialDataJSONLabel, value: .raw(rawJSON), rawValue: rawJSON, requested: false, shareable: false)]
-                )
-            ]
+            groups: groups
         )
     }
 

@@ -57,9 +57,6 @@ private struct NormalizedClaimKey: Hashable {
 }
 
 enum CredentialDisplayVocabulary {
-    static let rawCredentialDataTitle = "Raw credential data"
-    static let rawCredentialDataLabel = "Raw credential data"
-    static let credentialDataJSONLabel = "Credential data JSON"
     static let genericVerifiableCredentialType = "VerifiableCredential"
 
     private static let givenNameClaim = "given_name"

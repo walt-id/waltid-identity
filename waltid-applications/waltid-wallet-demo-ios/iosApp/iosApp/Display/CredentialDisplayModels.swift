@@ -8,7 +8,6 @@ struct CredentialDetails: Equatable, Identifiable {
     let format: String
     let addedAt: Date?
     let groups: [ClaimGroup]
-    let technicalGroups: [ClaimGroup]
 }
 
 struct ClaimGroup: Equatable, Identifiable {

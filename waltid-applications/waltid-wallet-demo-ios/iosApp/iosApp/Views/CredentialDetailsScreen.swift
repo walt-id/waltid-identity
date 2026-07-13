@@ -5,7 +5,7 @@ struct CredentialDetailsScreen: View {
 
     var body: some View {
         ScrollView {
-            CredentialDetailsView(details: details, includeTechnicalDetails: true)
+            CredentialDetailsView(details: details)
                 .padding()
         }
         .navigationTitle("Credential details")

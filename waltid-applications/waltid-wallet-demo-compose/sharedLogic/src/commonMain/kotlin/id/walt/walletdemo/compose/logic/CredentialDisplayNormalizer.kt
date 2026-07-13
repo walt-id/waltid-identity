@@ -31,19 +31,6 @@ object CredentialDisplayNormalizer {
             ?: return CredentialDetails(
                 summary = summary,
                 groups = emptyList(),
-                technicalGroups = listOf(
-                    ClaimGroup(
-                        title = CredentialDisplayVocabulary.RawCredentialDataTitle,
-                        items = listOf(
-                            ClaimItem(
-                                path = ClaimItemPath.root(),
-                                label = CredentialDisplayVocabulary.RawCredentialDataLabel,
-                                value = DisplayValue.Raw(rawJson),
-                                rawValue = rawJson,
-                            )
-                        ),
-                    )
-                ),
             )
 
         val groupedItems = parsed.entries
@@ -60,19 +47,6 @@ object CredentialDisplayNormalizer {
         return CredentialDetails(
             summary = summary,
             groups = groupedItems,
-            technicalGroups = listOf(
-                ClaimGroup(
-                    title = CredentialDisplayVocabulary.RawCredentialDataTitle,
-                    items = listOf(
-                        ClaimItem(
-                            path = ClaimItemPath.root(),
-                            label = CredentialDisplayVocabulary.CredentialDataJsonLabel,
-                            value = DisplayValue.Raw(rawJson),
-                            rawValue = rawJson,
-                        )
-                    ),
-                )
-            ),
         )
     }
 
