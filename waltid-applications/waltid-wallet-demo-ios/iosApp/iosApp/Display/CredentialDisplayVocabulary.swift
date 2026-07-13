@@ -141,7 +141,7 @@ enum CredentialDisplayVocabulary {
     private static func roles(for claimPath: ClaimPath) -> Set<ClaimRole> {
         let leaf = claimPath.leaf
         var roles = descriptor(for: leaf)?.roles ?? []
-        if claimPath.isTopLevel && topLevelCredentialTypeClaimNames.contains(NormalizedClaimKey(leaf)) {
+        if isCredentialTypeClaimPath(claimPath) {
             roles.insert(.credentialType)
         }
         if pathHasRole(claimPath, role: .image) {
@@ -168,6 +168,13 @@ enum CredentialDisplayVocabulary {
         path.components.contains { component in
             descriptor(for: component)?.roles.contains(role) == true
         }
+    }
+
+    private static func isCredentialTypeClaimPath(_ path: ClaimPath) -> Bool {
+        guard topLevelCredentialTypeClaimNames.contains(NormalizedClaimKey(path.leaf)) else {
+            return false
+        }
+        return path.isTopLevel || path.components == ["vc", path.leaf]
     }
 
     private static func descriptor(for name: String) -> ClaimDescriptor? {

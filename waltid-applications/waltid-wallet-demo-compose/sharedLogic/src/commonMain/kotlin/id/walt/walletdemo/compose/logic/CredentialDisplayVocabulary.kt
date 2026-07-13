@@ -116,7 +116,7 @@ internal object CredentialDisplayVocabulary {
     fun roles(path: ClaimPath): Set<ClaimRole> {
         val leaf = path.leaf
         val roles = descriptorFor(leaf)?.roles.orEmpty().toMutableSet()
-        if (path.isTopLevel && NormalizedClaimKey.from(leaf) in topLevelCredentialTypeClaimNames) roles += ClaimRole.CredentialType
+        if (path.isCredentialTypeClaimPath()) roles += ClaimRole.CredentialType
         if (pathHasRole(path, ClaimRole.Image)) roles += ClaimRole.Image
         return roles
     }
@@ -140,6 +140,11 @@ internal object CredentialDisplayVocabulary {
         path.components.any { pathComponent ->
             role in descriptorFor(pathComponent)?.roles.orEmpty()
         }
+
+    private fun ClaimPath.isCredentialTypeClaimPath(): Boolean {
+        if (NormalizedClaimKey.from(leaf) !in topLevelCredentialTypeClaimNames) return false
+        return isTopLevel || components == listOf("vc", leaf)
+    }
 
     private fun descriptorFor(name: String): ClaimDescriptor? =
         descriptors[NormalizedClaimKey.from(name)]

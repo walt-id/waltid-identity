@@ -137,7 +137,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         })
     }
 
-    func testRendersRepresentativeSupportedCredentialFormats() {
+    func testRendersAllSupportedCredentialFormats() {
         let cases: [(format: String, title: String, credentialDataJSON: String, expectedHolderName: String, expectedCredentialType: String?, expectedClaimPath: String)] = [
             (
                 format: "jwt_vc_json",
@@ -159,6 +159,70 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 expectedClaimPath: "credentialSubject.portrait"
             ),
             (
+                format: "jwt_vc_json-ld",
+                title: "JSON-LD credential",
+                credentialDataJSON: """
+                {
+                  "@context": ["https://www.w3.org/2018/credentials/v1"],
+                  "type": ["VerifiableCredential", "EmployeeCredential"],
+                  "issuer": "did:web:issuer.example",
+                  "credentialSubject": {
+                    "given_name": "Jane",
+                    "family_name": "Employee",
+                    "role": "Engineer"
+                  }
+                }
+                """,
+                expectedHolderName: "Jane Employee",
+                expectedCredentialType: "Employee credential",
+                expectedClaimPath: "credentialSubject.role"
+            ),
+            (
+                format: "ldp_vc",
+                title: "Linked data credential",
+                credentialDataJSON: """
+                {
+                  "@context": ["https://www.w3.org/2018/credentials/v1"],
+                  "type": ["VerifiableCredential", "UniversityDegreeCredential"],
+                  "issuer": "did:web:issuer.example",
+                  "credentialSubject": {
+                    "given_name": "Lin",
+                    "family_name": "Graduate",
+                    "degree": {
+                      "type": "BachelorDegree",
+                      "name": "Bachelor of Science"
+                    }
+                  },
+                  "proof": {
+                    "type": "DataIntegrityProof",
+                    "cryptosuite": "eddsa-rdfc-2022"
+                  }
+                }
+                """,
+                expectedHolderName: "Lin Graduate",
+                expectedCredentialType: "University degree credential",
+                expectedClaimPath: "credentialSubject.degree.name"
+            ),
+            (
+                format: "jwt_vc",
+                title: "Legacy JWT VC",
+                credentialDataJSON: """
+                {
+                  "vc": {
+                    "type": ["VerifiableCredential", "LegacyPersonCredential"],
+                    "credentialSubject": {
+                      "given_name": "Legacy",
+                      "family_name": "Holder",
+                      "member_id": "123"
+                    }
+                  }
+                }
+                """,
+                expectedHolderName: "Legacy Holder",
+                expectedCredentialType: "Legacy person credential",
+                expectedClaimPath: "vc.credentialSubject.member_id"
+            ),
+            (
                 format: "dc+sd-jwt",
                 title: "PID SD-JWT VC",
                 credentialDataJSON: """
@@ -173,6 +237,37 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                 """,
                 expectedHolderName: "Alice Tester",
                 expectedCredentialType: "Pid 1",
+                expectedClaimPath: "cnf"
+            ),
+            (
+                format: "vc+sd-jwt",
+                title: "PID SD-JWT VC legacy alias",
+                credentialDataJSON: """
+                {
+                  "vct": "eu.europa.ec.eudi.pid.1",
+                  "_sd": [],
+                  "given_name": "Ali",
+                  "family_name": "Alias",
+                  "iss": "https://issuer.example"
+                }
+                """,
+                expectedHolderName: "Ali Alias",
+                expectedCredentialType: "Pid 1",
+                expectedClaimPath: "_sd"
+            ),
+            (
+                format: "vc-sd_jwt",
+                title: "Stored SD-JWT VC alias",
+                credentialDataJSON: """
+                {
+                  "vct": "https://credentials.example/mobile-driving-licence",
+                  "given_name": "Sam",
+                  "family_name": "Stored",
+                  "cnf": {"kid": "holder-key-2"}
+                }
+                """,
+                expectedHolderName: "Sam Stored",
+                expectedCredentialType: "Mobile driving licence",
                 expectedClaimPath: "cnf"
             ),
             (

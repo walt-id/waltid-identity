@@ -10,6 +10,9 @@ enum CredentialTypeIdentifier {
     }
 
     private static func httpURLToken(_ value: String) -> String? {
+        guard value.contains("://") else {
+            return nil
+        }
         guard let components = URLComponents(string: value),
               let scheme = components.scheme?.lowercased(),
               httpSchemes.contains(scheme) else {
@@ -36,5 +39,5 @@ enum CredentialTypeIdentifier {
     }
 
     private static let httpSchemes: Set<String> = ["http", "https"]
-    private static let identifierDelimiters: Set<Character> = ["/", "#", ":"]
+    private static let identifierDelimiters: Set<Character> = ["/", "#", ":", "."]
 }

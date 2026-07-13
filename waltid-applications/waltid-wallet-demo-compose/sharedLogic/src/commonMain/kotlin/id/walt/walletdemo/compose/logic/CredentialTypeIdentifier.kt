@@ -10,6 +10,7 @@ internal object CredentialTypeIdentifier {
     }
 
     private fun String.httpUrlToken(): String? {
+        if (!contains("://")) return null
         val parsed = runCatching { Url(this) }.getOrNull()
             ?: return null
         if (parsed.protocol.name !in httpProtocols) return null
@@ -31,5 +32,5 @@ internal object CredentialTypeIdentifier {
     }
 
     private val httpProtocols = setOf("http", "https")
-    private val identifierDelimiters = charArrayOf('/', '#', ':')
+    private val identifierDelimiters = charArrayOf('/', '#', ':', '.')
 }
