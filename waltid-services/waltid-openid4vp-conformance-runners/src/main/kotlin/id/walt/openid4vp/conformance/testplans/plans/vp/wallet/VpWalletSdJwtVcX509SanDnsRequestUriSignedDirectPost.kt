@@ -45,7 +45,7 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
     override val configuration: JsonObject = Json.decodeFromString(
         """
         {
-            "alias": "waltid_vp_wallet_sd_jwt_vc_x509_san_dns",
+            "alias": "waltid_vp_wallet_sd_jwt_vc_x509_san_dns_v1",
             "description": "VP Wallet: SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt (HAIP)",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"
