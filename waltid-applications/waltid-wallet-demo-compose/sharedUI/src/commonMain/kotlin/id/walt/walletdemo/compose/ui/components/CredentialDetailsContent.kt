@@ -45,7 +45,7 @@ internal fun CredentialDetailsContent(
                 Text(if (showTechnicalDetails) "Hide raw credential data" else "Show raw credential data")
             }
         }
-        if (showTechnicalDetails) {
+        if (hasTechnicalDetails && showTechnicalDetails) {
             details.technicalGroups.forEach { group ->
                 ClaimGroupSection(group)
             }

@@ -142,7 +142,6 @@ class CredentialDisplayNormalizerTest {
         assertEquals("PID", details.title)
         assertEquals("Mobile driving licence", details.credentialType)
         assertEquals("Ada Lovelace", details.holderName)
-        assertEquals("2026-06-17", details.date)
         assertEquals("Expires 2026-06-17", details.validity)
     }
 

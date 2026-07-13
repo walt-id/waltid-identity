@@ -36,7 +36,11 @@ public data class MobileWalletBootstrapResult(
 )
 
 /**
- * Lightweight credential summary suitable for mobile UI lists.
+ * Credential entry suitable for mobile UI lists and detail display.
+ *
+ * The credential content is exposed as a JSON string so Kotlin, Swift, and other
+ * consumers can decode it with native platform tools without depending on Kotlinx
+ * JSON value types in the public mobile API.
  *
  * @property id Wallet-local credential identifier.
  * @property format Credential format, such as `jwt_vc_json`, `vc+sd-jwt`, or `mso_mdoc`.
@@ -210,7 +214,7 @@ public class MobileWallet internal constructor(
     /**
      * Lists all credentials currently stored in the mobile wallet.
      *
-     * @return Credential summaries ordered by the underlying credential store.
+     * @return Credential entries, including display JSON, ordered by the underlying credential store.
      */
     public suspend fun credentials(): List<MobileWalletCredential> =
         wallet.streamAllCredentials().toList().map { credential ->

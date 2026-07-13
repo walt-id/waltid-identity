@@ -7,7 +7,6 @@ data class CredentialCardDisplayData(
     val format: String,
     val issuer: String?,
     val holderName: String?,
-    val date: String?,
     val validity: String?,
     val portrait: DisplayValue.Image?,
 )
@@ -30,7 +29,6 @@ fun CredentialDetails.toCardDisplayData(): CredentialCardDisplayData {
         format = summary.format,
         issuer = summary.issuer,
         holderName = holderName,
-        date = expiryDate ?: fallbackAddedDate,
         validity = expiryDate?.let { CredentialDisplayText.expires(it) }
             ?: fallbackAddedDate?.let { CredentialDisplayText.added(it) },
         portrait = allItems.firstImageForRole(ClaimRole.Image),
