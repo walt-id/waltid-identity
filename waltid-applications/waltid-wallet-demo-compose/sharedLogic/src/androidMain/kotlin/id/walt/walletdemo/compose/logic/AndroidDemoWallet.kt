@@ -8,12 +8,15 @@ fun createAndroidDemoWallet(
     context: Context,
     config: DemoWalletConfig = DemoWalletConfig(),
 ): DemoWallet {
-    return MobileDemoWallet(
-        MobileWalletFactory(context).create(
-            MobileWalletConfig(
-                walletId = config.walletId,
-                attestationConfig = config.toWalletAttestationConfig(),
+
+    return LazyDemoWallet {
+        MobileDemoWallet(
+            MobileWalletFactory(context).create(
+                MobileWalletConfig(
+                    walletId = config.walletId,
+                    attestationConfig = config.toWalletAttestationConfig(),
+                )
             )
         )
-    )
+    }
 }

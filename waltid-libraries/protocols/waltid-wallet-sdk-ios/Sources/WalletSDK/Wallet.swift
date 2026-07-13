@@ -19,7 +19,7 @@ public actor Wallet {
     ///   bridge cannot be created.
     public init(configuration: WalletConfiguration = .init()) async throws {
         self.configuration = configuration
-        self.bridge = try DefaultWalletCoreBridgeFactory.makeBridge(configuration: configuration)
+        self.bridge = try await DefaultWalletCoreBridgeFactory.makeBridge(configuration: configuration)
     }
 
     init(
@@ -81,6 +81,13 @@ public actor Wallet {
     /// - Throws: ``WalletError`` when local storage cannot be read.
     public func credentials() async throws -> [Credential] {
         try await bridge.credentials()
+    }
+
+    /// Deletes wallet-local state and managed persistence material.
+    ///
+    /// - Throws: ``WalletError`` when local wallet material cannot be deleted.
+    public func deleteLocalData() async throws {
+        try await bridge.deleteLocalData()
     }
 
     /// Presents credentials for an OpenID4VP request URL.

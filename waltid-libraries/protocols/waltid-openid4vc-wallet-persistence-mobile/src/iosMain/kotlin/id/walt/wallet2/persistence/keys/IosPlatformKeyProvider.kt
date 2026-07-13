@@ -10,7 +10,7 @@ import kotlin.uuid.Uuid
  *
  * @param useSecureElement When `true`, P-256 keys are created in Secure Enclave where available.
  */
-class IosPlatformKeyProvider(
+public class IosPlatformKeyProvider(
     private val useSecureElement: Boolean = true,
 ) : PlatformKeyProvider {
 

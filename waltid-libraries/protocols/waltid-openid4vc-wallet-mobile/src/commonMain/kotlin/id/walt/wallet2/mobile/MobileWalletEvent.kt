@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 /**
  * High-level protocol flow that emitted a [MobileWalletEvent].
  */
-enum class MobileWalletEventPhase {
+public enum class MobileWalletEventPhase {
     /** Credential issuance flow. */
     issuance,
 
@@ -20,7 +20,7 @@ enum class MobileWalletEventPhase {
 /**
  * Progress state represented by a [MobileWalletEvent].
  */
-enum class MobileWalletEventStatus {
+public enum class MobileWalletEventStatus {
     /** The flow is still running. */
     progress,
 
@@ -38,10 +38,10 @@ enum class MobileWalletEventStatus {
  * @property phase Issuance or presentation flow that emitted the event.
  * @property status Current progress state for the event.
  */
-data class MobileWalletEvent(
-    val name: String,
-    val phase: MobileWalletEventPhase,
-    val status: MobileWalletEventStatus,
+public data class MobileWalletEvent(
+    public val name: String,
+    public val phase: MobileWalletEventPhase,
+    public val status: MobileWalletEventStatus,
 )
 
 internal class MobileWalletEventStream(

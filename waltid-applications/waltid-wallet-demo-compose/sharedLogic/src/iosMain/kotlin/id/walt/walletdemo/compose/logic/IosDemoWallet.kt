@@ -6,12 +6,15 @@ import id.walt.wallet2.mobile.MobileWalletFactory
 fun createIosDemoWallet(
     config: DemoWalletConfig = DemoWalletConfig(),
 ): DemoWallet {
-    return MobileDemoWallet(
-        MobileWalletFactory().create(
-            MobileWalletConfig(
-                walletId = config.walletId,
-                attestationConfig = config.toWalletAttestationConfig(),
+
+    return LazyDemoWallet {
+        MobileDemoWallet(
+            MobileWalletFactory().create(
+                MobileWalletConfig(
+                    walletId = config.walletId,
+                    attestationConfig = config.toWalletAttestationConfig(),
+                )
             )
         )
-    )
+    }
 }

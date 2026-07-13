@@ -5,7 +5,7 @@ import id.walt.crypto.keys.KeyType
 /**
  * Key algorithms supported by the mobile wallet bootstrap flow.
  */
-enum class MobileWalletKeyType {
+public enum class MobileWalletKeyType {
     /** Ed25519 signing key. */
     Ed25519,
 
