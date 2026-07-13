@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import org.junit.Assert.assertNotNull
@@ -17,6 +18,8 @@ internal object WalletComposeE2EHelper {
     const val VERIFIER_POLLING_TIMEOUT = 30_000L
     const val QUICK_STATUS_CHECK_TIMEOUT = 5_000L
     const val POST_PRESENT_DELAY = 5_000L
+    private const val STALE_RETRY_COUNT = 3
+    private const val STALE_RETRY_DELAY_MS = 50L
 
     private val statusPrefixes = listOf(
         "Wallet ready",
@@ -86,13 +89,40 @@ internal object WalletComposeE2EHelper {
         return null
     }
 
-    fun latestStatus(device: UiDevice): String {
-        val tagged = device.findObject(By.res("wallet.status"))
-        if (tagged?.text != null) return tagged.text
+    /**
+     * Reads a UiObject2's text safely, retrying on StaleObjectException.
+     * Compose can recompose (and thus recycle) a node between the moment
+     * findObject() returns it and the moment .text is read, especially
+     * during fast status transitions. Returns null if the node stays
+     * stale/unreachable after retrying, so callers can treat it as "no
+     * reading available yet" rather than crashing the test.
+     */
+    private fun UiObject2.textOrNullIfStale(): String? {
+        repeat(STALE_RETRY_COUNT) { attempt ->
+            try {
+                return this.text
+            } catch (e: StaleObjectException) {
+                if (attempt == STALE_RETRY_COUNT - 1) return null
+                Thread.sleep(STALE_RETRY_DELAY_MS)
+            }
+        }
+        return null
+    }
 
-        for (prefix in statusPrefixes) {
-            val obj = device.findObject(By.textStartsWith(prefix))
-            if (obj != null) return obj.text
+    fun latestStatus(device: UiDevice): String {
+        try {
+            val tagged = device.findObject(By.res("wallet.status"))
+            val taggedText = tagged?.textOrNullIfStale()
+            if (taggedText != null) return taggedText
+
+            for (prefix in statusPrefixes) {
+                val obj = device.findObject(By.textStartsWith(prefix)) ?: continue
+                val text = obj.textOrNullIfStale() ?: continue
+                return text
+            }
+        } catch (e: StaleObjectException) {
+            // The queried node tree itself shifted mid-lookup; treat as "unknown for now"
+            // rather than failing the whole polling loop.
         }
         return "UNKNOWN"
     }
