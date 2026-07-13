@@ -86,8 +86,8 @@ class AttestationBasedClientAuthenticationMethodTest {
         attestationSubject: String,
         popAudience: JsonElement,
     ): ClientAuthenticationResult {
-        val attesterKey = JWKKey.generate(KeyType.secp256r1)
-        val clientInstanceKey = JWKKey.generate(KeyType.secp256r1)
+        val attesterKey = JWKKey.generate(KeyType.Ed25519)
+        val clientInstanceKey = JWKKey.generate(KeyType.Ed25519)
         val now = Clock.System.now().epochSeconds
         val attestationJwt = attesterKey.signJws(
             buildJsonObject {
