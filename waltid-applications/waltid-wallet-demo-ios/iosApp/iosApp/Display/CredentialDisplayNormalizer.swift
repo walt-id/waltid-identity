@@ -25,7 +25,7 @@ enum CredentialDisplayNormalizer {
         credentialDataJSON: String
     ) -> CredentialDetails {
         let rawJSON = credentialDataJSON.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !rawJSON.isEmpty, let data = rawJSON.data(using: .utf8) else {
+        guard !rawJSON.isEmpty else {
             return CredentialDetails(
                 id: id,
                 title: title,
@@ -37,7 +37,7 @@ enum CredentialDisplayNormalizer {
             )
         }
 
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard case .object(let members) = CredentialDisplayJSONParser.parse(rawJSON) else {
             return CredentialDetails(
                 id: id,
                 title: title,
@@ -49,9 +49,9 @@ enum CredentialDisplayNormalizer {
             )
         }
 
-        let groupedItems = object.keys.sorted().flatMap { key in
-            let path = DisplayClaimPath.topLevel(key)
-            return claimItems(path: path, label: CredentialDisplayVocabulary.humanizedLabel(key), value: object[key] as Any)
+        let groupedItems = members.flatMap { member in
+            let path = DisplayClaimPath.topLevel(member.key)
+            return claimItems(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
                 .map { item in
                     (CredentialDisplayVocabulary.groupKind(for: path.components), item)
                 }
@@ -71,7 +71,7 @@ enum CredentialDisplayNormalizer {
         )
     }
 
-    private static func claimItem(path: DisplayClaimPath, label: String, value: Any) -> ClaimItem {
+    private static func claimItem(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> ClaimItem {
         ClaimItem(
             path: path.itemPath,
             label: label,
@@ -81,7 +81,7 @@ enum CredentialDisplayNormalizer {
         )
     }
 
-    private static func claimItems(path: DisplayClaimPath, label: String, value: Any) -> [ClaimItem] {
+    private static func claimItems(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> [ClaimItem] {
         let item = claimItem(path: path, label: label, value: value)
         if case .object = item.value {
             return flattenObjectForClaimRows(item)
@@ -105,11 +105,11 @@ enum CredentialDisplayNormalizer {
         }
     }
 
-    private static func displayValue(for value: Any, path: DisplayClaimPath) -> DisplayValue {
-        if value is NSNull {
+    private static func displayValue(for value: CredentialDisplayJSONValue, path: DisplayClaimPath) -> DisplayValue {
+        switch value {
+        case .null:
             return .null
-        }
-        if let string = value as? String {
+        case .string(let string):
             if let dateText = epochDateStringIfTemporal(value: string, path: path) {
                 return .text(dateText)
             }
@@ -118,23 +118,19 @@ enum CredentialDisplayNormalizer {
                 path: path,
                 renderJSON: { json, jsonPath in displayValue(for: json, path: jsonPath) }
             ) ?? .text(string)
-        }
-        if let number = value as? NSNumber {
-            if CFGetTypeID(number) == CFBooleanGetTypeID() {
-                return .bool(number.boolValue)
-            }
-            if let dateText = epochDateStringIfTemporal(value: number.stringValue, path: path) {
+        case .number(let number):
+            if let dateText = epochDateStringIfTemporal(value: number, path: path) {
                 return .text(dateText)
             }
-            return .number(number.stringValue)
-        }
-        if let object = value as? [String: Any] {
-            let items = object.keys.map { key in
-                claimItem(path: path.child(key), label: CredentialDisplayVocabulary.humanizedLabel(key), value: object[key] as Any)
+            return .number(number)
+        case .bool(let bool):
+            return .bool(bool)
+        case .object(let members):
+            let items = members.map { member in
+                claimItem(path: path.child(member.key), label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
             }
             return .object(items)
-        }
-        if let list = value as? [Any] {
+        case .array(let list):
             if let image = CredentialDisplayValueDecoder.imageDisplayValue(
                 for: list,
                 roles: CredentialDisplayVocabulary.roles(for: path.components)
@@ -145,19 +141,10 @@ enum CredentialDisplayNormalizer {
                 displayValue(for: element, path: path.indexed(index))
             })
         }
-        return .raw(String(describing: value))
     }
 
-    private static func rawString(_ value: Any) -> String? {
-        if JSONSerialization.isValidJSONObject(value),
-           let data = try? JSONSerialization.data(withJSONObject: value),
-           let string = String(data: data, encoding: .utf8) {
-            return string
-        }
-        if value is NSNull {
-            return "null"
-        }
-        return String(describing: value)
+    private static func rawString(_ value: CredentialDisplayJSONValue) -> String? {
+        value.rawJSON
     }
 
     private static func epochDateStringIfTemporal(value: String, path: DisplayClaimPath) -> String? {
@@ -193,5 +180,288 @@ private extension ClaimItem {
             rawValue: rawValue,
             roles: roles
         )
+    }
+}
+
+struct CredentialDisplayJSONMember {
+    let key: String
+    let value: CredentialDisplayJSONValue
+}
+
+enum CredentialDisplayJSONValue {
+    case object([CredentialDisplayJSONMember])
+    case array([CredentialDisplayJSONValue])
+    case string(String)
+    case number(String)
+    case bool(Bool)
+    case null
+
+    var rawJSON: String {
+        switch self {
+        case .object(let members):
+            let body = members
+                .map { jsonEscapedString($0.key) + ":" + $0.value.rawJSON }
+                .joined(separator: ",")
+            return "{\(body)}"
+        case .array(let values):
+            return "[" + values.map(\.rawJSON).joined(separator: ",") + "]"
+        case .string(let value):
+            return jsonEscapedString(value)
+        case .number(let value):
+            return value
+        case .bool(let value):
+            return value ? "true" : "false"
+        case .null:
+            return "null"
+        }
+    }
+}
+
+enum CredentialDisplayJSONParser {
+    static func parse(_ rawJSON: String) -> CredentialDisplayJSONValue? {
+        var parser = Parser(rawJSON)
+        return try? parser.parse()
+    }
+}
+
+private struct Parser {
+    private let scalars: [UnicodeScalar]
+    private var index = 0
+
+    init(_ rawJSON: String) {
+        self.scalars = Array(rawJSON.unicodeScalars)
+    }
+
+    mutating func parse() throws -> CredentialDisplayJSONValue {
+        skipWhitespace()
+        let value = try parseValue()
+        skipWhitespace()
+        guard index == scalars.count else { throw ParseError.invalidJSON }
+        return value
+    }
+
+    private mutating func parseValue() throws -> CredentialDisplayJSONValue {
+        skipWhitespace()
+        guard let scalar = current else { throw ParseError.invalidJSON }
+        switch scalar {
+        case "{": return .object(try parseObject())
+        case "[": return .array(try parseArray())
+        case "\"": return .string(try parseString())
+        case "t":
+            try consumeLiteral("true")
+            return .bool(true)
+        case "f":
+            try consumeLiteral("false")
+            return .bool(false)
+        case "n":
+            try consumeLiteral("null")
+            return .null
+        default:
+            return .number(try parseNumber())
+        }
+    }
+
+    private mutating func parseObject() throws -> [CredentialDisplayJSONMember] {
+        try consume("{")
+        skipWhitespace()
+        if consumeIfPresent("}") {
+            return []
+        }
+
+        var members: [CredentialDisplayJSONMember] = []
+        while true {
+            skipWhitespace()
+            let key = try parseString()
+            skipWhitespace()
+            try consume(":")
+            let value = try parseValue()
+            members.append(CredentialDisplayJSONMember(key: key, value: value))
+            skipWhitespace()
+            if consumeIfPresent("}") {
+                return members
+            }
+            try consume(",")
+        }
+    }
+
+    private mutating func parseArray() throws -> [CredentialDisplayJSONValue] {
+        try consume("[")
+        skipWhitespace()
+        if consumeIfPresent("]") {
+            return []
+        }
+
+        var values: [CredentialDisplayJSONValue] = []
+        while true {
+            values.append(try parseValue())
+            skipWhitespace()
+            if consumeIfPresent("]") {
+                return values
+            }
+            try consume(",")
+        }
+    }
+
+    private mutating func parseString() throws -> String {
+        try consume("\"")
+        var result = String.UnicodeScalarView()
+        while let scalar = current {
+            advance()
+            if scalar == "\"" {
+                return String(result)
+            }
+            if scalar != "\\" {
+                result.append(scalar)
+                continue
+            }
+            guard let escaped = current else { throw ParseError.invalidJSON }
+            advance()
+            switch escaped {
+            case "\"", "\\", "/":
+                result.append(escaped)
+            case "b":
+                result.append(UnicodeScalar(0x08)!)
+            case "f":
+                result.append(UnicodeScalar(0x0C)!)
+            case "n":
+                result.append("\n")
+            case "r":
+                result.append("\r")
+            case "t":
+                result.append("\t")
+            case "u":
+                try appendUnicodeEscape(to: &result)
+            default:
+                throw ParseError.invalidJSON
+            }
+        }
+        throw ParseError.invalidJSON
+    }
+
+    private mutating func appendUnicodeEscape(to result: inout String.UnicodeScalarView) throws {
+        let value = try readHexScalarValue()
+        if (0xD800...0xDBFF).contains(value) {
+            guard current == "\\", peek() == "u" else { throw ParseError.invalidJSON }
+            advance()
+            advance()
+            let low = try readHexScalarValue()
+            guard (0xDC00...0xDFFF).contains(low) else { throw ParseError.invalidJSON }
+            let scalarValue = 0x10000 + ((value - 0xD800) << 10) + (low - 0xDC00)
+            guard let scalar = UnicodeScalar(scalarValue) else { throw ParseError.invalidJSON }
+            result.append(scalar)
+            return
+        }
+        guard let scalar = UnicodeScalar(value) else { throw ParseError.invalidJSON }
+        result.append(scalar)
+    }
+
+    private mutating func readHexScalarValue() throws -> UInt32 {
+        var value: UInt32 = 0
+        for _ in 0..<4 {
+            guard let scalar = current, let digit = scalar.jsonHexDigitValue else { throw ParseError.invalidJSON }
+            advance()
+            value = value * 16 + UInt32(digit)
+        }
+        return value
+    }
+
+    private mutating func parseNumber() throws -> String {
+        let start = index
+        if current == "-" {
+            advance()
+        }
+        try consumeDigits()
+        if current == "." {
+            advance()
+            try consumeDigits()
+        }
+        if current == "e" || current == "E" {
+            advance()
+            if current == "+" || current == "-" {
+                advance()
+            }
+            try consumeDigits()
+        }
+        guard index > start else { throw ParseError.invalidJSON }
+        return String(String.UnicodeScalarView(scalars[start..<index]))
+    }
+
+    private mutating func consumeDigits() throws {
+        let start = index
+        while let scalar = current, scalar.value >= 48, scalar.value <= 57 {
+            advance()
+        }
+        guard index > start else { throw ParseError.invalidJSON }
+    }
+
+    private mutating func consumeLiteral(_ literal: String) throws {
+        for scalar in literal.unicodeScalars {
+            try consume(scalar)
+        }
+    }
+
+    private mutating func consume(_ expected: UnicodeScalar) throws {
+        guard current == expected else { throw ParseError.invalidJSON }
+        advance()
+    }
+
+    private mutating func consumeIfPresent(_ expected: UnicodeScalar) -> Bool {
+        guard current == expected else { return false }
+        advance()
+        return true
+    }
+
+    private mutating func skipWhitespace() {
+        while let scalar = current, scalar == " " || scalar == "\n" || scalar == "\r" || scalar == "\t" {
+            advance()
+        }
+    }
+
+    private var current: UnicodeScalar? {
+        index < scalars.count ? scalars[index] : nil
+    }
+
+    private func peek() -> UnicodeScalar? {
+        index + 1 < scalars.count ? scalars[index + 1] : nil
+    }
+
+    private mutating func advance() {
+        index += 1
+    }
+
+    private enum ParseError: Error {
+        case invalidJSON
+    }
+}
+
+private func jsonEscapedString(_ value: String) -> String {
+    var result = "\""
+    for scalar in value.unicodeScalars {
+        switch scalar {
+        case "\"": result += "\\\""
+        case "\\": result += "\\\\"
+        case "\n": result += "\\n"
+        case "\r": result += "\\r"
+        case "\t": result += "\\t"
+        default:
+            if scalar.value < 0x20 {
+                result += String(format: "\\u%04X", scalar.value)
+            } else {
+                result.unicodeScalars.append(scalar)
+            }
+        }
+    }
+    result += "\""
+    return result
+}
+
+private extension UnicodeScalar {
+    var jsonHexDigitValue: Int? {
+        switch value {
+        case 48...57: return Int(value - 48)
+        case 65...70: return Int(value - 55)
+        case 97...102: return Int(value - 87)
+        default: return nil
+        }
     }
 }

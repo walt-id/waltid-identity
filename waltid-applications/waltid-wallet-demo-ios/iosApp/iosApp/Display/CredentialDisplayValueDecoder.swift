@@ -4,7 +4,7 @@ enum CredentialDisplayValueDecoder {
     static func decodedValue(
         for value: String,
         path: DisplayClaimPath,
-        renderJSON: (Any, DisplayClaimPath) -> DisplayValue
+        renderJSON: (CredentialDisplayJSONValue, DisplayClaimPath) -> DisplayValue
     ) -> DisplayValue? {
         guard let payload = EncodedPayload.parse(value),
               let bytes = payload.base64.decode() else {
@@ -16,14 +16,13 @@ enum CredentialDisplayValueDecoder {
         guard let decoded = String(data: bytes, encoding: .utf8), decoded.isMostlyReadable else {
             return nil
         }
-        if let data = decoded.data(using: .utf8),
-           let json = try? JSONSerialization.jsonObject(with: data) {
+        if let json = CredentialDisplayJSONParser.parse(decoded) {
             return renderJSON(json, path)
         }
         return .decodedText(decoded)
     }
 
-    static func imageDisplayValue(for list: [Any], roles: Set<ClaimRole>) -> DisplayValue? {
+    static func imageDisplayValue(for list: [CredentialDisplayJSONValue], roles: Set<ClaimRole>) -> DisplayValue? {
         guard roles.contains(.image),
               let data = byteArrayData(from: list),
               let mimeType = ImageBytes.mimeType(for: data, hint: nil) else {
@@ -32,16 +31,13 @@ enum CredentialDisplayValueDecoder {
         return imageValue(for: data, mimeType: mimeType)
     }
 
-    private static func byteArrayData(from list: [Any]) -> Data? {
+    private static func byteArrayData(from list: [CredentialDisplayJSONValue]) -> Data? {
         guard !list.isEmpty else { return nil }
         var bytes: [UInt8] = []
         bytes.reserveCapacity(list.count)
         for element in list {
-            guard let number = element as? NSNumber,
-                  CFGetTypeID(number) != CFBooleanGetTypeID() else {
-                return nil
-            }
-            let value = number.intValue
+            guard case .number(let number) = element,
+                  let value = Int(number) else { return nil }
             guard (-128...255).contains(value) else {
                 return nil
             }

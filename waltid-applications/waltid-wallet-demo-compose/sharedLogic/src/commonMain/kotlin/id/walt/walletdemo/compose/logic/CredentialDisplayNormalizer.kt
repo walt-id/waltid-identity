@@ -61,7 +61,7 @@ object CredentialDisplayNormalizer {
 
     private fun JsonElement.toClaimItems(path: ClaimPath, label: String): List<ClaimItem> {
         val item = toClaimItem(path = path, label = label)
-        return if (this is JsonObject) item.flattenObjectForClaimRows() else listOf(item)
+        return item.flattenObjectForClaimRows()
     }
 
     private fun ClaimItem.flattenObjectForClaimRows(): List<ClaimItem> =

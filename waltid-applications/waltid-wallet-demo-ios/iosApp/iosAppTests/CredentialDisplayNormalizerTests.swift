@@ -27,15 +27,14 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         let credentialData = details.groups.first { $0.title == "Credential data" }
-        XCTAssertEqual(credentialData?.items.first?.path.id, "docType")
         XCTAssertEqual(
-            Set(credentialData?.items.map(\.path.id) ?? []),
-            Set([
+            credentialData?.items.map(\.path.id),
+            [
                 "docType",
                 "eu.europa.ec.eudi.pid.1.resident_state",
                 "eu.europa.ec.eudi.pid.1.birth_place.locality",
                 "eu.europa.ec.eudi.pid.1.birth_place.country"
-            ])
+            ]
         )
         XCTAssertEqual(credentialData?.items.contains { item in
             if case .object = item.value { return true }
@@ -146,7 +145,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             "Subject"
         ])
         XCTAssertEqual(systemInfo.items.map(\.value), [
-            .text("2026-07-09"),
+            .text("2026-07-09T12:00:00Z"),
             .text("cred-1"),
             .text("vc+sd-jwt"),
             .text("Example Issuer"),

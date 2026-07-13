@@ -13,12 +13,10 @@ extension CredentialDetails {
         return items.isEmpty ? nil : ClaimGroup(title: "System info", items: items)
     }
 
-    private static let systemInfoDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
+    private static let systemInfoDateFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
         formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.formatOptions = [.withInternetDateTime]
         return formatter
     }()
 }

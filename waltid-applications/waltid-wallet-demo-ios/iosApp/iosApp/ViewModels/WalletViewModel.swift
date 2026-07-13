@@ -225,13 +225,13 @@ private enum MockCredentialData {
           "given_name": "Ada",
           "family_name": "Lovelace",
           "age_over_18": true,
-          "portrait": "\(appIconPortraitDataURI)"
+          "portrait": "\(mockCredentialPortraitDataURI)"
         }
         """
     )
 
-    private static var appIconPortraitDataURI: String {
-        let data = UIImage(named: "AppIcon")?.pngData() ?? fallbackPortraitPNGData
+    private static var mockCredentialPortraitDataURI: String {
+        let data = UIImage(named: "MockCredentialPortrait")?.pngData() ?? fallbackPortraitPNGData
         return "data:image/png;base64,\(data.base64EncodedString())"
     }
 

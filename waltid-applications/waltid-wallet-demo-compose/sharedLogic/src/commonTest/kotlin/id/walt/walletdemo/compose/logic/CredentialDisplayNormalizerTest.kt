@@ -113,8 +113,7 @@ class CredentialDisplayNormalizerTest {
 
         val claims = details.groups.flatMap { it.items }
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
-        val decodedJson = assertIs<DisplayValue.ObjectValue>(claims.first { it.path.id == "json_note" }.value)
-        assertEquals(DisplayValue.Text("age proof"), decodedJson.entries.first { it.label == "Purpose" }.value)
+        assertEquals(DisplayValue.Text("age proof"), claims.first { it.path.id == "json_note.purpose" }.value)
     }
 
     @Test
@@ -138,8 +137,7 @@ class CredentialDisplayNormalizerTest {
         )
 
         val claims = details.groups.flatMap { it.items }
-        val decodedJson = assertIs<DisplayValue.ObjectValue>(claims.first { it.path.id == "json_note" }.value)
-        assertEquals(DisplayValue.Text("age proof"), decodedJson.entries.first { it.label == "Purpose" }.value)
+        assertEquals(DisplayValue.Text("age proof"), claims.first { it.path.id == "json_note.purpose" }.value)
         assertEquals(DisplayValue.DecodedText("Hello, wallet"), claims.first { it.path.id == "plain_note" }.value)
         assertIs<DisplayValue.Image>(claims.first { it.path.id == "portrait" }.value)
     }
