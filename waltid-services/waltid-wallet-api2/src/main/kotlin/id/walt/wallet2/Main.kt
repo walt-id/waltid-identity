@@ -10,9 +10,13 @@ import id.walt.did.dids.DidService
 import id.walt.wallet2.auth.configureWallet2Auth
 import id.walt.wallet2.auth.registerWallet2AuthRoutes
 import id.walt.wallet2.config.UrlHopliteDecoder
+import id.walt.wallet2.persistence.ExposedCredentialStore
+import id.walt.wallet2.persistence.ExposedDidStore
+import id.walt.wallet2.persistence.ExposedKeyStore
 import id.walt.wallet2.persistence.ExposedWalletStore
 import id.walt.wallet2.persistence.Wallet2PersistenceConfig
 import id.walt.wallet2.persistence.initWallet2Database
+import id.walt.wallet2.server.StoreFactory
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.callid.*
@@ -39,10 +43,12 @@ suspend fun main(args: Array<String>) {
                     val config = ConfigManager.getConfig<Wallet2PersistenceConfig>()
                     val db = initWallet2Database(config)
                     OSSWallet2Service.walletStore = ExposedWalletStore(db)
-                    // Wire persistent store registry so resolveKeyStore/resolveCredentialStore/
-                    // resolveDidStore return Exposed-backed stores for any store ID - including
-                    // IDs that exist in the DB from previous runs but are not yet in-process.
-                    OSSWallet2Service.initPersistentStoreRegistry(db)
+                    // Wire Exposed-backed store factories so all auto-created and named stores
+                    // are backed by the same database. The resolver's computeIfAbsent cache
+                    // ensures that store IDs from previous runs are resolved on first access.
+                    OSSWallet2Service.keyStoreFactory = StoreFactory { id -> ExposedKeyStore(id, db) }
+                    OSSWallet2Service.credentialStoreFactory = StoreFactory { id -> ExposedCredentialStore(id, db) }
+                    OSSWallet2Service.didStoreFactory = StoreFactory { id -> ExposedDidStore(id, db) }
                 }
             },
             run = WebService {

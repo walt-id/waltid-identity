@@ -9,9 +9,6 @@ import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
 import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
-import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
-import id.walt.wallet2.stores.inmemory.InMemoryDidStore
-import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -154,7 +151,7 @@ object Wallet2RouteHandler {
                     }
 
                 req.staticKey != null -> emptyList()
-                else -> listOf(InMemoryKeyStore().also { resolver.storeKeyStore("$id-keys", it) })
+                else -> listOf(resolver.keyStoreFactory.create("$id-keys").also { resolver.storeKeyStore("$id-keys", it) })
             }
 
             val credentialStores: List<WalletCredentialStore> = when {
@@ -164,7 +161,7 @@ object Wallet2RouteHandler {
                             ?: throw IllegalArgumentException("Credential store '$storeId' not found")
                     }
 
-                else -> listOf(InMemoryCredentialStore().also { resolver.storeCredentialStore("$id-credentials", it) })
+                else -> listOf(resolver.credentialStoreFactory.create("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
             val didStore: WalletDidStore? = when {
@@ -173,7 +170,7 @@ object Wallet2RouteHandler {
                     ?: throw IllegalArgumentException("DID store '${req.didStoreId}' not found")
 
                 req.staticDid != null -> null
-                else -> InMemoryDidStore().also { resolver.storeDidStore("$id-dids", it) }
+                else -> resolver.didStoreFactory.create("$id-dids").also { resolver.storeDidStore("$id-dids", it) }
             }
 
             val staticKey = req.staticKey?.let { KeyManager.resolveSerializedKey(it.toString()) }
@@ -696,10 +693,17 @@ object Wallet2RouteHandler {
             post("/{storeId}", {
                 summary = "Create a named key store"
                 request { pathParameter<String>("storeId") }
-                response { HttpStatusCode.Created to { description = "Store created" } }
+                response {
+                    HttpStatusCode.Created to { description = "Store created" }
+                    HttpStatusCode.Conflict to { description = "Store with this ID already exists" }
+                }
             }) {
                 val storeId = call.parameters["storeId"]!!
-                resolver.storeKeyStore(storeId, InMemoryKeyStore())
+                if (resolver.listKeyStoreIds().toList().contains(storeId)) {
+                    return@post call.respond(HttpStatusCode.Conflict, "Key store '$storeId' already exists")
+                }
+                val store = resolver.keyStoreFactory.create(storeId)
+                resolver.storeKeyStore(storeId, store)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
         }
@@ -714,10 +718,17 @@ object Wallet2RouteHandler {
             post("/{storeId}", {
                 summary = "Create a named credential store"
                 request { pathParameter<String>("storeId") }
-                response { HttpStatusCode.Created to { description = "Store created" } }
+                response {
+                    HttpStatusCode.Created to { description = "Store created" }
+                    HttpStatusCode.Conflict to { description = "Store with this ID already exists" }
+                }
             }) {
                 val storeId = call.parameters["storeId"]!!
-                resolver.storeCredentialStore(storeId, InMemoryCredentialStore())
+                if (resolver.listCredentialStoreIds().toList().contains(storeId)) {
+                    return@post call.respond(HttpStatusCode.Conflict, "Credential store '$storeId' already exists")
+                }
+                val store = resolver.credentialStoreFactory.create(storeId)
+                resolver.storeCredentialStore(storeId, store)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
         }
@@ -732,10 +743,17 @@ object Wallet2RouteHandler {
             post("/{storeId}", {
                 summary = "Create a named DID store"
                 request { pathParameter<String>("storeId") }
-                response { HttpStatusCode.Created to { description = "Store created" } }
+                response {
+                    HttpStatusCode.Created to { description = "Store created" }
+                    HttpStatusCode.Conflict to { description = "Store with this ID already exists" }
+                }
             }) {
                 val storeId = call.parameters["storeId"]!!
-                resolver.storeDidStore(storeId, InMemoryDidStore())
+                if (resolver.listDidStoreIds().toList().contains(storeId)) {
+                    return@post call.respond(HttpStatusCode.Conflict, "DID store '$storeId' already exists")
+                }
+                val store = resolver.didStoreFactory.create(storeId)
+                resolver.storeDidStore(storeId, store)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
         }

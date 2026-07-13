@@ -8,10 +8,29 @@ import id.walt.wallet2.data.WalletDescriptor
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.stores.WalletStore
+import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
+import id.walt.wallet2.stores.inmemory.InMemoryDidStore
+import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+
+/**
+ * Factory for creating named store instances.
+ *
+ * The default implementations create in-memory stores. When persistence is enabled,
+ * replace these with factories that produce [id.walt.wallet2.persistence.ExposedKeyStore] etc.
+ * backed by the same database.
+ *
+ * Declaring as a `fun interface` allows concise lambda syntax:
+ * ```kotlin
+ * keyStoreFactory = StoreFactory { id -> ExposedKeyStore(id, db) }
+ * ```
+ */
+fun interface StoreFactory<T> {
+    fun create(storeId: String): T
+}
 
 /**
  * Storage-backend abstraction used by [Wallet2RouteHandler].
@@ -23,6 +42,10 @@ import kotlinx.coroutines.flow.emptyFlow
  * For the [InMemoryWalletStore] default, wallet objects are kept in memory directly.
  * For persistent stores, [resolveWallet] assembles a [Wallet] from the persisted
  * [WalletDescriptor] by resolving each named store ID via [resolveKeyStore] etc.
+ *
+ * The three [StoreFactory] properties control what kind of store is auto-created when
+ * a new wallet is created without explicit store IDs, and when a named store is created
+ * via the `/stores/{storeId}` routes. Swap them for Exposed-backed factories to get persistence.
  */
 interface WalletResolver {
 
@@ -34,6 +57,18 @@ interface WalletResolver {
      * Swap this for a persistent implementation without changing any handler logic.
      */
     val walletStore: WalletStore
+
+    /** Factory for key stores. Default: in-memory. Replace with an Exposed-backed factory for persistence. */
+    val keyStoreFactory: StoreFactory<WalletKeyStore>
+        get() = StoreFactory { InMemoryKeyStore() }
+
+    /** Factory for credential stores. Default: in-memory. */
+    val credentialStoreFactory: StoreFactory<WalletCredentialStore>
+        get() = StoreFactory { InMemoryCredentialStore() }
+
+    /** Factory for DID stores. Default: in-memory. */
+    val didStoreFactory: StoreFactory<WalletDidStore>
+        get() = StoreFactory { InMemoryDidStore() }
 
     /**
      * Resolves a [Wallet] by ID.
@@ -84,10 +119,10 @@ interface WalletResolver {
         walletStore.getWalletIdsForAccount(accountId)
 
     // ---------------------------------------------------------------------------
-    // Named store management — needed when POST /wallet references storeIds,
-    // or when POST /stores/* creates named stores.
+    // Named store management - needed when POST /wallet references storeIds,
+    // or when POST /stores/{storeId} creates named stores.
     // Persistent implementations provide their own registry (e.g. a stores table).
-    // Default: no-op / null (simple deployments that auto-create in-memory stores).
+    // Default: no-op / null (simple deployments that auto-create stores via the factories).
     // ---------------------------------------------------------------------------
 
     suspend fun resolveKeyStore(storeId: String): WalletKeyStore? = null
@@ -108,7 +143,6 @@ interface WalletResolver {
 
     /**
      * Assembles a live [Wallet] from a [WalletDescriptor] by resolving each store ID.
-     * Falls back to a fresh in-memory store for any store ID that cannot be resolved.
      */
     suspend fun assembleWallet(descriptor: WalletDescriptor): Wallet {
         val keyStores = descriptor.keyStoreIds.mapNotNull { resolveKeyStore(it) }
