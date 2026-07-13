@@ -10,20 +10,91 @@ const props = defineProps<{
 const json = defineModel<string>("json", { required: true });
 const selectedIndex = defineModel<number>("selectedIndex", { default: 0 });
 
-const keyJson = ref("");
-const x5cValues = ref([""]);
-const signedRequest = ref(false);
-const encryptedResponse = ref(false);
-const optionsError = ref<string | null>(null);
-const clientIdType = ref<
+const config = useRuntimeConfig();
+
+type ClientIdType =
   | "x509_hash"
   | "x509_san_dns"
   | "redirect_uri"
   | "decentralized_identifier"
   | "verifier_attestation"
-  | "pre_registered"
->("x509_hash");
+  | "pre_registered";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function runtimeConfigValueToString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+  return JSON.stringify(value);
+}
+
+function wrapRawJwkPreset(value: unknown): unknown {
+  if (
+    isRecord(value) &&
+    value.type !== "jwk" &&
+    typeof value.kty === "string"
+  ) {
+    return { type: "jwk", jwk: value };
+  }
+
+  return value;
+}
+
+function formatJsonPreset(value: unknown): string {
+  const rawValue = runtimeConfigValueToString(value);
+  if (!rawValue.trim()) return "";
+
+  try {
+    return JSON.stringify(wrapRawJwkPreset(JSON.parse(rawValue)), null, 2);
+  } catch {
+    return rawValue;
+  }
+}
+
+function parseX5cPreset(value: unknown): string[] {
+  const trimmed = runtimeConfigValueToString(value).trim();
+  if (!trimmed) return [""];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      const certificates = parsed
+        .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+        .filter(Boolean);
+      return certificates.length > 0 ? certificates : [""];
+    }
+  } catch {
+    // Fall back to delimiter parsing for .env-friendly values.
+  }
+
+  const certificates = trimmed
+    .replace(/\\n/g, "\n")
+    .split(/[,\n]/)
+    .map((certificate) => certificate.trim())
+    .filter(Boolean);
+
+  return certificates.length > 0 ? certificates : [""];
+}
+
+const verifierKeyJwkPreset = config.public.verifierKeyJwk;
+const verifierX5cPreset = config.public.verifierX5c;
+const verifierClientIdPreset = runtimeConfigValueToString(
+  config.public.verifierClientId,
+);
+
+const keyJson = ref(formatJsonPreset(verifierKeyJwkPreset));
+const x5cValues = ref(parseX5cPreset(verifierX5cPreset));
+const signedRequest = ref(false);
+const encryptedResponse = ref(false);
+const optionsError = ref<string | null>(null);
+const clientIdType = ref<ClientIdType>("x509_hash");
 const clientIdInput = ref("");
+const x509HashClientIdPreset = ref("");
+const isWritingJson = ref(false);
 
 const clientIdOptions = [
   {
@@ -104,7 +175,9 @@ function removeX5cInput(index: number) {
 
 async function buildClientId(x5c: string[]): Promise<string | null> {
   if (clientIdType.value === "x509_hash") {
-    return x5c.length > 0 ? await computeX509HashClientId(x5c[0]!) : null;
+    return x5c.length > 0
+      ? await computeX509HashClientId(x5c[0]!)
+      : x509HashClientIdPreset.value || null;
   }
 
   const value = clientIdInput.value.trim();
@@ -115,6 +188,31 @@ async function buildClientId(x5c: string[]): Promise<string | null> {
     ? value
     : `${clientIdType.value}:${value}`;
 }
+
+function applyClientIdPreset(clientId: string) {
+  const trimmed = clientId.trim();
+  if (!trimmed) return;
+
+  const prefixedOption = clientIdOptions
+    .filter((option) => option.value !== "pre_registered")
+    .find((option) => trimmed.startsWith(`${option.value}:`));
+
+  if (prefixedOption) {
+    clientIdType.value = prefixedOption.value;
+    if (prefixedOption.value === "x509_hash") {
+      x509HashClientIdPreset.value = trimmed;
+      return;
+    }
+
+    clientIdInput.value = trimmed.slice(prefixedOption.value.length + 1);
+    return;
+  }
+
+  clientIdType.value = "pre_registered";
+  clientIdInput.value = trimmed;
+}
+
+applyClientIdPreset(verifierClientIdPreset);
 
 async function applySecurityOverridesToJson() {
   optionsError.value = null;
@@ -163,6 +261,7 @@ async function applySecurityOverridesToJson() {
     return null;
   }
 
+  isWritingJson.value = true;
   json.value = JSON.stringify(payload, null, 2);
   return payload;
 }
@@ -187,6 +286,17 @@ watch(selectedIndex, () =>
     void applySecurityOverridesToJson();
   }),
 );
+
+watch(json, () => {
+  if (isWritingJson.value) {
+    isWritingJson.value = false;
+    return;
+  }
+
+  nextTick(() => {
+    void applySecurityOverridesToJson();
+  });
+});
 
 async function submit() {
   const payload = await applySecurityOverridesToJson();
