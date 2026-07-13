@@ -60,7 +60,7 @@ import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialResult
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import io.ktor.client.call.*
 import io.ktor.client.request.*
@@ -489,7 +489,7 @@ class Wallet2IssuerVerifier2IntegrationTest {
                 //     and for presentation signing
                 val keyInfo = testAndReturn("[$tag] Generate key for wallet") {
                     http.post("/wallet/$walletId/keys/generate") {
-                        setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
+                        setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.Ed25519))
                     }.also { assertEquals(HttpStatusCode.Created, it.status) }
                         .body<WalletKeyInfo>()
                 }

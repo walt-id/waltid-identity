@@ -65,7 +65,7 @@ import id.walt.wallet2.handlers.ReceiveCredentialResult
 import id.walt.wallet2.handlers.ResolveVpRequestRequest
 import id.walt.wallet2.handlers.ResolveVpRequestResult
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.ImportKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
@@ -407,7 +407,7 @@ class Wallet2AdditionalUseCasesTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.Ed25519))
                 }.body<WalletKeyInfo>()
 
                 val holderDid = http.post("/wallet/$walletId/dids/create") {
@@ -640,7 +640,7 @@ class Wallet2AdditionalUseCasesTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = KeyType.secp256r1))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
                 }.body<WalletKeyInfo>()
 
                 // ── Step 1: Generate authorization URL ──

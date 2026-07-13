@@ -5,7 +5,7 @@ import id.walt.commons.testing.E2ETest
 import id.walt.did.dids.DidService
 import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.crypto.keys.KeyType
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.ImportCredentialRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
@@ -83,7 +83,7 @@ class Wallet2IntegrationTest {
             val keyInfo = testAndReturn("Generate Ed25519 key") {
                 http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.Ed25519))
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletKeyInfo>()
             }

@@ -49,7 +49,7 @@ import id.walt.wallet2.handlers.RequestTokenRequest
 import id.walt.wallet2.handlers.RequestTokenResult
 import id.walt.wallet2.handlers.SignProofRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
 import io.ktor.client.call.*
@@ -201,7 +201,7 @@ class Wallet2ExtendedIntegrationTest {
             val ed25519Key = testAndReturn("Generate Ed25519 key") {
                 http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.Ed25519))
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletKeyInfo>()
             }
@@ -212,7 +212,7 @@ class Wallet2ExtendedIntegrationTest {
             val p256Key = testAndReturn("Generate secp256r1 (P-256) key") {
                 http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = KeyType.secp256r1))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletKeyInfo>()
             }
@@ -460,7 +460,7 @@ class Wallet2ExtendedIntegrationTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = KeyType.secp256r1))
+                    setBody<TypedKeyGenerationRequest>(TypedKeyGenerationRequest.Jwk(keyType = KeyType.secp256r1))
                 }.body<WalletKeyInfo>()
 
                 val offerUri = "openid-credential-offer://?credential_offer_uri=${
