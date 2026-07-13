@@ -1,5 +1,6 @@
 package id.walt.wallet2.data
 
+import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.Key
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
@@ -74,6 +75,22 @@ data class Wallet(
     /** Finds a key by ID across all key stores; returns the first match. */
     suspend fun findKey(keyId: String): Key? =
         keyStores.firstNotNullOfOrNull { it.getKey(keyId) }
+
+    /**
+     * Resolves the key to use for signing, following this priority:
+     * 1. [inlineKey] - supplied directly by the caller (takes precedence over everything)
+     * 2. [keyId] - looked up in all key stores
+     * 3. [defaultKey] - the wallet's configured default key
+     *
+     * Returns null only when no key is available at all. Extracted here to eliminate the
+     * identical `resolveKey` private functions that existed in both [WalletIssuanceHandler]
+     * and [WalletPresentationHandler].
+     */
+    suspend fun resolveKey(inlineKey: DirectSerializedKey? = null, keyId: String? = null): Key? = when {
+        inlineKey != null -> inlineKey.key
+        keyId != null -> findKey(keyId) ?: error("Key '$keyId' not found in any wallet key store")
+        else -> defaultKey()
+    }
 
     /**
      * Returns the default key.

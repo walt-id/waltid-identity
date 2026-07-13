@@ -106,7 +106,10 @@ fun Application.wallet2Api(authConfig: OSSWallet2AuthConfig? = null) {
     routing {
         if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
             requireNotNull(authConfig) { "No auth config is provided for auth feature!" }
-            registerWallet2AuthRoutes(tokenExpiry = authConfig.tokenExpiry)
+            registerWallet2AuthRoutes(
+                tokenExpiry = authConfig.tokenExpiry,
+                walletResolver = OSSWallet2Service.resolver,
+            )
         }
         OSSWallet2Service.run { registerRoutes() }
     }

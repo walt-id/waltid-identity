@@ -106,8 +106,6 @@ data class ImportCredentialRequest(
  */
 object Wallet2RouteHandler {
 
-    private val noopOnEvent: suspend (WalletSessionEvent) -> Unit = {}
-
     fun Route.registerWallet2Routes(
         resolver: WalletResolver,
         /**
@@ -517,7 +515,7 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ReceiveCredentialRequest>()
                         try {
-                            val result = WalletIssuanceHandler.receiveCredential(wallet, req, onEvent = noopOnEvent)
+                            val result = WalletIssuanceHandler.receiveCredential(wallet, req)
                             call.respond(result)
                         } catch (e: Exception) {
                             val msg = e.message ?: ""
@@ -617,7 +615,7 @@ object Wallet2RouteHandler {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PollDeferredRequest>()
                         val ids = mutableListOf<String>()
-                        WalletIssuanceHandler.pollDeferredFlow(wallet, req, noopOnEvent)
+                        WalletIssuanceHandler.pollDeferredFlow(wallet, req)
                             .collect { ids += it.id }
                         call.respond(ReceiveCredentialResult(credentialIds = ids))
                     }
@@ -637,7 +635,7 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialRequest>()
-                        call.respond(WalletPresentationHandler.presentCredential(wallet, req, noopOnEvent))
+                        call.respond(WalletPresentationHandler.presentCredential(wallet, req))
                     }
 
                     post("/isolated", {
@@ -647,7 +645,7 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<PresentCredentialIsolatedRequest>()
-                        call.respond(WalletPresentationHandler.presentCredentialIsolated(wallet, req, noopOnEvent))
+                        call.respond(WalletPresentationHandler.presentCredentialIsolated(wallet, req))
                     }
 
                     post("/resolve-request", {
@@ -812,8 +810,8 @@ object Wallet2RouteHandler {
         if (getAccountId != null) {
             val accountId = getAccountId()
             if (accountId != null) {
-                val ownedIds = resolver.getWalletIdsForAccount(accountId)
-                if (ownedIds != null && walletId !in ownedIds) {
+                val ownedIds = resolver.getWalletIdsForAccount(accountId) ?: emptyList()
+                if (walletId !in ownedIds) {
                     respond(HttpStatusCode.Forbidden, "Wallet '$walletId' does not belong to this account")
                     return null
                 }

@@ -2,6 +2,7 @@ package id.walt.wallet2.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.DirectSerializedKey
+import id.walt.crypto.keys.Key
 import id.walt.openid4vci.CryptographicBindingMethod
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.requests.credential.DefaultCredentialRequest
@@ -39,6 +40,32 @@ import kotlin.uuid.Uuid
 private val log = KotlinLogging.logger {}
 
 // ---------------------------------------------------------------------------
+// Shared offer-source contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Common contract for request types that carry a credential offer, either as a URL
+ * (openid-credential-offer://...) or as inline JSON. Exactly one must be non-null.
+ *
+ * Eliminates duplicated [offerUrl]/[offerJson] mutual-exclusivity checks and
+ * [getEffectiveOfferString] across [ReceiveCredentialRequest], [ResolveOfferRequest],
+ * and [GenerateAuthorizationUrlRequest].
+ */
+interface CredentialOfferSource {
+    val offerUrl: Url?
+    val offerJson: JsonObject?
+
+    fun getEffectiveOfferString(): String =
+        offerUrl?.toString() ?: offerJson?.toString() ?: error("No offer source available")
+}
+
+/** Validates the mutual exclusivity of [offerUrl] and [offerJson]. Call from `init {}` blocks. */
+fun CredentialOfferSource.checkOfferSource() {
+    check(offerUrl != null || offerJson != null) { "Either offerUrl or offerJson must be provided" }
+    check(offerUrl == null || offerJson == null) { "Only one of offerUrl or offerJson may be provided, not both" }
+}
+
+// ---------------------------------------------------------------------------
 // Request / response types
 // ---------------------------------------------------------------------------
 
@@ -53,13 +80,13 @@ data class ReceiveCredentialRequest(
      * A credential offer URL (openid-credential-offer://...).
      * Provide this when the offer arrives as a URL (QR code, deep link).
      */
-    val offerUrl: Url? = null,
+    override val offerUrl: Url? = null,
 
     /**
      * A credential offer as a parsed JSON object.
      * Provide this when the offer arrives as inline JSON.
      */
-    val offerJson: JsonObject? = null,
+    override val offerJson: JsonObject? = null,
 
     /**
      * Inline key to use for proof-of-possession.
@@ -99,18 +126,8 @@ data class ReceiveCredentialRequest(
      * headers to the token request.
      */
     val tokenRequestHeaders: Map<String, String> = emptyMap()
-) {
-    init {
-        check(offerUrl != null || offerJson != null) {
-            "Either offerUrl or offerJson must be provided"
-        }
-        check(offerUrl == null || offerJson == null) {
-            "Only one of offerUrl or offerJson may be provided, not both"
-        }
-    }
-
-    fun getEffectiveOfferString(): String =
-        offerUrl?.toString() ?: offerJson?.toString() ?: error("No offer source available")
+) : CredentialOfferSource {
+    init { checkOfferSource() }
 }
 
 /** Result of a completed issuance flow. */
@@ -131,20 +148,10 @@ data class ReceiveCredentialResult(
 
 @Serializable
 data class ResolveOfferRequest(
-    val offerUrl: Url? = null,
-    val offerJson: JsonObject? = null
-) {
-    init {
-        check(offerUrl != null || offerJson != null) {
-            "Either offerUrl or offerJson must be provided"
-        }
-        check(offerUrl == null || offerJson == null) {
-            "Only one of offerUrl or offerJson may be provided, not both"
-        }
-    }
-
-    fun getEffectiveOfferString(): String =
-        offerUrl?.toString() ?: offerJson?.toString() ?: error("No offer source available")
+    override val offerUrl: Url? = null,
+    override val offerJson: JsonObject? = null
+) : CredentialOfferSource {
+    init { checkOfferSource() }
 }
 
 @Serializable
@@ -236,23 +243,13 @@ data class PollDeferredRequest(
 
 @Serializable
 data class GenerateAuthorizationUrlRequest(
-    val offerUrl: Url? = null,
-    val offerJson: JsonObject? = null,
+    override val offerUrl: Url? = null,
+    override val offerJson: JsonObject? = null,
     val clientId: String = "wallet-client",
     val redirectUri: Url = Url("openid://"),
     val usePkce: Boolean = true
-) {
-    init {
-        check(offerUrl != null || offerJson != null) {
-            "Either offerUrl or offerJson must be provided"
-        }
-        check(offerUrl == null || offerJson == null) {
-            "Only one of offerUrl or offerJson may be provided, not both"
-        }
-    }
-
-    fun getEffectiveOfferString(): String =
-        offerUrl?.toString() ?: offerJson?.toString() ?: error("No offer source available")
+) : CredentialOfferSource {
+    init { checkOfferSource() }
 }
 
 @Serializable
@@ -285,19 +282,45 @@ data class ExchangeCodeRequest(
  */
 object WalletIssuanceHandler {
 
+    /** Lenient JSON for decoding library responses that may contain unknown fields. */
     private val lenientJson = Json { ignoreUnknownKeys = true; encodeDefaults = false }
+
+    /** HTTP redirect status codes that the wallet should follow for credential/nonce endpoints. */
+    private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
 
     /**
      * Creates the [HttpClient] used for the issuance flow.
      *
-     * The client is created and configured by [WebDataFetcher] (default Native engine — Java on
-     * JVM, with TLS 1.3 — plus centrally-managed request/logging configuration, including lenient
+     * The client is created and configured by [WebDataFetcher] (default Native engine - Java on
+     * JVM, with TLS 1.3 - plus centrally-managed request/logging configuration, including lenient
      * JSON content negotiation) rather than constructed directly with the platform default engine.
      * The collaborators ([IssuerMetadataResolver], [CredentialOfferResolver], [TokenRequestBuilder])
      * and the direct credential/nonce/deferred POST calls continue to consume the raw [HttpClient].
      */
     private fun defaultHttpClient(): HttpClient =
         WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
+
+    /**
+     * Resolves a credential offer from any [CredentialOfferSource], handling both inline JSON
+     * and URL (openid-credential-offer://...) forms. Extracted to eliminate three identical
+     * if/else blocks across [receiveCredentialFlow], [resolveOffer], and [generateAuthorizationUrl].
+     */
+    private suspend fun resolveOffer(source: CredentialOfferSource, httpClient: HttpClient) =
+        if (source.offerJson != null) {
+            val inlineOffer = lenientJson.decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(source.getEffectiveOfferString())
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
+        } else {
+            val req = CredentialOfferParser.parseCredentialOfferUrl(source.getEffectiveOfferString())
+            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = req.credentialOffer, credentialOfferUri = req.credentialOfferUri)
+        }
+
+    /**
+     * Builds a proof JWT, choosing DID-based binding when [did] is non-null, or JWK-inclusion
+     * otherwise. Extracted to eliminate three identical `if (did != null)` proof-building blocks.
+     */
+    private suspend fun JwtProofBuilder.buildProof(key: Key, issuer: String, nonce: String, did: String?) =
+        if (did != null) buildJwtProof(key, issuer, nonce, keyId = did)
+        else buildJwtProof(key, issuer, nonce, includeJwk = true)
 
     /**
      * Full pre-authorized-code issuance flow, emitting each stored credential
@@ -318,37 +341,20 @@ object WalletIssuanceHandler {
          */
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
     ): Flow<StoredCredential> = channelFlow {
-        val key = resolveKey(wallet, request.key, request.keyId)
+        val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
 
-        val clientConfig = ClientConfiguration(
-            clientId = request.clientId,
-            redirectUris = listOf(request.redirectUri.toString())
-        )
+        val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val metadataResolver = IssuerMetadataResolver(httpClient)
         val tokenBuilder = TokenRequestBuilder(clientConfig, httpClient)
         val proofBuilder = JwtProofBuilder()
 
         // 1. Parse and resolve offer
-        val offerString = request.getEffectiveOfferString()
-        log.trace { "Parsing offer string: ${offerString.take(120)}..." }
-        // When offerJson is provided it's already the raw JSON object — decode directly instead of
+        // When offerJson is provided it's already the raw JSON object - decode directly instead of
         // parsing as a URL (which would fail since JSON is not a valid openid-credential-offer:// URL).
-        val offer = if (request.offerJson != null) {
-            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(
-                credentialOffer = inlineOffer,
-                credentialOfferUri = null
-            )
-        } else {
-            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(
-                credentialOffer = offerRequest.credentialOffer,
-                credentialOfferUri = offerRequest.credentialOfferUri
-            )
-        }
+        log.trace { "Parsing offer string: ${request.getEffectiveOfferString().take(120)}..." }
+        val offer = resolveOffer(request, httpClient)
         log.trace { "Resolved offer: issuer=${offer.credentialIssuer}, configIds=${offer.credentialConfigurationIds}" }
         onEvent(WalletSessionEvent.issuance_offer_resolved)
 
@@ -459,17 +465,7 @@ object WalletIssuanceHandler {
             }
 
             for (issuedCredential in rawCredentials) {
-                val rawString = issuedCredential.credential.let {
-                    if (it is JsonPrimitive) it.content else it.toString()
-                }
-                val (_, parsed) = CredentialParser.detectAndParse(rawString)
-                val entry = StoredCredential(
-                    id = Uuid.random().toString(),
-                    credential = parsed,
-                    label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name,
-                    addedAt = Clock.System.now()
-                )
-                wallet.addCredential(entry)
+                val entry = wallet.parseAndStore(issuedCredential, label = offeredCredential.configuration.credentialMetadata?.display?.firstOrNull()?.name)
                 onEvent(WalletSessionEvent.issuance_credential_stored)
                 send(entry)
             }
@@ -504,18 +500,7 @@ object WalletIssuanceHandler {
 
     suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult {
         val httpClient = defaultHttpClient()
-        val offerString = request.getEffectiveOfferString()
-        val offer = if (request.offerJson != null) {
-            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
-        } else {
-            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(
-                credentialOffer = offerRequest.credentialOffer,
-                credentialOfferUri = offerRequest.credentialOfferUri
-            )
-        }
+        val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
         val preAuthGrant = offer.grants?.preAuthorizedCode
@@ -538,10 +523,7 @@ object WalletIssuanceHandler {
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult {
         val httpClient = defaultHttpClient()
-        val clientConfig = ClientConfiguration(
-            clientId = request.clientId,
-            redirectUris = listOf(request.redirectUri.toString())
-        )
+        val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
             preAuthorizedCode = request.preAuthorizedCode,
@@ -555,14 +537,10 @@ object WalletIssuanceHandler {
     }
 
     suspend fun signProof(wallet: Wallet, request: SignProofRequest): SignProofResult {
-        val key = resolveKey(wallet, request.key, request.keyId)
+        val key = wallet.resolveKey(request.key, request.keyId)
             ?: error("No key available for signing proof")
         val proofBuilder = JwtProofBuilder()
-        val proofs = if (request.did != null) {
-            proofBuilder.buildJwtProof(key, request.issuerUrl.toString(), request.nonce, keyId = request.did)
-        } else {
-            proofBuilder.buildJwtProof(key, request.issuerUrl.toString(), request.nonce, includeJwk = true)
-        }
+        val proofs = proofBuilder.buildProof(key, request.issuerUrl.toString(), request.nonce, request.did)
         return SignProofResult(proofJwt = proofs.jwt?.firstOrNull() ?: error("Proof signing produced no JWT"))
     }
 
@@ -596,11 +574,34 @@ object WalletIssuanceHandler {
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveKey(wallet: Wallet, inlineKey: DirectSerializedKey?, keyId: String?) = when {
-        inlineKey != null -> inlineKey.key
-        keyId != null -> wallet.findKey(keyId)
-            ?: error("Key '$keyId' not found in any wallet key store")
-        else -> wallet.defaultKey()
+    // resolveKey is now wallet.resolveKey(inlineKey, keyId) - see Wallet.resolveKey
+
+    /**
+     * Builds a [ClientConfiguration] from the common clientId/redirectUri pair.
+     * Extracted to eliminate four identical constructions across issuance functions.
+     */
+    private fun clientConfig(clientId: String, redirectUri: Url) =
+        ClientConfiguration(clientId = clientId, redirectUris = listOf(redirectUri.toString()))
+
+    /**
+     * Parses a raw issued credential JSON element, creates a [StoredCredential], stores it in
+     * the wallet, and returns it. Extracted to eliminate duplication between [receiveCredentialFlow]
+     * and [pollDeferredFlow].
+     */
+    private suspend fun Wallet.parseAndStore(
+        issuedCredential: id.walt.openid4vci.responses.credential.IssuedCredential,
+        label: String? = null,
+    ): StoredCredential {
+        val rawString = issuedCredential.credential.let {
+            if (it is JsonPrimitive) it.content else it.toString()
+        }
+        val (_, parsed) = CredentialParser.detectAndParse(rawString)
+        return StoredCredential(
+            id = Uuid.random().toString(),
+            credential = parsed,
+            label = label,
+            addedAt = Clock.System.now()
+        ).also { addCredential(it) }
     }
 
     private suspend fun postFollowingRedirects(
@@ -609,7 +610,7 @@ object WalletIssuanceHandler {
         block: HttpRequestBuilder.() -> Unit
     ): HttpResponse {
         var response = httpClient.post(url, block)
-        if (response.status.value in listOf(301, 302, 303, 307, 308)) {
+        if (response.status.value in REDIRECT_STATUS_CODES) {
             val location = response.headers[HttpHeaders.Location]
             if (location != null) {
                 log.debug { "Following redirect to: $location" }
@@ -661,28 +662,14 @@ object WalletIssuanceHandler {
      */
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult {
         val httpClient = defaultHttpClient()
-        val offerString = request.getEffectiveOfferString()
-        val offer = if (request.offerJson != null) {
-            val inlineOffer = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-                .decodeFromString<id.walt.openid4vci.offers.CredentialOffer>(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(credentialOffer = inlineOffer, credentialOfferUri = null)
-        } else {
-            val offerRequest = CredentialOfferParser.parseCredentialOfferUrl(offerString)
-            CredentialOfferResolver(httpClient).resolveCredentialOffer(
-                credentialOffer = offerRequest.credentialOffer,
-                credentialOfferUri = offerRequest.credentialOfferUri
-            )
-        }
+        val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata = IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
 
         val authorizationEndpoint = asMetadata.authorizationEndpoint
             ?: error("Authorization server has no authorization_endpoint")
 
-        val clientConfig = ClientConfiguration(
-            clientId = request.clientId,
-            redirectUris = listOf(request.redirectUri.toString())
-        )
+        val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val authBuilder = id.waltid.openid4vci.wallet.authorization.AuthorizationRequestBuilder(clientConfig)
         val credentialConfigurationId = offer.credentialConfigurationIds.first()
 
@@ -707,10 +694,7 @@ object WalletIssuanceHandler {
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
         val httpClient = defaultHttpClient()
-        val clientConfig = ClientConfiguration(
-            clientId = request.clientId,
-            redirectUris = listOf(request.redirectUri.toString())
-        )
+        val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
             code = request.code,
@@ -752,8 +736,12 @@ object WalletIssuanceHandler {
 
         if (!response.status.isSuccess()) {
             val body = response.bodyAsText()
-            // issuance_pending is a spec-defined recoverable error — the wallet should retry later
-            if (body.contains("issuance_pending")) {
+            // issuance_pending is a spec-defined recoverable error - the wallet should retry later.
+            // Parse the error JSON rather than substring-matching the raw body, which would be fragile.
+            val errorCode = runCatching {
+                Json.parseToJsonElement(body).jsonObject["error"]?.jsonPrimitive?.content
+            }.getOrNull()
+            if (errorCode == "issuance_pending") {
                 log.info { "Deferred credential not yet ready for transactionId=${request.transactionId}" }
                 return@channelFlow
             }
@@ -765,16 +753,7 @@ object WalletIssuanceHandler {
             ?: error("Deferred credential response contained no credentials")
 
         for (issuedCredential in rawCredentials) {
-            val rawString = issuedCredential.credential.let {
-                if (it is JsonPrimitive) it.content else it.toString()
-            }
-            val (_, parsed) = CredentialParser.detectAndParse(rawString)
-            val entry = StoredCredential(
-                id = Uuid.random().toString(),
-                credential = parsed,
-                addedAt = Clock.System.now()
-            )
-            wallet.addCredential(entry)
+            val entry = wallet.parseAndStore(issuedCredential)
             onEvent(WalletSessionEvent.issuance_credential_stored)
             send(entry)
         }
@@ -814,7 +793,7 @@ object WalletIssuanceHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient()
     ): Flow<StoredCredential> = channelFlow {
-        val key = resolveKey(wallet, inlineKey, keyId = null)
+        val key = wallet.resolveKey(inlineKey)
             ?: error("No key available for proof-of-possession")
         val did = inlineDid ?: wallet.defaultDid()
 
@@ -833,11 +812,7 @@ object WalletIssuanceHandler {
             ?: tokenResult.cNonce
             ?: error("Issuer did not provide a c_nonce (neither via nonce endpoint nor token response)")
         val proofBuilder = JwtProofBuilder()
-        val proofs = if (did != null) {
-            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, keyId = did)
-        } else {
-            proofBuilder.buildJwtProof(key, credentialIssuer, cNonce, includeJwk = true)
-        }
+        val proofs = proofBuilder.buildProof(key, credentialIssuer, cNonce, did)
         onEvent(WalletSessionEvent.issuance_proof_signed)
 
         // Fetch credential

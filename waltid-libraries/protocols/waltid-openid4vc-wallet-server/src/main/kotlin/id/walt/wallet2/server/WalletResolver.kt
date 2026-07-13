@@ -146,9 +146,7 @@ interface WalletResolver {
      */
     suspend fun assembleWallet(descriptor: WalletDescriptor): Wallet {
         val keyStores = descriptor.keyStoreIds.mapNotNull { resolveKeyStore(it) }
-            .ifEmpty { emptyList() }
         val credentialStores = descriptor.credentialStoreIds.mapNotNull { resolveCredentialStore(it) }
-            .ifEmpty { emptyList() }
         val didStore = descriptor.didStoreId?.let { resolveDidStore(it) }
         val staticKey = descriptor.serializedStaticKey?.let {
             runCatching { KeyManager.resolveSerializedKey(it) }.getOrNull()

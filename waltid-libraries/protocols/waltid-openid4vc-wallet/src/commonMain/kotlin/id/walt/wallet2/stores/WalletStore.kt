@@ -34,8 +34,5 @@ interface WalletStore : WalletAccountMapping {
 
     /** Stream all wallet IDs known to this store. */
     suspend fun listWalletIds(): Flow<String>
-
-    /** Convenience: collect all wallet IDs as a list. */
-    suspend fun listWalletIdsAsList(): Flow<String> = listWalletIds()
 }
 

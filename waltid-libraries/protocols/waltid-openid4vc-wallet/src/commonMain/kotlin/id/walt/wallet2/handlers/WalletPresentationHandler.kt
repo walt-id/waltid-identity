@@ -28,6 +28,32 @@ import kotlinx.serialization.json.put
 private val log = KotlinLogging.logger {}
 
 // ---------------------------------------------------------------------------
+// Shared VP request-source contract
+// ---------------------------------------------------------------------------
+
+/**
+ * Common contract for request types that carry a VP authorization request, either as a URL
+ * or as an already-fetched JSON object. Exactly one must be non-null.
+ *
+ * Eliminates duplicated [requestUrl]/[requestObject] mutual-exclusivity checks and
+ * [getEffectiveRequestUrl] across [PresentCredentialRequest], [PresentCredentialIsolatedRequest],
+ * and [ResolveVpRequestRequest].
+ */
+interface VpRequestSource {
+    val requestUrl: Url?
+    val requestObject: JsonObject?
+
+    fun getEffectiveRequestUrl(): String =
+        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
+}
+
+/** Validates the mutual exclusivity of [requestUrl] and [requestObject]. Call from `init {}` blocks. */
+fun VpRequestSource.checkVpRequestSource() {
+    check(requestUrl != null || requestObject != null) { "Either requestUrl or requestObject must be provided" }
+    check(requestUrl == null || requestObject == null) { "Only one of requestUrl or requestObject may be provided, not both" }
+}
+
+// ---------------------------------------------------------------------------
 // Request / response types
 // ---------------------------------------------------------------------------
 
@@ -43,67 +69,40 @@ data class PresentCredentialRequest(
      * May be an openid4vp:// URL with inline parameters, or an https:// URL
      * whose request_uri parameter points to the actual request object.
      */
-    val requestUrl: Url? = null,
+    override val requestUrl: Url? = null,
 
     /**
      * The OpenID4VP authorization request as an already-fetched JSON object.
      * Use this when the request has been resolved out-of-band.
      */
-    val requestObject: JsonObject? = null,
+    override val requestObject: JsonObject? = null,
 
     val keyId: String? = null,
     val did: String? = null,
     val runPolicies: Boolean? = null
-) {
-    init {
-        check(requestUrl != null || requestObject != null) {
-            "Either requestUrl or requestObject must be provided"
-        }
-        check(requestUrl == null || requestObject == null) {
-            "Only one of requestUrl or requestObject may be provided, not both"
-        }
-    }
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
+) : VpRequestSource {
+    init { checkVpRequestSource() }
 }
 
 @Serializable
 data class PresentCredentialIsolatedRequest(
-    val requestUrl: Url? = null,
-    val requestObject: JsonObject? = null,
+    override val requestUrl: Url? = null,
+    override val requestObject: JsonObject? = null,
     val credentials: List<StoredCredential>,
     val keyId: String? = null,
     val did: String? = null
-) {
-    init {
-        check(requestUrl != null || requestObject != null) {
-            "Either requestUrl or requestObject must be provided"
-        }
-        check(requestUrl == null || requestObject == null) {
-            "Only one of requestUrl or requestObject may be provided, not both"
-        }
-    }
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
+) : VpRequestSource {
+    init { checkVpRequestSource() }
 }
 
 // Isolated step types
 
 @Serializable
 data class ResolveVpRequestRequest(
-    val requestUrl: Url? = null,
-    val requestObject: JsonObject? = null
-) {
-    init {
-        check(requestUrl != null || requestObject != null) {
-            "Either requestUrl or requestObject must be provided"
-        }
-    }
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
+    override val requestUrl: Url? = null,
+    override val requestObject: JsonObject? = null
+) : VpRequestSource {
+    init { checkVpRequestSource() }
 }
 
 @Serializable
@@ -168,7 +167,7 @@ object WalletPresentationHandler {
         request: PresentCredentialRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): WalletPresentResult {
-        val key = resolveKey(wallet, request.keyId)
+        val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
         val keyId = key.getKeyId()
@@ -211,7 +210,7 @@ object WalletPresentationHandler {
         request: PresentCredentialIsolatedRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): WalletPresentResult {
-        val key = resolveKey(wallet, request.keyId)
+        val key = wallet.resolveKey(keyId = request.keyId)
             ?: error("No key available for isolated presentation")
         val did = request.did ?: wallet.defaultDid()
 
@@ -266,7 +265,7 @@ object WalletPresentationHandler {
             log.debug { "Fetching Request Object from request_uri: $requestUri" }
             val httpResponse = fetcher.rawFetch(requestUri)
 
-            if (!httpResponse.status.value.let { it in 200..299 }) {
+            if (!httpResponse.status.isSuccess()) {
                 error("Failed to fetch Request Object from $requestUri: ${httpResponse.status}")
             }
 
@@ -308,33 +307,34 @@ object WalletPresentationHandler {
      */
     suspend fun matchCredentials(request: MatchCredentialsRequest): MatchCredentialsResult {
         // Build index: rawCredential index → wallet credential id
-        val idByIndex = request.credentials.mapIndexed { idx, stored -> idx.toString() to stored.id }.toMap()
-
+        val idByIndex = request.credentials.withIndex().associate { (idx, stored) -> idx.toString() to stored.id }
         val rawCredentials = request.credentials.mapIndexed { idx, stored ->
             stored.credential.toRawDcqlCredential(idx.toString())
         }
         val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
-
-        val matchedCredentialIds = matched.mapValues { (_, results) ->
-            results.map { result -> idByIndex[result.credential.id] ?: result.credential.id }
-        }
-
-        return MatchCredentialsResult(
-            matchedQueryIds = matched.keys.toList(),
-            matchCount = matched.values.sumOf { it.size },
-            matchedCredentialIds = matchedCredentialIds
-        )
+        return buildMatchResult(matched, idByIndex)
     }
 
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveKey(wallet: Wallet, keyId: String?) = when {
-        keyId != null -> wallet.findKey(keyId)
-            ?: error("Key '$keyId' not found in any wallet key store")
-        else -> wallet.defaultKey()
-    }
+    // resolveKey is now wallet.resolveKey(keyId = keyId) - see Wallet.resolveKey
+
+    /**
+     * Builds a [MatchCredentialsResult] from raw DCQL match results and an index-to-wallet-id map.
+     * Extracted to eliminate duplication between [matchCredentials] and [matchCredentialsFromStore].
+     */
+    private fun buildMatchResult(
+        matched: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        idByIndex: Map<String, String>
+    ) = MatchCredentialsResult(
+        matchedQueryIds = matched.keys.toList(),
+        matchCount = matched.values.sumOf { it.size },
+        matchedCredentialIds = matched.mapValues { (_, results) ->
+            results.map { idByIndex[it.credential.id] ?: it.credential.id }
+        }
+    )
 
     /**
      * DCQL-matches the wallet's own stored credentials against [query] without
@@ -360,22 +360,9 @@ object WalletPresentationHandler {
             rawCredentials += stored.credential.toRawDcqlCredential(key)
             idx++
         }
-        if (rawCredentials.isEmpty()) {
-            return MatchCredentialsResult(
-                matchedQueryIds = emptyList(),
-                matchCount = 0,
-                matchedCredentialIds = emptyMap()
-            )
-        }
+        if (rawCredentials.isEmpty()) return MatchCredentialsResult(emptyList(), 0, emptyMap())
         val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
-        val matchedCredentialIds = matched.mapValues { (_, results) ->
-            results.map { result -> idByIndex[result.credential.id] ?: result.credential.id }
-        }
-        return MatchCredentialsResult(
-            matchedQueryIds = matched.keys.toList(),
-            matchCount = matched.values.sumOf { it.size },
-            matchedCredentialIds = matchedCredentialIds
-        )
+        return buildMatchResult(matched, idByIndex)
     }
 
     /**
@@ -387,13 +374,8 @@ object WalletPresentationHandler {
      *   and optional key/DID overrides.
      */
     suspend fun buildVpToken(wallet: Wallet, request: BuildVpTokenRequest): BuildVpTokenResult {
-        val key = when {
-            request.key != null -> request.key.key
-            request.keyId != null -> wallet.findKey(request.keyId)
-                ?: throw IllegalArgumentException("Key '${request.keyId}' not found in wallet")
-            else -> wallet.defaultKey()
-                ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
-        }
+        val key = wallet.resolveKey(request.key, request.keyId)
+            ?: throw IllegalArgumentException("Wallet has no key available for VP token building")
         val did = request.did ?: wallet.defaultDid()
 
         val dcqlQuery = request.authorizationRequest.dcqlQuery

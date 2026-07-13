@@ -3,7 +3,6 @@ package id.walt.wallet2
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.featureflag.FeatureManager
 import id.walt.ktorauthnz.auth.getAuthenticatedAccount
-import id.walt.wallet2.auth.OSSWallet2AccountStore
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
@@ -58,9 +57,7 @@ object OSSWallet2Service {
     val resolver: WalletResolver = object : WalletResolver {
 
         override val publicBaseUrl: Url
-            get() = runCatching {
-                ConfigManager.getConfig<OSSWallet2ServiceConfig>().publicBaseUrl
-            }.getOrElse { Url("http://localhost:4000") }
+            get() = ConfigManager.getConfig<OSSWallet2ServiceConfig>().publicBaseUrl
 
         override val walletStore: WalletStore
             get() = OSSWallet2Service.walletStore
@@ -110,27 +107,18 @@ object OSSWallet2Service {
                 ?: namedCredentialStores.entries.firstOrNull { it.value === store }?.key
                 ?: namedDidStores.entries.firstOrNull { it.value === store }?.key
 
-        override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
-            if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-                OSSWallet2AccountStore.linkWalletToAccount(accountId, walletId)
-            } else {
-                walletStore.linkWalletToAccount(accountId, walletId)
-            }
-        }
+        // Account-wallet ownership always lives in walletStore (InMemoryWalletStore or
+        // ExposedWalletStore). When auth is enabled, OSSWallet2AccountStore handles user
+        // credentials; wallet ownership is a separate concern that belongs to the wallet store.
+        override suspend fun linkWalletToAccount(accountId: String, walletId: String) =
+            walletStore.linkWalletToAccount(accountId, walletId)
 
-        override suspend fun getWalletIdsForAccount(accountId: String): List<String>? {
-            return if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-                OSSWallet2AccountStore.getWalletsForAccount(accountId)
-            } else {
-                walletStore.getWalletIdsForAccount(accountId)
-            }
-        }
+        override suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
+            walletStore.getWalletIdsForAccount(accountId)
     }
 
     fun Route.registerRoutes() {
-        val authEnabled = runCatching {
-            FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
-        }.getOrElse { false }
+        val authEnabled = FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
 
         if (authEnabled) {
             authenticate("ktor-authnz") {

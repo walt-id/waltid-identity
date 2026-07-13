@@ -85,13 +85,13 @@ class Wallet2AuthIntegrationTest {
             },
             init = {
                 DidService.minimalInit()
-                // Wire JwtTokenHandler directly — mirrors what configureWallet2Auth() does at runtime.
+                // Wire JwtTokenHandler directly - mirrors what configureWallet2Auth() does at runtime.
                 // The same key is used here so tokens issued by the test server are verifiable.
-                val jwtHandler = JwtTokenHandler()
-                jwtHandler.signingKey = signingKey
-                jwtHandler.verificationKey = signingKey
                 KtorAuthnzManager.accountStore = OSSWallet2AccountStore
-                KtorAuthnzManager.tokenHandler = jwtHandler
+                KtorAuthnzManager.tokenHandler = JwtTokenHandler().apply {
+                    this.signingKey = signingKey
+                    verificationKey = signingKey
+                }
             },
             // wallet2Module is non-suspend; authConfig is passed in so registerWallet2AuthRoutes
             // uses the configured tokenExpirySeconds without requiring another ConfigManager call.
