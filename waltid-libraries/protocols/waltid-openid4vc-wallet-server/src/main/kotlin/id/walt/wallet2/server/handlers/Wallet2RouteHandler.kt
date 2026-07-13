@@ -182,8 +182,9 @@ object Wallet2RouteHandler {
             //  - the same store instance is resolvable later via resolveKeyStore()/etc.
             val keyStores: List<WalletKeyStore> = when {
                 req.keyStoreIds != null ->
-                    req.keyStoreIds.map {
-                        resolver.resolveKeyStore(it) ?: error("Key store '$it' not found")
+                    req.keyStoreIds.map { storeId ->
+                        resolver.resolveKeyStore(storeId)
+                            ?: throw IllegalArgumentException("Key store '$storeId' not found")
                     }
                 req.staticKey != null -> emptyList()
                 else -> listOf(InMemoryKeyStore().also { resolver.storeKeyStore("$id-keys", it) })
@@ -191,16 +192,17 @@ object Wallet2RouteHandler {
 
             val credentialStores: List<WalletCredentialStore> = when {
                 req.credentialStoreIds != null ->
-                    req.credentialStoreIds.map {
-                        resolver.resolveCredentialStore(it) ?: error("Credential store '$it' not found")
+                    req.credentialStoreIds.map { storeId ->
+                        resolver.resolveCredentialStore(storeId)
+                            ?: throw IllegalArgumentException("Credential store '$storeId' not found")
                     }
                 else -> listOf(InMemoryCredentialStore().also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
             val didStore: WalletDidStore? = when {
                 req.noDidStore -> null
-                req.didStoreId != null ->
-                    resolver.resolveDidStore(req.didStoreId) ?: error("DID store '${req.didStoreId}' not found")
+                req.didStoreId != null -> resolver.resolveDidStore(req.didStoreId)
+                    ?: throw IllegalArgumentException("DID store '${req.didStoreId}' not found")
                 req.staticDid != null -> null
                 else -> InMemoryDidStore().also { resolver.storeDidStore("$id-dids", it) }
             }
@@ -494,18 +496,31 @@ object Wallet2RouteHandler {
                 route("/receive", { tags = listOf("Issuance (OpenID4VCI 1.0)") }) {
 
                     post("", {
-                        summary = "Receive credential(s) — full pre-authorized code flow"
+                        summary = "Receive credential(s) - full pre-authorized code flow"
                         description =
                             "Resolves the offer, requests a token, signs proof-of-possession, " +
                             "fetches the credential(s) and stores them. " +
                             "Returns a stream of stored credentials as they arrive."
                         request { pathParameter<String>("walletId"); body<ReceiveCredentialRequest>() }
-                        response { HttpStatusCode.OK to { body<ReceiveCredentialResult>() } }
+                        response {
+                            HttpStatusCode.OK to { body<ReceiveCredentialResult>() }
+                            HttpStatusCode.BadRequest to { description = "Token request failed (e.g. wrong PIN / tx_code)" }
+                        }
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ReceiveCredentialRequest>()
-                        val result = WalletIssuanceHandler.receiveCredential(wallet, req, onEvent = noopOnEvent)
-                        call.respond(result)
+                        try {
+                            val result = WalletIssuanceHandler.receiveCredential(wallet, req, onEvent = noopOnEvent)
+                            call.respond(result)
+                        } catch (e: Exception) {
+                            val msg = e.message ?: ""
+                            // Token endpoint errors (wrong PIN, expired code, etc.) surface as
+                            // "Token request failed. Status: 4xx" from TokenRequestBuilder.
+                            if (msg.contains("Token request failed") && msg.contains(Regex("Status: [45]"))) {
+                                throw IllegalArgumentException(msg, e)
+                            }
+                            throw e
+                        }
                     }
 
                     post("/resolve-offer", {

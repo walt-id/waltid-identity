@@ -344,9 +344,28 @@ object WalletPresentationHandler {
         wallet: Wallet,
         request: MatchCredentialsFromStoreRequest
     ): MatchCredentialsResult {
-        val matched = selectFromStores(wallet, request.dcqlQuery)
+        // Build idByIndex and rawCredentials in a single streaming pass over the credential stores.
+        // selectFromStores uses integer indices as DCQL credential IDs internally; we need the
+        // idx -> wallet-assigned-id map to translate them back before returning to the caller.
+        val idByIndex = mutableMapOf<String, String>()
+        val rawCredentials = mutableListOf<RawDcqlCredential>()
+        var idx = 0
+        wallet.streamAllCredentials().collect { stored ->
+            val key = idx.toString()
+            idByIndex[key] = stored.id
+            rawCredentials += stored.credential.toRawDcqlCredential(key)
+            idx++
+        }
+        if (rawCredentials.isEmpty()) {
+            return MatchCredentialsResult(
+                matchedQueryIds = emptyList(),
+                matchCount = 0,
+                matchedCredentialIds = emptyMap()
+            )
+        }
+        val matched = DcqlMatcher.match(request.dcqlQuery, rawCredentials).getOrThrow()
         val matchedCredentialIds = matched.mapValues { (_, results) ->
-            results.map { result -> result.credential.id }
+            results.map { result -> idByIndex[result.credential.id] ?: result.credential.id }
         }
         return MatchCredentialsResult(
             matchedQueryIds = matched.keys.toList(),
