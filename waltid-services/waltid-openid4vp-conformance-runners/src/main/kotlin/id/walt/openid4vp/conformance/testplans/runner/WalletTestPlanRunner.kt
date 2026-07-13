@@ -126,20 +126,19 @@ class WalletTestPlanRunner(
             // Wait for test to be ready (WAITING state)
             conformance.waitForTestStatus(testId, shouldBeWaiting = true)
 
-            // Get the test run result which contains exposed endpoints
+            // Get the test run result which contains the wallet authorization URL
             val testRunResult = conformance.getTestRun(testId)
-            println("   Test exposed endpoints available")
-
-            // For wallet tests, trigger the wallet to process the authorization request
-            // The conformance suite exposes an authorization endpoint
-            val authEndpoint = testRunResult.getExposedAuthorizationEndpoint()
-            println("   Authorization endpoint: $authEndpoint")
             
-            // Trigger wallet via adapter (adapter forwards to wallet API)
-            // Use https for the conformance suite
-            val httpsEndpoint = authEndpoint.replace("http://", "https://")
-            val walletResponse = conformanceHttp.get(httpsEndpoint)
-            println("   Wallet response: ${walletResponse.status}")
+            // For wallet tests, the conformance suite provides a URL in browser.urls
+            // that should be called to trigger the wallet (simulating QR code scan / deep link)
+            val walletAuthUrl = testRunResult.getWalletAuthorizationUrl()
+                ?: throw IllegalStateException("No wallet authorization URL in browser.urls")
+            println("   Wallet authorization URL: $walletAuthUrl")
+            
+            // Call the wallet adapter to trigger the authorization flow
+            // The URL points to our adapter at host.docker.internal:7006
+            val walletResponse = conformanceHttp.get(walletAuthUrl)
+            println("   Wallet adapter response: ${walletResponse.status}")
 
             // Wait for test to complete (no longer WAITING)
             conformance.waitForTestStatus(testId, shouldBeWaiting = false)

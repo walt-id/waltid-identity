@@ -27,6 +27,14 @@ data class TestRunResult(
     fun getExposedAuthorizationEndpoint() = exposed["authorization_endpoint"]?.jsonPrimitive?.contentOrNull
         ?: throw IllegalArgumentException("Missing authorization_endpoint in TestRunResult")
 
+    /**
+     * Get the wallet authorization URL from browser.urls.
+     * For wallet tests, this is the URL the test runner should call to trigger the wallet.
+     */
+    fun getWalletAuthorizationUrl(): String? {
+        return browser.urls.firstOrNull()?.jsonPrimitive?.contentOrNull
+    }
+
     @Serializable
     data class Browser(
         val browserApiRequests: List<JsonElement?> = listOf(),
