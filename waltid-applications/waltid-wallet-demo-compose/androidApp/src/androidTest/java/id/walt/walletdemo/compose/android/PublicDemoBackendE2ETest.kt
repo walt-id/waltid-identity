@@ -1,19 +1,19 @@
 package id.walt.walletdemo.compose.android
 
-import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import id.walt.mobile.test.backend.EudiTestBackend
+import androidx.test.uiautomator.Until
+import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.POST_PRESENT_DELAY
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.QUICK_STATUS_CHECK_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
@@ -36,13 +36,15 @@ class PublicDemoBackendE2ETest {
 
         launchAndUnlock(context, device)
         clickByTag(device, "wallet.openReceiveButton")
-
+        grantCameraPermissionIfPrompted(device)
         sendDeepLink(context, offer.offerUrl)
         assertTrue(
             "Could not find 'Enter link' toggle to switch to manual entry mode",
             device.wait(Until.hasObject(By.text("Enter link")), UI_ELEMENT_TIMEOUT)
         )
         device.findObject(By.text("Enter link")).click()
+        device.wait(Until.findObject(By.res("wallet.offerInput").text(offer.offerUrl)), UI_ELEMENT_TIMEOUT)
+
         assertTrue(
             "Offer URL did not appear in UI after deep link",
             waitForResource(device, "wallet.offerInput", UI_ELEMENT_TIMEOUT)?.text == offer.offerUrl
@@ -60,6 +62,15 @@ class PublicDemoBackendE2ETest {
 
         val session = DemoTestBackend.createVerifierSession(scenario)
         sendDeepLink(context, session.authorizationRequestUri)
+
+        if (device.wait(Until.hasObject(By.res("wallet.offerInput")), QUICK_STATUS_CHECK_TIMEOUT)) {
+            device.findObject(By.desc("Back")).click()
+            assertTrue(
+                "Could not return to main screen after unexpected Receive redirect",
+                device.wait(Until.hasObject(By.res("wallet.presentationInput")), UI_ELEMENT_TIMEOUT)
+            )
+        }
+
 
         val startedWithoutTap = waitForStatus(
             device = device,
@@ -90,4 +101,22 @@ class PublicDemoBackendE2ETest {
 
         DemoTestBackend.waitForVerifierSuccess(session.sessionId, timeoutMs = VERIFIER_POLLING_TIMEOUT)
     }
+
+
+    private fun grantCameraPermissionIfPrompted(device: UiDevice) {
+        val allowButton = device.wait(
+            Until.findObject(
+                By.res("com.android.permissioncontroller:id/permission_allow_foreground_only_button")
+            ),
+            3000
+        ) ?: device.wait(
+            Until.findObject(By.text("While using the app")),
+            1000
+        ) ?: device.wait(
+            Until.findObject(By.text("Allow")),
+            1000
+        )
+        allowButton?.click()
+    }
+
 }

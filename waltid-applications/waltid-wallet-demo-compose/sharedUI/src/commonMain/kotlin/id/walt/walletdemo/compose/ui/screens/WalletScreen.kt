@@ -66,19 +66,6 @@ internal fun WalletScreen(
         StatusCard(state)
 
         HorizontalDivider()
-//        UrlActionSection(
-//            title = "Receive",
-//            value = requestDrafts.offerUrl,
-//            onValueChange = controller::updateOfferUrl,
-//            label = "Credential offer URL",
-//            buttonText = "Receive",
-//            enabled = ready != null &&
-//                requestDrafts.offerUrl.isNotBlank() &&
-//                !state.isBusy,
-//            inputTestTag = "wallet.offerInput",
-//            buttonTestTag = "wallet.receiveButton",
-//            onClick = controller::receive,
-//        )
         Button(
             onClick = onReceiveClick,
             modifier = Modifier
