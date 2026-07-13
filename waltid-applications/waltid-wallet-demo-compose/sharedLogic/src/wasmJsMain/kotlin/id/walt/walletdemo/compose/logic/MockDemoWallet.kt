@@ -22,7 +22,7 @@ private class MockDemoWallet : DemoWallet {
                 subject = "did:key:mock-holder",
                 label = "Mock credential",
                 addedAt = "2026-06-17",
-                credentialDataJson = """{"given_name":"Ada","family_name":"Lovelace","age_over_18":true}""",
+                credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
             )
         )
         return credentials.map { it.id }

@@ -20,6 +20,7 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletDemoSampleCredentialData
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.statusText
 import kotlin.test.assertEquals
@@ -56,6 +57,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.claimGroup("Personal details")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage("portrait")).performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.DetailsBack).performClick()
 
@@ -172,7 +174,7 @@ class WalletDemoAppTestScenarios {
             subject = "did:key:holder",
             label = "Example Credential",
             addedAt = "2026-06-17",
-            credentialDataJson = """{"given_name":"Ada","family_name":"Lovelace"}""",
+            credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
     }
 }

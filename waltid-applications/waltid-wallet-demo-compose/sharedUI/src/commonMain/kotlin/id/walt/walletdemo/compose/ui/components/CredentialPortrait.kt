@@ -1,6 +1,8 @@
 package id.walt.walletdemo.compose.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +29,7 @@ internal fun CredentialPortrait(
             .size(size)
             .clip(RoundedCornerShape(8.dp)),
         color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         if (portrait == null) {
             Box(contentAlignment = Alignment.Center) {
@@ -36,7 +39,8 @@ internal fun CredentialPortrait(
             AsyncImage(
                 model = portrait.bytes,
                 contentDescription = "Credential portrait",
-                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
             )
         }
     }

@@ -208,7 +208,7 @@ class WalletDemoControllerTest {
             subject = "did:key:holder",
             label = "Example Credential",
             addedAt = "2026-06-17",
-            credentialDataJson = """{"given_name":"Ada","family_name":"Lovelace"}""",
+            credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
     }
 }
