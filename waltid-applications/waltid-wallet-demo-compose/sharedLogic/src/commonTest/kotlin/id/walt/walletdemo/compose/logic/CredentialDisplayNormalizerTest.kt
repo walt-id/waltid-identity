@@ -50,7 +50,7 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Locality", address.items.first { it.path.id == "resident_address.locality" }.label)
 
         val systemInfo = assertNotNull(details.toSystemInfoGroup())
-        assertEquals("System info", systemInfo.title)
+        assertEquals("About this credential", systemInfo.title)
         assertEquals(DisplayValue.Text("2026-07-09T12:00:00Z"), systemInfo.items.first { it.path.id == "system.added" }.value)
         assertEquals(DisplayValue.Text("cred-1"), systemInfo.items.first { it.path.id == "system.id" }.value)
         assertEquals(DisplayValue.Text("vc+sd-jwt"), systemInfo.items.first { it.path.id == "system.format" }.value)

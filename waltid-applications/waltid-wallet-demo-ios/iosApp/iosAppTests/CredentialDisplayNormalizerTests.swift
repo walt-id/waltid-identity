@@ -116,7 +116,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(mimeType, "image/png")
     }
 
-    func testBuildsSystemInfoGroupFromCredentialMetadata() throws {
+    func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {
         let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
@@ -129,7 +129,7 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         )
 
         let systemInfo = try XCTUnwrap(details.systemInfoGroup)
-        XCTAssertEqual(systemInfo.title, "System info")
+        XCTAssertEqual(systemInfo.title, "About this credential")
         XCTAssertEqual(systemInfo.items.map(\.path.id), [
             "system.added",
             "system.id",

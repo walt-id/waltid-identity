@@ -10,7 +10,7 @@ fun CredentialDetails.toSystemInfoGroup(): ClaimGroup? {
     )
 
     return items.takeIf { it.isNotEmpty() }?.let {
-        ClaimGroup(title = "System info", items = it)
+        ClaimGroup(title = "About this credential", items = it)
     }
 }
 

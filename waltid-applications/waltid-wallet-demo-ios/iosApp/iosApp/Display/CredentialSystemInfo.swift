@@ -10,7 +10,7 @@ extension CredentialDetails {
             subject.systemInfoItem(path: "system.subject", label: "Subject")
         ].compactMap { $0 }
 
-        return items.isEmpty ? nil : ClaimGroup(title: "System info", items: items)
+        return items.isEmpty ? nil : ClaimGroup(title: "About this credential", items: items)
     }
 
     private static let systemInfoDateFormatter: ISO8601DateFormatter = {

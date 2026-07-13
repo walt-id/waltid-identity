@@ -64,7 +64,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 @MainActor
 final class MockCredentialDisplayUITests: XCTestCase {
 
-    func testMockCredentialDetailsRenderPortraitAndSystemInfo() {
+    func testMockCredentialDetailsRenderPortraitAndCredentialInfo() {
         let app = XCUIApplication()
         app.launchEnvironment["E2E_USE_MOCK_WALLET"] = "1"
         let ui = WalletE2EUI(app: app)
@@ -83,7 +83,7 @@ final class MockCredentialDisplayUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["wallet.credentialDetails.mock-credential"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.Personal_details"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.images["wallet.claimImage.portrait"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["wallet.claimGroup.System_info"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["No credential details available"].exists)
     }
 }
