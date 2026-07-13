@@ -20,6 +20,7 @@ dokka = "2.2.0"
 androidx-camera = "1.6.1"
 androidx-camera-lifecycle = "1.4.1"
 mlkit-barcode-scanning = "17.3.0"
+easyqrscan = "0.7.1"
 compose-material-icons-core = "1.7.8"
 # Plugins / Dependencies
 ktor = "3.5.0"
@@ -273,6 +274,7 @@ androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.r
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "androidx-camera-lifecycle" }
 androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "androidx-camera-lifecycle" }
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkit-barcode-scanning" }
+easyqrscan = { module = "io.github.kalinjul.easyqrscan:scanner", version.ref = "easyqrscan" }
 compose-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "compose-material-icons-core" }
 
 ## HTTP
