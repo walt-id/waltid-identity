@@ -8,6 +8,7 @@ import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.crypto.keys.DirectSerializedKey
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.did.dids.DidService
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.sessions.AuthSessionInformation
@@ -128,8 +129,7 @@ class Wallet2AuthIntegrationTest {
             // 3. Verify JWT exp claim matches tokenExpiry (within 30 s execution tolerance)
             testAndReturn("JWT carries exp claim matching tokenExpiry") {
                 val b64Payload = token.split(".")[1]
-                val padded = b64Payload + "=".repeat((4 - b64Payload.length % 4) % 4)
-                val payloadJson = java.util.Base64.getUrlDecoder().decode(padded).decodeToString()
+                val payloadJson = b64Payload.decodeFromBase64Url().decodeToString()
                 val payload = Json.parseToJsonElement(payloadJson).jsonObject
                 assertNotNull(payload["exp"], "JWT payload must contain 'exp' claim")
                 val expEpoch = payload["exp"]!!.toString().toLong()

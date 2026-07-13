@@ -261,7 +261,8 @@ object WalletPresentationHandler {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
 
         val authRequest: AuthorizationRequest = if (url.parameters.contains("request_uri")) {
-            val requestUri = url.parameters["request_uri"]!!
+            val requestUri = url.parameters["request_uri"]
+                ?: error("request_uri parameter unexpectedly absent")
             log.debug { "Fetching Request Object from request_uri: $requestUri" }
             val httpResponse = fetcher.rawFetch(requestUri)
 
@@ -274,11 +275,11 @@ object WalletPresentationHandler {
                 // Plain JSON request object
                 Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(bodyText)
             } else {
-                // Signed JWT — decode payload only (signature verification is handled by walletPresentHandling)
+                // Signed JWT - decode payload only (signature verification is handled by walletPresentHandling).
+                // decodeFromBase64Url uses ABSENT_OPTIONAL padding so no manual padding is needed.
                 val jwtParts = bodyText.trim().split(".")
                 if (jwtParts.size >= 2) {
-                    val paddedPayload = jwtParts[1].let { it + "=".repeat((4 - it.length % 4) % 4) }
-                    val payload = paddedPayload.decodeFromBase64Url().decodeToString()
+                    val payload = jwtParts[1].decodeFromBase64Url().decodeToString()
                     Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(payload)
                 } else {
                     error("Unexpected Request Object format from $requestUri")

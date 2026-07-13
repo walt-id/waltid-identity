@@ -248,9 +248,9 @@ class Wallet2RegressionTest {
 
         // Wire persistence exactly as Main.kt does at startup
         OSSWallet2Service.walletStore = ExposedWalletStore(db)
-        OSSWallet2Service.keyStoreFactory = StoreFactory { id -> ExposedKeyStore(id, db) }
-        OSSWallet2Service.credentialStoreFactory = StoreFactory { id -> ExposedCredentialStore(id, db) }
-        OSSWallet2Service.didStoreFactory = StoreFactory { id -> ExposedDidStore(id, db) }
+        OSSWallet2Service.keyStoreFactory = { id -> ExposedKeyStore(id, db) }
+        OSSWallet2Service.credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
+        OSSWallet2Service.didStoreFactory = { id -> ExposedDidStore(id, db) }
 
         E2ETest(host, 17063, failEarly = true).testBlock(
             features = listOf(OSSWallet2FeatureCatalog),
@@ -291,9 +291,9 @@ class Wallet2RegressionTest {
             // The in-process named-store cache is rebuilt from the factories on next access
             // (via computeIfAbsent), exactly as it would be after a real process restart.
             OSSWallet2Service.walletStore = ExposedWalletStore(db)
-            OSSWallet2Service.keyStoreFactory = StoreFactory { id -> ExposedKeyStore(id, db) }
-            OSSWallet2Service.credentialStoreFactory = StoreFactory { id -> ExposedCredentialStore(id, db) }
-            OSSWallet2Service.didStoreFactory = StoreFactory { id -> ExposedDidStore(id, db) }
+            OSSWallet2Service.keyStoreFactory = { id -> ExposedKeyStore(id, db) }
+            OSSWallet2Service.credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
+            OSSWallet2Service.didStoreFactory = { id -> ExposedDidStore(id, db) }
 
             testAndReturn("Key survives store-registry reset (Bug 8 regression)") {
                 val keys = http.get("/wallet/$walletId/keys").body<List<WalletKeyInfo>>()

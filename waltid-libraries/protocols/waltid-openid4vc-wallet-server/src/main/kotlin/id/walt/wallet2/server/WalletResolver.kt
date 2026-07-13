@@ -11,7 +11,6 @@ import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
-import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.http.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -25,12 +24,16 @@ import kotlinx.coroutines.flow.emptyFlow
  *
  * Declaring as a `fun interface` allows concise lambda syntax:
  * ```kotlin
- * keyStoreFactory = StoreFactory { id -> ExposedKeyStore(id, db) }
+ * keyStoreFactory = { id -> ExposedKeyStore(id, db) }
  * ```
  */
-fun interface StoreFactory<T> {
-    fun create(storeId: String): T
-}
+/**
+ * Factory for creating named store instances, expressed as a plain function type.
+ *
+ * Using a typealias keeps the API surface minimal - callers use standard lambda syntax
+ * `{ id -> ExposedKeyStore(id, db) }` and invoke it with `factory(storeId)`.
+ */
+typealias StoreFactory<T> = (storeId: String) -> T
 
 /**
  * Storage-backend abstraction used by [Wallet2RouteHandler].
@@ -39,7 +42,7 @@ fun interface StoreFactory<T> {
  * runtime object (store instances). All wallet CRUD in [Wallet2RouteHandler] calls
  * through here, keeping route logic decoupled from storage details.
  *
- * For the [InMemoryWalletStore] default, wallet objects are kept in memory directly.
+ * For in-memory stores, wallet objects are kept in memory directly.
  * For persistent stores, [resolveWallet] assembles a [Wallet] from the persisted
  * [WalletDescriptor] by resolving each named store ID via [resolveKeyStore] etc.
  *
@@ -60,43 +63,35 @@ interface WalletResolver {
 
     /** Factory for key stores. Default: in-memory. Replace with an Exposed-backed factory for persistence. */
     val keyStoreFactory: StoreFactory<WalletKeyStore>
-        get() = StoreFactory { InMemoryKeyStore() }
+        get() = { InMemoryKeyStore() }
 
     /** Factory for credential stores. Default: in-memory. */
     val credentialStoreFactory: StoreFactory<WalletCredentialStore>
-        get() = StoreFactory { InMemoryCredentialStore() }
+        get() = { InMemoryCredentialStore() }
 
     /** Factory for DID stores. Default: in-memory. */
     val didStoreFactory: StoreFactory<WalletDidStore>
-        get() = StoreFactory { InMemoryDidStore() }
+        get() = { InMemoryDidStore() }
 
     /**
      * Resolves a [Wallet] by ID.
      *
-     * For [InMemoryWalletStore]: returns the live wallet object directly.
-     * For persistent stores: loads the [WalletDescriptor] and assembles the
+     * If the store keeps live [Wallet] objects (e.g. in-memory), returns one directly via
+     * [WalletStore.loadWallet]. Otherwise loads the [WalletDescriptor] and assembles the
      * [Wallet] by resolving each store ID via [resolveKeyStore]/[resolveCredentialStore]/[resolveDidStore].
      */
-    suspend fun resolveWallet(walletId: String): Wallet? {
-        val inMemory = walletStore as? InMemoryWalletStore
-        if (inMemory != null) return inMemory.getWallet(walletId)
-
-        val descriptor = walletStore.loadDescriptor(walletId) ?: return null
-        return assembleWallet(descriptor)
-    }
+    suspend fun resolveWallet(walletId: String): Wallet? =
+        walletStore.loadWallet(walletId) ?: walletStore.loadDescriptor(walletId)?.let { assembleWallet(it) }
 
     /**
      * Persists a newly created [Wallet].
      *
-     * For [InMemoryWalletStore]: stores the live object directly.
-     * For persistent stores: saves the [WalletDescriptor] derived from the wallet.
+     * Delegates to [WalletStore.saveWallet] first. If the store handles it (returns true, e.g.
+     * in-memory), we are done. Otherwise serializes the wallet to a [WalletDescriptor] and saves
+     * that via [WalletStore.saveDescriptor] (persistent stores).
      */
     suspend fun storeWallet(wallet: Wallet) {
-        val inMemory = walletStore as? InMemoryWalletStore
-        if (inMemory != null) {
-            inMemory.putWallet(wallet)
-            return
-        }
+        if (walletStore.saveWallet(wallet)) return
         val serializedStaticKey = wallet.staticKey?.let { KeySerialization.serializeKey(it) }
         val descriptor = WalletDescriptor(
             id = wallet.id,
@@ -169,28 +164,23 @@ interface WalletResolver {
     /**
      * Persists updated [defaultKeyId] / [defaultDidId] for an existing wallet.
      *
-     * For [InMemoryWalletStore] the live [Wallet] object is replaced with a copy
-     * containing the new defaults. For persistent stores the descriptor is loaded,
-     * updated, and saved.
+     * For in-memory stores the live [Wallet] object is replaced with a copy containing the new
+     * defaults (via [WalletStore.loadWallet]/[WalletStore.saveWallet]). For persistent stores the
+     * descriptor is loaded, updated, and saved.
      */
     suspend fun setWalletDefaults(walletId: String, defaultKeyId: String?, defaultDidId: String?) {
-        val inMemory = walletStore as? InMemoryWalletStore
-        if (inMemory != null) {
-            val wallet = inMemory.getWallet(walletId) ?: return
-            inMemory.putWallet(
-                wallet.copy(
-                    defaultKeyId = defaultKeyId ?: wallet.defaultKeyId,
-                    defaultDidId = defaultDidId ?: wallet.defaultDidId,
-                )
-            )
+        val liveWallet = walletStore.loadWallet(walletId)
+        if (liveWallet != null) {
+            walletStore.saveWallet(liveWallet.copy(
+                defaultKeyId = defaultKeyId ?: liveWallet.defaultKeyId,
+                defaultDidId = defaultDidId ?: liveWallet.defaultDidId,
+            ))
             return
         }
         val descriptor = walletStore.loadDescriptor(walletId) ?: return
-        walletStore.saveDescriptor(
-            descriptor.copy(
-                defaultKeyId = defaultKeyId ?: descriptor.defaultKeyId,
-                defaultDidId = defaultDidId ?: descriptor.defaultDidId,
-            )
-        )
+        walletStore.saveDescriptor(descriptor.copy(
+            defaultKeyId = defaultKeyId ?: descriptor.defaultKeyId,
+            defaultDidId = defaultDidId ?: descriptor.defaultDidId,
+        ))
     }
 }

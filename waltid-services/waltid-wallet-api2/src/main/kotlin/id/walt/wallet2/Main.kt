@@ -46,9 +46,9 @@ suspend fun main(args: Array<String>) {
                     // Wire Exposed-backed store factories so all auto-created and named stores
                     // are backed by the same database. The resolver's computeIfAbsent cache
                     // ensures that store IDs from previous runs are resolved on first access.
-                    OSSWallet2Service.keyStoreFactory = StoreFactory { id -> ExposedKeyStore(id, db) }
-                    OSSWallet2Service.credentialStoreFactory = StoreFactory { id -> ExposedCredentialStore(id, db) }
-                    OSSWallet2Service.didStoreFactory = StoreFactory { id -> ExposedDidStore(id, db) }
+                    OSSWallet2Service.keyStoreFactory = { id -> ExposedKeyStore(id, db) }
+                    OSSWallet2Service.credentialStoreFactory = { id -> ExposedCredentialStore(id, db) }
+                    OSSWallet2Service.didStoreFactory = { id -> ExposedDidStore(id, db) }
                 }
             },
             run = WebService {

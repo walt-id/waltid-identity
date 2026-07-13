@@ -43,9 +43,9 @@ object OSSWallet2Service {
     // The route handler uses these (via the resolver) to create new stores for auto-created
     // and named stores, so the right store type is created regardless of whether the store ID
     // was supplied by the user or generated automatically.
-    var keyStoreFactory: StoreFactory<WalletKeyStore> = StoreFactory { InMemoryKeyStore() }
-    var credentialStoreFactory: StoreFactory<WalletCredentialStore> = StoreFactory { InMemoryCredentialStore() }
-    var didStoreFactory: StoreFactory<WalletDidStore> = StoreFactory { InMemoryDidStore() }
+    var keyStoreFactory: StoreFactory<WalletKeyStore> = { InMemoryKeyStore() }
+    var credentialStoreFactory: StoreFactory<WalletCredentialStore> = { InMemoryCredentialStore() }
+    var didStoreFactory: StoreFactory<WalletDidStore> = { InMemoryDidStore() }
 
     // In-process cache: storeId -> store instance.
     // computeIfAbsent ensures that on restart, a store for any ID known to the DB is
@@ -76,7 +76,7 @@ object OSSWallet2Service {
         // This handles wallets created in previous process runs whose store IDs exist in
         // the DB but are not yet in the in-process cache.
         override suspend fun resolveKeyStore(storeId: String): WalletKeyStore =
-            namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory.create(storeId) }
+            namedKeyStores.computeIfAbsent(storeId) { keyStoreFactory(storeId) }
 
         override suspend fun storeKeyStore(storeId: String, store: WalletKeyStore) {
             namedKeyStores[storeId] = store
@@ -85,7 +85,7 @@ object OSSWallet2Service {
         override fun listKeyStoreIds() = namedKeyStores.keys.toList().asFlow()
 
         override suspend fun resolveCredentialStore(storeId: String): WalletCredentialStore =
-            namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory.create(storeId) }
+            namedCredentialStores.computeIfAbsent(storeId) { credentialStoreFactory(storeId) }
 
         override suspend fun storeCredentialStore(storeId: String, store: WalletCredentialStore) {
             namedCredentialStores[storeId] = store
@@ -94,7 +94,7 @@ object OSSWallet2Service {
         override fun listCredentialStoreIds() = namedCredentialStores.keys.toList().asFlow()
 
         override suspend fun resolveDidStore(storeId: String): WalletDidStore =
-            namedDidStores.computeIfAbsent(storeId) { didStoreFactory.create(storeId) }
+            namedDidStores.computeIfAbsent(storeId) { didStoreFactory(storeId) }
 
         override suspend fun storeDidStore(storeId: String, store: WalletDidStore) {
             namedDidStores[storeId] = store

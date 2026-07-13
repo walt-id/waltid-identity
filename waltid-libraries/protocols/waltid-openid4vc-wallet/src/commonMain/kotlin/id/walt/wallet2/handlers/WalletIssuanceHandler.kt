@@ -289,16 +289,24 @@ object WalletIssuanceHandler {
     private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
 
     /**
-     * Creates the [HttpClient] used for the issuance flow.
+     * Shared [HttpClient] for all issuance step functions. Lazily initialized on first use.
      *
      * The client is created and configured by [WebDataFetcher] (default Native engine - Java on
      * JVM, with TLS 1.3 - plus centrally-managed request/logging configuration, including lenient
      * JSON content negotiation) rather than constructed directly with the platform default engine.
-     * The collaborators ([IssuerMetadataResolver], [CredentialOfferResolver], [TokenRequestBuilder])
-     * and the direct credential/nonce/deferred POST calls continue to consume the raw [HttpClient].
+     *
+     * Using a shared lazy instance avoids creating a new connection pool on every isolated-step
+     * call (resolveOffer, requestToken, etc.), which would be wasteful.
+     *
+     * The full receive flow and auth-code flow accept an httpClient parameter so tests and the
+     * Enterprise can inject a custom client; they fall back to this shared instance by default.
      */
-    private fun defaultHttpClient(): HttpClient =
+    private val httpClient: HttpClient by lazy {
         WebDataFetcher(WebDataFetcherId.WALLET2_ISSUANCE_HANDLER).httpClient
+    }
+
+    @Deprecated("Use the shared httpClient property", replaceWith = ReplaceWith("httpClient"))
+    private fun defaultHttpClient(): HttpClient = httpClient
 
     /**
      * Resolves a credential offer from any [CredentialOfferSource], handling both inline JSON
@@ -499,7 +507,7 @@ object WalletIssuanceHandler {
     // ---------------------------------------------------------------------------
 
     suspend fun resolveOffer(request: ResolveOfferRequest): ResolveOfferResult {
-        val httpClient = defaultHttpClient()
+
         val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val offeredCredentials = OfferedCredentialResolver.resolveOfferedCredentials(offer, issuerMetadata)
@@ -522,7 +530,7 @@ object WalletIssuanceHandler {
     }
 
     suspend fun requestToken(request: RequestTokenRequest): RequestTokenResult {
-        val httpClient = defaultHttpClient()
+
         val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangePreAuthorizedCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
@@ -545,7 +553,7 @@ object WalletIssuanceHandler {
     }
 
     suspend fun fetchCredential(request: FetchCredentialRequest): FetchCredentialResult {
-        val httpClient = defaultHttpClient()
+
         // Build JSON manually to avoid Proofs serialization issue
         val credentialRequestJson = buildJsonObject {
             put("credential_configuration_id", request.credentialConfigurationId)
@@ -661,7 +669,7 @@ object WalletIssuanceHandler {
      * and capture the `code` from the redirect callback before calling [exchangeCode].
      */
     suspend fun generateAuthorizationUrl(request: GenerateAuthorizationUrlRequest): GenerateAuthorizationUrlResult {
-        val httpClient = defaultHttpClient()
+
         val offer = resolveOffer(request, httpClient)
         val issuerMetadata = IssuerMetadataResolver(httpClient).resolveCredentialIssuerMetadata(offer.credentialIssuer)
         val asMetadata = IssuerMetadataResolver(httpClient).resolveAuthorizationServerMetadataWithFallback(issuerMetadata)
@@ -693,7 +701,7 @@ object WalletIssuanceHandler {
      * Wraps [TokenRequestBuilder.exchangeAuthorizationCode].
      */
     suspend fun exchangeCode(request: ExchangeCodeRequest): RequestTokenResult {
-        val httpClient = defaultHttpClient()
+
         val clientConfig = clientConfig(request.clientId, request.redirectUri)
         val tokenResponse = TokenRequestBuilder(clientConfig, httpClient).exchangeAuthorizationCode(
             tokenEndpoint = request.tokenEndpoint.toString(),
@@ -720,7 +728,7 @@ object WalletIssuanceHandler {
      *
      * On success the credential is stored in the wallet's credential store.
      */
-        fun pollDeferredFlow(
+    fun pollDeferredFlow(
         wallet: Wallet,
         request: PollDeferredRequest,
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
@@ -771,11 +779,11 @@ object WalletIssuanceHandler {
      * so it cannot be a single blocking call. Instead it is split into:
      *   1. [generateAuthorizationUrl] — get the URL to redirect the user to
      *   2. (caller handles browser redirect and captures the `code` callback)
-     *   3. [receiveCredentialAuthCode] — exchange code + issue credentials
+     *   3. [receiveCredentialAuthCodeFlow] - exchange code + issue credentials
      *
      * This function handles step 3 only, continuing from an authorization code.
      */
-        fun receiveCredentialAuthCodeFlow(
+    fun receiveCredentialAuthCodeFlow(
         wallet: Wallet,
         tokenEndpoint: Url,
         code: String,

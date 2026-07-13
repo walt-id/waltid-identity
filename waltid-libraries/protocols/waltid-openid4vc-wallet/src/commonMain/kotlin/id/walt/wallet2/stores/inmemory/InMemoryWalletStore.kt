@@ -25,13 +25,18 @@ class InMemoryWalletStore : WalletStore {
     private val descriptors = mutableMapOf<String, WalletDescriptor>()
     private val accountWallets = mutableMapOf<String, MutableList<String>>()
 
-    /** Direct wallet access — used by the in-memory WalletResolver path. */
-    fun getWallet(walletId: String): Wallet? = wallets[walletId]
+    /** Direct wallet access - used by the in-memory WalletResolver path. */
+    override suspend fun loadWallet(walletId: String): Wallet? = wallets[walletId]
 
-    /** Direct wallet storage — used when creating a wallet in the route handler. */
-    fun putWallet(wallet: Wallet) {
+    /** Stores the live wallet object; returns true so WalletResolver skips descriptor serialization. */
+    override suspend fun saveWallet(wallet: Wallet): Boolean {
         wallets[wallet.id] = wallet
+        return true
     }
+
+    // Keep the old direct-access functions for callers in this module
+    fun getWallet(walletId: String): Wallet? = wallets[walletId]
+    fun putWallet(wallet: Wallet) { wallets[wallet.id] = wallet }
 
     override suspend fun loadDescriptor(walletId: String): WalletDescriptor? =
         descriptors[walletId]

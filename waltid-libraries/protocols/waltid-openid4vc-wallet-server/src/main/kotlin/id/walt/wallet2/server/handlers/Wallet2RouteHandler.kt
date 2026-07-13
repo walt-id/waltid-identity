@@ -153,22 +153,22 @@ object Wallet2RouteHandler {
                 req.keyStoreIds != null ->
                     req.keyStoreIds.map { storeId ->
                         require(storeId in registeredKeyStoreIds) { "Key store '$storeId' not found" }
-                        // Non-null: existence validated above; computeIfAbsent returns the registered instance.
-                        resolver.resolveKeyStore(storeId)!!
+                        // Non-null: existence validated by require above
+                        requireNotNull(resolver.resolveKeyStore(storeId)) { "Key store '$storeId' disappeared between validation and use" }
                     }
 
                 req.staticKey != null -> emptyList()
-                else -> listOf(resolver.keyStoreFactory.create("$id-keys").also { resolver.storeKeyStore("$id-keys", it) })
+                else -> listOf(resolver.keyStoreFactory("$id-keys").also { resolver.storeKeyStore("$id-keys", it) })
             }
 
             val credentialStores: List<WalletCredentialStore> = when {
                 req.credentialStoreIds != null ->
                     req.credentialStoreIds.map { storeId ->
                         require(storeId in registeredCredentialStoreIds) { "Credential store '$storeId' not found" }
-                        resolver.resolveCredentialStore(storeId)!!
+                        requireNotNull(resolver.resolveCredentialStore(storeId)) { "Credential store '$storeId' disappeared between validation and use" }
                     }
 
-                else -> listOf(resolver.credentialStoreFactory.create("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
+                else -> listOf(resolver.credentialStoreFactory("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
             val didStore: WalletDidStore? = when {
@@ -178,7 +178,7 @@ object Wallet2RouteHandler {
                     resolver.resolveDidStore(req.didStoreId)
                 }
                 req.staticDid != null -> null
-                else -> resolver.didStoreFactory.create("$id-dids").also { resolver.storeDidStore("$id-dids", it) }
+                else -> resolver.didStoreFactory("$id-dids").also { resolver.storeDidStore("$id-dids", it) }
             }
 
             val staticKey = req.staticKey?.let { KeyManager.resolveSerializedKey(it.toString()) }
@@ -208,13 +208,10 @@ object Wallet2RouteHandler {
             description = "When auth is enabled, returns only wallets owned by the authenticated account."
             response { HttpStatusCode.OK to { body<List<String>>() } }
         }) {
-            val ids: List<String> = if (getAccountId != null) {
-                val accountId = call.getAccountId()
-                if (accountId != null) resolver.getWalletIdsForAccount(accountId) ?: resolver.listWalletIds().toList()
-                else resolver.listWalletIds().toList()
-            } else {
-                resolver.listWalletIds().toList()
-            }
+            val ids: List<String> = getAccountId
+                ?.let { call.it() }
+                ?.let { resolver.getWalletIdsForAccount(it) }
+                ?: resolver.listWalletIds().toList()
             call.respond(ids)
         }
 
@@ -518,11 +515,12 @@ object Wallet2RouteHandler {
                             val result = WalletIssuanceHandler.receiveCredential(wallet, req)
                             call.respond(result)
                         } catch (e: Exception) {
-                            val msg = e.message ?: ""
-                            // Token endpoint errors (wrong PIN, expired code, etc.) surface as
-                            // "Token request failed. Status: 4xx" from TokenRequestBuilder.
-                            if (msg.contains("Token request failed") && msg.contains(Regex("Status: [45]"))) {
-                                throw IllegalArgumentException(msg, e)
+                            // TokenRequestBuilder throws a plain Exception with this prefix when the
+                            // token endpoint returns 4xx (e.g. wrong PIN / tx_code). Reclassify as
+                            // IllegalArgumentException so the status pages handler maps it to 400.
+                            // TODO: Replace once TokenRequestBuilder throws a typed exception.
+                            if (e.message?.startsWith("Token request failed") == true) {
+                                throw IllegalArgumentException(e.message, e)
                             }
                             throw e
                         }
@@ -739,7 +737,7 @@ object Wallet2RouteHandler {
                 if (resolver.listKeyStoreIds().toList().contains(storeId)) {
                     return@post call.respond(HttpStatusCode.Conflict, "Key store '$storeId' already exists")
                 }
-                val store = resolver.keyStoreFactory.create(storeId)
+                val store = resolver.keyStoreFactory(storeId)
                 resolver.storeKeyStore(storeId, store)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
@@ -764,7 +762,7 @@ object Wallet2RouteHandler {
                 if (resolver.listCredentialStoreIds().toList().contains(storeId)) {
                     return@post call.respond(HttpStatusCode.Conflict, "Credential store '$storeId' already exists")
                 }
-                val store = resolver.credentialStoreFactory.create(storeId)
+                val store = resolver.credentialStoreFactory(storeId)
                 resolver.storeCredentialStore(storeId, store)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
@@ -789,7 +787,7 @@ object Wallet2RouteHandler {
                 if (resolver.listDidStoreIds().toList().contains(storeId)) {
                     return@post call.respond(HttpStatusCode.Conflict, "DID store '$storeId' already exists")
                 }
-                val store = resolver.didStoreFactory.create(storeId)
+                val store = resolver.didStoreFactory(storeId)
                 resolver.storeDidStore(storeId, store)
                 call.respond(HttpStatusCode.Created, mapOf("storeId" to storeId))
             }
