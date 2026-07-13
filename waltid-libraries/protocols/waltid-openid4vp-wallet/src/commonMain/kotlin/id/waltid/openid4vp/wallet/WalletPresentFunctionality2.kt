@@ -492,6 +492,19 @@ object WalletPresentFunctionality2 {
                 error.message,
             )
         }
+
+        // OID4VP 1.0 §5.5: redirect_uri and response_uri are mutually exclusive.
+        // When response_mode is direct_post or direct_post.jwt, only response_uri should be present.
+        // Having both is an invalid request.
+        if (authorizationRequest.redirectUri != null && authorizationRequest.responseUri != null) {
+            log.warn { "Invalid request: both redirect_uri and response_uri are present (mutually exclusive per OID4VP §5.5)" }
+            return walletRejectHandling(
+                authorizationRequest,
+                OID4VPErrorCode.INVALID_REQUEST,
+                "redirect_uri and response_uri are mutually exclusive; both cannot be present in the same request",
+            )
+        }
+
         require(
             authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN ||
             authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
