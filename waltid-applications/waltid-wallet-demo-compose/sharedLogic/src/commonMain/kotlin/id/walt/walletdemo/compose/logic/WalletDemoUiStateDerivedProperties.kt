@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.logic
 
 val WalletDemoUiState.isBusy: Boolean
     get() = session is WalletSessionState.Bootstrapping ||
+        operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
         operation is WalletOperationState.Presenting
 
@@ -12,6 +13,7 @@ val WalletDemoUiState.isError: Boolean
 val WalletDemoUiState.statusText: String
     get() = when (operation) {
         WalletOperationState.Idle -> session.statusText(auth)
+        WalletOperationState.ResolvingOffer -> "Resolving offer..."
         WalletOperationState.Receiving -> "Receiving credential..."
         WalletOperationState.Presenting -> "Presenting credential..."
         is WalletOperationState.Succeeded -> operation.message

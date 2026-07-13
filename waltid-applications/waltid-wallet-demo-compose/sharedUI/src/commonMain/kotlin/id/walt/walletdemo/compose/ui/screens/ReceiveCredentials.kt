@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
@@ -39,8 +40,9 @@ fun ReceiveCredential(
     val isReady = ready != null
     val canReceive = isReady && !state.isBusy
     val canSubmitManualOffer = canReceive && state.requestDrafts.offerUrl.isNotBlank()
+    val canSubmitScannedOffer = canReceive && state.requestDrafts.txCodeRequired
 
-    LaunchedEffect(state.operation) {
+    LaunchedEffect(state.operation, state.requestDrafts.txCodeRequired) {
         when (state.operation) {
             is WalletOperationState.Succeeded -> {
                 if (receiveRequested) {
@@ -49,10 +51,14 @@ fun ReceiveCredential(
                 }
             }
             is WalletOperationState.Failed,
-            WalletOperationState.Idle,
             WalletOperationState.Presenting,
             -> receiveRequested = false
-            WalletOperationState.Receiving -> Unit
+            WalletOperationState.Idle -> {
+                if (!state.requestDrafts.txCodeRequired) receiveRequested = false
+            }
+            WalletOperationState.ResolvingOffer,
+            WalletOperationState.Receiving,
+            -> Unit
         }
     }
 
@@ -93,26 +99,42 @@ fun ReceiveCredential(
 
         AnimatedContent(targetState = mode, label = "receive-mode") { current ->
             when (current) {
-                ReceiveMode.SCAN -> QrScanner(
-                    enabled = canReceive,
+                ReceiveMode.SCAN -> QrScannerSection(
+                    txCodeRequired = state.requestDrafts.txCodeRequired,
+                    txCode = state.requestDrafts.txCode,
+                    onTxCodeChange = controller::updateTxCode,
+                    canScan = canReceive,
+                    isBusy = state.isBusy,
+                    canSubmit = canSubmitScannedOffer,
                     onCodeScanned = { rawValue ->
                         val offerUrl = rawValue.trim()
                         if (offerUrl.isNotEmpty() && canReceive) {
-                            controller.updateOfferUrl(offerUrl)
                             receiveRequested = true
-                            controller.receive()
+                            controller.resolveAndReceive(offerUrl)
                         }
                     },
-                )
-                ReceiveMode.MANUAL -> ManualEntrySection(
-                    value = state.requestDrafts.offerUrl,
-                    onValueChange = controller::updateOfferUrl,
                     onSubmit = {
                         receiveRequested = true
                         controller.receive()
                     },
+                )
+                ReceiveMode.MANUAL -> ManualEntrySection(
+                    offerUrl = state.requestDrafts.offerUrl,
+                    onOfferUrlChange = controller::updateOfferUrl,
+                    txCode = state.requestDrafts.txCode,
+                    onTxCodeChange = controller::updateTxCode,
+                    txCodeRequired = state.requestDrafts.txCodeRequired,
+                    onResolve = {
+                        receiveRequested = true
+                        controller.resolveAndReceive(state.requestDrafts.offerUrl)
+                    },
+                    onReceive = {
+                        receiveRequested = true
+                        controller.receive()
+                    },
                     isBusy = state.isBusy,
-                    enabled = canSubmitManualOffer,
+                    canResolve = canSubmitManualOffer && !state.requestDrafts.txCodeRequired,
+                    canReceive = canSubmitScannedOffer,
                 )
             }
         }
@@ -173,40 +195,146 @@ private fun SegmentedModeToggle(
 }
 
 @Composable
-private fun ManualEntrySection(
+private fun TxCodeField(
     value: String,
     onValueChange: (String) -> Unit,
-    onSubmit: () -> Unit,
     isBusy: Boolean,
-    enabled: Boolean,
+    onGo: (() -> Unit)? = null,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("wallet.txCodeInput"),
+        label = { Text("Pincode (optional)") },
+        placeholder = { Text("Enter pincode if required") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = if (onGo != null) ImeAction.Go else ImeAction.Done,
+        ),
+        keyboardActions = KeyboardActions(onGo = { onGo?.invoke() }),
+        enabled = !isBusy,
+    )
+}
+
+@Composable
+private fun ManualEntrySection(
+    offerUrl: String,
+    onOfferUrlChange: (String) -> Unit,
+    txCode: String,
+    onTxCodeChange: (String) -> Unit,
+    txCodeRequired: Boolean,
+    onResolve: () -> Unit,
+    onReceive: () -> Unit,
+    isBusy: Boolean,
+    canResolve: Boolean,
+    canReceive: Boolean,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
+            value = offerUrl,
+            onValueChange = onOfferUrlChange,
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("wallet.offerInput"),
             label = { Text("Credential offer link") },
             placeholder = { Text("openid-credential-offer://...") },
             singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(onGo = { if (enabled) onSubmit() }),
+            keyboardOptions = KeyboardOptions(
+                imeAction = if (txCodeRequired) ImeAction.Done else ImeAction.Go,
+            ),
+            keyboardActions = KeyboardActions(onGo = { if (canResolve) onResolve() }),
             enabled = !isBusy,
         )
+        if (txCodeRequired) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "This offer requires a pincode. Enter it below and tap Receive.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            TxCodeField(
+                value = txCode,
+                onValueChange = onTxCodeChange,
+                isBusy = isBusy,
+                onGo = { if (canReceive) onReceive() },
+            )
+        }
         Spacer(Modifier.height(12.dp))
-        Button(
-            onClick = onSubmit,
-            enabled = enabled,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("wallet.receiveButton"),
-        ) {
-            if (isBusy) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            } else {
-                Text("Receive")
+        if (txCodeRequired) {
+            Button(
+                onClick = onReceive,
+                enabled = canReceive,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("wallet.receiveButton"),
+            ) {
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Receive")
+                }
             }
+        } else {
+            Button(
+                onClick = onResolve,
+                enabled = canResolve,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("wallet.receiveButton"),
+            ) {
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Receive")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QrScannerSection(
+    txCodeRequired: Boolean,
+    txCode: String,
+    onTxCodeChange: (String) -> Unit,
+    canScan: Boolean,
+    isBusy: Boolean,
+    canSubmit: Boolean,
+    onCodeScanned: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (txCodeRequired) {
+            Text(
+                text = "This offer requires a pincode. Enter it below and tap Receive.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TxCodeField(
+                value = txCode,
+                onValueChange = onTxCodeChange,
+                isBusy = isBusy,
+                onGo = { if (canSubmit) onSubmit() },
+            )
+            Button(
+                onClick = onSubmit,
+                enabled = canSubmit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("wallet.receiveButton"),
+            ) {
+                if (isBusy) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Receive")
+                }
+            }
+        } else {
+            QrScanner(enabled = canScan, onCodeScanned = onCodeScanned)
         }
     }
 }

@@ -5,4 +5,5 @@ data class WalletDemoUiState(
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
     val operation: WalletOperationState = WalletOperationState.Idle,
     val requestDrafts: WalletRequestDrafts = WalletRequestDrafts(),
+    val selectedCredentialDetails: WalletDemoCredentialDetails? = null,
 )

@@ -3,6 +3,7 @@ package id.walt.wallet2.mobile.swiftinterop
 import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletCredential
+import id.walt.wallet2.mobile.MobileWalletCredentialDetails
 import id.walt.wallet2.mobile.MobileWalletEvent
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
@@ -81,6 +82,17 @@ public class WalletSdkBridge private constructor(
         }
 
     /**
+     * Returns the full credential payload for a single wallet credential.
+     *
+     * The payload is encoded as a JSON object string. Returns `null` inside the result when no
+     * credential with [id] is found.
+     */
+    public suspend fun credentialDetails(id: String): WalletBridgeResult<MobileWalletCredentialDetails?> =
+        walletBridgeCall {
+            operations.credentialDetails(id)
+        }
+
+    /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
      */
     public suspend fun present(
@@ -121,6 +133,8 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun credentials(): List<MobileWalletCredential>
 
+    suspend fun credentialDetails(id: String): MobileWalletCredentialDetails?
+
     suspend fun present(
         requestUrl: String,
         did: String?,
@@ -153,6 +167,9 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun credentials(): List<MobileWalletCredential> =
         wallet.credentials()
+
+    override suspend fun credentialDetails(id: String): MobileWalletCredentialDetails? =
+        wallet.credentialDetails(id)
 
     override suspend fun present(
         requestUrl: String,

@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.logic
 
 sealed interface WalletOperationState {
     data object Idle : WalletOperationState
+    data object ResolvingOffer : WalletOperationState
     data object Receiving : WalletOperationState
     data object Presenting : WalletOperationState
 

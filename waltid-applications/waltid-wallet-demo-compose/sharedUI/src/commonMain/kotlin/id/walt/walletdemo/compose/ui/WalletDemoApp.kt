@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,13 @@ fun WalletDemoApp(controller: WalletDemoController) {
 
     var route by remember { mutableStateOf(WalletRoute.Main) }
     var selectedCredentialId by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.requestDrafts.offerFromDeepLink, state.auth) {
+        if (state.requestDrafts.offerFromDeepLink && state.auth == WalletAuthState.Unlocked) {
+            route = WalletRoute.Receive
+            controller.clearOfferDeepLinkFlag()
+        }
+    }
 
     MaterialTheme {
         Surface(
@@ -56,6 +64,7 @@ fun WalletDemoApp(controller: WalletDemoController) {
                             onReceiveClick = { route = WalletRoute.Receive },
                             onCredentialClick = { credentialId ->
                                 selectedCredentialId = credentialId
+                                controller.loadCredentialDetails(credentialId)
                                 route = WalletRoute.CredentialDetail
                             },
                         )
@@ -76,13 +85,20 @@ fun WalletDemoApp(controller: WalletDemoController) {
                                     onReceiveClick = { route = WalletRoute.Receive },
                                     onCredentialClick = { credentialId ->
                                         selectedCredentialId = credentialId
+                                        controller.loadCredentialDetails(credentialId)
                                         route = WalletRoute.CredentialDetail
                                     },
                                 )
                             } else {
                                 CredentialDetailScreen(
                                     credential = credential,
-                                    onBack = { route = WalletRoute.Main },
+                                    credentialDataJson = state.selectedCredentialDetails
+                                        ?.takeIf { it.id == credential.id }
+                                        ?.credentialDataJson,
+                                    onBack = {
+                                        controller.clearCredentialDetails()
+                                        route = WalletRoute.Main
+                                    },
                                 )
                             }
                         }

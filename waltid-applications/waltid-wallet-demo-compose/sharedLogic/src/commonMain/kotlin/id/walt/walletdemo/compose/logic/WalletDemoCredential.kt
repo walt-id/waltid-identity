@@ -1,8 +1,6 @@
 package id.walt.walletdemo.compose.logic
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
-
 
 @Serializable
 data class WalletDemoCredential(
@@ -12,5 +10,9 @@ data class WalletDemoCredential(
     val subject: String,
     val label: String,
     val addedAt: String,
-    val credentialData : JsonObject ,
+)
+
+data class WalletDemoCredentialDetails(
+    val id: String,
+    val credentialDataJson: String,
 )
