@@ -6,6 +6,8 @@ import id.walt.certificate.TestData.intermediateIssuerPublicKeyHex
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
+import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
+import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.crypto.keys.JvmJWKKeyCreator
@@ -37,6 +39,10 @@ class X509CertificateUtilCertificateSigningTest {
                 critical = true
                 addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign)
             }
+
+            extensionIssuerAltName {
+                addEmail("issuer@walt.id")
+            }
         }
 
         assertNotNull(certificate.data.extensionBasicConstraints) { constraints ->
@@ -49,6 +55,13 @@ class X509CertificateUtilCertificateSigningTest {
             assertTrue(keyUsage.critical)
             assertTrue(keyUsage.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.keyCertSign))
             assertFalse(keyUsage.keyPurposeIdList.contains(KeyUsageExtension.KeyUsage.cRLSign))
+        }
+
+        assertNotNull(certificate.data.extensionIssuerAltName) { issuerAltName ->
+            assertEquals(1, issuerAltName.alternativeNames.size)
+            val email = issuerAltName.alternativeNames.first()
+            assertEquals("issuer@walt.id", email.value)
+            assertEquals(IssuerAlternativeNameExtension.NameType.rfc822Name, email.type)
         }
 
         val certPem = certificate.encodedPem

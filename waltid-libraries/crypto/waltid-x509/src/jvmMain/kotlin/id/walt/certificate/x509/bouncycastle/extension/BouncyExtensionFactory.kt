@@ -13,6 +13,7 @@ internal object BouncyExtensionFactory {
         KeyUsageExtension.OID -> BouncyKeyUsageExtension(extension)
         ExtendedKeyUsageExtension.OID -> BouncyExtendedKeyUsageExtension(extension)
         SubjectAlternativeNameExtension.OID -> BouncySubjectAlternativeNameExtension(extension)
+        IssuerAlternativeNameExtension.OID -> BouncyIssuerAlternativeNameExtension(extension)
         else -> BouncyGenericExtension(extension)
     }
 
@@ -32,6 +33,12 @@ internal object BouncyExtensionFactory {
             extension,
             BouncySubjectAlternativeNameExtension.createExtension(extension)
         )
+
+        is IssuerAlternativeNameExtension -> createExtension(
+            extension,
+            BouncyIssuerAlternativeNameExtension.createExtension(extension)
+        )
+
 
         else -> error("Unknown BouncyCastleExtension type: ${extension::class.qualifiedName}")
     }

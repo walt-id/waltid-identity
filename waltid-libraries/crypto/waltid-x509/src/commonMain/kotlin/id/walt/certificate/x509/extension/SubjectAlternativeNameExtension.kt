@@ -1,33 +1,26 @@
 package id.walt.certificate.x509.extension
 
-interface SubjectAlternativeNameExtension : Extension {
+interface SubjectAlternativeNameExtension : AlternativeNameExtension {
 
-    val alternativeNames: List<AlternativeName>
+    typealias AlternativeName = AlternativeNameExtension.AlternativeName
+    typealias NameType = AlternativeNameExtension.NameType
 
-    enum class NameType {
-        dNSName,
-        uniformResourceIdentifier,
-        IPAddress,
-        registeredID,
-        directoryName,
-        rfc822Name,
-        ediPartyName,
-        x400Address,
-        otherName
-    }
+    override val alternativeNames: List<AlternativeName>
 
-    data class AlternativeName(
-        val type: NameType,
-        val value: String
-    )
+    class Builder(
+        critical: Boolean = false,
+    ) : AlternativeNameExtension.Builder(
+        OID,
+        critical,
+    ), SubjectAlternativeNameExtension
 
     companion object {
         const val OID = "2.5.29.17"
 
-        fun MutableExtensionContainer.extensionSan(block: SubjectAlternativeNameExtension.Builder.() -> Unit) {
-            val builder = Builder(OID)
+        fun MutableExtensionContainer.extensionSan(block: Builder.() -> Unit) {
+            val builder = Builder()
             builder.block()
-            this.extensions[KeyUsageExtension.OID] = builder
+            this.extensions[OID] = builder
         }
 
         val ExtensionContainer.extensionSan: SubjectAlternativeNameExtension?
@@ -35,24 +28,5 @@ interface SubjectAlternativeNameExtension : Extension {
                 val ext = this.extensions[OID]
                 return ext as? SubjectAlternativeNameExtension?
             }
-    }
-
-    data class Builder(
-        override val oid: String = OID,
-        override var critical: Boolean = false,
-    ) : SubjectAlternativeNameExtension {
-        override val alternativeNames: MutableList<AlternativeName> = mutableListOf()
-
-        fun addDnsName(dnsName: String) {
-            alternativeNames.add(AlternativeName(NameType.dNSName, dnsName))
-        }
-
-        fun addUri(uri: String) {
-            alternativeNames.add(AlternativeName(NameType.uniformResourceIdentifier, uri))
-        }
-
-        fun addIpAddress(ipAddress: String) {
-            alternativeNames.add(AlternativeName(NameType.IPAddress, ipAddress))
-        }
     }
 }
