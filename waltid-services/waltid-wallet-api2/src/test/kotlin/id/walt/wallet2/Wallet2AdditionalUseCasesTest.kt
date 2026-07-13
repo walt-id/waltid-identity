@@ -407,7 +407,7 @@ class Wallet2AdditionalUseCasesTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "Ed25519"))
+                    setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
                 }.body<WalletKeyInfo>()
 
                 val holderDid = http.post("/wallet/$walletId/dids/create") {
@@ -640,7 +640,7 @@ class Wallet2AdditionalUseCasesTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "secp256r1"))
+                    setBody(GenerateKeyRequest(keyType = KeyType.secp256r1))
                 }.body<WalletKeyInfo>()
 
                 // ── Step 1: Generate authorization URL ──

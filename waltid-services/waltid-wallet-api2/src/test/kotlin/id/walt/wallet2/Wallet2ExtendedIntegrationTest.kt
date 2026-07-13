@@ -201,7 +201,7 @@ class Wallet2ExtendedIntegrationTest {
             val ed25519Key = testAndReturn("Generate Ed25519 key") {
                 http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "Ed25519"))
+                    setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletKeyInfo>()
             }
@@ -212,7 +212,7 @@ class Wallet2ExtendedIntegrationTest {
             val p256Key = testAndReturn("Generate secp256r1 (P-256) key") {
                 http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "secp256r1"))
+                    setBody(GenerateKeyRequest(keyType = KeyType.secp256r1))
                 }.also { assertEquals(HttpStatusCode.Created, it.status) }
                     .body<WalletKeyInfo>()
             }
@@ -460,7 +460,7 @@ class Wallet2ExtendedIntegrationTest {
 
                 val keyInfo = http.post("/wallet/$walletId/keys/generate") {
                     contentType(ContentType.Application.Json)
-                    setBody(GenerateKeyRequest(keyType = "secp256r1"))
+                    setBody(GenerateKeyRequest(keyType = KeyType.secp256r1))
                 }.body<WalletKeyInfo>()
 
                 val offerUri = "openid-credential-offer://?credential_offer_uri=${

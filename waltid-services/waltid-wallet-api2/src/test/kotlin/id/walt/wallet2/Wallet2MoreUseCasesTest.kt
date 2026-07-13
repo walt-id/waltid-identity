@@ -298,7 +298,7 @@ class Wallet2MoreUseCasesTest {
             ) {
                 val http = testHttpClient()
                 val walletId = http.post("/wallet") { contentType(ContentType.Application.Json); setBody(CreateWalletRequest()) }.body<WalletCreatedResponse>().walletId
-                val keyInfo = http.post("/wallet/$walletId/keys/generate") { contentType(ContentType.Application.Json); setBody(GenerateKeyRequest(keyType = "Ed25519")) }.body<WalletKeyInfo>()
+                val keyInfo = http.post("/wallet/$walletId/keys/generate") { contentType(ContentType.Application.Json); setBody(GenerateKeyRequest(keyType = KeyType.Ed25519)) }.body<WalletKeyInfo>()
                 val holderDid = http.post("/wallet/$walletId/dids/create") { contentType(ContentType.Application.Json); setBody(id.walt.wallet2.server.handlers.CreateDidRequest(method = "key", keyId = keyInfo.keyId)) }.body<WalletDidEntry>().did
 
                 // ── Receive both credentials ──
@@ -442,7 +442,7 @@ class Wallet2MoreUseCasesTest {
                 testAndReturn("Deferred: generate wallet key") {
                     http.post("/wallet/$walletId/keys/generate") {
                         contentType(ContentType.Application.Json)
-                        setBody(GenerateKeyRequest(keyType = "Ed25519"))
+                        setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
                     }.also { assertEquals(HttpStatusCode.Created, it.status) }
                 }
 
@@ -619,7 +619,7 @@ class Wallet2MoreUseCasesTest {
                 testAndReturn("Generate key for JWK holder binding") {
                     http.post("/wallet/$walletId/keys/generate") {
                         contentType(ContentType.Application.Json)
-                        setBody(GenerateKeyRequest(keyType = "Ed25519"))
+                        setBody(GenerateKeyRequest(keyType = KeyType.Ed25519))
                     }.also { assertEquals(HttpStatusCode.Created, it.status) }
                 }
 
@@ -681,7 +681,7 @@ class Wallet2MoreUseCasesTest {
             ) {
                 val http = testHttpClient()
                 val walletId = http.post("/wallet") { contentType(ContentType.Application.Json); setBody(CreateWalletRequest()) }.body<WalletCreatedResponse>().walletId
-                val keyInfo = http.post("/wallet/$walletId/keys/generate") { contentType(ContentType.Application.Json); setBody(GenerateKeyRequest(keyType = "Ed25519")) }.body<WalletKeyInfo>()
+                val keyInfo = http.post("/wallet/$walletId/keys/generate") { contentType(ContentType.Application.Json); setBody(GenerateKeyRequest(keyType = KeyType.Ed25519)) }.body<WalletKeyInfo>()
                 val holderDid = http.post("/wallet/$walletId/dids/create") { contentType(ContentType.Application.Json); setBody(id.walt.wallet2.server.handlers.CreateDidRequest(method = "key", keyId = keyInfo.keyId)) }.body<WalletDidEntry>().did
 
                 // Receive credential
