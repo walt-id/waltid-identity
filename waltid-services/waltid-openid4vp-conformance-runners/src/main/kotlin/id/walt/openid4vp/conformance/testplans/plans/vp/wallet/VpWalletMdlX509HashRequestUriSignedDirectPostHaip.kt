@@ -22,14 +22,6 @@ import kotlinx.serialization.json.JsonObject
  * - MUST encrypt response using ECDH-ES with P-256
  * - MUST include DeviceAuth with session transcript binding
  * 
- * Expected test modules (6):
- * - oid4vp-1final-wallet-mdl-happy-flow
- * - oid4vp-1final-wallet-mdl-device-auth
- * - oid4vp-1final-wallet-mdl-session-transcript
- * - oid4vp-1final-wallet-mdl-invalid-mso-signature
- * - oid4vp-1final-wallet-mdl-invalid-device-signature
- * - oid4vp-1final-wallet-mdl-replay-protection
- * 
  * @see <a href="https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0-final.html">HAIP 1.0</a>
  * @see <a href="https://www.iso.org/standard/69084.html">ISO/IEC 18013-5:2021</a>
  */
@@ -53,10 +45,11 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
     /**
      * Test plan configuration for conformance suite.
      * 
-     * CRITICAL: Must include `client.jwks` with x5c for x509_hash scheme!
-     * The conformance suite (acting as verifier) needs this to:
-     * 1. Sign the authorization request (JAR) with the certificate
-     * 2. Compute x509_hash client_id from the leaf certificate
+     * Required for HAIP wallet tests:
+     * - client.jwks with x5c: For signing authorization requests and computing x509_hash client_id
+     * - client.dcql: DCQL query defining what credentials/claims to request (mDL format)
+     * - credential.trust_anchor: PEM certificate for validating credential signatures
+     * - credential.status_list_trust_anchor: PEM certificate for status list validation
      */
     override val configuration: JsonObject = Json.decodeFromString(
         """
@@ -83,7 +76,27 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
                             "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
                         }
                     ]
+                },
+                "dcql": {
+                    "credentials": [
+                        {
+                            "id": "mdl",
+                            "format": "mso_mdoc",
+                            "meta": {
+                                "doctype_value": "org.iso.18013.5.1.mDL"
+                            },
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
                 }
+            },
+            "credential": {
+                "trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}",
+                "status_list_trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}"
             },
             "publish": "everything"
         }

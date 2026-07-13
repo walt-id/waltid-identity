@@ -15,11 +15,6 @@ import kotlinx.serialization.json.JsonObject
  * 
  * NOTE: This uses x509_san_dns (baseline) instead of x509_hash (HAIP strict).
  * For official HAIP certification, use VpWalletMdlX509HashRequestUriSignedDirectPostHaip.
- * 
- * Expected test modules (6):
- * - oid4vp-1final-wallet-mdl-happy-flow
- * - oid4vp-1final-wallet-mdl-device-auth
- * - etc.
  */
 class VpWalletMdlX509SanDnsRequestUriSignedDirectPost(
     override val walletApiUrl: String,
@@ -41,9 +36,11 @@ class VpWalletMdlX509SanDnsRequestUriSignedDirectPost(
     /**
      * Test plan configuration for conformance suite.
      * 
-     * Includes `client.jwks` with x5c so conformance suite can:
-     * 1. Sign the authorization request (JAR)
-     * 2. Extract DNS SAN for x509_san_dns client_id
+     * Required for HAIP wallet tests:
+     * - client.jwks with x5c: For signing authorization requests and computing client_id
+     * - client.dcql: DCQL query defining what credentials/claims to request (mDL format)
+     * - credential.trust_anchor: PEM certificate for validating credential signatures
+     * - credential.status_list_trust_anchor: PEM certificate for status list validation
      */
     override val configuration: JsonObject = Json.decodeFromString(
         """
@@ -70,7 +67,27 @@ class VpWalletMdlX509SanDnsRequestUriSignedDirectPost(
                             "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
                         }
                     ]
+                },
+                "dcql": {
+                    "credentials": [
+                        {
+                            "id": "mdl",
+                            "format": "mso_mdoc",
+                            "meta": {
+                                "doctype_value": "org.iso.18013.5.1.mDL"
+                            },
+                            "claims": [
+                                {"path": ["org.iso.18013.5.1", "given_name"]},
+                                {"path": ["org.iso.18013.5.1", "family_name"]},
+                                {"path": ["org.iso.18013.5.1", "birth_date"]}
+                            ]
+                        }
+                    ]
                 }
+            },
+            "credential": {
+                "trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}",
+                "status_list_trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}"
             },
             "publish": "everything"
         }

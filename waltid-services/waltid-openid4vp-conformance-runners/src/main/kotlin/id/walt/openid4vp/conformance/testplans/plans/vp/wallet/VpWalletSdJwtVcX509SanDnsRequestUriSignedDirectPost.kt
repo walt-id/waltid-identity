@@ -15,13 +15,6 @@ import kotlinx.serialization.json.JsonObject
  * 
  * NOTE: This uses x509_san_dns (baseline) instead of x509_hash (HAIP strict).
  * For official HAIP certification, use VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip.
- * 
- * Expected test modules (14):
- * - oid4vp-1final-wallet-happy-flow
- * - oid4vp-1final-wallet-alternate-request-object-claims
- * - oid4vp-1final-wallet-request-uri-method-post
- * - oid4vp-1final-wallet-dcql-sd-jwt-vc-happy-flow
- * - etc.
  */
 class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
     override val walletApiUrl: String,
@@ -43,9 +36,11 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
     /**
      * Test plan configuration for conformance suite.
      * 
-     * Includes `client.jwks` with x5c so conformance suite can:
-     * 1. Sign the authorization request (JAR)
-     * 2. Extract DNS SAN for x509_san_dns client_id
+     * Required for HAIP wallet tests:
+     * - client.jwks with x5c: For signing authorization requests and computing client_id
+     * - client.dcql: DCQL query defining what credentials/claims to request
+     * - credential.trust_anchor: PEM certificate for validating credential signatures
+     * - credential.status_list_trust_anchor: PEM certificate for status list validation
      */
     override val configuration: JsonObject = Json.decodeFromString(
         """
@@ -72,7 +67,27 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
                             "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
                         }
                     ]
+                },
+                "dcql": {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://credentials.example.com/identity_credential"]
+                            },
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]},
+                                {"path": ["birthdate"]}
+                            ]
+                        }
+                    ]
                 }
+            },
+            "credential": {
+                "trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}",
+                "status_list_trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}"
             },
             "publish": "everything"
         }

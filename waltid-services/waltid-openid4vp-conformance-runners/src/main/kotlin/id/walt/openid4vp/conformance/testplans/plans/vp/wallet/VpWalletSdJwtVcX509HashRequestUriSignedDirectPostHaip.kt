@@ -21,22 +21,6 @@ import kotlinx.serialization.json.JsonObject
  * - MUST encrypt response using ECDH-ES with P-256
  * - MUST support A256GCM (or A128GCM) for JWE enc
  * 
- * Expected test modules (14):
- * - oid4vp-1final-wallet-happy-flow
- * - oid4vp-1final-wallet-alternate-request-object-claims
- * - oid4vp-1final-wallet-request-uri-method-post
- * - oid4vp-1final-wallet-dcql-sd-jwt-vc-happy-flow
- * - oid4vp-1final-wallet-dcql-sd-jwt-vc-credential-query
- * - oid4vp-1final-wallet-dcql-sd-jwt-vc-single-credential-multiple-queries
- * - oid4vp-1final-wallet-ensure-request-object-always-signed
- * - oid4vp-1final-wallet-ensure-request-uri-always-present
- * - oid4vp-1final-wallet-ensure-client-id-equals-client-id-scheme
- * - oid4vp-1final-wallet-ensure-client-id-x509-hash
- * - oid4vp-1final-wallet-ensure-response-type-always-vp-token
- * - oid4vp-1final-wallet-ensure-response-mode-direct-post-jwt
- * - oid4vp-1final-wallet-ensure-response-encrypted
- * - oid4vp-1final-wallet-ensure-nonce-always-present
- * 
  * @see <a href="https://openid.net/specs/openid4vc-high-assurance-interoperability-profile-1_0-final.html">HAIP 1.0</a>
  */
 class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
@@ -51,8 +35,6 @@ class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
 
     // Note: client_id_prefix is NOT specified here because the HAIP test plan
     // (oid4vp-1final-wallet-haip-test-plan) already defines it per-module.
-    // Specifying it here causes: "Variant 'client_id_prefix' has been set by user,
-    // but test plan already sets this variant for module..."
     override val variant = mapOf(
         "credential_format" to "sd_jwt_vc",
         "response_mode" to "direct_post.jwt"
@@ -61,15 +43,11 @@ class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
     /**
      * Test plan configuration for conformance suite.
      * 
-     * CRITICAL: Must include `client.jwks` with x5c for x509_hash scheme!
-     * The conformance suite (acting as verifier) needs this to:
-     * 1. Sign the authorization request (JAR) with the certificate
-     * 2. Compute x509_hash client_id from the leaf certificate
-     * 
-     * Per HAIP spec:
-     * - x509_hash = "x509_hash:" + base64url(SHA-256(DER(leaf_cert)))
-     * - Certificate chain must NOT include trust anchor (root CA)
-     * - Leaf certificate must NOT be self-signed
+     * Required for HAIP wallet tests:
+     * - client.jwks with x5c: For signing authorization requests and computing x509_hash client_id
+     * - client.dcql: DCQL query defining what credentials/claims to request
+     * - credential.trust_anchor: PEM certificate for validating credential signatures
+     * - credential.status_list_trust_anchor: PEM certificate for status list validation
      */
     override val configuration: JsonObject = Json.decodeFromString(
         """
@@ -96,7 +74,27 @@ class VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(
                             "x5c": ["${TestKeyMaterial.VERIFIER_LEAF_CERT}", "${TestKeyMaterial.VERIFIER_CA_CERT}"]
                         }
                     ]
+                },
+                "dcql": {
+                    "credentials": [
+                        {
+                            "id": "pid",
+                            "format": "dc+sd-jwt",
+                            "meta": {
+                                "vct_values": ["https://credentials.example.com/identity_credential"]
+                            },
+                            "claims": [
+                                {"path": ["given_name"]},
+                                {"path": ["family_name"]},
+                                {"path": ["birthdate"]}
+                            ]
+                        }
+                    ]
                 }
+            },
+            "credential": {
+                "trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}",
+                "status_list_trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}"
             },
             "publish": "everything"
         }
