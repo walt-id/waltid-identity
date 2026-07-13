@@ -136,8 +136,11 @@ class WalletTestPlanRunner(
             println("   Wallet authorization URL: $walletAuthUrl")
             
             // Call the wallet adapter to trigger the authorization flow
-            // The URL points to our adapter at host.docker.internal:7006
-            val walletResponse = conformanceHttp.get(walletAuthUrl)
+            // The URL from conformance suite points to ngrok/docker URL, but we call localhost directly
+            val localWalletUrl = walletAuthUrl
+                .replace(Regex("https?://[^/]+"), "http://127.0.0.1:7006")
+            println("   Calling local adapter: $localWalletUrl")
+            val walletResponse = conformanceHttp.get(localWalletUrl)
             println("   Wallet adapter response: ${walletResponse.status}")
 
             // Wait for test to complete (no longer WAITING)

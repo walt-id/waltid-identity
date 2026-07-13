@@ -74,7 +74,7 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
                             "id": "pid",
                             "format": "dc+sd-jwt",
                             "meta": {
-                                "vct_values": ["https://credentials.example.com/identity_credential"]
+                                "vct_values": ["http://localhost:7002/openid4vci/identity_credential"]
                             },
                             "claims": [
                                 {"path": ["given_name"]},
@@ -86,8 +86,8 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
                 }
             },
             "credential": {
-                "trust_anchor_pem": ${TestKeyMaterial.VERIFIER_CA_PEM_JSON},
-                "status_list_trust_anchor_pem": ${TestKeyMaterial.VERIFIER_CA_PEM_JSON}
+                "trust_anchor_pem": ${TestKeyMaterial.ISSUER_CA_PEM_JSON},
+                "status_list_trust_anchor_pem": ${TestKeyMaterial.ISSUER_CA_PEM_JSON}
             },
             "publish": "everything"
         }

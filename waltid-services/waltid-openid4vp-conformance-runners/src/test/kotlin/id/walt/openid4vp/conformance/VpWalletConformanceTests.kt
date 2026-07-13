@@ -56,7 +56,7 @@ class VpWalletConformanceTests {
     companion object {
         val walletApiUrl: String = ConformanceConfig.WALLET_API_URL
         val adapterPort: Int = ConformanceConfig.WALLET_ADAPTER_PORT
-        val adapterUrl: String = "http://host.docker.internal:$adapterPort/openid4vp/authorize"
+        val adapterUrl: String = ConformanceConfig.WALLET_ADAPTER_URL
         val conformanceHost: String = ConformanceConfig.CONFORMANCE_HOST
         val conformancePort: Int = ConformanceConfig.CONFORMANCE_PORT
 

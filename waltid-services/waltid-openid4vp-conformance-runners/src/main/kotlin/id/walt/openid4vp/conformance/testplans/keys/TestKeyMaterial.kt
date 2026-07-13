@@ -89,12 +89,59 @@ gw4g1u9yPw6wqf/QCx3ODl3BJg==
         get() = "[\"$MDOC_ISSUER_CERT\"]"
 
     // ================================
-    // SD-JWT VC Issuer Keys
+    // SD-JWT VC Issuer Keys & Certificates
     // ================================
 
     /**
-     * SD-JWT VC issuer key (P-256/ES256)
+     * SD-JWT VC Issuer CA certificate (walt.id Issuer CA)
+     * Self-signed root CA for issuing SD-JWT VC credentials
+     * Used as trust anchor for credential validation in wallet conformance tests
+     */
+    const val ISSUER_CA_CERT = "MIIBsDCCAVegAwIBAgIUD7VMTYFSHCCKaME4UTehV2rsbvkwCgYIKoZIzj0EAwIwLjEaMBgGA1UEAwwRd2FsdC5pZCBJc3N1ZXIgQ0ExEDAOBgNVBAoMB3dhbHQuaWQwHhcNMjYwNzEzMTQyNjQwWhcNMzYwNzEwMTQyNjQwWjAuMRowGAYDVQQDDBF3YWx0LmlkIElzc3VlciBDQTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABH+SamerI90NTCuDNSupIo0rvJRegHl2yTkKva2OOUXfXywgh7AbDGAiWxBEmedHDivpUCIoyxe+SuAVvDFfUxujUzBRMB0GA1UdDgQWBBRbugmrpGAaDgyj77GgBQevG29eyjAfBgNVHSMEGDAWgBRbugmrpGAaDgyj77GgBQevG29eyjAPBgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0cAMEQCIGZmRguYeYoBxNyjyEF8gBXFFVJTOIcGLBuBs2cYxN1TAiAQPvIuddRQdrm3Dc+S6sdK4P8/7zsYbmiGrqELhqT4+g=="
+
+    /**
+     * SD-JWT VC Issuer CA certificate in PEM format
+     */
+    const val ISSUER_CA_PEM = """-----BEGIN CERTIFICATE-----
+MIIBsDCCAVegAwIBAgIUD7VMTYFSHCCKaME4UTehV2rsbvkwCgYIKoZIzj0EAwIw
+LjEaMBgGA1UEAwwRd2FsdC5pZCBJc3N1ZXIgQ0ExEDAOBgNVBAoMB3dhbHQuaWQw
+HhcNMjYwNzEzMTQyNjQwWhcNMzYwNzEwMTQyNjQwWjAuMRowGAYDVQQDDBF3YWx0
+LmlkIElzc3VlciBDQTEQMA4GA1UECgwHd2FsdC5pZDBZMBMGByqGSM49AgEGCCqG
+SM49AwEHA0IABH+SamerI90NTCuDNSupIo0rvJRegHl2yTkKva2OOUXfXywgh7Ab
+DGAiWxBEmedHDivpUCIoyxe+SuAVvDFfUxujUzBRMB0GA1UdDgQWBBRbugmrpGAa
+Dgyj77GgBQevG29eyjAfBgNVHSMEGDAWgBRbugmrpGAaDgyj77GgBQevG29eyjAP
+BgNVHRMBAf8EBTADAQH/MAoGCCqGSM49BAMCA0cAMEQCIGZmRguYeYoBxNyjyEF8
+gBXFFVJTOIcGLBuBs2cYxN1TAiAQPvIuddRQdrm3Dc+S6sdK4P8/7zsYbmiGrqEL
+hqT4+g==
+-----END CERTIFICATE-----"""
+
+    /**
+     * SD-JWT VC Issuer CA PEM as JSON string (escaped for JSON embedding)
+     */
+    val ISSUER_CA_PEM_JSON: String
+        get() = "\"${ISSUER_CA_PEM.replace("\n", "\\n")}\""
+
+    /**
+     * SD-JWT VC Issuer leaf certificate (CN=issuer.walt.id)
+     * Signed by walt.id Issuer CA
+     */
+    const val ISSUER_LEAF_CERT = "MIIBzDCCAXKgAwIBAgIUdlm7mnmFbjlu0tqZlKro9u+PfjMwCgYIKoZIzj0EAwIwLjEaMBgGA1UEAwwRd2FsdC5pZCBJc3N1ZXIgQ0ExEDAOBgNVBAoMB3dhbHQuaWQwHhcNMjYwNzEzMTQyNjQwWhcNMjcwNzEzMTQyNjQwWjBaMRcwFQYDVQQDDA5pc3N1ZXIud2FsdC5pZDEQMA4GA1UECgwHd2FsdC5pZDELMAkGA1UEBhMCQVQxDzANBgNVBAgMBlZpZW5uYTEPMA0GA1UEBwwGVmllbm5hMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEGibjXhCooyI29MCa7z3MZMtCt1e_jSQEDQl-b8Ol2KHlL5HT9qxDkPPbuRH39nRplRZhrcfhuklmdLEYDMmESKNCMEAwHQYDVR0OBBYEFLqI0SKpK613gxs1LXdDS8GNLUbHMB8GA1UdIwQYMBaAFFu6CaukYBoODKPvsaAFB68bb17KMAoGCCqGSM49BAMCA0gAMEUCIGOWJtH0LKqE6sBRG+d4RdYxI+7SIjH2hdVuNalW77IJAiEAs9_G9CghrRRVkm-CIqIGv5YSyt7BsbW-bcuApoJQhA4="
+
+    /**
+     * SD-JWT VC Issuer private key (P-256/ES256)
+     * Corresponds to ISSUER_LEAF_CERT
+     */
+    const val ISSUER_KEY_JWK = """{"type":"jwk","jwk":{"kty":"EC","d":"ZNGqW-fqvLsO_kscAYNecT6LZ2uNUiL8yd591XoE5l0","crv":"P-256","x":"GibjXhCooyI29MCa7z3MZMtCt1e_jSQEDQl-b8Ol2KE","y":"5S-R0_asQ5Dz27kR9_Z0aZUWYa3H4bpJZnSxGAzJhEg"}}"""
+
+    /**
+     * SD-JWT VC Issuer certificate chain [leaf, CA] for x5c header
+     */
+    fun getIssuerCertificateChain(): List<String> = listOf(ISSUER_LEAF_CERT, ISSUER_CA_CERT)
+
+    /**
+     * SD-JWT VC issuer key (P-256/ES256) - LEGACY, uses old MDOC ROOT CA
      * Used by conformance suite to issue test SD-JWT VCs
+     * @deprecated Use ISSUER_KEY_JWK with getIssuerCertificateChain() instead
      */
     const val SDJWT_ISSUER_KEY_JWK = """{"kty":"EC","crv":"P-256","alg":"ES256","d":"KJ4k3Vcl5Sj9Mfq4rrNXBm2MoPoY3_Ak_PIR_EgsFhQ","x":"G0RINBiF-oQUD3d5DGnegQuXenI29JDaMGoMvioKRBM","y":"ed3eFGs2pEtrp7vAZ7BLcbrUtpKkYWAT2JPUQK4lN4E"}"""
 

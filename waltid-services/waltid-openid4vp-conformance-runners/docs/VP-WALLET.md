@@ -58,24 +58,90 @@ The following issues were identified and fixed during testing:
    curl -k https://localhost.emobix.co.uk:8443/api/runner/available
    ```
 
-3. **JVM truststore**: Configured automatically by `build.gradle.kts`
+3. **SSL Trust Configuration**: The conformance suite uses a self-signed certificate.
+   The JDK must trust it for the wallet to connect.
+   
+   **Add conformance suite certificate to JDK truststore:**
+   ```bash
+   # Extract the certificate
+   echo | openssl s_client -connect localhost.emobix.co.uk:8443 \
+       -servername localhost.emobix.co.uk 2>/dev/null | \
+       openssl x509 -out /tmp/conformance-suite.crt
+   
+   # Add to JDK 21 truststore (adjust path if needed)
+   JAVA_HOME=/home/pp/.gradle/jdks/eclipse_adoptium-21-amd64-linux.2
+   $JAVA_HOME/bin/keytool -import -trustcacerts \
+       -alias conformance-suite \
+       -file /tmp/conformance-suite.crt \
+       -keystore $JAVA_HOME/lib/security/cacerts \
+       -storepass changeit -noprompt
+   ```
 
 ### Run Wallet Conformance Tests
 
-**Step 1:** Start wallet-api2 (Terminal 1):
+The wallet conformance tests require multiple components running:
+
+**Terminal 1 — Wallet API:**
 ```bash
 cd ~/dev/walt-id/waltid-unified-build
 ./gradlew :waltid-services:waltid-wallet-api2:run
+# Runs on port 7005 (default for wallet-api2)
 ```
 
-**Step 2:** Run conformance tests (Terminal 2):
+**Terminal 2 — Issuer API (for test credentials):**
 ```bash
 cd ~/dev/walt-id/waltid-unified-build
+./gradlew :waltid-services:waltid-issuer-api2:run
+# Runs on port 7002
+```
+
+**Terminal 3 — Set up test wallet and credentials:**
+```bash
+# Create a wallet with credential store
+WALLET_ID=$(curl -s -X POST "http://127.0.0.1:7005/wallet" \
+    -H "Content-Type: application/json" \
+    -d '{"credentialStoreIds": ["conformance-store"]}' | jq -r '.walletId')
+echo "Created wallet: $WALLET_ID"
+
+# Create a DID for the wallet
+curl -s -X POST "http://127.0.0.1:7005/wallet/$WALLET_ID/dids/create" \
+    -H "Content-Type: application/json" \
+    -d '{"method": "key"}' | jq '.did'
+
+# Create a credential offer from issuer
+OFFER=$(curl -s -X POST "http://127.0.0.1:7002/issuer2/credential-offers" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "profileId": "identityCredentialSdJwt",
+      "authMethod": "PRE_AUTHORIZED",
+      "valueMode": "BY_VALUE",
+      "expiresInSeconds": 3600
+    }' | jq -r '.credentialOffer')
+echo "Credential offer created"
+
+# Receive credential in wallet
+curl -s -X POST "http://127.0.0.1:7005/wallet/$WALLET_ID/credentials/receive" \
+    -H "Content-Type: application/json" \
+    -d "{\"offerUrl\": \"$OFFER\"}" | jq '.'
+echo "Credential received!"
+
+# Verify credential is in wallet
+curl -s "http://127.0.0.1:7005/wallet/$WALLET_ID/credentials" | jq '.[].format'
+```
+
+**Terminal 4 — Run conformance tests:**
+```bash
+cd ~/dev/walt-id/waltid-unified-build
+
+# Set wallet ID if not using auto-discovery
+export CONFORMANCE_WALLET_ID=$WALLET_ID
+
+# Run tests
 ./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
     --tests "VpWalletConformanceTests" --rerun-tasks
 ```
 
-**Step 3:** View logs at https://localhost.emobix.co.uk:8443/logs.html
+**Step 5:** View logs at https://localhost.emobix.co.uk:8443/logs.html
 
 ---
 
@@ -171,26 +237,38 @@ The HAIP wallet test plan includes the following modules:
 ## Architecture
 
 ```
-┌─────────────────────────┐
-│   Conformance Suite     │  (Acts as Verifier)
-│   port 8443 (HTTPS)     │
+                              ┌──────────────────────┐
+                              │   Issuer API2        │  (Issues test credentials)
+                              │   port 7002          │
+                              └──────────┬───────────┘
+                                         │ OpenID4VCI (pre-auth)
+                                         ▼
+┌─────────────────────────┐    ┌──────────────────────┐
+│   Conformance Suite     │    │   Wallet API2        │  (Your wallet implementation)
+│   port 8443 (HTTPS)     │    │   port 7005          │
+│   (Acts as Verifier)    │    └──────────┬───────────┘
+└───────────┬─────────────┘               │
+            │                             │
+            │ 1. Authorization request (JAR via request_uri)
+            │                             │
+            ▼                             │
+┌─────────────────────────┐               │
+│   Wallet Adapter        │───────────────┘
+│   port 7006             │  2. Forward openid4vp:// URL
+│   (HTTP bridge)         │     to wallet /present endpoint
 └───────────┬─────────────┘
-            │ 1. Authorization request (JAR)
-            ▼
-┌─────────────────────────┐
-│   Wallet Adapter        │  (HTTP bridge, started by test)
-│   port 7006             │
-└───────────┬─────────────┘
-            │ 2. Forward to wallet
-            ▼
-┌─────────────────────────┐
-│   Wallet API2           │  (Your wallet implementation)
-│   port 7001             │
-└───────────┬─────────────┘
-            │ 3. Encrypted VP response (JWE)
+            │
+            │ 3. Wallet fetches JAR from conformance suite
+            │ 4. Wallet sends encrypted VP response (JWE)
             ▼
      Back to Conformance Suite
 ```
+
+**Component Ports:**
+- **7002** - Issuer API2 (for issuing test credentials)
+- **7005** - Wallet API2 (wallet implementation under test)
+- **7006** - Wallet Adapter (HTTP bridge for conformance suite)
+- **8443** - Conformance Suite (HTTPS, acts as verifier)
 
 ---
 
@@ -198,14 +276,50 @@ The HAIP wallet test plan includes the following modules:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WALLET_API_URL` | `http://127.0.0.1:7001` | Wallet API base URL |
+| `WALLET_API_URL` | `http://127.0.0.1:7005` | Wallet API base URL |
 | `WALLET_ADAPTER_PORT` | `7006` | Adapter port |
+| `WALLET_ADAPTER_URL` | `http://127.0.0.1:7006/openid4vp/authorize` | Full adapter URL (override for ngrok) |
 | `CONFORMANCE_HOST` | `localhost.emobix.co.uk` | Suite hostname |
 | `CONFORMANCE_PORT` | `8443` | Suite HTTPS port |
+| `CONFORMANCE_WALLET_ID` | (auto-detect) | Specific wallet ID to use |
+
+### Using ngrok for Docker networking
+
+If the conformance suite runs in Docker and can't reach `host.docker.internal`,
+use ngrok to expose the adapter:
+
+```bash
+# Start ngrok tunnel to adapter
+ngrok http 7006
+
+# Run tests with ngrok URL
+WALLET_ADAPTER_URL="https://your-ngrok-id.ngrok-free.app/openid4vp/authorize" \
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests" --rerun-tasks
+```
 
 ---
 
 ## Troubleshooting
+
+### VCT Mismatch Error
+
+**Symptom:** Conformance test fails because credential VCT doesn't match DCQL query.
+
+**Cause:** The conformance suite's DCQL query expects a specific `vct` (e.g., `https://credentials.example.com/identity_credential`), but the credential issued by issuer-api2 has `http://localhost:7002/openid4vci/identity_credential`.
+
+**Solutions:**
+1. **Update the DCQL query** in the test plan to match your issuer's VCT
+2. **Configure issuer** to use the expected VCT in credential configuration
+3. **Use a different test profile** that matches available credentials
+
+### SSL Certificate Error (PKIX path building failed)
+
+**Symptom:** `sun.security.validator.ValidatorException: PKIX path building failed`
+
+**Cause:** The wallet API can't verify the conformance suite's self-signed certificate.
+
+**Fix:** Add the certificate to Java's truststore (see Prerequisites above).
 
 ### Test plan creation fails with "Variant already set"
 
