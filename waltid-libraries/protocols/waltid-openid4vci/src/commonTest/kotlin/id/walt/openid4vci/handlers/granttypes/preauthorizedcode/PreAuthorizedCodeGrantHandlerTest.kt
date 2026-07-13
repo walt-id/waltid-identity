@@ -3,7 +3,6 @@ package id.walt.openid4vci.handlers.granttypes.preauthorizedcode
 import id.walt.openid4vci.DefaultClient
 import id.walt.openid4vci.DefaultSession
 import id.walt.openid4vci.GrantType
-import id.walt.openid4vci.StubTokenService
 import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.StubTokenIssuer
 import id.walt.openid4vci.TestRefreshTokenIssuer
