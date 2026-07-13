@@ -97,9 +97,8 @@ data class ReceiveCredentialRequest(
      * authentication headers `OAuth-Client-Attestation` / `OAuth-Client-Attestation-PoP`
      * (OpenID4VCI 1.0 §Token Endpoint; [@!I-D.ietf-oauth-attestation-based-client-auth]).
      *
-     * Building the attestation + PoP JWTs is the caller's responsibility (the wallet provider /
-     * Enterprise holds the stored client attestation); this handler only forwards the resulting
-     * headers to the token request.
+     * This is a manual escape hatch. Prefer passing a ClientAttestationAssembler to the handler so
+     * the library can create attestation headers from authorization server metadata and the wallet key.
      */
     val tokenRequestHeaders: Map<String, String> = emptyMap()
 ) {
@@ -155,6 +154,7 @@ data class ResolveOfferResult(
     val credentialIssuer: String,
     val credentialConfigurationIds: List<String>,
     val grantType: String?,
+    val preAuthorizedCode: String? = null,
     val txCodeRequired: Boolean,
     val credentialEndpoint: Url,
     val offeredCredentials: List<String>,
@@ -171,8 +171,6 @@ data class RequestTokenRequest(
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
     val anonymousPreAuthorizedCode: Boolean = false,
-    val key: DirectSerializedKey? = null,
-    val keyId: String? = null,
 )
 
 @Serializable
@@ -258,13 +256,12 @@ data class GenerateAuthorizationUrlResult(
 @Serializable
 data class ExchangeCodeRequest(
     val code: String,
+    /** Used to resolve AS metadata, including token endpoint, issuer, and token auth methods. */
     val credentialIssuerBaseUrl: String,
     val codeVerifier: String? = null,
     val clientId: String = DEFAULT_CLIENT_ID,
     val redirectUri: Url = Url("openid://"),
     val tokenRequestHeaders: Map<String, String> = emptyMap(),
-    val key: DirectSerializedKey? = null,
-    val keyId: String? = null,
 )
 
 // ---------------------------------------------------------------------------
@@ -313,7 +310,7 @@ object WalletIssuanceHandler {
          */
         onDeferredTransactionId: suspend (credentialConfigurationId: String, transactionId: String) -> Unit = { _, _ -> },
     ): Flow<StoredCredential> = channelFlow {
-        val key = resolveKey(wallet, request.key, request.keyId)
+        val key = request.key?.key ?: resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, no inline key, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
 
@@ -398,7 +395,6 @@ object WalletIssuanceHandler {
         log.trace { "Using nonce: $cNonce (from ${if (issuerMetadata.nonceEndpoint != null) "nonce endpoint" else "token response"})" }
 
         val credentialEndpoint = issuerMetadata.credentialEndpoint
-            ?: error("Issuer metadata contains no credential_endpoint")
         log.trace { "Credential endpoint: $credentialEndpoint" }
 
         // 6. Issue each offered credential
@@ -532,12 +528,10 @@ object WalletIssuanceHandler {
             credentialConfigurationIds = offer.credentialConfigurationIds,
             grantType = offer.grants?.preAuthorizedCode?.let { "pre-authorized_code" }
                 ?: offer.grants?.authorizationCode?.let { "authorization_code" },
+            preAuthorizedCode = offer.grants?.preAuthorizedCode?.preAuthorizedCode,
             txCodeRequired = offer.grants?.preAuthorizedCode?.txCode != null,
             tokenEndpoint = asMetadata.tokenEndpoint?.let { Url(it) },
-            credentialEndpoint = Url(
-                issuerMetadata.credentialEndpoint
-                    ?: error("Issuer metadata contains no credential_endpoint")
-            ),
+            credentialEndpoint = Url(issuerMetadata.credentialEndpoint),
             offeredCredentials = offeredCredentials.map { it.credentialConfigurationId }
         )
     }
@@ -567,7 +561,7 @@ object WalletIssuanceHandler {
                 asMetadata = it,
                 clientId = request.clientId,
                 attestationAssembler = attestationAssembler,
-                resolveInstanceKey = { resolveKey(wallet, request.key, request.keyId) },
+                resolveInstanceKey = { resolveKey(wallet, null) },
                 onAttestationObtained = onAttestationObtained,
             )
         }
@@ -611,7 +605,7 @@ object WalletIssuanceHandler {
     }
 
     suspend fun signProof(wallet: Wallet, request: SignProofRequest): SignProofResult {
-        val key = resolveKey(wallet, request.key, request.keyId)
+        val key = request.key?.key ?: resolveKey(wallet, request.keyId)
             ?: error("No key available for signing proof")
         val proofBuilder = JwtProofBuilder()
         val proofs = if (request.did != null) {
@@ -652,8 +646,7 @@ object WalletIssuanceHandler {
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private suspend fun resolveKey(wallet: Wallet, inlineKey: DirectSerializedKey?, keyId: String?): Key? = when {
-        inlineKey != null -> inlineKey.key
+    private suspend fun resolveKey(wallet: Wallet, keyId: String?): Key? = when {
         keyId != null -> wallet.findKey(keyId)
             ?: error("Key '$keyId' not found in any wallet key store")
 
@@ -831,7 +824,7 @@ object WalletIssuanceHandler {
             asMetadata = asMetadata,
             clientId = request.clientId,
             attestationAssembler = attestationAssembler,
-            resolveInstanceKey = { resolveKey(wallet, request.key, request.keyId) },
+            resolveInstanceKey = { resolveKey(wallet, null) },
             onAttestationObtained = onAttestationObtained,
         )
         return exchangeCode(
@@ -957,7 +950,7 @@ object WalletIssuanceHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {},
         httpClient: HttpClient = defaultHttpClient()
     ): Flow<StoredCredential> = channelFlow {
-        val key = resolveKey(wallet, inlineKey, keyId = null)
+        val key = inlineKey?.key ?: resolveKey(wallet, null)
             ?: error("No key available for proof-of-possession")
         val did = inlineDid ?: wallet.defaultDid()
 
@@ -968,7 +961,6 @@ object WalletIssuanceHandler {
             clientId = clientId,
             redirectUri = redirectUri,
             credentialIssuerBaseUrl = credentialIssuerBaseUrl,
-            key = inlineKey,
         )
         val tokenResult = exchangeCode(
             wallet = wallet,
