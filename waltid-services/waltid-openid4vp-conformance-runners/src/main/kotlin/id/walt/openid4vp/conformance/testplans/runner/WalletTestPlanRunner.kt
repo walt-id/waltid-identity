@@ -7,7 +7,7 @@ import id.walt.openid4vp.conformance.testplans.plans.vp.wallet.WalletTestPlan
 import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.http.*
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
 
 /**
  * Executes a single wallet conformance test plan
@@ -99,10 +99,8 @@ class WalletTestPlanRunner(
         
         println("DEBUG: URL: $createTestPlanUrl")
         
-        val body = buildJsonObject {
-            put("configuration", testPlan.configuration)
-        }
-        val response = conformance.createTestPlan(createTestPlanUrl, body)
+        // Send configuration directly - conformance suite expects client.jwks at root level
+        val response = conformance.createTestPlan(createTestPlanUrl, testPlan.configuration)
 
         println("Created test plan: ${response.id}")
         return response
