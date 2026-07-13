@@ -23,11 +23,18 @@ internal class MobileDemoWallet(
                 subject = credential.subject ?: "Unknown",
                 label = credential.label ?: credential.format,
                 addedAt = credential.addedAt ?: "",
-                credentialData = credential.credentialData
             )
         }
 
-    override suspend fun receive(offerUrl: String): List<String> = mobileWallet.receive(offerUrl)
+    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+        mobileWallet.credentialDetails(id)?.let {
+            WalletDemoCredentialDetails(id = it.id, credentialDataJson = it.credentialDataJson)
+        }
+
+    override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution =
+        mobileWallet.resolveOffer(offerUrl).let { DemoOfferResolution(txCodeRequired = it.txCodeRequired) }
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> = mobileWallet.receive(offerUrl, txCode)
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
