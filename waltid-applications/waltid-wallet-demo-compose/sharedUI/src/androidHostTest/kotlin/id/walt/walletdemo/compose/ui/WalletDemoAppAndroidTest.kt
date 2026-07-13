@@ -15,6 +15,10 @@ class WalletDemoAppAndroidTest {
         scenarios.pinSetupBootstrapsWalletAndShowsCredentials()
 
     @Test
+    fun savedCredentialOpensNeutralDetails() =
+        scenarios.savedCredentialOpensNeutralDetails()
+
+    @Test
     fun receiveFlowUpdatesStatusAndCredentialList() =
         scenarios.receiveFlowUpdatesStatusAndCredentialList()
 

@@ -41,6 +41,26 @@ class WalletDemoAppTestScenarios {
         assertEquals(1, wallet.bootstrapCalls)
     }
 
+    fun savedCredentialOpensNeutralDetails() = runComposeUiTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.credentialCard("cred-1")).performScrollTo().performClick()
+
+        onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.credentialDetails("cred-1")).assertIsDisplayed()
+        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+
+        onNodeWithTag(WalletUiTestTags.DetailsBack).performClick()
+
+        onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
+    }
+
     fun receiveFlowUpdatesStatusAndCredentialList() = runComposeUiTest {
         val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
         val controller = WalletDemoController(wallet)
@@ -148,8 +168,10 @@ class WalletDemoAppTestScenarios {
             id = "cred-1",
             format = "jwt_vc_json",
             issuer = "Example Issuer",
+            subject = "did:key:holder",
             label = "Example Credential",
             addedAt = "2026-06-17",
+            credentialDataJson = """{"given_name":"Ada","family_name":"Lovelace"}""",
         )
     }
 }

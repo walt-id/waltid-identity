@@ -1,5 +1,7 @@
 package id.walt.wallet2.mobile
 
+import id.walt.credentials.CredentialDetectorTypes
+import id.walt.credentials.formats.SdJwtCredential
 import id.walt.crypto.keys.KeyType
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletCredentialStore
@@ -19,6 +21,8 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -151,6 +155,42 @@ class MobileWalletTest {
         )
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
+    }
+
+    @Test
+    fun credentialsExposeStoredCredentialDataAsJsonString() = runTest {
+        val credentialStore = RecordingCredentialStore(
+            StoredCredential(
+                id = "credential-1",
+                credential = SdJwtCredential(
+                    dmtype = CredentialDetectorTypes.SDJWTVCSubType.sdjwtvc,
+                    credentialData = buildJsonObject {
+                        put("given_name", "Ada")
+                    },
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    signature = null,
+                    signed = null,
+                ),
+                label = "PID",
+            )
+        )
+        val wallet = MobileWallet(
+            walletId = "custom-wallet",
+            keyStore = PreloadedKeyStore(WalletKeyInfo(keyId = "custom-key", keyType = "secp256r1")),
+            didStore = PreloadedDidStore(WalletDidEntry(did = "did:key:custom", document = JsonObject(emptyMap()))),
+            credentialStore = credentialStore,
+            keyGenerator = { error("Injected credential listing should not generate a key") },
+        )
+
+        val credential = wallet.credentials().single()
+
+        assertEquals("credential-1", credential.id)
+        assertEquals("dc+sd-jwt", credential.format)
+        assertEquals("https://issuer.example", credential.issuer)
+        assertEquals("did:key:subject", credential.subject)
+        assertEquals("PID", credential.label)
+        assertEquals("""{"given_name":"Ada"}""", credential.credentialDataJson)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

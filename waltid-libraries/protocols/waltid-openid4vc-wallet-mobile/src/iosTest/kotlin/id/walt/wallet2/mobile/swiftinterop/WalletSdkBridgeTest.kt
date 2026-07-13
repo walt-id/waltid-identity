@@ -108,6 +108,7 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(result)
         assertEquals("credential-1", result.value.single().id)
         assertEquals("https://issuer.example", result.value.single().issuer)
+        assertEquals("""{"given_name":"Ada"}""", result.value.single().credentialDataJson)
     }
 
     @Test
@@ -459,6 +460,7 @@ class WalletSdkBridgeTest {
                     subject = null,
                     label = "PID",
                     addedAt = null,
+                    credentialDataJson = """{"given_name":"Ada"}""",
                 )
             )
 
