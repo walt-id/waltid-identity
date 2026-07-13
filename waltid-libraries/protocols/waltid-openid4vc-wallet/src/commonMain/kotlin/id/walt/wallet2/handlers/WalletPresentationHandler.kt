@@ -110,7 +110,9 @@ data class ResolveVpRequestResult(
     val nonce: String?,
     val clientId: String?,
     val responseUri: Url?,
-    val hasRequestUri: Boolean
+    val hasRequestUri: Boolean,
+    /** The DCQL query from the authorization request, ready to pass to match-credentials or present. */
+    val dcqlQuery: DcqlQuery?,
 )
 
 @Serializable
@@ -293,7 +295,8 @@ object WalletPresentationHandler {
             nonce = authRequest.nonce,
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
-            hasRequestUri = url.parameters.contains("request_uri")
+            hasRequestUri = url.parameters.contains("request_uri"),
+            dcqlQuery = authRequest.dcqlQuery,
         )
     }
 
