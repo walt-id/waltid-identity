@@ -69,6 +69,15 @@ object CredentialDisplayNormalizer {
             "cnf" -> (this as? JsonObject)?.let { confirmationKey ->
                 DisplayValue.Text(confirmationKey.confirmationKeyText())
             }
+            "status" -> (this as? JsonObject)?.let { status ->
+                DisplayValue.Text(status.credentialStatusText())
+            }
+            "credentialStatus", "credential_status" -> (this as? JsonObject)?.let { status ->
+                DisplayValue.Text(status.credentialStatusText())
+            }
+            "vct" -> (this as? JsonPrimitive)?.contentOrNull?.let { credentialType ->
+                DisplayValue.Text(credentialType.readableCredentialTypeText())
+            }
             else -> null
         }
 
@@ -173,10 +182,31 @@ private data class ClaimRow(
 
 private fun JsonArray.hiddenClaimCommitmentsText(): String =
     when (size) {
-        0 -> "No hidden claim commitments"
-        1 -> "1 hidden claim commitment"
-        else -> "$size hidden claim commitments"
+        0 -> "No undisclosed claim values"
+        1 -> "1 undisclosed claim value"
+        else -> "$size undisclosed claim values"
     }
+
+private fun JsonObject.credentialStatusText(): String {
+    val statusList = this["status_list"] as? JsonObject
+    if (statusList != null) {
+        val index = statusList["idx"]?.jsonPrimitive?.contentOrNull
+        val uri = statusList["uri"]?.jsonPrimitive?.contentOrNull
+        return listOfNotNull(
+            index?.let { "Status list index $it" },
+            uri,
+        ).joinToString(" - ").ifBlank { "Status list credential" }
+    }
+
+    val id = this["id"]?.jsonPrimitive?.contentOrNull
+    val type = this["type"]?.jsonPrimitive?.contentOrNull
+    return listOfNotNull(type, id).joinToString(" - ").ifBlank { toString() }
+}
+
+private fun String.readableCredentialTypeText(): String =
+    CredentialDisplayVocabulary.readableCredentialType(this)
+        ?.let { readable -> "$readable ($this)" }
+        ?: this
 
 private fun JsonObject.confirmationKeyText(): String {
     val jwk = this["jwk"] as? JsonObject

@@ -95,11 +95,14 @@ enum CredentialDisplayVocabulary {
             ClaimDescriptor("issuing_authority", label: "Issuing authority"),
             ClaimDescriptor("issuing_country", label: "Issuing country"),
             ClaimDescriptor("attestation_legal_category", label: "Attestation legal category"),
+            ClaimDescriptor("issuer", label: "Issuer"),
+            ClaimDescriptor("sub", label: "Subject", group: .technical),
             ClaimDescriptor("iss", label: "Issuer", group: .technical),
             ClaimDescriptor("vct", label: "Credential type", group: .technical, roles: [.credentialType]),
-            ClaimDescriptor("_sd", label: "Hidden claims", group: .technical),
+            ClaimDescriptor("_sd", label: "Undisclosed claims", group: .technical),
             ClaimDescriptor("_sd_alg", label: "Selective disclosure algorithm", group: .technical),
-            ClaimDescriptor("status", group: .technical),
+            ClaimDescriptor("status", label: "Credential status", group: .technical),
+            ClaimDescriptor("credential_status", aliases: ["credentialStatus"], label: "Credential status"),
             ClaimDescriptor("credential_type", aliases: ["Credential type", "credentialType"], roles: [.credentialType]),
             ClaimDescriptor("exp", label: "Expires", group: .technical, roles: [.temporal, .expiryDate]),
             ClaimDescriptor("expires", aliases: ["Expires"], roles: [.temporal, .expiryDate]),
@@ -126,6 +129,23 @@ enum CredentialDisplayVocabulary {
 
     private static let topLevelCredentialTypeClaimNames = Set(["type"].map(NormalizedClaimKey.init))
     private static let credentialSubjectContainerNames = Set(["credentialSubject", "credential_subject"].map(NormalizedClaimKey.init))
+    private static let w3cMetadataClaimNames = Set([
+        "@context",
+        "credentialSchema",
+        "credential_status",
+        "credentialStatus",
+        "evidence",
+        "expirationDate",
+        "id",
+        "issuanceDate",
+        "issuer",
+        "proof",
+        "refreshService",
+        "termsOfUse",
+        "type",
+        "validFrom",
+        "validUntil"
+    ].map(NormalizedClaimKey.init))
     private static let technicalContainerNames = Set([
         "@context",
         "credentialSchema",
@@ -139,6 +159,10 @@ enum CredentialDisplayVocabulary {
 
     static func groupKind(for components: [String]) -> ClaimGroupKind {
         let path = ClaimPath(components: components)
+        if isW3CMetadataClaimPath(path) {
+            return .technical
+        }
+
         if let descriptor = descriptor(for: path.topLevel) {
             return descriptor.group
         }
@@ -210,6 +234,17 @@ enum CredentialDisplayVocabulary {
             return false
         }
         return credentialSubjectContainerNames.contains(NormalizedClaimKey(path.components[1]))
+    }
+
+    private static func isW3CMetadataClaimPath(_ path: ClaimPath) -> Bool {
+        if path.isTopLevel, w3cMetadataClaimNames.contains(NormalizedClaimKey(path.topLevel)) {
+            return true
+        }
+
+        guard path.topLevel == "vc", path.components.count > 1 else {
+            return false
+        }
+        return w3cMetadataClaimNames.contains(NormalizedClaimKey(path.components[1]))
     }
 
     private static func hasTechnicalContainer(_ path: ClaimPath) -> Bool {

@@ -7,7 +7,7 @@ internal enum class ClaimGroupKind(
     Personal(title = "Personal details", order = 0),
     Address(title = "Address", order = 1),
     Other(title = "Credential data", order = 2),
-    Technical(title = "Technical claims", order = 3),
+    Technical(title = "Credential metadata", order = 3),
 }
 
 enum class ClaimRole {
@@ -80,11 +80,14 @@ internal object CredentialDisplayVocabulary {
         ClaimDescriptor("issuing_authority", label = "Issuing authority"),
         ClaimDescriptor("issuing_country", label = "Issuing country"),
         ClaimDescriptor("attestation_legal_category", label = "Attestation legal category"),
+        ClaimDescriptor("issuer", label = "Issuer"),
+        ClaimDescriptor("sub", label = "Subject", group = ClaimGroupKind.Technical),
         ClaimDescriptor("iss", label = "Issuer", group = ClaimGroupKind.Technical),
         ClaimDescriptor("vct", label = "Credential type", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.CredentialType)),
-        ClaimDescriptor("_sd", label = "Hidden claims", group = ClaimGroupKind.Technical),
+        ClaimDescriptor("_sd", label = "Undisclosed claims", group = ClaimGroupKind.Technical),
         ClaimDescriptor("_sd_alg", label = "Selective disclosure algorithm", group = ClaimGroupKind.Technical),
-        ClaimDescriptor("status", group = ClaimGroupKind.Technical),
+        ClaimDescriptor("status", label = "Credential status", group = ClaimGroupKind.Technical),
+        ClaimDescriptor("credential_status", aliases = setOf("credentialStatus"), label = "Credential status"),
         ClaimDescriptor("credential_type", aliases = setOf("Credential type", "credentialType"), roles = setOf(ClaimRole.CredentialType)),
         ClaimDescriptor("exp", label = "Expires", group = ClaimGroupKind.Technical, roles = setOf(ClaimRole.Temporal, ClaimRole.ExpiryDate)),
         ClaimDescriptor("expires", aliases = setOf("Expires"), roles = setOf(ClaimRole.Temporal, ClaimRole.ExpiryDate)),
@@ -109,6 +112,23 @@ internal object CredentialDisplayVocabulary {
     private val credentialSubjectContainerNames = setOf("credentialSubject", "credential_subject")
         .map(NormalizedClaimKey::from)
         .toSet()
+    private val w3cMetadataClaimNames = setOf(
+        "@context",
+        "credentialSchema",
+        "credential_status",
+        "credentialStatus",
+        "evidence",
+        "expirationDate",
+        "id",
+        "issuanceDate",
+        "issuer",
+        "proof",
+        "refreshService",
+        "termsOfUse",
+        "type",
+        "validFrom",
+        "validUntil",
+    ).map(NormalizedClaimKey::from).toSet()
     private val technicalContainerNames = setOf(
         "@context",
         "credentialSchema",
@@ -121,6 +141,10 @@ internal object CredentialDisplayVocabulary {
     ).map(NormalizedClaimKey::from).toSet()
 
     fun groupKind(path: ClaimPath): ClaimGroupKind {
+        if (path.isW3cMetadataClaimPath()) {
+            return ClaimGroupKind.Technical
+        }
+
         descriptorFor(path.topLevel)?.group?.let { return it }
 
         if (path.isCredentialSubjectWrapped()) {
@@ -176,6 +200,14 @@ internal object CredentialDisplayVocabulary {
 
         val secondLevel = components.getOrNull(1) ?: return false
         return topLevel == "vc" && NormalizedClaimKey.from(secondLevel) in credentialSubjectContainerNames
+    }
+
+    private fun ClaimPath.isW3cMetadataClaimPath(): Boolean {
+        val topLevelKey = NormalizedClaimKey.from(topLevel)
+        if (isTopLevel && topLevelKey in w3cMetadataClaimNames) return true
+
+        val secondLevel = components.getOrNull(1) ?: return false
+        return topLevel == "vc" && NormalizedClaimKey.from(secondLevel) in w3cMetadataClaimNames
     }
 
     private fun ClaimPath.hasTechnicalContainer(): Boolean {

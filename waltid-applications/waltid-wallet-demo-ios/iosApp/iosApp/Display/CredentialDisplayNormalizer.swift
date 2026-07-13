@@ -93,6 +93,15 @@ enum CredentialDisplayNormalizer {
         case "cnf":
             guard case .object(let members) = value else { return nil }
             return .text(confirmationKeyText(members))
+        case "status":
+            guard case .object(let members) = value else { return nil }
+            return .text(credentialStatusText(members))
+        case "credentialStatus", "credential_status":
+            guard case .object(let members) = value else { return nil }
+            return .text(credentialStatusText(members))
+        case "vct":
+            guard case .string(let credentialType) = value else { return nil }
+            return .text(readableCredentialTypeText(credentialType))
         default:
             return nil
         }
@@ -225,10 +234,36 @@ private struct ClaimRow {
 
 private func hiddenClaimCommitmentsText(count: Int) -> String {
     switch count {
-    case 0: return "No hidden claim commitments"
-    case 1: return "1 hidden claim commitment"
-    default: return "\(count) hidden claim commitments"
+    case 0: return "No undisclosed claim values"
+    case 1: return "1 undisclosed claim value"
+    default: return "\(count) undisclosed claim values"
     }
+}
+
+private func credentialStatusText(_ members: [CredentialDisplayJSONMember]) -> String {
+    if case .object(let statusListMembers)? = members.first(where: { $0.key == "status_list" })?.value {
+        let index = statusListMembers.stringOrNumberValue(for: "idx").map { "Status list index \($0)" }
+        let uri = statusListMembers.stringOrNumberValue(for: "uri")
+        let text = [index, uri]
+            .compactMap { $0 }
+            .joined(separator: " - ")
+        return text.isEmpty ? "Status list credential" : text
+    }
+
+    let text = [
+        members.stringOrNumberValue(for: "type"),
+        members.stringOrNumberValue(for: "id")
+    ]
+        .compactMap { $0 }
+        .joined(separator: " - ")
+    return text.isEmpty ? CredentialDisplayJSONValue.object(members).rawJSON : text
+}
+
+private func readableCredentialTypeText(_ value: String) -> String {
+    guard let readable = CredentialDisplayVocabulary.readableCredentialType(value) else {
+        return value
+    }
+    return "\(readable) (\(value))"
 }
 
 private func confirmationKeyText(_ members: [CredentialDisplayJSONMember]) -> String {
@@ -253,6 +288,15 @@ private extension Array where Element == CredentialDisplayJSONMember {
             return nil
         }
         return value
+    }
+
+    func stringOrNumberValue(for key: String) -> String? {
+        switch first(where: { $0.key == key })?.value {
+        case .string(let value), .number(let value):
+            return value
+        default:
+            return nil
+        }
     }
 }
 

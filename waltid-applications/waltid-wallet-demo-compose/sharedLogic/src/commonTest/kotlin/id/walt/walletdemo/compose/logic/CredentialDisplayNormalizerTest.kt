@@ -148,14 +148,74 @@ class CredentialDisplayNormalizerTest {
         val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
         assertEquals("Document number", credentialData.items.first { it.path.id == "document_number" }.label)
 
-        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Technical claims" })
-        assertEquals(DisplayValue.Text("2 hidden claim commitments"), technical.items.first { it.path.id == "_sd" }.value)
+        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
+        assertEquals(DisplayValue.Text("2 undisclosed claim values"), technical.items.first { it.path.id == "_sd" }.value)
         assertEquals(DisplayValue.Text("Key-bound credential - EC - P-256"), technical.items.first { it.path.id == "cnf" }.value)
         assertEquals(DisplayValue.Text("2025-01-15"), technical.items.first { it.path.id == "iat" }.value)
         assertEquals(DisplayValue.Text("2030-01-15"), technical.items.first { it.path.id == "exp" }.value)
         assertTrue(technical.items.none { item ->
             item.value == DisplayValue.Text("very-long-x-coordinate") ||
                 item.value == DisplayValue.Text("very-long-y-coordinate")
+        })
+    }
+
+    @Test
+    fun rendersUndisclosedSdJwtCredentialAsReadableMetadata() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = "https://backend.issuer.eudiw.dev",
+                label = "PID (SD-JWT VC)",
+                credentialDataJson = """
+                    {
+                      "_sd": [
+                        "064HX7n-bAY4l5g0JpiA4wnrJ2ufmT1gYv9s5r5TaZI",
+                        "2HP56d9-TgEG8BERV6z9n0MKBaxeTLkcC-R_5SGiL_M",
+                        "71g4sTDmdx29r5RkywJ1gM4pvYA0UShWpHuIP4nwP2E"
+                      ],
+                      "iss": "https://backend.issuer.eudiw.dev",
+                      "iat": 1783897200,
+                      "exp": 1791673200,
+                      "vct": "urn:eudi:pid:1",
+                      "status": {
+                        "status_list": {
+                          "idx": 8965,
+                          "uri": "https://issuer.eudiw.dev/token_status_list/FC/urn:eudi:pid:1/15a4de9f-d535-4441-8564-02784d7b1d30"
+                        }
+                      },
+                      "_sd_alg": "sha-256",
+                      "cnf": {
+                        "jwk": {
+                          "kty": "EC",
+                          "crv": "P-256",
+                          "x": "long-x-coordinate",
+                          "y": "long-y-coordinate"
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        assertTrue(details.groups.none { it.title == "Personal details" })
+        assertTrue(details.groups.none { it.title == "Address" })
+
+        val metadata = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
+        assertEquals("Undisclosed claims", metadata.items.first { it.path.id == "_sd" }.label)
+        assertEquals(DisplayValue.Text("3 undisclosed claim values"), metadata.items.first { it.path.id == "_sd" }.value)
+        assertEquals(DisplayValue.Text("Pid 1 (urn:eudi:pid:1)"), metadata.items.first { it.path.id == "vct" }.value)
+        assertEquals(
+            DisplayValue.Text("Status list index 8965 - https://issuer.eudiw.dev/token_status_list/FC/urn:eudi:pid:1/15a4de9f-d535-4441-8564-02784d7b1d30"),
+            metadata.items.first { it.path.id == "status" }.value,
+        )
+        assertEquals(DisplayValue.Text("Key-bound credential - EC - P-256"), metadata.items.first { it.path.id == "cnf" }.value)
+        assertTrue(metadata.items.none { item ->
+            item.path.id.contains("status_list") ||
+                item.path.id == "cnf.jwk.x" ||
+                item.path.id == "cnf.jwk.y" ||
+                item.value == DisplayValue.Text("long-x-coordinate") ||
+                item.value == DisplayValue.Text("long-y-coordinate")
         })
     }
 
@@ -398,8 +458,10 @@ class CredentialDisplayNormalizerTest {
         val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
         assertEquals("E-123", (credentialData.items.first { it.path.id == "credentialSubject.employee_id" }.value as DisplayValue.Text).value)
 
-        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Technical claims" })
+        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
         assertTrue(technical.items.any { it.path.id == "@context" })
+        assertTrue(technical.items.any { it.path.id == "type" })
+        assertTrue(technical.items.any { it.path.id == "issuer" })
         assertTrue(technical.items.any { it.path.id == "proof.type" })
     }
 
@@ -445,11 +507,15 @@ class CredentialDisplayNormalizerTest {
         val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
         assertEquals("E-123", (credentialData.items.first { it.path.id == "vc.credentialSubject.employee_id" }.value as DisplayValue.Text).value)
 
-        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Technical claims" })
+        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Credential metadata" })
         assertTrue(technical.items.any { it.path.id == "iss" })
+        assertTrue(technical.items.any { it.path.id == "sub" })
+        assertTrue(technical.items.any { it.path.id == "vc.type" })
         assertTrue(technical.items.any { it.path.id == "vc.@context" })
-        assertTrue(technical.items.any { it.path.id == "vc.credentialStatus.id" })
-        assertTrue(technical.items.any { it.path.id == "vc.credentialStatus.type" })
+        assertEquals(
+            DisplayValue.Text("StatusList2021Entry - https://issuer.example/status/1"),
+            technical.items.first { it.path.id == "vc.credentialStatus" }.value,
+        )
     }
 
     @Test

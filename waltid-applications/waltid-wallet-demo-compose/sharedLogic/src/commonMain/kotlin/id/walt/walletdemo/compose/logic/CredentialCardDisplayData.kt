@@ -54,7 +54,8 @@ private fun List<ClaimItem>.firstExpiryDateText(): String? =
 private fun List<ClaimItem>.firstCredentialTypeText(): String? =
     firstNotNullOfOrNull { item ->
         if (item.hasRole(ClaimRole.CredentialType)) {
-            item.value.asCredentialTypeText()?.let(CredentialDisplayVocabulary::readableCredentialType)
+            (item.rawCredentialTypeText() ?: item.value.asCredentialTypeText())
+                ?.let(CredentialDisplayVocabulary::readableCredentialType)
         } else {
             null
         }
@@ -67,6 +68,12 @@ private fun List<ClaimItem>.firstImageForRole(role: ClaimRole): DisplayValue.Ima
 
 private fun ClaimItem.hasRole(role: ClaimRole): Boolean =
     role in roles
+
+private fun ClaimItem.rawCredentialTypeText(): String? {
+    val raw = rawValue?.trim().orEmpty()
+    if (raw.isBlank() || raw.startsWith("[") || raw.startsWith("{")) return null
+    return raw.removeSurrounding("\"")
+}
 
 private fun DisplayValue.asCredentialTypeText(): String? =
     when (this) {

@@ -130,7 +130,7 @@ enum ClaimGroupKind: CaseIterable {
         case .personal: return "Personal details"
         case .address: return "Address"
         case .other: return "Credential data"
-        case .technical: return "Technical claims"
+        case .technical: return "Credential metadata"
         }
     }
 

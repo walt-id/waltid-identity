@@ -126,14 +126,73 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let credentialData = try XCTUnwrap(details.groups.first { $0.title == "Credential data" })
         XCTAssertEqual(credentialData.items.first { $0.path.id == "document_number" }?.label, "Document number")
 
-        let technical = try XCTUnwrap(details.groups.first { $0.title == "Technical claims" })
-        XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 hidden claim commitments"))
+        let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
+        XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 undisclosed claim values"))
         XCTAssertEqual(technical.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
         XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .text("2025-01-15"))
         XCTAssertEqual(technical.items.first { $0.path.id == "exp" }?.value, .text("2030-01-15"))
         XCTAssertFalse(technical.items.contains { item in
             item.value == .text("very-long-x-coordinate") ||
                 item.value == .text("very-long-y-coordinate")
+        })
+    }
+
+    func testRendersUndisclosedSdJwtCredentialAsReadableMetadata() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "PID (SD-JWT VC)",
+            issuer: "https://backend.issuer.eudiw.dev",
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "_sd": [
+                "064HX7n-bAY4l5g0JpiA4wnrJ2ufmT1gYv9s5r5TaZI",
+                "2HP56d9-TgEG8BERV6z9n0MKBaxeTLkcC-R_5SGiL_M",
+                "71g4sTDmdx29r5RkywJ1gM4pvYA0UShWpHuIP4nwP2E"
+              ],
+              "iss": "https://backend.issuer.eudiw.dev",
+              "iat": 1783897200,
+              "exp": 1791673200,
+              "vct": "urn:eudi:pid:1",
+              "status": {
+                "status_list": {
+                  "idx": 8965,
+                  "uri": "https://issuer.eudiw.dev/token_status_list/FC/urn:eudi:pid:1/15a4de9f-d535-4441-8564-02784d7b1d30"
+                }
+              },
+              "_sd_alg": "sha-256",
+              "cnf": {
+                "jwk": {
+                  "kty": "EC",
+                  "crv": "P-256",
+                  "x": "long-x-coordinate",
+                  "y": "long-y-coordinate"
+                }
+              }
+            }
+            """
+        )
+
+        XCTAssertFalse(details.groups.contains { $0.title == "Personal details" })
+        XCTAssertFalse(details.groups.contains { $0.title == "Address" })
+
+        let metadata = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
+        XCTAssertEqual(metadata.items.first { $0.path.id == "_sd" }?.label, "Undisclosed claims")
+        XCTAssertEqual(metadata.items.first { $0.path.id == "_sd" }?.value, .text("3 undisclosed claim values"))
+        XCTAssertEqual(metadata.items.first { $0.path.id == "vct" }?.value, .text("Pid 1 (urn:eudi:pid:1)"))
+        XCTAssertEqual(
+            metadata.items.first { $0.path.id == "status" }?.value,
+            .text("Status list index 8965 - https://issuer.eudiw.dev/token_status_list/FC/urn:eudi:pid:1/15a4de9f-d535-4441-8564-02784d7b1d30")
+        )
+        XCTAssertEqual(metadata.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
+        XCTAssertFalse(metadata.items.contains { item in
+            item.path.id.contains("status_list") ||
+                item.path.id == "cnf.jwk.x" ||
+                item.path.id == "cnf.jwk.y" ||
+                item.value == .text("long-x-coordinate") ||
+                item.value == .text("long-y-coordinate")
         })
     }
 
@@ -365,8 +424,10 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let credentialData = try XCTUnwrap(details.groups.first { $0.title == "Credential data" })
         XCTAssertEqual(credentialData.items.first { $0.path.id == "credentialSubject.employee_id" }?.value, .text("E-123"))
 
-        let technical = try XCTUnwrap(details.groups.first { $0.title == "Technical claims" })
+        let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
         XCTAssertTrue(technical.items.contains { $0.path.id == "@context" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "type" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "issuer" })
         XCTAssertTrue(technical.items.contains { $0.path.id == "proof.type" })
     }
 
@@ -410,11 +471,15 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         let credentialData = try XCTUnwrap(details.groups.first { $0.title == "Credential data" })
         XCTAssertEqual(credentialData.items.first { $0.path.id == "vc.credentialSubject.employee_id" }?.value, .text("E-123"))
 
-        let technical = try XCTUnwrap(details.groups.first { $0.title == "Technical claims" })
+        let technical = try XCTUnwrap(details.groups.first { $0.title == "Credential metadata" })
         XCTAssertTrue(technical.items.contains { $0.path.id == "iss" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "sub" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "vc.type" })
         XCTAssertTrue(technical.items.contains { $0.path.id == "vc.@context" })
-        XCTAssertTrue(technical.items.contains { $0.path.id == "vc.credentialStatus.id" })
-        XCTAssertTrue(technical.items.contains { $0.path.id == "vc.credentialStatus.type" })
+        XCTAssertEqual(
+            technical.items.first { $0.path.id == "vc.credentialStatus" }?.value,
+            .text("StatusList2021Entry - https://issuer.example/status/1")
+        )
     }
 
     func testUsesPortraitImageForCardSummary() {

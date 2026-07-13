@@ -71,7 +71,7 @@ private func firstExpiryDate(in items: [ClaimItem]) -> String? {
 private func firstCredentialType(in items: [ClaimItem]) -> String? {
     for item in items {
         if item.hasRole(.credentialType) {
-            if let type = credentialTypeValue(item.value).flatMap(CredentialDisplayVocabulary.readableCredentialType) {
+            if let type = (rawCredentialTypeValue(item) ?? credentialTypeValue(item.value)).flatMap(CredentialDisplayVocabulary.readableCredentialType) {
                 return type
             }
         }
@@ -92,6 +92,20 @@ private func firstImage(in items: [ClaimItem]) -> (data: Data, mimeType: String)
         }
     }
     return nil
+}
+
+private func rawCredentialTypeValue(_ item: ClaimItem) -> String? {
+    guard let rawValue = item.rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !rawValue.isEmpty,
+          !rawValue.hasPrefix("["),
+          !rawValue.hasPrefix("{") else {
+        return nil
+    }
+
+    if rawValue.hasPrefix("\""), rawValue.hasSuffix("\"") {
+        return String(rawValue.dropFirst().dropLast())
+    }
+    return rawValue
 }
 
 private func credentialTypeValue(_ value: DisplayValue) -> String? {
