@@ -124,7 +124,7 @@ private fun ImageValue(value: DisplayValue.Image, path: ClaimItemPath, modifier:
                 model = value.bytes,
                 contentDescription = "Credential image",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
             )
         }
         Text(
