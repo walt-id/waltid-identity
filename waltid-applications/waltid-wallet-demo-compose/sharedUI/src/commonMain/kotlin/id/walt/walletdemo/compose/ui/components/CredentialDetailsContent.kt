@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.CredentialDetails
+import id.walt.walletdemo.compose.logic.toSystemInfoGroup
 import id.walt.walletdemo.compose.ui.WalletUiTestTags
 
 @Composable
@@ -23,7 +24,8 @@ internal fun CredentialDetailsContent(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         CredentialOverviewSection(details)
-        if (details.groups.isEmpty()) {
+        val systemInfoGroup = details.toSystemInfoGroup()
+        if (details.groups.isEmpty() && systemInfoGroup == null) {
             Text(
                 "No credential details available",
             )
@@ -31,5 +33,6 @@ internal fun CredentialDetailsContent(
         details.groups.forEach { group ->
             ClaimGroupSection(group)
         }
+        systemInfoGroup?.let { ClaimGroupSection(it) }
     }
 }

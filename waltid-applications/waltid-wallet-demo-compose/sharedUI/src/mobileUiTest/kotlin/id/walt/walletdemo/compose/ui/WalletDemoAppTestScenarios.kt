@@ -58,6 +58,8 @@ class WalletDemoAppTestScenarios {
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.claimImage("portrait")).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimGroup("System info")).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("system.id")).performScrollTo().assertIsDisplayed()
 
         onNodeWithTag(WalletUiTestTags.DetailsBack).performClick()
 

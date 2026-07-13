@@ -48,6 +48,14 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Street address", address.items.first { it.path.id == "resident_address.street_address" }.label)
         assertEquals(DisplayValue.Text("1 Infinite Loop"), address.items.first { it.path.id == "resident_address.street_address" }.value)
         assertEquals("Locality", address.items.first { it.path.id == "resident_address.locality" }.label)
+
+        val systemInfo = assertNotNull(details.toSystemInfoGroup())
+        assertEquals("System info", systemInfo.title)
+        assertEquals(DisplayValue.Text("2026-07-09T12:00:00Z"), systemInfo.items.first { it.path.id == "system.added" }.value)
+        assertEquals(DisplayValue.Text("cred-1"), systemInfo.items.first { it.path.id == "system.id" }.value)
+        assertEquals(DisplayValue.Text("vc+sd-jwt"), systemInfo.items.first { it.path.id == "system.format" }.value)
+        assertEquals(DisplayValue.Text("did:web:issuer.example"), systemInfo.items.first { it.path.id == "system.issuer" }.value)
+        assertEquals(DisplayValue.Text("did:key:holder"), systemInfo.items.first { it.path.id == "system.subject" }.value)
     }
 
     @Test

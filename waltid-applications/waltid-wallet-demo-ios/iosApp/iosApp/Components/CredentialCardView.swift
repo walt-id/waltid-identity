@@ -31,7 +31,7 @@ struct CredentialCardView: View {
                         .font(.caption)
                         .foregroundColor(.primary)
                 }
-                Text(details.issuer ?? "Unknown issuer")
+                Text("Issuer: \(details.issuer ?? CredentialDisplayText.unknown)")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(1)

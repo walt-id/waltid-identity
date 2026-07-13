@@ -89,6 +89,43 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(details.cardSummary.portraitMimeType, "image/png")
     }
 
+    func testBuildsSystemInfoGroupFromCredentialMetadata() throws {
+        let addedAt = try XCTUnwrap(Self.isoDateFormatter.date(from: "2026-07-09T12:00:00Z"))
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "PID",
+            issuer: "Example Issuer",
+            subject: "did:key:holder",
+            format: "vc+sd-jwt",
+            addedAt: addedAt,
+            credentialDataJSON: "{}"
+        )
+
+        let systemInfo = try XCTUnwrap(details.systemInfoGroup)
+        XCTAssertEqual(systemInfo.title, "System info")
+        XCTAssertEqual(systemInfo.items.map(\.path.id), [
+            "system.added",
+            "system.id",
+            "system.format",
+            "system.issuer",
+            "system.subject"
+        ])
+        XCTAssertEqual(systemInfo.items.map(\.label), [
+            "Added",
+            "Credential ID",
+            "Format",
+            "Issuer",
+            "Subject"
+        ])
+        XCTAssertEqual(systemInfo.items.map(\.value), [
+            .text("2026-07-09"),
+            .text("cred-1"),
+            .text("vc+sd-jwt"),
+            .text("Example Issuer"),
+            .text("did:key:holder")
+        ])
+    }
+
     func testLeavesMalformedCredentialJSONWithoutDisplayGroups() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",
@@ -113,4 +150,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
 
     private static let onePixelPNGBase64 =
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+
+    private static let isoDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
+        return formatter
+    }()
 }

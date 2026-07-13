@@ -20,6 +20,10 @@ struct CredentialDetailsView: View {
             ForEach(details.groups) { group in
                 ClaimGroupView(group: group)
             }
+
+            if let systemInfoGroup = details.systemInfoGroup {
+                ClaimGroupView(group: systemInfoGroup)
+            }
         }
     }
 }
@@ -51,7 +55,7 @@ private struct CredentialOverviewView: View {
                         .font(.caption)
                 }
 
-                Text(details.issuer ?? "Unknown issuer")
+                Text("Issuer: \(details.issuer ?? CredentialDisplayText.unknown)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
