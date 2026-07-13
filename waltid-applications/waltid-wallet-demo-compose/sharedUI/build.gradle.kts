@@ -40,17 +40,33 @@ kotlin {
             implementation(identityLibs.compose.foundation)
             implementation(identityLibs.compose.ui)
             implementation(identityLibs.compose.material3)
-            implementation(identityLibs.androidx.camera.core)
-            implementation(identityLibs.androidx.camera.camera2)
-            implementation(identityLibs.androidx.camera.lifecycle)
-            implementation(identityLibs.androidx.camera.view)
-            implementation(identityLibs.mlkit.barcode.scanning)
-            implementation(identityLibs.androidx.activity.compose)
             implementation(identityLibs.compose.material.icons.core)
-            implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-            implementation("androidx.compose.material:material-icons-extended:1.7.8")
+            implementation(identityLibs.kotlinx.serialization.json)
+        }
 
+        if (enableAndroidBuild || enableIosBuild) {
+            val mobileMain by creating {
+                dependsOn(commonMain.get())
+                dependencies {
+                    api(identityLibs.easyqrscan)
+                }
+            }
 
+            if (enableAndroidBuild) {
+                androidMain {
+                    dependsOn(mobileMain)
+                    dependencies {
+                        implementation(identityLibs.androidx.activity.compose)
+                        implementation("androidx.compose.material:material-icons-extended:1.7.8")
+                    }
+                }
+            }
+
+            if (enableIosBuild) {
+                iosMain {
+                    dependsOn(mobileMain)
+                }
+            }
         }
 
         commonTest.dependencies {
