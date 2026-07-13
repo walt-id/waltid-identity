@@ -53,7 +53,10 @@ class PreAuthorizedCodeGrantHandlerTest {
         )
         val code = issued.code
 
-        val request = createAccessRequestWithGrant(code = code)
+        val request = createAccessRequestWithGrant(
+            code = code,
+            clientId = "client-pre",
+        )
 
         val result = handler.handleTokenEndpointRequest(request)
         assertTrue(result is AccessTokenResponseResult.Success)
