@@ -156,7 +156,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
         waitUntil(timeoutMillis = 5_000) { controller.state.value.requestDrafts.txCodeRequired }
-        onNodeWithText("This offer requires a pincode").performScrollTo().assertIsDisplayed()
+        onNodeWithText("This offer requires a pincode", substring = true).performScrollTo().assertIsDisplayed()
         onNodeWithTag("wallet.txCodeInput").performScrollTo().performTextInput("5678")
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
@@ -182,7 +182,7 @@ class WalletDemoAppTestScenarios {
         controller.resolveAndReceive("openid-credential-offer://qr-example")
         waitUntil(timeoutMillis = 5_000) { controller.state.value.requestDrafts.txCodeRequired }
 
-        onNodeWithText("This offer requires a pincode").performScrollTo().assertIsDisplayed()
+        onNodeWithText("This offer requires a pincode", substring = true).performScrollTo().assertIsDisplayed()
         onNodeWithTag("wallet.txCodeInput").performScrollTo().performTextInput("4321")
         onNodeWithTag("wallet.receiveButton").performScrollTo().performSemanticsAction(SemanticsActions.OnClick)
 
