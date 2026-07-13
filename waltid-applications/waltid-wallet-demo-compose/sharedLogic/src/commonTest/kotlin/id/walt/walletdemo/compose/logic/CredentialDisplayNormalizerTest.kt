@@ -45,12 +45,48 @@ class CredentialDisplayNormalizerTest {
         assertEquals(DisplayValue.NumberValue("28"), personal.items.first { it.path.id == "age" }.value)
 
         val address = assertNotNull(details.groups.firstOrNull { it.title == "Address" })
-        val residentAddress = address.items.first { it.path.id == "resident_address" }
-        assertEquals("Resident address", residentAddress.label)
-        assertIs<DisplayValue.ObjectValue>(residentAddress.value)
+        assertEquals("Street address", address.items.first { it.path.id == "resident_address.street_address" }.label)
+        assertEquals(DisplayValue.Text("1 Infinite Loop"), address.items.first { it.path.id == "resident_address.street_address" }.value)
+        assertEquals("Locality", address.items.first { it.path.id == "resident_address.locality" }.label)
 
         val technical = assertNotNull(details.technicalGroups.firstOrNull { it.title == "Raw credential data" })
         assertTrue(technical.items.any { it.path.id == "$" })
+    }
+
+    @Test
+    fun flattensNamespacedMdocObjectClaimsIntoDisplayRows() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "mso_mdoc",
+                credentialDataJson = """
+                    {
+                      "docType": "eu.europa.ec.eudi.pid.1",
+                      "eu.europa.ec.eudi.pid.1": {
+                        "resident_state": "Vienna",
+                        "birth_place": {
+                          "locality": "Vienna",
+                          "country": "Austria"
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
+        assertEquals(
+            listOf(
+                "docType",
+                "eu.europa.ec.eudi.pid.1.resident_state",
+                "eu.europa.ec.eudi.pid.1.birth_place.locality",
+                "eu.europa.ec.eudi.pid.1.birth_place.country",
+            ),
+            credentialData.items.map { it.path.id },
+        )
+        assertTrue(credentialData.items.none { it.value is DisplayValue.ObjectValue })
     }
 
     @Test
@@ -90,9 +126,9 @@ class CredentialDisplayNormalizerTest {
 
         val portrait = details.groups
             .flatMap { it.items }
-            .first { it.path.id == "portrait" }
-        val portraitObject = assertIs<DisplayValue.ObjectValue>(portrait.value)
-        val image = assertIs<DisplayValue.Image>(portraitObject.entries.first { it.path.id == "portrait.elementValue" }.value)
+            .first { it.path.id == "portrait.elementValue" }
+        assertEquals("Portrait", portrait.label)
+        val image = assertIs<DisplayValue.Image>(portrait.value)
 
         assertEquals("image/png", image.mimeType)
         assertTrue(image.bytes.contentEquals(Base64.Default.decode(onePixelPngBase64)))

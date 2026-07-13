@@ -47,10 +47,10 @@ object CredentialDisplayNormalizer {
             )
 
         val groupedItems = parsed.entries
-            .map { (key, value) ->
+            .flatMap { (key, value) ->
                 val path = ClaimPath.topLevel(key)
-                CredentialDisplayVocabulary.groupKind(path) to
-                        value.toClaimItem(path = path, label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
+                value.toClaimItems(path = path, label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
+                    .map { item -> CredentialDisplayVocabulary.groupKind(path) to item }
             }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
             .entries
@@ -84,6 +84,24 @@ object CredentialDisplayNormalizer {
             rawValue = toString(),
             roles = CredentialDisplayVocabulary.roles(path),
         )
+
+    private fun JsonElement.toClaimItems(path: ClaimPath, label: String): List<ClaimItem> {
+        val item = toClaimItem(path = path, label = label)
+        return if (this is JsonObject) item.flattenObjectForClaimRows() else listOf(item)
+    }
+
+    private fun ClaimItem.flattenObjectForClaimRows(): List<ClaimItem> =
+        when (val displayValue = value) {
+            is DisplayValue.ObjectValue -> displayValue.entries.flatMap { entry ->
+                val rows = entry.flattenObjectForClaimRows()
+                if (rows.size == 1 && rows.single().value is DisplayValue.Image) {
+                    listOf(rows.single().copy(label = label))
+                } else {
+                    rows
+                }
+            }
+            else -> listOf(this)
+        }
 
     private fun JsonElement.toDisplayValue(path: ClaimPath): DisplayValue =
         when (this) {
