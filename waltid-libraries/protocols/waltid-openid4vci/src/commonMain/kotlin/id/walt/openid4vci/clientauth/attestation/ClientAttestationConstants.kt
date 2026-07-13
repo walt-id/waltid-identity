@@ -24,7 +24,6 @@ object ClientAttestationSigningAlgorithms {
         ES256,
         ES384,
         ES512,
-        ES256K,
         RS256,
         RS384,
         RS512,
