@@ -63,6 +63,23 @@ jobs:
       deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
       oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
       enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
+  deploy-license:
+    runs-on: ubuntu-latest
+    needs: [ version, api-docker ]
+    if: ${{ !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    steps:
+      - name: Dispatch license deployment in enterprise repo
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_ACCESS_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'walt-id',
+              repo: 'waltid-identity-enterprise',
+              workflow_id: 'deploy-k8s-license.yml',
+              ref: 'main',
+              inputs: { version: '${{ needs.version.outputs.release_version }}' }
+            })
   branch:
     uses: walt-id/waltid-identity/.github/workflows/branch.yml@main
     secrets: inherit
