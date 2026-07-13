@@ -73,6 +73,166 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertEqual(data, onePixelPNGData)
     }
 
+    func testRendersSdJwtProtocolDataAsReadableMetadataAndKeepsClaimsGrouped() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "PID (SD-JWT VC)",
+            issuer: "https://issuer.example",
+            subject: nil,
+            format: "dc+sd-jwt",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "_sd": [
+                "09vKrJMOlyTWM0sjpu_pdOBVBQ2M1y3KhpH515nXkpY",
+                "2rsjGbaC0ky8mT0pJrPioWTq0_daw1sX76poUlgCwbI"
+              ],
+              "iss": "https://issuer.example",
+              "iat": 1736899200,
+              "exp": 1894699800,
+              "vct": "eu.europa.ec.eudi.pid.1",
+              "_sd_alg": "sha-256",
+              "cnf": {
+                "jwk": {
+                  "kty": "EC",
+                  "crv": "P-256",
+                  "x": "very-long-x-coordinate",
+                  "y": "very-long-y-coordinate"
+                }
+              },
+              "given_name": "Alice",
+              "family_name": "Tester",
+              "birthdate": "1990-01-01",
+              "place_of_birth": {
+                "locality": "Berlin",
+                "country": "DE"
+              },
+              "resident_country": "AT",
+              "resident_state": "Vienna",
+              "document_number": "A01234567"
+            }
+            """
+        )
+
+        let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
+        XCTAssertEqual(personal.items.first { $0.path.id == "given_name" }?.value, .text("Alice"))
+        XCTAssertEqual(personal.items.first { $0.path.id == "birthdate" }?.label, "Date of birth")
+        XCTAssertEqual(personal.items.first { $0.path.id == "place_of_birth.locality" }?.label, "Locality")
+
+        let address = try XCTUnwrap(details.groups.first { $0.title == "Address" })
+        XCTAssertEqual(address.items.first { $0.path.id == "resident_country" }?.label, "Resident country")
+        XCTAssertEqual(address.items.first { $0.path.id == "resident_state" }?.value, .text("Vienna"))
+
+        let credentialData = try XCTUnwrap(details.groups.first { $0.title == "Credential data" })
+        XCTAssertEqual(credentialData.items.first { $0.path.id == "document_number" }?.label, "Document number")
+
+        let technical = try XCTUnwrap(details.groups.first { $0.title == "Technical claims" })
+        XCTAssertEqual(technical.items.first { $0.path.id == "_sd" }?.value, .text("2 hidden claim commitments"))
+        XCTAssertEqual(technical.items.first { $0.path.id == "cnf" }?.value, .text("Key-bound credential - EC - P-256"))
+        XCTAssertEqual(technical.items.first { $0.path.id == "iat" }?.value, .text("2025-01-15"))
+        XCTAssertEqual(technical.items.first { $0.path.id == "exp" }?.value, .text("2030-01-15"))
+        XCTAssertFalse(technical.items.contains { item in
+            item.value == .text("very-long-x-coordinate") ||
+                item.value == .text("very-long-y-coordinate")
+        })
+    }
+
+    func testRendersRepresentativeSupportedCredentialFormats() {
+        let cases: [(format: String, title: String, credentialDataJSON: String, expectedHolderName: String, expectedCredentialType: String?, expectedClaimPath: String)] = [
+            (
+                format: "jwt_vc_json",
+                title: "Person credential",
+                credentialDataJSON: """
+                {
+                  "@context": ["https://www.w3.org/2018/credentials/v1"],
+                  "type": ["VerifiableCredential", "PersonCredential"],
+                  "issuer": "did:web:issuer.example",
+                  "credentialSubject": {
+                    "given_name": "Ada",
+                    "family_name": "Lovelace",
+                    "portrait": "data:image/png;base64,\(Self.onePixelPNGBase64)"
+                  }
+                }
+                """,
+                expectedHolderName: "Ada Lovelace",
+                expectedCredentialType: "Person credential",
+                expectedClaimPath: "credentialSubject.portrait"
+            ),
+            (
+                format: "dc+sd-jwt",
+                title: "PID SD-JWT VC",
+                credentialDataJSON: """
+                {
+                  "vct": "urn:eudi:pid:1",
+                  "_sd": ["digest-1"],
+                  "cnf": {"kid": "holder-key-1"},
+                  "given_name": "Alice",
+                  "family_name": "Tester",
+                  "exp": 1894699800
+                }
+                """,
+                expectedHolderName: "Alice Tester",
+                expectedCredentialType: "Pid 1",
+                expectedClaimPath: "cnf"
+            ),
+            (
+                format: "mso_mdoc",
+                title: "EUDI PID mdoc",
+                credentialDataJSON: """
+                {
+                  "docType": "eu.europa.ec.eudi.pid.1",
+                  "eu.europa.ec.eudi.pid.1": {
+                    "given_name": "Anna",
+                    "family_name": "Musterfrau",
+                    "resident_state": "Vienna"
+                  }
+                }
+                """,
+                expectedHolderName: "Anna Musterfrau",
+                expectedCredentialType: nil,
+                expectedClaimPath: "eu.europa.ec.eudi.pid.1.resident_state"
+            ),
+            (
+                format: "mso_mdoc",
+                title: "ISO mDL",
+                credentialDataJSON: """
+                {
+                  "docType": "org.iso.18013.5.1.mDL",
+                  "org.iso.18013.5.1": {
+                    "given_name": "Max",
+                    "family_name": "Driver",
+                    "document_number": "D1234567"
+                  }
+                }
+                """,
+                expectedHolderName: "Max Driver",
+                expectedCredentialType: nil,
+                expectedClaimPath: "org.iso.18013.5.1.document_number"
+            )
+        ]
+
+        for credential in cases {
+            let details = CredentialDisplayNormalizer.details(
+                id: "cred-\(credential.format)-\(credential.title)",
+                title: credential.title,
+                issuer: "Example Issuer",
+                subject: "did:key:holder",
+                format: credential.format,
+                addedAt: nil,
+                credentialDataJSON: credential.credentialDataJSON
+            )
+            let claims = details.groups.flatMap(\.items)
+
+            XCTAssertEqual(details.cardSummary.holderName, credential.expectedHolderName, credential.title)
+            XCTAssertEqual(details.cardSummary.credentialType, credential.expectedCredentialType, credential.title)
+            XCTAssertTrue(claims.contains { $0.path.id == credential.expectedClaimPath }, credential.title)
+            XCTAssertFalse(claims.contains { item in
+                if case .object = item.value { return true }
+                return false
+            }, credential.title)
+        }
+    }
+
     func testUsesPortraitImageForCardSummary() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",

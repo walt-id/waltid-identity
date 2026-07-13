@@ -13,6 +13,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 object CredentialDisplayNormalizer {
     private val json = Json {
@@ -54,10 +55,21 @@ object CredentialDisplayNormalizer {
         ClaimItem(
             path = path.itemPath,
             label = label,
-            value = toDisplayValue(path),
+            value = toProtocolDisplayValue(path) ?: toDisplayValue(path),
             rawValue = toString(),
             roles = CredentialDisplayVocabulary.roles(path),
         )
+
+    private fun JsonElement.toProtocolDisplayValue(path: ClaimPath): DisplayValue? =
+        when (path.leaf) {
+            "_sd" -> (this as? JsonArray)?.let { digests ->
+                DisplayValue.Text(digests.hiddenClaimCommitmentsText())
+            }
+            "cnf" -> (this as? JsonObject)?.let { confirmationKey ->
+                DisplayValue.Text(confirmationKey.confirmationKeyText())
+            }
+            else -> null
+        }
 
     private fun JsonElement.toClaimItems(path: ClaimPath, label: String): List<ClaimItem> {
         val item = toClaimItem(path = path, label = label)
@@ -128,4 +140,26 @@ object CredentialDisplayNormalizer {
     private const val minimumCredibleEpochSeconds = 100_000_000L
     private const val epochMillisecondsThreshold = 10_000_000_000L
     private const val imageWrapperClaimName = "elementValue"
+}
+
+private fun JsonArray.hiddenClaimCommitmentsText(): String =
+    when (size) {
+        0 -> "No hidden claim commitments"
+        1 -> "1 hidden claim commitment"
+        else -> "$size hidden claim commitments"
+    }
+
+private fun JsonObject.confirmationKeyText(): String {
+    val jwk = this["jwk"] as? JsonObject
+    if (jwk != null) {
+        val keyType = jwk["kty"]?.jsonPrimitive?.contentOrNull
+        val curve = jwk["crv"]?.jsonPrimitive?.contentOrNull
+        return listOfNotNull("Key-bound credential", keyType, curve)
+            .joinToString(" - ")
+    }
+
+    val keyId = this["kid"]?.jsonPrimitive?.contentOrNull
+    if (!keyId.isNullOrBlank()) return "Key-bound credential - $keyId"
+
+    return "Key-bound credential"
 }

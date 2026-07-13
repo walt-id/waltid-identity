@@ -95,6 +95,176 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun rendersSdJwtProtocolDataAsReadableMetadataAndKeepsClaimsGrouped() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "dc+sd-jwt",
+                issuer = "https://issuer.example",
+                label = "PID (SD-JWT VC)",
+                credentialDataJson = """
+                    {
+                      "_sd": [
+                        "09vKrJMOlyTWM0sjpu_pdOBVBQ2M1y3KhpH515nXkpY",
+                        "2rsjGbaC0ky8mT0pJrPioWTq0_daw1sX76poUlgCwbI"
+                      ],
+                      "iss": "https://issuer.example",
+                      "iat": 1736899200,
+                      "exp": 1894699800,
+                      "vct": "eu.europa.ec.eudi.pid.1",
+                      "_sd_alg": "sha-256",
+                      "cnf": {
+                        "jwk": {
+                          "kty": "EC",
+                          "crv": "P-256",
+                          "x": "very-long-x-coordinate",
+                          "y": "very-long-y-coordinate"
+                        }
+                      },
+                      "given_name": "Alice",
+                      "family_name": "Tester",
+                      "birthdate": "1990-01-01",
+                      "place_of_birth": {
+                        "locality": "Berlin",
+                        "country": "DE"
+                      },
+                      "resident_country": "AT",
+                      "resident_state": "Vienna",
+                      "document_number": "A01234567"
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
+        assertEquals("Alice", (personal.items.first { it.path.id == "given_name" }.value as DisplayValue.Text).value)
+        assertEquals("Date of birth", personal.items.first { it.path.id == "birthdate" }.label)
+        assertEquals("Locality", personal.items.first { it.path.id == "place_of_birth.locality" }.label)
+
+        val address = assertNotNull(details.groups.firstOrNull { it.title == "Address" })
+        assertEquals("Resident country", address.items.first { it.path.id == "resident_country" }.label)
+        assertEquals("Vienna", (address.items.first { it.path.id == "resident_state" }.value as DisplayValue.Text).value)
+
+        val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
+        assertEquals("Document number", credentialData.items.first { it.path.id == "document_number" }.label)
+
+        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Technical claims" })
+        assertEquals(DisplayValue.Text("2 hidden claim commitments"), technical.items.first { it.path.id == "_sd" }.value)
+        assertEquals(DisplayValue.Text("Key-bound credential - EC - P-256"), technical.items.first { it.path.id == "cnf" }.value)
+        assertEquals(DisplayValue.Text("2025-01-15"), technical.items.first { it.path.id == "iat" }.value)
+        assertEquals(DisplayValue.Text("2030-01-15"), technical.items.first { it.path.id == "exp" }.value)
+        assertTrue(technical.items.none { item ->
+            item.value == DisplayValue.Text("very-long-x-coordinate") ||
+                item.value == DisplayValue.Text("very-long-y-coordinate")
+        })
+    }
+
+    @Test
+    fun rendersRepresentativeSupportedCredentialFormats() {
+        data class FormatCase(
+            val format: String,
+            val label: String,
+            val credentialDataJson: String,
+            val expectedHolderName: String,
+            val expectedCredentialType: String?,
+            val expectedClaimPath: String,
+        )
+
+        val cases = listOf(
+            FormatCase(
+                format = "jwt_vc_json",
+                label = "Person credential",
+                credentialDataJson = """
+                    {
+                      "@context": ["https://www.w3.org/2018/credentials/v1"],
+                      "type": ["VerifiableCredential", "PersonCredential"],
+                      "issuer": "did:web:issuer.example",
+                      "credentialSubject": {
+                        "given_name": "Ada",
+                        "family_name": "Lovelace",
+                        "portrait": "data:image/png;base64,$onePixelPngBase64"
+                      }
+                    }
+                """.trimIndent(),
+                expectedHolderName = "Ada Lovelace",
+                expectedCredentialType = "Person credential",
+                expectedClaimPath = "credentialSubject.portrait",
+            ),
+            FormatCase(
+                format = "dc+sd-jwt",
+                label = "PID SD-JWT VC",
+                credentialDataJson = """
+                    {
+                      "vct": "urn:eudi:pid:1",
+                      "_sd": ["digest-1"],
+                      "cnf": {"kid": "holder-key-1"},
+                      "given_name": "Alice",
+                      "family_name": "Tester",
+                      "exp": 1894699800
+                    }
+                """.trimIndent(),
+                expectedHolderName = "Alice Tester",
+                expectedCredentialType = "Pid 1",
+                expectedClaimPath = "cnf",
+            ),
+            FormatCase(
+                format = "mso_mdoc",
+                label = "EUDI PID mdoc",
+                credentialDataJson = """
+                    {
+                      "docType": "eu.europa.ec.eudi.pid.1",
+                      "eu.europa.ec.eudi.pid.1": {
+                        "given_name": "Anna",
+                        "family_name": "Musterfrau",
+                        "resident_state": "Vienna"
+                      }
+                    }
+                """.trimIndent(),
+                expectedHolderName = "Anna Musterfrau",
+                expectedCredentialType = null,
+                expectedClaimPath = "eu.europa.ec.eudi.pid.1.resident_state",
+            ),
+            FormatCase(
+                format = "mso_mdoc",
+                label = "ISO mDL",
+                credentialDataJson = """
+                    {
+                      "docType": "org.iso.18013.5.1.mDL",
+                      "org.iso.18013.5.1": {
+                        "given_name": "Max",
+                        "family_name": "Driver",
+                        "document_number": "D1234567"
+                      }
+                    }
+                """.trimIndent(),
+                expectedHolderName = "Max Driver",
+                expectedCredentialType = null,
+                expectedClaimPath = "org.iso.18013.5.1.document_number",
+            ),
+        )
+
+        cases.forEach { case ->
+            val details = CredentialDisplayNormalizer.toDetails(
+                CredentialSummary(
+                    id = "cred-${case.format}-${case.label}",
+                    format = case.format,
+                    issuer = "Example Issuer",
+                    subject = "did:key:holder",
+                    label = case.label,
+                    credentialDataJson = case.credentialDataJson,
+                )
+            )
+            val claims = details.groups.flatMap { it.items }
+            val card = details.toCardDisplayData()
+
+            assertEquals(case.expectedHolderName, card.holderName, case.label)
+            assertEquals(case.expectedCredentialType, card.credentialType, case.label)
+            assertTrue(claims.any { it.path.id == case.expectedClaimPath }, case.label)
+            assertTrue(claims.none { it.value is DisplayValue.ObjectValue }, case.label)
+        }
+    }
+
+    @Test
     fun decodesBase64TextAndJsonValues() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(

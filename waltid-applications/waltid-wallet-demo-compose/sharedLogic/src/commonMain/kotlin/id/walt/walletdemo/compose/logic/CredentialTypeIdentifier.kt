@@ -20,8 +20,14 @@ internal object CredentialTypeIdentifier {
     }
 
     private fun String.trailingIdentifierToken(): String {
-        val index = lastIndexOfAny(identifierDelimiters)
-        return if (index >= 0) substring(index + 1) else this
+        val parts = split(*identifierDelimiters)
+            .filter { it.isNotBlank() }
+        val last = parts.lastOrNull() ?: return this
+        return if (last.all(Char::isDigit) && parts.size >= 2) {
+            "${parts[parts.lastIndex - 1]}_$last"
+        } else {
+            last
+        }
     }
 
     private val httpProtocols = setOf("http", "https")

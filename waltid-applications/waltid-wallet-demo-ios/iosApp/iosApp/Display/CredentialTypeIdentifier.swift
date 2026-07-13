@@ -23,10 +23,16 @@ enum CredentialTypeIdentifier {
     }
 
     private static func trailingIdentifierToken(_ value: String) -> String {
-        guard let delimiterIndex = value.lastIndex(where: identifierDelimiters.contains) else {
+        let parts = value
+            .split(whereSeparator: identifierDelimiters.contains)
+            .map(String.init)
+        guard let last = parts.last else {
             return value
         }
-        return String(value[value.index(after: delimiterIndex)...])
+        if last.allSatisfy(\.isNumber), parts.count >= 2 {
+            return "\(parts[parts.count - 2])_\(last)"
+        }
+        return last
     }
 
     private static let httpSchemes: Set<String> = ["http", "https"]

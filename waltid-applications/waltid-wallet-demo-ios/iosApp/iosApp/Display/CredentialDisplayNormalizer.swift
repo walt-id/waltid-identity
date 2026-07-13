@@ -75,10 +75,26 @@ enum CredentialDisplayNormalizer {
         ClaimItem(
             path: path.itemPath,
             label: label,
-            value: displayValue(for: value, path: path),
+            value: protocolDisplayValue(for: value, path: path) ?? displayValue(for: value, path: path),
             rawValue: rawString(value),
             roles: CredentialDisplayVocabulary.roles(for: path.components)
         )
+    }
+
+    private static func protocolDisplayValue(
+        for value: CredentialDisplayJSONValue,
+        path: DisplayClaimPath
+    ) -> DisplayValue? {
+        switch path.components.last {
+        case "_sd":
+            guard case .array(let values) = value else { return nil }
+            return .text(hiddenClaimCommitmentsText(count: values.count))
+        case "cnf":
+            guard case .object(let members) = value else { return nil }
+            return .text(confirmationKeyText(members))
+        default:
+            return nil
+        }
     }
 
     private static func claimItems(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> [ClaimItem] {
@@ -169,6 +185,39 @@ enum CredentialDisplayNormalizer {
     private static let minimumCredibleEpochSeconds: Int64 = 100_000_000
     private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
     private static let imageWrapperClaimName = "elementValue"
+}
+
+private func hiddenClaimCommitmentsText(count: Int) -> String {
+    switch count {
+    case 0: return "No hidden claim commitments"
+    case 1: return "1 hidden claim commitment"
+    default: return "\(count) hidden claim commitments"
+    }
+}
+
+private func confirmationKeyText(_ members: [CredentialDisplayJSONMember]) -> String {
+    if case .object(let jwkMembers)? = members.first(where: { $0.key == "jwk" })?.value {
+        let keyType = jwkMembers.stringValue(for: "kty")
+        let curve = jwkMembers.stringValue(for: "crv")
+        return ["Key-bound credential", keyType, curve]
+            .compactMap { $0 }
+            .joined(separator: " - ")
+    }
+
+    if let keyID = members.stringValue(for: "kid"), !keyID.isEmpty {
+        return "Key-bound credential - \(keyID)"
+    }
+
+    return "Key-bound credential"
+}
+
+private extension Array where Element == CredentialDisplayJSONMember {
+    func stringValue(for key: String) -> String? {
+        guard case .string(let value)? = first(where: { $0.key == key })?.value else {
+            return nil
+        }
+        return value
+    }
 }
 
 private extension ClaimItem {
