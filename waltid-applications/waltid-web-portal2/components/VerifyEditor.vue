@@ -90,6 +90,7 @@ const keyJson = ref(formatJsonPreset(verifierKeyJwkPreset));
 const x5cValues = ref(parseX5cPreset(verifierX5cPreset));
 const signedRequest = ref(false);
 const encryptedResponse = ref(false);
+const dcApiMediationRequired = ref(false);
 const optionsError = ref<string | null>(null);
 const clientIdType = ref<ClientIdType>("x509_hash");
 const clientIdInput = ref("");
@@ -133,6 +134,12 @@ const selectedClientIdOption = computed(() =>
   clientIdOptions.find((option) => option.value === clientIdType.value)!,
 );
 const clientIdNeedsInput = computed(() => clientIdType.value !== "x509_hash");
+const selectedSwaggerExample = computed(
+  () => props.swagger.examples.value[selectedIndex.value] ?? null,
+);
+const isDcApiExample = computed(() =>
+  selectedSwaggerExample.value?.title.toLowerCase().includes("dc_api"),
+);
 
 const canSubmit = computed(() => {
   if (!json.value.trim()) return false;
@@ -302,7 +309,14 @@ async function submit() {
   const payload = await applySecurityOverridesToJson();
   if (!payload) return;
 
-  await props.session.createSession(payload);
+  if (isDcApiExample.value) {
+    await props.session.createDcApiSession(
+      payload,
+      dcApiMediationRequired.value,
+    );
+  } else {
+    await props.session.createSession(payload);
+  }
 }
 </script>
 
@@ -351,6 +365,22 @@ async function submit() {
       </summary>
 
       <div class="grid gap-4 px-4 pb-4">
+        <div
+          v-if="isDcApiExample"
+          class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900"
+        >
+          <p class="font-medium">Digital Credentials API flow</p>
+          <p class="mt-1">
+            This example will create a verifier session, fetch the browser API
+            request, call <code>navigator.credentials.get</code>, post the
+            wallet response, and poll the verifier result.
+          </p>
+          <label class="mt-3 inline-flex items-center gap-2 font-medium">
+            <input v-model="dcApiMediationRequired" type="checkbox" />
+            mediation: required
+          </label>
+        </div>
+
         <div class="grid gap-3">
           <div>
             <label class="form-label">Client ID type</label>
