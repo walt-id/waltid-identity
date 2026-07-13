@@ -76,6 +76,20 @@ object KeyManager {
         return function.invoke(generationRequest)
     }
 
+    /**
+     * Type-safe overload of [createKey] for [TypedKeyGenerationRequest].
+     *
+     * Dispatches directly to the appropriate backend without any stringly-typed
+     * discriminator or [kotlinx.serialization.json.JsonObject] config encoding.
+     */
+    suspend fun createKey(request: TypedKeyGenerationRequest): Key = when (request) {
+        is TypedKeyGenerationRequest.Jwk -> JWKKey.generate(request.keyType)
+        is TypedKeyGenerationRequest.Tse -> TSEKey.generate(request.keyType, request.config)
+        is TypedKeyGenerationRequest.Azure -> AzureKeyRestApi.generate(request.keyType, request.config)
+        is TypedKeyGenerationRequest.Oci -> OCIKeyRestApi.generateKey(request.keyType, request.config)
+        is TypedKeyGenerationRequest.Aws -> AWSKeyRestAPI.generate(request.keyType, request.config)
+    }
+
     suspend fun resolveSerializedKey(jsonString: String): Key =
         resolveSerializedKey(json = Json.parseToJsonElement(jsonString).jsonObject)
 

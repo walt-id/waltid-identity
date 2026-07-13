@@ -1,10 +1,10 @@
 package id.walt.wallet2.server.openapi
 
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.server.handlers.CreateDidRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.GenerateKeyRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import io.github.smiley4.ktoropenapi.config.RouteConfig
 import io.ktor.http.HttpStatusCode
@@ -63,14 +63,14 @@ object Wallet2OpenApiDocs {
                 description = "Wallet ID returned by POST /wallet"
                 example("Wallet ID") { value = "9bbbc42d-8f3a-4b1c-9e2d-1a2b3c4d5e6f" }
             }
-            body<GenerateKeyRequest> {
-                example("Ed25519 (default)") {
+            body<TypedKeyGenerationRequest> {
+                example("Ed25519 (JWK)") {
                     value = Wallet2RequestExamples.GENERATE_KEY_ED25519
                 }
-                example("secp256r1 / NIST P-256") {
+                example("secp256r1 / NIST P-256 (JWK)") {
                     value = Wallet2RequestExamples.GENERATE_KEY_SECP256R1
                 }
-                example("secp256k1") {
+                example("secp256k1 (JWK)") {
                     value = Wallet2RequestExamples.GENERATE_KEY_SECP256K1
                 }
             }

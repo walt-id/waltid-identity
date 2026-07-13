@@ -2,41 +2,12 @@ package id.walt.wallet2.server.handlers
 
 import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.KeyManager
-import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
-import id.walt.wallet2.data.StoredCredential
-import id.walt.wallet2.data.StoredCredentialMetadata
-import id.walt.wallet2.data.Wallet
-import id.walt.wallet2.data.WalletCredentialStore
-import id.walt.wallet2.data.WalletDidEntry
-import id.walt.wallet2.data.WalletDidStore
-import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletKeyStore
-import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.wallet2.handlers.ExchangeCodeRequest
-import id.walt.wallet2.handlers.FetchCredentialRequest
-import id.walt.wallet2.handlers.FetchCredentialResult
-import id.walt.wallet2.handlers.GenerateAuthorizationUrlRequest
-import id.walt.wallet2.handlers.GenerateAuthorizationUrlResult
-import id.walt.wallet2.handlers.PollDeferredRequest
-import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
-import id.walt.wallet2.handlers.MatchCredentialsRequest
-import id.walt.wallet2.handlers.MatchCredentialsResult
-import id.walt.wallet2.handlers.PresentCredentialIsolatedRequest
-import id.walt.wallet2.handlers.PresentCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ReceiveCredentialResult
-import id.walt.wallet2.handlers.RequestTokenRequest
-import id.walt.wallet2.handlers.RequestTokenResult
-import id.walt.wallet2.handlers.ResolveOfferRequest
-import id.walt.wallet2.handlers.ResolveOfferResult
-import id.walt.wallet2.handlers.ResolveVpRequestRequest
-import id.walt.wallet2.handlers.ResolveVpRequestResult
-import id.walt.wallet2.handlers.SignProofRequest
-import id.walt.wallet2.handlers.SignProofResult
-import id.walt.wallet2.handlers.WalletIssuanceHandler
-import id.walt.wallet2.handlers.WalletPresentationHandler
+import id.walt.wallet2.data.*
+import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
+import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
@@ -45,6 +16,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
 import io.github.smiley4.ktoropenapi.post
+import io.github.smiley4.ktoropenapi.put
 import io.github.smiley4.ktoropenapi.route
 import io.ktor.http.*
 import io.ktor.server.request.*
@@ -98,12 +70,6 @@ data class WalletInfoResponse(
     val hasDidStore: Boolean,
     val hasStaticKey: Boolean,
     val hasStaticDid: Boolean
-)
-
-@Serializable
-data class GenerateKeyRequest(
-    /** Key type: Ed25519, secp256r1, secp256k1, RSA. Defaults to Ed25519. */
-    val keyType: String = "Ed25519"
 )
 
 @Serializable
@@ -291,13 +257,12 @@ object Wallet2RouteHandler {
 
                 post("/generate", Wallet2OpenApiDocs.generateKey()) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
-                    val req = call.receive<GenerateKeyRequest>()
-                    val keyType = KeyType.valueOf(req.keyType)
-                    val key = id.walt.crypto.keys.jwk.JWKKey.generate(keyType)
+                    val req = call.receive<TypedKeyGenerationRequest>()
                     val store = wallet.keyStores.firstOrNull()
                         ?: return@post call.respond(HttpStatusCode.BadRequest, "Wallet has no key stores")
+                    val key = KeyManager.createKey(req)
                     val keyId = store.addKey(key)
-                    call.respond(HttpStatusCode.Created, WalletKeyInfo(keyId = keyId, keyType = keyType.name))
+                    call.respond(HttpStatusCode.Created, WalletKeyInfo(keyId = keyId, keyType = req.keyType.name))
                 }
 
                 post("/import", {
