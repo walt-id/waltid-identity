@@ -206,7 +206,13 @@ data class FetchCredentialRequest(
     val accessToken: String,
     val credentialConfigurationId: String,
     val proofJwt: String? = null,
-    val clientId: String = "wallet-client"
+    val clientId: String = "wallet-client",
+    /**
+     * When true, the server-side route handler automatically stores the fetched
+     * credential(s) in the wallet after retrieval. Defaults to false (stateless).
+     * This field is ignored by [WalletIssuanceHandler.fetchCredential] itself.
+     */
+    val storeInWallet: Boolean = false,
 )
 
 @Serializable

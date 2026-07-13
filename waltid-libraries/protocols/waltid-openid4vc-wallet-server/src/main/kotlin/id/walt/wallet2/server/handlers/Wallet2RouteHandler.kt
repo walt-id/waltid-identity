@@ -588,11 +588,27 @@ object Wallet2RouteHandler {
 
                     post("/fetch-credential", {
                         summary = "Isolated: fetch a credential from the issuer's credential endpoint"
+                        description = "When storeInWallet is true the fetched credential(s) are automatically " +
+                                "stored in the wallet, removing the need to call the import endpoint afterwards."
                         request { pathParameter<String>("walletId"); body<FetchCredentialRequest>() }
                         response { HttpStatusCode.OK to { body<FetchCredentialResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
-                        call.respond(WalletIssuanceHandler.fetchCredential(req))
+                        val result = WalletIssuanceHandler.fetchCredential(req)
+                        if (req.storeInWallet) {
+                            for (raw in result.rawCredentials) {
+                                val (_, parsed) = CredentialParser.detectAndParse(raw)
+                                wallet.addCredential(
+                                    StoredCredential(
+                                        id = Uuid.random().toString(),
+                                        credential = parsed,
+                                        addedAt = Clock.System.now()
+                                    )
+                                )
+                            }
+                        }
+                        call.respond(result)
                     }
 
                     // Auth-code grant isolated steps
