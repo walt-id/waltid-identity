@@ -40,7 +40,7 @@
 3. Set your `sdk.dir` in `local.properties`.
 4. Run the application on your device or emulator.
 
-For the current wallet issuance/presentation demo and Android E2E scripts, see [waltid-wallet-demo-compose](../waltid-wallet-demo-compose/README.md). For broader mobile setup, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
+For the current wallet issuance/presentation demo and Android E2E tests, see [waltid-wallet-demo-compose](../waltid-wallet-demo-compose/README.md). For broader mobile setup, see the [Mobile Wallet Development Guide](../../docs/mobile-wallet-development.md).
 
 ## Join the community
 

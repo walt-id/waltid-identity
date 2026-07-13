@@ -179,8 +179,6 @@ runs:
           -project iosApp.xcodeproj \
           -scheme iosApp \
           -destination "${{ steps.resolve-simulator.outputs.destination }}" \
-          -skip-testing:iosAppUITests/EudiPublicBackendE2ETests \
-          -skip-testing:iosAppUITests/LocalEnterpriseBackendE2ETests \
           -resultBundlePath TestResults \
           -derivedDataPath /tmp/xcode-derived-compose \
           -enableCodeCoverage NO \
@@ -304,7 +302,6 @@ runs:
         if [[ "${{ inputs.run-compose-demo-tests }}" == "true" && "${{ steps.compose_ios_demo_app_tests.outcome }}" == "failure" ]]; then
           failed+=("Compose iOS demo app tests")
         fi
-
         if (( ${#failed[@]} > 0 )); then
           printf '::error::iOS test step(s) failed: %s\n' "${failed[*]}"
           exit 1
