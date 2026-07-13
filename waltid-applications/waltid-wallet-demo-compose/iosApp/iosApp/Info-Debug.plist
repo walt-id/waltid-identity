@@ -6,6 +6,8 @@
 	<true/>
 	<key>CFBundleDisplayName</key>
 	<string>walt.id</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera access is required to scan QR codes for credential offers.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
