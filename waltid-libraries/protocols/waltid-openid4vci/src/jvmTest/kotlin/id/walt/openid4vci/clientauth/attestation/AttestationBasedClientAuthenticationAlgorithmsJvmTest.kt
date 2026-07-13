@@ -22,7 +22,6 @@ class AttestationBasedClientAuthenticationAlgorithmsJvmTest {
             KeyType.secp256r1,
             KeyType.secp384r1,
             KeyType.secp521r1,
-            KeyType.secp256k1,
             KeyType.RSA,
             KeyType.RSA3072,
             KeyType.RSA4096,
@@ -42,9 +41,25 @@ class AttestationBasedClientAuthenticationAlgorithmsJvmTest {
         }
     }
 
+    @Test
+    fun `authenticates ES256K when explicitly accepted`() = runTest {
+        val attesterKey = JWKKey.generate(KeyType.secp256k1)
+        val clientInstanceKey = JWKKey.generate(KeyType.secp256k1)
+
+        val result = authenticate(
+            attesterKey = attesterKey,
+            clientInstanceKey = clientInstanceKey,
+            acceptedAlgorithms = ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS +
+                ClientAttestationSigningAlgorithms.ES256K,
+        )
+
+        assertIs<ClientAuthenticationResult.Authenticated>(result)
+    }
+
     private suspend fun authenticate(
         attesterKey: JWKKey,
         clientInstanceKey: JWKKey,
+        acceptedAlgorithms: Set<String> = ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
     ): ClientAuthenticationResult {
         val now = Clock.System.now().epochSeconds
         val attestationPayload = buildJsonObject {
@@ -62,6 +77,8 @@ class AttestationBasedClientAuthenticationAlgorithmsJvmTest {
         }
         val method = AttestationBasedClientAuthenticationMethod(
             trustedAttesterKeys = { _, _ -> listOf(attesterKey.getPublicKey()) },
+            acceptedAttestationSigningAlgorithms = acceptedAlgorithms,
+            acceptedPopSigningAlgorithms = acceptedAlgorithms,
         )
 
         return method.authenticate(
