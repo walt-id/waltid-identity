@@ -77,8 +77,6 @@ enum CredentialDisplayNormalizer {
             label: label,
             value: displayValue(for: value, path: path),
             rawValue: rawString(value),
-            requested: false,
-            shareable: true,
             roles: CredentialDisplayVocabulary.roles(for: path.components)
         )
     }
@@ -193,8 +191,6 @@ private extension ClaimItem {
             label: label,
             value: value,
             rawValue: rawValue,
-            requested: requested,
-            shareable: shareable,
             roles: roles
         )
     }

@@ -22,8 +22,6 @@ struct ClaimItem: Equatable, Identifiable {
     let label: String
     let value: DisplayValue
     let rawValue: String?
-    let requested: Bool
-    let shareable: Bool
     let roles: Set<ClaimRole>
 
     var id: String { path.id }
@@ -33,16 +31,12 @@ struct ClaimItem: Equatable, Identifiable {
         label: String,
         value: DisplayValue,
         rawValue: String?,
-        requested: Bool,
-        shareable: Bool,
         roles: Set<ClaimRole> = []
     ) {
         self.path = path
         self.label = label
         self.value = value
         self.rawValue = rawValue
-        self.requested = requested
-        self.shareable = shareable
         self.roles = roles
     }
 }

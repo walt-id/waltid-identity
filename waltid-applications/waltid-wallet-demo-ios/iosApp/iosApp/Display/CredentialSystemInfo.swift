@@ -38,9 +38,7 @@ private extension String {
             path: ClaimItemPath.topLevel(path),
             label: label,
             value: .text(value),
-            rawValue: value,
-            requested: false,
-            shareable: false
+            rawValue: value
         )
     }
 }

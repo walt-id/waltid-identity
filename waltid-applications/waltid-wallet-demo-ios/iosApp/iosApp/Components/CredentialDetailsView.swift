@@ -4,6 +4,8 @@ struct CredentialDetailsView: View {
     let details: CredentialDetails
 
     var body: some View {
+        let systemInfoGroup = details.systemInfoGroup
+
         VStack(alignment: .leading, spacing: 12) {
             Text("Credential details")
                 .font(.subheadline.weight(.semibold))
@@ -11,7 +13,7 @@ struct CredentialDetailsView: View {
 
             CredentialOverviewView(details: details)
 
-            if details.groups.isEmpty {
+            if details.groups.isEmpty && systemInfoGroup == nil {
                 Text("No credential details available")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -21,7 +23,7 @@ struct CredentialDetailsView: View {
                 ClaimGroupView(group: group)
             }
 
-            if let systemInfoGroup = details.systemInfoGroup {
+            if let systemInfoGroup {
                 ClaimGroupView(group: systemInfoGroup)
             }
         }
