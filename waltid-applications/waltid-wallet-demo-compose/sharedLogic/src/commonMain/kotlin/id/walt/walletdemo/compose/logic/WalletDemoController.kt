@@ -125,7 +125,7 @@ class WalletDemoController(
         scope.launch(dispatcher) {
             _state.update {
                 it.copy(
-                    requestDrafts = it.requestDrafts.copy(offerUrl = url, txCode = "", txCodeRequired = false),
+                    requestDrafts = it.requestDrafts.copy(offerUrl = url, txCode = "", txCodeRequired = false, offerFromDeepLink = false),
                     operation = WalletOperationState.ResolvingOffer,
                 )
             }
