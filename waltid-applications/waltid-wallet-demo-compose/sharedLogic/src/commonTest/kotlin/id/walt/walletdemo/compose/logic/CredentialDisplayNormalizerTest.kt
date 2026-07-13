@@ -136,6 +136,33 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun keepsNestedMdocPortraitLabelWhenFlatteningNamespaceObject() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "mso_mdoc",
+                issuer = null,
+                label = "mso_mdoc",
+                credentialDataJson = """
+                    {
+                      "eu.europa.ec.eudi.pid.1": {
+                        "portrait": {
+                          "elementValue": ${onePixelPngByteArrayJson()}
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val portrait = details.groups
+            .flatMap { it.items }
+            .first { it.path.id == "eu.europa.ec.eudi.pid.1.portrait.elementValue" }
+        assertEquals("Portrait", portrait.label)
+        assertIs<DisplayValue.Image>(portrait.value)
+    }
+
+    @Test
     fun keepsMalformedCredentialJsonAsRawTechnicalDetails() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(

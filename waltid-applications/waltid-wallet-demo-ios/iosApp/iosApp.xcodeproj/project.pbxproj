@@ -18,6 +18,17 @@
 		A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000006AAAA000000000006 /* StatusBannerView.swift */; };
 		A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000007AAAA000000000007 /* CredentialCardView.swift */; };
 		A1000008AAAA000100000008 /* WalletColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000008AAAA000000000008 /* WalletColors.swift */; };
+		A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000301AAAA000000000001 /* ClaimGroupView.swift */; };
+		A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000302AAAA000000000002 /* ClaimValueRow.swift */; };
+		A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000303AAAA000000000003 /* CredentialDetailsView.swift */; };
+		A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000304AAAA000000000004 /* CredentialDisplayModels.swift */; };
+		A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */; };
+		A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */; };
+		A1000307AAAA000100000007 /* CredentialDisplayVocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */; };
+		A1000308AAAA000100000008 /* CredentialTypeIdentifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */; };
+		A1000309AAAA000100000009 /* CredentialCardSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000309AAAA000000000009 /* CredentialCardSummary.swift */; };
+		A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */; };
+		A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000311AAAA000000000011 /* WalletAccessibilityID.swift */; };
 		B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
@@ -59,6 +70,17 @@
 		A1000006AAAA000000000006 /* StatusBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBannerView.swift; sourceTree = "<group>"; };
 		A1000007AAAA000000000007 /* CredentialCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialCardView.swift; sourceTree = "<group>"; };
 		A1000008AAAA000000000008 /* WalletColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletColors.swift; sourceTree = "<group>"; };
+		A1000301AAAA000000000001 /* ClaimGroupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimGroupView.swift; sourceTree = "<group>"; };
+		A1000302AAAA000000000002 /* ClaimValueRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaimValueRow.swift; sourceTree = "<group>"; };
+		A1000303AAAA000000000003 /* CredentialDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsView.swift; sourceTree = "<group>"; };
+		A1000304AAAA000000000004 /* CredentialDisplayModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayModels.swift; sourceTree = "<group>"; };
+		A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayNormalizer.swift; sourceTree = "<group>"; };
+		A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayValueDecoder.swift; sourceTree = "<group>"; };
+		A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDisplayVocabulary.swift; sourceTree = "<group>"; };
+		A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialTypeIdentifier.swift; sourceTree = "<group>"; };
+		A1000309AAAA000000000009 /* CredentialCardSummary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialCardSummary.swift; sourceTree = "<group>"; };
+		A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsScreen.swift; sourceTree = "<group>"; };
+		A1000311AAAA000000000011 /* WalletAccessibilityID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessibilityID.swift; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDemoApp.swift; sourceTree = "<group>"; };
@@ -174,6 +196,7 @@
 				A1000002AAAA000000000002 /* HomeView.swift */,
 				A1000003AAAA000000000003 /* ReceiveView.swift */,
 				A1000004AAAA000000000004 /* PresentView.swift */,
+				A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -183,6 +206,9 @@
 			children = (
 				A1000006AAAA000000000006 /* StatusBannerView.swift */,
 				A1000007AAAA000000000007 /* CredentialCardView.swift */,
+				A1000301AAAA000000000001 /* ClaimGroupView.swift */,
+				A1000302AAAA000000000002 /* ClaimValueRow.swift */,
+				A1000303AAAA000000000003 /* CredentialDetailsView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -193,6 +219,19 @@
 				A1000008AAAA000000000008 /* WalletColors.swift */,
 			);
 			path = Theme;
+			sourceTree = "<group>";
+		};
+		A1000320AAAA000000000020 /* Display */ = {
+			isa = PBXGroup;
+			children = (
+				A1000309AAAA000000000009 /* CredentialCardSummary.swift */,
+				A1000304AAAA000000000004 /* CredentialDisplayModels.swift */,
+				A1000305AAAA000000000005 /* CredentialDisplayNormalizer.swift */,
+				A1000306AAAA000000000006 /* CredentialDisplayValueDecoder.swift */,
+				A1000307AAAA000000000007 /* CredentialDisplayVocabulary.swift */,
+				A1000308AAAA000000000008 /* CredentialTypeIdentifier.swift */,
+			);
+			path = Display;
 			sourceTree = "<group>";
 		};
 		B33B17DD2C2C394F001A32F7 = {
@@ -226,9 +265,11 @@
 				B30E22802C2D8AD700D4781C /* Info.plist */,
 				B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */,
 				B33B17EB2C2C394F001A32F7 /* ContentView.swift */,
+				A1000311AAAA000000000011 /* WalletAccessibilityID.swift */,
 				A1000010AAAA000000000010 /* ViewModels */,
 				A1000011AAAA000000000011 /* Views */,
 				A1000012AAAA000000000012 /* Components */,
+				A1000320AAAA000000000020 /* Display */,
 				A1000013AAAA000000000013 /* Theme */,
 				B33B17ED2C2C3957001A32F7 /* Assets.xcassets */,
 			);
@@ -464,6 +505,17 @@
 				A1000006AAAA000100000006 /* StatusBannerView.swift in Sources */,
 				A1000007AAAA000100000007 /* CredentialCardView.swift in Sources */,
 				A1000008AAAA000100000008 /* WalletColors.swift in Sources */,
+				A1000301AAAA000100000001 /* ClaimGroupView.swift in Sources */,
+				A1000302AAAA000100000002 /* ClaimValueRow.swift in Sources */,
+				A1000303AAAA000100000003 /* CredentialDetailsView.swift in Sources */,
+				A1000304AAAA000100000004 /* CredentialDisplayModels.swift in Sources */,
+				A1000305AAAA000100000005 /* CredentialDisplayNormalizer.swift in Sources */,
+				A1000306AAAA000100000006 /* CredentialDisplayValueDecoder.swift in Sources */,
+				A1000307AAAA000100000007 /* CredentialDisplayVocabulary.swift in Sources */,
+				A1000308AAAA000100000008 /* CredentialTypeIdentifier.swift in Sources */,
+				A1000309AAAA000100000009 /* CredentialCardSummary.swift in Sources */,
+				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
+				A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

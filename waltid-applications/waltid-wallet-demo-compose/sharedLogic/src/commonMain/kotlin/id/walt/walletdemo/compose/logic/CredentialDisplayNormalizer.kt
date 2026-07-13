@@ -94,7 +94,11 @@ object CredentialDisplayNormalizer {
         when (val displayValue = value) {
             is DisplayValue.ObjectValue -> displayValue.entries.flatMap { entry ->
                 val rows = entry.flattenObjectForClaimRows()
-                if (rows.size == 1 && rows.single().value is DisplayValue.Image) {
+                if (
+                    rows.size == 1 &&
+                    rows.single().value is DisplayValue.Image &&
+                    rows.single().label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
+                ) {
                     listOf(rows.single().copy(label = label))
                 } else {
                     rows
@@ -149,4 +153,5 @@ object CredentialDisplayNormalizer {
     }
     private const val minimumCredibleEpochSeconds = 100_000_000L
     private const val epochMillisecondsThreshold = 10_000_000_000L
+    private const val imageWrapperClaimName = "elementValue"
 }
