@@ -7,10 +7,6 @@ struct CredentialDetailsView: View {
         let systemInfoGroup = details.systemInfoGroup
 
         VStack(alignment: .leading, spacing: 12) {
-            Text("Credential details")
-                .font(.subheadline.weight(.semibold))
-                .accessibilityIdentifier(WalletAccessibilityID.credentialDetails(details.id))
-
             CredentialOverviewView(details: details)
 
             if details.groups.isEmpty && systemInfoGroup == nil {

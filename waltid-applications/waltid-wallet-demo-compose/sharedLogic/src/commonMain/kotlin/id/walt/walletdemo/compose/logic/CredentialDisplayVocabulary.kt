@@ -106,9 +106,33 @@ internal object CredentialDisplayVocabulary {
         .toMap()
 
     private val topLevelCredentialTypeClaimNames = setOf("type").map(NormalizedClaimKey::from).toSet()
+    private val credentialSubjectContainerNames = setOf("credentialSubject", "credential_subject")
+        .map(NormalizedClaimKey::from)
+        .toSet()
+    private val technicalContainerNames = setOf(
+        "@context",
+        "credentialSchema",
+        "credential_status",
+        "credentialStatus",
+        "evidence",
+        "proof",
+        "refreshService",
+        "termsOfUse",
+    ).map(NormalizedClaimKey::from).toSet()
 
-    fun groupKind(path: ClaimPath): ClaimGroupKind =
-        descriptorFor(path.topLevel)?.group ?: ClaimGroupKind.Other
+    fun groupKind(path: ClaimPath): ClaimGroupKind {
+        descriptorFor(path.topLevel)?.group?.let { return it }
+
+        if (path.isCredentialSubjectWrapped()) {
+            return descriptorFor(path.leaf)?.group ?: ClaimGroupKind.Other
+        }
+
+        if (path.hasTechnicalContainer()) {
+            return ClaimGroupKind.Technical
+        }
+
+        return ClaimGroupKind.Other
+    }
 
     fun humanizedClaimLabel(key: String): String =
         descriptorFor(key)?.label ?: ClaimLabelFormatter.humanize(key)
@@ -144,6 +168,21 @@ internal object CredentialDisplayVocabulary {
     private fun ClaimPath.isCredentialTypeClaimPath(): Boolean {
         if (NormalizedClaimKey.from(leaf) !in topLevelCredentialTypeClaimNames) return false
         return isTopLevel || components == listOf("vc", leaf)
+    }
+
+    private fun ClaimPath.isCredentialSubjectWrapped(): Boolean {
+        val topLevelKey = NormalizedClaimKey.from(topLevel)
+        if (topLevelKey in credentialSubjectContainerNames) return true
+
+        val secondLevel = components.getOrNull(1) ?: return false
+        return topLevel == "vc" && NormalizedClaimKey.from(secondLevel) in credentialSubjectContainerNames
+    }
+
+    private fun ClaimPath.hasTechnicalContainer(): Boolean {
+        if (NormalizedClaimKey.from(topLevel) in technicalContainerNames) return true
+
+        val secondLevel = components.getOrNull(1) ?: return false
+        return topLevel == "vc" && NormalizedClaimKey.from(secondLevel) in technicalContainerNames
     }
 
     private fun descriptorFor(name: String): ClaimDescriptor? =

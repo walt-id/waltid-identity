@@ -328,6 +328,95 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         }
     }
 
+    func testClassifiesW3CSubjectClaimsByDisplayedClaimInsteadOfOuterWrapper() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "Person credential",
+            issuer: "did:web:issuer.example",
+            subject: "did:key:holder",
+            format: "jwt_vc_json",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "@context": ["https://www.w3.org/2018/credentials/v1"],
+              "type": ["VerifiableCredential", "PersonCredential"],
+              "issuer": "did:web:issuer.example",
+              "credentialSubject": {
+                "given_name": "Ada",
+                "family_name": "Lovelace",
+                "resident_country": "AT",
+                "employee_id": "E-123"
+              },
+              "proof": {
+                "type": "DataIntegrityProof",
+                "cryptosuite": "eddsa-rdfc-2022"
+              }
+            }
+            """
+        )
+
+        let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
+        XCTAssertEqual(personal.items.first { $0.path.id == "credentialSubject.given_name" }?.value, .text("Ada"))
+        XCTAssertEqual(personal.items.first { $0.path.id == "credentialSubject.family_name" }?.value, .text("Lovelace"))
+
+        let address = try XCTUnwrap(details.groups.first { $0.title == "Address" })
+        XCTAssertEqual(address.items.first { $0.path.id == "credentialSubject.resident_country" }?.value, .text("AT"))
+
+        let credentialData = try XCTUnwrap(details.groups.first { $0.title == "Credential data" })
+        XCTAssertEqual(credentialData.items.first { $0.path.id == "credentialSubject.employee_id" }?.value, .text("E-123"))
+
+        let technical = try XCTUnwrap(details.groups.first { $0.title == "Technical claims" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "@context" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "proof.type" })
+    }
+
+    func testClassifiesJWTVCEnvelopeTechnicalContainersLikeUnwrappedW3CCredentials() throws {
+        let details = CredentialDisplayNormalizer.details(
+            id: "cred-1",
+            title: "Person credential",
+            issuer: "did:web:issuer.example",
+            subject: "did:key:holder",
+            format: "jwt_vc_json",
+            addedAt: nil,
+            credentialDataJSON: """
+            {
+              "iss": "did:web:issuer.example",
+              "sub": "did:key:holder",
+              "vc": {
+                "@context": ["https://www.w3.org/2018/credentials/v1"],
+                "type": ["VerifiableCredential", "PersonCredential"],
+                "credentialSubject": {
+                  "given_name": "Ada",
+                  "family_name": "Lovelace",
+                  "resident_country": "AT",
+                  "employee_id": "E-123"
+                },
+                "credentialStatus": {
+                  "id": "https://issuer.example/status/1",
+                  "type": "StatusList2021Entry"
+                }
+              }
+            }
+            """
+        )
+
+        let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
+        XCTAssertEqual(personal.items.first { $0.path.id == "vc.credentialSubject.given_name" }?.value, .text("Ada"))
+        XCTAssertEqual(personal.items.first { $0.path.id == "vc.credentialSubject.family_name" }?.value, .text("Lovelace"))
+
+        let address = try XCTUnwrap(details.groups.first { $0.title == "Address" })
+        XCTAssertEqual(address.items.first { $0.path.id == "vc.credentialSubject.resident_country" }?.value, .text("AT"))
+
+        let credentialData = try XCTUnwrap(details.groups.first { $0.title == "Credential data" })
+        XCTAssertEqual(credentialData.items.first { $0.path.id == "vc.credentialSubject.employee_id" }?.value, .text("E-123"))
+
+        let technical = try XCTUnwrap(details.groups.first { $0.title == "Technical claims" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "iss" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "vc.@context" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "vc.credentialStatus.id" })
+        XCTAssertTrue(technical.items.contains { $0.path.id == "vc.credentialStatus.type" })
+    }
+
     func testUsesPortraitImageForCardSummary() {
         let details = CredentialDisplayNormalizer.details(
             id: "cred-1",

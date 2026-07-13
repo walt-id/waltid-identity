@@ -360,6 +360,99 @@ class CredentialDisplayNormalizerTest {
     }
 
     @Test
+    fun classifiesW3cSubjectClaimsByDisplayedClaimInsteadOfOuterWrapper() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "jwt_vc_json",
+                issuer = "did:web:issuer.example",
+                subject = "did:key:holder",
+                label = "Person credential",
+                credentialDataJson = """
+                    {
+                      "@context": ["https://www.w3.org/2018/credentials/v1"],
+                      "type": ["VerifiableCredential", "PersonCredential"],
+                      "issuer": "did:web:issuer.example",
+                      "credentialSubject": {
+                        "given_name": "Ada",
+                        "family_name": "Lovelace",
+                        "resident_country": "AT",
+                        "employee_id": "E-123"
+                      },
+                      "proof": {
+                        "type": "DataIntegrityProof",
+                        "cryptosuite": "eddsa-rdfc-2022"
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
+        assertEquals("Ada", (personal.items.first { it.path.id == "credentialSubject.given_name" }.value as DisplayValue.Text).value)
+        assertEquals("Lovelace", (personal.items.first { it.path.id == "credentialSubject.family_name" }.value as DisplayValue.Text).value)
+
+        val address = assertNotNull(details.groups.firstOrNull { it.title == "Address" })
+        assertEquals("AT", (address.items.first { it.path.id == "credentialSubject.resident_country" }.value as DisplayValue.Text).value)
+
+        val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
+        assertEquals("E-123", (credentialData.items.first { it.path.id == "credentialSubject.employee_id" }.value as DisplayValue.Text).value)
+
+        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Technical claims" })
+        assertTrue(technical.items.any { it.path.id == "@context" })
+        assertTrue(technical.items.any { it.path.id == "proof.type" })
+    }
+
+    @Test
+    fun classifiesJwtVcEnvelopeTechnicalContainersLikeUnwrappedW3cCredentials() {
+        val details = CredentialDisplayNormalizer.toDetails(
+            CredentialSummary(
+                id = "cred-1",
+                format = "jwt_vc_json",
+                issuer = "did:web:issuer.example",
+                subject = "did:key:holder",
+                label = "Person credential",
+                credentialDataJson = """
+                    {
+                      "iss": "did:web:issuer.example",
+                      "sub": "did:key:holder",
+                      "vc": {
+                        "@context": ["https://www.w3.org/2018/credentials/v1"],
+                        "type": ["VerifiableCredential", "PersonCredential"],
+                        "credentialSubject": {
+                          "given_name": "Ada",
+                          "family_name": "Lovelace",
+                          "resident_country": "AT",
+                          "employee_id": "E-123"
+                        },
+                        "credentialStatus": {
+                          "id": "https://issuer.example/status/1",
+                          "type": "StatusList2021Entry"
+                        }
+                      }
+                    }
+                """.trimIndent(),
+            )
+        )
+
+        val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
+        assertEquals("Ada", (personal.items.first { it.path.id == "vc.credentialSubject.given_name" }.value as DisplayValue.Text).value)
+        assertEquals("Lovelace", (personal.items.first { it.path.id == "vc.credentialSubject.family_name" }.value as DisplayValue.Text).value)
+
+        val address = assertNotNull(details.groups.firstOrNull { it.title == "Address" })
+        assertEquals("AT", (address.items.first { it.path.id == "vc.credentialSubject.resident_country" }.value as DisplayValue.Text).value)
+
+        val credentialData = assertNotNull(details.groups.firstOrNull { it.title == "Credential data" })
+        assertEquals("E-123", (credentialData.items.first { it.path.id == "vc.credentialSubject.employee_id" }.value as DisplayValue.Text).value)
+
+        val technical = assertNotNull(details.groups.firstOrNull { it.title == "Technical claims" })
+        assertTrue(technical.items.any { it.path.id == "iss" })
+        assertTrue(technical.items.any { it.path.id == "vc.@context" })
+        assertTrue(technical.items.any { it.path.id == "vc.credentialStatus.id" })
+        assertTrue(technical.items.any { it.path.id == "vc.credentialStatus.type" })
+    }
+
+    @Test
     fun decodesBase64TextAndJsonValues() {
         val details = CredentialDisplayNormalizer.toDetails(
             CredentialSummary(

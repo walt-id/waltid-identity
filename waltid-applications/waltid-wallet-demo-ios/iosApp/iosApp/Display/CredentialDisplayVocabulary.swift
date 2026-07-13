@@ -125,9 +125,33 @@ enum CredentialDisplayVocabulary {
     }()
 
     private static let topLevelCredentialTypeClaimNames = Set(["type"].map(NormalizedClaimKey.init))
+    private static let credentialSubjectContainerNames = Set(["credentialSubject", "credential_subject"].map(NormalizedClaimKey.init))
+    private static let technicalContainerNames = Set([
+        "@context",
+        "credentialSchema",
+        "credential_status",
+        "credentialStatus",
+        "evidence",
+        "proof",
+        "refreshService",
+        "termsOfUse"
+    ].map(NormalizedClaimKey.init))
 
     static func groupKind(for components: [String]) -> ClaimGroupKind {
-        descriptor(for: ClaimPath(components: components).topLevel)?.group ?? .other
+        let path = ClaimPath(components: components)
+        if let descriptor = descriptor(for: path.topLevel) {
+            return descriptor.group
+        }
+
+        if isCredentialSubjectWrapped(path) {
+            return descriptor(for: path.leaf)?.group ?? .other
+        }
+
+        if hasTechnicalContainer(path) {
+            return .technical
+        }
+
+        return .other
     }
 
     static func humanizedLabel(_ key: String) -> String {
@@ -175,6 +199,28 @@ enum CredentialDisplayVocabulary {
             return false
         }
         return path.isTopLevel || path.components == ["vc", path.leaf]
+    }
+
+    private static func isCredentialSubjectWrapped(_ path: ClaimPath) -> Bool {
+        if credentialSubjectContainerNames.contains(NormalizedClaimKey(path.topLevel)) {
+            return true
+        }
+
+        guard path.topLevel == "vc", path.components.count > 1 else {
+            return false
+        }
+        return credentialSubjectContainerNames.contains(NormalizedClaimKey(path.components[1]))
+    }
+
+    private static func hasTechnicalContainer(_ path: ClaimPath) -> Bool {
+        if technicalContainerNames.contains(NormalizedClaimKey(path.topLevel)) {
+            return true
+        }
+
+        guard path.topLevel == "vc", path.components.count > 1 else {
+            return false
+        }
+        return technicalContainerNames.contains(NormalizedClaimKey(path.components[1]))
     }
 
     private static func descriptor(for name: String) -> ClaimDescriptor? {

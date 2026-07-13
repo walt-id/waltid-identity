@@ -37,8 +37,8 @@ object CredentialDisplayNormalizer {
         val groupedItems = parsed.entries
             .flatMap { (key, value) ->
                 val path = ClaimPath.topLevel(key)
-                value.toClaimItems(path = path, label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
-                    .map { item -> CredentialDisplayVocabulary.groupKind(path) to item }
+                value.toClaimRows(path = path, label = CredentialDisplayVocabulary.humanizedClaimLabel(key))
+                    .map { row -> CredentialDisplayVocabulary.groupKind(row.path) to row.item }
             }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
             .entries
@@ -54,6 +54,7 @@ object CredentialDisplayNormalizer {
     private fun JsonElement.toClaimItem(path: ClaimPath, label: String): ClaimItem =
         ClaimItem(
             path = path.itemPath,
+            pathComponents = path.components,
             label = label,
             value = toProtocolDisplayValue(path) ?: toDisplayValue(path),
             rawValue = toString(),
@@ -71,26 +72,49 @@ object CredentialDisplayNormalizer {
             else -> null
         }
 
-    private fun JsonElement.toClaimItems(path: ClaimPath, label: String): List<ClaimItem> {
+    private fun JsonElement.toClaimRows(path: ClaimPath, label: String): List<ClaimRow> {
         val item = toClaimItem(path = path, label = label)
-        return item.flattenObjectForClaimRows()
+        return flattenObjectForClaimRows(path = path, item = item)
     }
 
-    private fun ClaimItem.flattenObjectForClaimRows(): List<ClaimItem> =
-        when (val displayValue = value) {
-            is DisplayValue.ObjectValue -> displayValue.entries.flatMap { entry ->
-                val rows = entry.flattenObjectForClaimRows()
+    private fun JsonElement.flattenObjectForClaimRows(path: ClaimPath, item: ClaimItem): List<ClaimRow> =
+        when {
+            item.value !is DisplayValue.ObjectValue -> listOf(ClaimRow(path = path, item = item))
+            this is JsonObject -> entries.flatMap { (key, value) ->
+                val childPath = ClaimPath.child(path, key)
+                val childItem = value.toClaimItem(
+                    path = childPath,
+                    label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
+                )
+                val rows = value.flattenObjectForClaimRows(path = childPath, item = childItem)
                 if (
                     rows.size == 1 &&
-                    rows.single().value is DisplayValue.Image &&
-                    rows.single().label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
+                    rows.single().item.value is DisplayValue.Image &&
+                    rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
                 ) {
-                    listOf(rows.single().copy(label = label))
+                    listOf(rows.single().copy(item = rows.single().item.copy(label = item.label)))
                 } else {
                     rows
                 }
             }
-            else -> listOf(this)
+            else -> item.flattenDisplayObjectForClaimRows()
+        }
+
+    private fun ClaimItem.flattenDisplayObjectForClaimRows(): List<ClaimRow> =
+        when (val displayValue = value) {
+            is DisplayValue.ObjectValue -> displayValue.entries.flatMap { entry ->
+                val rows = entry.flattenDisplayObjectForClaimRows()
+                if (
+                    rows.size == 1 &&
+                    rows.single().item.value is DisplayValue.Image &&
+                    rows.single().item.label == CredentialDisplayVocabulary.humanizedClaimLabel(imageWrapperClaimName)
+                ) {
+                    listOf(rows.single().copy(item = rows.single().item.copy(label = label)))
+                } else {
+                    rows
+                }
+            }
+            else -> listOf(ClaimRow(path = ClaimPath(itemPath = path, components = pathComponents), item = this))
         }
 
     private fun JsonElement.toDisplayValue(path: ClaimPath): DisplayValue =
@@ -141,6 +165,11 @@ object CredentialDisplayNormalizer {
     private const val epochMillisecondsThreshold = 10_000_000_000L
     private const val imageWrapperClaimName = "elementValue"
 }
+
+private data class ClaimRow(
+    val path: ClaimPath,
+    val item: ClaimItem,
+)
 
 private fun JsonArray.hiddenClaimCommitmentsText(): String =
     when (size) {

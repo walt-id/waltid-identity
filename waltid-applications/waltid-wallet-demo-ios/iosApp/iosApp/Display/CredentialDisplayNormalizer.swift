@@ -51,9 +51,9 @@ enum CredentialDisplayNormalizer {
 
         let groupedItems = members.flatMap { member in
             let path = DisplayClaimPath.topLevel(member.key)
-            return claimItems(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
-                .map { item in
-                    (CredentialDisplayVocabulary.groupKind(for: path.components), item)
+            return claimRows(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+                .map { row in
+                    (CredentialDisplayVocabulary.groupKind(for: row.path.components), row.item)
                 }
         }
         let groups = Dictionary(grouping: groupedItems, by: { $0.0 })
@@ -74,6 +74,7 @@ enum CredentialDisplayNormalizer {
     private static func claimItem(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> ClaimItem {
         ClaimItem(
             path: path.itemPath,
+            pathComponents: path.components,
             label: label,
             value: protocolDisplayValue(for: value, path: path) ?? displayValue(for: value, path: path),
             rawValue: rawString(value),
@@ -97,25 +98,55 @@ enum CredentialDisplayNormalizer {
         }
     }
 
-    private static func claimItems(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> [ClaimItem] {
+    private static func claimRows(path: DisplayClaimPath, label: String, value: CredentialDisplayJSONValue) -> [ClaimRow] {
         let item = claimItem(path: path, label: label, value: value)
-        if case .object = item.value {
-            return flattenObjectForClaimRows(item)
-        }
-        return [item]
+        return flattenObjectForClaimRows(path: path, item: item, value: value)
     }
 
-    private static func flattenObjectForClaimRows(_ item: ClaimItem) -> [ClaimItem] {
+    private static func flattenObjectForClaimRows(
+        path: DisplayClaimPath,
+        item: ClaimItem,
+        value: CredentialDisplayJSONValue
+    ) -> [ClaimRow] {
+        guard case .object(let members) = value else {
+            if case .object = item.value {
+                return flattenDisplayObjectForClaimRows(item)
+            }
+            return [ClaimRow(path: path, item: item)]
+        }
+        guard case .object = item.value else {
+            return [ClaimRow(path: path, item: item)]
+        }
+
+        return members.flatMap { member in
+            let childPath = path.child(member.key)
+            let childItem = claimItem(path: childPath, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+            let rows = flattenObjectForClaimRows(path: childPath, item: childItem, value: member.value)
+            if rows.count == 1,
+               case .image = rows[0].item.value,
+               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
+                return [ClaimRow(path: rows[0].path, item: rows[0].item.relabelled(item.label))]
+            }
+            return rows
+        }
+    }
+
+    private static func flattenDisplayObjectForClaimRows(_ item: ClaimItem) -> [ClaimRow] {
         guard case .object(let entries) = item.value else {
-            return [item]
+            return [
+                ClaimRow(
+                    path: DisplayClaimPath(itemPath: item.path, components: item.pathComponents),
+                    item: item
+                )
+            ]
         }
 
         return entries.flatMap { entry in
-            let rows = flattenObjectForClaimRows(entry)
+            let rows = flattenDisplayObjectForClaimRows(entry)
             if rows.count == 1,
-               case .image = rows[0].value,
-               rows[0].label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
-                return [rows[0].relabelled(item.label)]
+               case .image = rows[0].item.value,
+               rows[0].item.label == CredentialDisplayVocabulary.humanizedLabel(imageWrapperClaimName) {
+                return [ClaimRow(path: rows[0].path, item: rows[0].item.relabelled(item.label))]
             }
             return rows
         }
@@ -187,6 +218,11 @@ enum CredentialDisplayNormalizer {
     private static let imageWrapperClaimName = "elementValue"
 }
 
+private struct ClaimRow {
+    let path: DisplayClaimPath
+    let item: ClaimItem
+}
+
 private func hiddenClaimCommitmentsText(count: Int) -> String {
     switch count {
     case 0: return "No hidden claim commitments"
@@ -224,6 +260,7 @@ private extension ClaimItem {
     func relabelled(_ label: String) -> ClaimItem {
         ClaimItem(
             path: path,
+            pathComponents: pathComponents,
             label: label,
             value: value,
             rawValue: rawValue,

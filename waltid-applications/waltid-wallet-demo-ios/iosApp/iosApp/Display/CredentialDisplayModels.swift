@@ -19,6 +19,7 @@ struct ClaimGroup: Equatable, Identifiable {
 
 struct ClaimItem: Equatable, Identifiable {
     let path: ClaimItemPath
+    let pathComponents: [String]
     let label: String
     let value: DisplayValue
     let rawValue: String?
@@ -28,12 +29,14 @@ struct ClaimItem: Equatable, Identifiable {
 
     init(
         path: ClaimItemPath,
+        pathComponents: [String] = [],
         label: String,
         value: DisplayValue,
         rawValue: String?,
         roles: Set<ClaimRole> = []
     ) {
         self.path = path
+        self.pathComponents = pathComponents
         self.label = label
         self.value = value
         self.rawValue = rawValue

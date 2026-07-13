@@ -78,6 +78,7 @@ private sealed interface PathOperation {
 
 data class ClaimItem(
     val path: ClaimItemPath,
+    val pathComponents: List<String> = emptyList(),
     val label: String,
     val value: DisplayValue,
     val rawValue: String? = null,
