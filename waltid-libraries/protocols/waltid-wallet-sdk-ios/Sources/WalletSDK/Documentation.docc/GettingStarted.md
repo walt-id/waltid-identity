@@ -22,6 +22,43 @@ let wallet = try await Wallet(
 )
 ```
 
+``WalletConfiguration`` uses managed encrypted local persistence by default.
+Apps that own database-key recovery can pass ``WalletPersistence`` with
+``WalletDatabaseKeyConfiguration/provided(_:)`` and a
+``WalletDatabaseKeyProvider`` implementation.
+
+Apps can also pass ``WalletStores`` when they own credential, DID, or signing-key
+durability. Omitted credential and DID stores use the encrypted local database,
+while an omitted key store uses platform signing-key persistence and generation.
+Credential and DID stores can be supplied independently. Signing-key stores use
+``WalletKeys`` so the app-owned ``WalletKeyStore`` and key generator are
+configured atomically. This example assumes app-defined store types that
+implement the corresponding protocols.
+
+<!-- doc-snippet:start swift-full-store-overrides -->
+```swift
+let keyStore = AppKeyStore()
+
+let wallet = try await Wallet(
+    configuration: WalletConfiguration(
+        walletID: "consumer-wallet",
+        persistence: WalletPersistence(
+            stores: WalletStores(
+                credentials: AppCredentialStore(),
+                dids: AppDidStore(),
+                keys: WalletKeys(store: keyStore) { keyType in
+                    try await keyStore.generateKey(type: keyType)
+                }
+            )
+        )
+    )
+)
+```
+<!-- doc-snippet:end swift-full-store-overrides -->
+
+``StoredKey`` contains walt.id serialized key JSON and may include private key
+material. Keep those entries in app-owned secure storage.
+
 > Important: Keep Kotlin Multiplatform and generated bridge symbols behind
 > `WalletSDK`. Native iOS consumers should import this Swift package and work
 > with Swift-owned types.

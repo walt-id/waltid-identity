@@ -39,9 +39,9 @@ public enum class MobileWalletEventStatus {
  * @property status Current progress state for the event.
  */
 public data class MobileWalletEvent(
-    val name: String,
-    val phase: MobileWalletEventPhase,
-    val status: MobileWalletEventStatus,
+    public val name: String,
+    public val phase: MobileWalletEventPhase,
+    public val status: MobileWalletEventStatus,
 )
 
 internal class MobileWalletEventStream(

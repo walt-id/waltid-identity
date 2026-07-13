@@ -2,18 +2,59 @@ name: Mobile SDK API docs
 
 on:
   workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, labeled, unlabeled]
   push:
+    branches: [main]
+  workflow_call:
+    inputs:
+      deploy:
+        description: "Package the generated HTML into the sdk-docs image and publish it (release only)"
+        required: false
+        type: boolean
+        default: false
+      version:
+        description: "Release version used to tag the sdk-docs image"
+        required: false
+        type: string
+        default: ""
+      tags:
+        description: 'JSON array of extra tags for the sdk-docs image, e.g. ["stable"]'
+        required: false
+        type: string
+        default: '[]'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
+  macos-eligibility:
+    uses: ./.github/workflows/macos-eligibility.yml
+    with:
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
+
   mobile-sdk-docs:
+    needs: macos-eligibility
+    if: ${{ needs.macos-eligibility.outputs.should-run == 'true' }}
     runs-on: macos-26
     env:
       XCODE_DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout all repos with ref fallback
-        uses: walt-id/waltid-identity/.github/actions/checkout-repos@864f84343fdeea17f6f63434bc8036c39f178dc7
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
         with:
-          token: ${{ secrets.GH_ACCESS_TOKEN }}
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Configure gradle
         uses: walt-id/waltid-identity/.github/actions/gradle-setup-action@864f84343fdeea17f6f63434bc8036c39f178dc7
@@ -39,11 +80,44 @@ jobs:
 
       - name: Generate mobile SDK API docs
         timeout-minutes: 45
-        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@108ad19bd20ff41d0adf823457adf6b017e9d91e
+        uses: walt-id/waltid-identity/.github/actions/gradle-mobile-sdk-docs@88ae3106d2882f728b7c79f16295dcf665506af3
         with:
           waltid-directory: 'waltid-identity'
           xcode-developer-dir: ${{ env.XCODE_DEVELOPER_DIR }}
 
+      - name: Collect generated HTML
+        if: ${{ inputs.deploy }}
+        shell: bash
+        run: |
+          base="waltid-identity/waltid-libraries/protocols"
+          out="$RUNNER_TEMP/sdk-docs-html"
+          rm -rf "$out"
+          mkdir -p "$out/wallet-mobile" "$out/wallet-persistence-mobile"
+          cp -R "$base/waltid-openid4vc-wallet-mobile/build/dokka/html/." "$out/wallet-mobile/"
+          cp -R "$base/waltid-openid4vc-wallet-persistence-mobile/build/dokka/html/." "$out/wallet-persistence-mobile/"
+          # Landing page linking the two module docs.
+          cat > "$out/index.html" <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head><meta charset="utf-8"><title>walt.id Mobile SDK API docs</title></head>
+          <body>
+          <h1>walt.id Mobile SDK API documentation</h1>
+          <ul>
+            <li><a href="wallet-mobile/index.html">OpenID4VC Wallet (mobile)</a></li>
+            <li><a href="wallet-persistence-mobile/index.html">OpenID4VC Wallet persistence (mobile)</a></li>
+          </ul>
+          </body>
+          </html>
+          HTML
+
+      - name: Upload SDK docs HTML artifact
+        if: ${{ inputs.deploy }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: sdk-docs-html
+          path: ${{ runner.temp }}/sdk-docs-html
+          retention-days: 1
+     
       - name: Package Swift WalletSDK DocC archive
         working-directory: waltid-identity
         run: |
@@ -58,3 +132,56 @@ jobs:
           name: walletsdk-doccarchive
           path: waltid-identity/waltid-libraries/protocols/waltid-wallet-sdk-ios/build/docc/WalletSDK.doccarchive.tar.gz
           if-no-files-found: error
+
+  publish:
+    needs: mobile-sdk-docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip publishing outside deploy mode
+        if: ${{ inputs.deploy != true }}
+        run: echo "SDK docs image publishing is disabled for this run."
+
+      - name: Checkout all repos with ref fallback
+        if: ${{ inputs.deploy == true }}
+        uses: walt-id/waltid-identity/.github/actions/checkout-repos@4296a7f80cacf7e60cb1a20321956768892eb7e3
+        with:
+          token: ${{ secrets.GH_ACCESS_TOKEN || github.token }}
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Download SDK docs HTML artifact
+        if: ${{ inputs.deploy == true }}
+        uses: actions/download-artifact@v5
+        with:
+          name: sdk-docs-html
+          path: waltid-identity/docs/mobile-sdk-api/html
+
+      - name: Login to Docker Hub
+        if: ${{ inputs.deploy == true }}
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        if: ${{ inputs.deploy == true }}
+        uses: docker/setup-buildx-action@v4
+
+      - name: Generate Docker tags
+        if: ${{ inputs.deploy == true }}
+        id: tags
+        run: |
+          TAGS="waltid/waltid-sdk-docs:${{ inputs.version }}, waltid/waltid-sdk-docs:latest"
+          for tag in $(echo '${{ inputs.tags }}' | jq -r '.[]'); do
+            TAGS="$TAGS, waltid/waltid-sdk-docs:$tag"
+          done
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Build and push sdk-docs image
+        if: ${{ inputs.deploy == true }}
+        uses: docker/build-push-action@v7
+        with:
+          platforms: linux/amd64,linux/arm64
+          push: true
+          file: waltid-identity/docs/mobile-sdk-api/Dockerfile
+          context: waltid-identity/docs/mobile-sdk-api
+          tags: ${{ steps.tags.outputs.tags }}

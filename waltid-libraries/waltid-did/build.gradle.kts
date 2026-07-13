@@ -1,5 +1,5 @@
 plugins {
-    id("waltid.multiplatform.library")
+    id("waltid.full.library")
     id("waltid.publish.maven")
 }
 
@@ -47,12 +47,15 @@ kotlin {
             implementation(kotlin("test"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
+        val jvmAndroidMain by getting {
+            dependencies {
+                // Json canonicalization
+                implementation(identityLibs.java.json.canonicalization)
+            }
+        }
         jvmMain.dependencies {
             // Ktor client
             implementation(identityLibs.ktor.client.java)
-
-            // Json canonicalization
-            implementation(identityLibs.java.json.canonicalization)
 
             // Multiformat
             // implementation("com.github.multiformats:java-multibase:v1.1.1")

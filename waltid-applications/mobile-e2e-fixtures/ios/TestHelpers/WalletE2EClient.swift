@@ -29,9 +29,17 @@ public final class WalletE2EClient {
         method: String = "GET",
         headers: [String: String] = [:],
         body: Data? = nil,
-        allow3xx: Bool = false
+        allow3xx: Bool = false,
+        retryTransientFailures: Bool = false
     ) async throws -> [String: Any] {
-        let response = try await textRequest(url: url, method: method, headers: headers, body: body, allow3xx: allow3xx)
+        let response = try await textRequest(
+            url: url,
+            method: method,
+            headers: headers,
+            body: body,
+            allow3xx: allow3xx,
+            retryTransientFailures: retryTransientFailures
+        )
         if response.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return [:]
         }
@@ -47,7 +55,38 @@ public final class WalletE2EClient {
         method: String = "GET",
         headers: [String: String] = [:],
         body: Data? = nil,
-        allow3xx: Bool = false
+        allow3xx: Bool = false,
+        retryTransientFailures: Bool = false
+    ) async throws -> WalletE2EHttpResponse {
+        let maxAttempts = retryTransientFailures ? 3 : 1
+        var attempt = 1
+
+        while true {
+            do {
+                return try await performTextRequest(
+                    url: url,
+                    method: method,
+                    headers: headers,
+                    body: body,
+                    allow3xx: allow3xx
+                )
+            } catch {
+                guard attempt < maxAttempts, Self.isTransient(error) else {
+                    throw error
+                }
+
+                try await Task.sleep(nanoseconds: UInt64(attempt) * 1_000_000_000)
+                attempt += 1
+            }
+        }
+    }
+
+    private func performTextRequest(
+        url: URL,
+        method: String,
+        headers: [String: String],
+        body: Data?,
+        allow3xx: Bool
     ) async throws -> WalletE2EHttpResponse {
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -88,5 +127,27 @@ public final class WalletE2EClient {
     public static func urlEncode(_ value: String) -> String {
         let allowed = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+    }
+
+    private static func isTransient(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain {
+            let code = URLError.Code(rawValue: nsError.code)
+            return [
+                .timedOut,
+                .networkConnectionLost,
+                .notConnectedToInternet,
+                .cannotFindHost,
+                .cannotConnectToHost,
+                .dnsLookupFailed,
+                .secureConnectionFailed,
+            ].contains(code)
+        }
+
+        if nsError.domain == "WalletE2E" {
+            return [408, 429, 500, 502, 503, 504].contains(nsError.code)
+        }
+
+        return false
     }
 }

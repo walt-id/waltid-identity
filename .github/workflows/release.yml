@@ -31,7 +31,7 @@ jobs:
     with:
       images: ${{ needs.docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable"]'
+      tags: '["stable", "latest"]'
       publish: true
   api-docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
@@ -44,17 +44,64 @@ jobs:
     with:
       images: ${{ needs.api-docker-matrix.outputs.json }}
       version: ${{ needs.version.outputs.release_version }}
-      tags: '["stable"]'
+      tags: '["stable", "latest"]'
       publish: true
+  sdk-docs:
+    uses: walt-id/waltid-identity/.github/workflows/mobile-sdk-docs.yml@main
+    secrets: inherit
+    needs: version
+    with:
+      deploy: true
+      version: ${{ needs.version.outputs.release_version }}
+      tags: '["stable", "latest"]'
   deploy:
     uses: walt-id/waltid-identity/.github/workflows/deployment.yml@main
     secrets: inherit
-    needs: [ version, gradle, docker, api-docker ]
+    needs: [ version, gradle, docker, api-docker, sdk-docs ]
     with:
       version: ${{ needs.version.outputs.release_version }}
       deployment: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'dev' || 'prod' }}
       oss: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-identity-main' || 'identity-main' }}
       enterprise: ${{ contains(needs.version.outputs.release_version, 'PRE-RELEASE') && 'test-enterprise-main' || 'enterprise-main' }}
+  branch:
+    uses: walt-id/waltid-identity/.github/workflows/branch.yml@main
+    secrets: inherit
+    needs: [ version, deploy ]
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+  enterprise-branch:
+    uses: walt-id/waltid-identity/.github/workflows/branch.yml@main
+    secrets: inherit
+    needs: [ version, deploy ]
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-identity-enterprise
+  docs-branch:
+    uses: walt-id/waltid-identity/.github/workflows/branch.yml@main
+    secrets: inherit
+    needs: [ version, deploy ]
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-docs
+  quickstart-branch:
+    uses: walt-id/waltid-identity/.github/workflows/branch.yml@main
+    secrets: inherit
+    needs: [ version, deploy ]
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-enterprise-quickstart
+  unified-build-branch:
+    uses: walt-id/waltid-identity/.github/workflows/branch.yml@main
+    secrets: inherit
+    needs: [ version, deploy ]
+    if: ${{ endsWith(needs.version.outputs.release_version, '.0') && !contains(needs.version.outputs.release_version, 'PRE-RELEASE') }}
+    with:
+      version: ${{ needs.version.outputs.release_version }}
+      repository: walt-id/waltid-unified-build
   tag:
     uses: walt-id/waltid-identity/.github/workflows/tag.yml@main
     secrets: inherit

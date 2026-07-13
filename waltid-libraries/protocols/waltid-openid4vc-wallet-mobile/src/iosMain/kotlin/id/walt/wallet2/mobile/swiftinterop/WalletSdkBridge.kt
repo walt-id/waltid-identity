@@ -82,6 +82,14 @@ public class WalletSdkBridge private constructor(
         }
 
     /**
+     * Deletes wallet-local state and managed persistence material.
+     */
+    public suspend fun deleteWallet(): WalletBridgeResult<Unit> =
+        walletBridgeCall {
+            operations.deleteWallet()
+        }
+
+    /**
      * Returns the full credential payload for a single wallet credential.
      *
      * The payload is encoded as a JSON object string. Returns `null` inside the result when no
@@ -133,6 +141,8 @@ internal interface WalletSdkBridgeOperations {
 
     suspend fun credentials(): List<MobileWalletCredential>
 
+    suspend fun deleteWallet()
+
     suspend fun credentialDetails(id: String): MobileWalletCredentialDetails?
 
     suspend fun present(
@@ -167,6 +177,9 @@ internal class MobileWalletSdkBridgeOperations(
 
     override suspend fun credentials(): List<MobileWalletCredential> =
         wallet.credentials()
+
+    override suspend fun deleteWallet() =
+        wallet.deleteWallet()
 
     override suspend fun credentialDetails(id: String): MobileWalletCredentialDetails? =
         wallet.credentialDetails(id)
