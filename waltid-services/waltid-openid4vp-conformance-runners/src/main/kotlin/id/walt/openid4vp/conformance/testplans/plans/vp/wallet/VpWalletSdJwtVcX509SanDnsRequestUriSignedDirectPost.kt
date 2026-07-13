@@ -86,8 +86,8 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
                 }
             },
             "credential": {
-                "trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}",
-                "status_list_trust_anchor": "${TestKeyMaterial.VERIFIER_CA_CERT}"
+                "trust_anchor": ${TestKeyMaterial.VERIFIER_CA_PEM_JSON},
+                "status_list_trust_anchor": ${TestKeyMaterial.VERIFIER_CA_PEM_JSON}
             },
             "publish": "everything"
         }
