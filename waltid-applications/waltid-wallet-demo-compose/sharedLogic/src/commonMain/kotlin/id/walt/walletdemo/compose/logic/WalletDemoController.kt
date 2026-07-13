@@ -59,8 +59,31 @@ class WalletDemoController(
 
     fun updateOfferUrl(value: String) {
         _state.update {
-            it.copy(requestDrafts = it.requestDrafts.copy(offerUrl = value))
+            it.copy(requestDrafts = it.requestDrafts.copy(offerUrl = value, txCodeRequired = false, offerFromDeepLink = false))
         }
+    }
+
+    fun clearOfferDeepLinkFlag() {
+        _state.update {
+            it.copy(requestDrafts = it.requestDrafts.copy(offerFromDeepLink = false))
+        }
+    }
+
+    fun updateTxCode(value: String) {
+        _state.update {
+            it.copy(requestDrafts = it.requestDrafts.copy(txCode = value))
+        }
+    }
+
+    fun loadCredentialDetails(id: String) {
+        scope.launch(dispatcher) {
+            val details = runCatching { wallet.credentialDetails(id) }.getOrNull()
+            _state.update { it.copy(selectedCredentialDetails = details) }
+        }
+    }
+
+    fun clearCredentialDetails() {
+        _state.update { it.copy(selectedCredentialDetails = null) }
     }
 
     fun updatePresentationRequestUrl(value: String) {
@@ -71,8 +94,57 @@ class WalletDemoController(
 
     fun handleDeepLink(url: String) {
         when {
-            url.startsWith("openid-credential-offer:") -> updateOfferUrl(url)
+            url.startsWith("openid-credential-offer:") -> {
+                _state.update {
+                    it.copy(requestDrafts = it.requestDrafts.copy(
+                        offerUrl = url,
+                        txCode = "",
+                        txCodeRequired = false,
+                        offerFromDeepLink = true,
+                    ))
+                }
+                if (_state.value.session is WalletSessionState.Ready) {
+                    resolveAndReceive(url)
+                }
+                // If not ready, bootstrapIfNeeded will call resolveAndReceive once bootstrap completes.
+            }
             url.startsWith("openid4vp:") -> updatePresentationRequestUrl(url)
+        }
+    }
+
+    /**
+     * Resolves an offer URL and either proceeds directly to receive (no txCode required) or
+     * pauses and waits for the user to supply a txCode before calling [receive].
+     * Used by both QR scan and manual URL entry.
+     */
+    fun resolveAndReceive(offerUrl: String) {
+        val ready = _state.value.session as? WalletSessionState.Ready ?: return
+        val url = offerUrl.trim()
+        if (url.isBlank()) return
+
+        scope.launch(dispatcher) {
+            _state.update {
+                it.copy(
+                    requestDrafts = it.requestDrafts.copy(offerUrl = url, txCode = "", txCodeRequired = false),
+                    operation = WalletOperationState.ResolvingOffer,
+                )
+            }
+            runCatching {
+                wallet.resolveOffer(url)
+            }.onSuccess { resolution ->
+                if (resolution.txCodeRequired) {
+                    _state.update {
+                        it.copy(
+                            requestDrafts = it.requestDrafts.copy(txCodeRequired = true),
+                            operation = WalletOperationState.Idle,
+                        )
+                    }
+                } else {
+                    doReceive(ready, url, txCode = null)
+                }
+            }.onFailure { error ->
+                setOperationError("Resolve failed", error)
+            }
         }
     }
 
@@ -81,23 +153,33 @@ class WalletDemoController(
         val ready = current.session as? WalletSessionState.Ready ?: return
         val offerUrl = current.requestDrafts.offerUrl.trim()
         if (offerUrl.isBlank()) return
+        val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
 
         scope.launch(dispatcher) {
-            _state.update { it.copy(operation = WalletOperationState.Receiving) }
-            runCatching {
-                val ids = wallet.receive(offerUrl)
-                val credentials = wallet.listCredentials()
-                ids to credentials
-            }.onSuccess { (ids, credentials) ->
-                _state.update {
-                    it.copy(
-                        session = ready.copy(credentials = credentials),
-                        operation = WalletOperationState.Succeeded("Received ${ids.size} credential(s)"),
-                    )
-                }
-            }.onFailure { error ->
-                setOperationError("Receive failed", error)
+            doReceive(ready, offerUrl, txCode)
+        }
+    }
+
+    private suspend fun doReceive(ready: WalletSessionState.Ready, offerUrl: String, txCode: String?) {
+        _state.update {
+            it.copy(
+                requestDrafts = it.requestDrafts.copy(txCodeRequired = false),
+                operation = WalletOperationState.Receiving,
+            )
+        }
+        runCatching {
+            val ids = wallet.receive(offerUrl, txCode)
+            val credentials = wallet.listCredentials()
+            ids to credentials
+        }.onSuccess { (ids, credentials) ->
+            _state.update {
+                it.copy(
+                    session = ready.copy(credentials = credentials),
+                    operation = WalletOperationState.Succeeded("Received ${ids.size} credential(s)"),
+                )
             }
+        }.onFailure { error ->
+            setOperationError("Receive failed", error)
         }
     }
 
@@ -187,6 +269,11 @@ class WalletDemoController(
                         operation = WalletOperationState.Idle,
                     )
                 }
+                val pendingOffer = _state.value.requestDrafts
+                    .takeIf { it.offerFromDeepLink }
+                    ?.offerUrl
+                    ?.takeIf { it.isNotBlank() }
+                if (pendingOffer != null) resolveAndReceive(pendingOffer)
             }.onFailure { error ->
                 _state.update {
                     it.copy(
