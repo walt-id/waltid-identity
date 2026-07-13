@@ -1,6 +1,9 @@
 package id.walt.wallet2.auth
 
+import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.hours
 import id.walt.ktorauthnz.AuthContext
 import id.walt.ktorauthnz.KtorAuthnzManager
 import id.walt.ktorauthnz.accounts.Account
@@ -15,6 +18,8 @@ import id.walt.ktorauthnz.methods.EmailPass
 import id.walt.ktorauthnz.methods.registerAuthenticationMethod
 import id.walt.ktorauthnz.methods.storeddata.AuthMethodStoredData
 import id.walt.ktorauthnz.methods.storeddata.EmailPassStoredData
+import id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler
+import id.walt.wallet2.OSSWallet2AuthConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -134,28 +139,51 @@ data class AccountInfoResponse(
 // ---------------------------------------------------------------------------
 
 /**
- * Configures [KtorAuthnzManager] and hooks into the shared [AuthenticationServiceModule]
- * so that the Ktor Authentication plugin is configured once by the WebService wrapper
- * (via [AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication])
- * rather than installing it a second time here.
+ * Configures [KtorAuthnzManager] for JWT-based session tokens and hooks into
+ * [AuthenticationServiceModule] so the Ktor Authentication plugin is installed
+ * exactly once by the WebService wrapper.
+ *
+ * Reads [OSSWallet2AuthConfig] from the config manager:
+ * - [OSSWallet2AuthConfig.signingKey]: waltid-crypto key used to sign and verify JWT
+ *   session tokens. Must be identical on every replica (HA-safe).
+ * - [OSSWallet2AuthConfig.tokenExpiry]: JWT `exp` lifetime as a [Duration].
+ *
+ * Returns the loaded [OSSWallet2AuthConfig] so the caller can pass
+ * [OSSWallet2AuthConfig.tokenExpiry] to [registerWallet2AuthRoutes].
  *
  * Called from Main.kt when the auth optional feature is enabled.
  */
-fun Application.configureWallet2Auth() {
+suspend fun Application.configureWallet2Auth(): OSSWallet2AuthConfig {
+    val config = ConfigManager.getConfig<OSSWallet2AuthConfig>()
+
+    // signingKey is a DirectSerializedKey - the Key is already resolved by deserialization.
+    val signingKey = config.signingKey.key
+
+    val jwtHandler = JwtTokenHandler()
+    jwtHandler.signingKey = signingKey
+    jwtHandler.verificationKey = signingKey
+
     KtorAuthnzManager.accountStore = OSSWallet2AccountStore
+    KtorAuthnzManager.tokenHandler = jwtHandler
 
     AuthenticationServiceModule.AuthenticationServiceConfig.customAuthentication = {
         ktorAuthnz("ktor-authnz") { }
     }
 
-    authLog.info { "Wallet2 auth configured (email+password, in-memory store)" }
+    authLog.info { "Wallet2 auth configured: JWT tokens (keyType=${signingKey.keyType}, expiry=${config.tokenExpiry})" }
+    return config
 }
 
 /**
  * Registers /auth/[*] routes.
  * Should be called inside the main routing block when auth is enabled.
+ *
+ * @param tokenExpiry JWT token lifetime embedded into the [AuthFlow] so
+ *   [id.walt.ktorauthnz.tokens.jwttoken.JwtTokenHandler] encodes `exp` into each issued token.
+ *   Defaults to 24 hours. Pass the value from [configureWallet2Auth] to keep it in sync
+ *   with the loaded config.
  */
-fun Route.registerWallet2AuthRoutes() {
+fun Route.registerWallet2AuthRoutes(tokenExpiry: Duration = 24.hours) {
     route("/auth") {
 
         post("/register") {
@@ -175,8 +203,12 @@ fun Route.registerWallet2AuthRoutes() {
             call.respond(HttpStatusCode.Created, mapOf("accountId" to account.id))
         }
 
-        // Register EmailPass login route with implicit session generation
-        val emailPassFlow = id.walt.ktorauthnz.flows.AuthFlow(method = EmailPass.id, success = true)
+        // expiration is an ISO-8601 duration string parsed by AuthFlow.parsedDuration.
+        val emailPassFlow = id.walt.ktorauthnz.flows.AuthFlow(
+            method = EmailPass.id,
+            success = true,
+            expiration = tokenExpiry.toIsoString()
+        )
         registerAuthenticationMethod(EmailPass, authContext = {
             AuthContext(
                 implicitSessionGeneration = true,

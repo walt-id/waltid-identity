@@ -41,19 +41,25 @@ suspend fun main(args: Array<String>) {
                     OSSWallet2Service.walletStore = ExposedWalletStore(db)
                 }
             },
-            run = WebService(Application::wallet2Module).run()
+            run = WebService {
+                val authConfig = if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
+                    configureWallet2Auth()
+                } else null
+                wallet2Module(withPlugins = true, authConfig = authConfig)
+            }.run()
         )
     ).main(args)
 }
 
-fun Application.wallet2Module(withPlugins: Boolean = true) {
+/**
+ * Ktor Application module. [authConfig] is pre-resolved by the caller (Main or test)
+ * so this function can remain non-suspend and compatible with [E2ETest.testBlock].
+ */
+fun Application.wallet2Module(withPlugins: Boolean = true, authConfig: OSSWallet2AuthConfig? = null) {
     if (withPlugins) {
         configurePlugins()
     }
-    if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-        configureWallet2Auth()
-    }
-    wallet2Api()
+    wallet2Api(authConfig)
 }
 
 fun Application.configurePlugins() {
@@ -86,10 +92,11 @@ fun Application.configureMonitoring() {
     }
 }
 
-fun Application.wallet2Api() {
+fun Application.wallet2Api(authConfig: OSSWallet2AuthConfig? = null) {
     routing {
         if (FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)) {
-            registerWallet2AuthRoutes()
+            requireNotNull(authConfig) { "No auth config is provided for auth feature!" }
+            registerWallet2AuthRoutes(tokenExpiry = authConfig.tokenExpiry)
         }
         OSSWallet2Service.run { registerRoutes() }
     }
