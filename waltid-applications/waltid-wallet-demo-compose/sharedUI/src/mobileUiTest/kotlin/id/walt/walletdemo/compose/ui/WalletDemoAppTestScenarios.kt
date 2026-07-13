@@ -53,6 +53,7 @@ class WalletDemoAppTestScenarios {
 
         onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
         onNodeWithTag(WalletUiTestTags.credentialDetails("cred-1")).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimGroup("Personal details")).performScrollTo().assertIsDisplayed()
         onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
         onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
 

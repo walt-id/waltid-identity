@@ -6,7 +6,7 @@ internal enum class ClaimGroupKind(
 ) {
     Personal(title = "Personal details", order = 0),
     Address(title = "Address", order = 1),
-    Other(title = "Other claims", order = 2),
+    Other(title = "Credential data", order = 2),
     Technical(title = "Technical claims", order = 3),
 }
 

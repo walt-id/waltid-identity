@@ -29,7 +29,7 @@ internal fun CredentialDetailsContent(
         modifier = modifier
             .fillMaxWidth()
             .testTag(WalletUiTestTags.credentialDetails(details.summary.id)),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         CredentialOverviewSection(details)
         if (details.groups.isEmpty() && details.technicalGroups.isEmpty()) {

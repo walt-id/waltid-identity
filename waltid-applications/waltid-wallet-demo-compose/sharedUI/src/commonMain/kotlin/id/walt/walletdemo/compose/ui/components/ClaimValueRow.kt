@@ -34,7 +34,7 @@ internal fun ClaimValueRow(item: ClaimItem, modifier: Modifier = Modifier) {
         Text(
             item.label,
             style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         ClaimValue(value = item.value, path = item.path, modifier = Modifier.fillMaxWidth())
@@ -47,12 +47,12 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         is DisplayValue.BooleanValue -> Text(
             value.value.toString(),
             modifier = modifier,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
         )
         is DisplayValue.DecodedText -> Text(
             value.value,
             modifier = modifier,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
         )
         is DisplayValue.Image -> ImageValue(value, path, modifier)
         is DisplayValue.ListValue -> Column(
@@ -61,7 +61,7 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         ) {
             value.values.forEachIndexed { index, child ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("${index + 1}.", style = MaterialTheme.typography.bodySmall)
+                    Text("${index + 1}.", style = MaterialTheme.typography.bodyMedium)
                     ClaimValue(child, path.indexedChild(index), Modifier.weight(1f))
                 }
             }
@@ -69,13 +69,13 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         DisplayValue.NullValue -> Text(
             "Not provided",
             modifier = modifier,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         is DisplayValue.NumberValue -> Text(
             value.value,
             modifier = modifier,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
         )
         is DisplayValue.ObjectValue -> Column(
             modifier = modifier,
@@ -94,7 +94,7 @@ private fun ClaimValue(value: DisplayValue, path: ClaimItemPath, modifier: Modif
         is DisplayValue.Text -> Text(
             value.value,
             modifier = modifier,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
         )
     }
 }
