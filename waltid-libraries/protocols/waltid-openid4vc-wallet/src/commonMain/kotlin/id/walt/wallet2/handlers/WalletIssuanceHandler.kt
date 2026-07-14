@@ -578,6 +578,17 @@ object WalletIssuanceHandler {
         return FetchCredentialResult(rawCredentials = rawCredentials)
     }
 
+    /**
+     * Fetches credentials and applies [FetchCredentialRequest.storeInWallet] consistently for
+     * every server adapter. Use the stateless overload when no wallet is available.
+     */
+    suspend fun fetchCredential(wallet: Wallet, request: FetchCredentialRequest): FetchCredentialResult =
+        fetchCredential(request).also { result ->
+            if (request.storeInWallet) {
+                result.rawCredentials.forEach { wallet.parseAndStore(it) }
+            }
+        }
+
     // ---------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------
