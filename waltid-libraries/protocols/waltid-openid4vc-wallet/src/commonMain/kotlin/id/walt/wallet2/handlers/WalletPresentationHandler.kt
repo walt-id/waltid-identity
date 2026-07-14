@@ -33,6 +33,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 private val log = KotlinLogging.logger {}
@@ -597,12 +598,7 @@ object WalletPresentationHandler {
         selectedDisclosureOptions?.requireValidPresentationDisclosureSelection()
         val selectedOptions = selectedCredentialOptions.toSet()
         val availableOptions = flatMap { (queryId, results) ->
-            results.map { result ->
-                PresentationCredentialSelection(
-                    queryId = queryId,
-                    credentialId = result.credential.id,
-                )
-            }
+            results.map { result -> result.toPresentationCredentialSelection(queryId) }
         }.toSet()
 
         val unknownSelection = selectedOptions.firstOrNull { selection -> selection !in availableOptions }
@@ -643,21 +639,14 @@ object WalletPresentationHandler {
 
         return mapValues { (queryId, results) ->
             results.filter { result ->
-                PresentationCredentialSelection(
-                    queryId = queryId,
-                    credentialId = result.credential.id,
-                ) in selectedOptions
+                result.toPresentationCredentialSelection(queryId) in selectedOptions
             }.map { result ->
                 if (selectedDisclosurePathsByOption == null) {
                     result
                 } else {
+                    val option = result.toPresentationCredentialSelection(queryId)
                     result.selectDisclosures(
-                        selectedPaths = selectedDisclosurePathsByOption[
-                            PresentationCredentialSelection(
-                                queryId = queryId,
-                                credentialId = result.credential.id,
-                            )
-                        ].orEmpty(),
+                        selectedPaths = selectedDisclosurePathsByOption[option].orEmpty(),
                     )
                 }
             }
@@ -672,7 +661,8 @@ object WalletPresentationHandler {
     private fun DcqlMatcher.DcqlMatchResult.selectDisclosures(
         selectedPaths: Set<String>,
     ): DcqlMatcher.DcqlMatchResult {
-        val disclosures = selectedDisclosures ?: run {
+        val plan = originalQuery.claimSelectionPlan()
+        val disclosures = availablePresentationDisclosures(plan) ?: run {
             require(selectedPaths.isEmpty()) {
                 "Selected disclosure option does not match the presentation preview"
             }
@@ -685,12 +675,11 @@ object WalletPresentationHandler {
         require(unknownPaths.isEmpty()) {
             "Selected disclosure option does not match a selectively disclosable presentation claim"
         }
-        val requiredPaths = originalQuery.requiredClaimPathKeys()
-        val retainedPaths = requiredPaths + selectedPaths
+        val retainedPaths = plan.requiredPaths + selectedPaths
         val retainedClaimPaths = retainedPaths + disclosures
             .filterValues { value -> value !is DcqlDisclosure }
             .keys
-        require(originalQuery.claimSelectionSatisfiedBy(retainedClaimPaths)) {
+        require(plan.satisfiedBy(retainedClaimPaths)) {
             "Selected disclosure option(s) do not satisfy required presentation claim constraints"
         }
 
@@ -700,6 +689,12 @@ object WalletPresentationHandler {
             }
         )
     }
+
+    private fun DcqlMatcher.DcqlMatchResult.toPresentationCredentialSelection(queryId: String) =
+        PresentationCredentialSelection(
+            queryId = queryId,
+            credentialId = credential.id,
+        )
 
     private data class PresentationPreviewCacheKey(
         val walletId: String,
@@ -743,11 +738,11 @@ object WalletPresentationHandler {
     private fun presentationPreviewCacheKey(wallet: Wallet, requestUrl: Url): PresentationPreviewCacheKey =
         PresentationPreviewCacheKey(walletId = wallet.id, requestUrl = requestUrl.toString())
 
-    private fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
-        val requiredPaths = originalQuery.requiredClaimPathKeys()
-        return selectedDisclosures.orEmpty().map { (path, value) ->
-            val required = path in requiredPaths
-            val selectable = value is DcqlDisclosure && !required
+    internal fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
+        val plan = originalQuery.claimSelectionPlan()
+        return availablePresentationDisclosures(plan).orEmpty().map { (path, value) ->
+            val required = plan.isRequired(path)
+            val selectable = plan.isSelectable(path, value)
             when (value) {
                 is DcqlDisclosure -> PresentationDisclosure(
                     path = path,
@@ -777,41 +772,89 @@ object WalletPresentationHandler {
         }
     }
 
-    private fun CredentialQuery.requiredClaimPathKeys(): Set<String> {
-        val claimsById = claims.orEmpty().associateBy { it.id }
-        val claimSets = claimSets
-        if (claimSets.isNullOrEmpty()) {
-            return claims.orEmpty().mapTo(mutableSetOf()) { it.pathKey() }
-        }
+    private fun DcqlMatcher.DcqlMatchResult.availablePresentationDisclosures(
+        plan: ClaimSelectionPlan,
+    ): Map<String, Any>? {
+        val selected = selectedDisclosures ?: return null
+        if (plan.optionalPaths.isEmpty()) return selected
 
-        val requiredClaimIds = claimSets
-            .map { it.toSet() }
-            .reduceOrNull { required, option -> required intersect option }
-            .orEmpty()
-
-        return requiredClaimIds
-            .mapNotNull { claimId -> claimsById[claimId]?.pathKey() }
-            .toSet()
-    }
-
-    private fun CredentialQuery.claimSelectionSatisfiedBy(selectedPathKeys: Set<String>): Boolean {
-        val claimSets = claimSets
-        if (claimSets.isNullOrEmpty()) {
-            return claims.orEmpty()
-                .map { it.pathKey() }
-                .all { path -> path in selectedPathKeys }
-        }
-
-        val claimsById = claims.orEmpty().associateBy { it.id }
-        return claimSets.any { option ->
-            option.isNotEmpty() && option.all { claimId ->
-                claimsById[claimId]?.pathKey()?.let { path -> path in selectedPathKeys } == true
+        val expanded = linkedMapOf<String, Any>()
+        val selectedByPath = selected.toMutableMap()
+        originalQuery.claims.orEmpty().forEach { claim ->
+            val path = claim.pathKey()
+            val selectedValue = selectedByPath.remove(path)
+            when {
+                selectedValue != null -> expanded[path] = selectedValue
+                path in plan.optionalPaths -> findMatchingDisclosure(claim)?.let { expanded[path] = it }
             }
         }
+        selectedByPath.forEach { (path, value) -> expanded[path] = value }
+        return expanded
     }
 
-    private fun ClaimsQuery.pathKey(): String =
-        path.joinToString(".")
+    private fun DcqlMatcher.DcqlMatchResult.findMatchingDisclosure(claim: ClaimsQuery): DcqlDisclosure? {
+        val claimName = claim.path
+            .lastOrNull { pathPart -> pathPart is JsonPrimitive && pathPart.isString }
+            ?.jsonPrimitive?.content
+            ?: return null
+        val allowedValues = claim.values.orEmpty()
+
+        return credential.disclosures?.firstOrNull { disclosure ->
+            disclosure.name == claimName && (allowedValues.isEmpty() || disclosure.value in allowedValues)
+        }
+    }
+
+    private data class ClaimSelectionPlan(
+        val requiredPaths: Set<String>,
+        val optionalPaths: Set<String>,
+        private val allClaimPaths: Set<String>,
+        private val claimSetOptions: List<Set<String>>?,
+    ) {
+        fun isRequired(path: String): Boolean = path in requiredPaths
+
+        fun isSelectable(path: String, value: Any): Boolean = path in optionalPaths && value is DcqlDisclosure
+
+        fun satisfiedBy(selectedPathKeys: Set<String>): Boolean =
+            claimSetOptions
+                ?.any { option -> option.isNotEmpty() && option.all { path -> path in selectedPathKeys } }
+                ?: allClaimPaths.all { path -> path in selectedPathKeys }
+    }
+
+    private fun CredentialQuery.claimSelectionPlan(): ClaimSelectionPlan {
+        val claims = claims.orEmpty()
+        val allClaimPaths = claims.mapTo(linkedSetOf()) { it.pathKey() }
+        val claimSets = claimSets
+        if (claimSets.isNullOrEmpty()) {
+            return ClaimSelectionPlan(
+                requiredPaths = allClaimPaths,
+                optionalPaths = emptySet(),
+                allClaimPaths = allClaimPaths,
+                claimSetOptions = null,
+            )
+        }
+
+        val pathByClaimId = claims
+            .mapNotNull { claim -> claim.id?.let { id -> id to claim.pathKey() } }
+            .toMap()
+        val requiredClaimIds = claimSets
+            .map { ids -> ids.toSet() }
+            .reduceOrNull { required, option -> required intersect option }
+            .orEmpty()
+        val claimIdsInAnySet = claimSets.flatten().toSet()
+
+        return ClaimSelectionPlan(
+            requiredPaths = requiredClaimIds.mapNotNullTo(linkedSetOf()) { id -> pathByClaimId[id] },
+            optionalPaths = (claimIdsInAnySet - requiredClaimIds).mapNotNullTo(linkedSetOf()) { id -> pathByClaimId[id] },
+            allClaimPaths = allClaimPaths,
+            claimSetOptions = claimSets.mapNotNull { optionIds ->
+                optionIds
+                    .mapNotNullTo(linkedSetOf()) { id -> pathByClaimId[id] }
+                    .takeIf { paths -> paths.size == optionIds.size }
+            },
+        )
+    }
+
+    private fun ClaimsQuery.pathKey(): String = path.joinToString(".")
 
     private fun DigitalCredential.toRawDcqlCredential(id: String): RawDcqlCredential {
         val sdvc = this as? id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential

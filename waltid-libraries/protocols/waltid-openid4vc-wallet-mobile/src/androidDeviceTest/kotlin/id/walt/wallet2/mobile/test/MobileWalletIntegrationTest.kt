@@ -8,13 +8,18 @@ import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
+import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
+import java.util.Base64
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -154,6 +159,101 @@ class MobileWalletIntegrationTest {
     @Test
     fun previewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
         previewAndSubmitDemoCredential("eudi-pid-mdoc")
+    }
+
+    @Test
+    fun previewAndSubmitOptionalBirthDateClaimSetAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = DemoTestBackend.optionalBirthDatePresentationScenario
+        val client = MobileWalletFactory(context).create(walletConfig("optional-birth-date-${scenario.id}"))
+        val bootstrapResult = client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive ${scenario.displayName} from public demo issuer2",
+        )
+
+        val defaultOffSession = DemoTestBackend.createVerifierSession(scenario)
+        val defaultOffPreview = client.previewPresentation(defaultOffSession.authorizationRequestUri)
+        val defaultOffOption = defaultOffPreview.singleReceivedCredentialOption(credentialIds)
+        val defaultOffBirthDate = defaultOffOption.disclosures.singleOrNull { it.name == "birth_date" }
+        assertNotNull(
+            defaultOffBirthDate,
+            "Preview should expose optional birth_date from alternative DCQL claim_set: preview=$defaultOffPreview",
+        )
+        assertTrue(defaultOffBirthDate.selectivelyDisclosable, "birth_date should be selectively disclosable")
+        assertTrue(defaultOffBirthDate.selectable, "birth_date should be selectable")
+        assertEquals(false, defaultOffBirthDate.required, "birth_date should not be required by the minimal claim_set")
+        assertTrue(
+            defaultOffOption.disclosures.filter { it.name == "given_name" || it.name == "family_name" }
+                .all { it.required && !it.selectable },
+            "Minimal claim-set disclosures should remain required and non-selectable: ${defaultOffOption.disclosures}",
+        )
+
+        val defaultOffResult = client.submitPresentation(
+            requestUrl = defaultOffSession.authorizationRequestUri,
+            selectedCredentialOptions = listOf(defaultOffOption.selection),
+            selectedDisclosureOptions = emptyList(),
+            did = bootstrapResult.did,
+        )
+        assertTrue(
+            defaultOffResult.success,
+            "Optional-off presentation should succeed against public demo verifier2: preview=$defaultOffPreview, result=$defaultOffResult",
+        )
+        DemoTestBackend.waitForVerifierSuccess(defaultOffSession.sessionId)
+        val defaultOffInfo = DemoTestBackend.verifierSessionInfo(defaultOffSession.sessionId)
+        assertEquals(
+            false,
+            defaultOffInfo.verifiedPresentationData().containsKey("birth_date"),
+            "Default optional-off submission must not disclose birth_date",
+        )
+        assertEquals(
+            false,
+            defaultOffInfo.presentedCredentialData().any { it.containsKey("birth_date") },
+            "Default optional-off verifier credential data must not include birth_date",
+        )
+        assertEquals(
+            false,
+            defaultOffInfo.presentedSdJwtDisclosureClaimNames().contains("birth_date"),
+            "Default optional-off VP token must not include a birth_date disclosure",
+        )
+
+        val selectedSession = DemoTestBackend.createVerifierSession(scenario)
+        val selectedPreview = client.previewPresentation(selectedSession.authorizationRequestUri)
+        val selectedOption = selectedPreview.singleReceivedCredentialOption(credentialIds)
+        val selectedBirthDate = selectedOption.disclosures.singleOrNull { it.name == "birth_date" }
+        assertNotNull(
+            selectedBirthDate,
+            "Preview should expose optional birth_date before selected submission: preview=$selectedPreview",
+        )
+
+        val selectedResult = client.submitPresentation(
+            requestUrl = selectedSession.authorizationRequestUri,
+            selectedCredentialOptions = listOf(selectedOption.selection),
+            selectedDisclosureOptions = listOf(
+                MobileWalletPresentationDisclosureSelection(
+                    queryId = selectedOption.queryId,
+                    credentialId = selectedOption.credentialId,
+                    path = selectedBirthDate.path,
+                )
+            ),
+            did = bootstrapResult.did,
+        )
+        assertTrue(
+            selectedResult.success,
+            "Optional-selected presentation should succeed against public demo verifier2: preview=$selectedPreview, result=$selectedResult",
+        )
+        DemoTestBackend.waitForVerifierSuccess(selectedSession.sessionId)
+        val selectedInfo = DemoTestBackend.verifierSessionInfo(selectedSession.sessionId)
+        assertTrue(
+            selectedInfo.presentedSdJwtDisclosureClaimNames().contains("birth_date"),
+            "Selected optional submission must include birth_date in the VP token disclosures: info=$selectedInfo",
+        )
+        assertTrue(
+            selectedInfo.presentedCredentialData().any { it["birth_date"]?.jsonPrimitive?.contentOrNull == "1971-09-01" },
+            "Selected optional submission must disclose birth_date in verifier credential data: info=$selectedInfo",
+        )
     }
 
     @Test
@@ -299,6 +399,83 @@ class MobileWalletIntegrationTest {
     private fun demoScenario(id: String) = DemoTestBackend.scenarios.first { it.id == id }
 
     private fun demoPresentationScenario(id: String) = DemoTestBackend.presentationScenarios.first { it.id == id }
+
+    private val id.walt.wallet2.mobile.MobileWalletPresentationCredentialOption.selection
+        get() = MobileWalletPresentationCredentialSelection(
+            queryId = queryId,
+            credentialId = credentialId,
+        )
+
+    private fun id.walt.wallet2.mobile.MobileWalletPresentationPreview.singleReceivedCredentialOption(
+        credentialIds: List<String>,
+    ) = credentialOptions.singleOrNull { it.credentialId in credentialIds }
+        ?: error("Expected exactly one preview option for received credential IDs $credentialIds: $this")
+
+    private fun JsonObject.verifiedPresentationData(): JsonObject =
+        verifiedDataObjects().firstOrNull {
+            it["given_name"]?.jsonPrimitive?.contentOrNull == "Anna Maria" &&
+                    it["family_name"]?.jsonPrimitive?.contentOrNull == "Musterfrau"
+        } ?: error("Missing verified_data object for EUDI PID presentation: $this")
+
+    private fun JsonElement.verifiedDataObjects(): List<JsonObject> =
+        when (this) {
+            is JsonObject -> entries.flatMap { (key, value) ->
+                if (key == "verified_data" && value is JsonObject) {
+                    listOf(value)
+                } else {
+                    value.verifiedDataObjects()
+                }
+            }
+            is JsonArray -> flatMap { it.verifiedDataObjects() }
+            else -> emptyList()
+        }
+
+    private fun JsonObject.presentedCredentialData(): List<JsonObject> =
+        this["presented_credentials"]
+            ?.jsonObject
+            ?.values
+            ?.flatMap { credentialEntries ->
+                credentialEntries.jsonArray.mapNotNull { credential ->
+                    credential.jsonObject["credentialData"]?.jsonObject
+                }
+            }.orEmpty()
+
+    private fun JsonObject.presentedSdJwtDisclosureClaimNames(): Set<String> =
+        presentedVpTokens()
+            .flatMap { token -> token.sdJwtDisclosureClaimNames() }
+            .toSet()
+
+    private fun JsonObject.presentedVpTokens(): List<String> {
+        val vpToken = this["presented_raw_data"]
+            ?.jsonObject
+            ?.get("vpToken")
+            ?: return emptyList()
+        return when (vpToken) {
+            is JsonObject -> vpToken.values.flatMap { value ->
+                when (value) {
+                    is JsonArray -> value.mapNotNull { it.jsonPrimitive.contentOrNull }
+                    else -> value.jsonPrimitive.contentOrNull?.let(::listOf).orEmpty()
+                }
+            }
+            is JsonArray -> vpToken.mapNotNull { it.jsonPrimitive.contentOrNull }
+            else -> vpToken.jsonPrimitive.contentOrNull?.let(::listOf).orEmpty()
+        }
+    }
+
+    private fun String.sdJwtDisclosureClaimNames(): List<String> =
+        split("~")
+            .drop(1)
+            .filter { part -> part.isNotBlank() && "." !in part }
+            .mapNotNull { encodedDisclosure ->
+                runCatching {
+                    val decoded = Base64.getUrlDecoder().decode(encodedDisclosure).decodeToString()
+                    displayJson.parseToJsonElement(decoded)
+                        .jsonArray
+                        .getOrNull(1)
+                        ?.jsonPrimitive
+                        ?.contentOrNull
+                }.getOrNull()
+            }
 
     private fun assertStoredCredentialDisplayData(
         scenario: DemoTestBackend.CredentialScenario,

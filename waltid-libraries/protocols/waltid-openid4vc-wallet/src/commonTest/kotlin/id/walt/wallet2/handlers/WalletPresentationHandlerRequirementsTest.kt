@@ -351,6 +351,68 @@ class WalletPresentationHandlerRequirementsTest {
     }
 
     @Test
+    fun presentationPreviewIncludesOptionalClaimSetDisclosuresWhenMatcherSelectedMinimalSet() {
+        val givenName = claimPath("$", "given_name")
+        val familyName = claimPath("$", "family_name")
+        val birthDate = claimPath("$", "birth_date")
+        val matched = matchResult(
+            "pid" to "cred-1",
+            selectedDisclosures = mapOf(
+                givenName to DcqlDisclosure("given_name", JsonPrimitive("Ada")),
+                familyName to DcqlDisclosure("family_name", JsonPrimitive("Lovelace")),
+            ),
+            credentialDisclosures = listOf(
+                DcqlDisclosure("given_name", JsonPrimitive("Ada")),
+                DcqlDisclosure("family_name", JsonPrimitive("Lovelace")),
+                DcqlDisclosure("birth_date", JsonPrimitive("1815-12-10")),
+            ),
+            query = ::optionalBirthDateCredentialQuery,
+        )
+
+        val disclosures = WalletPresentationHandler.run {
+            matched.getValue("pid").single().toPresentationDisclosures()
+        }
+
+        assertEquals(listOf(givenName, familyName, birthDate), disclosures.map { it.path })
+        assertEquals(listOf(true, true, false), disclosures.map { it.required })
+        assertEquals(listOf(false, false, true), disclosures.map { it.selectable })
+    }
+
+    @Test
+    fun disclosureSelectionCanIncludeOptionalClaimSetDisclosureWhenMatcherSelectedMinimalSet() {
+        val givenName = claimPath("$", "given_name")
+        val familyName = claimPath("$", "family_name")
+        val birthDate = claimPath("$", "birth_date")
+        val matched = matchResult(
+            "pid" to "cred-1",
+            selectedDisclosures = mapOf(
+                givenName to DcqlDisclosure("given_name", JsonPrimitive("Ada")),
+                familyName to DcqlDisclosure("family_name", JsonPrimitive("Lovelace")),
+            ),
+            credentialDisclosures = listOf(
+                DcqlDisclosure("given_name", JsonPrimitive("Ada")),
+                DcqlDisclosure("family_name", JsonPrimitive("Lovelace")),
+                DcqlDisclosure("birth_date", JsonPrimitive("1815-12-10")),
+            ),
+            query = ::optionalBirthDateCredentialQuery,
+        )
+
+        val selected = WalletPresentationHandler.run {
+            matched.selectCredentialOptions(
+                selectedCredentialOptions = listOf(PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1")),
+                selectedDisclosureOptions = listOf(
+                    PresentationDisclosureSelection(queryId = "pid", credentialId = "cred-1", path = birthDate),
+                ),
+            )
+        }
+
+        assertEquals(
+            setOf(givenName, familyName, birthDate),
+            selected.getValue("pid").single().selectedDisclosures.orEmpty().keys,
+        )
+    }
+
+    @Test
     fun disclosureSelectionOmitsSelectivelyDisclosableClaimsWhenNoClaimsAreRequested() {
         val givenName = claimPath("$", "given_name")
         val vct = claimPath("$", "vct")
@@ -472,12 +534,27 @@ class WalletPresentationHandlerRequirementsTest {
             claimSets = claimSets,
         )
 
+    private fun optionalBirthDateCredentialQuery(queryId: String): CredentialQuery =
+        credentialQuery(
+            queryId,
+            claims = listOf(
+                ClaimsQuery(id = "given_name", pathStrings = listOf("$", "given_name")),
+                ClaimsQuery(id = "family_name", pathStrings = listOf("$", "family_name")),
+                ClaimsQuery(id = "birth_date", pathStrings = listOf("$", "birth_date")),
+            ),
+            claimSets = listOf(
+                listOf("given_name", "family_name"),
+                listOf("given_name", "family_name", "birth_date"),
+            ),
+        )
+
     private fun claimPath(vararg parts: String): String =
         parts.map { JsonPrimitive(it) }.joinToString(".")
 
     private fun matchResult(
         vararg options: Pair<String, String>,
         selectedDisclosures: Map<String, Any>? = null,
+        credentialDisclosures: List<DcqlDisclosure>? = null,
         query: (String) -> CredentialQuery = ::credentialQuery,
     ): Map<String, List<DcqlMatcher.DcqlMatchResult>> =
         options
@@ -489,6 +566,7 @@ class WalletPresentationHandlerRequirementsTest {
                             id = credentialId,
                             format = CredentialFormat.JWT_VC_JSON.id.first(),
                             data = JsonObject(emptyMap()),
+                            disclosures = credentialDisclosures,
                         ),
                         selectedDisclosures = selectedDisclosures,
                         originalQuery = query(queryId),
