@@ -215,9 +215,8 @@ data class FetchCredentialRequest(
     val proofJwt: String? = null,
     val clientId: String = "wallet-client",
     /**
-     * When true, the server-side route handler automatically stores the fetched
-     * credential(s) in the wallet after retrieval. Defaults to false (stateless).
-     * This field is ignored by [WalletIssuanceHandler.fetchCredential] itself.
+     * When true, [WalletIssuanceHandler.fetchCredential] stores the fetched
+     * credential(s) when called with a wallet. Defaults to false (stateless).
      */
     val storeInWallet: Boolean = false,
 )
@@ -610,11 +609,18 @@ object WalletIssuanceHandler {
     private suspend fun Wallet.parseAndStore(
         issuedCredential: id.walt.openid4vci.responses.credential.IssuedCredential,
         label: String? = null,
-    ): StoredCredential {
-        val rawString = issuedCredential.credential.let {
+    ): StoredCredential = parseAndStore(
+        rawCredential = issuedCredential.credential.let {
             if (it is JsonPrimitive) it.content else it.toString()
-        }
-        val (_, parsed) = CredentialParser.detectAndParse(rawString)
+        },
+        label = label,
+    )
+
+    private suspend fun Wallet.parseAndStore(
+        rawCredential: String,
+        label: String? = null,
+    ): StoredCredential {
+        val (_, parsed) = CredentialParser.detectAndParse(rawCredential)
         return StoredCredential(
             id = Uuid.random().toString(),
             credential = parsed,
