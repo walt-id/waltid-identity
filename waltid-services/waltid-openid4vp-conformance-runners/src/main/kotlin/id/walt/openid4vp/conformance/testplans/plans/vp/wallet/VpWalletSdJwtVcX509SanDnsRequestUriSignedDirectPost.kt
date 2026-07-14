@@ -22,6 +22,8 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
     val conformancePort: Int
 ) : WalletTestPlan {
 
+    private val uniqueId = System.currentTimeMillis()
+
     override val description = "VP Wallet: SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt (HAIP)"
 
     override val planName = "oid4vp-1final-wallet-haip-test-plan"
@@ -42,10 +44,10 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
      * - credential.trust_anchor: PEM certificate for validating credential signatures
      * - credential.status_list_trust_anchor: PEM certificate for status list validation
      */
-    override val configuration: JsonObject = Json.decodeFromString(
+    override val configuration: JsonObject by lazy { Json.decodeFromString(
         """
         {
-            "alias": "waltid_wallet_sdjwt_x509san",
+            "alias": "waltid_sdjwt_x509san_$uniqueId",
             "description": "VP Wallet: SD-JWT VC + x509_san_dns + request_uri_signed + direct_post.jwt (HAIP)",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"
@@ -92,5 +94,5 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
             "publish": "everything"
         }
         """.trimIndent()
-    )
+    )}
 }

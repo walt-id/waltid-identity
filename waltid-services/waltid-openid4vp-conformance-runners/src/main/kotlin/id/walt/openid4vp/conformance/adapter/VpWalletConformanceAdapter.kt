@@ -33,8 +33,24 @@ import kotlinx.serialization.json.*
 class VpWalletConformanceAdapter(
     private val walletApiUrl: String = "http://127.0.0.1:7005",
     private val adapterPort: Int = 7006,
-    private val walletId: String = System.getenv("CONFORMANCE_WALLET_ID") ?: "conformance-test-wallet"
+    private val walletId: String = resolveWalletId()
 ) {
+    companion object {
+        private fun resolveWalletId(): String {
+            // Priority: env var > file > fallback
+            System.getenv("CONFORMANCE_WALLET_ID")?.takeIf { it.isNotBlank() }?.let { return it }
+            
+            // Try reading from file written by setup script
+            runCatching {
+                java.io.File("/tmp/conformance-wallet-id.txt").readText().trim()
+            }.getOrNull()?.takeIf { it.isNotBlank() }?.let {
+                println("[Adapter] Read wallet ID from /tmp/conformance-wallet-id.txt: $it")
+                return it
+            }
+            
+            return "conformance-test-wallet"  // Triggers auto-discovery
+        }
+    }
     
     private var server: EmbeddedServer<*, *>? = null
     
@@ -89,7 +105,7 @@ class VpWalletConformanceAdapter(
             
             // Get available wallet ID dynamically if not configured
             val effectiveWalletId = if (walletId == "conformance-test-wallet") {
-                // Fetch first available wallet
+                // Auto-discover: find a wallet with credentials
                 val walletsResponse = httpClient.get("$walletApiUrl/wallet")
                 val wallets = Json.parseToJsonElement(walletsResponse.bodyAsText()).jsonArray
                 if (wallets.isEmpty()) {
@@ -97,8 +113,26 @@ class VpWalletConformanceAdapter(
                     call.respond(HttpStatusCode.InternalServerError, "No wallets available in wallet API")
                     return
                 }
-                val foundWalletId = wallets[0].jsonPrimitive.content
-                println("[Adapter] Using first available wallet: $foundWalletId")
+                
+                // Find first wallet that has credentials
+                var foundWalletId: String? = null
+                for (walletJson in wallets) {
+                    val wId = walletJson.jsonPrimitive.content
+                    val credsResponse = httpClient.get("$walletApiUrl/wallet/$wId/credentials")
+                    val creds = Json.parseToJsonElement(credsResponse.bodyAsText()).jsonArray
+                    if (creds.isNotEmpty()) {
+                        foundWalletId = wId
+                        println("[Adapter] Found wallet with ${creds.size} credential(s): $wId")
+                        break
+                    }
+                }
+                
+                if (foundWalletId == null) {
+                    println("[Adapter] ERROR: No wallets with credentials found")
+                    call.respond(HttpStatusCode.InternalServerError, 
+                        "No wallets with credentials found. Run setup-test-wallet.sh first.")
+                    return
+                }
                 foundWalletId
             } else {
                 walletId
@@ -156,7 +190,8 @@ class VpWalletConformanceAdapter(
                 call.respondText("Presentation complete", status = HttpStatusCode.OK)
             } else {
                 println("[Adapter] ERROR: Wallet API returned ${presentResponse.status}")
-                call.respond(HttpStatusCode.InternalServerError, "Wallet API error: $responseBody")
+                // Pass through the wallet's error response - important for negative test detection
+                call.respond(presentResponse.status, responseBody)
             }
             
         } catch (e: Exception) {

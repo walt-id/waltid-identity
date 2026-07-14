@@ -31,6 +31,8 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
     val conformancePort: Int
 ) : WalletTestPlan {
 
+    private val uniqueId = System.currentTimeMillis()
+
     override val description = "VP Wallet: mDL + x509_hash + request_uri_signed + direct_post.jwt (HAIP Strict)"
 
     override val planName = "oid4vp-1final-wallet-haip-test-plan"
@@ -51,10 +53,10 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
      * - credential.trust_anchor: PEM certificate for validating credential signatures
      * - credential.status_list_trust_anchor: PEM certificate for status list validation
      */
-    override val configuration: JsonObject = Json.decodeFromString(
+    override val configuration: JsonObject by lazy { Json.decodeFromString(
         """
         {
-            "alias": "waltid_wallet_mdl_x509hash_haip",
+            "alias": "waltid_mdl_x509hash_$uniqueId",
             "description": "VP Wallet: mDL + x509_hash + request_uri_signed + direct_post.jwt (HAIP Strict)",
             "server": {
                 "authorization_endpoint": "$walletApiUrl"
@@ -101,5 +103,5 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
             "publish": "everything"
         }
         """.trimIndent()
-    )
+    )}
 }
