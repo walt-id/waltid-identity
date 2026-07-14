@@ -700,21 +700,23 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
                     type: "org.waltid.transaction-data.payment-authorization",
                     displayName: "Payment Authorization",
                     credentialQueryIDs: ["pid", "payment"],
-                    supportedFields: ["amount", "currency", "payee"],
+                    supportedFields: ["amount", "currency", "payee", "reference"],
                     rawJSON: """
                     {
                       "type": "org.waltid.transaction-data.payment-authorization",
                       "credential_ids": ["pid", "payment"],
                       "amount": "42.00",
                       "currency": "EUR",
-                      "payee": "ACME Corp"
+                      "payee": "ACME Corp",
+                      "reference": "INV-2026-042"
                     }
                     """,
                     detailsJSON: """
                     {
                       "amount": "42.00",
                       "currency": "EUR",
-                      "payee": "ACME Corp"
+                      "payee": "ACME Corp",
+                      "reference": "INV-2026-042"
                     }
                     """
                 )
@@ -727,11 +729,13 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         })
 
         XCTAssertEqual(payment.title, "Payment Authorization")
+        XCTAssertEqual(Array(payment.items.prefix(4).map(\.label)), ["Amount", "Currency", "Payee", "Reference"])
         XCTAssertEqual(valuesByLabel["Type"], "org.waltid.transaction-data.payment-authorization")
         XCTAssertEqual(valuesByLabel["Credential queries"], "pid, payment")
         XCTAssertEqual(valuesByLabel["Amount"], "42.00")
         XCTAssertEqual(valuesByLabel["Currency"], "EUR")
         XCTAssertEqual(valuesByLabel["Payee"], "ACME Corp")
+        XCTAssertEqual(valuesByLabel["Reference"], "INV-2026-042")
     }
 
     private func onePixelPNGByteArrayJSON() -> String {

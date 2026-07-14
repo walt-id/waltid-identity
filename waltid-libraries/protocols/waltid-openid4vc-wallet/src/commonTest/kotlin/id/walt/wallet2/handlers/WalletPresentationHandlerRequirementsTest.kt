@@ -544,6 +544,20 @@ class WalletPresentationHandlerRequirementsTest {
         }
     }
 
+    @Test
+    fun transactionDataSelectionRejectsMissingReferencedCredential() {
+        val transactionData = transactionDataForCredentialIds("identity", "payment")
+
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentationHandler.run {
+                validateSelectedTransactionDataCredentials(
+                    transactionData = listOf(transactionData),
+                    selectedQueryIds = setOf("profile"),
+                )
+            }
+        }
+    }
+
     private fun credentialQuery(
         id: String,
         multiple: Boolean = false,

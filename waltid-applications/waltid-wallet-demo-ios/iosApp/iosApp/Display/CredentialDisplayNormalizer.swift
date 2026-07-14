@@ -72,7 +72,13 @@ enum CredentialDisplayNormalizer {
                 : baseTitle
 
             let typePath = DisplayClaimPath.transactionData(index: index, field: .type)
-            var items = [
+            var items = claimItems(
+                fromJSON: item.detailsJSON,
+                pathPrefix: .transactionData(index: index, field: .details),
+                fallbackLabel: CredentialDisplayVocabulary.transactionDataLabel(.details)
+            )
+
+            items.append(
                 ClaimItem(
                     path: typePath.itemPath,
                     pathComponents: typePath.components,
@@ -81,7 +87,7 @@ enum CredentialDisplayNormalizer {
                     rawValue: item.type,
                     roles: CredentialDisplayVocabulary.roles(for: typePath.components)
                 )
-            ]
+            )
 
             if !item.credentialQueryIDs.isEmpty {
                 let queryPath = DisplayClaimPath.transactionData(index: index, field: .credentialQueryIDs)
@@ -97,12 +103,6 @@ enum CredentialDisplayNormalizer {
                     )
                 )
             }
-
-            items.append(contentsOf: claimItems(
-                fromJSON: item.detailsJSON,
-                pathPrefix: .transactionData(index: index, field: .details),
-                fallbackLabel: CredentialDisplayVocabulary.transactionDataLabel(.details)
-            ))
 
             return ClaimGroup(title: title, items: items)
         }

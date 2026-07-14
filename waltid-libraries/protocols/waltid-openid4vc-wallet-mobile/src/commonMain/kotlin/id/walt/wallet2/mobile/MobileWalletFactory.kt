@@ -59,7 +59,7 @@ public data class MobileWalletTransactionDataProfile(
             MobileWalletTransactionDataProfile(
                 type = PaymentAuthorizationType,
                 displayName = "Payment Authorization",
-                fields = listOf("amount", "currency", "payee"),
+                fields = listOf("amount", "currency", "payee", "reference"),
             ),
             MobileWalletTransactionDataProfile(
                 type = AccountAccessType,

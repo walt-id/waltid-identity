@@ -162,6 +162,46 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
+    fun previewAndSubmitTransactionDataAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = DemoTestBackend.transactionDataPresentationScenario
+        val client = MobileWalletFactory(context).create(walletConfig("transaction-data-${scenario.id}"))
+        val bootstrapResult = client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive ${scenario.displayName} from public demo issuer2",
+        )
+
+        val session = DemoTestBackend.createTransactionDataVerifierSession(scenario)
+        val preview = client.previewPresentation(session.authorizationRequestUri)
+        val transactionData = preview.request.transactionData.singleOrNull()
+        assertNotNull(transactionData, "Preview should expose payment transaction data: preview=$preview")
+        assertEquals("Payment Authorization", transactionData.displayName)
+        assertEquals(listOf("pid"), transactionData.credentialQueryIds)
+        assertTrue(
+            transactionData.detailsJson.contains("\"amount\":\"42.00\"") &&
+                transactionData.detailsJson.contains("\"currency\":\"EUR\"") &&
+                transactionData.detailsJson.contains("\"payee\":\"ACME Corp\"") &&
+                transactionData.detailsJson.contains("\"reference\":\"INV-2026-042\""),
+            "Preview should expose readable payment details: ${transactionData.detailsJson}",
+        )
+
+        val result = client.submitPresentation(
+            requestUrl = session.authorizationRequestUri,
+            selectedCredentialOptions = preview.credentialOptions.map { option -> option.selection },
+            did = bootstrapResult.did,
+        )
+        assertTrue(
+            result.success,
+            "public demo verifier2 transaction-data presentation should succeed: preview=$preview, result=$result",
+        )
+
+        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
+    }
+
+    @Test
     fun previewAndSubmitOptionalBirthDateClaimSetAgainstDemoIssuer2AndVerifier2() = runBlocking {
         val scenario = DemoTestBackend.optionalBirthDatePresentationScenario
         val client = MobileWalletFactory(context).create(walletConfig("optional-birth-date-${scenario.id}"))

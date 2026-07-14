@@ -783,12 +783,13 @@ class CredentialDisplayNormalizerTest {
                     type = "org.waltid.transaction-data.payment-authorization",
                     displayName = "Payment Authorization",
                     credentialQueryIds = listOf("pid", "payment"),
-                    supportedFields = listOf("amount", "currency", "payee"),
+                    supportedFields = listOf("amount", "currency", "payee", "reference"),
                     detailsJson = """
                         {
                           "amount": "42.00",
                           "currency": "EUR",
-                          "payee": "ACME Corp"
+                          "payee": "ACME Corp",
+                          "reference": "INV-2026-042"
                         }
                     """.trimIndent(),
                     rawJson = """
@@ -797,7 +798,8 @@ class CredentialDisplayNormalizerTest {
                           "credential_ids": ["pid", "payment"],
                           "amount": "42.00",
                           "currency": "EUR",
-                          "payee": "ACME Corp"
+                          "payee": "ACME Corp",
+                          "reference": "INV-2026-042"
                         }
                     """.trimIndent(),
                 )
@@ -813,11 +815,16 @@ class CredentialDisplayNormalizerTest {
         }
 
         assertEquals("Payment Authorization", payment.title)
+        assertEquals(
+            listOf("Amount", "Currency", "Payee", "Reference"),
+            payment.items.take(4).map { it.label },
+        )
         assertEquals("org.waltid.transaction-data.payment-authorization", labelsToValues["Type"])
         assertEquals("pid, payment", labelsToValues["Credential queries"])
         assertEquals("42.00", labelsToValues["Amount"])
         assertEquals("EUR", labelsToValues["Currency"])
         assertEquals("ACME Corp", labelsToValues["Payee"])
+        assertEquals("INV-2026-042", labelsToValues["Reference"])
     }
 
     private fun onePixelPngByteArrayJson(): String =

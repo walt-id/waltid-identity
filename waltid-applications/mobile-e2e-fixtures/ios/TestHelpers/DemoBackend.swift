@@ -64,6 +64,8 @@ public final class DemoBackend {
 
     public static let presentationScenarios = scenarios
 
+    public static let transactionDataPresentationScenario = scenarios.first { $0.id == "eudi-pid-sdjwt" }!
+
     public static let persistenceScenario = scenarios.first { $0.id == "eudi-pid-mdoc" }!
 
     private static let issuerBaseURL = URL(string: "https://issuer2.demo.walt.id")!
@@ -102,10 +104,29 @@ public final class DemoBackend {
     }
 
     public func createVerifierSession(scenario: DemoCredentialScenario) async throws -> DemoVerifierSession {
+        try await createVerifierSession(
+            scenario: scenario,
+            transactionData: []
+        )
+    }
+
+    public func createTransactionDataVerifierSession(
+        scenario: DemoCredentialScenario = DemoBackend.transactionDataPresentationScenario
+    ) async throws -> DemoVerifierSession {
+        try await createVerifierSession(
+            scenario: scenario,
+            transactionData: [Self.paymentAuthorizationTransactionData(credentialID: "pid")]
+        )
+    }
+
+    private func createVerifierSession(
+        scenario: DemoCredentialScenario,
+        transactionData: [[String: Any]]
+    ) async throws -> DemoVerifierSession {
         let endpoint = Self.verifierBaseURL
             .appendingPathComponent("verification-session")
             .appendingPathComponent("create")
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "flow_type": "cross_device",
             "core_flow": [
                 "dcql_query": [
@@ -113,6 +134,9 @@ public final class DemoBackend {
                 ],
             ],
         ]
+        if !transactionData.isEmpty {
+            payload["openid"] = ["transactionData": transactionData]
+        }
         let response = try await client.jsonRequest(
             url: endpoint,
             method: "POST",
@@ -202,6 +226,19 @@ public final class DemoBackend {
             "format": "mso_mdoc",
             "meta": ["doctype_value": doctype],
             "claims": claims.map { ["path": [namespace, $0]] },
+        ]
+    }
+
+    private static func paymentAuthorizationTransactionData(credentialID: String) -> [String: Any] {
+        [
+            "type": "org.waltid.transaction-data.payment-authorization",
+            "credential_ids": [credentialID],
+            "require_cryptographic_holder_binding": true,
+            "transaction_data_hashes_alg": ["sha-256"],
+            "amount": "42.00",
+            "currency": "EUR",
+            "payee": "ACME Corp",
+            "reference": "INV-2026-042",
         ]
     }
 }

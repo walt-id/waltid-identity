@@ -91,6 +91,13 @@ object CredentialDisplayNormalizer {
             val title = if (titleCounts.getValue(baseTitle) > 1) "$baseTitle $seenCount" else baseTitle
             val typePath = ClaimPath.transactionData(index, TransactionDataField.Type)
             val claimItems = buildList {
+                addAll(
+                    claimItemsFromJson(
+                        rawJson = item.detailsJson,
+                        path = ClaimPath.transactionData(index, TransactionDataField.Details),
+                        fallbackLabel = CredentialDisplayVocabulary.transactionDataLabel(TransactionDataField.Details),
+                    )
+                )
                 add(
                     ClaimItem(
                         path = typePath.itemPath,
@@ -112,13 +119,6 @@ object CredentialDisplayNormalizer {
                         )
                     )
                 }
-                addAll(
-                    claimItemsFromJson(
-                        rawJson = item.detailsJson,
-                        path = ClaimPath.transactionData(index, TransactionDataField.Details),
-                        fallbackLabel = CredentialDisplayVocabulary.transactionDataLabel(TransactionDataField.Details),
-                    )
-                )
             }
 
             ClaimGroup(title = title, items = claimItems)

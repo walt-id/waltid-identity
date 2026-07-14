@@ -898,8 +898,8 @@ object WalletPresentationHandler {
         decodeList(transactionData).forEach { decoded ->
             val selectedTransactionCredentialIds = decoded.transactionData.credentialIds
                 .filter { it in selectedQueryIds }
-            require(selectedTransactionCredentialIds.size <= 1) {
-                "transaction_data credential_ids references multiple selected credentials; select only one credential for transaction authorization"
+            require(selectedTransactionCredentialIds.size == 1) {
+                "transaction_data credential_ids must reference exactly one selected credential for transaction authorization"
             }
         }
     }

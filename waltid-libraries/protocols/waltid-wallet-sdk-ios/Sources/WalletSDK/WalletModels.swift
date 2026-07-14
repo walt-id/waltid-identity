@@ -67,7 +67,7 @@ public struct WalletTransactionDataProfile: Equatable, Sendable {
         WalletTransactionDataProfile(
             type: "org.waltid.transaction-data.payment-authorization",
             displayName: "Payment Authorization",
-            fields: ["amount", "currency", "payee"]
+            fields: ["amount", "currency", "payee", "reference"]
         ),
         WalletTransactionDataProfile(
             type: "org.waltid.transaction-data.account-access",

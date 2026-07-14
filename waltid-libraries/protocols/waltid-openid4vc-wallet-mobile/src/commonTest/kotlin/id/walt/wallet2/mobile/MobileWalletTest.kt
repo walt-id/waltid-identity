@@ -46,6 +46,12 @@ class MobileWalletTest {
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
         assertEquals(MobileWalletTransactionDataProfile.DefaultProfiles, config.transactionDataProfiles)
+        assertEquals(
+            listOf("amount", "currency", "payee", "reference"),
+            MobileWalletTransactionDataProfile.DefaultProfiles
+                .first { it.type == MobileWalletTransactionDataProfile.PaymentAuthorizationType }
+                .fields,
+        )
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(MobileWalletStores(), config.persistence.stores)
     }

@@ -78,6 +78,54 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         try await backend.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
     }
 
+    func testTransactionDataPreviewAgainstPublicDemoIssuer2Verifier2() async throws {
+        let scenario = DemoBackend.transactionDataPresentationScenario
+        let offer = try await backend.createOffer(scenario: scenario)
+
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        ui.launch()
+
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        ui.tapTab(label: "Receive")
+        let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
+        ui.replaceText(in: offerInput, value: offer.offerUrl)
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+
+        let receiveStatus = ui.waitForStatus(
+            prefixes: ["Received", "Receive failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
+
+        let session = try await backend.createTransactionDataVerifierSession(scenario: scenario)
+        ui.tapTab(label: "Present")
+        let presentInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
+        ui.replaceText(in: presentInput, value: session.authorizationRequestUri)
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        let previewStatus = ui.waitForStatus(
+            prefixes: ["Review presentation request", "Preview failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(previewStatus, "Review presentation request", "Preview failed, status: \(previewStatus ?? "nil")")
+
+        XCTAssertTrue(app.staticTexts["Payment Authorization"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["INV-2026-042"].waitForExistence(timeout: 10))
+
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "WAL-1077 native iOS transaction data preview"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }

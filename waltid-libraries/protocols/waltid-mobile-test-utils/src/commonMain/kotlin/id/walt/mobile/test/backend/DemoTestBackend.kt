@@ -80,6 +80,8 @@ object DemoTestBackend {
         ),
     )
 
+    val transactionDataPresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }
+
     val persistenceScenario = scenarios.first { it.id == "eudi-pid-mdoc" }
 
     private val client by lazy {
@@ -127,12 +129,38 @@ object DemoTestBackend {
     }
 
     suspend fun createVerifierSession(credentialQuery: JsonObject): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = credentialQuery,
+            transactionData = emptyList(),
+        )
+    }
+
+    suspend fun createTransactionDataVerifierSession(
+        scenario: CredentialScenario = transactionDataPresentationScenario,
+    ): VerifierSession {
+        return createVerifierSession(
+            credentialQuery = scenario.verifierCredentialQuery,
+            transactionData = listOf(paymentAuthorizationTransactionData("pid")),
+        )
+    }
+
+    private suspend fun createVerifierSession(
+        credentialQuery: JsonObject,
+        transactionData: List<JsonObject>,
+    ): VerifierSession {
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
                         add(credentialQuery)
+                    }
+                }
+            }
+            if (transactionData.isNotEmpty()) {
+                putJsonObject("openid") {
+                    putJsonArray("transactionData") {
+                        transactionData.forEach { add(it) }
                     }
                 }
             }
@@ -150,6 +178,21 @@ object DemoTestBackend {
             ?: error("Missing authorization request URL in public demo verifier2 response: $response")
 
         return VerifierSession(sessionId, authorizationRequestUri)
+    }
+
+    private fun paymentAuthorizationTransactionData(credentialId: String): JsonObject = buildJsonObject {
+        put("type", JsonPrimitive("org.waltid.transaction-data.payment-authorization"))
+        putJsonArray("credential_ids") {
+            add(JsonPrimitive(credentialId))
+        }
+        put("require_cryptographic_holder_binding", JsonPrimitive(true))
+        putJsonArray("transaction_data_hashes_alg") {
+            add(JsonPrimitive("sha-256"))
+        }
+        put("amount", JsonPrimitive("42.00"))
+        put("currency", JsonPrimitive("EUR"))
+        put("payee", JsonPrimitive("ACME Corp"))
+        put("reference", JsonPrimitive("INV-2026-042"))
     }
 
     suspend fun verifierSessionInfo(sessionId: String): JsonObject {
