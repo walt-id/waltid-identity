@@ -45,12 +45,16 @@ fun ReceiveCredential(
         return
     }
 
-    var mode by remember { mutableStateOf(ReceiveMode.SCAN) }
+    var mode by remember { mutableStateOf(if (state.requestDrafts.offerUrl.isNotBlank()) ReceiveMode.MANUAL else ReceiveMode.SCAN) }
     var receiveRequested by remember { mutableStateOf(false) }
     val isReady = ready != null
     val canReceive = isReady && !state.isBusy
     val canSubmitManualOffer = canReceive && state.requestDrafts.offerUrl.isNotBlank()
     val canSubmitScannedOffer = canReceive && state.requestDrafts.txCodeRequired
+
+    LaunchedEffect(state.requestDrafts.offerUrl) {
+        if (state.requestDrafts.offerUrl.isNotBlank()) mode = ReceiveMode.MANUAL
+    }
 
     LaunchedEffect(state.operation, state.requestDrafts.txCodeRequired) {
         when (state.operation) {
