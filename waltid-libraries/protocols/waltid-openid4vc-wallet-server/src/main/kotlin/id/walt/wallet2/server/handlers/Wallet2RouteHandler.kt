@@ -84,13 +84,6 @@ data class ImportDidRequest(
     val document: String
 )
 
-@Serializable
-data class ImportCredentialRequest(
-    /** Raw credential string (JWT, SD-JWT, base64url mdoc, etc.). */
-    val rawCredential: String,
-    val label: String? = null
-)
-
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
@@ -239,6 +232,7 @@ object Wallet2RouteHandler {
                 }
             }) {
                 val walletId = call.parameters["walletId"] ?: return@delete
+                call.resolveOrRespond(resolver, getAccountId) ?: return@delete
                 resolver.deleteWallet(walletId)
                 call.respond(HttpStatusCode.NoContent)
             }
@@ -453,15 +447,10 @@ object Wallet2RouteHandler {
                 }) {
                     val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                     val req = call.receive<ImportCredentialRequest>()
-                    val (_, parsed) = CredentialParser.detectAndParse(req.rawCredential)
-                    val entry = StoredCredential(
-                        id = Uuid.random().toString(),
-                        credential = parsed,
-                        label = req.label,
-                        addedAt = Clock.System.now()
+                    call.respond(
+                        HttpStatusCode.Created,
+                        WalletCredentialHandler.importCredential(wallet, req),
                     )
-                    wallet.addCredential(entry)
-                    call.respond(HttpStatusCode.Created, entry)
                 }
 
                 route("/{credentialId}") {
@@ -564,20 +553,7 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<FetchCredentialRequest>()
-                        val result = WalletIssuanceHandler.fetchCredential(req)
-                        if (req.storeInWallet) {
-                            for (raw in result.rawCredentials) {
-                                val (_, parsed) = CredentialParser.detectAndParse(raw)
-                                wallet.addCredential(
-                                    StoredCredential(
-                                        id = Uuid.random().toString(),
-                                        credential = parsed,
-                                        addedAt = Clock.System.now()
-                                    )
-                                )
-                            }
-                        }
-                        call.respond(result)
+                        call.respond(WalletIssuanceHandler.fetchCredential(wallet, req))
                     }
 
                     // Auth-code grant isolated steps
