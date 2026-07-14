@@ -42,7 +42,10 @@ class X509ChainClientAttestationVerifierTest {
             context = ClientAuthenticationContext(authorizationServerIssuer = issuer),
         )
 
-        val authenticated = assertIs<ClientAuthenticationResult.Authenticated>(result)
+        val authenticated = assertIs<ClientAuthenticationResult.Authenticated>(
+            result,
+            (result as? ClientAuthenticationResult.Failure)?.error?.description,
+        )
         assertEquals(clientId, authenticated.client.id)
     }
 
