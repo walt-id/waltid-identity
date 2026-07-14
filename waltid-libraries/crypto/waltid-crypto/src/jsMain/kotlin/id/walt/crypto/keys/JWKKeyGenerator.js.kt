@@ -56,6 +56,7 @@ object JsJWKKeyCreator : JWKKeyCreator() {
 
             val hasPrivateKey = lines.any { it.getPemTitle().isPemTitle("BEGIN", "PRIVATE KEY") }
             val hasPublicKey = lines.any { it.getPemTitle().isPemTitle("BEGIN", "PUBLIC KEY") }
+            val hasCertificate = lines.any { it.getPemTitle().isPemTitle("BEGIN", "CERTIFICATE") }
 
             val importedPemKey: KeyLike = await(
                 when {
@@ -65,9 +66,12 @@ object JsJWKKeyCreator : JWKKeyCreator() {
                     hasPublicKey -> jose.importSPKI(lines.dropWhile { !it.getPemTitle().isPemTitle("BEGIN", "PUBLIC KEY") }
                         .dropLastWhile { !it.getPemTitle().isPemTitle("END", "PUBLIC KEY") }.joinToString("\n"), "")
 
+                    hasCertificate -> jose.importX509(lines.dropWhile { !it.getPemTitle().isPemTitle("BEGIN", "CERTIFICATE") }
+                        .dropLastWhile { !it.getPemTitle().isPemTitle("END", "CERTIFICATE") }.joinToString("\n"), "")
+
                     else -> throw IllegalArgumentException(
                         "Unable to determine if public or private PEM-encoded key. " +
-                                "Make sure the title line includes 'BEGIN PUBLIC KEY' or 'BEGIN PRIVATE KEY'."
+                                "Make sure the title line includes 'BEGIN PUBLIC KEY', 'BEGIN PRIVATE KEY', or 'BEGIN CERTIFICATE'."
                     )
                 }
             )

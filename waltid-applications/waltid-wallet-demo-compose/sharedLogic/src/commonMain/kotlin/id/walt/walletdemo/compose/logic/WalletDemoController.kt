@@ -75,7 +75,7 @@ class WalletDemoController(
         }
     }
 
-    fun loadCredentialDetails(id: String) {
+ /*   fun loadCredentialDetails(id: String) {
         scope.launch(dispatcher) {
             val details = runCatching { wallet.credentialDetails(id) }.getOrNull()
             _state.update { it.copy(selectedCredentialDetails = details) }
@@ -85,7 +85,7 @@ class WalletDemoController(
     fun clearCredentialDetails() {
         _state.update { it.copy(selectedCredentialDetails = null) }
     }
-
+*/
     fun updatePresentationRequestUrl(value: String) {
         _state.update {
             it.copy(requestDrafts = it.requestDrafts.copy(presentationRequestUrl = value))
@@ -110,6 +110,18 @@ class WalletDemoController(
             }
             url.startsWith("openid4vp:") -> updatePresentationRequestUrl(url)
         }
+    }
+
+    fun selectCredential(id: String) {
+        _state.update { state ->
+            val ready = state.session as? WalletSessionState.Ready ?: return@update state
+            if (ready.credentials.none { it.id == id }) return@update state
+            state.copy(selectedCredentialId = id)
+        }
+    }
+
+    fun clearSelectedCredential() {
+        _state.update { it.copy(selectedCredentialId = null) }
     }
 
     /**
@@ -156,6 +168,24 @@ class WalletDemoController(
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
 
         scope.launch(dispatcher) {
+            _state.update { it.copy(operation = WalletOperationState.Receiving) }
+            runCatching {
+                val ids = wallet.receive(offerUrl)
+                val credentials = wallet.listCredentials()
+                ids to credentials
+            }.onSuccess { (ids, credentials) ->
+                _state.update {
+                    it.copy(
+                        session = ready.copy(credentials = credentials),
+                        selectedCredentialId = it.selectedCredentialId.takeIf { selectedId ->
+                            credentials.any { credential -> credential.id == selectedId }
+                        },
+                        operation = WalletOperationState.Succeeded("Received ${ids.size} credential(s)"),
+                    )
+                }
+            }.onFailure { error ->
+                setOperationError("Receive failed", error)
+            }
             doReceive(ready, offerUrl, txCode)
         }
     }
@@ -266,6 +296,9 @@ class WalletDemoController(
                             did = result.did,
                             credentials = credentials,
                         ),
+                        selectedCredentialId = it.selectedCredentialId.takeIf { selectedId ->
+                            credentials.any { credential -> credential.id == selectedId }
+                        },
                         operation = WalletOperationState.Idle,
                     )
                 }

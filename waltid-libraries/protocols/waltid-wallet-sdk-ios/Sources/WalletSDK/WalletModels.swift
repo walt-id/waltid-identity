@@ -468,6 +468,9 @@ public struct Credential: Equatable, Identifiable, Sendable {
     /// Date the credential was added to the wallet when available.
     public let addedAt: Date?
 
+    /// Parsed credential data encoded as JSON for app-side display.
+    public let credentialDataJSON: String
+
     /// Creates credential metadata visible to SDK consumers.
     ///
     /// - Parameters:
@@ -479,13 +482,16 @@ public struct Credential: Equatable, Identifiable, Sendable {
     ///   - label: User-facing credential label when available.
     ///   - addedAt: Date the credential was added to the wallet when
     ///     available.
+    ///   - credentialDataJSON: Parsed credential data encoded as JSON for
+    ///     app-side display.
     public init(
         id: String,
         format: String,
         issuer: String?,
         subject: String?,
         label: String?,
-        addedAt: Date?
+        addedAt: Date?,
+        credentialDataJSON: String
     ) {
         self.id = id
         self.format = format
@@ -493,6 +499,7 @@ public struct Credential: Equatable, Identifiable, Sendable {
         self.subject = subject
         self.label = label
         self.addedAt = addedAt
+        self.credentialDataJSON = credentialDataJSON
     }
 }
 

@@ -299,6 +299,33 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun selectCredentialTracksSavedCredentialDetails() = runTest {
+        val controller = unlockedControllerWith(FakeDemoWallet(credentials = listOf(sampleCredential)), this)
+
+        controller.selectCredential("cred-1")
+
+        assertEquals("cred-1", controller.state.value.selectedCredentialId)
+
+        controller.clearSelectedCredential()
+
+        assertEquals(null, controller.state.value.selectedCredentialId)
+    }
+
+    @Test
+    fun receiveClearsSelectedCredentialWhenItNoLongerExists() = runTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectCredential("cred-1")
+        wallet.credentials = emptyList()
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.receive()
+        runCurrent()
+
+        assertEquals(null, controller.state.value.selectedCredentialId)
+    }
+
+    @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
         val offerUrl = "openid-credential-offer://example"
@@ -333,9 +360,10 @@ class WalletDemoControllerTest {
             id = "cred-1",
             format = "jwt_vc_json",
             issuer = "Example Issuer",
-            subject = "did:key:subject",
+            subject = "did:key:holder",
             label = "Example Credential",
             addedAt = "2026-06-17",
+            credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
     }
 }
@@ -359,9 +387,9 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+  /*  override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
         credentials.firstOrNull { it.id == id }?.let { WalletDemoCredentialDetails(id = it.id, credentialDataJson = "{}") }
-
+*/
     override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution {
         resolvedOfferUrl = offerUrl
         return DemoOfferResolution(txCodeRequired = offerTxCodeRequired)

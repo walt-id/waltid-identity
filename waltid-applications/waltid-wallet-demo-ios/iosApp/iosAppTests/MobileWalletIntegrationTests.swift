@@ -281,6 +281,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
         _ = try await wallet2.bootstrap()
         let credentials = try await wallet2.credentials()
         XCTAssertFalse(credentials.isEmpty, "public demo credential should persist across controller recreation")
+        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
@@ -316,6 +317,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
             credentialIDs.isEmpty,
             "Should receive \(scenario.displayName) from public demo issuer2"
         )
+
+        let credentials = try await wallet.credentials()
+        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
     }
 
     private func receiveAndPresentDemoCredential(scenarioID: String) async throws {
@@ -337,6 +341,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let credentials = try await wallet.credentials()
         XCTAssertFalse(credentials.isEmpty, "Should have stored \(scenario.displayName) credentials")
+        try assertStoredCredentialDisplayData(scenario: scenario, credentials: credentials)
 
         let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
         let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
@@ -362,6 +367,63 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func demoPresentationScenario(_ id: String) throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == id })
+    }
+
+    private func assertStoredCredentialDisplayData(
+        scenario: DemoCredentialScenario,
+        credentials: [Credential]
+    ) throws {
+        let credential = try XCTUnwrap(
+            credentials.first { $0.format == scenario.format } ?? credentials.first,
+            "\(scenario.displayName) should be present in wallet credentials"
+        )
+        XCTAssertEqual(credential.format, scenario.format, "\(scenario.displayName) should expose the expected format")
+
+        let data = try XCTUnwrap(credential.credentialDataJSON.data(using: .utf8))
+        let json = try JSONSerialization.jsonObject(with: data)
+        XCTAssertTrue(
+            containsAnyUserFacingClaim(json),
+            "\(scenario.displayName) display data should include readable user-facing claims: \(credential.credentialDataJSON)"
+        )
+
+        if let object = json as? [String: Any] {
+            XCTAssertTrue(
+                object.keys.contains { $0 != "_sd" },
+                "\(scenario.displayName) display data should not expose only selective-disclosure commitments"
+            )
+        }
+    }
+
+    private func containsAnyUserFacingClaim(_ value: Any) -> Bool {
+        if let object = value as? [String: Any] {
+            return object.keys.contains { userFacingClaimNames.contains(normalizedClaimName($0)) } ||
+                object.values.contains { containsAnyUserFacingClaim($0) }
+        }
+        if let array = value as? [Any] {
+            return array.contains { containsAnyUserFacingClaim($0) }
+        }
+        return false
+    }
+
+    private func normalizedClaimName(_ name: String) -> String {
+        name.filter { $0.isLetter || $0.isNumber }.lowercased()
+    }
+
+    private var userFacingClaimNames: Set<String> {
+        [
+            "birthdate",
+            "birthplace",
+            "documentnumber",
+            "familyname",
+            "familynamebirth",
+            "givenname",
+            "nationality",
+            "portrait",
+            "residentcity",
+            "residentcountry",
+            "residentstate",
+            "residentstreet",
+        ]
     }
 }
 

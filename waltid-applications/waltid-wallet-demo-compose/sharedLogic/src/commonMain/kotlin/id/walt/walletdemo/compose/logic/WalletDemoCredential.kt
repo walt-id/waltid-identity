@@ -1,18 +1,18 @@
 package id.walt.walletdemo.compose.logic
 
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class WalletDemoCredential(
+data class CredentialSummary(
     val id: String,
     val format: String,
-    val issuer: String,
-    val subject: String,
+    val issuer: String?,
+    val subject: String? = null,
     val label: String,
-    val addedAt: String,
+    val addedAt: String? = null,
+    val credentialDataJson: String? = null,
 )
 
-data class WalletDemoCredentialDetails(
+typealias WalletDemoCredential = CredentialSummary
+
+/*data class WalletDemoCredentialDetails(
     val id: String,
     val credentialDataJson: String,
-)
+)*/

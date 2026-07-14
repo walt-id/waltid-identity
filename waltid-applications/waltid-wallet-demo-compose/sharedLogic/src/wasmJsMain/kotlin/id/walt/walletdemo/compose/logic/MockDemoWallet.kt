@@ -16,10 +16,10 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution =
         DemoOfferResolution(txCodeRequired = false)
 
-    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+    /*override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
         credentials.firstOrNull { it.id == id }?.let {
             WalletDemoCredentialDetails(id = it.id, credentialDataJson = "{}")
-        }
+        }*/
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         credentials = listOf(
@@ -27,9 +27,10 @@ private class MockDemoWallet : DemoWallet {
                 id = "mock-credential",
                 format = "jwt_vc_json",
                 issuer = "walt.id demo issuer",
-                subject = "did:key:mock-wallet-demo",
+                subject = "did:key:mock-holder",
                 label = "Mock credential",
                 addedAt = "2026-06-17",
+                credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
             )
         )
         return credentials.map { it.id }

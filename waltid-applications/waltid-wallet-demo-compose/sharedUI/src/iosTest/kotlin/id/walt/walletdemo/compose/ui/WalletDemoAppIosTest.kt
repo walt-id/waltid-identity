@@ -10,6 +10,10 @@ class WalletDemoAppIosTest {
         scenarios.pinSetupBootstrapsWalletAndShowsCredentials()
 
     @Test
+    fun savedCredentialOpensCredentialDetails() =
+        scenarios.savedCredentialOpensCredentialDetails()
+
+    @Test
     fun receiveFlowUpdatesStatusAndCredentialList() =
         scenarios.receiveFlowUpdatesStatusAndCredentialList()
 

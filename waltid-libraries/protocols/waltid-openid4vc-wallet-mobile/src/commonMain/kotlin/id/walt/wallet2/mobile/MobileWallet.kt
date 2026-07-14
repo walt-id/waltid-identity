@@ -13,7 +13,6 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -23,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -36,11 +36,11 @@ public data class MobileWalletBootstrapResult(
 )
 
 /**
- * Lightweight credential summary suitable for mobile UI lists.
+ * Credential entry suitable for mobile UI lists and detail display.
  *
- * This type is the stable public ABI for listing credentials. It intentionally omits raw
- * credential payload to keep the list summary light and language-agnostic. Use
- * [MobileWallet.credentialDetails] to fetch the full JSON payload for a single credential.
+ * The credential content is exposed as a JSON string so Kotlin, Swift, and other
+ * consumers can decode it with native platform tools without depending on Kotlinx
+ * JSON value types in the public mobile API.
  *
  * @property id Wallet-local credential identifier.
  * @property format Credential format, such as `jwt_vc_json`, `vc+sd-jwt`, or `mso_mdoc`.
@@ -48,6 +48,7 @@ public data class MobileWalletBootstrapResult(
  * @property subject Subject identifier extracted from the credential when available.
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
+ * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
  */
 public data class MobileWalletCredential(
     public val id: String,
@@ -56,31 +57,7 @@ public data class MobileWalletCredential(
     public val subject: String?,
     public val label: String?,
     public val addedAt: String?,
-)
-
-/**
- * Full credential payload for a single wallet credential.
- *
- * Returned by [MobileWallet.credentialDetails]. The payload is encoded as a JSON string so
- * callers on all target languages (Swift, Kotlin, JS) can decode it using their native mechanisms
- * without a dependency on the Kotlinx serialization runtime types.
- *
- * @property id Wallet-local credential identifier matching [MobileWalletCredential.id].
- * @property credentialDataJson The structured credential data encoded as a JSON object string.
- */
-public data class MobileWalletCredentialDetails(
-    val id: String,
-    val credentialDataJson: String,
-)
-
-/**
- * Result of resolving a credential offer URL before executing the issuance flow.
- *
- * @property txCodeRequired `true` when the pre-authorized code grant requires the user to supply
- *   a transaction code (PIN) before the token request can proceed.
- */
-public data class MobileWalletOfferResolution(
-    val txCodeRequired: Boolean,
+    public val credentialDataJson: String,
 )
 
 /**
@@ -253,10 +230,7 @@ public class MobileWallet internal constructor(
     /**
      * Lists all credentials currently stored in the mobile wallet.
      *
-     * Returns lightweight summaries only. Call [credentialDetails] to retrieve the full
-     * credential payload for a specific credential.
-     *
-     * @return Credential summaries ordered by the underlying credential store.
+     * @return Credential entries, including display JSON, ordered by the underlying credential store.
      */
     public suspend fun credentials(): List<MobileWalletCredential> =
         wallet.streamAllCredentials().toList().map { credential ->
@@ -268,27 +242,9 @@ public class MobileWallet internal constructor(
                 subject = meta.subject,
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
+                credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
             )
         }
-
-    /**
-     * Returns the full credential payload for a single wallet credential.
-     *
-     * The payload is serialized as a JSON object string so callers on all target languages can
-     * decode it using their native mechanisms.
-     *
-     * @param id Wallet-local credential identifier from [MobileWalletCredential.id].
-     * @return Full credential details, or `null` if no credential with [id] is found.
-     */
-    public suspend fun credentialDetails(id: String): MobileWalletCredentialDetails? {
-        val credential = wallet.streamAllCredentials().toList().firstOrNull { it.toMetadata().id == id }
-            ?: return null
-        val credentialData = credential.toMetadata().credentialData
-        return MobileWalletCredentialDetails(
-            id = id,
-            credentialDataJson = Json.encodeToString(JsonElement.serializer(), credentialData),
-        )
-    }
 
     /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
@@ -346,4 +302,7 @@ public class MobileWallet internal constructor(
         eventStream.tryEmit(mobileEvent)
         onEvent(mobileEvent)
     }
+
+    private fun JsonObject.encodeJsonObject(): String =
+        Json.encodeToString(JsonObject.serializer(), this)
 }

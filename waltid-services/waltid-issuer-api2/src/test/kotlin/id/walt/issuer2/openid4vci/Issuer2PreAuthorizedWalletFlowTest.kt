@@ -14,6 +14,7 @@ import id.walt.issuer2.testsupport.assertSdJwtVcCredentialPayload
 import id.walt.issuer2.testsupport.assertSessionStatus
 import id.walt.issuer2.testsupport.clearIssuer2TestEnvironment
 import id.walt.issuer2.testsupport.createCredentialOffer
+import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
 import id.walt.issuer2.testsupport.createWalletFlowCredentialOffer
 import id.walt.issuer2.testsupport.installIssuer2WithConfigFiles
 import id.walt.issuer2.testsupport.referencedOfferUri
@@ -133,11 +134,19 @@ class Issuer2PreAuthorizedWalletFlowTest {
     }
 
     @Test
-    fun walletCanRefreshPreAuthorizedAccessToken() = testApplication {
+    fun walletCanRefreshClientAuthenticatedPreAuthorizedAccessToken() = testApplication {
         val scenario = Issuer2CredentialScenarios.identitySdJwt
-        installIssuer2WithConfigFiles()
+        val clientAttestation = createIssuer2ClientAttestationTestMaterial()
+        installIssuer2WithConfigFiles { serviceConfig ->
+            serviceConfig.copy(
+                clientAuthenticationConfig = clientAttestation.clientAuthenticationConfig,
+            )
+        }
         val client = apiClient()
-        val walletFlow = Issuer2WalletFlowDriver(client)
+        val walletFlow = Issuer2WalletFlowDriver(
+            client = client,
+            attestationAssembler = clientAttestation.attestationAssembler,
+        )
 
         val createdOffer = client.createWalletFlowCredentialOffer(
             scenario = scenario,

@@ -1,6 +1,8 @@
 package id.walt.wallet2.mobile.swiftinterop
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.crypto.keys.Key
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeySerialization
@@ -394,11 +396,16 @@ private suspend fun WalletBridgeStoredCredential.toStoredCredential(): StoredCre
 
 private fun StoredCredential.toBridgeStoredCredential() = WalletBridgeStoredCredential(
     id = id,
-    serializedCredential = credential.signed ?: credential.credentialData.toString(),
+    serializedCredential = credential.serializedForBridgeStorage(),
     format = credential.format,
     label = label,
     addedAt = addedAt?.toString(),
 )
+
+private fun DigitalCredential.serializedForBridgeStorage(): String =
+    (this as? SelectivelyDisclosableVerifiableCredential)?.signedWithDisclosures?.takeIf { it.isNotBlank() }
+        ?: signed?.takeIf { it.isNotBlank() }
+        ?: credentialData.toString()
 
 private fun WalletBridgeStoredDid.toWalletDidEntry() = WalletDidEntry(
     did = did,

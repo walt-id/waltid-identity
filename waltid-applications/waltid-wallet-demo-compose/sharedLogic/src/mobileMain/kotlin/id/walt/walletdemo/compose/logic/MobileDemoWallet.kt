@@ -19,17 +19,18 @@ internal class MobileDemoWallet(
             WalletDemoCredential(
                 id = credential.id,
                 format = credential.format,
-                issuer = credential.issuer ?: "Unknown",
-                subject = credential.subject ?: "Unknown",
+                issuer = credential.issuer ?: CredentialDisplayText.Unknown,
+                subject = credential.subject,
                 label = credential.label ?: credential.format,
-                addedAt = credential.addedAt ?: "",
+                addedAt = credential.addedAt,
+                credentialDataJson = credential.credentialDataJson,
             )
         }
 
-    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
+   /* override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
         mobileWallet.credentialDetails(id)?.let {
             WalletDemoCredentialDetails(id = it.id, credentialDataJson = it.credentialDataJson)
-        }
+        }*/
 
     override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution =
         mobileWallet.resolveOffer(offerUrl).let { DemoOfferResolution(txCodeRequired = it.txCodeRequired) }

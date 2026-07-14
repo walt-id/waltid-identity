@@ -41,6 +41,10 @@ kotlin {
             implementation(identityLibs.compose.ui)
             implementation(identityLibs.compose.material3)
             implementation(identityLibs.compose.material.icons.core)
+            implementation(identityLibs.coil.compose)
+
+
+            implementation(identityLibs.compose.material.icons.core)
             implementation(identityLibs.kotlinx.serialization.json)
         }
 
