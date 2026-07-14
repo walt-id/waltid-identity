@@ -7,6 +7,51 @@ on:
         description: "the json file path containing the matrix"
         required: true
         type: string
+      filter-mode:
+        description: "Optional matrix filter mode"
+        required: false
+        type: string
+        default: "none"
+      event-name:
+        description: "Caller event name"
+        required: false
+        type: string
+        default: ""
+      ref:
+        description: "Caller git ref"
+        required: false
+        type: string
+        default: ""
+      base-sha:
+        description: "Base commit SHA for push comparisons"
+        required: false
+        type: string
+        default: ""
+      head-sha:
+        description: "Head commit SHA for push comparisons"
+        required: false
+        type: string
+        default: ""
+      pr-number:
+        description: "Pull request number, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-head-repo:
+        description: "Pull request head repository, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-labels:
+        description: "JSON array of pull request label names"
+        required: false
+        type: string
+        default: "[]"
+      pr-draft:
+        description: "Whether the pull request is currently a draft"
+        required: false
+        type: boolean
+        default: false
     outputs:
       json:
         description: "The json data"
@@ -20,5 +65,159 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - id: load-json
+        env:
+          BASE_SHA: ${{ inputs.base-sha }}
+          EVENT_NAME: ${{ inputs.event-name }}
+          FILTER_MODE: ${{ inputs.filter-mode }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ inputs.head-sha }}
+          JSON_PATH: ${{ inputs.jsonpath }}
+          PR_DRAFT: ${{ inputs.pr-draft }}
+          PR_HEAD_REPO: ${{ inputs.pr-head-repo }}
+          PR_LABELS: ${{ inputs.pr-labels }}
+          PR_NUMBER: ${{ inputs.pr-number }}
         run: |
-          echo "matrix=$(jq -c . < ${{ inputs.jsonpath }})" >> $GITHUB_OUTPUT
+          set -euo pipefail
+
+          matrix="$(jq -c . < "$JSON_PATH")"
+
+          output_matrix() {
+            echo "matrix=$1" >> "$GITHUB_OUTPUT"
+          }
+
+          if [[ "$FILTER_MODE" == "none" ]]; then
+            output_matrix "$matrix"
+            exit 0
+          fi
+
+          run_full_matrix() {
+            output_matrix "$matrix"
+            exit 0
+          }
+
+          run_empty_matrix() {
+            output_matrix "[]"
+            exit 0
+          }
+
+          case "$EVENT_NAME" in
+            workflow_dispatch|workflow_call)
+              run_full_matrix
+              ;;
+            pull_request)
+              if [[ "$PR_HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
+                run_empty_matrix
+              fi
+
+              if jq -e 'index("ci:docker") != null' <<< "$PR_LABELS" >/dev/null; then
+                run_full_matrix
+              fi
+
+              if [[ "$PR_DRAFT" == "true" ]]; then
+                run_empty_matrix
+              fi
+              ;;
+          esac
+
+          changed_files_path="$(mktemp)"
+          case "$EVENT_NAME" in
+            pull_request)
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename' > "$changed_files_path" || run_full_matrix
+              ;;
+            push)
+              if [[ -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ || -z "$HEAD_SHA" ]]; then
+                run_full_matrix
+              fi
+              gh api "repos/${GITHUB_REPOSITORY}/compare/${BASE_SHA}...${HEAD_SHA}" --jq '.files[].filename' > "$changed_files_path" || run_full_matrix
+              ;;
+            *)
+              run_full_matrix
+              ;;
+          esac
+
+          changed_files=()
+          while IFS= read -r changed_file; do
+            changed_files+=("$changed_file")
+          done < "$changed_files_path"
+
+          if (( ${#changed_files[@]} == 0 )); then
+            run_empty_matrix
+          fi
+
+          app_common_watch_paths=(
+            ".github/actions/checkout-repos"
+            ".github/workflows/build.yml"
+            ".github/workflows/data/docker-matrix.json"
+            ".github/workflows/docker.yml"
+            ".github/workflows/load-json.yml"
+          )
+
+          service_common_watch_paths=(
+            ".github/actions/checkout-repos"
+            ".github/actions/gradle-setup-action"
+            ".github/workflows/api-docker.yml"
+            ".github/workflows/build.yml"
+            ".github/workflows/data/api-docker-matrix.json"
+            ".github/workflows/load-json.yml"
+            "build-logic"
+            "build.gradle.kts"
+            "gradle"
+            "gradle.properties"
+            "gradlew"
+            "settings.gradle.kts"
+            "waltid-libraries"
+            "waltid-services/waltid-service-commons"
+          )
+
+          path_matches() {
+            local watch="${1%/}"
+            local changed candidate
+
+            for changed in "${changed_files[@]}"; do
+              for candidate in \
+                "$changed" \
+                "${changed#waltid-identity/}" \
+                "${changed#waltid-identity-enterprise/}"
+              do
+                if [[ "$candidate" == "$watch" || "$candidate" == "$watch/"* ]]; then
+                  return 0
+                fi
+              done
+            done
+
+            return 1
+          }
+
+          selected="$(mktemp)"
+
+          while IFS= read -r item; do
+            watch_paths=()
+            while IFS= read -r watch_path; do
+              watch_paths+=("$watch_path")
+            done < <(jq -r '.watchPaths[]?' <<< "$item")
+
+            case "$FILTER_MODE" in
+              application-docker)
+                watch_paths+=("${app_common_watch_paths[@]}")
+                ;;
+              service-docker)
+                watch_paths+=("${service_common_watch_paths[@]}")
+                ;;
+              *)
+                run_full_matrix
+                ;;
+            esac
+
+            for watch_path in "${watch_paths[@]}"; do
+              if path_matches "$watch_path"; then
+                printf '%s\n' "$item" >> "$selected"
+                break
+              fi
+            done
+          done < <(jq -c '.[]' <<< "$matrix")
+
+          if [[ -s "$selected" ]]; then
+            output_matrix "$(jq -s -c . "$selected")"
+          else
+            output_matrix "[]"
+          fi

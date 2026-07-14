@@ -2,36 +2,62 @@
   {
     "context": "waltid-identity",
     "folder": "waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet",
-    "image": "waltid-demo-wallet"
+    "image": "waltid-demo-wallet",
+    "watchPaths": [
+      "waltid-applications/waltid-web-wallet/apps/waltid-demo-wallet",
+      "waltid-applications/waltid-web-wallet/libs",
+      "waltid-applications/waltid-web-wallet/package.json"
+    ]
   },
   {
     "context": "waltid-identity",
     "folder": "waltid-identity/waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet",
-    "image": "waltid-dev-wallet"
+    "image": "waltid-dev-wallet",
+    "watchPaths": [
+      "waltid-applications/waltid-web-wallet/apps/waltid-dev-wallet",
+      "waltid-applications/waltid-web-wallet/libs",
+      "waltid-applications/waltid-web-wallet/package.json"
+    ]
   },
   {
     "context": "waltid-identity",
     "folder": "waltid-identity/waltid-applications/waltid-web-portal",
-    "image": "portal"
+    "image": "portal",
+    "watchPaths": [
+      "waltid-applications/waltid-web-portal"
+    ]
   },
   {
     "context": "waltid-identity",
     "folder": "waltid-identity/waltid-applications/waltid-web-portal2",
-    "image": "portal2"
+    "image": "portal2",
+    "watchPaths": [
+      "waltid-applications/waltid-web-portal2"
+    ]
   },
   {
     "context": "waltid-identity/waltid-applications/waltid-credentials",
     "folder": "waltid-identity/waltid-applications/waltid-credentials",
-    "image": "vc-repository"
+    "image": "vc-repository",
+    "watchPaths": [
+      "waltid-applications/waltid-credentials"
+    ]
   },
   {
     "context": "waltid-identity/waltid-applications/waltid-digital-credentials",
     "folder": "waltid-identity/waltid-applications/waltid-digital-credentials",
-    "image": "digital-credentials"
+    "image": "digital-credentials",
+    "watchPaths": [
+      "waltid-applications/waltid-digital-credentials"
+    ]
   },
   {
     "context": "waltid-identity-enterprise",
     "folder": "waltid-identity-enterprise/waltid-enterprise-ui",
-    "image": "waltid-enterprise-ui"
+    "image": "waltid-enterprise-ui",
+    "watchPaths": [
+      "waltid-enterprise-ui",
+      "waltid-identity-enterprise/waltid-enterprise-ui"
+    ]
   }
 ]

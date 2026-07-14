@@ -1,30 +1,54 @@
 [
   {
     "commandPath": ":waltid-services:waltid-issuer-api",
-    "image": "issuer-api"
+    "image": "issuer-api",
+    "watchPaths": [
+      "waltid-services/waltid-issuer-api"
+    ]
   },
   {
     "commandPath": ":waltid-services:waltid-issuer-api2",
-    "image": "issuer-api2"
+    "image": "issuer-api2",
+    "watchPaths": [
+      "waltid-services/waltid-issuer-api2"
+    ]
   },
   {
     "commandPath": ":waltid-services:waltid-verifier-api",
-    "image": "verifier-api"
+    "image": "verifier-api",
+    "watchPaths": [
+      "waltid-services/waltid-verifier-api"
+    ]
   },
   {
     "commandPath": ":waltid-services:waltid-verifier-api2",
-    "image": "verifier-api2"
+    "image": "verifier-api2",
+    "watchPaths": [
+      "waltid-services/waltid-verifier-api2"
+    ]
   },
   {
     "commandPath": ":waltid-services:waltid-wallet-api",
-    "image": "wallet-api"
+    "image": "wallet-api",
+    "watchPaths": [
+      "waltid-services/waltid-wallet-api"
+    ]
   },
   {
     "commandPath": ":waltid-services:waltid-wallet-api2",
-    "image": "wallet-api2"
+    "image": "wallet-api2",
+    "watchPaths": [
+      "waltid-services/waltid-wallet-api2"
+    ]
   },
   {
     "commandPath": ":waltid-enterprise-api",
-    "image": "waltid-enterprise-api"
+    "image": "waltid-enterprise-api",
+    "watchPaths": [
+      "waltid-enterprise-api",
+      "waltid-credential-status",
+      "waltid-identity-enterprise/waltid-enterprise-api",
+      "waltid-identity-enterprise/waltid-credential-status"
+    ]
   }
 ]

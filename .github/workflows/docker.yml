@@ -29,6 +29,7 @@ on:
 
 jobs:
   docker:
+    if: ${{ inputs.images != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

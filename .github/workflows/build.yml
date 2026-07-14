@@ -30,11 +30,20 @@ jobs:
       enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
   docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
+    uses: ./.github/workflows/load-json.yml
     with:
       jsonpath: ".github/workflows/data/docker-matrix.json"
+      filter-mode: application-docker
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      base-sha: ${{ github.event.before }}
+      head-sha: ${{ github.sha }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
   docker:
-    uses: walt-id/waltid-identity/.github/workflows/docker.yml@main
+    uses: ./.github/workflows/docker.yml
     secrets: inherit
     needs: [ version, docker-matrix ]
     with:
@@ -42,11 +51,20 @@ jobs:
       version: ${{ needs.version.outputs.release_version }}
       artifact: true
   api-docker-matrix:
-    uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
+    uses: ./.github/workflows/load-json.yml
     with:
       jsonpath: ".github/workflows/data/api-docker-matrix.json"
+      filter-mode: service-docker
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      base-sha: ${{ github.event.before }}
+      head-sha: ${{ github.sha }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
   api-docker:
-    uses: walt-id/waltid-identity/.github/workflows/api-docker.yml@main
+    uses: ./.github/workflows/api-docker.yml
     secrets: inherit
     needs: [ version, api-docker-matrix ]
     with:
