@@ -164,6 +164,7 @@ async function submit() {
       </select>
       <p class="mt-2 text-xs text-[--color-text-muted]">
         {{ selectedPidRequestOption.description }}
+        <a v-if="selectedPidRequestOption.link" :href="selectedPidRequestOption.link" target="_blank" class="text-blue-500">Learn more</a>
       </p>
     </section>
 
