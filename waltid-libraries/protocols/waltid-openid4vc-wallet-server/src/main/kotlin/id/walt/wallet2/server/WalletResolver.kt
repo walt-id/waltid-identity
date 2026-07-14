@@ -95,9 +95,15 @@ interface WalletResolver {
         val serializedStaticKey = wallet.staticKey?.let { KeySerialization.serializeKey(it) }
         val descriptor = WalletDescriptor(
             id = wallet.id,
-            keyStoreIds = wallet.keyStores.mapNotNull { resolveStoreId(it) },
-            credentialStoreIds = wallet.credentialStores.mapNotNull { resolveStoreId(it) },
-            didStoreId = wallet.didStore?.let { resolveStoreId(it) },
+            keyStoreIds = wallet.keyStores.map { store ->
+                requireNotNull(resolveStoreId(store)) { "Wallet '${wallet.id}' has an unregistered key store" }
+            },
+            credentialStoreIds = wallet.credentialStores.map { store ->
+                requireNotNull(resolveStoreId(store)) { "Wallet '${wallet.id}' has an unregistered credential store" }
+            },
+            didStoreId = wallet.didStore?.let { store ->
+                requireNotNull(resolveStoreId(store)) { "Wallet '${wallet.id}' has an unregistered DID store" }
+            },
             serializedStaticKey = serializedStaticKey,
             staticDid = wallet.staticDid,
             defaultKeyId = wallet.defaultKeyId,
