@@ -75,6 +75,7 @@ object AuthorizationRequestResolver {
         requestUri: String,
         requestUriMethod: RequestUriHttpMethod?,
         requestUriPostWalletMetadata: String? = null,
+        sendWalletMetadata: Boolean = true,
     ): RequestUriFetchResponse {
         val walletNonce = requestUriMethod
             .takeIf { it == RequestUriHttpMethod.POST }
@@ -87,10 +88,11 @@ object AuthorizationRequestResolver {
                 contentType(ContentType.Application.FormUrlEncoded)
                 accept(ContentType.parse("application/oauth-authz-req+jwt"))
                 setBody(
-                    Parameters.build {
-                        append("wallet_metadata", requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata)
-                        append("wallet_nonce", requireNotNull(walletNonce))
-                    }.formUrlEncode(),
+                    buildRequestUriPostBody(
+                        walletNonce = requireNotNull(walletNonce),
+                        walletMetadata = requestUriPostWalletMetadata ?: defaultRequestUriPostWalletMetadata,
+                        sendWalletMetadata = sendWalletMetadata,
+                    )
                 )
             }
         }
@@ -102,6 +104,15 @@ object AuthorizationRequestResolver {
             walletNonce = walletNonce,
         )
     }
+
+    internal fun buildRequestUriPostBody(
+        walletNonce: String,
+        walletMetadata: String,
+        sendWalletMetadata: Boolean,
+    ): String = Parameters.build {
+        if (sendWalletMetadata) append("wallet_metadata", walletMetadata)
+        append("wallet_nonce", walletNonce)
+    }.formUrlEncode()
 
     suspend fun resolve(
         requestUrl: Url,

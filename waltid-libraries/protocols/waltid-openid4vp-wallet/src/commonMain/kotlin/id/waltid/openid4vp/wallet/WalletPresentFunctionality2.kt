@@ -334,6 +334,10 @@ object WalletPresentFunctionality2 {
                         webResolveAuthReq = webResolveAuthReq,
                         requestUri = requestUri,
                         requestUriMethod = requestUriMethod,
+                        // Optional wallet metadata is omitted until the caller explicitly profiles
+                        // its values. Some Final-compliant verifier endpoints reject unsupported
+                        // capability members, while wallet_nonce remains mandatory for this flow.
+                        sendWalletMetadata = false,
                     )
                 },
             ).authorizationRequest.also(::validateAuthorizationRequest)

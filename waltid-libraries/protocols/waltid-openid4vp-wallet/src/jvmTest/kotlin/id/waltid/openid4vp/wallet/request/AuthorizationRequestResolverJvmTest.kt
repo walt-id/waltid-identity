@@ -1,6 +1,7 @@
 package id.waltid.openid4vp.wallet.request
 
 import io.ktor.http.URLBuilder
+import io.ktor.http.parseQueryString
 import kotlinx.coroutines.runBlocking
 import java.util.Base64
 import kotlin.test.Test
@@ -103,6 +104,20 @@ class AuthorizationRequestResolverJvmTest {
                 ) { _, _ -> error("request_uri fetch should not be called") }
             }
         }
+    }
+
+    @Test
+    fun `request uri post can omit optional wallet metadata`() {
+        val parameters = parseQueryString(
+            AuthorizationRequestResolver.buildRequestUriPostBody(
+                walletNonce = "nonce",
+                walletMetadata = "{\"vp_formats_supported\":{}}",
+                sendWalletMetadata = false,
+            )
+        )
+
+        assertEquals("nonce", parameters["wallet_nonce"])
+        assertEquals(null, parameters["wallet_metadata"])
     }
 
     private fun unsignedJwt(payloadJson: String, type: String = "oauth-authz-req+jwt"): String {
