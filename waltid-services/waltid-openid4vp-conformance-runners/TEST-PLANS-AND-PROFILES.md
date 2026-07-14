@@ -178,31 +178,42 @@ Examples:
 }
 ```
 
-**Status:** 🚫 **Blocked** - Awaiting WAL-896 implementation
+**Status:** ✅ **11/12 tests passing (92%)**
 
-**Expected Modules (14):**
-- `oid4vp-1final-wallet-happy-flow`
-- `oid4vp-1final-wallet-alternate-request-object-claims`
-- `oid4vp-1final-wallet-request-uri-method-post`
-- `oid4vp-1final-wallet-dcql-sd-jwt-vc-happy-flow`
-- `oid4vp-1final-wallet-dcql-sd-jwt-vc-credential-query`
-- `oid4vp-1final-wallet-dcql-sd-jwt-vc-single-credential-multiple-queries`
-- `oid4vp-1final-wallet-ensure-request-object-always-signed`
-- `oid4vp-1final-wallet-ensure-request-uri-always-present`
-- `oid4vp-1final-wallet-ensure-client-id-equals-client-id-scheme`
-- `oid4vp-1final-wallet-ensure-client-id-x509-san-dns`
-- `oid4vp-1final-wallet-ensure-response-type-always-vp-token`
-- `oid4vp-1final-wallet-ensure-response-mode-direct-post-jwt`
-- `oid4vp-1final-wallet-ensure-response-encrypted`
-- `oid4vp-1final-wallet-ensure-nonce-always-present`
+**Modules (12):**
+| # | Module | Status | Notes |
+|---|--------|--------|-------|
+| 1 | `oid4vp-1final-wallet-happy-flow` | ✅ PASSED | Baseline VP flow |
+| 2 | `oid4vp-1final-wallet-alternate-happy-flow` | ⚠️ SKIPPED | Test automation limitation (requires browser redirect) |
+| 3 | `oid4vp-1final-wallet-request-uri-method-post` | ✅ PASSED | POST method works |
+| 4 | `oid4vp-1final-wallet-fewer-claims-than-available` | ✅ PASSED | Selective disclosure |
+| 5 | `oid4vp-1final-wallet-optional-credential-set` | ✅ PASSED | Optional credentials |
+| 6 | `oid4vp-1final-wallet-no-claims-in-dcql-query` | ✅ PASSED | DCQL without claims |
+| 7 | `oid4vp-1final-wallet-negative-test-invalid-request-signature` | ✅ REJECTED | Correctly rejects invalid JAR signature |
+| 8 | `oid4vp-1final-wallet-negative-test-mismatched-client-id` | ✅ REJECTED | Correctly rejects client_id mismatch |
+| 9 | `oid4vp-1final-wallet-negative-test-redirect-uri-with-direct-post` | ✅ REJECTED | Correctly rejects redirect_uri with direct_post |
+| 10 | `oid4vp-1final-wallet-negative-test-missing-nonce` | ✅ REJECTED | Correctly rejects missing nonce |
+| 11 | `oid4vp-1final-wallet-negative-test-invalid-client-id-prefix` | ✅ REJECTED | Correctly rejects invalid client_id prefix |
+| 12 | `oid4vp-1final-wallet-negative-test-unknown-transaction-data-type` | ✅ REJECTED | Correctly rejects unknown transaction_data types |
 
-**HAIP Features to Test:**
-- 🚫 Signed request authentication (JAR parsing)
-- 🚫 Encrypted response generation (JWE)
-- 🚫 KB-JWT holder binding
-- 🚫 P-256 key curve enforcement
-- 🚫 SHA-256 hash algorithm
-- 🚫 X.509 certificate chain validation
+**HAIP Features Validated:**
+- ✅ Signed request authentication (JAR parsing)
+- ✅ Encrypted response generation (JWE)
+- ✅ KB-JWT holder binding
+- ✅ P-256 key curve enforcement
+- ✅ SHA-256 hash algorithm
+- ✅ X.509 certificate chain validation (x509_hash)
+- ✅ Negative test rejection (6/6 security validations)
+
+**Known Limitation:**
+The `alternate-happy-flow` test requires a real browser to navigate to `redirect_uri#fragment`. Our headless test runner cannot simulate browser redirects. The wallet correctly returns the `redirect_uri`, but the conformance suite waits for actual browser navigation.
+
+**Run Single Module:**
+```bash
+./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
+    --tests "VpWalletConformanceTests.Run single module" \
+    -DmoduleName=oid4vp-1final-wallet-alternate-happy-flow
+```
 
 ---
 
@@ -228,82 +239,46 @@ Examples:
 }
 ```
 
-**Status:** 🚫 **Blocked** - Awaiting WAL-896 implementation
-
-**Expected Modules (6):**
-- `oid4vp-1final-wallet-mdl-happy-flow`
-- `oid4vp-1final-wallet-mdl-device-auth`
-- `oid4vp-1final-wallet-mdl-session-transcript`
-- `oid4vp-1final-wallet-mdl-invalid-mso-signature`
-- `oid4vp-1final-wallet-mdl-invalid-device-signature`
-- `oid4vp-1final-wallet-mdl-replay-protection`
-
-**HAIP Features to Test:**
-- 🚫 Signed request authentication (JAR parsing)
-- 🚫 Encrypted response generation (JWE)
-- 🚫 DeviceAuth holder binding
-- 🚫 Session transcript validation (ISO 18013-7 Annex C)
-- 🚫 X.509 certificate chain validation
+**Status:** 🚧 **Pending validation** - Runner ready, needs mDL credential setup
 
 ---
 
 #### VpWalletNegativeTests
-**File:** `src/main/kotlin/id/walt/openid4vp/conformance/testplans/plans/vp/wallet/VpWalletNegativeTests.kt`  
-**Test Class:** `VpWalletConformanceTests.kt`
+**Note:** Negative tests are included as part of the HAIP test plans above, not as a separate plan.
 
-**Configuration:**
-- **Protocol:** OpenID4VP 1.0
-- **Role:** Wallet (Presentation Provider)
-- **Credential Format:** SD-JWT VC (`dc+sd-jwt`)
-- **Test Type:** Negative / Security Validation
+The OIDF conformance suite includes negative tests within the main `oid4vp-1final-wallet` test plan. These are identified by module names containing `negative-test`.
 
-**Test Plan Name:** `oid4vp-1final-wallet-haip-test-plan`
+**Negative Test Behavior:**
+- Conformance suite sends an invalid/malformed request
+- Wallet must **reject** the request (return error, NOT call `response_uri`)
+- Suite status shows `REVIEW` (awaiting screenshot for certification)
+- Our runner treats `REVIEW` as `REJECTED` ✅ (wallet behaved correctly)
 
-**Variant:**
-```json
-{
-  "credential_format": "sd_jwt_vc",
-  "response_mode": "direct_post.jwt"
-}
-```
-
-**Status:** 🚫 **Blocked** - Awaiting WAL-896 implementation
-
-**Expected Modules (9):**
-- `oid4vp-1final-wallet-reject-unsigned-request`
-- `oid4vp-1final-wallet-reject-cleartext-response`
-- `oid4vp-1final-wallet-reject-weak-curve`
-- `oid4vp-1final-wallet-reject-weak-hash`
-- `oid4vp-1final-wallet-reject-missing-holder-binding`
-- `oid4vp-1final-wallet-reject-expired-certificate`
-- `oid4vp-1final-wallet-reject-untrusted-ca`
-- `oid4vp-1final-wallet-reject-wallet-nonce-mismatch`
-- `oid4vp-1final-wallet-reject-insecure-origin`
-
-**HAIP Security Requirements:**
-- Must reject unsigned requests
-- Must reject cleartext response requests
-- Must reject weak cryptographic parameters
-- Must reject untrusted certificates
+**Why REVIEW instead of PASSED?**
+For official OIDF certification, a screenshot of the wallet's error UI is required. Since we run headless automation, there's no UI to screenshot. However, the protocol behavior is validated:
+- ✅ Wallet detects invalid request
+- ✅ Wallet returns HTTP 400 to caller  
+- ✅ Wallet does NOT call verifier's `response_uri`
 
 ---
 
 ## Summary by Status
 
-### ⚠️ Validated Runner Profiles
+### ✅ Passing
+1. **VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip** - 11/12 tests (92%), 6/6 negative tests
+2. **MdlX509SanDnsRequestUriSignedDirectPost** (Verifier) - mDL tests passing
+
+### ✅ Validated Runner Profiles
 1. **VciWalletSdJwtDpop** - stable SD-JWT VC reference profile
 2. **VciWalletMdocDpop** - stable ISO mdoc reference profile
 3. **VciWalletSdJwtHaip** - HAIP-oriented baseline profile
 
 ### ⚠️ Mostly Working (Minor Issues)
-2. **Oid4vciIssuerClientAttestationDpop** - 53/55 tests passing
-3. **MdlX509SanDnsRequestUriSignedDirectPost** - mDL tests passing
-4. **SdJwtVcX509SanDnsRequestUriSignedDirectPost** - needs trust anchor config
+1. **Oid4vciIssuerClientAttestationDpop** - 53/55 tests passing
+2. **SdJwtVcX509SanDnsRequestUriSignedDirectPost** (Verifier) - needs trust anchor config
 
-### 🚫 Framework Ready (Awaiting Implementation)
-5. **VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost** - awaiting WAL-896
-6. **VpWalletMdlX509SanDnsRequestUriSignedDirectPost** - awaiting WAL-896
-7. **VpWalletNegativeTests** - awaiting WAL-896
+### 🚧 Pending Validation
+1. **VpWalletMdlX509SanDnsRequestUriSignedDirectPost** - Runner ready, needs mDL credential setup
 
 ---
 
@@ -316,9 +291,8 @@ Examples:
 | OpenID4VCI | Issuer | SD-JWT VC | DPoP + Client Attestation | ⚠️ 53/55 |
 | OpenID4VP | Verifier | SD-JWT VC | x509_san_dns | ⚠️ Config |
 | OpenID4VP | Verifier | mDL | x509_san_dns | ✅ Passing |
-| OpenID4VP | Wallet | SD-JWT VC | x509_san_dns | 🚫 WAL-896 |
-| OpenID4VP | Wallet | mDL | x509_san_dns | 🚫 WAL-896 |
-| OpenID4VP | Wallet | Negative Tests | x509_san_dns | 🚫 WAL-896 |
+| OpenID4VP | Wallet | SD-JWT VC | x509_hash (HAIP) | ✅ 11/12 (92%) |
+| OpenID4VP | Wallet | mDL | x509_san_dns | 🚧 Pending |
 
 ---
 
