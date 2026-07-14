@@ -208,13 +208,6 @@ Examples:
 **Known Limitation:**
 The `alternate-happy-flow` test requires a real browser to navigate to `redirect_uri#fragment`. Our headless test runner cannot simulate browser redirects. The wallet correctly returns the `redirect_uri`, but the conformance suite waits for actual browser navigation.
 
-**Run Single Module:**
-```bash
-./gradlew :waltid-services:waltid-openid4vp-conformance-runners:test \
-    --tests "VpWalletConformanceTests.Run single module" \
-    -DmoduleName=oid4vp-1final-wallet-alternate-happy-flow
-```
-
 ---
 
 #### VpWalletMdlX509SanDnsRequestUriSignedDirectPost
