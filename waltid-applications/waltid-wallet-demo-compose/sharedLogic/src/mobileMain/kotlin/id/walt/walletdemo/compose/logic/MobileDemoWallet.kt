@@ -8,12 +8,14 @@ import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
     private val mobileWallet: MobileWallet,
+    private val warning: String? = null,
 ) : DemoWallet {
     override suspend fun bootstrap(): WalletDemoBootstrapResult =
         mobileWallet.bootstrap().let { result ->
             WalletDemoBootstrapResult(
                 keyId = result.keyId,
                 did = result.did,
+                warning = warning,
             )
         }
 

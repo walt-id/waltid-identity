@@ -21,7 +21,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch()
+        ui.launch(environment: publicDemoEnvironment())
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -84,7 +84,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
 
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch()
+        ui.launch(environment: publicDemoEnvironment())
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -118,7 +118,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["INV-2026-042"].waitForExistence(timeout: 10))
+        let transactionDataFields = try await backend.transactionDataProfileFields(type: "org.waltid.transaction-data.payment-authorization")
+        if transactionDataFields.contains("reference") {
+            XCTAssertTrue(app.staticTexts["INV-2026-042"].waitForExistence(timeout: 10))
+        }
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "WAL-1077 native iOS transaction data preview"
@@ -129,6 +132,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private func publicDemoScenario() throws -> DemoCredentialScenario {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }
+
+    private func publicDemoEnvironment() -> [String: String] {
+        ["TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString]
+    }
 }
 
 @MainActor
@@ -136,9 +143,8 @@ final class MockCredentialDisplayUITests: XCTestCase {
 
     func testMockCredentialDetailsRenderPortraitAndCredentialInfo() {
         let app = XCUIApplication()
-        app.launchEnvironment["E2E_USE_MOCK_WALLET"] = "1"
         let ui = WalletE2EUI(app: app)
-        ui.launch()
+        ui.launch(environment: ["E2E_MOCK_WALLET": "1"])
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -146,13 +152,24 @@ final class MockCredentialDisplayUITests: XCTestCase {
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
-        let credentialCard = app.buttons["wallet.credentialCard.mock-credential"]
+        ui.tapTab(label: "Receive")
+        ui.replaceText(
+            in: ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL"),
+            value: "openid-credential-offer://mock"
+        )
+        ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
+        XCTAssertEqual(
+            ui.waitForStatus(prefixes: ["Received", "Receive failed"], timeout: 10),
+            "Received 1 credential(s)"
+        )
+
+        let credentialCard = app.buttons["wallet.credentialCard.cred-1"]
         XCTAssertTrue(credentialCard.waitForExistence(timeout: 10), "Mock credential card was not shown")
         credentialCard.tap()
 
-        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.mock-credential"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.cred-1"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.Personal_details"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.images["wallet.claimImage.portrait"].waitForExistence(timeout: 10))
+        ui.assertExists(identifier: ui.claimImageIdentifier(path: "portrait.elementValue"), timeout: 10)
         XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["No credential details available"].exists)
     }

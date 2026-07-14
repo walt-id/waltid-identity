@@ -174,7 +174,10 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(app.staticTexts["42.00"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["EUR"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["ACME Corp"].waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts["INV-2026-042"].waitForExistence(timeout: 10))
+        let transactionDataFields = try await backend.transactionDataProfileFields(type: "org.waltid.transaction-data.payment-authorization")
+        if transactionDataFields.contains("reference") {
+            XCTAssertTrue(app.staticTexts["INV-2026-042"].waitForExistence(timeout: 10))
+        }
 
         let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         screenshot.name = "WAL-1077 Compose iOS transaction data preview"
@@ -231,6 +234,9 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     }
 
     private func isolatedWalletEnvironment() -> [String: String] {
-        ["WALLET_ID": "compose-ios-public-demo-\(UUID().uuidString)"]
+        [
+            "WALLET_ID": "compose-ios-public-demo-\(UUID().uuidString)",
+            "TRANSACTION_DATA_PROFILES_URL": DemoBackend.transactionDataProfilesURL.absoluteString,
+        ]
     }
 }

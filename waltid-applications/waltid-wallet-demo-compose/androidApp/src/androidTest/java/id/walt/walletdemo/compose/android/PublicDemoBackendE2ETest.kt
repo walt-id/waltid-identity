@@ -179,12 +179,16 @@ class PublicDemoBackendE2ETest {
             expectedValues = listOf("ACME Corp"),
             message = "Payment payee missing",
         )
-        assertClaimValueVisibleAfterScrolling(
-            device = device,
-            path = "transactionData[0].details.reference",
-            label = "Reference",
-            expectedValues = listOf("INV-2026-042"),
-            message = "Payment reference missing",
-        )
+        val transactionDataFields =
+            DemoTestBackend.transactionDataProfileFields("org.waltid.transaction-data.payment-authorization")
+        if ("reference" in transactionDataFields) {
+            assertClaimValueVisibleAfterScrolling(
+                device = device,
+                path = "transactionData[0].details.reference",
+                label = "Reference",
+                expectedValues = listOf("INV-2026-042"),
+                message = "Payment reference missing",
+            )
+        }
     }
 }

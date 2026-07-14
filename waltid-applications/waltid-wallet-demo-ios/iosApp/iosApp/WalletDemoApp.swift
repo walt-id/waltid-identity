@@ -23,16 +23,21 @@ struct WalletDemoApp: App {
             )
         }
         let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL")
+        let transactionDataProfilesUrl = env["TRANSACTION_DATA_PROFILES_URL"] ?? defaults.string(forKey: "TRANSACTION_DATA_PROFILES_URL")
         if let baseUrl, !baseUrl.isEmpty {
             return WalletViewModel(
                 walletID: walletID,
                 attestationBaseUrl: baseUrl,
                 attestationAttesterPath: env["ATTESTATION_ATTESTER_PATH"] ?? defaults.string(forKey: "ATTESTATION_ATTESTER_PATH"),
                 attestationBearerToken: env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN"),
-                attestationHostHeader: env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER")
+                attestationHostHeader: env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER"),
+                transactionDataProfilesUrl: transactionDataProfilesUrl
             )
         }
-        return WalletViewModel(walletID: walletID)
+        return WalletViewModel(
+            walletID: walletID,
+            transactionDataProfilesUrl: transactionDataProfilesUrl
+        )
     }()
 
     var body: some Scene {

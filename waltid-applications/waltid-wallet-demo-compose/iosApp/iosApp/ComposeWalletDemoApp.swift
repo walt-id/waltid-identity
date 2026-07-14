@@ -8,6 +8,7 @@ struct ComposeWalletDemoApp: App {
     private let attestationAttesterPath: String
     private let attestationBearerToken: String
     private let attestationHostHeader: String
+    private let transactionDataProfilesUrl: String
 
     init() {
         let env = ProcessInfo.processInfo.environment
@@ -17,6 +18,7 @@ struct ComposeWalletDemoApp: App {
         attestationAttesterPath = env["ATTESTATION_ATTESTER_PATH"] ?? defaults.string(forKey: "ATTESTATION_ATTESTER_PATH") ?? ""
         attestationBearerToken = env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? ""
         attestationHostHeader = env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? ""
+        transactionDataProfilesUrl = env["TRANSACTION_DATA_PROFILES_URL"] ?? defaults.string(forKey: "TRANSACTION_DATA_PROFILES_URL") ?? ""
     }
 
     var body: some Scene {
@@ -26,7 +28,8 @@ struct ComposeWalletDemoApp: App {
                 attestationBaseUrl: attestationBaseUrl,
                 attestationAttesterPath: attestationAttesterPath,
                 attestationBearerToken: attestationBearerToken,
-                attestationHostHeader: attestationHostHeader
+                attestationHostHeader: attestationHostHeader,
+                transactionDataProfilesUrl: transactionDataProfilesUrl
             )
             .ignoresSafeArea()
             .onOpenURL { url in

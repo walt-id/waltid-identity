@@ -31,6 +31,7 @@ private enum WalletStatusText {
     static let invalidRequestURL = "invalid request URL"
     static let selectCredentialForEveryRequest = "select a credential for every requested credential"
     static let receivedCredentialsUnavailable = "received credentials are not available locally"
+    static let transactionDataProfilesUnavailable = "Transaction data profiles could not be loaded; transaction-data presentation requests will be rejected."
 
     static func receivedCredentials(_ count: Int) -> String {
         "Received \(count) credential(s)"
@@ -65,6 +66,7 @@ class WalletViewModel: ObservableObject {
     @Published var receiveNavigationResetKey = 0
     @Published var presentationNavigationResetKey = 0
     @Published var inputFocusResetKey = 0
+    @Published var transactionDataProfilesWarning: String?
     private var statusTab: WalletTab?
 
     var receiveUrlEntryEnabled: Bool {
@@ -124,8 +126,15 @@ class WalletViewModel: ObservableObject {
         attestationAttesterPath: String? = nil,
         attestationBearerToken: String? = nil,
         attestationHostHeader: String? = nil,
+        transactionDataProfilesUrl: String? = nil,
         walletClient: (any WalletClient)? = nil
     ) {
+        let transactionDataProfiles: TransactionDataProfilesConfiguration
+        if walletClient == nil {
+            transactionDataProfiles = Self.resolveTransactionDataProfiles(from: transactionDataProfilesUrl)
+        } else {
+            transactionDataProfiles = TransactionDataProfilesConfiguration(profiles: [])
+        }
         let configuration = WalletConfiguration(
             walletID: walletID,
             attestation: Self.attestationConfiguration(
@@ -134,24 +143,106 @@ class WalletViewModel: ObservableObject {
                 bearerToken: attestationBearerToken,
                 hostHeader: attestationHostHeader
             ),
-            transactionDataProfiles: Self.demoTransactionDataProfiles
+            transactionDataProfiles: transactionDataProfiles.profiles
         )
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
+        transactionDataProfilesWarning = transactionDataProfiles.warning
         bootstrap()
     }
 
-    private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = [
-        WalletTransactionDataProfile(
-            type: "org.waltid.transaction-data.payment-authorization",
-            displayName: "Payment Authorization",
-            fields: ["amount", "currency", "payee", "reference"]
-        ),
-        WalletTransactionDataProfile(
-            type: "org.waltid.transaction-data.account-access",
-            displayName: "Account Access",
-            fields: ["account_identifier", "access_scope"]
+    private static func resolveTransactionDataProfiles(from urlString: String?) -> TransactionDataProfilesConfiguration {
+        guard let trimmed = urlString?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty,
+              let url = URL(string: trimmed) else {
+            return transactionDataProfilesUnavailable("TRANSACTION_DATA_PROFILES_URL is not configured")
+        }
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var fetchResult: Result<[WalletTransactionDataProfile], Error>?
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            defer { semaphore.signal() }
+            if let error {
+                fetchResult = .failure(error)
+                return
+            }
+
+            guard let status = (response as? HTTPURLResponse)?.statusCode else {
+                fetchResult = .failure(TransactionDataProfileFetchError.missingResponse)
+                return
+            }
+            guard (200..<300).contains(status) else {
+                fetchResult = .failure(TransactionDataProfileFetchError.httpStatus(status))
+                return
+            }
+            guard let data else {
+                fetchResult = .failure(TransactionDataProfileFetchError.missingBody)
+                return
+            }
+
+            do {
+                let profiles = try JSONDecoder().decode([RemoteTransactionDataProfile].self, from: data)
+                guard !profiles.isEmpty else {
+                    fetchResult = .failure(TransactionDataProfileFetchError.emptyProfiles)
+                    return
+                }
+                fetchResult = .success(
+                    profiles.map {
+                        WalletTransactionDataProfile(
+                            type: $0.type,
+                            displayName: $0.displayName,
+                            fields: $0.fields
+                        )
+                    }
+                )
+            } catch {
+                fetchResult = .failure(error)
+            }
+        }.resume()
+
+        guard semaphore.wait(timeout: .now() + 3) == .success else {
+            return transactionDataProfilesUnavailable("Timed out fetching transaction data profiles from \(url.absoluteString)")
+        }
+
+        switch fetchResult {
+        case .success(let profiles):
+            return TransactionDataProfilesConfiguration(profiles: profiles)
+        case .failure(let error):
+            return transactionDataProfilesUnavailable("Could not fetch transaction data profiles from \(url.absoluteString): \(error)")
+        case nil:
+            return transactionDataProfilesUnavailable("Could not fetch transaction data profiles from \(url.absoluteString)")
+        }
+    }
+
+    private static func transactionDataProfilesUnavailable(_ reason: String) -> TransactionDataProfilesConfiguration {
+        NSLog("[WalletE2E] Transaction data profiles unavailable: \(reason)")
+        return TransactionDataProfilesConfiguration(
+            profiles: [],
+            warning: WalletStatusText.transactionDataProfilesUnavailable
         )
-    ]
+    }
+
+    private struct TransactionDataProfilesConfiguration {
+        let profiles: [WalletTransactionDataProfile]
+        let warning: String?
+
+        init(profiles: [WalletTransactionDataProfile], warning: String? = nil) {
+            self.profiles = profiles
+            self.warning = warning
+        }
+    }
+
+    private struct RemoteTransactionDataProfile: Decodable {
+        let type: String
+        let displayName: String
+        let fields: [String]
+    }
+
+    private enum TransactionDataProfileFetchError: Error {
+        case emptyProfiles
+        case httpStatus(Int)
+        case missingBody
+        case missingResponse
+    }
 
     func handleDeepLink(_ url: URL) {
         resetInputFocus()

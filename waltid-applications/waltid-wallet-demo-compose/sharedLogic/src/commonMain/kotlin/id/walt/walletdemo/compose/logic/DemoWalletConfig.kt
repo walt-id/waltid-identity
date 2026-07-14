@@ -6,4 +6,5 @@ data class DemoWalletConfig(
     val attestationAttesterPath: String = "",
     val attestationBearerToken: String = "",
     val attestationHostHeader: String = "",
+    val transactionDataProfilesUrl: String = "",
 )

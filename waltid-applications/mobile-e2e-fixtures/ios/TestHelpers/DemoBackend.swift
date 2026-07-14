@@ -21,6 +21,9 @@ public struct DemoVerifierSession {
 public final class DemoBackend {
     public static let shared = DemoBackend()
     private static let eudiPidSdJwtVct = "https://issuer2.demo.walt.id/openid4vci/urn:eudi:pid:1"
+    public static let transactionDataProfilesURL = URL(string: "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles")!
+    private static let paymentAuthorizationType = "org.waltid.transaction-data.payment-authorization"
+    private static let requiredPaymentAuthorizationFields: Set<String> = ["amount", "currency", "payee"]
 
     public static let scenarios: [DemoCredentialScenario] = [
         DemoCredentialScenario(
@@ -113,10 +116,37 @@ public final class DemoBackend {
     public func createTransactionDataVerifierSession(
         scenario: DemoCredentialScenario = DemoBackend.transactionDataPresentationScenario
     ) async throws -> DemoVerifierSession {
-        try await createVerifierSession(
+        let fields = try await transactionDataProfileFields(type: Self.paymentAuthorizationType)
+        let missingFields = Self.requiredPaymentAuthorizationFields.subtracting(fields)
+        guard missingFields.isEmpty else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 305,
+                userInfo: [NSLocalizedDescriptionKey: "Public demo transaction data profile '\(Self.paymentAuthorizationType)' is missing required fields: \(missingFields.sorted().joined(separator: ", "))"]
+            )
+        }
+        return try await createVerifierSession(
             scenario: scenario,
-            transactionData: [Self.paymentAuthorizationTransactionData(credentialID: "pid")]
+            transactionData: [Self.paymentAuthorizationTransactionData(credentialID: "pid", fields: fields)]
         )
+    }
+
+    public func transactionDataProfileFields(type: String) async throws -> Set<String> {
+        let response = try await client.textRequest(
+            url: Self.transactionDataProfilesURL,
+            retryTransientFailures: true
+        )
+        let json = try JSONSerialization.jsonObject(with: Data(response.body.utf8), options: [])
+        guard let profiles = json as? [[String: Any]],
+              let profile = profiles.first(where: { $0["type"] as? String == type }),
+              let fields = profile["fields"] as? [String] else {
+            throw NSError(
+                domain: "WalletE2E",
+                code: 306,
+                userInfo: [NSLocalizedDescriptionKey: "Missing public demo transaction data profile: \(type)"]
+            )
+        }
+        return Set(fields)
     }
 
     private func createVerifierSession(
@@ -229,16 +259,25 @@ public final class DemoBackend {
         ]
     }
 
-    private static func paymentAuthorizationTransactionData(credentialID: String) -> [String: Any] {
-        [
-            "type": "org.waltid.transaction-data.payment-authorization",
+    private static func paymentAuthorizationTransactionData(credentialID: String, fields: Set<String>) -> [String: Any] {
+        var payload: [String: Any] = [
+            "type": paymentAuthorizationType,
             "credential_ids": [credentialID],
             "require_cryptographic_holder_binding": true,
             "transaction_data_hashes_alg": ["sha-256"],
-            "amount": "42.00",
-            "currency": "EUR",
-            "payee": "ACME Corp",
-            "reference": "INV-2026-042",
         ]
+        payload.putProfileField(fields: fields, key: "amount", value: "42.00")
+        payload.putProfileField(fields: fields, key: "currency", value: "EUR")
+        payload.putProfileField(fields: fields, key: "payee", value: "ACME Corp")
+        payload.putProfileField(fields: fields, key: "reference", value: "INV-2026-042")
+        return payload
+    }
+}
+
+private extension Dictionary where Key == String, Value == Any {
+    mutating func putProfileField(fields: Set<String>, key: String, value: String) {
+        if fields.contains(key) {
+            self[key] = value
+        }
     }
 }
