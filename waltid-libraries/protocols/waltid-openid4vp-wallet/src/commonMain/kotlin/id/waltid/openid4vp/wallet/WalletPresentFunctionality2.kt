@@ -327,7 +327,7 @@ object WalletPresentFunctionality2 {
         runPolicies: Boolean?,
 
         // Added from Branch B
-        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry.STANDARD,
 
         // TODO: selected credentials
 
@@ -479,29 +479,37 @@ object WalletPresentFunctionality2 {
 
         log.trace { "Wallet will try to present to AuthorizationRequest: $authorizationRequest" }
 
-        runCatching {
-            validateRequestTransactionData(
-                transactionData = authorizationRequest.transactionData,
-                typeRegistry = transactionDataTypeRegistry,
-                credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
-            )
-        }.onFailure { error ->
-            return walletRejectHandling(
-                authorizationRequest,
-                OID4VPErrorCode.INVALID_TRANSACTION_DATA,
-                error.message,
-            )
-        }
+        // Validate transaction_data - throw exception instead of calling walletRejectHandling
+        // because for validation failures we should NOT call the verifier's response_uri at all.
+        // The conformance tests expect the wallet to reject without making any network calls.
+        validateRequestTransactionData(
+            transactionData = authorizationRequest.transactionData,
+            typeRegistry = transactionDataTypeRegistry,
+            credentialQueriesById = authorizationRequest.dcqlQuery?.credentials?.associateBy { it.id },
+        )
 
         // OID4VP 1.0 §5.5: redirect_uri and response_uri are mutually exclusive.
         // When response_mode is direct_post or direct_post.jwt, only response_uri should be present.
         // Having both is an invalid request.
+        // NOTE: We throw IllegalArgumentException instead of calling walletRejectHandling because
+        // for these validation failures we should NOT call the verifier's response_uri at all.
+        // The wallet should reject the request without making any network calls to the verifier.
         if (authorizationRequest.redirectUri != null && authorizationRequest.responseUri != null) {
             log.warn { "Invalid request: both redirect_uri and response_uri are present (mutually exclusive per OID4VP §5.5)" }
-            return walletRejectHandling(
-                authorizationRequest,
-                OID4VPErrorCode.INVALID_REQUEST,
-                "redirect_uri and response_uri are mutually exclusive; both cannot be present in the same request",
+            throw IllegalArgumentException(
+                "redirect_uri and response_uri are mutually exclusive; both cannot be present in the same request"
+            )
+        }
+
+        // OID4VP 1.0 §5.5: When using direct_post or direct_post.jwt response modes,
+        // redirect_uri MUST NOT be present. These modes use response_uri exclusively.
+        // We throw instead of calling walletRejectHandling to avoid POSTing to response_uri.
+        val responseMode = authorizationRequest.responseMode
+        if (responseMode in listOf(OpenID4VPResponseMode.DIRECT_POST, OpenID4VPResponseMode.DIRECT_POST_JWT)
+            && authorizationRequest.redirectUri != null) {
+            log.warn { "Invalid request: redirect_uri present with response_mode=$responseMode (OID4VP §5.5)" }
+            throw IllegalArgumentException(
+                "redirect_uri must not be present when response_mode is $responseMode; use response_uri instead"
             )
         }
 

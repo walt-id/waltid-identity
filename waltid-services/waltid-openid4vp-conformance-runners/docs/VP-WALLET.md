@@ -20,27 +20,27 @@ This document covers **OpenID4VP Wallet** conformance testing — validating tha
 | Result | Count | Description |
 |--------|-------|-------------|
 | ✅ PASSED | 5 | Happy path tests working correctly |
-| ✅ REJECTED | 4 | Negative tests - wallet correctly rejects invalid requests |
-| ❌ FAILED | 3 | Tests that need investigation |
+| ✅ REJECTED | 6 | Negative tests - wallet correctly rejects invalid requests |
+| ❌ FAILED | 1 | Test framework limitation (alias conflict) |
 
-**Overall: 9/12 tests passing (75%)**
+**Overall: 11/12 tests passing (92%)**
 
 ### Detailed Results
 
 | # | Module | Result | Notes |
 |---|--------|--------|-------|
 | 1 | `happy-flow` | ✅ PASSED | Baseline VP flow works |
-| 2 | `alternate-happy-flow` | ❌ FAILED | Alias conflict (test plan limitation) |
+| 2 | `alternate-happy-flow` | ❌ FAILED | Alias conflict (test framework limitation) |
 | 3 | `request-uri-method-post` | ✅ PASSED | POST method works |
 | 4 | `fewer-claims-than-available` | ✅ PASSED | Selective disclosure works |
 | 5 | `optional-credential-set` | ✅ PASSED | Optional credentials work |
 | 6 | `no-claims-in-dcql-query` | ✅ PASSED | DCQL without claims works |
 | 7 | `negative-invalid-request-signature` | ✅ REJECTED | Wallet correctly rejects invalid JAR signature |
 | 8 | `negative-mismatched-client-id` | ✅ REJECTED | Wallet correctly rejects client_id mismatch |
-| 9 | `negative-redirect-uri-with-direct-post` | ❌ FAILED | **Wallet bug** - should reject but accepts |
+| 9 | `negative-redirect-uri-with-direct-post` | ✅ REJECTED | Wallet rejects `redirect_uri` with `direct_post` |
 | 10 | `negative-missing-nonce` | ✅ REJECTED | Wallet correctly rejects missing nonce |
 | 11 | `negative-invalid-client-id-prefix` | ✅ REJECTED | Wallet correctly rejects invalid prefix |
-| 12 | `negative-unknown-transaction-data-type` | ❌ FAILED | **Wallet bug** - should reject but accepts |
+| 12 | `negative-unknown-transaction-data-type` | ✅ REJECTED | Wallet rejects unknown transaction_data types |
 
 ### Component Status
 
@@ -57,8 +57,6 @@ This document covers **OpenID4VP Wallet** conformance testing — validating tha
 | Issue | Root Cause | Status |
 |-------|------------|--------|
 | Test 2 fails (alias conflict) | All modules in same plan share alias | Test framework limitation |
-| Test 9 fails | Wallet doesn't validate `redirect_uri` with `direct_post` | Wallet bug - needs fix |
-| Test 12 fails | Wallet doesn't reject unknown `transaction_data` types | Wallet bug - needs fix |
 
 ---
 
@@ -154,7 +152,7 @@ The HAIP wallet test plan (`oid4vp-1final-wallet-haip-test-plan`) includes 12 mo
 | Module | Description | Status |
 |--------|-------------|--------|
 | `happy-flow` | Baseline VP flow | ✅ PASSED |
-| `alternate-happy-flow` | Alternate request claims, longer nonce | ❌ Alias conflict |
+| `alternate-happy-flow` | Alternate request claims, longer nonce | ❌ Alias conflict (framework) |
 | `request-uri-method-post` | POST method for `request_uri` | ✅ PASSED |
 | `fewer-claims-than-available` | Selective disclosure | ✅ PASSED |
 | `optional-credential-set` | Optional credentials | ✅ PASSED |
@@ -166,10 +164,10 @@ The HAIP wallet test plan (`oid4vp-1final-wallet-haip-test-plan`) includes 12 mo
 |--------|-------------|--------|
 | `negative-invalid-request-signature` | Invalid JAR signature | ✅ REJECTED |
 | `negative-mismatched-client-id` | client_id mismatch | ✅ REJECTED |
-| `negative-redirect-uri-with-direct-post` | redirect_uri with direct_post | ❌ Wallet accepts (bug) |
+| `negative-redirect-uri-with-direct-post` | redirect_uri with direct_post | ✅ REJECTED |
 | `negative-missing-nonce` | Missing nonce | ✅ REJECTED |
 | `negative-invalid-client-id-prefix` | Invalid client_id prefix | ✅ REJECTED |
-| `negative-unknown-transaction-data-type` | Unknown transaction type | ❌ Wallet accepts (bug) |
+| `negative-unknown-transaction-data-type` | Unknown transaction type | ✅ REJECTED |
 
 ---
 
@@ -260,25 +258,31 @@ The HAIP wallet test plan (`oid4vp-1final-wallet-haip-test-plan`) includes 12 mo
 
 ---
 
-## Wallet Validation Gaps (TODO)
+## Wallet Validation Implementation
 
-The following negative tests fail because the wallet doesn't validate these conditions:
+The following validations were implemented to pass the negative tests:
 
 ### 1. redirect_uri with direct_post (Test 9)
 
-**Spec requirement:** When using `response_mode=direct_post`, the wallet MUST NOT accept a `redirect_uri` parameter.
+**Spec requirement (OID4VP §5.5):** When using `response_mode=direct_post` or `direct_post.jwt`, the wallet MUST NOT accept a `redirect_uri` parameter. These modes use `response_uri` exclusively.
 
-**Current behavior:** Wallet accepts the request anyway.
+**Implementation:** Added validation in `WalletPresentFunctionality2.kt` that throws `IllegalArgumentException` when:
+- Both `redirect_uri` and `response_uri` are present (mutually exclusive)
+- `redirect_uri` is present with `response_mode` of `direct_post` or `direct_post.jwt`
 
-**Fix needed in:** `waltid-openid4vc-wallet` - validation in authorization request parsing.
+**Key behavior:** The wallet throws an exception instead of calling `walletRejectHandling`, ensuring NO network call is made to the verifier's `response_uri`. The conformance test expects the wallet to reject *without* touching the direct_post endpoint.
 
 ### 2. Unknown transaction_data type (Test 12)
 
 **Spec requirement:** Wallet MUST reject unknown `transaction_data` types.
 
-**Current behavior:** Wallet ignores unknown types and proceeds.
+**Implementation:** 
+- Refactored `TransactionDataTypeRegistry` from `data class` to `open class` with `strictMode` parameter
+- Added `STANDARD` companion (strict mode): only allows known types (`payment_confirmation`, `qes_authorization`)
+- Added `PERMISSIVE` companion: allows all types (for backwards compatibility)
+- `validateRequestTransactionData()` now throws `IllegalArgumentException` directly instead of returning via `walletRejectHandling`
 
-**Fix needed in:** `waltid-openid4vc-wallet` - validation in transaction_data processing.
+**Key behavior:** Same as above — throws exception to ensure no network call to verifier.
 
 ---
 

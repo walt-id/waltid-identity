@@ -2,12 +2,12 @@
 
 ## Quick Reference
 
-**Current Test Status: 9/12 passing (75%)**
+**Current Test Status: 11/12 passing (92%)**
 
 | Category | Passed | Failed | Notes |
 |----------|--------|--------|-------|
-| Happy Path | 5/6 | 1 | Test 2 alias conflict |
-| Negative Tests | 4/6 | 2 | Wallet validation gaps |
+| Happy Path | 5/6 | 1 | Test 2 alias conflict (framework limitation) |
+| Negative Tests | 6/6 | 0 | All validations working ✅ |
 
 ---
 
@@ -92,7 +92,7 @@ grep "Result:" build/reports/tests/test/*/*.html
 [1/12] Running module: oid4vp-1final-wallet-happy-flow
    Result: PASSED
 [2/12] Running module: oid4vp-1final-wallet-alternate-happy-flow
-   Result: FAILED          ← Alias conflict (known issue)
+   Result: FAILED          ← Alias conflict (known framework issue)
 [3/12] Running module: oid4vp-1final-wallet-request-uri-method-post
    Result: PASSED
 [4/12] Running module: oid4vp-1final-wallet-fewer-claims-than-available
@@ -106,13 +106,13 @@ grep "Result:" build/reports/tests/test/*/*.html
 [8/12] Running module: oid4vp-1final-wallet-negative-test-mismatched-client-id
    Result: REJECTED        ← Wallet correctly rejected
 [9/12] Running module: oid4vp-1final-wallet-negative-test-redirect-uri-with-direct-post
-   Result: FAILED          ← Wallet bug - should reject
+   Result: REJECTED        ← Wallet correctly rejected (redirect_uri + direct_post)
 [10/12] Running module: oid4vp-1final-wallet-negative-test-missing-nonce
    Result: REJECTED        ← Wallet correctly rejected
 [11/12] Running module: oid4vp-1final-wallet-negative-test-invalid-client-id-prefix
    Result: REJECTED        ← Wallet correctly rejected
 [12/12] Running module: oid4vp-1final-wallet-negative-test-unknown-transaction-data-type
-   Result: FAILED          ← Wallet bug - should reject
+   Result: REJECTED        ← Wallet correctly rejected (unknown transaction_data type)
 ```
 
 ---
@@ -217,10 +217,5 @@ $JAVA_HOME/bin/keytool -import -trustcacerts -alias conformance-suite \
 
 - [ ] **Alias conflict (Test 2)**: Each module needs unique alias; currently all share one
 - [ ] Add per-module alias generation
-
-### Wallet Validation Gaps
-
-- [ ] **Test 9**: Wallet should reject `redirect_uri` with `response_mode=direct_post`
-- [ ] **Test 12**: Wallet should reject unknown `transaction_data` types
 
 See [VP-WALLET.md](VP-WALLET.md) for detailed status and architecture documentation.
