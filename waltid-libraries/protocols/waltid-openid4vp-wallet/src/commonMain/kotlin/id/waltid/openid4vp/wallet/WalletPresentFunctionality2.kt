@@ -4,39 +4,31 @@ package id.waltid.openid4vp.wallet
 
 import id.walt.credentials.formats.DigitalCredential
 import id.walt.credentials.signatures.sdjwt.SdJwtSelectiveDisclosure
-import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.keys.Key
-import id.walt.crypto.keys.jwk.JWKKey
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.crypto.utils.ShaUtils.calculateSha256Base64Url
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.RawDcqlCredential
 import id.walt.dcql.models.CredentialFormat
 import id.walt.dcql.models.DcqlQuery
 import id.walt.holderpolicies.HolderPolicy
 import id.walt.holderpolicies.HolderPolicyEngine
-import id.walt.openid4vp.clientidprefix.*
+import id.walt.openid4vp.clientidprefix.ClientIdError
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
+import id.walt.verifier.openid.transactiondata.*
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.walt.verifier.openid.transactiondata.calculateTransactionDataHashes
-import id.walt.verifier.openid.transactiondata.decodeList
-import id.walt.verifier.openid.transactiondata.resolveHashAlgorithm
-import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
-import id.walt.verifier.openid.transactiondata.validateRequestTransactionData
-import id.waltid.openid4vp.wallet.presentation.LDPPresenter
-import id.waltid.openid4vp.wallet.presentation.MdocPresenter
-import id.waltid.openid4vp.wallet.presentation.SdJwtVcPresenter
-import id.waltid.openid4vp.wallet.presentation.SelfIssuedIdTokenBuilder
-import id.waltid.openid4vp.wallet.presentation.W3CPresenter
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.buildIdToken
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.buildVpToken
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.resolveAuthorizationRequest
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.sendAuthorizationResponse
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletPresentHandling
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.walletRejectHandling
+import id.waltid.openid4vp.wallet.presentation.*
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.response.ResponseEncryption
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.call.*
-import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.util.*
@@ -48,7 +40,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import kotlin.time.Clock
-import kotlin.uuid.Uuid
 
 
 object WalletPresentFunctionality2 {
@@ -252,11 +243,6 @@ object WalletPresentFunctionality2 {
         }
     }
 
-    /**
-     * Generates a fresh wallet_nonce per OID4VP 1.0 §5.6.
-     */
-        private fun generateWalletNonce(): String = Uuid.random().toHexString()
-
     private fun buildErrorResponseParameters(
         authorizationRequest: AuthorizationRequest,
         error: String,
@@ -339,116 +325,50 @@ object WalletPresentFunctionality2 {
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
         legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
     ): AuthorizationRequest {
-        if (!presentationRequestUrl.parameters.contains("request_uri")) {
-            // Inline parameters - no network fetch needed
-            val parsedParameters = JsonObject(presentationRequestUrl.parameters.flattenEntries().associate { (k, v) ->
-                k to Json.parseToJsonElement(v)
-            })
-            return Json.decodeFromJsonElement<AuthorizationRequest>(parsedParameters)
-        }
-
-        val requestUri = presentationRequestUrl.parameters["request_uri"]!!
-        val requestUriMethod = presentationRequestUrl.parameters["request_uri_method"]
-        log.trace { "Resolving AuthorizationRequest from URI: $requestUri (method=${requestUriMethod ?: "get"})" }
-
-        val walletNonce: String? = if (requestUriMethod?.lowercase() == "post") {
-            // Per OID4VP 1.0 §5.1: if request_uri_method=post, send a POST with wallet_nonce
-            // to bind this request and prevent replay attacks.
-            // Generate a fresh, cryptographically random wallet_nonce (base64url, 128 bits).
-            generateWalletNonce()
-        } else null
-
-        val httpResponse = if (walletNonce != null) {
-            log.trace { "Sending POST to request URI with wallet_nonce (request_uri_method=post)" }
-            webResolveAuthReq.rawFetch(io.ktor.http.Url(requestUri)) {
-                method = HttpMethod.Post
-                headers.append(HttpHeaders.ContentType, ContentType.Application.FormUrlEncoded.toString())
-                headers.append(HttpHeaders.Accept, "application/oauth-authz-req+jwt")
-                setBody("wallet_nonce=${walletNonce.encodeURLQueryComponent()}")
-            }
-        } else {
-            webResolveAuthReq.rawFetch(requestUri)
-        }
-
-        check(httpResponse.status.isSuccess()) {
-            "AuthorizationRequest cannot be retrieved (${httpResponse.status}): from $requestUri - ${httpResponse.bodyAsText()}"
-        }
-
-        val contentType = httpResponse.contentType()
-            ?: throw IllegalArgumentException("AuthorizationRequest does not have HTTP ContentType header set: $requestUri")
-        log.trace { "Retrieved response has content type: $contentType" }
-
-        return when {
-            contentType.match("application/oauth-authz-req+jwt") -> {
-                val authReqJwt = httpResponse.bodyAsText()
-                require(authReqJwt.isJwt()) { "Response for AuthorizationRequest should be JWT, but is not a valid JWT" }
-                val authReqJws = authReqJwt.decodeJws()
-                val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.content
-                log.trace { "JWT AuthorizationRequest algorithm: $jwtAlg" }
-
-                if (jwtAlg.equals("none", true)) {
-                    if (unsignedRequestObjectPolicy == AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
-                        throw IllegalArgumentException(
-                            "Authorization request JWT uses alg=none - unsigned requests are not accepted for request_uri signed flows."
-                        )
-                    }
-                    Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
-                } else {
-                    val clientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull
-                    require(clientId != null) { "Missing client_id for signed AuthorizationRequest authentication" }
-                    val clientIdPrefix = ClientIdPrefixParser.parse(clientId)
-                        .getOrElse { e -> throw IllegalArgumentException("Could not parse client id prefix: $clientId", e) }
-                    val clientMetadata = authReqJws.payload["client_metadata"]?.let {
-                        ClientMetadata.fromJson(it)
-                            .getOrElse { e -> throw IllegalArgumentException("Could not parse client metadata: $it", e) }
-                    }
-                    val context = RequestContext(
-                        clientId = clientId,
-                        clientMetadata = clientMetadata,
-                        requestObjectJws = authReqJwt,
-                        redirectUri = authReqJws.payload["redirect_uri"]?.jsonPrimitive?.contentOrNull,
-                        responseUri = authReqJws.payload["response_uri"]?.jsonPrimitive?.contentOrNull,
+        return try {
+            AuthorizationRequestResolver.resolve(
+                requestUrl = presentationRequestUrl,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                fetchRequestUri = { requestUri, requestUriMethod ->
+                    AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(
+                        webResolveAuthReq = webResolveAuthReq,
+                        requestUri = requestUri,
+                        requestUriMethod = requestUriMethod,
                     )
-                    val result = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)
-                    when (result) {
-                        is ClientValidationResult.Failure -> {
-                            if (result.error is ClientIdError.PreRegisteredClientNotFound && legacyFallbackCallback != null) {
-                                val fallback = runCatching { legacyFallbackCallback(presentationRequestUrl) }
-                                if (fallback.isSuccess && fallback.getOrThrow().isSuccess) {
-                                    // Legacy path: return a minimal AuthorizationRequest so the
-                                    // caller can detect the fallback path via the result.
-                                    throw LegacyFallbackException(fallback.getOrThrow().getOrThrow())
-                                }
-                            }
-                            throw IllegalArgumentException(
-                                "Could not verify signed AuthorizationRequest with client id prefix: ${result.error::class.simpleName} - ${result.error.message}"
-                            )
-                        }
-                        is ClientValidationResult.Success -> {
-                            val decoded = Json.decodeFromJsonElement<AuthorizationRequest>(authReqJws.payload)
-                            if (walletNonce != null) {
-                                // Per OID4VP 1.0 §5.6: if wallet sent wallet_nonce, the request object
-                                // MUST contain the same value in a wallet_nonce claim.
-                                val received = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
-                                require(received == walletNonce) {
-                                    "wallet_nonce mismatch: sent '$walletNonce' but request object contains '$received'. " +
-                                        "Possible replay attack - terminating request processing."
-                                }
-                                log.trace { "wallet_nonce validated successfully" }
-                            }
-                            decoded
-                        }
-                    }
-                }
+                },
+            ).authorizationRequest.also(::validateAuthorizationRequest)
+        } catch (error: AuthorizationRequestResolver.SignedAuthorizationRequestValidationException) {
+            if (error.clientIdError is ClientIdError.PreRegisteredClientNotFound && legacyFallbackCallback != null) {
+                val fallback = legacyFallbackCallback(presentationRequestUrl)
+                if (fallback.isSuccess) throw LegacyFallbackException(fallback.getOrThrow())
             }
-            contentType.match(ContentType.Application.Json) ->
-                runCatching { httpResponse.body<AuthorizationRequest>() }.recover {
-                    throw IllegalArgumentException("Error parsing AuthorizationRequest retrieved from: $presentationRequestUrl")
-                }.getOrThrow()
-            else -> throw IllegalArgumentException(
-                "Invalid ContentType \"$contentType\" for AuthorizationRequest retrieved from \"$presentationRequestUrl\", " +
-                    "content is: ${runCatching { httpResponse.bodyAsText() }.getOrElse { "(could not read http response body)" }}"
-            )
+            throw error
+        } catch (error: IllegalArgumentException) {
+            if (legacyFallbackCallback != null) {
+                val fallback = legacyFallbackCallback(presentationRequestUrl)
+                if (fallback.isSuccess) throw LegacyFallbackException(fallback.getOrThrow())
+            }
+            throw error
+        }
+    }
+
+    private fun validateAuthorizationRequest(request: AuthorizationRequest) {
+        require(!request.clientId.isNullOrBlank()) { "Authorization Request client_id is required" }
+        require(!request.nonce.isNullOrBlank()) { "Authorization Request nonce is required" }
+        require(request.dcqlQuery != null) {
+            if (request.scope != null) {
+                "Scope-based DCQL is not configured for this wallet"
+            } else {
+                "Authorization Request must contain dcql_query"
+            }
+        }
+        if (request.responseMode in OpenID4VPResponseMode.DIRECT_POST_RESPONSES) {
+            require(request.redirectUri == null) {
+                "redirect_uri must not be present with response_mode=${request.responseMode}"
+            }
+            require(!request.responseUri.isNullOrBlank()) {
+                "response_uri is required with response_mode=${request.responseMode}"
+            }
         }
     }
 
@@ -590,20 +510,17 @@ object WalletPresentFunctionality2 {
                 requireNotNull(responseUri) {
                     "Invalid AuthorizationRequest: 'response_uri' is required for response_mode 'direct_post.jwt'."
                 }
-                val clientMetadata = authorizationRequest.clientMetadata
-                    ?: throw IllegalArgumentException("client_metadata is required for direct_post.jwt to obtain encryption keys")
-                val verifierJwkData = clientMetadata.jwks?.keys?.firstOrNull { it["use"]?.jsonPrimitive?.content == "enc" }
-                    ?: clientMetadata.jwks?.keys?.firstOrNull()
-                    ?: throw IllegalArgumentException("No suitable encryption key found in client_metadata jwks")
-                val verifierKey = JWKKey.importJWK(verifierJwkData.toString()).getOrThrow()
-                val encAlg = clientMetadata.encryptedResponseEncValuesSupported?.firstOrNull() ?: "A128GCM"
+                val encryption = requireNotNull(ResponseEncryption.resolve(authorizationRequest))
                 val vpTokenElement = Json.parseToJsonElement(vpToken)
                 val payloadJson = buildJsonObject {
                     put("vp_token", vpTokenElement)
                     idToken?.let { put("id_token", it) }
                     authorizationRequest.state?.let { put("state", JsonPrimitive(it)) }
                 }
-                val jweString = verifierKey.encryptJwe(payloadJson.toString().encodeToByteArray(), encAlg)
+                val jweString = encryption.key.encryptJwe(
+                    payloadJson.toString().encodeToByteArray(),
+                    encryption.encryptionMethod,
+                )
                 val parameters = ParametersBuilder().apply { append("response", jweString) }.build()
                 postFormResponse(responseUri, parameters)
             }
@@ -628,7 +545,7 @@ object WalletPresentFunctionality2 {
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
 
         // TODO: selected credentials
-        
+
         /**
          * Fallback for ancient legacy tests, wrong integration tests, and various other stuff that should have long been removed
          * Use: `OldWalletPresentFunctionality.oldWalletPresentHandling(walletService, presentationRequestUrl, request)` for this
@@ -662,10 +579,10 @@ object WalletPresentFunctionality2 {
         }
         require(
             authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN ||
-            authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
+                    authorizationRequest.responseType == OpenID4VPResponseType.VP_TOKEN_ID_TOKEN
         ) {
             "Unsupported response_type '${authorizationRequest.responseType}': " +
-                "only 'vp_token' and 'vp_token id_token' are supported."
+                    "only 'vp_token' and 'vp_token id_token' are supported."
         }
 
         // Step 2: Select credentials via the caller-supplied lambda.
@@ -689,7 +606,9 @@ object WalletPresentFunctionality2 {
             }
             val evalResult = HolderPolicyEngine.evaluate(relevantHolderPolicies, credentialsToEvaluate.asFlow())
             when {
-                runPolicies == null && evalResult == null -> { /* ok */ }
+                runPolicies == null && evalResult == null -> { /* ok */
+                }
+
                 runPolicies == true -> {
                     if (evalResult == HolderPolicy.HolderPolicyAction.BLOCK)
                         throw IllegalArgumentException("Presentation execution was blocked by Holder Policy.")
