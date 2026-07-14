@@ -90,12 +90,17 @@ final class WalletE2EUI {
         return false
     }
 
-    func tapButton(identifier: String, fallbackLabel: String) {
+    func tapButton(identifier: String, fallbackLabel: String, useCoordinateTap: Bool = false) {
         let targetButton = button(identifier: identifier, fallbackLabel: fallbackLabel)
         XCTAssertTrue(targetButton.waitForExistence(timeout: 20), "Button not found: \(identifier)")
         makeHittable(targetButton)
         XCTAssertTrue(targetButton.isHittable, "Button is not hittable: \(identifier)")
-        targetButton.tap()
+        XCTAssertTrue(targetButton.isEnabled, "Button is not enabled: \(identifier)")
+        if useCoordinateTap {
+            targetButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        } else {
+            targetButton.tap()
+        }
     }
 
     private func replaceText(in element: XCUIElement, value: String) {

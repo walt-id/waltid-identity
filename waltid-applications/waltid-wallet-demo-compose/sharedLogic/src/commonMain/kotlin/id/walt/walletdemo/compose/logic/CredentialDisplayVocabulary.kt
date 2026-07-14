@@ -45,6 +45,7 @@ private data class NormalizedClaimKey(val value: String) {
 
 internal object CredentialDisplayVocabulary {
     const val GenericVerifiableCredentialType = "VerifiableCredential"
+    const val RequestedDisclosuresTitle = "Requested disclosures"
 
     private const val GivenNameClaim = "given_name"
     private const val FamilyNameClaim = "family_name"
@@ -167,6 +168,13 @@ internal object CredentialDisplayVocabulary {
 
     fun humanizedClaimLabel(key: String): String =
         descriptorFor(key)?.label ?: ClaimLabelFormatter.humanize(key)
+
+    fun disclosureLabel(name: String?, path: String): String =
+        name
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::humanizedClaimLabel)
+            ?: ClaimPath.semanticLeaf(path)?.let(::humanizedClaimLabel)
+            ?: path
 
     fun roles(path: ClaimPath): Set<ClaimRole> {
         val leaf = path.leaf

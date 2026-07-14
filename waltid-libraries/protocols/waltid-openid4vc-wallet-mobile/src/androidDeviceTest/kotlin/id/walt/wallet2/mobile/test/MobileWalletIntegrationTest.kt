@@ -7,6 +7,7 @@ import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
+import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -104,6 +105,48 @@ class MobileWalletIntegrationTest {
     @Test
     fun receiveAndPresentEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
         receiveAndPresentDemoCredential("eudi-pid-mdoc")
+    }
+
+    @Test
+    fun previewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = demoPresentationScenario("eudi-pid-mdoc")
+        val client = MobileWalletFactory(context).create(walletConfig("preview-submit-${scenario.id}"))
+        val bootstrapResult = client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive ${scenario.displayName} from public demo issuer2",
+        )
+
+        val session = DemoTestBackend.createVerifierSession(scenario)
+        val preview = client.previewPresentation(session.authorizationRequestUri)
+        assertTrue(
+            preview.credentialOptions.isNotEmpty(),
+            "Should preview at least one matching credential for ${scenario.displayName}: preview=$preview",
+        )
+        assertTrue(
+            preview.credentialOptions.all { it.credentialId in credentialIds },
+            "Preview should only offer credentials received in this test: received=$credentialIds, preview=$preview",
+        )
+
+        val result = client.submitPresentation(
+            requestUrl = session.authorizationRequestUri,
+            selectedCredentialOptions = preview.credentialOptions.map { option ->
+                MobileWalletPresentationCredentialSelection(
+                    queryId = option.queryId,
+                    credentialId = option.credentialId,
+                )
+            },
+            did = bootstrapResult.did,
+        )
+        assertTrue(
+            result.success,
+            "public demo verifier2 stepwise presentation should succeed for ${scenario.displayName}: preview=$preview, result=$result",
+        )
+
+        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
     }
 
     @Test

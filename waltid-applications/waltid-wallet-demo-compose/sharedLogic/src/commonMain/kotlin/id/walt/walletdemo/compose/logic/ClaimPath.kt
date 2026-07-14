@@ -20,9 +20,37 @@ internal data class ClaimPath(
 
         fun indexed(parent: ClaimPath, index: Int): ClaimPath =
             ClaimPath(itemPath = parent.itemPath.indexedChild(index), components = parent.components)
+
+        fun disclosure(index: Int, rawPath: String, label: String): ClaimPath {
+            val semanticLeaf = semanticLeaf(rawPath)
+                ?: label.takeIf { it.isNotBlank() }
+                ?: ClaimPathRoot.Disclosures.singularId
+            return ClaimPath(
+                itemPath = ClaimItemPath.topLevel(ClaimPathRoot.Disclosures.id)
+                    .indexedChild(index)
+                    .child(semanticLeaf),
+                components = ClaimPathRoot.Disclosures.componentsWith(semanticLeaf),
+            )
+        }
+
+        fun semanticLeaf(rawPath: String): String? =
+            ClaimPathExpression.parse(rawPath).leafKey
     }
 }
 
 internal enum class ClaimPathRoot(val id: String) {
     Root("$"),
+    Disclosures("disclosures"),
+    ;
+
+    val singularId: String
+        get() = when (this) {
+            Disclosures -> "disclosure"
+            else -> id
+        }
+
+    fun componentsWith(child: String): List<String> =
+        listOf(id, child)
+            .filter { it.isNotBlank() }
+            .distinct()
 }

@@ -30,4 +30,19 @@ private class MockDemoWallet : DemoWallet {
 
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")
+
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview =
+        WalletDemoPresentationPreview(
+            verifierName = "Mock verifier",
+            clientId = "mock-verifier",
+            credentialOptions = emptyList(),
+        )
+
+    override suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoOperationResult =
+        WalletDemoOperationResult.Success("Mock presentation sent")
 }
