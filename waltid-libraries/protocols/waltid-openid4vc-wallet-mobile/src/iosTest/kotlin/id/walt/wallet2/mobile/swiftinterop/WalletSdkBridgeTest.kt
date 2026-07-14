@@ -1,7 +1,10 @@
 package id.walt.wallet2.mobile.swiftinterop
 
+import id.walt.credentials.CredentialParser
+import id.walt.credentials.examples.SdJwtExamples
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.KeyType
+import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.mobile.MobileWalletEvent
@@ -23,7 +26,9 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -108,6 +113,7 @@ class WalletSdkBridgeTest {
         assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(result)
         assertEquals("credential-1", result.value.single().id)
         assertEquals("https://issuer.example", result.value.single().issuer)
+        assertEquals("""{"given_name":"Ada"}""", result.value.single().credentialDataJson)
     }
 
     @Test
@@ -256,6 +262,48 @@ class WalletSdkBridgeTest {
         val credentialStore = persistence?.stores?.credentials
         assertEquals(true, credentialStore?.removeCredential("credential-1"))
         assertEquals(listOf("credential-1"), bridgeCredentialStore.removedCredentialIds)
+    }
+
+    @Test
+    fun swiftCredentialStorePersistsSdJwtDisclosuresForReloadableDisplay() = runTest {
+        var capturedConfig: MobileWalletConfig? = null
+        val bridgeCredentialStore = RecordingBridgeCredentialStore()
+        val factory = WalletSdkBridgeFactory.forOperationsFactory { config ->
+            capturedConfig = config
+            FakeWalletSdkBridgeOperations()
+        }
+
+        val result = factory.create(
+            WalletBridgeConfiguration(
+                walletId = "swift-sd-jwt-store-wallet",
+                persistence = WalletBridgePersistence(
+                    stores = WalletBridgeStores(credentials = bridgeCredentialStore),
+                ),
+            )
+        )
+
+        assertIs<WalletBridgeResult.Success<WalletSdkBridge>>(result)
+        val (_, parsedCredential) = CredentialParser.detectAndParse(SdJwtExamples.sdJwtVcSignedExample2)
+        val credentialStore = requireNotNull(capturedConfig)
+            .persistence
+            .stores
+            .credentials
+        requireNotNull(credentialStore).addCredential(
+            StoredCredential(
+                id = "credential-sd-jwt",
+                credential = parsedCredential,
+                label = "PID",
+            )
+        )
+
+        val bridgeEntry = bridgeCredentialStore.addedCredentials.single()
+        assertEquals(SdJwtExamples.sdJwtVcSignedExample2, bridgeEntry.serializedCredential)
+
+        val (_, reloadedCredential) = CredentialParser.detectAndParse(bridgeEntry.serializedCredential)
+        assertEquals("Inga", reloadedCredential.credentialData["given_name"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("Silverstone", reloadedCredential.credentialData["family_name"]?.jsonPrimitive?.contentOrNull)
+        assertEquals("1991-11-06", reloadedCredential.credentialData["birthdate"]?.jsonPrimitive?.contentOrNull)
+        assertFalse(reloadedCredential.credentialData.containsKey("_sd"))
     }
 
     @Test
@@ -459,6 +507,7 @@ class WalletSdkBridgeTest {
                     subject = null,
                     label = "PID",
                     addedAt = null,
+                    credentialDataJson = """{"given_name":"Ada"}""",
                 )
             )
 
@@ -497,12 +546,15 @@ class WalletSdkBridgeTest {
 
     private class RecordingBridgeCredentialStore : WalletBridgeCredentialStore {
         val removedCredentialIds = mutableListOf<String>()
+        val addedCredentials = mutableListOf<WalletBridgeStoredCredential>()
 
         override suspend fun getCredential(id: String): WalletBridgeStoredCredential? = null
 
         override suspend fun listCredentials(): List<WalletBridgeStoredCredential> = emptyList()
 
-        override suspend fun addCredential(entry: WalletBridgeStoredCredential) = Unit
+        override suspend fun addCredential(entry: WalletBridgeStoredCredential) {
+            addedCredentials += entry
+        }
 
         override suspend fun removeCredential(id: String): Boolean {
             removedCredentialIds += id

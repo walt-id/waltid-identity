@@ -60,3 +60,30 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         try XCTUnwrap(DemoBackend.presentationScenarios.first { $0.id == "eudi-pid-mdoc" })
     }
 }
+
+@MainActor
+final class MockCredentialDisplayUITests: XCTestCase {
+
+    func testMockCredentialDetailsRenderPortraitAndCredentialInfo() {
+        let app = XCUIApplication()
+        app.launchEnvironment["E2E_USE_MOCK_WALLET"] = "1"
+        let ui = WalletE2EUI(app: app)
+        ui.launch()
+
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: 30
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        let credentialCard = app.buttons["wallet.credentialCard.mock-credential"]
+        XCTAssertTrue(credentialCard.waitForExistence(timeout: 10), "Mock credential card was not shown")
+        credentialCard.tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["wallet.credentialOverview.mock-credential"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["wallet.claimGroup.Personal_details"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.images["wallet.claimImage.portrait"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["wallet.claimGroup.About_this_credential"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["No credential details available"].exists)
+    }
+}
