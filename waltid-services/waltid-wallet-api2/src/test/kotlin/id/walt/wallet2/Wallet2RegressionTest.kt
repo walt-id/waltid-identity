@@ -12,25 +12,18 @@ import id.walt.did.dids.DidService
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.handlers.ImportCredentialRequest
 import id.walt.wallet2.handlers.MatchCredentialsFromStoreRequest
 import id.walt.wallet2.handlers.MatchCredentialsResult
-import id.walt.wallet2.persistence.ExposedCredentialStore
-import id.walt.wallet2.persistence.ExposedDidStore
-import id.walt.wallet2.persistence.ExposedKeyStore
-import id.walt.wallet2.persistence.ExposedWalletStore
-import id.walt.wallet2.persistence.Wallet2PersistenceConfig
-import id.walt.wallet2.persistence.initWallet2Database
-import id.walt.wallet2.server.StoreFactory
+import id.walt.wallet2.persistence.*
 import id.walt.wallet2.server.handlers.CreateDidRequest
 import id.walt.wallet2.server.handlers.CreateWalletRequest
-import id.walt.wallet2.server.handlers.ImportCredentialRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.Url
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -70,8 +63,10 @@ class Wallet2RegressionTest {
                     contentType(ContentType.Application.Json)
                     setBody(CreateWalletRequest(keyStoreIds = listOf("does-not-exist")))
                 }.also {
-                    assertEquals(HttpStatusCode.BadRequest, it.status,
-                        "Expected 400 for missing key store, got ${it.status}: ${it.bodyAsText()}")
+                    assertEquals(
+                        HttpStatusCode.BadRequest, it.status,
+                        "Expected 400 for missing key store, got ${it.status}: ${it.bodyAsText()}"
+                    )
                 }
             }
 
@@ -80,8 +75,10 @@ class Wallet2RegressionTest {
                     contentType(ContentType.Application.Json)
                     setBody(CreateWalletRequest(credentialStoreIds = listOf("does-not-exist")))
                 }.also {
-                    assertEquals(HttpStatusCode.BadRequest, it.status,
-                        "Expected 400 for missing credential store, got ${it.status}: ${it.bodyAsText()}")
+                    assertEquals(
+                        HttpStatusCode.BadRequest, it.status,
+                        "Expected 400 for missing credential store, got ${it.status}: ${it.bodyAsText()}"
+                    )
                 }
             }
 
@@ -90,8 +87,10 @@ class Wallet2RegressionTest {
                     contentType(ContentType.Application.Json)
                     setBody(CreateWalletRequest(didStoreId = "does-not-exist"))
                 }.also {
-                    assertEquals(HttpStatusCode.BadRequest, it.status,
-                        "Expected 400 for missing DID store, got ${it.status}: ${it.bodyAsText()}")
+                    assertEquals(
+                        HttpStatusCode.BadRequest, it.status,
+                        "Expected 400 for missing DID store, got ${it.status}: ${it.bodyAsText()}"
+                    )
                 }
             }
         }
@@ -126,8 +125,10 @@ class Wallet2RegressionTest {
             testAndReturn("Create named key store - duplicate -> 409") {
                 http.post("/stores/keys/my-keys")
                     .also {
-                        assertEquals(HttpStatusCode.Conflict, it.status,
-                            "Expected 409 for duplicate store, got ${it.status}: ${it.bodyAsText()}")
+                        assertEquals(
+                            HttpStatusCode.Conflict, it.status,
+                            "Expected 409 for duplicate store, got ${it.status}: ${it.bodyAsText()}"
+                        )
                     }
             }
 
@@ -139,8 +140,10 @@ class Wallet2RegressionTest {
             testAndReturn("Create named credential store - duplicate -> 409") {
                 http.post("/stores/credentials/my-creds")
                     .also {
-                        assertEquals(HttpStatusCode.Conflict, it.status,
-                            "Expected 409 for duplicate credential store, got ${it.status}: ${it.bodyAsText()}")
+                        assertEquals(
+                            HttpStatusCode.Conflict, it.status,
+                            "Expected 409 for duplicate credential store, got ${it.status}: ${it.bodyAsText()}"
+                        )
                     }
             }
         }
@@ -193,16 +196,20 @@ class Wallet2RegressionTest {
             testAndReturn("Set second key as default -> 204") {
                 http.put("/wallet/$walletId/keys/${key2.keyId}/set-default")
                     .also {
-                        assertEquals(HttpStatusCode.NoContent, it.status,
-                            "Expected 204 for set-default key, got ${it.status}: ${it.bodyAsText()}")
+                        assertEquals(
+                            HttpStatusCode.NoContent, it.status,
+                            "Expected 204 for set-default key, got ${it.status}: ${it.bodyAsText()}"
+                        )
                     }
             }
 
             testAndReturn("Set-default with non-existing key -> 400") {
                 http.put("/wallet/$walletId/keys/nonexistent-key-id/set-default")
                     .also {
-                        assertEquals(HttpStatusCode.BadRequest, it.status,
-                            "Expected 400 for non-existing key in set-default, got ${it.status}")
+                        assertEquals(
+                            HttpStatusCode.BadRequest, it.status,
+                            "Expected 400 for non-existing key in set-default, got ${it.status}"
+                        )
                     }
             }
 
@@ -226,8 +233,10 @@ class Wallet2RegressionTest {
                 val encodedDid = did2.replace(":", "%3A")
                 http.put("/wallet/$walletId/dids/$encodedDid/set-default")
                     .also {
-                        assertEquals(HttpStatusCode.NoContent, it.status,
-                            "Expected 204 for set-default DID, got ${it.status}: ${it.bodyAsText()}")
+                        assertEquals(
+                            HttpStatusCode.NoContent, it.status,
+                            "Expected 204 for set-default DID, got ${it.status}: ${it.bodyAsText()}"
+                        )
                     }
             }
         }
@@ -241,10 +250,12 @@ class Wallet2RegressionTest {
     @Test
     fun `keys survive store-registry reset when persistence is enabled`() {
         // Use an in-memory SQLite DB so the test is fully self-contained
-        val db = initWallet2Database(Wallet2PersistenceConfig(
-            jdbcUrl = "jdbc:sqlite::memory:",
-            driverClassName = "org.sqlite.JDBC",
-        ))
+        val db = initWallet2Database(
+            Wallet2PersistenceConfig(
+                jdbcUrl = "jdbc:sqlite::memory:",
+                driverClassName = "org.sqlite.JDBC",
+            )
+        )
 
         // Wire persistence exactly as Main.kt does at startup
         OSSWallet2Service.walletStore = ExposedWalletStore(db)
@@ -283,8 +294,10 @@ class Wallet2RegressionTest {
 
             testAndReturn("Key is listed before reset") {
                 val keys = http.get("/wallet/$walletId/keys").body<List<WalletKeyInfo>>()
-                assertTrue(keys.any { it.keyId == keyId },
-                    "Generated key $keyId should be listed before reset")
+                assertTrue(
+                    keys.any { it.keyId == keyId },
+                    "Generated key $keyId should be listed before reset"
+                )
             }
 
             // Simulate a service restart by re-assigning the factories.
@@ -297,14 +310,18 @@ class Wallet2RegressionTest {
 
             testAndReturn("Key survives store-registry reset (Bug 8 regression)") {
                 val keys = http.get("/wallet/$walletId/keys").body<List<WalletKeyInfo>>()
-                assertTrue(keys.any { it.keyId == keyId },
-                    "Key $keyId should still be listed after store-registry reset")
+                assertTrue(
+                    keys.any { it.keyId == keyId },
+                    "Key $keyId should still be listed after store-registry reset"
+                )
             }
 
             testAndReturn("Wallet is still listed after reset") {
                 val wallets = http.get("/wallet").body<List<String>>()
-                assertTrue(walletId in wallets,
-                    "Wallet $walletId should still be listed after reset")
+                assertTrue(
+                    walletId in wallets,
+                    "Wallet $walletId should still be listed after reset"
+                )
             }
         }
     }
@@ -342,8 +359,8 @@ class Wallet2RegressionTest {
             // The JWT is intentionally malformed (fake signature) - we only care
             // that CredentialParser recognises the format and stores the credential.
             val rawSdJwt = "eyJhbGciOiJFZERTQSIsInR5cCI6InZjK3NkLWp3dCJ9" +
-                ".eyJzdWIiOiJkaWQ6a2V5OnRlc3QiLCJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwidmN0IjoiSWRlbnRpdHlDcmVkZW50aWFsIn0" +
-                ".sig~"
+                    ".eyJzdWIiOiJkaWQ6a2V5OnRlc3QiLCJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwidmN0IjoiSWRlbnRpdHlDcmVkZW50aWFsIn0" +
+                    ".sig~"
 
             val credentialId = testAndReturn("Import SD-JWT credential") {
                 val response = http.post("/wallet/$walletId/credentials/import") {
@@ -362,17 +379,19 @@ class Wallet2RegressionTest {
                 testAndReturn("match-credentials-from-store returns wallet ID not index") {
                     val result = http.post("/wallet/$walletId/credentials/present/match-credentials-from-store") {
                         contentType(ContentType.Application.Json)
-                        setBody(MatchCredentialsFromStoreRequest(
-                            dcqlQuery = DcqlQuery(
-                                credentials = listOf(
-                                    CredentialQuery(
-                                        id = "cred-q",
-                                        format = CredentialFormat.DC_SD_JWT,
-                                        meta = NoMeta,
+                        setBody(
+                            MatchCredentialsFromStoreRequest(
+                                dcqlQuery = DcqlQuery(
+                                    credentials = listOf(
+                                        CredentialQuery(
+                                            id = "cred-q",
+                                            format = CredentialFormat.DC_SD_JWT,
+                                            meta = NoMeta,
+                                        )
                                     )
                                 )
                             )
-                        ))
+                        )
                     }.also { assertEquals(HttpStatusCode.OK, it.status) }
                         .body<MatchCredentialsResult>()
 
@@ -382,8 +401,10 @@ class Wallet2RegressionTest {
                             !id.matches(Regex("^\\d+$")),
                             "Expected wallet-assigned UUID but got index '$id' (Bug 3 regression)"
                         )
-                        assertEquals(credentialId, id,
-                            "Matched ID should equal the wallet-assigned credential ID")
+                        assertEquals(
+                            credentialId, id,
+                            "Matched ID should equal the wallet-assigned credential ID"
+                        )
                     }
                     result
                 }
