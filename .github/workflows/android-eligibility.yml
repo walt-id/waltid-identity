@@ -1,0 +1,160 @@
+name: Android eligibility
+
+on:
+  workflow_call:
+    inputs:
+      event-name:
+        description: "Caller event name"
+        required: true
+        type: string
+      ref:
+        description: "Caller git ref"
+        required: true
+        type: string
+      pr-number:
+        description: "Pull request number, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-head-repo:
+        description: "Pull request head repository, if the caller is a PR event"
+        required: false
+        type: string
+        default: ""
+      pr-labels:
+        description: "JSON array of pull request label names"
+        required: false
+        type: string
+        default: "[]"
+      pr-draft:
+        description: "Whether the pull request is currently a draft"
+        required: false
+        type: boolean
+        default: false
+    outputs:
+      should-run:
+        description: "Whether Android jobs should run"
+        value: ${{ jobs.decide.outputs.should-run }}
+      reason:
+        description: "Human-readable decision reason"
+        value: ${{ jobs.decide.outputs.reason }}
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  decide:
+    runs-on: ubuntu-22.04
+    outputs:
+      should-run: ${{ steps.decide.outputs.should-run }}
+      reason: ${{ steps.decide.outputs.reason }}
+    steps:
+      - name: Decide whether Android jobs should run
+        id: decide
+        env:
+          EVENT_NAME: ${{ inputs.event-name }}
+          GH_TOKEN: ${{ github.token }}
+          PR_DRAFT: ${{ inputs.pr-draft }}
+          PR_HEAD_REPO: ${{ inputs.pr-head-repo }}
+          PR_LABELS: ${{ inputs.pr-labels }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          REF: ${{ inputs.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set_decision() {
+            echo "should-run=$1" >> "$GITHUB_OUTPUT"
+            echo "reason=$2" >> "$GITHUB_OUTPUT"
+          }
+
+          is_android_relevant_path() {
+            local path="$1"
+            local patterns=(
+              ".github/workflows/android-device-tests.yml"
+              ".github/workflows/android-eligibility.yml"
+              ".github/workflows/gradle.yml"
+              ".github/actions/checkout-repos/*"
+              ".github/actions/gradle-setup-action/*"
+              ".github/actions/set-properties/*"
+              ".github/scripts/mobile-ci/*android*"
+              "build-logic/*"
+              "build.gradle.kts"
+              "gradle/*"
+              "gradle.properties"
+              "gradlew"
+              "settings.gradle.kts"
+              "gradle/libs.versions.toml"
+              "*/src/commonMain/*"
+              "*/src/commonTest/*"
+              "*/src/androidMain/*"
+              "*/src/androidTest/*"
+              "*/src/androidDeviceTest/*"
+              "*/src/androidUnitTest/*"
+              "*/src/androidInstrumentedTest/*"
+              "waltid-applications/waltid-wallet-demo-compose/*"
+              "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*"
+              "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*"
+              "waltid-libraries/web/waltid-web-data-fetching/*"
+            )
+
+            for pattern in "${patterns[@]}"; do
+              if [[ "$path" == $pattern ]]; then
+                return 0
+              fi
+            done
+
+            return 1
+          }
+
+          case "$EVENT_NAME" in
+            workflow_call)
+              set_decision true "workflow call"
+              exit 0
+              ;;
+            workflow_dispatch)
+              set_decision true "manual dispatch"
+              exit 0
+              ;;
+            push)
+              if [[ "$REF" == "refs/heads/main" ]]; then
+                set_decision true "main push"
+              else
+                set_decision false "non-main branch push"
+              fi
+              exit 0
+              ;;
+            pull_request)
+              if [[ "$PR_HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
+                set_decision false "fork PR requires manual dispatch by maintainer"
+                exit 0
+              fi
+
+              if jq -e 'index("ci:android") != null' <<< "$PR_LABELS" >/dev/null; then
+                set_decision true "ci:android label"
+                exit 0
+              fi
+
+              if [[ "$PR_DRAFT" == "true" ]]; then
+                set_decision false "draft PR without ci:android label"
+                exit 0
+              fi
+
+              mapfile -t changed_files < <(
+                gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --jq '.[].filename'
+              )
+
+              for file in "${changed_files[@]}"; do
+                if is_android_relevant_path "$file"; then
+                  set_decision true "matched Android-relevant path: $file"
+                  exit 0
+                fi
+              done
+
+              set_decision false "no Android-relevant path changes or ci:android label"
+              exit 0
+              ;;
+          esac
+
+          set_decision false "unsupported event: $EVENT_NAME"
