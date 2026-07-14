@@ -1,18 +1,21 @@
 package id.waltid.openid4vci.wallet.token
 
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationHeaders
 import id.waltid.openid4vci.wallet.oauth.ClientConfiguration
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.http.*
+import io.ktor.http.content.OutgoingContent
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
-import kotlin.test.assertContains
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class TokenRequestBuilderTest {
 
@@ -29,6 +32,12 @@ class TokenRequestBuilderTest {
             install(ContentNegotiation) { json(json) }
         }
     }
+
+    private fun HttpRequestData.formParameters(): Parameters =
+        parseQueryString(bodyText())
+
+    private fun HttpRequestData.bodyText(): String =
+        (body as OutgoingContent.ByteArrayContent).bytes().decodeToString()
 
     @Test
     fun testExchangeAuthorizationCodeSuccess() = runTest {
@@ -68,7 +77,11 @@ class TokenRequestBuilderTest {
             }
         """.trimIndent()
 
-        val client = createMockClient { _ ->
+        val client = createMockClient { request ->
+            val parameters = request.formParameters()
+            assertEquals("test-client", parameters["client_id"])
+            assertEquals("pre-auth-code", parameters["pre-authorized_code"])
+
             respond(
                 content = mockResponse,
                 status = HttpStatusCode.OK,
@@ -78,6 +91,30 @@ class TokenRequestBuilderTest {
 
         val builder = TokenRequestBuilder(clientConfig, client)
         val response = builder.exchangePreAuthorizedCode(tokenEndpoint, "pre-auth-code", "123456")
+
+        assertEquals("pre-auth-token", response.access_token)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeAnonymousOmitsClientId() = runTest {
+        val client = createMockClient { request ->
+            val parameters = request.formParameters()
+            assertNull(parameters["client_id"])
+            assertEquals("pre-auth-code", parameters["pre-authorized_code"])
+
+            respond(
+                content = """{"access_token":"pre-auth-token","token_type":"Bearer"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        val response = builder.exchangePreAuthorizedCode(
+            tokenEndpoint = tokenEndpoint,
+            preAuthorizedCode = "pre-auth-code",
+            anonymous = true,
+        )
 
         assertEquals("pre-auth-token", response.access_token)
     }
@@ -120,6 +157,172 @@ class TokenRequestBuilderTest {
         )
 
         assertEquals("pre-auth-token", response.access_token)
+    }
+
+    @Test
+    fun testExchangeAuthorizationCodeForwardsAttestationHeaders() = runTest {
+        val client = createMockClient { request ->
+            assertEquals(
+                "attestation.jwt",
+                request.headers[ClientAttestationHeaders.HEADER_ATTESTATION],
+            )
+            assertEquals(
+                "pop.jwt",
+                request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP],
+            )
+            respond(
+                content = """{"access_token":"auth-token","token_type":"Bearer"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        val response = builder.exchangeAuthorizationCode(
+            tokenEndpoint = tokenEndpoint,
+            code = "auth-code",
+            attestationHeaders = ClientAttestationHeaders(
+                attestationJwt = "attestation.jwt",
+                popJwt = "pop.jwt",
+            ),
+        )
+
+        assertEquals("auth-token", response.access_token)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeForwardsAttestationHeaders() = runTest {
+        val client = createMockClient { request ->
+            val parameters = request.formParameters()
+            assertEquals("test-client", parameters["client_id"])
+            assertEquals("pre-auth-code", parameters["pre-authorized_code"])
+            assertEquals(
+                "attestation.jwt",
+                request.headers[ClientAttestationHeaders.HEADER_ATTESTATION],
+            )
+            assertEquals(
+                "pop.jwt",
+                request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP],
+            )
+            respond(
+                content = """{"access_token":"pre-auth-token","token_type":"Bearer"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        val response = builder.exchangePreAuthorizedCode(
+            tokenEndpoint = tokenEndpoint,
+            preAuthorizedCode = "pre-auth-code",
+            attestationHeaders = ClientAttestationHeaders(
+                attestationJwt = "attestation.jwt",
+                popJwt = "pop.jwt",
+            ),
+        )
+
+        assertEquals("pre-auth-token", response.access_token)
+    }
+
+    @Test
+    fun testExchangePreAuthorizedCodeAnonymousRejectsClientAuthenticationHeaders() = runTest {
+        val client = createMockClient {
+            error("Request should fail before sending")
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        assertFailsWith<IllegalArgumentException> {
+            builder.exchangePreAuthorizedCode(
+                tokenEndpoint = tokenEndpoint,
+                preAuthorizedCode = "pre-auth-code",
+                anonymous = true,
+                attestationHeaders = ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop.jwt",
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun testRefreshAccessTokenForwardsAttestationHeaders() = runTest {
+        val client = createMockClient { request ->
+            val parameters = request.formParameters()
+            assertEquals("refresh_token", parameters["grant_type"])
+            assertEquals("refresh-token", parameters["refresh_token"])
+            assertEquals("test-client", parameters["client_id"])
+            assertEquals(
+                "attestation.jwt",
+                request.headers[ClientAttestationHeaders.HEADER_ATTESTATION],
+            )
+            assertEquals(
+                "pop.jwt",
+                request.headers[ClientAttestationHeaders.HEADER_ATTESTATION_POP],
+            )
+            respond(
+                content = """{"access_token":"refreshed-token","token_type":"Bearer","refresh_token":"rotated-refresh-token"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        val response = builder.refreshAccessToken(
+            tokenEndpoint = tokenEndpoint,
+            refreshToken = "refresh-token",
+            attestationHeaders = ClientAttestationHeaders(
+                attestationJwt = "attestation.jwt",
+                popJwt = "pop.jwt",
+            ),
+        )
+
+        assertEquals("refreshed-token", response.access_token)
+        assertEquals("rotated-refresh-token", response.refresh_token)
+    }
+
+    @Test
+    fun testRefreshAccessTokenAnonymousOmitsClientId() = runTest {
+        val client = createMockClient { request ->
+            val parameters = request.formParameters()
+            assertEquals("refresh_token", parameters["grant_type"])
+            assertEquals("refresh-token", parameters["refresh_token"])
+            assertNull(parameters["client_id"])
+
+            respond(
+                content = """{"access_token":"refreshed-token","token_type":"Bearer"}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        val response = builder.refreshAccessToken(
+            tokenEndpoint = tokenEndpoint,
+            refreshToken = "refresh-token",
+            anonymous = true,
+        )
+
+        assertEquals("refreshed-token", response.access_token)
+    }
+
+    @Test
+    fun testRefreshAccessTokenAnonymousRejectsClientAuthenticationHeaders() = runTest {
+        val client = createMockClient {
+            error("Request should fail before sending")
+        }
+
+        val builder = TokenRequestBuilder(clientConfig, client)
+        assertFailsWith<IllegalArgumentException> {
+            builder.refreshAccessToken(
+                tokenEndpoint = tokenEndpoint,
+                refreshToken = "refresh-token",
+                anonymous = true,
+                attestationHeaders = ClientAttestationHeaders(
+                    attestationJwt = "attestation.jwt",
+                    popJwt = "pop.jwt",
+                ),
+            )
+        }
     }
 
     @Test

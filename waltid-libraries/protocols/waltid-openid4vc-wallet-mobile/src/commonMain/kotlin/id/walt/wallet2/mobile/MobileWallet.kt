@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Result returned after a mobile wallet has been initialized with signing material and a DID.
@@ -35,7 +36,11 @@ public data class MobileWalletBootstrapResult(
 )
 
 /**
- * Lightweight credential summary suitable for mobile UI lists.
+ * Credential entry suitable for mobile UI lists and detail display.
+ *
+ * The credential content is exposed as a JSON string so Kotlin, Swift, and other
+ * consumers can decode it with native platform tools without depending on Kotlinx
+ * JSON value types in the public mobile API.
  *
  * @property id Wallet-local credential identifier.
  * @property format Credential format, such as `jwt_vc_json`, `vc+sd-jwt`, or `mso_mdoc`.
@@ -43,6 +48,7 @@ public data class MobileWalletBootstrapResult(
  * @property subject Subject identifier extracted from the credential when available.
  * @property label Optional display label stored with the credential.
  * @property addedAt ISO-8601 timestamp string for when the credential was added, when known.
+ * @property credentialDataJson Parsed credential data encoded as JSON for app-side display.
  */
 public data class MobileWalletCredential(
     public val id: String,
@@ -51,6 +57,7 @@ public data class MobileWalletCredential(
     public val subject: String?,
     public val label: String?,
     public val addedAt: String?,
+    public val credentialDataJson: String,
 )
 
 /**
@@ -207,7 +214,7 @@ public class MobileWallet internal constructor(
     /**
      * Lists all credentials currently stored in the mobile wallet.
      *
-     * @return Credential summaries ordered by the underlying credential store.
+     * @return Credential entries, including display JSON, ordered by the underlying credential store.
      */
     public suspend fun credentials(): List<MobileWalletCredential> =
         wallet.streamAllCredentials().toList().map { credential ->
@@ -219,6 +226,7 @@ public class MobileWallet internal constructor(
                 subject = meta.subject,
                 label = meta.label,
                 addedAt = meta.addedAt?.toString(),
+                credentialDataJson = credential.credential.credentialData.encodeJsonObject(),
             )
         }
 
@@ -278,4 +286,7 @@ public class MobileWallet internal constructor(
         eventStream.tryEmit(mobileEvent)
         onEvent(mobileEvent)
     }
+
+    private fun JsonObject.encodeJsonObject(): String =
+        Json.encodeToString(JsonObject.serializer(), this)
 }

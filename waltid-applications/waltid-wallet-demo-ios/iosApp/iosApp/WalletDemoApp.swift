@@ -5,6 +5,11 @@ struct WalletDemoApp: App {
     @StateObject private var viewModel: WalletViewModel = {
         let env = ProcessInfo.processInfo.environment
         let defaults = UserDefaults.standard
+        #if DEBUG
+        if env["E2E_USE_MOCK_WALLET"] == "1" {
+            return WalletViewModel.mockForUITests()
+        }
+        #endif
         let walletID = env["E2E_WALLET_ID"] ?? defaults.string(forKey: "E2E_WALLET_ID") ?? "default"
         let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL")
         if let baseUrl, !baseUrl.isEmpty {

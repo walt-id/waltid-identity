@@ -488,18 +488,19 @@ class Wallet2ExtendedIntegrationTest {
                         .body<ResolveOfferResult>()
                 }
                 assertEquals(issuerBase, resolveResult.credentialIssuer)
+                assertEquals("$issuerBase/token", resolveResult.tokenEndpoint?.toString())
+                assertEquals(preAuthCode, resolveResult.preAuthorizedCode)
                 assertTrue(resolveResult.offeredCredentials.isNotEmpty())
 
                 // -- Isolated step 2: Request token --
                 val tokenResult = testAndReturn("Isolated: request-token") {
                     http.post("/wallet/$walletId/credentials/receive/request-token") {
                         contentType(ContentType.Application.Json)
-                        setBody(
-                            RequestTokenRequest(
-                                tokenEndpoint = Url("$issuerBase/token"),
-                                preAuthorizedCode = preAuthCode
-                            )
-                        )
+                        setBody(RequestTokenRequest(
+                            tokenEndpoint = requireNotNull(resolveResult.tokenEndpoint),
+                            credentialIssuer = resolveResult.credentialIssuer,
+                            preAuthorizedCode = requireNotNull(resolveResult.preAuthorizedCode)
+                        ))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
                         .body<RequestTokenResult>()
                 }

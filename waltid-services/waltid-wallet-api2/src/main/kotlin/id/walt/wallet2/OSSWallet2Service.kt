@@ -14,6 +14,8 @@ import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
+import id.waltid.openid4vci.wallet.attestation.GenericHttpWalletAttestationProvider
 import io.ktor.http.*
 import io.ktor.server.auth.*
 import io.ktor.server.routing.*
@@ -118,16 +120,38 @@ object OSSWallet2Service {
     }
 
     fun Route.registerRoutes() {
-        val authEnabled = FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
+        val attestationAssembler = createAttestationAssembler()
+        val authEnabled = runCatching {
+            FeatureManager.isFeatureEnabled(OSSWallet2FeatureCatalog.authFeature)
+        }.getOrElse { false }
 
         if (authEnabled) {
             authenticate("ktor-authnz") {
                 val getAccountId: suspend RoutingCall.() -> String? =
                     { runCatching { this.getAuthenticatedAccount() }.getOrNull() }
-                registerWallet2Routes(resolver, getAccountId)
+                registerWallet2Routes(
+                    resolver = resolver,
+                    getAccountId = getAccountId,
+                    attestationAssembler = attestationAssembler,
+                )
             }
         } else {
-            registerWallet2Routes(resolver, getAccountId = null)
+            registerWallet2Routes(
+                resolver = resolver,
+                getAccountId = null,
+                attestationAssembler = attestationAssembler,
+            )
         }
+    }
+
+    private fun createAttestationAssembler(): ClientAttestationAssembler? {
+        val config = ConfigManager.getConfig<OSSWallet2ServiceConfig>().attestationConfig ?: return null
+
+        return ClientAttestationAssembler(
+            GenericHttpWalletAttestationProvider(
+                attesterUrl = config.attesterUrl,
+                requestBodyTemplate = config.requestBody,
+            )
+        )
     }
 }

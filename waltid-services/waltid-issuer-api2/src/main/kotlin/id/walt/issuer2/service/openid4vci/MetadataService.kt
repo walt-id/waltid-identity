@@ -6,6 +6,8 @@ import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
+import id.walt.openid4vci.clientauth.ClientAuthenticationMethods
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.metadata.issuer.CredentialConfiguration
 import id.walt.openid4vci.metadata.issuer.CredentialIssuerMetadata
 import id.walt.openid4vci.metadata.issuer.IssuerDisplay
@@ -25,6 +27,7 @@ class MetadataService(
     metadataConfig: Issuer2MetadataConfig,
     private val profileService: CredentialProfileService,
     private val sessionService: IssuanceSessionService,
+    private val preAuthorizedGrantAnonymousAccessSupported: Boolean = false,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -32,9 +35,10 @@ class MetadataService(
         encodeDefaults = true
     }
 
-    private val baseUrl = serviceConfig.baseUrl.trimEnd('/') + "/openid4vci"
+    private val baseUrl = serviceConfig.openId4VciBaseUrl()
     private val tokenSigningKeyConfig = serviceConfig.ciTokenKey
     private val enforcePushedAuthorizationRequests = serviceConfig.enforcePushedAuthorizationRequests
+    private val supportsClientAttestation = serviceConfig.clientAttestationConfig() != null
 
     private val issuerDisplay: List<IssuerDisplay>? =
         metadataConfig.issuerDisplay
@@ -59,6 +63,13 @@ class MetadataService(
             baseUrl = baseUrl,
             pushedAuthorizationRequestEndpointPath = "/par",
             requirePushedAuthorizationRequests = enforcePushedAuthorizationRequests,
+            tokenEndpointAuthMethodsSupported =
+                if (supportsClientAttestation) setOf(ClientAuthenticationMethods.ATTEST_JWT_CLIENT_AUTH) else null,
+            clientAttestationSigningAlgValuesSupported =
+                if (supportsClientAttestation) ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS else null,
+            clientAttestationPopSigningAlgValuesSupported =
+                if (supportsClientAttestation) ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS else null,
+            preAuthorizedGrantAnonymousAccessSupported = preAuthorizedGrantAnonymousAccessSupported,
         )
 
     fun getJwtVcIssuerMetadata(): JWTVCIssuerMetadata =
