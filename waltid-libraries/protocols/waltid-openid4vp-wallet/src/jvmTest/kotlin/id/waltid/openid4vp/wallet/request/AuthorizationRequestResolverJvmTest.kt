@@ -21,6 +21,7 @@ class AuthorizationRequestResolverJvmTest {
             """.trimIndent(),
         )
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
             parameters.append("request", requestObject)
         }.build()
 
@@ -47,6 +48,7 @@ class AuthorizationRequestResolverJvmTest {
             """.trimIndent(),
         )
         val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
             parameters.append("request", requestObject)
         }.build()
 
@@ -64,8 +66,47 @@ class AuthorizationRequestResolverJvmTest {
         assertEquals(requestObject, resolved.requestObject)
     }
 
-    private fun unsignedJwt(payloadJson: String): String {
-        val header = """{"alg":"none","typ":"oauth-authz-req+jwt"}"""
+    @Test
+    fun `request object with wrong typ is rejected`() {
+        val requestObject = unsignedJwt(
+            payloadJson = """{"client_id":"verifier2","nonce":"nonce-123"}""",
+            type = "JWT",
+        )
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "verifier2")
+            parameters.append("request", requestObject)
+        }.build()
+
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ -> error("request_uri fetch should not be called") }
+            }
+        }
+    }
+
+    @Test
+    fun `outer and request object client ids must match`() {
+        val requestObject = unsignedJwt("""{"client_id":"inner","nonce":"nonce-123"}""")
+        val requestUrl = URLBuilder("openid4vp://authorize").apply {
+            parameters.append("client_id", "outer")
+            parameters.append("request", requestObject)
+        }.build()
+
+        assertFailsWith<IllegalArgumentException> {
+            runBlocking {
+                AuthorizationRequestResolver.resolve(
+                    requestUrl,
+                    AuthorizationRequestResolver.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED,
+                ) { _, _ -> error("request_uri fetch should not be called") }
+            }
+        }
+    }
+
+    private fun unsignedJwt(payloadJson: String, type: String = "oauth-authz-req+jwt"): String {
+        val header = """{"alg":"none","typ":"$type"}"""
         return listOf(header, payloadJson)
             .joinToString(".") { segment ->
                 Base64.getUrlEncoder().withoutPadding().encodeToString(segment.toByteArray())
