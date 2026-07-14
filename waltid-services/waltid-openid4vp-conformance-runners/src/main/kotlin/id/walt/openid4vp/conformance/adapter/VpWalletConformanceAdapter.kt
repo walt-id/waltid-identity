@@ -187,7 +187,8 @@ class VpWalletConformanceAdapter(
             
             if (presentResponse.status.isSuccess()) {
                 println("[Adapter] Presentation completed successfully")
-                call.respondText("Presentation complete", status = HttpStatusCode.OK)
+                // Return the wallet's response which may contain redirect_to for fragment-based flows
+                call.respond(presentResponse.status, responseBody)
             } else {
                 println("[Adapter] ERROR: Wallet API returned ${presentResponse.status}")
                 // Pass through the wallet's error response - important for negative test detection

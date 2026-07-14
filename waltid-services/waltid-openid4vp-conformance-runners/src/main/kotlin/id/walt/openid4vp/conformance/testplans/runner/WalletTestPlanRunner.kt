@@ -8,7 +8,9 @@ import io.ktor.client.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import kotlinx.serialization.json.Json
+import kotlinx.coroutines.delay
+import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Executes a single wallet conformance test plan
@@ -34,7 +36,11 @@ class WalletTestPlanRunner(
     private val conformance = ConformanceInterface(conformanceHost, conformancePort)
 
     /**
-     * Execute the test plan and return results
+     * Execute the test plan and return results.
+     * 
+     * Each module is run in its own test plan with a unique alias to avoid
+     * "alias conflict" errors from the conformance suite when one test starts
+     * before the previous one fully completes.
      */
     suspend fun test(): List<TestPlanResult> {
         println()
@@ -48,22 +54,24 @@ class WalletTestPlanRunner(
         println("  Signed request: ${testPlan.requiresSignedRequest}")
         println()
 
-        // Create test plan (response includes modules)
-        val planResponse = createTestPlan()
-        val testPlanId = planResponse.id
-        println("Test plan created: $testPlanId")
-        println("View plan: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
-
-        // Get test modules from create response
-        val modules = planResponse.modules
-        println("Test modules: ${modules.size}")
+        // First, create a "discovery" plan to get the list of modules
+        // We'll then create individual plans per module to avoid alias conflicts
+        val discoveryPlanResponse = createTestPlan(moduleIndex = 0)
+        val modules = discoveryPlanResponse.modules
+        println("Discovered ${modules.size} test modules:")
         modules.forEach { println("   - ${it.testModule}") }
         println()
 
-        // Run each module
+        // Run each module in its own test plan with unique alias
         val results = mutableListOf<TestPlanResult>()
         modules.forEachIndexed { index, module ->
             println("[${index + 1}/${modules.size}] Running module: ${module.testModule}")
+            
+            // Create a dedicated test plan for this module with unique alias
+            val modulePlanResponse = createTestPlan(moduleIndex = index + 1)
+            val testPlanId = modulePlanResponse.id
+            println("   Plan ID: $testPlanId (unique alias)")
+            println("   View: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
             
             val result = runModule(testPlanId, module)
             results.add(result)
@@ -84,8 +92,10 @@ class WalletTestPlanRunner(
     /**
      * Create test plan on conformance suite.
      * Returns the full response which includes the modules list.
+     * 
+     * @param moduleIndex Index to make the alias unique per module (0 for discovery)
      */
-    private suspend fun createTestPlan(): CreateTestPlanResponse {        
+    private suspend fun createTestPlan(moduleIndex: Int): CreateTestPlanResponse {        
         val variantJson = Json.encodeToString(testPlan.variant)
         
         val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
@@ -93,12 +103,32 @@ class WalletTestPlanRunner(
             append("variant", variantJson)
         }
         
+        // Modify configuration to use unique alias per module
+        // This prevents "alias conflict" errors when tests run sequentially
+        val configWithUniqueAlias = makeAliasUnique(testPlan.configuration, moduleIndex)
+        
         // Send configuration directly - conformance suite expects client.jwks at root level
-        val response = conformance.createTestPlan(createTestPlanUrl, testPlan.configuration)
+        val response = conformance.createTestPlan(createTestPlanUrl, configWithUniqueAlias)
         println(response)
 
         println("Created test plan: ${response.id}")
         return response
+    }
+    
+    /**
+     * Modify configuration JSON to create a completely unique alias.
+     * Uses a fresh timestamp + random suffix for each test plan to avoid
+     * "another test using the same alias" conflicts on conformance suite.
+     */
+    private fun makeAliasUnique(config: JsonObject, moduleIndex: Int): JsonObject {
+        val mutableMap = config.toMutableMap()
+        // Create completely unique alias: base_timestamp_random_moduleIndex
+        val randomSuffix = (1000..9999).random()
+        val freshTimestamp = System.currentTimeMillis()
+        val uniqueAlias = "waltid_${freshTimestamp}_${randomSuffix}_m${moduleIndex}"
+        mutableMap["alias"] = JsonPrimitive(uniqueAlias)
+        println("   Using unique alias: $uniqueAlias")
+        return JsonObject(mutableMap)
     }
 
     /**
@@ -139,6 +169,43 @@ class WalletTestPlanRunner(
             val walletResponse = conformanceHttp.get(localWalletUrl)
             println("   Wallet adapter response: ${walletResponse.status}")
             
+            // Check if wallet response contains a redirect URL that we need to follow
+            // This is needed for tests like "alternate-happy-flow" that use fragment-based redirects
+            if (walletResponse.status.isSuccess()) {
+                val responseBody = try { walletResponse.bodyAsText() } catch (_: Exception) { "" }
+                println("   Response body preview: ${responseBody.take(200)}")
+                val redirectUrl = try {
+                    val json = Json.parseToJsonElement(responseBody).jsonObject
+                    json["redirect_to"]?.jsonPrimitive?.contentOrNull
+                } catch (e: Exception) { 
+                    println("   Warning: Could not parse redirect_to: ${e.message}")
+                    null 
+                }
+                
+                if (redirectUrl != null && redirectUrl.contains("#")) {
+                    // Fragment-based redirect - browser would navigate here to complete the flow
+                    // We need to POST the fragment data to the callback URL for the test to complete
+                    println("   Following fragment redirect: ${redirectUrl.take(100)}...")
+                    
+                    // Extract the base URL and fragment
+                    val fragmentIndex = redirectUrl.indexOf('#')
+                    val baseUrl = redirectUrl.substring(0, fragmentIndex)
+                    val fragment = redirectUrl.substring(fragmentIndex + 1)
+                    
+                    // POST the fragment as 'response' form parameter to complete the callback
+                    // This simulates what the browser's JavaScript would do to deliver the fragment
+                    try {
+                        val callbackResponse = conformanceHttp.post(baseUrl) {
+                            contentType(ContentType.Application.FormUrlEncoded)
+                            setBody("response=$fragment")
+                        }
+                        println("   Callback response: ${callbackResponse.status}")
+                    } catch (e: Exception) {
+                        println("   Warning: Failed to complete redirect callback: ${e.message}")
+                    }
+                }
+            }
+            
             // Determine if this is a negative test by module name (conformance suite naming convention)
             val isNegativeTest = testPlan.expectRejection || moduleId.contains("negative-test")
             
@@ -162,6 +229,10 @@ class WalletTestPlanRunner(
                     
                 if (isValidRejection) {
                     println("   ✓ Wallet correctly rejected the invalid request")
+                    // Wait for conformance suite to finish processing before returning
+                    // This prevents alias conflicts when the next test starts
+                    println("   Waiting for conformance suite to complete...")
+                    delay(3.seconds)
                     return TestPlanResult(
                         conformanceTestId = testId,
                         conformanceResult = "REVIEW",  // Matches manual test flow expectation
@@ -202,6 +273,10 @@ class WalletTestPlanRunner(
                 else -> "UNKNOWN"
             }
 
+            // Wait a bit after each module to let the conformance suite fully release the alias
+            println("   Waiting for conformance suite to release alias...")
+            delay(2.seconds)
+            
             return TestPlanResult(
                 conformanceTestId = testId,
                 conformanceResult = conformanceResult,

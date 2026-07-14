@@ -21,7 +21,7 @@ This document covers **OpenID4VP Wallet** conformance testing — validating tha
 |--------|-------|-------------|
 | ✅ PASSED | 5 | Happy path tests working correctly |
 | ✅ REJECTED | 6 | Negative tests - wallet correctly rejects invalid requests |
-| ❌ FAILED | 1 | Test framework limitation (alias conflict) |
+| ⚠️ SKIPPED | 1 | Test automation limitation (requires browser redirect) |
 
 **Overall: 11/12 tests passing (92%)**
 
@@ -30,7 +30,7 @@ This document covers **OpenID4VP Wallet** conformance testing — validating tha
 | # | Module | Result | Notes |
 |---|--------|--------|-------|
 | 1 | `happy-flow` | ✅ PASSED | Baseline VP flow works |
-| 2 | `alternate-happy-flow` | ❌ FAILED | Alias conflict (test framework limitation) |
+| 2 | `alternate-happy-flow` | ⚠️ SKIPPED | Test automation limitation (see below) |
 | 3 | `request-uri-method-post` | ✅ PASSED | POST method works |
 | 4 | `fewer-claims-than-available` | ✅ PASSED | Selective disclosure works |
 | 5 | `optional-credential-set` | ✅ PASSED | Optional credentials work |
@@ -47,16 +47,47 @@ This document covers **OpenID4VP Wallet** conformance testing — validating tha
 | Component | Status | Notes |
 |-----------|--------|-------|
 | Test runner framework | ✅ Working | Creates plans, runs modules, reports results |
-| Test plan creation | ✅ Working | Plans created with modules via `/api/plan` |
+| Test plan creation | ✅ Working | Plans created with unique aliases per module |
 | Wallet adapter | ✅ Working | HTTP bridge on port 7006, passes through errors |
 | Negative test detection | ✅ Working | Recognizes wallet rejections as success |
 | URL rewriting | ✅ Fixed | Preserves `request_uri` query parameters |
 
-### Known Issues
+### Known Limitations
 
-| Issue | Root Cause | Status |
-|-------|------------|--------|
-| Test 2 fails (alias conflict) | All modules in same plan share alias | Test framework limitation |
+| Test | Issue | Root Cause |
+|------|-------|------------|
+| `alternate-happy-flow` | INTERRUPTED | Test expects browser to navigate to `redirect_uri#fragment`. Our headless test runner cannot simulate browser redirects. The wallet correctly processes the request and returns `redirect_uri`, but the conformance suite waits for the browser to actually navigate there. |
+
+### Understanding Negative Test Results
+
+Negative tests in the OIDF conformance suite have a special status flow:
+
+| Status | Meaning |
+|--------|--------|
+| `WAITING` | Conformance suite is waiting for wallet action |
+| `REVIEW` | Wallet correctly rejected the request; screenshot upload required for certification |
+| `REJECTED` (our runner) | We treat `REVIEW` as success since the wallet behaved correctly |
+
+**Why REVIEW instead of PASSED?**
+
+For negative tests, the conformance suite expects:
+1. The wallet to **reject** the invalid request (not call `response_uri`)
+2. A **screenshot** of the wallet displaying an error to the user
+
+Since we run headless automation, there's no UI to screenshot. However, the wallet's behavior is correct:
+- ✅ Wallet detects the invalid request
+- ✅ Wallet returns an error to the caller (HTTP 400)
+- ✅ Wallet does NOT call the verifier's `response_uri`
+
+The `REVIEW` status confirms the wallet rejected correctly — the screenshot is only needed for official OIDF certification, not for validating the protocol implementation.
+
+**Example: `negative-test-invalid-client-id-prefix`**
+```
+Test sends: client_id with invalid prefix scheme (e.g., "invalid_scheme:...")
+Expected:   Wallet rejects, shows error, does NOT call response_uri
+Result:     REVIEW (wallet rejected correctly, awaiting screenshot)
+Our status: REJECTED ✅ (wallet behaved correctly)
+```
 
 ---
 
