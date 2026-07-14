@@ -9,6 +9,9 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.wallet2.data.Wallet
+import io.ktor.http.Url
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -105,6 +108,26 @@ class WalletPresentationHandlerRequirementsTest {
                 emptyList<PresentationCredentialSelection>().requireValidPresentationCredentialSelection()
             }
         }
+    }
+
+    @Test
+    fun submitPresentationRequiresMatchingPreview() = runTest {
+        val error = assertFailsWith<MissingPresentationPreviewException> {
+            WalletPresentationHandler.submitPresentation(
+                wallet = Wallet(id = "wallet-without-preview"),
+                request = SubmitPresentationRequest(
+                    requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Frequest.jwt"),
+                    selectedCredentialOptions = listOf(
+                        PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
+                    ),
+                ),
+            )
+        }
+
+        assertEquals(
+            "Presentation request preview expired or was not found; preview the request again before submitting.",
+            error.message,
+        )
     }
 
     @Test

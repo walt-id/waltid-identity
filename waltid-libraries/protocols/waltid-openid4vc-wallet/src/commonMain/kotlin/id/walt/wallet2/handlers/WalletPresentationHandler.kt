@@ -19,12 +19,14 @@ import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
+import id.waltid.openid4vp.wallet.request.ResolvedAuthorizationRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -205,6 +207,9 @@ data class SubmitPresentationRequest(
     val runPolicies: Boolean? = null,
 )
 
+class MissingPresentationPreviewException :
+    IllegalStateException("Presentation request preview expired or was not found; preview the request again before submitting.")
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -222,6 +227,10 @@ data class SubmitPresentationRequest(
  * supported here by design.
  */
 object WalletPresentationHandler {
+    private const val MAX_PREVIEWED_AUTHORIZATION_REQUESTS = 16
+    private val authorizationRequestJson = Json { ignoreUnknownKeys = true }
+    private val previewedAuthorizationRequests = LinkedHashMap<PresentationPreviewCacheKey, ResolvedAuthorizationRequest>()
+    private val previewedAuthorizationRequestsMutex = Mutex()
 
     /**
      * Full presentation flow: resolve VP request → DCQL-match credentials
@@ -312,7 +321,9 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): PreviewPresentationResult {
         onEvent(WalletSessionEvent.presentation_request_parsed)
-        val authorizationRequest = resolveAuthorizationRequest(request.requestUrl)
+        val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
+        rememberPreviewedAuthorizationRequest(wallet, request.requestUrl, resolvedAuthorizationRequest)
+        val authorizationRequest = resolvedAuthorizationRequest.authorizationRequest
         val query = authorizationRequest.dcqlQuery ?: error("Missing dcql_query for AuthorizationRequest")
         val storedById = wallet.streamAllCredentials().toList().associateBy { it.id }
         val matched = selectFromStores(wallet, query, useWalletCredentialIds = true)
@@ -348,6 +359,7 @@ object WalletPresentationHandler {
         onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
+        val resolvedAuthorizationRequest = consumePreviewedAuthorizationRequest(wallet, request.requestUrl)
         val key = resolveKey(wallet, null)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
         val did = request.did ?: wallet.defaultDid()
@@ -359,6 +371,7 @@ object WalletPresentationHandler {
             holderKey = key,
             holderDid = did,
             presentationRequestUrl = request.requestUrl,
+            resolvedAuthorizationRequest = resolvedAuthorizationRequest,
             selectCredentialsForQuery = { query ->
                 val requirements = query.requiredCredentialRequirements()
                 require(requirements.satisfiedBy(selectedQueryIds)) {
@@ -422,14 +435,14 @@ object WalletPresentationHandler {
             val bodyText = httpResponse.bodyAsText()
             if (bodyText.trimStart().startsWith("{")) {
                 // Plain JSON request object
-                Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(bodyText)
+                authorizationRequestJson.decodeFromString<AuthorizationRequest>(bodyText)
             } else {
                 // Signed JWT — decode payload only (signature verification is handled by walletPresentHandling)
                 val jwtParts = bodyText.trim().split(".")
                 if (jwtParts.size >= 2) {
                     val paddedPayload = jwtParts[1].let { it + "=".repeat((4 - it.length % 4) % 4) }
                     val payload = paddedPayload.decodeFromBase64Url().decodeToString()
-                    Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(payload)
+                    authorizationRequestJson.decodeFromString<AuthorizationRequest>(payload)
                 } else {
                     error("Unexpected Request Object format from $requestUri")
                 }
@@ -438,7 +451,7 @@ object WalletPresentationHandler {
             // Parse inline URL parameters
             val params = url.parameters.entries().associate { (k, vs) -> k to vs.firstOrNull().orEmpty() }
             val jsonObj = buildJsonObject { params.forEach { (k, v) -> put(k, v) } }
-            Json { ignoreUnknownKeys = true }.decodeFromJsonElement<AuthorizationRequest>(jsonObj)
+            authorizationRequestJson.decodeFromJsonElement<AuthorizationRequest>(jsonObj)
         }
 
         return ResolveVpRequestResult(
@@ -688,7 +701,12 @@ object WalletPresentationHandler {
         )
     }
 
-    private suspend fun resolveAuthorizationRequest(requestUrl: Url): AuthorizationRequest {
+    private data class PresentationPreviewCacheKey(
+        val walletId: String,
+        val requestUrl: String,
+    )
+
+    private suspend fun resolveAuthorizationRequest(requestUrl: Url): ResolvedAuthorizationRequest {
         val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
         return AuthorizationRequestResolver.resolve(
             requestUrl = requestUrl,
@@ -700,8 +718,30 @@ object WalletPresentationHandler {
                     requestUriMethod = requestUriMethod,
                 )
             },
-        ).authorizationRequest
+        )
     }
+
+    private suspend fun rememberPreviewedAuthorizationRequest(
+        wallet: Wallet,
+        requestUrl: Url,
+        resolvedAuthorizationRequest: ResolvedAuthorizationRequest,
+    ) = previewedAuthorizationRequestsMutex.withLock {
+        if (previewedAuthorizationRequests.size >= MAX_PREVIEWED_AUTHORIZATION_REQUESTS) {
+            previewedAuthorizationRequests.remove(previewedAuthorizationRequests.keys.first())
+        }
+        previewedAuthorizationRequests[presentationPreviewCacheKey(wallet, requestUrl)] = resolvedAuthorizationRequest
+    }
+
+    private suspend fun consumePreviewedAuthorizationRequest(
+        wallet: Wallet,
+        requestUrl: Url,
+    ): ResolvedAuthorizationRequest =
+        previewedAuthorizationRequestsMutex.withLock {
+            previewedAuthorizationRequests.remove(presentationPreviewCacheKey(wallet, requestUrl))
+        } ?: throw MissingPresentationPreviewException()
+
+    private fun presentationPreviewCacheKey(wallet: Wallet, requestUrl: Url): PresentationPreviewCacheKey =
+        PresentationPreviewCacheKey(walletId = wallet.id, requestUrl = requestUrl.toString())
 
     private fun DcqlMatcher.DcqlMatchResult.toPresentationDisclosures(): List<PresentationDisclosure> {
         val requiredPaths = originalQuery.requiredClaimPathKeys()
