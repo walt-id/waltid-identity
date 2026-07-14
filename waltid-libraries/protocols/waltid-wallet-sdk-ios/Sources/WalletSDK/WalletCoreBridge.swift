@@ -5,6 +5,7 @@ protocol WalletCoreBridge: Sendable {
     var events: AsyncStream<WalletEvent> { get }
 
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult
+    func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
     func credentials() async throws -> [Credential]
     func deleteLocalData() async throws
@@ -31,6 +32,10 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
     }
 
     func bootstrap(keyType: WalletKeyType, didMethod: String) async throws -> WalletBootstrapResult {
+        throw unavailableError()
+    }
+
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
         throw unavailableError()
     }
 

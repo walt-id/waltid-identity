@@ -448,6 +448,19 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     }
 }
 
+/// Result of resolving a credential offer.
+public struct OfferResolution: Equatable, Sendable {
+    /// Whether the issuer requires a transaction code to complete issuance.
+    public let txCodeRequired: Bool
+
+    /// Creates an offer resolution.
+    ///
+    /// - Parameter txCodeRequired: Whether the issuer requires a transaction code.
+    public init(txCodeRequired: Bool) {
+        self.txCodeRequired = txCodeRequired
+    }
+}
+
 /// Credential metadata visible to Swift consumers.
 public struct Credential: Equatable, Identifiable, Sendable {
     /// Stable local credential identifier.

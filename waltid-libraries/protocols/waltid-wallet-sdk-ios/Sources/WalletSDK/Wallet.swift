@@ -58,6 +58,15 @@ public actor Wallet {
         )
     }
 
+    /// Resolves a credential offer and returns whether a transaction code is required.
+    ///
+    /// - Parameter offer: OpenID4VCI credential offer URL to resolve.
+    /// - Returns: Offer resolution result indicating whether a transaction code is needed.
+    /// - Throws: ``WalletError`` when the offer URL is invalid or issuer communication fails.
+    public func resolveOffer(offer: URL) async throws -> OfferResolution {
+        try await bridge.resolveOffer(offer: offer)
+    }
+
     /// Receives credentials from an OpenID4VCI credential offer URL.
     ///
     /// - Parameters:

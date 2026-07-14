@@ -445,6 +445,15 @@ private fun KeyType.toMobileWalletKeyType(): MobileWalletKeyType = when (this) {
 }
 
 /**
+ * Result of resolving a credential offer, indicating whether a transaction code is required.
+ *
+ * @property txCodeRequired Whether the issuer requires a transaction code to complete issuance.
+ */
+public data class WalletBridgeOfferResolution(
+    public val txCodeRequired: Boolean,
+)
+
+/**
  * Coarse error category for Swift bridge failures.
  */
 @Serializable

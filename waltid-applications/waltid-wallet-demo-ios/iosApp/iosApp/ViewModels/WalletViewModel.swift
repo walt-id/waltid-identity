@@ -4,6 +4,7 @@ import WalletSDK
 
 protocol WalletClient {
     func bootstrap(keyType: WalletKeyType?, didMethod: String) async throws -> WalletBootstrapResult
+    func resolveOffer(offer: URL) async throws -> OfferResolution
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
     func credentials() async throws -> [Credential]
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
@@ -20,6 +21,8 @@ class WalletViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var isError = false
     @Published var offerUrl = ""
+    @Published var txCode = ""
+    @Published var txCodeRequired = false
     @Published var presentationRequestUrl = ""
 
     private let walletFactory: () async throws -> any WalletClient
@@ -51,10 +54,42 @@ class WalletViewModel: ObservableObject {
         switch url.scheme {
         case "openid-credential-offer":
             offerUrl = url.absoluteString
+            txCode = ""
+            txCodeRequired = false
+            if isReady {
+                resolveOffer()
+            }
         case "openid4vp":
             presentationRequestUrl = url.absoluteString
         default:
             break
+        }
+    }
+
+    func resolveOffer() {
+        let trimmedOfferUrl = offerUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let offer = URL(string: trimmedOfferUrl) else {
+            setError("Receive failed: invalid offer URL")
+            return
+        }
+
+        txCode = ""
+        txCodeRequired = false
+        setLoading("Resolving offer...")
+        Task {
+            do {
+                let wallet = try await wallet()
+                let resolution = try await wallet.resolveOffer(offer: offer)
+                if resolution.txCodeRequired {
+                    txCodeRequired = true
+                    isLoading = false
+                    statusMessage = "Enter the PIN code provided by the issuer"
+                } else {
+                    await receiveWithOffer(offer, txCode: nil)
+                }
+            } catch {
+                setError("Receive failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -64,17 +99,23 @@ class WalletViewModel: ObservableObject {
             setError("Receive failed: invalid offer URL")
             return
         }
-
-        setLoading("Receiving credential...")
+        let code = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
-            do {
-                let wallet = try await wallet()
-                let credentialIDs = try await wallet.receive(offer: offer, txCode: nil, clientID: "wallet-client")
-                credentials = try await wallet.credentials()
-                setSuccess("Received \(credentialIDs.count) credential(s)")
-            } catch {
-                setError("Receive failed: \(error.localizedDescription)")
-            }
+            await receiveWithOffer(offer, txCode: code.isEmpty ? nil : code)
+        }
+    }
+
+    private func receiveWithOffer(_ offer: URL, txCode: String?) async {
+        setLoading("Receiving credential...")
+        do {
+            let wallet = try await wallet()
+            let credentialIDs = try await wallet.receive(offer: offer, txCode: txCode, clientID: "wallet-client")
+            credentials = try await wallet.credentials()
+            txCodeRequired = false
+            self.txCode = ""
+            setSuccess("Received \(credentialIDs.count) credential(s)")
+        } catch {
+            setError("Receive failed: \(error.localizedDescription)")
         }
     }
 
@@ -196,6 +237,10 @@ private final class MockWalletClient: WalletClient {
 
     func bootstrap(keyType: WalletKeyType?, didMethod: String) async throws -> WalletBootstrapResult {
         WalletBootstrapResult(keyID: "mock-key", did: "did:key:mock-wallet-demo")
+    }
+
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        OfferResolution(txCodeRequired: false)
     }
 
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
