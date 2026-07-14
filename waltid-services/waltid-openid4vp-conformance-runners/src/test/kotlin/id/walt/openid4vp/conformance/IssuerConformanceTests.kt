@@ -4,8 +4,8 @@ import id.walt.openid4vp.conformance.config.ConformanceConfig
 import id.walt.openid4vp.conformance.testplans.IssuerConformanceTestRunner
 import id.walt.openid4vp.conformance.testplans.http.ConformanceInterface
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -140,20 +140,24 @@ class IssuerConformanceTests {
     }
 
     @Test
-    fun runIssuerConformanceTests() = runTest(timeout = 10.minutes) {
-        assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable")
-        assumeTrue(isIssuerConfigured, "No credential issuer URL / enterprise issuer target configured")
+    fun runIssuerConformanceTests() {
+        runBlocking {
+            assumeTrue(isConformanceAvailable, "OpenID conformance suite is not reachable")
+            assumeTrue(isIssuerConfigured, "No credential issuer URL / enterprise issuer target configured")
 
-        IssuerConformanceTestRunner(
-            credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
-            conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
-            conformancePort = ConformanceConfig.CONFORMANCE_PORT,
-            sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
-            mdocCredentialConfigurationId = mdocCredentialConfigurationId,
-            clientAttestationIssuer = clientAttestationIssuer,
-            clientAttesterJwks = clientAttesterJwks,
-            authorizationServer = authorizationServer,
-            credentialProofTypeHint = credentialProofTypeHint,
-        ).run()
+            withTimeout(10.minutes) {
+                IssuerConformanceTestRunner(
+                    credentialIssuerUrl = requireNotNull(credentialIssuerUrl),
+                    conformanceHost = ConformanceConfig.CONFORMANCE_HOST,
+                    conformancePort = ConformanceConfig.CONFORMANCE_PORT,
+                    sdJwtCredentialConfigurationId = sdJwtCredentialConfigurationId,
+                    mdocCredentialConfigurationId = mdocCredentialConfigurationId,
+                    clientAttestationIssuer = clientAttestationIssuer,
+                    clientAttesterJwks = clientAttesterJwks,
+                    authorizationServer = authorizationServer,
+                    credentialProofTypeHint = credentialProofTypeHint,
+                ).run()
+            }
+        }
     }
 }

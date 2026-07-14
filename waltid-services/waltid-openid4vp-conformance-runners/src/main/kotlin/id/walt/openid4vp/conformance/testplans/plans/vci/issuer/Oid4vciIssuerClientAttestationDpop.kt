@@ -46,14 +46,12 @@ class Oid4vciIssuerClientAttestationDpop(
         }
     """.trimIndent()
     private val clientJwksJson = Json.decodeFromString<JsonObject>(clientJwks)
-    // OSS configuration: Use private_key_jwt instead of client_attestation
-    // For Enterprise: Change "private_key_jwt" to "client_attestation"
-    // Using pre-authorized_code for baseline happy-path testing
+    // Using pre-authorized_code for baseline happy-path testing.
     private val moduleVariant = """
         {
           "fapi_profile": "vci",
           "sender_constrain": "dpop",
-          "client_auth_type": "private_key_jwt",
+          "client_auth_type": "client_attestation",
           "vci_authorization_code_flow_variant": "wallet_initiated",
           "authorization_request_type": "simple",
           "fapi_request_method": "unsigned",
