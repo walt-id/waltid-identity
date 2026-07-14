@@ -31,8 +31,7 @@ public data class MobileWalletConfig(
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
-    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> =
-        MobileWalletTransactionDataProfile.DefaultProfiles,
+    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
 
 /**
@@ -50,25 +49,7 @@ public data class MobileWalletTransactionDataProfile(
     public val type: String,
     public val displayName: String = type,
     public val fields: List<String> = emptyList(),
-) {
-    public companion object {
-        public const val PaymentAuthorizationType: String = "org.waltid.transaction-data.payment-authorization"
-        public const val AccountAccessType: String = "org.waltid.transaction-data.account-access"
-
-        public val DefaultProfiles: List<MobileWalletTransactionDataProfile> = listOf(
-            MobileWalletTransactionDataProfile(
-                type = PaymentAuthorizationType,
-                displayName = "Payment Authorization",
-                fields = listOf("amount", "currency", "payee", "reference"),
-            ),
-            MobileWalletTransactionDataProfile(
-                type = AccountAccessType,
-                displayName = "Account Access",
-                fields = listOf("account_identifier", "access_scope"),
-            ),
-        )
-    }
-}
+)
 
 internal fun List<MobileWalletTransactionDataProfile>.toTransactionDataTypeRegistry(): TransactionDataTypeRegistry =
     TransactionDataTypeRegistry(

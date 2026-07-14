@@ -15,6 +15,7 @@ fun createAndroidDemoWallet(
                 MobileWalletConfig(
                     walletId = config.walletId,
                     attestationConfig = config.toWalletAttestationConfig(),
+                    transactionDataProfiles = DemoTransactionDataProfiles,
                 )
             )
         )

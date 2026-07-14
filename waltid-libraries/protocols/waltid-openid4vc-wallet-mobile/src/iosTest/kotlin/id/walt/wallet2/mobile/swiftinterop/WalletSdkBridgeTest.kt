@@ -484,6 +484,7 @@ class WalletSdkBridgeTest {
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
+        assertEquals(emptyList(), config.transactionDataProfiles)
     }
 
     @Test

@@ -50,8 +50,7 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
-    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> =
-        MobileWalletTransactionDataProfile.DefaultProfiles,
+    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(

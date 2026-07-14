@@ -9,6 +9,7 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -41,6 +42,19 @@ class MobileWalletIntegrationTest {
 
     companion object {
         private const val TEST_WALLET_ID = "android-device-test-wallet"
+
+        private val DEMO_TRANSACTION_DATA_PROFILES = listOf(
+            MobileWalletTransactionDataProfile(
+                type = "org.waltid.transaction-data.payment-authorization",
+                displayName = "Payment Authorization",
+                fields = listOf("amount", "currency", "payee", "reference"),
+            ),
+            MobileWalletTransactionDataProfile(
+                type = "org.waltid.transaction-data.account-access",
+                displayName = "Account Access",
+                fields = listOf("account_identifier", "access_scope"),
+            ),
+        )
     }
 
     private val context: Context
@@ -353,6 +367,7 @@ class MobileWalletIntegrationTest {
     private fun walletConfig(prefix: String) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         onEvent = { event -> println("WALLET EVENT: $event") },
+        transactionDataProfiles = DEMO_TRANSACTION_DATA_PROFILES,
     )
 
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {

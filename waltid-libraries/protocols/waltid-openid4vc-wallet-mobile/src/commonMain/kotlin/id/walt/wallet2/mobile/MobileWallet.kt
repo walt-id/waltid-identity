@@ -117,8 +117,7 @@ public class MobileWallet internal constructor(
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
-    private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> =
-        MobileWalletTransactionDataProfile.DefaultProfiles,
+    private val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {

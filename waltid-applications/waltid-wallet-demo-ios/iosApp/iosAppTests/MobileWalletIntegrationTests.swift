@@ -14,6 +14,18 @@ import WalletSDK
 final class MobileWalletIntegrationTests: XCTestCase {
 
     private let testWalletId = "ios-unit-test-wallet"
+    private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = [
+        WalletTransactionDataProfile(
+            type: "org.waltid.transaction-data.payment-authorization",
+            displayName: "Payment Authorization",
+            fields: ["amount", "currency", "payee", "reference"]
+        ),
+        WalletTransactionDataProfile(
+            type: "org.waltid.transaction-data.account-access",
+            displayName: "Account Access",
+            fields: ["account_identifier", "access_scope"]
+        )
+    ]
 
     // Timeouts (aligned with Android for cross-platform consistency)
     private let verifierPollingTimeout: TimeInterval = 30  // 30 sec - backend verification
@@ -58,7 +70,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func makeWallet(walletId: String? = nil) async throws -> Wallet {
         try await Wallet(
-            configuration: WalletConfiguration(walletID: walletId ?? testWalletId)
+            configuration: WalletConfiguration(
+                walletID: walletId ?? testWalletId,
+                transactionDataProfiles: Self.demoTransactionDataProfiles
+            )
         )
     }
 
@@ -66,7 +81,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: testWalletId,
-                persistence: persistence
+                persistence: persistence,
+                transactionDataProfiles: Self.demoTransactionDataProfiles
             )
         )
     }

@@ -776,16 +776,6 @@ final class id.walt.wallet2.mobile/MobileWalletTransactionDataProfile { // id.wa
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.toString|toString(){}[0]
-
-    final object Companion { // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion|null[0]
-        final const val AccountAccessType // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.AccountAccessType|{}AccountAccessType[0]
-            final fun <get-AccountAccessType>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.AccountAccessType.<get-AccountAccessType>|<get-AccountAccessType>(){}[0]
-        final const val PaymentAuthorizationType // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.PaymentAuthorizationType|{}PaymentAuthorizationType[0]
-            final fun <get-PaymentAuthorizationType>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.PaymentAuthorizationType.<get-PaymentAuthorizationType>|<get-PaymentAuthorizationType>(){}[0]
-
-        final val DefaultProfiles // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.DefaultProfiles|{}DefaultProfiles[0]
-            final fun <get-DefaultProfiles>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.DefaultProfiles.<get-DefaultProfiles>|<get-DefaultProfiles>(){}[0]
-    }
 }
 
 final class id.walt.wallet2.mobile/WalletAttestationConfig { // id.walt.wallet2.mobile/WalletAttestationConfig|null[0]

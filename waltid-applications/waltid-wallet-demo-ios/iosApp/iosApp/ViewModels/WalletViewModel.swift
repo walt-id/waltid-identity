@@ -133,11 +133,25 @@ class WalletViewModel: ObservableObject {
                 attesterPath: attestationAttesterPath,
                 bearerToken: attestationBearerToken,
                 hostHeader: attestationHostHeader
-            )
+            ),
+            transactionDataProfiles: Self.demoTransactionDataProfiles
         )
         self.walletClient = walletClient ?? SDKWalletClient(configuration: configuration)
         bootstrap()
     }
+
+    private static let demoTransactionDataProfiles: [WalletTransactionDataProfile] = [
+        WalletTransactionDataProfile(
+            type: "org.waltid.transaction-data.payment-authorization",
+            displayName: "Payment Authorization",
+            fields: ["amount", "currency", "payee", "reference"]
+        ),
+        WalletTransactionDataProfile(
+            type: "org.waltid.transaction-data.account-access",
+            displayName: "Account Access",
+            fields: ["account_identifier", "access_scope"]
+        )
+    ]
 
     func handleDeepLink(_ url: URL) {
         resetInputFocus()

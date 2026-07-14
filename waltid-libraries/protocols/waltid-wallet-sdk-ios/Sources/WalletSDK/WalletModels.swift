@@ -34,7 +34,7 @@ public struct WalletConfiguration: Sendable {
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
         persistence: WalletPersistence = WalletPersistence(),
-        transactionDataProfiles: [WalletTransactionDataProfile] = WalletTransactionDataProfile.defaultProfiles
+        transactionDataProfiles: [WalletTransactionDataProfile] = []
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -62,19 +62,6 @@ public struct WalletTransactionDataProfile: Equatable, Sendable {
         self.fields = fields
     }
 
-    /// walt.id demo/service transaction data profiles.
-    public static let defaultProfiles: [WalletTransactionDataProfile] = [
-        WalletTransactionDataProfile(
-            type: "org.waltid.transaction-data.payment-authorization",
-            displayName: "Payment Authorization",
-            fields: ["amount", "currency", "payee", "reference"]
-        ),
-        WalletTransactionDataProfile(
-            type: "org.waltid.transaction-data.account-access",
-            displayName: "Account Access",
-            fields: ["account_identifier", "access_scope"]
-        )
-    ]
 }
 
 /// Wallet-local persistence configuration.

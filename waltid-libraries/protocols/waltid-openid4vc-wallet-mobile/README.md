@@ -40,6 +40,8 @@ For local setup and platform build flags, see the [Mobile Wallet Development Gui
 
 Managed keys are device-local by default. They protect data at rest on the current device, but they are not a cross-device recovery mechanism. Use `MobileWalletDatabaseKey.Provided` when an app needs enterprise/KMS ownership or recoverable database-key material. Store overrides are independent: `null` credential and DID overrides use the encrypted SQLDelight database opened by this persistence configuration, while a `null` key override keeps platform-backed signing-key persistence and generation. Supported mobile platforms intentionally do not fall back to plaintext wallet databases.
 
+`MobileWalletConfig()` does not accept any OpenID4VP `transaction_data` profiles by default. Wallet apps must pass the profile types and type-specific field allow-lists they understand through `transactionDataProfiles`; requests containing unknown transaction data types or fields are rejected before the user can submit a presentation.
+
 The examples below build `MobileWalletConfig` values. Pass the selected config
 to `MobileWalletFactory(...).create(config)` from a coroutine to create the
 wallet.
