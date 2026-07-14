@@ -120,11 +120,13 @@ final class WalletAPITests: XCTestCase {
             issuer: "https://issuer.example",
             subject: "did:key:subject",
             label: "PID",
-            addedAt: nil
+            addedAt: nil,
+            credentialDataJSON: #"{"given_name":"Ada"}"#
         )
 
         acceptsSendable(credential)
         XCTAssertEqual(credential.id, "credential-1")
+        XCTAssertEqual(credential.credentialDataJSON, #"{"given_name":"Ada"}"#)
         XCTAssertEqual(credential, credential)
 
         let storedCredential = StoredCredential(
@@ -216,7 +218,8 @@ final class WalletAPITests: XCTestCase {
             issuer: "https://issuer.example",
             subject: "did:key:subject",
             label: "PID",
-            addedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            addedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            credentialDataJSON: #"{"given_name":"Ada"}"#
         )
         let bridge = FakeWalletCoreBridge()
         bridge.credentialsResult = [credential]

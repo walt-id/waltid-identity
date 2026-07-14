@@ -5,10 +5,17 @@ import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
 import id.walt.wallet2.mobile.MobileWalletConfig
+import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import org.junit.Test
 import java.util.UUID
+import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -142,6 +149,7 @@ class MobileWalletIntegrationTest {
         val client2 = MobileWalletFactory(context).create(walletConfig)
         val credentials = client2.credentials()
         assertTrue(credentials.isNotEmpty(), "public demo credential should persist across client recreation")
+        assertStoredCredentialDisplayData(scenario = DemoTestBackend.persistenceScenario, credentials = credentials)
 
         val session = DemoTestBackend.createVerifierSession(scenario)
         val presentResult = client2.present(session.authorizationRequestUri, did = bootstrapResult.did)
@@ -168,6 +176,7 @@ class MobileWalletIntegrationTest {
             credentialIds.isNotEmpty(),
             "Should receive at least one ${scenario.displayName} credential from public demo issuer2",
         )
+        assertStoredCredentialDisplayData(scenario = scenario, credentials = client.credentials())
     }
 
     private suspend fun receiveAndPresentDemoCredential(scenarioId: String) {
@@ -184,6 +193,7 @@ class MobileWalletIntegrationTest {
 
         val credentials = client.credentials()
         assertTrue(credentials.isNotEmpty(), "Should have stored ${scenario.displayName} credentials")
+        assertStoredCredentialDisplayData(scenario = scenario, credentials = credentials)
 
         val session = DemoTestBackend.createVerifierSession(scenario)
         val presentResult = client.present(session.authorizationRequestUri, did = bootstrapResult.did)
@@ -198,4 +208,53 @@ class MobileWalletIntegrationTest {
     private fun demoScenario(id: String) = DemoTestBackend.scenarios.first { it.id == id }
 
     private fun demoPresentationScenario(id: String) = DemoTestBackend.presentationScenarios.first { it.id == id }
+
+    private fun assertStoredCredentialDisplayData(
+        scenario: DemoTestBackend.CredentialScenario,
+        credentials: List<MobileWalletCredential>,
+    ) {
+        val credential = credentials.firstOrNull { it.format == scenario.format } ?: credentials.single()
+        assertEquals(scenario.format, credential.format, "${scenario.displayName} should expose the expected format")
+
+        val credentialData = displayJson.parseToJsonElement(credential.credentialDataJson)
+        assertTrue(
+            credentialData.containsAnyUserFacingClaim(),
+            "${scenario.displayName} display data should include readable user-facing claims: ${credential.credentialDataJson}",
+        )
+        assertTrue(
+            credentialData.jsonObject.keys.any { it != "_sd" },
+            "${scenario.displayName} display data should not expose only selective-disclosure commitments",
+        )
+    }
+
+    private fun JsonElement.containsAnyUserFacingClaim(): Boolean =
+        when (this) {
+            is JsonObject -> keys.any { it.normalizedClaimName() in userFacingClaimNames } ||
+                    values.any { it.containsAnyUserFacingClaim() }
+            is JsonArray -> any { it.containsAnyUserFacingClaim() }
+            else -> false
+        }
+
+    private fun String.normalizedClaimName(): String =
+        filter { it.isLetterOrDigit() }.lowercase()
+
+    private val displayJson = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
+
+    private val userFacingClaimNames = setOf(
+        "birthdate",
+        "birthplace",
+        "documentnumber",
+        "familyname",
+        "familynamebirth",
+        "givenname",
+        "nationality",
+        "portrait",
+        "residentcity",
+        "residentcountry",
+        "residentstate",
+        "residentstreet",
+    )
 }

@@ -252,7 +252,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive \
 #### Step-by-step (isolated steps)
 
 ```bash
-# Step 1: Resolve the offer - returns issuer, offered credentials, grant type
+# Step 1: Resolve the offer - returns issuer, token endpoint, offered credentials, grant type
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/resolve-offer \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\"}"
@@ -260,7 +260,11 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/reso
 # Step 2: Request an access token
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/request-token \
   -H "Content-Type: application/json" \
-  -d '{"tokenEndpoint":"https://issuer.example.com/token","preAuthorizedCode":"abc123"}'
+  -d '{
+    "tokenEndpoint": "https://issuer.example.com/token",
+    "credentialIssuer": "https://issuer.example.com",
+    "preAuthorizedCode": "abc123"
+  }'
 
 ACCESS_TOKEN="..."
 C_NONCE="..."
@@ -290,7 +294,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/fetc
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/authorization-url \
   -H "Content-Type: application/json" \
   -d "{\"offerUrl\":\"$OFFER_URL\",\"usePkce\":true}"
-# → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"..."}
+# → {"authorizationUrl":"https://issuer.example.com/authorize?...","codeVerifier":"...","state":"...","credentialIssuerBaseUrl":"https://issuer.example.com"}
 
 # (User follows authorizationUrl in a browser, then is redirected back with ?code=...)
 
@@ -298,7 +302,7 @@ curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/auth
 curl -s -X POST http://localhost:7005/wallet/$WALLET_ID/credentials/receive/exchange-code \
   -H "Content-Type: application/json" \
   -d '{
-    "tokenEndpoint": "https://issuer.example.com/token",
+    "credentialIssuerBaseUrl": "https://issuer.example.com",
     "code": "<code-from-redirect>",
     "codeVerifier": "<pkce-verifier>",
     "redirectUri": "openid://"

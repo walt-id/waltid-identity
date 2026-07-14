@@ -1,6 +1,8 @@
 package id.walt.wallet2.persistence.stores
 
 import id.walt.credentials.CredentialParser
+import id.walt.credentials.formats.DigitalCredential
+import id.walt.credentials.signatures.sdjwt.SelectivelyDisclosableVerifiableCredential
 import id.walt.wallet2.persistence.db.Credentials
 import id.walt.wallet2.persistence.db.WalletPersistenceQueries
 import id.walt.wallet2.data.StoredCredential
@@ -40,7 +42,7 @@ public class SqlDelightCredentialStore(
      * Stores a credential and its display metadata.
      */
     override suspend fun addCredential(entry: StoredCredential) {
-        val rawString = entry.credential.signed ?: entry.credential.credentialData.toString()
+        val rawString = entry.credential.serializedForWalletPersistence()
         queries.insertCredential(
             id = entry.id,
             serialized_credential = rawString,
@@ -69,3 +71,8 @@ public class SqlDelightCredentialStore(
         )
     }
 }
+
+internal fun DigitalCredential.serializedForWalletPersistence(): String =
+    (this as? SelectivelyDisclosableVerifiableCredential)?.signedWithDisclosures?.takeIf { it.isNotBlank() }
+        ?: signed?.takeIf { it.isNotBlank() }
+        ?: credentialData.toString()

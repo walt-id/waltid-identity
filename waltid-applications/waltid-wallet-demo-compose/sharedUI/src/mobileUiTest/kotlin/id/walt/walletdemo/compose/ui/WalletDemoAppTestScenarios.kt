@@ -20,6 +20,7 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletDemoSampleCredentialData
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.statusText
 import kotlin.test.assertEquals
@@ -39,6 +40,30 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
+    }
+
+    fun savedCredentialOpensCredentialDetails() = runComposeUiTest {
+        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
+        val controller = WalletDemoController(wallet)
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.credentialCard("cred-1")).performScrollTo().performClick()
+
+        onNodeWithTag(WalletUiTestTags.CredentialDetailsScreen).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.credentialDetails("cred-1")).assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimGroup("Personal details")).performScrollTo().assertIsDisplayed()
+        onNodeWithText("Given name").performScrollTo().assertIsDisplayed()
+        onNodeWithText("Ada").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimImage("portrait")).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claimGroup("About this credential")).performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.claim("system.id")).performScrollTo().assertIsDisplayed()
+
+        onNodeWithTag(WalletUiTestTags.DetailsBack).performClick()
+
+        onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
     }
 
     fun receiveFlowUpdatesStatusAndCredentialList() = runComposeUiTest {
@@ -148,8 +173,10 @@ class WalletDemoAppTestScenarios {
             id = "cred-1",
             format = "jwt_vc_json",
             issuer = "Example Issuer",
+            subject = "did:key:holder",
             label = "Example Credential",
             addedAt = "2026-06-17",
+            credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
     }
 }

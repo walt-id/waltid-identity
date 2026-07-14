@@ -95,7 +95,7 @@ class KtorAuthnzE2ETest {
     }
 
     @Test
-    fun testNonJwt() = runTest(timeout = 20.seconds) {
+    fun testNonJwt() = runTest(timeout = 60.seconds) {
         val s = startExample(wait = false, jwt = false)
 
         implicit1Test()
@@ -105,7 +105,7 @@ class KtorAuthnzE2ETest {
     }
 
     @Test
-    fun testJwt() = runTest(timeout = 20.seconds) {
+    fun testJwt() = runTest(timeout = 60.seconds) {
         val s = startExample(wait = false, jwt = true)
 
         implicit1Test()

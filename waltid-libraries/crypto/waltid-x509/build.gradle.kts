@@ -71,7 +71,7 @@ kotlin {
             implementation(identityLibs.nimbus.jose.jwt)
         }
         jsMain.dependencies {
-
+            implementation(identityLibs.signum.indispensable)
         }
         jsTest.dependencies {
             implementation(kotlin("test-js"))

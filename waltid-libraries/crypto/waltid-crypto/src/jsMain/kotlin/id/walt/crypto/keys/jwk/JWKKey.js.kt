@@ -24,9 +24,6 @@ import org.khronos.webgl.Uint8Array
 import kotlin.collections.Map
 import kotlin.collections.firstOrNull
 import kotlin.collections.joinToString
-import kotlin.collections.map
-import kotlin.collections.toPair
-import kotlin.collections.toTypedArray
 import kotlin.io.encoding.Base64
 import kotlin.js.json
 
@@ -225,13 +222,21 @@ actual class JWKKey actual constructor(
     actual override suspend fun signJws(plaintext: ByteArray, headers: Map<String, JsonElement>): String {
         check(hasPrivateKey) { "No private key is attached to this key!" }
 
-        val headerEntries = headers.entries.toTypedArray().map { it.toPair() }.toTypedArray()
+        val protectedHeader = json("alg" to keyType.jwsAlg)
+        headers.forEach { (name, value) ->
+            protectedHeader[name] = value.toJsJsonValue()
+        }
 
         return PromiseUtils.await(
             jose.CompactSign(Uint8Array(plaintext.toTypedArray()))
-                .setProtectedHeader(json("alg" to keyType.jwsAlg, *headerEntries))
+                .setProtectedHeader(protectedHeader)
                 .sign(_internalKey)
         )
+    }
+
+    private fun JsonElement.toJsJsonValue(): dynamic {
+        val serialized = Json.encodeToString(JsonElement.serializer(), this)
+        return JSON.parse<dynamic>(serialized)
     }
 
     private data class WebCryptoParams(val importAlgorithm: dynamic, val signAlgorithm: dynamic)

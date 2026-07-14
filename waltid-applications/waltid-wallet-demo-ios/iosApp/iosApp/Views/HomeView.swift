@@ -23,9 +23,18 @@ struct HomeView: View {
                 if viewModel.credentials.isEmpty {
                     Text("No credentials")
                         .foregroundColor(.secondary)
+                        .accessibilityIdentifier(WalletAccessibilityID.credentialsEmpty)
                 } else {
                     ForEach(viewModel.credentials, id: \.id) { credential in
-                        CredentialCardView(credential: credential)
+                        let details = CredentialDisplayNormalizer.details(for: credential)
+                        NavigationLink {
+                            CredentialDetailsScreen(details: details)
+                        } label: {
+                            CredentialCardView(details: details)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier(WalletAccessibilityID.credentialCard(details.id))
                     }
                 }
             }
