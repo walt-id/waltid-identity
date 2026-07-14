@@ -10,20 +10,13 @@ import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.wallet2.data.StoredCredential
 import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
-import id.walt.webdatafetching.WebDataFetcher
-import id.walt.webdatafetching.WebDataFetcherId
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
+import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentials
+import id.walt.wallet2.handlers.WalletPresentationHandler.matchCredentialsFromStore
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.put
 
 private val log = KotlinLogging.logger {}
 
@@ -32,25 +25,11 @@ private val log = KotlinLogging.logger {}
 // ---------------------------------------------------------------------------
 
 /**
- * Common contract for request types that carry a VP authorization request, either as a URL
- * or as an already-fetched JSON object. Exactly one must be non-null.
- *
- * Eliminates duplicated [requestUrl]/[requestObject] mutual-exclusivity checks and
- * [getEffectiveRequestUrl] across [PresentCredentialRequest], [PresentCredentialIsolatedRequest],
- * and [ResolveVpRequestRequest].
+ * Common contract for request types that carry an untrusted OpenID4VP request URL.
+ * Resolution and Request Object authentication always happen inside the wallet.
  */
 interface VpRequestSource {
-    val requestUrl: Url?
-    val requestObject: JsonObject?
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
-}
-
-/** Validates the mutual exclusivity of [requestUrl] and [requestObject]. Call from `init {}` blocks. */
-fun VpRequestSource.checkVpRequestSource() {
-    check(requestUrl != null || requestObject != null) { "Either requestUrl or requestObject must be provided" }
-    check(requestUrl == null || requestObject == null) { "Only one of requestUrl or requestObject may be provided, not both" }
+    val requestUrl: Url
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +39,7 @@ fun VpRequestSource.checkVpRequestSource() {
 /**
  * Input for the full presentation flow.
  *
- * Exactly one of [requestUrl] or [requestObject] must be non-null.
+ * The request is resolved and authenticated by the wallet before credentials are selected.
  */
 @Serializable
 data class PresentCredentialRequest(
@@ -69,44 +48,32 @@ data class PresentCredentialRequest(
      * May be an openid4vp:// URL with inline parameters, or an https:// URL
      * whose request_uri parameter points to the actual request object.
      */
-    override val requestUrl: Url? = null,
-
-    /**
-     * The OpenID4VP authorization request as an already-fetched JSON object.
-     * Use this when the request has been resolved out-of-band.
-     */
-    override val requestObject: JsonObject? = null,
+    override val requestUrl: Url,
 
     val keyId: String? = null,
     val did: String? = null,
     val runPolicies: Boolean? = null
-) : VpRequestSource {
-    init { checkVpRequestSource() }
-}
+) : VpRequestSource
 
 @Serializable
 data class PresentCredentialIsolatedRequest(
-    override val requestUrl: Url? = null,
-    override val requestObject: JsonObject? = null,
+    override val requestUrl: Url,
     val credentials: List<StoredCredential>,
     val keyId: String? = null,
     val did: String? = null
-) : VpRequestSource {
-    init { checkVpRequestSource() }
-}
+) : VpRequestSource
 
 // Isolated step types
 
 @Serializable
 data class ResolveVpRequestRequest(
-    override val requestUrl: Url? = null,
-    override val requestObject: JsonObject? = null
-) : VpRequestSource {
-    init { checkVpRequestSource() }
-}
+    override val requestUrl: Url,
+) : VpRequestSource
 
 @Serializable
 data class ResolveVpRequestResult(
+    /** Complete authenticated request to use for subsequent manual presentation steps. */
+    val authorizationRequest: AuthorizationRequest,
     val nonce: String?,
     val clientId: String?,
     val responseUri: Url?,
@@ -178,7 +145,7 @@ object WalletPresentationHandler {
         val result = WalletPresentFunctionality2.walletPresentHandling(
             holderKey = key,
             holderDid = did,
-            presentationRequestUrl = Url(request.getEffectiveRequestUrl()),
+            presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
                 selectFromStores(wallet, query)
@@ -223,7 +190,7 @@ object WalletPresentationHandler {
         val result = WalletPresentFunctionality2.walletPresentHandling(
             holderKey = key,
             holderDid = did,
-            presentationRequestUrl = Url(request.getEffectiveRequestUrl()),
+            presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
@@ -257,46 +224,14 @@ object WalletPresentationHandler {
      * [WalletPresentFunctionality2.walletPresentHandling].
      */
     suspend fun resolveRequest(request: ResolveVpRequestRequest): ResolveVpRequestResult {
-        val url = Url(request.getEffectiveRequestUrl())
-        val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
-
-        val authRequest: AuthorizationRequest = if (url.parameters.contains("request_uri")) {
-            val requestUri = url.parameters["request_uri"]
-                ?: error("request_uri parameter unexpectedly absent")
-            log.debug { "Fetching Request Object from request_uri: $requestUri" }
-            val httpResponse = fetcher.rawFetch(requestUri)
-
-            if (!httpResponse.status.isSuccess()) {
-                error("Failed to fetch Request Object from $requestUri: ${httpResponse.status}")
-            }
-
-            val bodyText = httpResponse.bodyAsText()
-            if (bodyText.trimStart().startsWith("{")) {
-                // Plain JSON request object
-                Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(bodyText)
-            } else {
-                // Signed JWT - decode payload only (signature verification is handled by walletPresentHandling).
-                // decodeFromBase64Url uses ABSENT_OPTIONAL padding so no manual padding is needed.
-                val jwtParts = bodyText.trim().split(".")
-                if (jwtParts.size >= 2) {
-                    val payload = jwtParts[1].decodeFromBase64Url().decodeToString()
-                    Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(payload)
-                } else {
-                    error("Unexpected Request Object format from $requestUri")
-                }
-            }
-        } else {
-            // Parse inline URL parameters
-            val params = url.parameters.entries().associate { (k, vs) -> k to vs.firstOrNull().orEmpty() }
-            val jsonObj = buildJsonObject { params.forEach { (k, v) -> put(k, v) } }
-            Json { ignoreUnknownKeys = true }.decodeFromJsonElement<AuthorizationRequest>(jsonObj)
-        }
+        val authRequest = WalletPresentFunctionality2.resolveAuthorizationRequest(request.requestUrl)
 
         return ResolveVpRequestResult(
+            authorizationRequest = authRequest,
             nonce = authRequest.nonce,
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
-            hasRequestUri = url.parameters.contains("request_uri"),
+            hasRequestUri = request.requestUrl.parameters.contains("request_uri"),
             dcqlQuery = authRequest.dcqlQuery,
         )
     }
@@ -382,19 +317,33 @@ object WalletPresentationHandler {
         val dcqlQuery = request.authorizationRequest.dcqlQuery
             ?: throw IllegalArgumentException("AuthorizationRequest has no dcql_query")
 
-        // Load selected credentials from the wallet and re-run DCQL matching to produce
-        // the DcqlMatchResult map that WalletPresentFunctionality2 expects. Running the full
-        // DCQL match on only the user-selected credentials ensures correct selective-disclosure
-        // claim selection without reconstructing DcqlMatchResult manually.
-        val allSelectedIds = request.selectedCredentialIds.values.flatten().toSet()
-        val selectedCredentials = allSelectedIds.map { credId ->
-            wallet.findCredential(credId)
-                ?: throw IllegalArgumentException("Credential '$credId' not found in wallet")
+        val queriesById = dcqlQuery.credentials.associateBy { it.id }
+        val unknownQueryIds = request.selectedCredentialIds.keys - queriesById.keys
+        require(unknownQueryIds.isEmpty()) { "Unknown DCQL query IDs selected: $unknownQueryIds" }
+        require(request.selectedCredentialIds.isNotEmpty()) { "No credentials selected" }
+
+        val matchedCredentials = request.selectedCredentialIds.mapValues { (queryId, credentialIds) ->
+            val query = requireNotNull(queriesById[queryId])
+            require(credentialIds.isNotEmpty()) { "No credentials selected for DCQL query '$queryId'" }
+            require(query.multiple || credentialIds.size == 1) {
+                "DCQL query '$queryId' does not allow multiple credentials"
+            }
+
+            val selectedCredentials = credentialIds.distinct().map { credentialId ->
+                wallet.findCredential(credentialId)
+                    ?: throw IllegalArgumentException("Credential '$credentialId' not found in wallet")
+            }
+            val matches = DcqlMatcher.match(
+                query = DcqlQuery(credentials = listOf(query)),
+                availableCredentials = selectedCredentials.map { stored ->
+                    stored.credential.toRawDcqlCredential(stored.id)
+                },
+            ).getOrThrow()[queryId].orEmpty()
+            require(matches.size == selectedCredentials.size) {
+                "One or more selected credentials do not satisfy DCQL query '$queryId'"
+            }
+            matches
         }
-        val rawCredentials = selectedCredentials.map { stored ->
-            stored.credential.toRawDcqlCredential(stored.id)
-        }
-        val matchedCredentials = DcqlMatcher.match(dcqlQuery, rawCredentials).getOrThrow()
 
         val vpToken = WalletPresentFunctionality2.buildVpToken(
             authorizationRequest = request.authorizationRequest,
