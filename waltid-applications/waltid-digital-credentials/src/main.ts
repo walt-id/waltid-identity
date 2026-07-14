@@ -6,7 +6,7 @@ const VERIFIER_PRESETS = {
     // verifierBase: '/'
   },
   enterprise: {
-    verifierBase: 'https://waltid.enterprise.test.waltid.cloud/v1/waltid.tenant1.verifier2/verifier2-service-api',
+    verifierBase: 'https://waltid.enterprise.test.waltid.cloud/v2/waltid.tenant1.verifier2/verifier-service-api',
     openApiUrl: 'https://waltid.enterprise.test.waltid.cloud/api.json'
   }
 } as const;
