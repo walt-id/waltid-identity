@@ -2,21 +2,20 @@ package id.walt.wallet2
 
 import id.walt.commons.config.ConfigManager
 import id.walt.commons.testing.E2ETest
-import id.walt.did.dids.DidService
-import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.crypto.keys.KeyType
 import id.walt.crypto.keys.TypedKeyGenerationRequest
-import id.walt.wallet2.server.handlers.ImportCredentialRequest
+import id.walt.did.dids.DidService
+import id.walt.wallet2.data.StoredCredentialMetadata
+import id.walt.wallet2.data.WalletDidEntry
+import id.walt.wallet2.data.WalletKeyInfo
+import id.walt.wallet2.handlers.ImportCredentialRequest
+import id.walt.wallet2.server.handlers.CreateWalletRequest
 import id.walt.wallet2.server.handlers.WalletCreatedResponse
 import id.walt.wallet2.server.handlers.WalletInfoResponse
-import id.walt.wallet2.data.StoredCredentialMetadata
-import id.walt.wallet2.data.WalletKeyInfo
-import id.walt.wallet2.data.WalletDidEntry
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
-import io.ktor.http.Url
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -115,7 +114,8 @@ class Wallet2IntegrationTest {
             }
 
             // 7. Import a raw credential
-            val rawJwt = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6a2V5OnRlc3QiLCJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJpZCI6ImRpZDprZXk6dGVzdCJ9fX0.signature"
+            val rawJwt =
+                "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6a2V5OnRlc3QiLCJpc3MiOiJodHRwczovL2V4YW1wbGUuY29tIiwidmMiOnsiQGNvbnRleHQiOlsiaHR0cHM6Ly93d3cudzMub3JnLzIwMTgvY3JlZGVudGlhbHMvdjEiXSwidHlwZSI6WyJWZXJpZmlhYmxlQ3JlZGVudGlhbCJdLCJjcmVkZW50aWFsU3ViamVjdCI6eyJpZCI6ImRpZDprZXk6dGVzdCJ9fX0.signature"
             testAndReturn("Import credential") {
                 http.post("/wallet/$walletId/credentials/import") {
                     contentType(ContentType.Application.Json)
