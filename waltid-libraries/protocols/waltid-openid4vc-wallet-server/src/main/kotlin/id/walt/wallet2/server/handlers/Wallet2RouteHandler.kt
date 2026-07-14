@@ -1,13 +1,11 @@
 package id.walt.wallet2.server.handlers
 
-import id.walt.credentials.CredentialParser
 import id.walt.crypto.keys.KeyManager
 import id.walt.crypto.keys.TypedKeyGenerationRequest
 import id.walt.did.dids.DidService
 import id.walt.wallet2.data.*
 import id.walt.wallet2.handlers.*
 import id.walt.wallet2.server.WalletResolver
-import id.walt.wallet2.server.handlers.Wallet2RouteHandler.registerWallet2Routes
 import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,7 +23,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 private val log = KotlinLogging.logger {}
@@ -146,7 +143,8 @@ object Wallet2RouteHandler {
             // so we can validate them before calling resolveKeyStore() (which uses computeIfAbsent
             // and would silently create a new store for any unknown ID instead of rejecting it).
             val registeredKeyStoreIds = if (req.keyStoreIds != null) resolver.listKeyStoreIds().toList() else emptyList()
-            val registeredCredentialStoreIds = if (req.credentialStoreIds != null) resolver.listCredentialStoreIds().toList() else emptyList()
+            val registeredCredentialStoreIds =
+                if (req.credentialStoreIds != null) resolver.listCredentialStoreIds().toList() else emptyList()
             val registeredDidStoreIds = if (req.didStoreId != null) resolver.listDidStoreIds().toList() else emptyList()
 
             val keyStores: List<WalletKeyStore> = when {
@@ -168,7 +166,8 @@ object Wallet2RouteHandler {
                         requireNotNull(resolver.resolveCredentialStore(storeId)) { "Credential store '$storeId' disappeared between validation and use" }
                     }
 
-                else -> listOf(resolver.credentialStoreFactory("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
+                else -> listOf(
+                    resolver.credentialStoreFactory("$id-credentials").also { resolver.storeCredentialStore("$id-credentials", it) })
             }
 
             val didStore: WalletDidStore? = when {
@@ -177,6 +176,7 @@ object Wallet2RouteHandler {
                     require(req.didStoreId in registeredDidStoreIds) { "DID store '${req.didStoreId}' not found" }
                     resolver.resolveDidStore(req.didStoreId)
                 }
+
                 req.staticDid != null -> null
                 else -> resolver.didStoreFactory("$id-dids").also { resolver.storeDidStore("$id-dids", it) }
             }
@@ -683,10 +683,10 @@ object Wallet2RouteHandler {
                         summary = "Build VP token from selected credentials"
                         description =
                             "Step 3 of the manual presentation flow. " +
-                            "Takes the resolved authorization request (from /resolve-request) and the " +
-                            "credential IDs selected by the user (from /match-credentials-from-store), " +
-                            "then builds and signs the vp_token. " +
-                            "Pass the result to /send-response to complete the flow."
+                                    "Takes the resolved authorization request (from /resolve-request) and the " +
+                                    "credential IDs selected by the user (from /match-credentials-from-store), " +
+                                    "then builds and signs the vp_token. " +
+                                    "Pass the result to /send-response to complete the flow."
                         request { pathParameter<String>("walletId"); body<BuildVpTokenRequest>() }
                         response { HttpStatusCode.OK to { body<BuildVpTokenResult>() } }
                     }) {
@@ -699,8 +699,8 @@ object Wallet2RouteHandler {
                         summary = "Send authorization response to the verifier"
                         description =
                             "Step 4 of the manual presentation flow. " +
-                            "Transmits the vp_token (from /build-vp-token) to the verifier " +
-                            "according to the response_mode in the authorization request."
+                                    "Transmits the vp_token (from /build-vp-token) to the verifier " +
+                                    "according to the response_mode in the authorization request."
                         request { pathParameter<String>("walletId"); body<SendAuthorizationResponseRequest>() }
                         response { HttpStatusCode.OK to { body<WalletPresentResult>() } }
                     }) {
