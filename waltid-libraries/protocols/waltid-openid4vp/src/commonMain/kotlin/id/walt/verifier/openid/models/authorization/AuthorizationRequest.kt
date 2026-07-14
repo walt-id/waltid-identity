@@ -157,8 +157,13 @@ data class AuthorizationRequest(
     val expectedOrigins: List<String>? = null,
 
     /**
-     * REQUIRED in signed Authorization Request Objects. Per JAR/OID4VP, this
-     * identifies the Verifier issuing the request object and matches client_id.
+     * Optional under OID4VP, Recommended under JAR. 
+     * OpenID4VP says client_id is required and iss is redundant
+     *    iss MAY be present in a Request Object
+     *    If present, the Wallet MUST ignore it
+     *    Neither OID4VP1.0 nor RFC 9191 require iss. And the wallet correctly ignores iss for authentication and uses client_id.
+     *
+     * Added due to requirements from the France Identitie wallet enforcing iss = clientId
      */
     @SerialName("iss")
     val issuer: String? = null,
