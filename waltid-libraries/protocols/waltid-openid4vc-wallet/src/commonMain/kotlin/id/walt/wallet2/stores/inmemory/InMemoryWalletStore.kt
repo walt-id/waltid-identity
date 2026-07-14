@@ -48,12 +48,16 @@ class InMemoryWalletStore : WalletStore {
     override suspend fun deleteWallet(walletId: String) {
         wallets.remove(walletId)
         descriptors.remove(walletId)
+        accountWallets.values.forEach { it.removeAll { mappedWalletId -> mappedWalletId == walletId } }
+        accountWallets.entries.removeAll { it.value.isEmpty() }
     }
 
     override suspend fun listWalletIds(): Flow<String> = wallets.keys.toList().asFlow()
 
     override suspend fun linkWalletToAccount(accountId: String, walletId: String) {
-        accountWallets.getOrPut(accountId) { mutableListOf() }.add(walletId)
+        accountWallets.getOrPut(accountId) { mutableListOf() }.apply {
+            if (walletId !in this) add(walletId)
+        }
     }
 
     override suspend fun getWalletIdsForAccount(accountId: String): List<String>? =
