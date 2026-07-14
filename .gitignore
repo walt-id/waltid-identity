@@ -186,3 +186,6 @@ iOSInjectionProject/
 # E2E test local config
 waltid-applications/waltid-wallet-demo-ios/scripts/e2e.env
 waltid-applications/waltid-wallet-demo-android/scripts/e2e.env
+
+# OpenID conformance runner local state
+waltid-services/waltid-openid4vp-conformance-runners/mongo/

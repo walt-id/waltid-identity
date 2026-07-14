@@ -84,16 +84,35 @@ Examples:
 - **Role:** Issuer (Credential Provider)
 - **Credential Format:** SD-JWT VC (`vc+sd-jwt`)
 - **Authentication:** DPoP + Client Attestation
-- **Flow:** Authorization Code
+- **Flow:** Pre-Authorized Code
 - **Key Binding:** openid4vci-proof+jwt
 
-**Test Plan Name:** `oid4vci-1_0-issuer-test-credential-issuance-dpop-client_attestation-sd_jwt_vc-issuer_initiated-simple-immediate-unsigned-authorization_code-by_value-plain`
+**Test Plan Name:** `oid4vci-1_0-issuer-test-plan`
 
-**Status:** ⚠️ **53/55 tests passing**
+**Current handover variant:**
 
-**Known Issues:**
-1. Missing RFC 9207 `iss` in authorization response
-2. Unexpected HTTP status on credential endpoint
+```json
+{
+  "sender_constrain": "dpop",
+  "client_auth_type": "client_attestation",
+  "vci_authorization_code_flow_variant": "wallet_initiated",
+  "credential_format": "sd_jwt_vc",
+  "authorization_request_type": "simple",
+  "fapi_request_method": "unsigned",
+  "vci_grant_type": "pre-authorized_code",
+  "fapi_profile": "vci",
+  "fapi_response_mode": "plain_response"
+}
+```
+
+The conformance-suite UI may display `vci_credential_encryption=plain` as part of the normalized variant. The runner creates an issuer2 credential offer and adds it to the plan configuration as `vci.credential_offer_uri`.
+
+**Status:** Observed passing in the local issuer2 handover setup. Re-run before using as a CI or release gate.
+
+**Handover notes:**
+1. Keep the working variant values above unless the changed values are re-tested against the same conformance-suite plan.
+2. The issuer2 target must trust the attester key via `static-jwk` or the generated root CA via `x509-chain`.
+3. Keycloak is only needed for authorization-code plans, not for this pre-authorized-code issuer baseline.
 
 **HAIP Features:**
 - ✅ DPoP support
