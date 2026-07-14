@@ -56,6 +56,11 @@ public struct WalletTransactionDataProfile: Equatable, Sendable {
     public let fields: [String]
 
     /// Creates a transaction data profile.
+    ///
+    /// - Parameters:
+    ///   - type: Collision-resistant OpenID4VP `transaction_data.type` value.
+    ///   - displayName: Human-readable label for consent UI. Defaults to `type`.
+    ///   - fields: Supported transaction type-specific fields.
     public init(type: String, displayName: String? = nil, fields: [String] = []) {
         self.type = type
         self.displayName = displayName ?? type
