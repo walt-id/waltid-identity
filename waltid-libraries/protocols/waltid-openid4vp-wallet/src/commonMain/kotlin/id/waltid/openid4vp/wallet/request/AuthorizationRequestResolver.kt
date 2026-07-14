@@ -26,6 +26,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 object AuthorizationRequestResolver {
     private val log = KotlinLogging.logger { }
+    private const val REQUEST_OBJECT_TYPE = "oauth-authz-req+jwt"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -105,6 +106,7 @@ object AuthorizationRequestResolver {
     suspend fun resolve(
         requestUrl: Url,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        enforceFinalRequestObject: Boolean = true,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest {
         val requestUri = requestUrl.parameters["request_uri"]
@@ -112,13 +114,20 @@ object AuthorizationRequestResolver {
             return resolveFromRequestUri(
                 requestUri = requestUri,
                 requestUriMethod = requestUrl.parameters["request_uri_method"],
+                outerClientId = requestUrl.parameters["client_id"],
+                enforceFinalRequestObject = enforceFinalRequestObject,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 fetchRequestUri = fetchRequestUri,
             )
         }
 
         val requestObject = requestUrl.parameters["request"]
-        if (requestObject != null) return resolveFromRequestObject(requestObject, unsignedRequestObjectPolicy)
+        if (requestObject != null) return resolveFromRequestObject(
+            requestObject = requestObject,
+            outerClientId = requestUrl.parameters["client_id"],
+            enforceFinalRequestObject = enforceFinalRequestObject,
+            unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        )
 
         return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
     }
@@ -143,6 +152,8 @@ object AuthorizationRequestResolver {
     private suspend fun resolveFromRequestUri(
         requestUri: String,
         requestUriMethod: String?,
+        outerClientId: String?,
+        enforceFinalRequestObject: Boolean,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest {
@@ -159,18 +170,24 @@ object AuthorizationRequestResolver {
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
                 requestObject = response.body,
+                outerClientId = outerClientId,
+                enforceFinalRequestObject = enforceFinalRequestObject,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 expectedWalletNonce = response.walletNonce,
             )
-            contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest.Plain(
-                authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body),
-            )
+            contentType.match(ContentType.Application.Json) -> {
+                val authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body)
+                if (enforceFinalRequestObject) requireMatchingClientId(outerClientId, authorizationRequest.clientId)
+                ResolvedAuthorizationRequest.Plain(authorizationRequest)
+            }
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
     }
 
     private suspend fun resolveFromRequestObject(
         requestObject: String,
+        outerClientId: String?,
+        enforceFinalRequestObject: Boolean,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         expectedWalletNonce: String? = null,
     ): ResolvedAuthorizationRequest {
@@ -178,6 +195,15 @@ object AuthorizationRequestResolver {
         require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
         val authReqJws = requestObject.decodeJws()
+        if (enforceFinalRequestObject) {
+            require(authReqJws.header["typ"]?.jsonPrimitive?.contentOrNull == REQUEST_OBJECT_TYPE) {
+                "Authorization Request Object typ must be '$REQUEST_OBJECT_TYPE'"
+            }
+            requireMatchingClientId(
+                outerClientId = outerClientId,
+                innerClientId = authReqJws.payload["client_id"]?.jsonPrimitive?.contentOrNull,
+            )
+        }
         expectedWalletNonce?.let { nonce ->
             val walletNonceClaim = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
             require(walletNonceClaim == nonce) {
@@ -236,6 +262,15 @@ object AuthorizationRequestResolver {
         RequestUriHttpMethod.GET.method -> RequestUriHttpMethod.GET
         RequestUriHttpMethod.POST.method -> RequestUriHttpMethod.POST
         else -> throw IllegalArgumentException("invalid_request_uri_method: $value is neither 'get' nor 'post'")
+    }
+
+    private fun requireMatchingClientId(outerClientId: String?, innerClientId: String?) {
+        require(!outerClientId.isNullOrBlank()) {
+            "client_id is required alongside request or request_uri"
+        }
+        require(innerClientId == outerClientId) {
+            "Authorization Request client_id mismatch between outer request and Request Object"
+        }
     }
 
 }
