@@ -42,6 +42,7 @@ import id.walt.wallet2.server.openapi.Wallet2OpenApiDocs
 import id.walt.wallet2.stores.inmemory.InMemoryCredentialStore
 import id.walt.wallet2.stores.inmemory.InMemoryDidStore
 import id.walt.wallet2.stores.inmemory.InMemoryKeyStore
+import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.github.smiley4.ktoropenapi.delete
 import io.github.smiley4.ktoropenapi.get
@@ -152,10 +153,11 @@ object Wallet2RouteHandler {
          * When provided, wallet routes check that the authenticated account owns
          * the requested wallet. When null, all wallets are accessible (dev / no-auth mode).
          */
-        getAccountId: (suspend RoutingCall.() -> String?)? = null
+        getAccountId: (suspend RoutingCall.() -> String?)? = null,
+        attestationAssembler: ClientAttestationAssembler? = null,
     ) {
         route("/wallet", { tags = listOf("Wallet Management") }) {
-            registerWalletManagementRoutes(resolver, getAccountId)
+            registerWalletManagementRoutes(resolver, getAccountId, attestationAssembler)
         }
         route("/stores", { tags = listOf("Named Store Management") }) {
             registerNamedStoreRoutes(resolver)
@@ -168,7 +170,8 @@ object Wallet2RouteHandler {
 
     internal fun Route.registerWalletManagementRoutes(
         resolver: WalletResolver,
-        getAccountId: (suspend RoutingCall.() -> String?)?
+        getAccountId: (suspend RoutingCall.() -> String?)?,
+        attestationAssembler: ClientAttestationAssembler?,
     ) {
 
         post("", Wallet2OpenApiDocs.createWallet()) {
@@ -505,7 +508,12 @@ object Wallet2RouteHandler {
                     }) {
                         val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ReceiveCredentialRequest>()
-                        val result = WalletIssuanceHandler.receiveCredential(wallet, req, onEvent = noopOnEvent)
+                        val result = WalletIssuanceHandler.receiveCredential(
+                            wallet = wallet,
+                            request = req,
+                            attestationAssembler = attestationAssembler,
+                            onEvent = noopOnEvent,
+                        )
                         call.respond(result)
                     }
 
@@ -523,8 +531,15 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<RequestTokenRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<RequestTokenRequest>()
-                        call.respond(WalletIssuanceHandler.requestToken(req))
+                        call.respond(
+                            WalletIssuanceHandler.requestToken(
+                                wallet = wallet,
+                                request = req,
+                                attestationAssembler = attestationAssembler,
+                            )
+                        )
                     }
 
                     post("/sign-proof", {
@@ -552,7 +567,8 @@ object Wallet2RouteHandler {
                         summary = "Auth-code grant: generate authorization redirect URL"
                         description =
                             "Resolves the offer and builds the OAuth authorization URL. " +
-                            "The caller must redirect to this URL and capture the returned code."
+                            "The caller must redirect to this URL and capture the returned code. " +
+                            "The response includes continuation data for later token and credential requests."
                         request { pathParameter<String>("walletId"); body<GenerateAuthorizationUrlRequest>() }
                         response { HttpStatusCode.OK to { body<GenerateAuthorizationUrlResult>() } }
                     }) {
@@ -562,11 +578,23 @@ object Wallet2RouteHandler {
 
                     post("/exchange-code", {
                         summary = "Auth-code grant: exchange authorization code for access token"
+                        description =
+                            "Exchanges the authorization code for an access token. " +
+                            "credentialIssuerBaseUrl is used to resolve authorization server metadata. " +
+                            "If attestation is configured and supported by the issuer, the wallet key is used " +
+                            "to create token endpoint client authentication headers."
                         request { pathParameter<String>("walletId"); body<ExchangeCodeRequest>() }
                         response { HttpStatusCode.OK to { body<RequestTokenResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ExchangeCodeRequest>()
-                        call.respond(WalletIssuanceHandler.exchangeCode(req))
+                        call.respond(
+                            WalletIssuanceHandler.exchangeCode(
+                                wallet = wallet,
+                                request = req,
+                                attestationAssembler = attestationAssembler,
+                            )
+                        )
                     }
 
                     post("/deferred", {

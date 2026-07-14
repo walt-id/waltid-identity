@@ -55,6 +55,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
             implementation(identityLibs.kotlinx.coroutines.test)
         }
         if (enableAndroidBuild) {
