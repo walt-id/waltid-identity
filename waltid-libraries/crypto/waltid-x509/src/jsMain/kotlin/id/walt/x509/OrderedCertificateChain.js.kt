@@ -1,29 +1,113 @@
 package id.walt.x509
 
+import at.asitplus.signum.indispensable.X509SignatureAlgorithm
+import at.asitplus.signum.indispensable.requireSupported
+import at.asitplus.signum.indispensable.asn1.Asn1Element
+import at.asitplus.signum.indispensable.asn1.Asn1Primitive
+import at.asitplus.signum.indispensable.asn1.ObjectIdentifier
+import at.asitplus.signum.indispensable.asn1.TagClass
+import at.asitplus.signum.indispensable.asn1.encoding.asAsn1BitString
+import at.asitplus.signum.indispensable.asn1.encoding.parse
+import at.asitplus.signum.indispensable.pki.X509Certificate
 import kotlin.time.Instant
 
-internal actual class PlatformX509Certificate private constructor() {
+internal actual class PlatformX509Certificate private constructor(
+    private val der: CertificateDer,
+    private val certificate: X509Certificate,
+) {
     actual val subjectKeyIdentifier: ByteArray?
-        get() = unsupported()
+        get() = certificate.subjectKeyIdentifier()
 
     actual val authorityKeyIdentifier: ByteArray?
-        get() = unsupported()
+        get() = certificate.authorityKeyIdentifier()
 
     actual val subjectAlternativeDnsNames: List<String>
-        get() = unsupported()
+        get() = certificate.tbsCertificate.subjectAlternativeNames?.dnsNames.orEmpty()
 
-    actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean = unsupported()
+    actual fun hasIssuerNameMatching(issuer: PlatformX509Certificate): Boolean =
+        certificate.tbsCertificate.issuerName == issuer.certificate.tbsCertificate.subjectName
 
-    actual fun verifySignedBy(issuer: PlatformX509Certificate): Unit = unsupported()
+    actual fun verifySignedBy(issuer: PlatformX509Certificate) {
+        val signatureAlgorithm = certificate.signatureAlgorithm
+        signatureAlgorithm.requireSupported()
+        val algorithm = signatureAlgorithm.toNodeCryptoAlgorithm()
+        val signature = certificate.rawSignature.asAsn1BitString().rawBytes
+        val verified = nodeCrypto.verify(
+            algorithm,
+            certificate.rawTbsCertificate.derEncoded,
+            issuer.der.toPEMEncodedString(),
+            signature,
+        )
+        if (!verified) {
+            throw IllegalArgumentException("certificate signature verification failed")
+        }
+    }
 
-    actual fun isSelfSigned(): Boolean = unsupported()
+    actual fun isSelfSigned(): Boolean =
+        certificate.tbsCertificate.issuerName == certificate.tbsCertificate.subjectName &&
+                runCatching { verifySignedBy(this) }.isSuccess
 
-    actual fun checkValidityAt(instant: Instant): Unit = unsupported()
+    actual fun checkValidityAt(instant: Instant) {
+        val validFrom = certificate.tbsCertificate.validFrom.instant
+        val validUntil = certificate.tbsCertificate.validUntil.instant
+        if (instant !in validFrom..validUntil) {
+            throw IllegalArgumentException("certificate validity is $validFrom to $validUntil")
+        }
+    }
 
     actual companion object {
-        actual fun parse(der: CertificateDer): PlatformX509Certificate = unsupported()
+        actual fun parse(der: CertificateDer): PlatformX509Certificate {
+            val certificate = X509Certificate.decodeFromByteArray(der.bytes.toByteArray())
+                ?: throw IllegalArgumentException("Invalid X.509 DER certificate")
+            return PlatformX509Certificate(der, certificate)
+        }
     }
 }
 
-private fun unsupported(): Nothing =
-    throw UnsupportedOperationException("Ordered X.509 certificate chain verification is not supported on JS")
+@JsModule("crypto")
+@JsNonModule
+private external object nodeCrypto {
+    fun verify(algorithm: String?, data: ByteArray, key: String, signature: ByteArray): Boolean
+}
+
+private val subjectKeyIdentifierOid = ObjectIdentifier("2.5.29.14")
+private val authorityKeyIdentifierOid = ObjectIdentifier("2.5.29.35")
+
+private fun X509Certificate.subjectKeyIdentifier(): ByteArray? =
+    extensionValue(subjectKeyIdentifierOid)
+        ?.let { Asn1Element.parse(it).asOctetString().content }
+
+private fun X509Certificate.authorityKeyIdentifier(): ByteArray? =
+    extensionValue(authorityKeyIdentifierOid)
+        ?.let { Asn1Element.parse(it).asSequence() }
+        ?.children
+        ?.filterIsInstance<Asn1Primitive>()
+        ?.firstOrNull { it.tag.tagClass == TagClass.CONTEXT_SPECIFIC && it.tag.tagValue == 0uL }
+        ?.content
+
+private fun X509Certificate.extensionValue(oid: ObjectIdentifier): ByteArray? =
+    tbsCertificate.extensions
+        ?.firstOrNull { it.oid == oid }
+        ?.value
+        ?.asOctetString()
+        ?.content
+
+private fun X509SignatureAlgorithm.toNodeCryptoAlgorithm(): String =
+    when (this) {
+        X509SignatureAlgorithm.ES256,
+        X509SignatureAlgorithm.RS256 -> "sha256"
+
+        X509SignatureAlgorithm.ES384,
+        X509SignatureAlgorithm.RS384 -> "sha384"
+
+        X509SignatureAlgorithm.ES512,
+        X509SignatureAlgorithm.RS512 -> "sha512"
+
+        X509SignatureAlgorithm.RS1 -> "sha1"
+
+        X509SignatureAlgorithm.PS256,
+        X509SignatureAlgorithm.PS384,
+        X509SignatureAlgorithm.PS512 -> throw UnsupportedOperationException(
+            "RSA-PSS certificate signatures are not supported on JS"
+        )
+    }

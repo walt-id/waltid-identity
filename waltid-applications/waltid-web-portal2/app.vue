@@ -169,16 +169,18 @@ const hasResult = computed(() =>
         </div>
 
         <div class="p-5 flex-1">
-          <SimpleIssueEditor
-            v-if="mode === 'simple' && activeTab === 'issue'"
-            :session="issuerSession"
-          />
-          <SimpleVerifyEditor
-            v-else-if="mode === 'simple'"
-            :session="verifierSession"
-          />
+          <KeepAlive>
+            <SimpleIssueEditor
+              v-if="mode === 'simple' && activeTab === 'issue'"
+              :session="issuerSession"
+            />
+            <SimpleVerifyEditor
+              v-else-if="mode === 'simple' && activeTab === 'verify'"
+              :session="verifierSession"
+            />
+          </KeepAlive>
           <IssueEditor
-            v-else-if="activeTab === 'issue'"
+            v-if="mode === 'advanced' && activeTab === 'issue'"
             v-model:json="issuerJson"
             v-model:selected-index="issuerSelectedIndex"
             :swagger="issuerSwagger"
@@ -186,7 +188,7 @@ const hasResult = computed(() =>
             :profiles="issuerProfiles"
           />
           <VerifyEditor
-            v-else
+            v-else-if="mode === 'advanced' && activeTab === 'verify'"
             v-model:json="verifierJson"
             v-model:selected-index="verifierSelectedIndex"
             :swagger="verifierSwagger"

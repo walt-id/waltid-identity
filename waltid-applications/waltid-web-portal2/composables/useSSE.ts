@@ -69,18 +69,44 @@ export function useSSE() {
   }
 
   function open(url: string) {
-    reset();
+      reset();
 
-    source = new EventSource(url);
+      source = new EventSource(url);
 
-    source.onmessage = (e: MessageEvent) => {
-      addEvent(e.data);
-    };
+      source.onmessage = (e: MessageEvent) => {
+        addEvent(e.data);
 
-    source.onerror = () => {
-      // EventSource auto-reconnects on transient errors; only close on terminal state
-      if (isTerminal.value) close();
-    };
+      source = new EventSource(url);
+
+      source.onmessage = (e: MessageEvent) => {
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(e.data);
+        } catch {
+          /* non-JSON keep raw */
+        }
+
+        events.value.push({
+          timestamp: new Date().toISOString(),
+          raw: e.data,
+          parsed,
+        });
+
+        const s = getStatus(parsed);
+        if (s) {
+          status.value = s;
+          if (TERMINAL_STATUSES.has(s)) {
+            isTerminal.value = true;
+            close();
+          }
+        }
+      };
+
+      source.onerror = () => {
+        // EventSource auto-reconnects on transient errors; only close on terminal state
+        if (isTerminal.value) close();
+      };
+    }
   }
 
   function close() {

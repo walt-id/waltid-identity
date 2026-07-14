@@ -3,6 +3,7 @@ package id.walt.openid4vci.metadata.oauth
 import id.walt.openid4vci.GrantType
 import id.walt.openid4vci.ResponseMode
 import id.walt.openid4vci.ResponseType
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -76,8 +77,14 @@ class AuthorizationServerMetadataTest {
         assertEquals(setOf(ResponseType.CODE.value), metadata.responseTypesSupported)
         assertEquals(setOf(ResponseMode.QUERY.value, ResponseMode.FRAGMENT.value), metadata.responseModesSupported)
         assertEquals(setOf("attest_jwt_client_auth"), metadata.tokenEndpointAuthMethodsSupported)
-        assertEquals(setOf("ES256"), metadata.clientAttestationSigningAlgValuesSupported)
-        assertEquals(setOf("ES256"), metadata.clientAttestationPopSigningAlgValuesSupported)
+        assertEquals(
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+            metadata.clientAttestationSigningAlgValuesSupported,
+        )
+        assertEquals(
+            ClientAttestationSigningAlgorithms.SUPPORTED_JWS_ALGORITHMS,
+            metadata.clientAttestationPopSigningAlgValuesSupported,
+        )
         assertEquals(setOf("ES256"), metadata.dpopSigningAlgValuesSupported)
         assertEquals(true, metadata.preAuthorizedGrantAnonymousAccessSupported)
         assertEquals(null, metadata.codeChallengeMethodsSupported)

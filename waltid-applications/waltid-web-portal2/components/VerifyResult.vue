@@ -34,7 +34,6 @@ const verifiedClaims = computed(() => {
         :value="session.result.value.authorizationRequestUrl"
         :wallet-url="walletUrl"
         wallet-path="api/siop/initiatePresentation"
-        :label="session.result.value.authorizationRequestUrl"
       />
 
       <div

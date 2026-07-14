@@ -11,7 +11,6 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 
 private val log = KotlinLogging.logger {}
 
@@ -48,6 +47,8 @@ class TokenRequestBuilder(
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param code The authorization code received from authorization endpoint
      * @param codeVerifier The PKCE code verifier (if PKCE was used)
+     * @param additionalHeaders Extra HTTP headers for token endpoint client authentication
+     * @param attestationHeaders Attestation-based client authentication headers
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -55,6 +56,8 @@ class TokenRequestBuilder(
         tokenEndpoint: String,
         code: String,
         codeVerifier: String? = null,
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(code.isNotBlank()) { "Authorization code cannot be blank" }
@@ -62,6 +65,8 @@ class TokenRequestBuilder(
         log.info { "Exchanging authorization code for access token" }
         log.trace { "Token endpoint: $tokenEndpoint" }
         log.trace { "Code verifier present: ${codeVerifier != null}" }
+        log.trace { "Additional headers: ${additionalHeaders.keys}" }
+        log.trace { "Client attestation: ${attestationHeaders != null}" }
 
         val parameters = Parameters.build {
             append("grant_type", GrantType.AuthorizationCode.value)
@@ -74,7 +79,7 @@ class TokenRequestBuilder(
             }
         }
 
-        return executeTokenRequest(tokenEndpoint, parameters)
+        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
     }
 
     /**
@@ -83,6 +88,10 @@ class TokenRequestBuilder(
      * @param tokenEndpoint The token endpoint URL from metadata
      * @param preAuthorizedCode The pre-authorized code from credential offer
      * @param txCode Optional transaction code (PIN) if required by the issuer
+     * @param additionalParameters Extra form parameters for the token request
+     * @param additionalHeaders Extra HTTP headers for token endpoint client authentication
+     * @param attestationHeaders Attestation-based client authentication headers
+     * @param anonymous Whether to omit client_id for anonymous pre-authorized code token requests
      * @return TokenResponse containing access token and optional c_nonce
      * @throws Exception if token request fails
      */
@@ -93,9 +102,13 @@ class TokenRequestBuilder(
         additionalParameters: Map<String, String> = emptyMap(),
         additionalHeaders: Map<String, String> = emptyMap(),
         attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
     ): TokenResponse {
         require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
         require(preAuthorizedCode.isNotBlank()) { "Pre-authorized code cannot be blank" }
+        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null)) {
+            "Anonymous pre-authorized code token requests cannot include client authentication headers"
+        }
 
         log.info { "Exchanging pre-authorized code for access token" }
         log.trace { "Token endpoint: $tokenEndpoint" }
@@ -103,14 +116,62 @@ class TokenRequestBuilder(
         log.trace { "Additional parameters: ${additionalParameters.keys}" }
         log.trace { "Additional headers: ${additionalHeaders.keys}" }
         log.trace { "Client attestation: ${attestationHeaders != null}" }
+        log.trace { "Anonymous pre-authorized request: $anonymous" }
 
         val parameters = Parameters.build {
             append("grant_type", "urn:ietf:params:oauth:grant-type:pre-authorized_code")
             append("pre-authorized_code", preAuthorizedCode)
-            append("client_id", clientConfig.clientId)
+            if (!anonymous) {
+                append("client_id", clientConfig.clientId)
+            }
             txCode?.let {
                 append("tx_code", it)
                 log.trace { "Including transaction code in token request" }
+            }
+            additionalParameters.forEach { (k, v) -> append(k, v) }
+        }
+
+        return executeTokenRequest(tokenEndpoint, parameters, additionalHeaders, attestationHeaders)
+    }
+
+    /**
+     * Exchanges a refresh token for a new access token.
+     *
+     * @param tokenEndpoint The token endpoint URL from metadata
+     * @param refreshToken The refresh token issued by the authorization server
+     * @param additionalParameters Extra form parameters for the token request
+     * @param additionalHeaders Extra HTTP headers for token endpoint client authentication
+     * @param attestationHeaders Attestation-based client authentication headers
+     * @param anonymous Whether to omit client_id for anonymous refresh token requests
+     * @return TokenResponse containing a new access token and optional rotated refresh token
+     * @throws Exception if token request fails
+     */
+    suspend fun refreshAccessToken(
+        tokenEndpoint: String,
+        refreshToken: String,
+        additionalParameters: Map<String, String> = emptyMap(),
+        additionalHeaders: Map<String, String> = emptyMap(),
+        attestationHeaders: ClientAttestationHeaders? = null,
+        anonymous: Boolean = false,
+    ): TokenResponse {
+        require(tokenEndpoint.isNotBlank()) { "Token endpoint cannot be blank" }
+        require(refreshToken.isNotBlank()) { "Refresh token cannot be blank" }
+        require(!anonymous || (additionalHeaders.isEmpty() && attestationHeaders == null)) {
+            "Anonymous refresh token requests cannot include client authentication headers"
+        }
+
+        log.info { "Refreshing access token" }
+        log.trace { "Token endpoint: $tokenEndpoint" }
+        log.trace { "Additional parameters: ${additionalParameters.keys}" }
+        log.trace { "Additional headers: ${additionalHeaders.keys}" }
+        log.trace { "Client attestation: ${attestationHeaders != null}" }
+        log.trace { "Anonymous refresh request: $anonymous" }
+
+        val parameters = Parameters.build {
+            append("grant_type", GrantType.RefreshToken.value)
+            append("refresh_token", refreshToken)
+            if (!anonymous) {
+                append("client_id", clientConfig.clientId)
             }
             additionalParameters.forEach { (k, v) -> append(k, v) }
         }
@@ -134,11 +195,7 @@ class TokenRequestBuilder(
             httpClient.post(tokenEndpoint) {
                 contentType(ContentType.Application.FormUrlEncoded)
                 setBody(parameters.formUrlEncode())
-                additionalHeaders.forEach { (name, value) -> header(name, value) }
-                attestationHeaders?.let {
-                    header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
-                    header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
-                }
+                appendTokenRequestHeaders(additionalHeaders, attestationHeaders)
             }
         } catch (e: Exception) {
             log.error(e) { "Network error sending token request to: $tokenEndpoint" }
@@ -160,11 +217,7 @@ class TokenRequestBuilder(
                     contentType(ContentType.Application.FormUrlEncoded)
                     setBody(parameters.formUrlEncode())
                     if (isSameOrigin) {
-                        additionalHeaders.forEach { (name, value) -> header(name, value) }
-                        attestationHeaders?.let {
-                            header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
-                            header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
-                        }
+                        appendTokenRequestHeaders(additionalHeaders, attestationHeaders)
                     }
                 }
             }
@@ -207,5 +260,16 @@ class TokenRequestBuilder(
         return sourceUrl.protocol == targetUrl.protocol &&
             sourceUrl.host == targetUrl.host &&
             sourceUrl.port == targetUrl.port
+    }
+
+    private fun HttpRequestBuilder.appendTokenRequestHeaders(
+        additionalHeaders: Map<String, String>,
+        attestationHeaders: ClientAttestationHeaders?,
+    ) {
+        additionalHeaders.forEach { (name, value) -> header(name, value) }
+        attestationHeaders?.let {
+            header(ClientAttestationHeaders.HEADER_ATTESTATION, it.attestationJwt)
+            header(ClientAttestationHeaders.HEADER_ATTESTATION_POP, it.popJwt)
+        }
     }
 }
