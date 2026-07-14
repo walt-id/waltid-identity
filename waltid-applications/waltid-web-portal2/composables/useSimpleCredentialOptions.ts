@@ -492,10 +492,10 @@ export const SIMPLE_CREDENTIAL_OPTIONS: SimpleCredentialOption[] = [
     id: "pid",
     title: "PID",
     description:
-      "A person identification data credential for EUDI wallet interoperability testing.",
+      "A person identification data credential using within the eIDAS 2 framework.",
     profileId: "isoMdl",
     format: "mso_mdoc",
-    pills: [{ label: "EUDI PID", tone: "purple" }],
+    pills: [{ label: "eIDAS 2", tone: "purple" }],
     defaultCredentialData: {},
     verifier: {
       credentialId: "simple_pid",

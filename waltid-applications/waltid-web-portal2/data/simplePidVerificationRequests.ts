@@ -2,6 +2,7 @@ export interface SimplePidVerificationRequestOption {
   id: string;
   label: string;
   description: string;
+  link?: string;
   requestBody: Record<string, unknown>;
 }
 
@@ -18,15 +19,16 @@ const GERMAN_EUDI_WALLET_KEY = {
   type: "jwk",
   jwk: {
     kty: "EC",
+    d: "P_jpnuZYhXY6-A3p96EYXlxsVBgzN2WyrhdPLHiQH94",
     crv: "P-256",
-    x: "8VoEZqKzypAcaCIQ8hrd2YIRCExkSvJRYiWxi0YNDCY",
-    y: "B19upk_qV_Rzu5y75SJVdUV8aTSUerbDCXAJdkPaZpc",
-    d: "1FcMsm7HhM0LK8nRFyDLuy4Ggn1Yg_6yRy5mXjwNV-s",
+    kid: "wtX5fYw8vKVEpcBOMtOHkyCfGLvT_gH2gmEvTTf2UIo",
+    x: "VshNGFJvttuxuPHnG7FAK6FFohlDpm969JOWJb6bt4k",
+    y: "g5jjPMFRbW06lxjcNk2i305gV8iZvFpC-cTh0y9IaeI"
   },
 };
 
 const GERMAN_EUDI_WALLET_X5C = [
-  "MIIDNjCCAt2gAwIBAgIQBvlTHoTShzBBTeJJVOwBjTAKBggqhkjOPQQDAjCBjzEeMBwGA1UEAxMVUmVhZGVyIENBIENlcnRpZmljYXRlMQswCQYDVQQGEwJGUjEVMBMGA1UEChMMRVVESVcgVW5mb2xkMR4wHAYDVQQLExVDZXJ0aWZpY2F0ZSBBdXRob3JpdHkxKTAnBgNVBAUTIDQwNDE0MjQzNDQ0NTQ2NDc0ODQ5NEE0QjRDNEQ0RTRGMB4XDTI2MDYwNDE1MzIyMFoXDTI5MDkwMzE1MzIyMFowdTFGMEQGA1UEAxM9bWRvYyBSZWFkZXIgQXV0aGVudGljYXRpb24gQ2VydGlmaWNhdGUgdmVyaWZpZXIyLmRlbW8ud2FsdC5pZDELMAkGA1UEBhMCQVQxDzANBgNVBAgTBlZpZW5uYTENMAsGA1UEChMEV2FsdDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABPFaBGais8qQHGgiEPIa3dmCEQhMZEryUWIlsYtGDQwmB19upk/qV/Rzu5y75SJVdUV8aTSUerbDCXAJdkPaZpejggEyMIIBLjAdBgNVHQ4EFgQUDvjneLBmEZV3pDIWnd/t7GPR9c4wDgYDVR0PAQH/BAQDAgeAMCEGA1UdEQQaMBiCFnZlcmlmaWVyMi5kZW1vLndhbHQuaWQwFQYDVR0lAQH/BAswCQYHKIGMXQUBBjBSBgNVHR8ESzBJMEegRaBDhkFodHRwczovL3VuZm9sZC5tZG9jLm9ubGluZS9DZXJ0aWZpY2F0ZXMvMS9SZWFkZXJDYUNlcnRpZmljYXRlLmNybDAfBgNVHSMEGDAWgBQN9ximilsuU4x4quk+86Tge3GOoTBOBgNVHRIERzBFhhtodHRwczovL3VuZm9sZC5tZG9jLm9ubGluZS+BJnJlYWRlcmNhY2VydGlmaWNhdGVAdW5mb2xkLm1kb2Mub25saW5lMAoGCCqGSM49BAMCA0cAMEQCIDNZhYs23qySJvJvJBOk6Et2uSvF/OimwjJYOtlfIU+mAiASMBqnOCZJt+C6blPRVj1mBbp2/+EzYsUCwmQTaANRQA==",
+  "MIICaDCCAg6gAwIBAgIJAKBS4zLZ+it3MAoGCCqGSM49BAMCMCgxCzAJBgNVBAYTAkRFMRkwFwYDVQQDDBBHZXJtYW4gUmVnaXN0cmFyMB4XDTI2MDYwNDA5NTQwMloXDTI3MDYwNDA5NTQwMlowZDELMAkGA1UEBhMCREUxGTAXBgNVBAoMEEhhY2thdGhvbiAtIFdhbHQxHzAdBgNVBGEMFkVVSURFLURBRERCMjY2Qzg3QzE1MTIxGTAXBgNVBAMMEEhhY2thdGhvbiAtIFdhbHQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAARWyE0YUm+227G48ecbsUAroUWiGUOmb3r0k5Ylvpu3iYOY4zzBUW1tOpcY3DZNot9OYFfImbxaQvnE4dMvSGnio4HkMIHhMAwGA1UdEwEB/wQCMAAwHQYDVR0OBBYEFGMT/sq1tiFwocG+RThOnbOWpMSgMB8GA1UdIwQYMBaAFKnCo9ovbaxU7s65TugsySwAg4AzMA4GA1UdDwEB/wQEAwIHgDASBgNVHSUECzAJBgcogYxdBQEGMCEGA1UdEQQaMBiCFnZlcmlmaWVyMi5kZW1vLndhbHQuaWQwSgYDVR0fBEMwQTA/oD2gO4Y5aHR0cHM6Ly9zYW5kYm94LmV1ZGktd2FsbGV0Lm9yZy9hcGkvc3RhdHVzLW1hbmFnZW1lbnQvY3JsMAoGCCqGSM49BAMCA0gAMEUCIE289V5vphX/COky5iTKi5I7xcd5Om2PHTXJP/5X02VfAiEA1an9HPlkA3ReGqWcF4/xaEwvjeaUdxATs/vSAuW+nFY="
 ];
 
 const GERMAN_VERIFIER_INFO = [
@@ -131,10 +133,11 @@ export const SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS: SimplePidVerificationReque
       id: "german-eudi-wallet",
       label: "German EUDI Wallet 🇩🇪",
       description:
-        "Signed x509_hash request with German EUDI verifier metadata.",
+        "Verify a PID from the German EUDI wallet.",
+      link: "https://eudi-wallet.gov.de",
       requestBody: createPidRequestBody({
         signedRequest: true,
-        clientId: "x509_hash:YLg9XAMTIMecqGH-2CtrxXB3L3gfBu9V5I2vrqy-zDk",
+        clientId: "x509_hash:cbxrATH66Crh_jzd4JUQriuZpBH_vl5Syc-S_JU8fQE",
         key: GERMAN_EUDI_WALLET_KEY,
         x5c: GERMAN_EUDI_WALLET_X5C,
         verifierInfo: GERMAN_VERIFIER_INFO
@@ -144,7 +147,8 @@ export const SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS: SimplePidVerificationReque
       id: "france-identite",
       label: "France Identité 🇫🇷",
       description:
-        "Signed and encrypted x509_san_dns PID request for France Identité.",
+        "Verify a PID from the France Identité app.",
+      link: "https://playground.france-identite.gouv.fr/marketplace/wallets/fin/",
       requestBody: createPidRequestBody({
         signedRequest: true,
         encryptedResponse: true,
@@ -157,7 +161,8 @@ export const SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS: SimplePidVerificationReque
       id: "eudi-reference-wallet",
       label: "EUDI Reference Wallet 🇪🇺",
       description:
-        "Signed and encrypted x509_san_dns PID request for the EUDI Reference Wallet.",
+        "Verify a PID from the EUDI Reference Wallet",
+      link: "https://github.com/eu-digital-identity-wallet",
       requestBody: createPidRequestBody({
         signedRequest: true,
         encryptedResponse: true,
