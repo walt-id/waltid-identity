@@ -22,6 +22,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletOperationState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.components.CredentialCard
 import id.walt.walletdemo.compose.ui.components.StatusCard
 
@@ -34,9 +35,18 @@ fun ReceiveCredential(
     onBack: () -> Unit,
     onReceived: () -> Unit,
 ) {
+    val ready = state.session as? WalletSessionState.Ready
+    val selectedCredential = ready?.credentials?.firstOrNull { it.id == state.selectedCredentialId }
+    if (selectedCredential != null) {
+        CredentialDetailsScreen(
+            details = selectedCredential.toCredentialDetails(),
+            onBack = controller::clearSelectedCredential,
+        )
+        return
+    }
+
     var mode by remember { mutableStateOf(ReceiveMode.SCAN) }
     var receiveRequested by remember { mutableStateOf(false) }
-    val ready = state.session as? WalletSessionState.Ready
     val isReady = ready != null
     val canReceive = isReady && !state.isBusy
     val canSubmitManualOffer = canReceive && state.requestDrafts.offerUrl.isNotBlank()
@@ -165,7 +175,10 @@ fun ReceiveCredential(
                 fontWeight = FontWeight.SemiBold,
             )
             credentials.forEach { credential ->
-                CredentialCard(credential)
+                CredentialCard(
+                    details = credential.toCredentialDetails(),
+                    onClick =  { controller.selectCredential(credential.id) }
+                )
             }
         }
     }

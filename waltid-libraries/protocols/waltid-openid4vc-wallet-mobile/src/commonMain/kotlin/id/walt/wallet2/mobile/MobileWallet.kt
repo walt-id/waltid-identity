@@ -13,6 +13,7 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
 import id.waltid.openid4vci.wallet.attestation.ClientAttestationAssembler
@@ -73,6 +74,15 @@ public data class MobileWalletPresentationResult(
     public val verifierResponseJson: String? = null,
 )
 
+/**
+ * Result of resolving a credential offer URL before executing the issuance flow.
+ *
+ * @property txCodeRequired `true` when the pre-authorized code grant requires the user to supply
+ *   a transaction code (PIN) before the token request can proceed.
+ */
+public data class MobileWalletOfferResolution(
+    val txCodeRequired: Boolean,
+)
 /**
  * OAuth 2.0 client-attestation configuration used during mobile issuance.
  *

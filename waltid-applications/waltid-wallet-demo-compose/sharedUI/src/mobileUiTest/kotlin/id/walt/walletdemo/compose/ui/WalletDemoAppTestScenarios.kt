@@ -20,7 +20,6 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.DemoOfferResolution
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
-import id.walt.walletdemo.compose.logic.WalletDemoCredentialDetails
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
 import id.walt.walletdemo.compose.logic.WalletDemoSampleCredentialData
 import id.walt.walletdemo.compose.logic.WalletSessionState
@@ -42,9 +41,7 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.status").assertTextContains("Wallet ready")
         onNodeWithText("Example Credential").performScrollTo().assertIsDisplayed()
         onNodeWithText("Example Credential").performClick()
-        onNodeWithTag("credential.detailScreen").assertIsDisplayed()
-        onNodeWithText("Credential Details").assertIsDisplayed()
-        onNodeWithText("did:key:subject").assertIsDisplayed()
+        onNodeWithTag("wallet.credentialDetailsScreen").assertIsDisplayed()
         assertEquals(1, wallet.bootstrapCalls)
     }
 

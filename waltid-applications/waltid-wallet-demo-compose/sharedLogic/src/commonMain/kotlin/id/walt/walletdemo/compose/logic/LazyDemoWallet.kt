@@ -20,9 +20,6 @@ internal class LazyDemoWallet(
     override suspend fun listCredentials(): List<WalletDemoCredential> =
         wallet().listCredentials()
 
-    override suspend fun credentialDetails(id: String): WalletDemoCredentialDetails? =
-        wallet().credentialDetails(id)
-
     override suspend fun resolveOffer(offerUrl: String): DemoOfferResolution =
         wallet().resolveOffer(offerUrl)
 

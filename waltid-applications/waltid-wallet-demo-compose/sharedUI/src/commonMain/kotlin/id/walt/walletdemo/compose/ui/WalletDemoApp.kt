@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import id.walt.walletdemo.compose.logic.WalletAuthState
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.ui.screens.CredentialDetailScreen
 import id.walt.walletdemo.compose.logic.isBusy
 import id.walt.walletdemo.compose.ui.screens.PinScreen
 import id.walt.walletdemo.compose.ui.screens.ReceiveCredential
@@ -64,7 +63,6 @@ fun WalletDemoApp(controller: WalletDemoController) {
                             onReceiveClick = { route = WalletRoute.Receive },
                             onCredentialClick = { credentialId ->
                                 selectedCredentialId = credentialId
-                                controller.loadCredentialDetails(credentialId)
                                 route = WalletRoute.CredentialDetail
                             },
                         )
@@ -85,19 +83,7 @@ fun WalletDemoApp(controller: WalletDemoController) {
                                     onReceiveClick = { route = WalletRoute.Receive },
                                     onCredentialClick = { credentialId ->
                                         selectedCredentialId = credentialId
-                                        controller.loadCredentialDetails(credentialId)
                                         route = WalletRoute.CredentialDetail
-                                    },
-                                )
-                            } else {
-                                CredentialDetailScreen(
-                                    credential = credential,
-                                    credentialDataJson = state.selectedCredentialDetails
-                                        ?.takeIf { it.id == credential.id }
-                                        ?.credentialDataJson,
-                                    onBack = {
-                                        controller.clearCredentialDetails()
-                                        route = WalletRoute.Main
                                     },
                                 )
                             }

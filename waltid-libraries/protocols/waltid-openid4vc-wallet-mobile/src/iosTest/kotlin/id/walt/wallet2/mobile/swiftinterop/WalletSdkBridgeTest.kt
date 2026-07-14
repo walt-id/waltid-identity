@@ -15,7 +15,6 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
-import id.walt.wallet2.mobile.MobileWalletCredentialDetails
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -516,7 +515,6 @@ class WalletSdkBridgeTest {
             deleteWalletCalls++
         }
 
-        override suspend fun credentialDetails(id: String): MobileWalletCredentialDetails? = null
 
         override suspend fun present(
             requestUrl: String,
