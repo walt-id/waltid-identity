@@ -69,7 +69,13 @@ import kotlin.time.Duration.Companion.days
 
 class MsoMdocsTransactionDataVerifier2IntegrationTest {
 
-    private val typeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE, ACCOUNT_ACCESS_TYPE)
+    private val typeRegistry = TransactionDataTypeRegistry(
+        types = setOf(PAYMENT_TYPE, ACCOUNT_ACCESS_TYPE),
+        fieldsByType = mapOf(
+            PAYMENT_TYPE to setOf("amount", "currency", "payee"),
+            ACCOUNT_ACCESS_TYPE to setOf("account_identifier", "access_scope"),
+        ),
+    )
 
     private val issuerKey: JWKKey = runBlocking {
         KeyManager.resolveSerializedKey(

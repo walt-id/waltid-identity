@@ -9,7 +9,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class TransactionDataRequestValidatorTest {
-    private val registry = TransactionDataTypeRegistry(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE)
+    private val registry = TransactionDataTypeRegistry(
+        types = setOf(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE),
+        fieldsByType = mapOf(
+            TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE to setOf("amount", "currency", "payee"),
+        ),
+    )
 
     @Test
     fun `accepts supported payment data`() {
@@ -23,6 +28,17 @@ class TransactionDataRequestValidatorTest {
 
         assertEquals(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE, decoded.single().transactionData.type)
         assertEquals("42.00", decoded.single().details["amount"]?.toString()?.trim('"'))
+    }
+
+    @Test
+    fun `rejects empty transaction data array when present`() {
+        assertFailsWith<IllegalArgumentException> {
+            validateRequestTransactionData(
+                transactionData = emptyList(),
+                typeRegistry = registry,
+                credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
+            )
+        }
     }
 
     @Test

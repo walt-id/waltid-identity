@@ -8,7 +8,7 @@ This package contains shared transaction-data primitives used by both wallet and
 - `TransactionDataRequestValidator`: structural checks (non-blank type, non-empty credential_ids, holder binding requirement, supported formats) and optional type-registry enforcement
 - `TransactionDataHashing`: hash algorithm resolution (`sha-256` only for now) and hash calculation
 - `TransactionDataSelection`: filters transaction_data items by credential_id (`filterTransactionDataForCredentialId`)
-- `TransactionDataTypeRegistry`: set of known type strings; `requireKnown` rejects unrecognized types
+- `TransactionDataTypeRegistry`: set of known type strings plus optional type-specific field allow-lists
 
 ## Validation modes
 
@@ -18,6 +18,7 @@ Two entry points in `TransactionDataRequestValidator`:
 - `validateRequestTransactionDataStructure(transactionData, credentialQueriesById)` — used by the **verifier** when creating sessions. Runs structural checks only (no type registry).
 
 Both validate:
+- `transaction_data`, when present, is non-empty
 - `type` is non-blank
 - `credential_ids` is non-empty and references valid DCQL credential query ids (when provided)
 - Referenced credential queries use a supported format (`dc+sd-jwt` or `mso_mdoc`)
@@ -38,8 +39,11 @@ The credential's `keyAuthorizations` must authorize either the namespace or the 
 
 ## Service-layer configuration
 
-Concrete type sets and UI metadata (display names, field lists for discovery endpoints) live in the service layer
-(`waltid-wallet-api`, `waltid-verifier-api2`) via `TransactionDataProfilesConfig`. This protocol module only knows type strings.
+Concrete type sets and UI metadata live at the integration boundary:
+- Services (`waltid-wallet-api`, `waltid-verifier-api2`) load `TransactionDataProfilesConfig`
+- Mobile wallets receive `MobileWalletTransactionDataProfile` entries through `MobileWalletConfig`
+
+When a profile is converted to `TransactionDataTypeRegistry`, its `fields` list is an allow-list. An explicitly empty field list means the type accepts no type-specific fields.
 
 ## Module-local responsibilities
 

@@ -8,6 +8,7 @@ import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertClaimValueVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
@@ -157,9 +158,33 @@ class PublicDemoBackendE2ETest {
             listOf("PAYMENT AUTHORIZATION", "Payment Authorization"),
             "Payment profile title missing",
         )
-        assertTextVisibleAfterScrolling(device, listOf("42.00"), "Payment amount missing")
-        assertTextVisibleAfterScrolling(device, listOf("EUR"), "Payment currency missing")
-        assertTextVisibleAfterScrolling(device, listOf("ACME Corp"), "Payment payee missing")
-        assertTextVisibleAfterScrolling(device, listOf("INV-2026-042"), "Payment reference missing")
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.amount",
+            label = "Amount",
+            expectedValues = listOf("42.00"),
+            message = "Payment amount missing",
+        )
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.currency",
+            label = "Currency",
+            expectedValues = listOf("EUR"),
+            message = "Payment currency missing",
+        )
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.payee",
+            label = "Payee",
+            expectedValues = listOf("ACME Corp"),
+            message = "Payment payee missing",
+        )
+        assertClaimValueVisibleAfterScrolling(
+            device = device,
+            path = "transactionData[0].details.reference",
+            label = "Reference",
+            expectedValues = listOf("INV-2026-042"),
+            message = "Payment reference missing",
+        )
     }
 }

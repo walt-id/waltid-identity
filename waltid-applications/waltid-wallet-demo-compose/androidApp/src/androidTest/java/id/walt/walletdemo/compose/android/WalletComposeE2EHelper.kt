@@ -124,6 +124,38 @@ internal object WalletComposeE2EHelper {
         fail("$message. Expected one of $texts.\n${visibleUiSnapshot(device)}")
     }
 
+    fun assertClaimValueVisibleAfterScrolling(
+        device: UiDevice,
+        path: String,
+        label: String,
+        expectedValues: List<String>,
+        message: String,
+    ) {
+        val tag = claimTag(path)
+        val node = waitForResource(device, tag, CLICK_VISIBLE_TIMEOUT)
+            ?: findVisibleResource(device, tag)
+            ?: findResourceAfterScrolling(device, tag)
+        if (node == null) {
+            fail("$message. Claim row $tag not found.\n${visibleUiSnapshot(device)}")
+            return
+        }
+        val visibleTexts = node.flatten()
+            .mapNotNull { it.text?.trim()?.takeIf(String::isNotEmpty) }
+        val missingValues = expectedValues.filter { expected -> expected !in visibleTexts }
+        if (label !in visibleTexts || missingValues.isNotEmpty()) {
+            fail(
+                """
+                    $message.
+                    claim=$tag
+                    expectedLabel=$label
+                    expectedValues=$expectedValues
+                    visibleTexts=$visibleTexts
+                    ${visibleUiSnapshot(device)}
+                """.trimIndent()
+            )
+        }
+    }
+
     fun waitForResource(device: UiDevice, tag: String, timeoutMs: Long): UiObject2? {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -138,14 +170,11 @@ internal object WalletComposeE2EHelper {
     private fun findTextAfterScrolling(device: UiDevice, texts: List<String>): UiObject2? {
         texts.firstNotNullOfOrNull { text -> device.findObject(By.text(text)) }?.let { return it }
         repeat(6) {
-            device.swipe(
-                device.displayWidth / 2,
-                (device.displayHeight * 0.72).toInt(),
-                device.displayWidth / 2,
-                (device.displayHeight * 0.36).toInt(),
-                24,
-            )
-            device.waitForIdle()
+            device.scrollDown()
+            texts.firstNotNullOfOrNull { text -> device.findObject(By.text(text)) }?.let { return it }
+        }
+        repeat(12) {
+            device.scrollUp()
             texts.firstNotNullOfOrNull { text -> device.findObject(By.text(text)) }?.let { return it }
         }
         return null
@@ -160,18 +189,41 @@ internal object WalletComposeE2EHelper {
 
     private fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
         repeat(6) {
-            device.swipe(
-                device.displayWidth / 2,
-                (device.displayHeight * 0.72).toInt(),
-                device.displayWidth / 2,
-                (device.displayHeight * 0.36).toInt(),
-                24,
-            )
-            device.waitForIdle()
+            device.scrollDown()
+            waitForResource(device, tag, 1_000L)?.let { return it }
+            findVisibleResource(device, tag)?.let { return it }
+        }
+        repeat(12) {
+            device.scrollUp()
             waitForResource(device, tag, 1_000L)?.let { return it }
             findVisibleResource(device, tag)?.let { return it }
         }
         return null
+    }
+
+    private fun claimTag(path: String): String =
+        "wallet.claim.${path.map { if (it.isLetterOrDigit()) it else '_' }.joinToString("")}"
+
+    private fun UiDevice.scrollDown() {
+        swipe(
+            displayWidth / 2,
+            (displayHeight * 0.72).toInt(),
+            displayWidth / 2,
+            (displayHeight * 0.36).toInt(),
+            24,
+        )
+        waitForIdle()
+    }
+
+    private fun UiDevice.scrollUp() {
+        swipe(
+            displayWidth / 2,
+            (displayHeight * 0.36).toInt(),
+            displayWidth / 2,
+            (displayHeight * 0.72).toInt(),
+            24,
+        )
+        waitForIdle()
     }
 
     fun latestStatus(device: UiDevice): String {

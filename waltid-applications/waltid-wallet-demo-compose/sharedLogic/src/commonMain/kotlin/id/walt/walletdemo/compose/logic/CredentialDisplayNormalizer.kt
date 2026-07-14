@@ -76,10 +76,7 @@ object CredentialDisplayNormalizer {
 
     fun transactionDataGroups(items: List<WalletDemoTransactionDataItem>): List<ClaimGroup> {
         val baseTitles = items.map { item ->
-            item.displayName
-                .takeIf { it.isNotBlank() }
-                ?.let(CredentialDisplayVocabulary::humanizedClaimLabel)
-                ?: CredentialDisplayVocabulary.TransactionDataTitle
+            item.transactionDataTitle()
         }
         val titleCounts = baseTitles.groupingBy { it }.eachCount()
         val seenTitles = mutableMapOf<String, Int>()
@@ -122,6 +119,15 @@ object CredentialDisplayNormalizer {
             }
 
             ClaimGroup(title = title, items = claimItems)
+        }
+    }
+
+    private fun WalletDemoTransactionDataItem.transactionDataTitle(): String {
+        val title = displayName.trim()
+        return when {
+            title.isBlank() -> CredentialDisplayVocabulary.TransactionDataTitle
+            title == type -> CredentialDisplayVocabulary.humanizedClaimLabel(title)
+            else -> title
         }
     }
 

@@ -24,6 +24,9 @@ private fun validateTransactionDataInternal(
     typeRegistry: TransactionDataTypeRegistry?,
     credentialQueriesById: Map<String, CredentialQuery>?,
 ): List<DecodedTransactionData> {
+    if (transactionData != null) {
+        require(transactionData.isNotEmpty()) { "transaction_data must not be empty when present" }
+    }
     val decodedItems = decodeList(transactionData.orEmpty())
 
     decodedItems.forEach { decodedItem ->

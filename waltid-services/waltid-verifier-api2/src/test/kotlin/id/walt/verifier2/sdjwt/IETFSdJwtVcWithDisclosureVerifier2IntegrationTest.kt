@@ -445,7 +445,10 @@ class IETFSdJwtVcWithDisclosureVerifier2IntegrationTest {
                     selectCredentialsForQuery = selectCallback,
                     holderPoliciesToRun = null,
                     runPolicies = null,
-                    transactionDataTypeRegistry = TransactionDataTypeRegistry(PAYMENT_TYPE),
+                    transactionDataTypeRegistry = TransactionDataTypeRegistry(
+                        types = setOf(PAYMENT_TYPE),
+                        fieldsByType = mapOf(PAYMENT_TYPE to setOf("amount", "currency", "payee", "reference")),
+                    ),
                 )
             }
 
