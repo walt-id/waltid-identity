@@ -160,7 +160,7 @@ sealed interface id.walt.wallet2.mobile/MobileWalletDatabaseKey { // id.walt.wal
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration|null[0]
-    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?){}[0]
+    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>){}[0]
 
     final val attestation // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.attestation|{}attestation[0]
         final fun <get-attestation>(): id.walt.wallet2.mobile/WalletAttestationConfig? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.attestation.<get-attestation>|<get-attestation>(){}[0]
@@ -170,6 +170,8 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // i
         final fun <get-defaultKeyType>(): id.walt.wallet2.mobile/MobileWalletKeyType // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.defaultKeyType.<get-defaultKeyType>|<get-defaultKeyType>(){}[0]
     final val persistence // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.persistence|{}persistence[0]
         final fun <get-persistence>(): id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.persistence.<get-persistence>|<get-persistence>(){}[0]
+    final val transactionDataProfiles // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.transactionDataProfiles|{}transactionDataProfiles[0]
+        final fun <get-transactionDataProfiles>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.transactionDataProfiles.<get-transactionDataProfiles>|<get-transactionDataProfiles>(){}[0]
     final val walletId // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.walletId|{}walletId[0]
         final fun <get-walletId>(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.walletId.<get-walletId>|<get-walletId>(){}[0]
 
@@ -178,7 +180,8 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration { // i
     final fun component3(): id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component3|component3(){}[0]
     final fun component4(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component4|component4(){}[0]
     final fun component5(): id.walt.wallet2.mobile/WalletAttestationConfig? // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?){}[0]
+    final fun component6(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseEncryptionKeyProvider? = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.swiftinterop.WalletBridgePersistence;id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseEncryptionKeyProvider?;id.walt.wallet2.mobile.WalletAttestationConfig?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeConfiguration.toString|toString(){}[0]
@@ -412,7 +415,7 @@ final class id.walt.wallet2.mobile/MobileWalletBootstrapResult { // id.walt.wall
 }
 
 final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobile/MobileWalletConfig|null[0]
-    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ...) // id.walt.wallet2.mobile/MobileWalletConfig.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>){}[0]
+    constructor <init>(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ...) // id.walt.wallet2.mobile/MobileWalletConfig.<init>|<init>(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>){}[0]
 
     final val attestationConfig // id.walt.wallet2.mobile/MobileWalletConfig.attestationConfig|{}attestationConfig[0]
         final fun <get-attestationConfig>(): id.walt.wallet2.mobile/WalletAttestationConfig? // id.walt.wallet2.mobile/MobileWalletConfig.attestationConfig.<get-attestationConfig>|<get-attestationConfig>(){}[0]
@@ -422,6 +425,8 @@ final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobil
         final fun <get-onEvent>(): kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> // id.walt.wallet2.mobile/MobileWalletConfig.onEvent.<get-onEvent>|<get-onEvent>(){}[0]
     final val persistence // id.walt.wallet2.mobile/MobileWalletConfig.persistence|{}persistence[0]
         final fun <get-persistence>(): id.walt.wallet2.mobile/MobileWalletPersistence // id.walt.wallet2.mobile/MobileWalletConfig.persistence.<get-persistence>|<get-persistence>(){}[0]
+    final val transactionDataProfiles // id.walt.wallet2.mobile/MobileWalletConfig.transactionDataProfiles|{}transactionDataProfiles[0]
+        final fun <get-transactionDataProfiles>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile/MobileWalletConfig.transactionDataProfiles.<get-transactionDataProfiles>|<get-transactionDataProfiles>(){}[0]
     final val walletId // id.walt.wallet2.mobile/MobileWalletConfig.walletId|{}walletId[0]
         final fun <get-walletId>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletConfig.walletId.<get-walletId>|<get-walletId>(){}[0]
 
@@ -430,7 +435,8 @@ final class id.walt.wallet2.mobile/MobileWalletConfig { // id.walt.wallet2.mobil
     final fun component3(): id.walt.wallet2.mobile/WalletAttestationConfig? // id.walt.wallet2.mobile/MobileWalletConfig.component3|component3(){}[0]
     final fun component4(): id.walt.wallet2.mobile/MobileWalletPersistence // id.walt.wallet2.mobile/MobileWalletConfig.component4|component4(){}[0]
     final fun component5(): kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> // id.walt.wallet2.mobile/MobileWalletConfig.component5|component5(){}[0]
-    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ...): id.walt.wallet2.mobile/MobileWalletConfig // id.walt.wallet2.mobile/MobileWalletConfig.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>){}[0]
+    final fun component6(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile/MobileWalletConfig.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., id.walt.wallet2.mobile/MobileWalletKeyType = ..., id.walt.wallet2.mobile/WalletAttestationConfig? = ..., id.walt.wallet2.mobile/MobileWalletPersistence = ..., kotlin.coroutines/SuspendFunction1<id.walt.wallet2.mobile/MobileWalletEvent, kotlin/Unit> = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> = ...): id.walt.wallet2.mobile/MobileWalletConfig // id.walt.wallet2.mobile/MobileWalletConfig.copy|copy(kotlin.String;id.walt.wallet2.mobile.MobileWalletKeyType;id.walt.wallet2.mobile.WalletAttestationConfig?;id.walt.wallet2.mobile.MobileWalletPersistence;kotlin.coroutines.SuspendFunction1<id.walt.wallet2.mobile.MobileWalletEvent,kotlin.Unit>;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataProfile>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletConfig.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletConfig.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletConfig.toString|toString(){}[0]
@@ -660,7 +666,7 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationPreview { // id.walt.
 }
 
 final class id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo { // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo|null[0]
-    constructor <init>(kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?) // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    constructor <init>(kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin/String?, kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> = ...) // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.<init>|<init>(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataItem>){}[0]
 
     final val clientId // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.clientId|{}clientId[0]
         final fun <get-clientId>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.clientId.<get-clientId>|<get-clientId>(){}[0]
@@ -670,6 +676,8 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo { // id.w
         final fun <get-responseUri>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.responseUri.<get-responseUri>|<get-responseUri>(){}[0]
     final val state // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.state|{}state[0]
         final fun <get-state>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.state.<get-state>|<get-state>(){}[0]
+    final val transactionData // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.transactionData|{}transactionData[0]
+        final fun <get-transactionData>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.transactionData.<get-transactionData>|<get-transactionData>(){}[0]
     final val verifierName // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.verifierName|{}verifierName[0]
         final fun <get-verifierName>(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.verifierName.<get-verifierName>|<get-verifierName>(){}[0]
 
@@ -678,7 +686,8 @@ final class id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo { // id.w
     final fun component3(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component3|component3(){}[0]
     final fun component4(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component4|component4(){}[0]
     final fun component5(): kotlin/String? // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component5|component5(){}[0]
-    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ...): id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?){}[0]
+    final fun component6(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.component6|component6(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin/String? = ..., kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataItem> = ...): id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.copy|copy(kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.String?;kotlin.collections.List<id.walt.wallet2.mobile.MobileWalletTransactionDataItem>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletPresentationRequestInfo.toString|toString(){}[0]
@@ -720,6 +729,63 @@ final class id.walt.wallet2.mobile/MobileWalletStores { // id.walt.wallet2.mobil
     final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletStores.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletStores.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletStores.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/MobileWalletTransactionDataItem { // id.walt.wallet2.mobile/MobileWalletTransactionDataItem|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin.collections/List<kotlin/String>, kotlin.collections/List<kotlin/String>, kotlin/String, kotlin/String) // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String){}[0]
+
+    final val credentialQueryIds // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.credentialQueryIds|{}credentialQueryIds[0]
+        final fun <get-credentialQueryIds>(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.credentialQueryIds.<get-credentialQueryIds>|<get-credentialQueryIds>(){}[0]
+    final val detailsJson // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.detailsJson|{}detailsJson[0]
+        final fun <get-detailsJson>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.detailsJson.<get-detailsJson>|<get-detailsJson>(){}[0]
+    final val displayName // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val rawJson // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.rawJson|{}rawJson[0]
+        final fun <get-rawJson>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.rawJson.<get-rawJson>|<get-rawJson>(){}[0]
+    final val supportedFields // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.supportedFields|{}supportedFields[0]
+        final fun <get-supportedFields>(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.supportedFields.<get-supportedFields>|<get-supportedFields>(){}[0]
+    final val type // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.type|{}type[0]
+        final fun <get-type>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.type.<get-type>|<get-type>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.component4|component4(){}[0]
+    final fun component5(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.component5|component5(){}[0]
+    final fun component6(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.component6|component6(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ..., kotlin.collections/List<kotlin/String> = ..., kotlin/String = ..., kotlin/String = ...): id.walt.wallet2.mobile/MobileWalletTransactionDataItem // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>;kotlin.collections.List<kotlin.String>;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataItem.toString|toString(){}[0]
+}
+
+final class id.walt.wallet2.mobile/MobileWalletTransactionDataProfile { // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile|null[0]
+    constructor <init>(kotlin/String, kotlin/String = ..., kotlin.collections/List<kotlin/String> = ...) // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.<init>|<init>(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+
+    final val displayName // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.displayName|{}displayName[0]
+        final fun <get-displayName>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.displayName.<get-displayName>|<get-displayName>(){}[0]
+    final val fields // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.fields|{}fields[0]
+        final fun <get-fields>(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.fields.<get-fields>|<get-fields>(){}[0]
+    final val type // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.type|{}type[0]
+        final fun <get-type>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.type.<get-type>|<get-type>(){}[0]
+
+    final fun component1(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.component1|component1(){}[0]
+    final fun component2(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<kotlin/String> // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin.collections/List<kotlin/String> = ...): id.walt.wallet2.mobile/MobileWalletTransactionDataProfile // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.copy|copy(kotlin.String;kotlin.String;kotlin.collections.List<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.toString|toString(){}[0]
+
+    final object Companion { // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion|null[0]
+        final const val AccountAccessType // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.AccountAccessType|{}AccountAccessType[0]
+            final fun <get-AccountAccessType>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.AccountAccessType.<get-AccountAccessType>|<get-AccountAccessType>(){}[0]
+        final const val PaymentAuthorizationType // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.PaymentAuthorizationType|{}PaymentAuthorizationType[0]
+            final fun <get-PaymentAuthorizationType>(): kotlin/String // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.PaymentAuthorizationType.<get-PaymentAuthorizationType>|<get-PaymentAuthorizationType>(){}[0]
+
+        final val DefaultProfiles // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.DefaultProfiles|{}DefaultProfiles[0]
+            final fun <get-DefaultProfiles>(): kotlin.collections/List<id.walt.wallet2.mobile/MobileWalletTransactionDataProfile> // id.walt.wallet2.mobile/MobileWalletTransactionDataProfile.Companion.DefaultProfiles.<get-DefaultProfiles>|<get-DefaultProfiles>(){}[0]
+    }
 }
 
 final class id.walt.wallet2.mobile/WalletAttestationConfig { // id.walt.wallet2.mobile/WalletAttestationConfig|null[0]

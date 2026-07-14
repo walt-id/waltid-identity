@@ -7,7 +7,10 @@ import kotlinx.serialization.Serializable
 data class TransactionDataProfilesConfig(
     val transactionDataProfiles: List<TransactionDataProfile> = emptyList(),
 ) {
-    fun toTypeRegistry() = TransactionDataTypeRegistry(transactionDataProfiles.map { it.type }.toSet())
+    fun toTypeRegistry() = TransactionDataTypeRegistry(
+        types = transactionDataProfiles.map { it.type }.toSet(),
+        fieldsByType = transactionDataProfiles.associate { it.type to it.fields.toSet() },
+    )
 }
 
 @Serializable

@@ -19,6 +19,7 @@ import id.walt.wallet2.mobile.MobileWalletKeys
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletStores
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
@@ -41,6 +42,7 @@ import kotlin.time.Instant
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
+ * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -48,6 +50,8 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> =
+        MobileWalletTransactionDataProfile.DefaultProfiles,
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
@@ -55,6 +59,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConf
     defaultKeyType = defaultKeyType,
     attestationConfig = attestation,
     persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
+    transactionDataProfiles = transactionDataProfiles,
 )
 
 /**

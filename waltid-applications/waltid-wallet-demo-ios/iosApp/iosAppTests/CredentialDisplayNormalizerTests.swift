@@ -693,6 +693,47 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         XCTAssertTrue(details.groups.isEmpty)
     }
 
+    func testTransactionDataGroupsRenderProfileAndDetailsReadably() throws {
+        let request = PresentationRequestInfo(
+            transactionData: [
+                PresentationTransactionData(
+                    type: "org.waltid.transaction-data.payment-authorization",
+                    displayName: "Payment Authorization",
+                    credentialQueryIDs: ["pid", "payment"],
+                    supportedFields: ["amount", "currency", "payee"],
+                    rawJSON: """
+                    {
+                      "type": "org.waltid.transaction-data.payment-authorization",
+                      "credential_ids": ["pid", "payment"],
+                      "amount": "42.00",
+                      "currency": "EUR",
+                      "payee": "ACME Corp"
+                    }
+                    """,
+                    detailsJSON: """
+                    {
+                      "amount": "42.00",
+                      "currency": "EUR",
+                      "payee": "ACME Corp"
+                    }
+                    """
+                )
+            ]
+        )
+
+        let payment = try XCTUnwrap(CredentialDisplayNormalizer.transactionDataGroups(for: request).single)
+        let valuesByLabel = Dictionary(uniqueKeysWithValues: payment.items.map { item in
+            (item.label, item.textValue ?? item.rawValue ?? "")
+        })
+
+        XCTAssertEqual(payment.title, "Payment Authorization")
+        XCTAssertEqual(valuesByLabel["Type"], "org.waltid.transaction-data.payment-authorization")
+        XCTAssertEqual(valuesByLabel["Credential queries"], "pid, payment")
+        XCTAssertEqual(valuesByLabel["Amount"], "42.00")
+        XCTAssertEqual(valuesByLabel["Currency"], "EUR")
+        XCTAssertEqual(valuesByLabel["Payee"], "ACME Corp")
+    }
+
     private func onePixelPNGByteArrayJSON() -> String {
         "[" + onePixelPNGData.map { String($0) }.joined(separator: ",") + "]"
     }
@@ -712,4 +753,19 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
         return formatter
     }()
+}
+
+private extension ClaimItem {
+    var textValue: String? {
+        if case .text(let value) = self.value {
+            return value
+        }
+        return nil
+    }
+}
+
+private extension Collection {
+    var single: Element? {
+        count == 1 ? first : nil
+    }
 }

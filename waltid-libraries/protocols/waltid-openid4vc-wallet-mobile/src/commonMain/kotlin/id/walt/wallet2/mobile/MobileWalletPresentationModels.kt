@@ -3,7 +3,7 @@ package id.walt.wallet2.mobile
 /**
  * Preview of an OpenID4VP presentation request before the wallet submits a VP token.
  *
- * @property request Verifier and protocol metadata extracted from the request.
+ * @property request Verifier, protocol, and transaction metadata extracted from the request.
  * @property credentialOptions Wallet-local credentials that can satisfy the presentation request.
  * @property credentialRequirements Required DCQL credential query combinations that must be satisfied before submission.
  */
@@ -26,13 +26,14 @@ public data class MobileWalletPresentationCredentialRequirement(
 )
 
 /**
- * Verifier metadata extracted from a presentation request.
+ * Verifier and transaction metadata extracted from a presentation request.
  *
  * @property clientId Raw OpenID4VP `client_id` value, when available.
  * @property verifierName Human-readable verifier name derived from request metadata or the client identifier.
  * @property responseUri Verifier response URI to which the wallet will submit the presentation, when provided.
  * @property state OpenID4VP state value supplied by the verifier, when provided.
  * @property nonce OpenID4VP nonce value supplied by the verifier, when provided.
+ * @property transactionData Decoded transaction data items requested by the verifier.
  */
 public data class MobileWalletPresentationRequestInfo(
     val clientId: String?,
@@ -40,6 +41,7 @@ public data class MobileWalletPresentationRequestInfo(
     val responseUri: String?,
     val state: String?,
     val nonce: String?,
+    val transactionData: List<MobileWalletTransactionDataItem> = emptyList(),
 )
 
 /**
@@ -114,4 +116,23 @@ public data class MobileWalletPresentationDisclosure(
     val selectivelyDisclosable: Boolean,
     val required: Boolean = !selectivelyDisclosable,
     val selectable: Boolean = selectivelyDisclosable && !required,
+)
+
+/**
+ * Decoded transaction_data item attached to a presentation request.
+ *
+ * @property type Transaction data type value.
+ * @property displayName Human-readable label from the accepted mobile transaction data profile.
+ * @property credentialQueryIds Credential query identifiers to which this transaction data applies.
+ * @property supportedFields Profile-declared transaction-data fields this wallet accepts for [type].
+ * @property rawJson Full transaction data item encoded as JSON.
+ * @property detailsJson Decoded transaction data details encoded as JSON.
+ */
+public data class MobileWalletTransactionDataItem(
+    val type: String,
+    val displayName: String,
+    val credentialQueryIds: List<String>,
+    val supportedFields: List<String>,
+    val rawJson: String,
+    val detailsJson: String,
 )

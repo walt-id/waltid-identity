@@ -23,6 +23,7 @@ import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationRequestInfo
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletPersistence
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.mobile.toKeyType
@@ -224,6 +225,13 @@ class WalletSdkBridgeTest {
                     bearerToken = "token",
                     hostHeader = "attestation.example",
                 ),
+                transactionDataProfiles = listOf(
+                    MobileWalletTransactionDataProfile(
+                        type = "example.transaction",
+                        displayName = "Example Transaction",
+                        fields = listOf("amount"),
+                    )
+                ),
             )
         )
 
@@ -238,6 +246,16 @@ class WalletSdkBridgeTest {
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
+        assertEquals(
+            listOf(
+                MobileWalletTransactionDataProfile(
+                    type = "example.transaction",
+                    displayName = "Example Transaction",
+                    fields = listOf("amount"),
+                )
+            ),
+            capturedConfig?.transactionDataProfiles,
+        )
 
         val credentials = result.value.credentials()
         assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(credentials)

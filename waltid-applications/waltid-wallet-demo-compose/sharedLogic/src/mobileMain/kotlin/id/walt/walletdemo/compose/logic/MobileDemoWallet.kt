@@ -93,6 +93,18 @@ private fun MobileWalletPresentationPreview.toDemoPreview(): WalletDemoPresentat
         responseUri = request.responseUri,
         state = request.state,
         nonce = request.nonce,
+        transactionData = CredentialDisplayNormalizer.transactionDataGroups(
+            request.transactionData.map { item ->
+                WalletDemoTransactionDataItem(
+                    type = item.type,
+                    displayName = item.displayName,
+                    credentialQueryIds = item.credentialQueryIds,
+                    supportedFields = item.supportedFields,
+                    rawJson = item.rawJson,
+                    detailsJson = item.detailsJson,
+                )
+            }
+        ),
         credentialOptions = credentialOptions.map { option ->
             WalletDemoPresentationCredentialOption(
                 queryId = option.queryId,

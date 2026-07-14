@@ -39,6 +39,44 @@ class TransactionDataRequestValidatorTest {
     }
 
     @Test
+    fun `rejects fields outside supported profile`() {
+        val encoded = TransactionDataTestFixtures.transactionData()
+        val profileRegistry = TransactionDataTypeRegistry(
+            types = setOf(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE),
+            fieldsByType = mapOf(
+                TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE to setOf("amount", "currency"),
+            ),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            validateRequestTransactionData(
+                transactionData = listOf(encoded),
+                typeRegistry = profileRegistry,
+                credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
+            )
+        }
+    }
+
+    @Test
+    fun `accepts fields declared by supported profile`() {
+        val encoded = TransactionDataTestFixtures.transactionData()
+        val profileRegistry = TransactionDataTypeRegistry(
+            types = setOf(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE),
+            fieldsByType = mapOf(
+                TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE to setOf("amount", "currency", "payee"),
+            ),
+        )
+
+        val decoded = validateRequestTransactionData(
+            transactionData = listOf(encoded),
+            typeRegistry = profileRegistry,
+            credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
+        )
+
+        assertEquals("ACME Corp", decoded.single().details["payee"]?.toString()?.trim('"'))
+    }
+
+    @Test
     fun `structural validation accepts any type`() {
         val encoded = TransactionDataTestFixtures.transactionData(type = "unsupported-type")
 

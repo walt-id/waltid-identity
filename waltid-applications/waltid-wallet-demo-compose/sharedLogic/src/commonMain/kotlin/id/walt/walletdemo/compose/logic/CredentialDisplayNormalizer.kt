@@ -74,6 +74,85 @@ object CredentialDisplayNormalizer {
             ?: DisplayValue.Raw(valueJson)
     }
 
+    fun transactionDataGroups(items: List<WalletDemoTransactionDataItem>): List<ClaimGroup> {
+        val baseTitles = items.map { item ->
+            item.displayName
+                .takeIf { it.isNotBlank() }
+                ?.let(CredentialDisplayVocabulary::humanizedClaimLabel)
+                ?: CredentialDisplayVocabulary.TransactionDataTitle
+        }
+        val titleCounts = baseTitles.groupingBy { it }.eachCount()
+        val seenTitles = mutableMapOf<String, Int>()
+
+        return items.mapIndexed { index, item ->
+            val baseTitle = baseTitles[index]
+            val seenCount = seenTitles.getOrElse(baseTitle) { 0 } + 1
+            seenTitles[baseTitle] = seenCount
+            val title = if (titleCounts.getValue(baseTitle) > 1) "$baseTitle $seenCount" else baseTitle
+            val typePath = ClaimPath.transactionData(index, TransactionDataField.Type)
+            val claimItems = buildList {
+                add(
+                    ClaimItem(
+                        path = typePath.itemPath,
+                        label = CredentialDisplayVocabulary.transactionDataLabel(TransactionDataField.Type),
+                        value = DisplayValue.Text(item.type),
+                        rawValue = item.type,
+                        roles = CredentialDisplayVocabulary.roles(typePath),
+                    )
+                )
+                if (item.credentialQueryIds.isNotEmpty()) {
+                    val queryPath = ClaimPath.transactionData(index, TransactionDataField.CredentialQueryIds)
+                    add(
+                        ClaimItem(
+                            path = queryPath.itemPath,
+                            label = CredentialDisplayVocabulary.transactionDataLabel(TransactionDataField.CredentialQueryIds),
+                            value = DisplayValue.Text(item.credentialQueryIds.joinToString()),
+                            rawValue = item.credentialQueryIds.joinToString(),
+                            roles = CredentialDisplayVocabulary.roles(queryPath),
+                        )
+                    )
+                }
+                addAll(
+                    claimItemsFromJson(
+                        rawJson = item.detailsJson,
+                        path = ClaimPath.transactionData(index, TransactionDataField.Details),
+                        fallbackLabel = CredentialDisplayVocabulary.transactionDataLabel(TransactionDataField.Details),
+                    )
+                )
+            }
+
+            ClaimGroup(title = title, items = claimItems)
+        }
+    }
+
+    private fun claimItemsFromJson(rawJson: String, path: ClaimPath, fallbackLabel: String): List<ClaimItem> {
+        if (rawJson.isBlank()) {
+            return emptyList()
+        }
+
+        val parsed = runCatching { json.parseToJsonElement(rawJson) }.getOrNull()
+            ?: return listOf(
+                ClaimItem(
+                    path = path.itemPath,
+                    pathComponents = path.components,
+                    label = fallbackLabel,
+                    value = DisplayValue.Raw(rawJson),
+                    rawValue = rawJson,
+                    roles = CredentialDisplayVocabulary.roles(path),
+                )
+            )
+
+        return when (parsed) {
+            is JsonObject -> parsed.entries.flatMap { (key, value) ->
+                value.toClaimRows(
+                    path = ClaimPath.child(path, key),
+                    label = CredentialDisplayVocabulary.humanizedClaimLabel(key),
+                ).map { row -> row.item }
+            }
+            else -> parsed.toClaimRows(path = path, label = fallbackLabel).map { row -> row.item }
+        }
+    }
+
     private fun JsonElement.toClaimItem(path: ClaimPath, label: String): ClaimItem =
         ClaimItem(
             path = path.itemPath,

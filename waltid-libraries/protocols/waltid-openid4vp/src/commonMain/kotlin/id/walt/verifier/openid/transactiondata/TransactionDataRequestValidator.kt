@@ -29,7 +29,7 @@ private fun validateTransactionDataInternal(
     decodedItems.forEach { decodedItem ->
         val item = decodedItem.transactionData
         require(item.type.isNotBlank()) { "transaction_data.type must not be blank" }
-        typeRegistry?.requireKnown(item.type)
+        typeRegistry?.requireConforming(item.type, decodedItem.details.keys)
         require(item.credentialIds.isNotEmpty()) { "transaction_data.credential_ids must not be empty" }
         require(item.requireCryptographicHolderBinding != false) {
             "transaction_data type ${item.type} requires cryptographic holder binding"
