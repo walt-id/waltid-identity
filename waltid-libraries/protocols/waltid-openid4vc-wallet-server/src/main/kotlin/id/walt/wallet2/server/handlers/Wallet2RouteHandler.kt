@@ -98,8 +98,9 @@ data class ImportCredentialRequest(
 /**
  * Shared Ktor route handler for the Wallet2 API.
  *
- * Both the OSS service and the Enterprise service call [registerWallet2Routes],
- * providing their own [WalletResolver]. All HTTP logic lives here.
+ * Deployments using descriptor-based wallet lifecycle provide their own [WalletResolver].
+ * Enterprise keeps its resource-tree route adapter but delegates operation semantics to the
+ * same framework-neutral Wallet2 handlers.
  */
 object Wallet2RouteHandler {
 
