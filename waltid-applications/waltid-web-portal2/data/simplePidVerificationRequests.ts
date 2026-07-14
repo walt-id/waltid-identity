@@ -161,7 +161,7 @@ export const SIMPLE_PID_VERIFICATION_REQUEST_OPTIONS: SimplePidVerificationReque
       requestBody: createPidRequestBody({
         signedRequest: true,
         encryptedResponse: true,
-        clientId: "x509_hash:",
+        clientId: "x509_hash:IEP4DYWPki3n7eibTrkX_zWb9oICgQKDb1Gl3t7cKmk",
         key: EUDI_REFERENCE_WALLET_KEY,
         x5c: EUDI_REFERENCE_WALLET_X5C,
       }),
