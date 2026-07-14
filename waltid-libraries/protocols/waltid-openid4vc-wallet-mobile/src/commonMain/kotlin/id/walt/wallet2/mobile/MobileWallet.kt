@@ -246,6 +246,11 @@ public class MobileWallet internal constructor(
     /**
      * Presents matching wallet credentials to an OpenID4VP verifier request.
      *
+     * This immediate submission API is intended for callers that already handled
+     * request review and user consent. Apps that need to display verifier details,
+     * credential choices, selective disclosures, or transaction data should use
+     * [previewPresentation] followed by [submitPresentation].
+     *
      * @param requestUrl Authorization request URL received from the verifier.
      * @param did Optional DID override for selecting the wallet DID used in the presentation.
      * @param runPolicies Optional override for verifier policy execution in the core presentation handler.

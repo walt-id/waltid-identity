@@ -115,6 +115,15 @@ internal object WalletComposeE2EHelper {
         device.waitForIdle()
     }
 
+    fun assertTextVisibleAfterScrolling(
+        device: UiDevice,
+        texts: List<String>,
+        message: String,
+    ) {
+        if (findTextAfterScrolling(device, texts) != null) return
+        fail("$message. Expected one of $texts.\n${visibleUiSnapshot(device)}")
+    }
+
     fun waitForResource(device: UiDevice, tag: String, timeoutMs: Long): UiObject2? {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -122,6 +131,22 @@ internal object WalletComposeE2EHelper {
             if (node != null) return node
             findVisibleResource(device, tag)?.let { return it }
             Thread.sleep(500)
+        }
+        return null
+    }
+
+    private fun findTextAfterScrolling(device: UiDevice, texts: List<String>): UiObject2? {
+        texts.firstNotNullOfOrNull { text -> device.findObject(By.text(text)) }?.let { return it }
+        repeat(6) {
+            device.swipe(
+                device.displayWidth / 2,
+                (device.displayHeight * 0.72).toInt(),
+                device.displayWidth / 2,
+                (device.displayHeight * 0.36).toInt(),
+                24,
+            )
+            device.waitForIdle()
+            texts.firstNotNullOfOrNull { text -> device.findObject(By.text(text)) }?.let { return it }
         }
         return null
     }

@@ -251,8 +251,8 @@ object WalletPresentationHandler {
     suspend fun presentCredential(
         wallet: Wallet,
         request: PresentCredentialRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available: wallet has no keyStores, no staticKey, and no keyId was specified")
@@ -296,8 +296,8 @@ object WalletPresentationHandler {
     suspend fun presentCredentialIsolated(
         wallet: Wallet,
         request: PresentCredentialIsolatedRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): WalletPresentResult {
         val key = resolveKey(wallet, request.keyId)
             ?: error("No key available for isolated presentation")
@@ -334,8 +334,8 @@ object WalletPresentationHandler {
     suspend fun previewPresentation(
         wallet: Wallet,
         request: PreviewPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): PreviewPresentationResult {
         onEvent(WalletSessionEvent.presentation_request_parsed)
         val resolvedAuthorizationRequest = resolveAuthorizationRequest(request.requestUrl)
@@ -386,8 +386,8 @@ object WalletPresentationHandler {
     suspend fun submitPresentation(
         wallet: Wallet,
         request: SubmitPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
         transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
-        onEvent: suspend (WalletSessionEvent) -> Unit = {}
     ): WalletPresentResult {
         request.selectedCredentialOptions.requireValidPresentationCredentialSelection()
         val resolvedAuthorizationRequest = consumePreviewedAuthorizationRequest(wallet, request.requestUrl)

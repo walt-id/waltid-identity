@@ -58,6 +58,25 @@ class TransactionDataRequestValidatorTest {
     }
 
     @Test
+    fun `rejects type-specific fields when profile declares none`() {
+        val encoded = TransactionDataTestFixtures.transactionData()
+        val profileRegistry = TransactionDataTypeRegistry(
+            types = setOf(TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE),
+            fieldsByType = mapOf(
+                TransactionDataTestFixtures.SUPPORTED_TRANSACTION_DATA_TYPE to emptySet(),
+            ),
+        )
+
+        assertFailsWith<IllegalArgumentException> {
+            validateRequestTransactionData(
+                transactionData = listOf(encoded),
+                typeRegistry = profileRegistry,
+                credentialQueriesById = TransactionDataTestFixtures.sdJwtCredentialQueries(),
+            )
+        }
+    }
+
+    @Test
     fun `accepts fields declared by supported profile`() {
         val encoded = TransactionDataTestFixtures.transactionData()
         val profileRegistry = TransactionDataTypeRegistry(

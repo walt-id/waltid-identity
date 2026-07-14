@@ -11,8 +11,8 @@ data class TransactionDataTypeRegistry(
 
     fun requireConforming(type: String, fields: Set<String>) {
         requireKnown(type)
-        val supportedFields = fieldsByType[type].orEmpty()
-        if (supportedFields.isNotEmpty()) {
+        val supportedFields = fieldsByType[type]
+        if (supportedFields != null) {
             require(fields.all { it in supportedFields }) {
                 "Unsupported transaction_data fields for type '$type': ${(fields - supportedFields).joinToString()}"
             }

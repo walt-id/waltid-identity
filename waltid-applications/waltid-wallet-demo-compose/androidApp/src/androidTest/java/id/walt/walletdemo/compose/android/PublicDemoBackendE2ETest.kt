@@ -9,6 +9,7 @@ import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPER
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertTextVisibleAfterScrolling
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
@@ -144,17 +145,21 @@ class PublicDemoBackendE2ETest {
         )
         assertTrue("Transaction-data preview did not load. Latest status: ${latestStatus(device)}", previewReady)
 
-        assertTrue("Payment profile title missing", device.findObject(By.text("PAYMENT AUTHORIZATION")) != null)
-        assertTrue("Payment amount missing", device.findObject(By.text("42.00")) != null)
-        assertTrue("Payment currency missing", device.findObject(By.text("EUR")) != null)
-        assertTrue("Payment payee missing", device.findObject(By.text("ACME Corp")) != null)
-        assertTrue("Payment reference missing", device.findObject(By.text("INV-2026-042")) != null)
-
         val screenshot = File("/sdcard/Download/wal1077-compose-android-transaction-data.png")
         if (device.takeScreenshot(screenshot)) {
             println("WAL1077_SCREENSHOT=${screenshot.absolutePath}")
         } else {
             println("WAL1077_SCREENSHOT_CAPTURE_FAILED=${screenshot.absolutePath}")
         }
+
+        assertTextVisibleAfterScrolling(
+            device,
+            listOf("PAYMENT AUTHORIZATION", "Payment Authorization"),
+            "Payment profile title missing",
+        )
+        assertTextVisibleAfterScrolling(device, listOf("42.00"), "Payment amount missing")
+        assertTextVisibleAfterScrolling(device, listOf("EUR"), "Payment currency missing")
+        assertTextVisibleAfterScrolling(device, listOf("ACME Corp"), "Payment payee missing")
+        assertTextVisibleAfterScrolling(device, listOf("INV-2026-042"), "Payment reference missing")
     }
 }
