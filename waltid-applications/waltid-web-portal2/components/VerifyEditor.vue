@@ -143,6 +143,16 @@ const canSubmit = computed(() => {
     return false;
   }
 });
+const missingRequiredClientId = computed(
+  () => clientIdNeedsInput.value && !clientIdInput.value.trim(),
+);
+const submitDisabled = computed(
+  () =>
+    !canSubmit.value ||
+    !!optionsError.value ||
+    missingRequiredClientId.value ||
+    props.session.loading.value,
+);
 
 function readPayload(): Record<string, unknown> {
   const parsed = JSON.parse(json.value || "{}");
@@ -440,7 +450,7 @@ async function submit() {
     <div class="flex items-center gap-3">
       <button
         class="btn btn-primary"
-        :disabled="!canSubmit || session.loading.value"
+        :disabled="submitDisabled"
         @click="submit"
       >
         <svg
