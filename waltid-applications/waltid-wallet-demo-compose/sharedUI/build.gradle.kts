@@ -62,6 +62,7 @@ kotlin {
                     dependencies {
                         implementation(identityLibs.androidx.activity.compose)
                         implementation("androidx.compose.material:material-icons-extended:1.7.8")
+                        implementation(identityLibs.compose.material.icons.core)
                     }
                 }
             }
