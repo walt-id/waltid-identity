@@ -1,4 +1,8 @@
+@file:OptIn(ExperimentalAbiValidation::class)
+
 import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+import org.jetbrains.kotlin.gradle.dsl.abi.BinariesSource
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     id("waltid.mobile.library")
@@ -23,6 +27,12 @@ skie {
 }
 
 kotlin {
+    explicitApi()
+
+    abiValidation {
+        binariesSource.set(BinariesSource.MAIN_COMPILATION)
+    }
+
     if (enableIosBuild) {
         val walletCoreXcFramework = XCFramework("WalletCore")
 
@@ -34,9 +44,6 @@ kotlin {
                 walletCoreXcFramework.add(this)
             }
 
-            binaries.configureEach {
-                linkerOpts("-lsqlite3")
-            }
         }
     }
 
@@ -53,6 +60,7 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            implementation(project(":waltid-libraries:credentials:waltid-digital-credentials-examples"))
             implementation(identityLibs.kotlinx.coroutines.test)
             implementation(identityLibs.ktor.client.core)
             implementation(identityLibs.kotlinx.serialization.json)

@@ -8,7 +8,109 @@ final class WalletAPITests: XCTestCase {
         acceptsSendable(configuration)
         XCTAssertEqual(configuration.walletID, "default")
         XCTAssertEqual(configuration.defaultKeyType, .secp256r1)
+        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
+        XCTAssertNil(configuration.persistence.stores.credentials)
+        XCTAssertNil(configuration.persistence.stores.dids)
+        XCTAssertNil(configuration.persistence.stores.keys)
         XCTAssertNil(configuration.attestation)
+    }
+
+    func testPublicPersistenceConfigurationUsesEncryptedDefault() {
+        let configuration = WalletConfiguration(persistence: WalletPersistence(databaseKey: .managed))
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertTrue(configuration.persistence.databaseKey.isManaged)
+    }
+
+    func testPublicPersistenceConfigurationAcceptsProvidedDatabaseKeyProvider() {
+        let provider = FakeDatabaseKeyProvider()
+        let configuration = WalletConfiguration(
+            persistence: WalletPersistence(databaseKey: .provided(provider))
+        )
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+    }
+
+    func testPublicPersistenceConfigurationAcceptsCustomCredentialStore() {
+        let store = FakeCredentialStore()
+        let configuration = WalletConfiguration(
+            persistence: WalletPersistence(stores: WalletStores(credentials: store))
+        )
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertNotNil(configuration.persistence.stores.credentials)
+    }
+
+    func testPublicPersistenceConfigurationCombinesProvidedDatabaseKeyAndCustomCredentialStore() {
+        let provider = FakeDatabaseKeyProvider()
+        let store = FakeCredentialStore()
+        let configuration = WalletConfiguration(
+            persistence: WalletPersistence(
+                databaseKey: .provided(provider),
+                stores: WalletStores(credentials: store)
+            )
+        )
+
+        acceptsSendable(configuration.persistence)
+        XCTAssertTrue(configuration.persistence.databaseKey.isProvided)
+        XCTAssertNotNil(configuration.persistence.stores.credentials)
+    }
+
+    func testPublicWalletStoresExposeCredentialDidAndKeyOverrides() {
+        let credentialStore = FakeCredentialStore()
+        let didStore = FakeDidStore()
+        let keyStore = FakeKeyStore()
+        let keys = WalletKeys(store: keyStore) { keyType in
+            StoredKey(
+                keyID: "generated-\(keyType)",
+                keyType: keyType,
+                algorithm: nil,
+                serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"generated"}}"#
+            )
+        }
+        let stores = WalletStores(
+            credentials: credentialStore,
+            dids: didStore,
+            keys: keys
+        )
+
+        acceptsSendable(stores)
+        XCTAssertNotNil(stores.credentials)
+        XCTAssertNotNil(stores.dids)
+        XCTAssertNotNil(stores.keys)
+    }
+
+    func testWalletDatabaseKeyDescriptionRedactsMaterial() {
+        let key = WalletDatabaseKey(
+            keyID: "consumer-wallet:wallet_consumer-wallet",
+            material: Data([1, 2, 3, 4])
+        )
+
+        XCTAssertEqual(
+            String(describing: key),
+            "WalletDatabaseKey(keyID: consumer-wallet:wallet_consumer-wallet, material: <redacted>)"
+        )
+        XCTAssertEqual(String(reflecting: key), String(describing: key))
+        XCTAssertFalse(String(describing: key).contains("1 bytes"))
+        XCTAssertFalse(String(describing: key).contains("4 bytes"))
+    }
+
+    func testStoredKeyDescriptionRedactsSerializedKeyJSON() {
+        let key = StoredKey(
+            keyID: "key-1",
+            keyType: .secp256r1,
+            algorithm: "ES256",
+            serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"key-1","d":"secret"}}"#
+        )
+
+        XCTAssertEqual(
+            String(describing: key),
+            "StoredKey(keyID: key-1, keyType: secp256r1, algorithm: ES256, serializedKeyJSON: <redacted>)"
+        )
+        XCTAssertEqual(String(reflecting: key), String(describing: key))
+        XCTAssertFalse(String(describing: key).contains("secret"))
+        XCTAssertFalse(String(reflecting: key).contains("secret"))
     }
 
     func testPublicModelsAreValueTypesAndEquatable() {
@@ -18,16 +120,46 @@ final class WalletAPITests: XCTestCase {
             issuer: "https://issuer.example",
             subject: "did:key:subject",
             label: "PID",
-            addedAt: nil
+            addedAt: nil,
+            credentialDataJSON: #"{"given_name":"Ada"}"#
         )
 
         acceptsSendable(credential)
         XCTAssertEqual(credential.id, "credential-1")
+        XCTAssertEqual(credential.credentialDataJSON, #"{"given_name":"Ada"}"#)
         XCTAssertEqual(credential, credential)
+
+        let storedCredential = StoredCredential(
+            id: "stored-credential-1",
+            serializedCredential: #"{"type":["VerifiableCredential"]}"#,
+            format: "jwt_vc_json",
+            label: "PID",
+            addedAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        acceptsSendable(storedCredential)
+        XCTAssertEqual(storedCredential, storedCredential)
+
+        let storedDid = StoredDid(
+            did: "did:key:wallet",
+            documentJSON: #"{"id":"did:key:wallet"}"#
+        )
+        acceptsSendable(storedDid)
+        XCTAssertEqual(storedDid.id, "did:key:wallet")
+        XCTAssertEqual(storedDid, storedDid)
+
+        let storedKey = StoredKey(
+            keyID: "key-1",
+            keyType: .secp256r1,
+            algorithm: "ES256",
+            serializedKeyJSON: #"{"type":"jwk","jwk":{"kid":"key-1"}}"#
+        )
+        acceptsSendable(storedKey)
+        XCTAssertEqual(storedKey.id, "key-1")
+        XCTAssertEqual(storedKey, storedKey)
     }
 
     func testWalletHasAsyncFacadeShape() async {
-        let wallet = try? await Wallet(configuration: .init())
+        let wallet = Wallet(configuration: .init(), bridge: FakeWalletCoreBridge())
 
         XCTAssertNotNil(wallet)
     }
@@ -86,7 +218,8 @@ final class WalletAPITests: XCTestCase {
             issuer: "https://issuer.example",
             subject: "did:key:subject",
             label: "PID",
-            addedAt: Date(timeIntervalSince1970: 1_700_000_000)
+            addedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            credentialDataJSON: #"{"given_name":"Ada"}"#
         )
         let bridge = FakeWalletCoreBridge()
         bridge.credentialsResult = [credential]
@@ -96,6 +229,15 @@ final class WalletAPITests: XCTestCase {
 
         XCTAssertEqual(result, [credential])
         XCTAssertEqual(bridge.credentialsCallCount, 1)
+    }
+
+    func testDeleteLocalDataForwardsToBridge() async throws {
+        let bridge = FakeWalletCoreBridge()
+        let wallet = Wallet(bridge: bridge)
+
+        try await wallet.deleteLocalData()
+
+        XCTAssertEqual(bridge.deleteLocalDataCallCount, 1)
     }
 
     func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
@@ -159,6 +301,107 @@ final class WalletAPITests: XCTestCase {
     }
 }
 
+private extension WalletDatabaseKeyConfiguration {
+    var isManaged: Bool {
+        switch self {
+        case .managed:
+            return true
+        case .provided:
+            return false
+        }
+    }
+
+    var isProvided: Bool {
+        switch self {
+        case .managed:
+            return false
+        case .provided:
+            return true
+        }
+    }
+}
+
+private struct FakeDatabaseKeyProvider: WalletDatabaseKeyProvider {
+    func databaseKey(walletID: String, databaseName: String) async throws -> WalletDatabaseKey {
+        WalletDatabaseKey(keyID: "\(walletID)-\(databaseName)", material: Data(repeating: 7, count: 32))
+    }
+
+    func deleteDatabaseKey(walletID: String, databaseName: String) async throws {
+        _ = walletID
+        _ = databaseName
+    }
+}
+
+private final class FakeCredentialStore: WalletCredentialStore, @unchecked Sendable {
+    private var entries: [StoredCredential] = []
+
+    func credential(id: String) async throws -> StoredCredential? {
+        entries.first { $0.id == id }
+    }
+
+    func credentials() async throws -> [StoredCredential] {
+        entries
+    }
+
+    func addCredential(_ credential: StoredCredential) async throws {
+        entries.removeAll { $0.id == credential.id }
+        entries.append(credential)
+    }
+
+    func removeCredential(id: String) async throws -> Bool {
+        let originalCount = entries.count
+        entries.removeAll { $0.id == id }
+        return entries.count != originalCount
+    }
+}
+
+private final class FakeDidStore: WalletDidStore, @unchecked Sendable {
+    private var entries: [StoredDid] = []
+
+    func did(id: String) async throws -> StoredDid? {
+        entries.first { $0.id == id }
+    }
+
+    func dids() async throws -> [StoredDid] {
+        entries
+    }
+
+    func addDid(_ did: StoredDid) async throws {
+        entries.removeAll { $0.id == did.id }
+        entries.append(did)
+    }
+
+    func removeDid(id: String) async throws -> Bool {
+        let originalCount = entries.count
+        entries.removeAll { $0.id == id }
+        return entries.count != originalCount
+    }
+}
+
+private final class FakeKeyStore: WalletKeyStore, @unchecked Sendable {
+    private var entries: [StoredKey] = []
+
+    func key(id: String) async throws -> StoredKey? {
+        entries.first { $0.id == id }
+    }
+
+    func keys() async throws -> [WalletKeyInfo] {
+        entries.map { WalletKeyInfo(keyID: $0.keyID, keyType: $0.keyType, algorithm: $0.algorithm) }
+    }
+
+    func addKey(_ key: StoredKey) async throws -> String {
+        entries.removeAll { $0.id == key.id }
+        entries.append(key)
+        return key.keyID
+    }
+
+    func removeKey(id: String) async throws -> Bool {
+        let originalCount = entries.count
+        entries.removeAll { $0.id == id }
+        return entries.count != originalCount
+    }
+}
+
 private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
     struct BootstrapCall {
         let keyType: WalletKeyType
@@ -186,6 +429,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var receiveCalls: [ReceiveCall] = []
     private(set) var credentialsCallCount = 0
+    private(set) var deleteLocalDataCallCount = 0
     private(set) var presentCalls: [PresentCall] = []
 
     init(events: [WalletEvent] = []) {
@@ -222,6 +466,14 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
 
         credentialsCallCount += 1
         return credentialsResult
+    }
+
+    func deleteLocalData() async throws {
+        if let error {
+            throw error
+        }
+
+        deleteLocalDataCallCount += 1
     }
 
     func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {

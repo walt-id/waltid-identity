@@ -8,6 +8,10 @@ inputs:
     description: 'GitHub token (optional, defaults to github.token)'
     required: false
     default: ${{ github.token }}
+  ref:
+    description: 'Ref to try in each repository before falling back to main'
+    required: false
+    default: ${{ github.head_ref || github.ref_name }}
   checkoutUnifiedToRepoDir:
     description: 'If set to "yes", checkout waltid-unified-build to its repo name instead of "."'
     required: false
@@ -20,7 +24,7 @@ runs:
       id: ref_unified
       shell: bash
       env:
-        REF: ${{ github.ref_name }}
+        REF: ${{ inputs.ref }}
         TOKEN: ${{ inputs.token }}
       run: |
         REPO="walt-id/waltid-unified-build"
@@ -42,7 +46,7 @@ runs:
       id: ref_identity
       shell: bash
       env:
-        REF: ${{ github.ref_name }}
+        REF: ${{ inputs.ref }}
       run: |
         REPO="walt-id/waltid-identity"
         if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then
@@ -63,7 +67,7 @@ runs:
       id: ref_enterprise
       shell: bash
       env:
-        REF: ${{ github.ref_name }}
+        REF: ${{ inputs.ref }}
       run: |
         REPO="walt-id/waltid-identity-enterprise"
         if [ -n "$REF" ] && git ls-remote --exit-code "https://github.com/${REPO}.git" "$REF"; then

@@ -35,7 +35,7 @@ val issuer2AuthenticationPluginAmendment: suspend () -> Unit = suspend {
                         },
                     )
                 }
-                urlProvider = { "${issuerServiceConfig.baseUrl.trimEnd('/')}/openid4vci/external/oauth/callback" }
+                urlProvider = { "${issuerServiceConfig.openId4VciBaseUrl()}/external/oauth/callback" }
             }
         }
     }

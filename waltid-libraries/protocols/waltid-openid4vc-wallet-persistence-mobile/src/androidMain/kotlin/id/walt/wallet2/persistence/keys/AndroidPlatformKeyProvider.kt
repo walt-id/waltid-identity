@@ -8,7 +8,7 @@ import kotlin.uuid.Uuid
 /**
  * [PlatformKeyProvider] implementation backed by Android KeyStore.
  */
-class AndroidPlatformKeyProvider : PlatformKeyProvider {
+public class AndroidPlatformKeyProvider : PlatformKeyProvider {
 
     /**
      * Android platform-backed key types supported by this provider.

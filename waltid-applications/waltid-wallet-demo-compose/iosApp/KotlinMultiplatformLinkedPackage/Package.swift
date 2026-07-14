@@ -1,6 +1,5 @@
 // swift-tools-version: 5.9
 import PackageDescription
-
 let package = Package(
   name: "KotlinMultiplatformLinkedPackage",
   platforms: [
@@ -14,12 +13,13 @@ let package = Package(
     )
   ],
   dependencies: [
+    .package(path: "subpackages/_waltid_libraries_protocols_waltid_openid4vc_wallet_persistence_mobile")
   ],
   targets: [
     .target(
       name: "KotlinMultiplatformLinkedPackage",
-      linkerSettings: [
-        .linkedLibrary("sqlite3")
+      dependencies: [
+        .product(name: "_waltid_libraries_protocols_waltid_openid4vc_wallet_persistence_mobile", package: "_waltid_libraries_protocols_waltid_openid4vc_wallet_persistence_mobile")
       ]
     )
   ]
