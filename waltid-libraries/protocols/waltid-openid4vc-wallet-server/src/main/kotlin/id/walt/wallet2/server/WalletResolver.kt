@@ -146,12 +146,18 @@ interface WalletResolver {
      * Assembles a live [Wallet] from a [WalletDescriptor] by resolving each store ID.
      */
     suspend fun assembleWallet(descriptor: WalletDescriptor): Wallet {
-        val keyStores = descriptor.keyStoreIds.mapNotNull { resolveKeyStore(it) }
-        val credentialStores = descriptor.credentialStoreIds.mapNotNull { resolveCredentialStore(it) }
-        val didStore = descriptor.didStoreId?.let { resolveDidStore(it) }
-        val staticKey = descriptor.serializedStaticKey?.let {
-            runCatching { KeyManager.resolveSerializedKey(it) }.getOrNull()
+        val keyStores = descriptor.keyStoreIds.map { storeId ->
+            requireNotNull(resolveKeyStore(storeId)) { "Wallet '${descriptor.id}' references missing key store '$storeId'" }
         }
+        val credentialStores = descriptor.credentialStoreIds.map { storeId ->
+            requireNotNull(resolveCredentialStore(storeId)) {
+                "Wallet '${descriptor.id}' references missing credential store '$storeId'"
+            }
+        }
+        val didStore = descriptor.didStoreId?.let { storeId ->
+            requireNotNull(resolveDidStore(storeId)) { "Wallet '${descriptor.id}' references missing DID store '$storeId'" }
+        }
+        val staticKey = descriptor.serializedStaticKey?.let { KeyManager.resolveSerializedKey(it) }
         return Wallet(
             id = descriptor.id,
             keyStores = keyStores,
