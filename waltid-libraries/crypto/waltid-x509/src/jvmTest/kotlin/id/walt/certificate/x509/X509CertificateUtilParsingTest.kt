@@ -2,8 +2,11 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.TestData.GOOGLE_CERTIFICATE_PEM
 import id.walt.certificate.TestData.V_TRUST_ROOT_CA_CERTIFICATE_PEM
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
+import kotlinx.io.bytestring.toHexString
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class X509CertificateUtilParsingTest {
@@ -48,6 +51,11 @@ class X509CertificateUtilParsingTest {
                     it.publicKeyHex
                 )
             }
+
+            assertNotNull(cert.data.extensionSubjectKeyIdentifier) { extKeyIdentifier ->
+                assertEquals("54627063f1758443588ed11620b1c6ac1abcf689", extKeyIdentifier.keyIdentifier.toHexString())
+            }
+
             assertEquals(
                 "8a71de6559336f426c26e53880d00d88a18da4c6a91f0dcb6194e206c5c96387",
                 cert.fingerprintSha256Hex

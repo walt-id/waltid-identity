@@ -9,6 +9,7 @@ interface IssuerAlternativeNameExtension : AlternativeNameExtension {
 
     companion object {
         const val OID = "2.5.29.18"
+        const val NAME = "Issuer Alternative Name"
 
         class Builder(
             critical: Boolean = false,

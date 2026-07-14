@@ -6,6 +6,7 @@ interface BasicConstraintsExtension : Extension {
 
     companion object {
         const val OID = "2.5.29.19"
+        const val NAME = "Basic Constraints"
 
         fun MutableExtensionContainer.extensionBasicConstraints(block: Builder.() -> Unit) {
             val builder = Builder(oid = OID)

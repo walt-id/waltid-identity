@@ -19,6 +19,7 @@ interface KeyUsageExtension : Extension {
     companion object {
 
         const val OID = "2.5.29.15"
+        const val NAME = "Key Usage"
 
         fun MutableExtensionContainer.extensionKeyUsage(block: Builder.() -> Unit) {
             val builder = Builder(oid = OID)

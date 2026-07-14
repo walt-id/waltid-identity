@@ -3,6 +3,7 @@ package id.walt.x509.id.walt.certificate.x509.bouncycastle
 import id.walt.certificate.x509.X509Certificate
 import id.walt.certificate.x509.X509CertificateSigner
 import id.walt.certificate.x509.builder.X509CertificateDataBuilder
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.crypto.keys.Key
 import id.walt.x509.id.walt.certificate.x509.bouncycastle.extension.BouncyExtensionFactory
 import org.bouncycastle.asn1.ASN1ObjectIdentifier
@@ -47,7 +48,11 @@ internal class BouncyX509CertificateSigner : X509CertificateSigner {
         val bouncyBuilder = X509v3CertificateBuilder(issuer, serial, notBefore, notAfter, subject, keyInfo)
 
         builder.extensions.values.forEach {
-            bouncyBuilder.addExtension(BouncyExtensionFactory.createExtension(it))
+            if (it is SubjectKeyIdentifierExtension) {
+                bouncyBuilder.addExtension(BouncyExtensionFactory.createSubjectKeyIdentifierExtension(it, keyInfo.publicKeyData))
+            } else {
+                bouncyBuilder.addExtension(BouncyExtensionFactory.createExtension(it))
+            }
         }
 
         val signed = bouncyBuilder.build(BouncyContentSigner(issuerKey))

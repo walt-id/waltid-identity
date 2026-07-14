@@ -16,6 +16,7 @@ interface SubjectAlternativeNameExtension : AlternativeNameExtension {
 
     companion object {
         const val OID = "2.5.29.17"
+        const val NAME = "Subject Alternative Name"
 
         fun MutableExtensionContainer.extensionSan(block: Builder.() -> Unit) {
             val builder = Builder()

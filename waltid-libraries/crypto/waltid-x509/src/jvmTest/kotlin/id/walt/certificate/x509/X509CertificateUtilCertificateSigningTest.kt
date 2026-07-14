@@ -10,8 +10,10 @@ import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.crypto.keys.JvmJWKKeyCreator
 import kotlinx.coroutines.test.runTest
+import kotlinx.io.bytestring.toHexString
 import java.io.ByteArrayInputStream
 import java.security.KeyStore
 import java.security.cert.CertPathValidator
@@ -43,6 +45,8 @@ class X509CertificateUtilCertificateSigningTest {
             extensionIssuerAltName {
                 addEmail("issuer@walt.id")
             }
+
+            extensionSubjectKeyIdentifier()
         }
 
         assertNotNull(certificate.data.extensionBasicConstraints) { constraints ->
@@ -63,6 +67,11 @@ class X509CertificateUtilCertificateSigningTest {
             assertEquals("issuer@walt.id", email.value)
             assertEquals(IssuerAlternativeNameExtension.NameType.rfc822Name, email.type)
         }
+
+        assertNotNull(certificate.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
+            assertEquals("bf1a4ae1c79b2c5b2e3c021661ebad0f4696bf02", keyIdentifier.keyIdentifier.toHexString())
+        }
+
 
         val certPem = certificate.encodedPem
         assertEquals("OU=waltid", certificate.data.subjectDn)
@@ -90,6 +99,8 @@ class X509CertificateUtilCertificateSigningTest {
                     ExtendedKeyUsageExtension.KeyUsage.serverAuth
                 )
             }
+
+            extensionSubjectKeyIdentifier()
         }
 
         assertNotNull(intermediateCert.data.extensionExtendedKeyUsage) {
@@ -103,6 +114,10 @@ class X509CertificateUtilCertificateSigningTest {
             assertEquals("1.2.840.10045.2.1", keyInfo.algorithmOid)
             assertEquals("id-ecPublicKey", keyInfo.algorithmName)
             assertEquals(intermediateIssuerPublicKeyHex, keyInfo.publicKeyHex)
+        }
+
+        assertNotNull(intermediateCert.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
+            assertEquals("ee73f2b305b33302d57024a1fa29b2d8108f10ff", keyIdentifier.keyIdentifier.toHexString())
         }
 
         println("Cert of intermediate certificate: ${intermediateCert.fingerprintSha256Hex}")
