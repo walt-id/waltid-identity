@@ -76,6 +76,18 @@ class WalletDemoController(
         }
     }
 
+    fun selectCredential(id: String) {
+        _state.update { state ->
+            val ready = state.session as? WalletSessionState.Ready ?: return@update state
+            if (ready.credentials.none { it.id == id }) return@update state
+            state.copy(selectedCredentialId = id)
+        }
+    }
+
+    fun clearSelectedCredential() {
+        _state.update { it.copy(selectedCredentialId = null) }
+    }
+
     fun receive() {
         val current = _state.value
         val ready = current.session as? WalletSessionState.Ready ?: return
@@ -92,6 +104,9 @@ class WalletDemoController(
                 _state.update {
                     it.copy(
                         session = ready.copy(credentials = credentials),
+                        selectedCredentialId = it.selectedCredentialId.takeIf { selectedId ->
+                            credentials.any { credential -> credential.id == selectedId }
+                        },
                         operation = WalletOperationState.Succeeded("Received ${ids.size} credential(s)"),
                     )
                 }
@@ -184,6 +199,9 @@ class WalletDemoController(
                             did = result.did,
                             credentials = credentials,
                         ),
+                        selectedCredentialId = it.selectedCredentialId.takeIf { selectedId ->
+                            credentials.any { credential -> credential.id == selectedId }
+                        },
                         operation = WalletOperationState.Idle,
                     )
                 }

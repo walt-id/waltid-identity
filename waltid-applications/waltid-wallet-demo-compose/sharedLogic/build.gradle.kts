@@ -25,6 +25,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(identityLibs.kotlinx.coroutines.core)
+            implementation(identityLibs.kotlinx.datetime)
+            implementation(identityLibs.kotlinx.serialization.json)
+            implementation(identityLibs.ktor.http)
         }
 
         if (enableMobileWallet) {

@@ -21,6 +21,7 @@ import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
 import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.toCredentialDetails
 import id.walt.walletdemo.compose.ui.components.CredentialCard
 import id.walt.walletdemo.compose.ui.components.StatusCard
 import id.walt.walletdemo.compose.ui.components.UrlActionSection
@@ -28,6 +29,15 @@ import id.walt.walletdemo.compose.ui.components.UrlActionSection
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
     val ready = state.session as? WalletSessionState.Ready
+    val selectedCredential = ready?.credentials?.firstOrNull { it.id == state.selectedCredentialId }
+    if (selectedCredential != null) {
+        CredentialDetailsScreen(
+            details = selectedCredential.toCredentialDetails(),
+            onBack = controller::clearSelectedCredential,
+        )
+        return
+    }
+
     val requestDrafts = state.requestDrafts
 
     Column(
@@ -97,7 +107,10 @@ internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiS
             Text("No credentials", color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             credentials.forEach { credential ->
-                CredentialCard(credential)
+                CredentialCard(
+                    details = credential.toCredentialDetails(),
+                    onClick = { controller.selectCredential(credential.id) },
+                )
             }
         }
     }

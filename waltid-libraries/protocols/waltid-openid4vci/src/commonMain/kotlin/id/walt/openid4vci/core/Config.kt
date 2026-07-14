@@ -1,5 +1,8 @@
 package id.walt.openid4vci.core
 
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceConfig
+import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolver
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationConfig
 import id.walt.openid4vci.handlers.endpoints.authorization.AuthorizationEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.credential.CredentialEndpointHandlers
 import id.walt.openid4vci.handlers.endpoints.par.PushedAuthorizationEndpointHandlers
@@ -33,6 +36,8 @@ import id.walt.openid4vci.validation.IssuerStateValidator
  * repositories stay internal to the DI layer so applications pass in their own implementations.
  */
 data class OAuth2ProviderConfig(
+    val authorizationServerIssuer: String? = null,
+
     val authorizationRequestValidator: AuthorizationRequestValidator,
     val issuerStateValidator: IssuerStateValidator? = null,
     val authorizationEndpointHandlers: AuthorizationEndpointHandlers,
@@ -40,6 +45,13 @@ data class OAuth2ProviderConfig(
 
     val pushedAuthorizationEndpointHandlers: PushedAuthorizationEndpointHandlers = PushedAuthorizationEndpointHandlers(),
     val pushedAuthorizationConfig: PushedAuthorizationConfig? = null,
+
+    // Static client-auth setup for providers with one fixed runtime configuration.
+    val clientAuthenticationServiceConfig: ClientAuthenticationServiceConfig = ClientAuthenticationServiceConfig(),
+    // Dynamic client-auth setup for singleton providers that resolve configuration from request context.
+    // If present, it owns client-auth policy for the request. Static config is used only when this is null.
+    val clientAuthenticationServiceResolver: ClientAuthenticationServiceResolver? = null,
+    val clientAttestationConfig: ClientAttestationConfig? = null,
 
     val accessTokenRequestValidator: AccessTokenRequestValidator,
     val tokenEndpointHandlers: TokenEndpointHandlers,

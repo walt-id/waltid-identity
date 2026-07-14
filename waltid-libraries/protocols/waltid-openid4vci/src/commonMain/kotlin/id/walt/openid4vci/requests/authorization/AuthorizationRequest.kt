@@ -2,6 +2,7 @@ package id.walt.openid4vci.requests.authorization
 
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.ResponseMode
+import id.walt.openid4vci.clientauth.AuthenticatedClient
 import kotlin.time.Instant
 
 /**
@@ -25,12 +26,14 @@ interface AuthorizationRequest {
     val requestForm: Map<String, List<String>>
     val issClaim: String?
     val authorizationDetails: List<AuthorizationDetail>
+    val authenticatedClient: AuthenticatedClient?
 
     fun markResponseTypeHandled(responseType: String): AuthorizationRequest
     fun grantScopes(scopes: Collection<String>): AuthorizationRequest
     fun grantAudience(audience: Collection<String>): AuthorizationRequest
     fun withIssuer(issClaim: String?): AuthorizationRequest
     fun withRedirectUri(uri: String?): AuthorizationRequest
+    fun withAuthenticatedClient(authenticatedClient: AuthenticatedClient?): AuthorizationRequest
     fun didHandleAllResponseTypes(): Boolean =
         responseTypes.isNotEmpty() && responseTypes.all { handledResponseTypes.contains(it) }
 }

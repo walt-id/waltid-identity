@@ -1,9 +1,13 @@
 package id.walt.walletdemo.compose.logic
 
-data class WalletDemoCredential(
+data class CredentialSummary(
     val id: String,
     val format: String,
-    val issuer: String,
+    val issuer: String?,
+    val subject: String? = null,
     val label: String,
-    val addedAt: String,
+    val addedAt: String? = null,
+    val credentialDataJson: String? = null,
 )
+
+typealias WalletDemoCredential = CredentialSummary

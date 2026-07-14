@@ -1,5 +1,15 @@
 import Foundation
+import UIKit
 import WalletSDK
+
+protocol WalletClient {
+    func bootstrap(keyType: WalletKeyType?, didMethod: String) async throws -> WalletBootstrapResult
+    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String]
+    func credentials() async throws -> [Credential]
+    func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult
+}
+
+extension Wallet: WalletClient {}
 
 @MainActor
 class WalletViewModel: ObservableObject {
@@ -12,17 +22,18 @@ class WalletViewModel: ObservableObject {
     @Published var offerUrl = ""
     @Published var presentationRequestUrl = ""
 
-    private let configuration: WalletConfiguration
-    private var cachedWallet: Wallet?
+    private let walletFactory: () async throws -> any WalletClient
+    private var cachedWallet: (any WalletClient)?
 
     init(
         walletID: String = "default",
         attestationBaseUrl: String? = nil,
         attestationAttesterPath: String? = nil,
         attestationBearerToken: String? = nil,
-        attestationHostHeader: String? = nil
+        attestationHostHeader: String? = nil,
+        walletFactory: (() async throws -> any WalletClient)? = nil
     ) {
-        configuration = WalletConfiguration(
+        let configuration = WalletConfiguration(
             walletID: walletID,
             attestation: Self.attestationConfiguration(
                 baseUrl: attestationBaseUrl,
@@ -31,6 +42,7 @@ class WalletViewModel: ObservableObject {
                 hostHeader: attestationHostHeader
             )
         )
+        self.walletFactory = walletFactory ?? { try await Wallet(configuration: configuration) }
         bootstrap()
     }
 
@@ -57,7 +69,7 @@ class WalletViewModel: ObservableObject {
         Task {
             do {
                 let wallet = try await wallet()
-                let credentialIDs = try await wallet.receive(offer: offer)
+                let credentialIDs = try await wallet.receive(offer: offer, txCode: nil, clientID: "wallet-client")
                 credentials = try await wallet.credentials()
                 setSuccess("Received \(credentialIDs.count) credential(s)")
             } catch {
@@ -79,7 +91,8 @@ class WalletViewModel: ObservableObject {
                 let wallet = try await wallet()
                 let result = try await wallet.present(
                     request: request,
-                    did: did.isEmpty ? nil : did
+                    did: did.isEmpty ? nil : did,
+                    runPolicies: nil
                 )
                 setSuccess(result.success ? "Presentation sent" : "Presentation finished without verifier confirmation")
             } catch {
@@ -95,7 +108,7 @@ class WalletViewModel: ObservableObject {
             do {
                 let wallet = try await wallet()
                 logE2E("Bootstrap: calling wallet.bootstrap()")
-                let result = try await wallet.bootstrap()
+                let result = try await wallet.bootstrap(keyType: nil, didMethod: "key")
                 logE2E("Bootstrap: success, DID: \(result.did)")
 
                 logE2E("Bootstrap: calling wallet.credentials()")
@@ -114,12 +127,12 @@ class WalletViewModel: ObservableObject {
         }
     }
 
-    private func wallet() async throws -> Wallet {
+    private func wallet() async throws -> any WalletClient {
         if let cachedWallet {
             return cachedWallet
         }
 
-        let wallet = try await Wallet(configuration: configuration)
+        let wallet = try await walletFactory()
         cachedWallet = wallet
         return wallet
     }
@@ -168,3 +181,65 @@ class WalletViewModel: ObservableObject {
         NSLog("[WalletE2E] \(message)")
     }
 }
+
+#if DEBUG
+extension WalletViewModel {
+    static func mockForUITests() -> WalletViewModel {
+        WalletViewModel(walletID: "mock-wallet") {
+            MockWalletClient()
+        }
+    }
+}
+
+private final class MockWalletClient: WalletClient {
+    private var storedCredentials = [MockCredentialData.credential]
+
+    func bootstrap(keyType: WalletKeyType?, didMethod: String) async throws -> WalletBootstrapResult {
+        WalletBootstrapResult(keyID: "mock-key", did: "did:key:mock-wallet-demo")
+    }
+
+    func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
+        storedCredentials = [MockCredentialData.credential]
+        return storedCredentials.map(\.id)
+    }
+
+    func credentials() async throws -> [Credential] {
+        storedCredentials
+    }
+
+    func present(request: URL, did: String?, runPolicies: Bool?) async throws -> PresentationResult {
+        PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+    }
+}
+
+private enum MockCredentialData {
+    static let credential = Credential(
+        id: "mock-credential",
+        format: "jwt_vc_json",
+        issuer: "walt.id demo issuer",
+        subject: "did:key:mock-holder",
+        label: "Mock credential",
+        addedAt: Date(timeIntervalSince1970: 1_771_132_800),
+        credentialDataJSON: """
+        {
+          "given_name": "Ada",
+          "family_name": "Lovelace",
+          "age_over_18": true,
+          "portrait": "\(mockCredentialPortraitDataURI)"
+        }
+        """
+    )
+
+    private static var mockCredentialPortraitDataURI: String {
+        let data = UIImage(named: "MockCredentialPortrait")?.pngData() ?? fallbackPortraitPNGData
+        return "data:image/png;base64,\(data.base64EncodedString())"
+    }
+
+    private static var fallbackPortraitPNGData: Data {
+        Data(base64Encoded: fallbackPortraitPNGBase64) ?? Data()
+    }
+
+    private static let fallbackPortraitPNGBase64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+}
+#endif

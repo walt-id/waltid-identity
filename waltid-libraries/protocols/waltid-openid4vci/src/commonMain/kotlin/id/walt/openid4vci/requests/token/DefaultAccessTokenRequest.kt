@@ -2,6 +2,7 @@ package id.walt.openid4vci.requests.token
 
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.Session
+import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.requests.generateRequestId
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -19,6 +20,7 @@ data class DefaultAccessTokenRequest(
     override val requestForm: Map<String, List<String>> = emptyMap(),
     override val session: Session? = null,
     override val issClaim: String? = null,
+    override val authenticatedClient: AuthenticatedClient? = null,
 ) : AccessTokenRequest {
     override fun markGrantTypeHandled(grantType: String): AccessTokenRequest =
         copy(handledGrantTypes = handledGrantTypes + grantType)
@@ -43,6 +45,9 @@ data class DefaultAccessTokenRequest(
 
     override fun withIssuer(issClaim: String?): AccessTokenRequest =
         copy(issClaim = issClaim)
+
+    override fun withAuthenticatedClient(authenticatedClient: AuthenticatedClient?): AccessTokenRequest =
+        copy(authenticatedClient = authenticatedClient)
 
     fun hasHandledGrantType(grantType: String): Boolean = handledGrantTypes.contains(grantType)
 }
