@@ -164,13 +164,18 @@ async function submit() {
       </select>
       <p class="mt-2 text-xs text-[--color-text-muted]">
         {{ selectedPidRequestOption.description }}
-        <a v-if="selectedPidRequestOption.link" :href="selectedPidRequestOption.link" target="_blank" class="text-blue-500">Learn more</a>
+        <a
+          v-if="selectedPidRequestOption.link"
+          :href="selectedPidRequestOption.link"
+          target="_blank"
+          class="text-blue-500"
+          >Learn more</a
+        >
       </p>
     </section>
 
     <details
       v-else
-      open
       class="group rounded-xl border border-[--color-border] bg-white"
     >
       <summary class="cursor-pointer list-none p-4">
