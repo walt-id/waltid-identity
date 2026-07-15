@@ -12,6 +12,8 @@ import id.walt.wallet2.mobile.MobileWalletEventPhase
 import id.walt.wallet2.mobile.MobileWalletEventStatus
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletOfferResolution
+import id.walt.wallet2.mobile.MobileWalletTxCode
+import id.walt.wallet2.mobile.MobileWalletTxCodeInputMode
 import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
@@ -118,8 +120,10 @@ class WalletSdkBridgeTest {
 
         val result = bridge.resolveOffer("openid-credential-offer://issuer.example")
 
-        assertIs<WalletBridgeResult.Success<WalletBridgeOfferResolution>>(result)
-        assertEquals(true, result.value.txCodeRequired)
+        assertIs<WalletBridgeResult.Success<MobileWalletOfferResolution>>(result)
+        assertEquals(MobileWalletTxCodeInputMode.numeric, result.value.txCode?.inputMode)
+        assertEquals(6, result.value.txCode?.length)
+        assertEquals("Enter the issuer code", result.value.txCode?.issuerDescription)
         assertEquals("openid-credential-offer://issuer.example", operations.resolvedOfferUrl)
     }
 
@@ -578,7 +582,13 @@ class WalletSdkBridgeTest {
 
         override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
             resolvedOfferUrl = offerUrl
-            return MobileWalletOfferResolution(txCodeRequired = true)
+            return MobileWalletOfferResolution(
+                txCode = MobileWalletTxCode(
+                    inputMode = MobileWalletTxCodeInputMode.numeric,
+                    length = 6,
+                    issuerDescription = "Enter the issuer code",
+                ),
+            )
         }
 
         override suspend fun receive(

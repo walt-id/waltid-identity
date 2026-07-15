@@ -21,6 +21,7 @@ import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ResolveOfferRequest
+import id.walt.wallet2.handlers.ResolveOfferTxCodeInputMode
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -73,12 +74,23 @@ public data class MobileWalletCredential(
 )
 
 /**
- * Result of resolving an OpenID4VCI credential offer before issuance.
- *
- * @property txCodeRequired `true` when the issuer requires a transaction code before issuance.
+ * Accepted input modes for an issuer-provided transaction code.
  */
+public enum class MobileWalletTxCodeInputMode {
+    numeric,
+    text,
+}
+
+/** Metadata for a transaction code that the wallet must collect from the user. */
+public data class MobileWalletTxCode(
+    public val inputMode: MobileWalletTxCodeInputMode,
+    public val length: Int?,
+    public val issuerDescription: String?,
+)
+
+/** Result of resolving an OpenID4VCI credential offer before issuance. */
 public data class MobileWalletOfferResolution(
-    public val txCodeRequired: Boolean,
+    public val txCode: MobileWalletTxCode?,
 )
 
 /**
@@ -210,7 +222,7 @@ public class MobileWallet internal constructor(
         }
 
     /**
-     * Resolves a credential offer and reports whether the issuer requires a transaction code.
+     * Resolves a credential offer and reports any transaction code the app must collect.
      *
      * Apps can use this before [receive] to decide whether to prompt the user for a code.
      *
@@ -220,7 +232,18 @@ public class MobileWallet internal constructor(
         val resolution = WalletIssuanceHandler.resolveOffer(
             ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
         )
-        return MobileWalletOfferResolution(txCodeRequired = resolution.txCodeRequired)
+        return MobileWalletOfferResolution(
+            txCode = resolution.txCode?.let {
+                MobileWalletTxCode(
+                    inputMode = when (it.inputMode) {
+                        ResolveOfferTxCodeInputMode.numeric -> MobileWalletTxCodeInputMode.numeric
+                        ResolveOfferTxCodeInputMode.text -> MobileWalletTxCodeInputMode.text
+                    },
+                    length = it.length,
+                    issuerDescription = it.description,
+                )
+            },
+        )
     }
 
     /**

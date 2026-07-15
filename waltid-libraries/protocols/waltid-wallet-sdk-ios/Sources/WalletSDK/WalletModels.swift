@@ -480,14 +480,32 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     }
 }
 
+/// Accepted input modes for an issuer-provided transaction code.
+public enum TransactionCodeInputMode: String, Equatable, Sendable {
+    case numeric
+    case text
+}
+
+/// Metadata for a transaction code that the wallet must collect from the user.
+public struct TransactionCode: Equatable, Sendable {
+    public let inputMode: TransactionCodeInputMode
+    public let length: Int?
+    public let description: String?
+
+    public init(inputMode: TransactionCodeInputMode, length: Int? = nil, description: String? = nil) {
+        self.inputMode = inputMode
+        self.length = length
+        self.description = description
+    }
+}
+
 /// Result of resolving an OpenID4VCI credential offer before issuance.
 public struct OfferResolution: Equatable, Sendable {
-    /// Whether the issuer requires a transaction code before issuance.
-    public let txCodeRequired: Bool
+    /// Transaction code metadata when the app must collect a code from the user.
+    public let transactionCode: TransactionCode?
 
-    /// Creates an offer resolution.
-    public init(txCodeRequired: Bool) {
-        self.txCodeRequired = txCodeRequired
+    public init(transactionCode: TransactionCode?) {
+        self.transactionCode = transactionCode
     }
 }
 
