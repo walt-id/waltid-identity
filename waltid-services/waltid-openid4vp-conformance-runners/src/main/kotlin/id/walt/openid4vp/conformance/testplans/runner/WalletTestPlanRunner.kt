@@ -206,42 +206,6 @@ class WalletTestPlanRunner(
                 }
             }
             
-            // Determine if this is a negative test by module name (conformance suite naming convention)
-            val isNegativeTest = testPlan.expectRejection || moduleId.contains("negative-test")
-            
-            // For negative tests: if wallet/adapter returned an error, this may indicate successful rejection
-            // The wallet correctly rejecting a bad request is expected behavior
-            if (isNegativeTest && !walletResponse.status.isSuccess()) {
-                val responseBody = try { walletResponse.bodyAsText() } catch (_: Exception) { "" }
-                println("   Negative test: Wallet returned error (expected for rejection)")
-                println("   Response: ${responseBody.take(200)}")
-                
-                // Check if it's a meaningful rejection error
-                val isValidRejection = responseBody.contains("Could not verify") ||
-                    responseBody.contains("Mismatch") ||
-                    responseBody.contains("Invalid") ||
-                    responseBody.contains("UnsupportedPrefix") ||
-                    responseBody.contains("should have rejected") ||
-                    responseBody.contains("Bad Request") ||
-                    responseBody.contains("NullPointerException") ||  // Some negative tests expose bugs
-                    responseBody.contains("nonce") ||  // missing-nonce test
-                    responseBody.contains("exception")
-                    
-                if (isValidRejection) {
-                    println("   ✓ Wallet correctly rejected the invalid request")
-                    // Wait for conformance suite to finish processing before returning
-                    // This prevents alias conflicts when the next test starts
-                    println("   Waiting for conformance suite to complete...")
-                    delay(3.seconds)
-                    return TestPlanResult(
-                        conformanceTestId = testId,
-                        conformanceResult = "REVIEW",  // Matches manual test flow expectation
-                        walletStatus = "REJECTED",
-                        errorMessage = null
-                    )
-                }
-            }
-
             // Wait for test to complete (no longer WAITING)
             conformance.waitForTestStatus(testId, shouldBeWaiting = false)
 
@@ -250,26 +214,12 @@ class WalletTestPlanRunner(
             val conformanceResult = testInfo.result ?: "UNKNOWN"
             val testStatus = testInfo.status ?: "UNKNOWN"
             
-            // For wallet tests, determine wallet status based on conformance result
-            // For negative tests (module name contains "negative-test"):
-            //   - REVIEW means wallet correctly rejected but needs manual screenshot verification
-            //   - INTERRUPTED with REVIEW means same thing but another test started
-            //   - These should be treated as "REJECTED" (success for negative tests)
             val walletStatus = when {
-                // Negative test: wallet rejected correctly (shown error page)
-                isNegativeTest && conformanceResult == "REVIEW" -> {
-                    println("   NOTE: Negative test requires manual screenshot upload for full verification")
-                    "REJECTED"
-                }
-                isNegativeTest && testStatus == "INTERRUPTED" && conformanceResult in setOf("REVIEW", "UNKNOWN") -> {
-                    println("   NOTE: Test interrupted (alias conflict) but wallet rejection was triggered")
-                    "REJECTED"
-                }
-                isNegativeTest && conformanceResult == "PASSED" -> "REJECTED"
                 conformanceResult == "PASSED" -> "PASSED"
                 conformanceResult == "FAILED" -> "FAILED"
-                conformanceResult == "WARNING" -> "PASSED" // Warnings are acceptable
                 testStatus == "INTERRUPTED" -> "INTERRUPTED"
+                conformanceResult == "REVIEW" -> "REVIEW"
+                conformanceResult == "WARNING" -> "WARNING"
                 else -> "UNKNOWN"
             }
 

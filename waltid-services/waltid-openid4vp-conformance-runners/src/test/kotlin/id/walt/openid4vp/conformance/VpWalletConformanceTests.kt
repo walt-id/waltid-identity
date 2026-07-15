@@ -18,6 +18,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.condition.EnabledIf
 import kotlin.test.Test
+import kotlin.test.assertTrue
 
 /**
  * VP Wallet Conformance Tests
@@ -101,6 +102,15 @@ class VpWalletConformanceTests {
             }
             expectSuccess = false
         }
+
+        fun assertConformancePassed(results: List<id.walt.openid4vp.conformance.testplans.plans.TestPlanResult>) {
+            assertTrue(results.isNotEmpty(), "Conformance plan returned no module results")
+            assertTrue(results.all { it.passed },
+                "Conformance failures: " + results.filterNot { it.passed }.joinToString { result ->
+                    "${result.conformanceTestId}=${result.conformanceResult}/${result.walletStatus}: ${result.message}"
+                }
+            )
+        }
     }
 
     // ========================================================================
@@ -125,7 +135,7 @@ class VpWalletConformanceTests {
         try {
             adapter.start(httpClient)
             val plan = VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
         } finally {
             adapter.stop()
             httpClient.close()
@@ -150,7 +160,7 @@ class VpWalletConformanceTests {
         try {
             adapter.start(httpClient)
             val plan = VpWalletMdlX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
         } finally {
             adapter.stop()
             httpClient.close()
@@ -179,7 +189,7 @@ class VpWalletConformanceTests {
         try {
             adapter.start(httpClient)
             val plan = VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
         } finally {
             adapter.stop()
             httpClient.close()
@@ -204,7 +214,7 @@ class VpWalletConformanceTests {
         try {
             adapter.start(httpClient)
             val plan = VpWalletMdlX509SanDnsRequestUriSignedDirectPost(adapterUrl, conformanceHost, conformancePort)
-            WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+            assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
         } finally {
             adapter.stop()
             httpClient.close()
@@ -244,7 +254,7 @@ class VpWalletConformanceTests {
                 println("Running: ${plan.description}")
                 println("=" .repeat(80))
                 
-                WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+                assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
             }
         } finally {
             adapter.stop()
@@ -284,7 +294,7 @@ class VpWalletConformanceTests {
                 println("Running: ${plan.description}")
                 println("=" .repeat(80))
                 
-                WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test()
+                assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
             }
         } finally {
             adapter.stop()
