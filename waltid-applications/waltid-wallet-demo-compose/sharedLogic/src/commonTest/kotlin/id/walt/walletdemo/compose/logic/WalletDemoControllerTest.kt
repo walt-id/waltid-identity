@@ -233,6 +233,87 @@ class WalletDemoControllerTest {
     }
 
     @Test
+    fun staleOfferResolutionFailureCannotOverwriteIncomingDeepLink() = runTest {
+        val resolutionGate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(
+            resolveOfferGate = resolutionGate,
+            ignoreResolveCancellation = true,
+            resolveOfferError = IllegalStateException("stale failure"),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+        val replacementOffer = "openid-credential-offer://replacement"
+
+        controller.updateOfferUrl("openid-credential-offer://original")
+        controller.receive()
+        runCurrent()
+        controller.handleDeepLink(replacementOffer)
+        resolutionGate.complete(Unit)
+        runCurrent()
+
+        val state = controller.state.value
+        assertEquals(replacementOffer, state.requestDrafts.offerUrl)
+        assertEquals(WalletOperationState.Idle, state.operation)
+        assertFalse(state.isError)
+    }
+
+    @Test
+    fun lockCancelsOfferResolutionAndInvalidatesReceiveFlow() = runTest {
+        val resolutionGate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(
+            resolveOfferGate = resolutionGate,
+            ignoreResolveCancellation = true,
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.receive()
+        runCurrent()
+        val resetKeyBeforeLock = controller.state.value.receiveNavigationResetKey
+
+        controller.lock()
+        resolutionGate.complete(Unit)
+        runCurrent()
+
+        val state = controller.state.value
+        assertTrue(state.auth is WalletAuthState.Login)
+        assertEquals(WalletOperationState.Idle, state.operation)
+        assertEquals(resetKeyBeforeLock + 1, state.receiveNavigationResetKey)
+        assertEquals(0, wallet.receiveCalls)
+        assertFalse(state.receiveCompleted)
+    }
+
+    @Test
+    fun lockCancelsIssuanceAndClearsTransactionCode() = runTest {
+        val receiveGate = CompletableDeferred<Unit>()
+        val wallet = FakeDemoWallet(
+            offerResolution = WalletDemoOfferResolution(txCode = numericTxCode),
+            receiveGate = receiveGate,
+            ignoreReceiveCancellation = true,
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.receive()
+        runCurrent()
+        controller.updateTxCode("123456")
+        controller.receive()
+        runCurrent()
+        assertEquals(1, wallet.receiveCalls)
+
+        controller.lock()
+        wallet.credentials = listOf(sampleCredential)
+        receiveGate.complete(Unit)
+        runCurrent()
+
+        val state = controller.state.value
+        assertTrue(state.auth is WalletAuthState.Login)
+        assertEquals("", state.requestDrafts.txCode)
+        assertEquals(WalletOperationState.Idle, state.operation)
+        assertEquals(emptyList(), state.lastReceivedCredentialIds)
+        assertFalse(state.receiveCompleted)
+    }
+
+    @Test
     fun presentUpdatesStatusOnSuccess() = runTest {
         val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult.Success("Presentation sent"))
         val controller = unlockedControllerWith(wallet, this)
@@ -960,6 +1041,9 @@ private class FakeDemoWallet(
     private val offerResolution: WalletDemoOfferResolution = WalletDemoOfferResolution(txCode = null),
     private val resolveOfferGate: CompletableDeferred<Unit>? = null,
     private val ignoreResolveCancellation: Boolean = false,
+    private val resolveOfferError: Throwable? = null,
+    private val receiveGate: CompletableDeferred<Unit>? = null,
+    private val ignoreReceiveCancellation: Boolean = false,
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoPresentationPreview(
         verifierName = null,
@@ -994,6 +1078,7 @@ private class FakeDemoWallet(
         } else {
             resolveOfferGate?.await()
         }
+        resolveOfferError?.let { throw it }
         return offerResolution
     }
 
@@ -1001,6 +1086,11 @@ private class FakeDemoWallet(
         receiveCalls += 1
         receivedOfferUrl = offerUrl
         receivedTxCode = txCode
+        if (ignoreReceiveCancellation) {
+            withContext(NonCancellable) { receiveGate?.await() }
+        } else {
+            receiveGate?.await()
+        }
         return receivedCredentialIds
     }
 
