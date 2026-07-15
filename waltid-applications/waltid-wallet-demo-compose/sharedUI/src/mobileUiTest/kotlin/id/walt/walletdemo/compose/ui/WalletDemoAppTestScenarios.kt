@@ -28,6 +28,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
 import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.DemoWallet
+import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
@@ -49,7 +50,7 @@ class WalletDemoAppTestScenarios {
 
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
 
@@ -92,7 +93,7 @@ class WalletDemoAppTestScenarios {
 
     fun credentialsTabShowsEmptyStateAndUpdatesAfterReceive() = runComposeUiTest {
         val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1", "cred-2"))
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -124,7 +125,7 @@ class WalletDemoAppTestScenarios {
 
     fun receiveTabCanStartNewFlowAfterSuccess() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentialsAfterReceive = listOf(sampleCredential))
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -144,7 +145,7 @@ class WalletDemoAppTestScenarios {
 
     fun receiveDetailsStayScopedToReceiveTabNavigationStack() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentialsAfterReceive = listOf(sampleCredential))
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -173,7 +174,7 @@ class WalletDemoAppTestScenarios {
             credentialsAfterReceive = listOf(sampleCredential),
             receiveGate = receiveGate,
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -208,7 +209,7 @@ class WalletDemoAppTestScenarios {
 
     fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = emptyList())
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -227,7 +228,7 @@ class WalletDemoAppTestScenarios {
             presentationResult = WalletDemoOperationResult.Success("Presentation sent"),
             presentationPreview = samplePresentationPreview,
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -279,7 +280,7 @@ class WalletDemoAppTestScenarios {
                 credentialOptions = listOf(pathOnlyPortraitDisclosureCredentialOption),
             ),
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -310,7 +311,7 @@ class WalletDemoAppTestScenarios {
                 clientId = sampleDidClientId,
             ),
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -335,7 +336,7 @@ class WalletDemoAppTestScenarios {
                 clientId = sampleX509SanDnsClientId,
             ),
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -388,7 +389,7 @@ class WalletDemoAppTestScenarios {
                 ),
             ),
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -423,7 +424,7 @@ class WalletDemoAppTestScenarios {
             credentials = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview,
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -453,7 +454,7 @@ class WalletDemoAppTestScenarios {
             presentationPreview = samplePresentationPreview,
             previewGate = previewGate,
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -481,7 +482,7 @@ class WalletDemoAppTestScenarios {
             presentationResult = WalletDemoOperationResult.Success("Presentation sent"),
             presentationPreview = samplePresentationPreview,
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -519,7 +520,7 @@ class WalletDemoAppTestScenarios {
             credentialsAfterReceive = listOf(sampleCredential),
             presentationPreview = samplePresentationPreview,
         )
-        val controller = WalletDemoController(wallet)
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -554,7 +555,8 @@ class WalletDemoAppTestScenarios {
 
     fun credentialsPersistAcrossControllerRecreation() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentialsAfterReceive = listOf(sampleCredential))
-        val firstController = WalletDemoController(wallet)
+        val pinStore = InMemoryDemoPinStore()
+        val firstController = WalletDemoController(wallet, pinStore)
         var activeController by mutableStateOf(firstController)
 
         setContent { WalletDemoApp(activeController) }
@@ -566,10 +568,12 @@ class WalletDemoAppTestScenarios {
         waitUntil(timeoutMillis = 5_000) { firstController.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
 
-        val recreatedController = WalletDemoController(wallet)
+        val recreatedController = WalletDemoController(wallet, pinStore)
         activeController = recreatedController
         waitForIdle()
-        unlockWithPin()
+        onNodeWithText("Enter your PIN").assertIsDisplayed()
+        onAllNodesWithTag("wallet.pinConfirmationInput").assertCountEquals(0)
+        loginWithPin()
         waitUntil(timeoutMillis = 5_000) { recreatedController.state.value.session is WalletSessionState.Ready }
 
         onNodeWithTag("wallet.credentialCard.cred-1").assertIsDisplayed()
@@ -580,6 +584,12 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag("wallet.pinInput").performClick().performTextInput("1234")
         onNodeWithTag("wallet.pinConfirmationInput").performClick().performTextInput("1234")
         waitForIdle()
+        onNodeWithTag("wallet.pinSubmitButton").performSemanticsAction(SemanticsActions.OnClick)
+        waitForIdle()
+    }
+
+    private fun ComposeUiTest.loginWithPin() {
+        onNodeWithTag("wallet.pinInput").performClick().performTextInput("1234")
         onNodeWithTag("wallet.pinSubmitButton").performSemanticsAction(SemanticsActions.OnClick)
         waitForIdle()
     }

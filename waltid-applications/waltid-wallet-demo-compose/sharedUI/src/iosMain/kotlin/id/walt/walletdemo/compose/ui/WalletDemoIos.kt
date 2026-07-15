@@ -4,6 +4,7 @@ import androidx.compose.ui.window.ComposeUIViewController
 import id.walt.walletdemo.compose.logic.DemoWalletConfig
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.createIosDemoWallet
+import id.walt.walletdemo.compose.logic.createIosDemoPinStore
 import platform.UIKit.UIViewController
 
 private var iosController: WalletDemoController? = null
@@ -17,17 +18,17 @@ fun walletDemoViewController(
     attestationHostHeader: String = "",
     transactionDataProfilesUrl: String = "",
 ): UIViewController {
+    val config = DemoWalletConfig(
+        walletId = walletId,
+        attestationBaseUrl = attestationBaseUrl,
+        attestationAttesterPath = attestationAttesterPath,
+        attestationBearerToken = attestationBearerToken,
+        attestationHostHeader = attestationHostHeader,
+        transactionDataProfilesUrl = transactionDataProfilesUrl,
+    )
     val controller = WalletDemoController(
-        createIosDemoWallet(
-            DemoWalletConfig(
-                walletId = walletId,
-                attestationBaseUrl = attestationBaseUrl,
-                attestationAttesterPath = attestationAttesterPath,
-                attestationBearerToken = attestationBearerToken,
-                attestationHostHeader = attestationHostHeader,
-                transactionDataProfilesUrl = transactionDataProfilesUrl,
-            )
-        )
+        wallet = createIosDemoWallet(config),
+        pinStore = createIosDemoPinStore(config.walletId),
     )
     iosController = controller
     pendingDeepLink?.let(controller::handleDeepLink)

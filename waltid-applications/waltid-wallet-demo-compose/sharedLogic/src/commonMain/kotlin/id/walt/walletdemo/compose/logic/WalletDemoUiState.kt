@@ -2,6 +2,7 @@ package id.walt.walletdemo.compose.logic
 
 data class WalletDemoUiState(
     val auth: WalletAuthState = WalletAuthState.Setup(),
+    val isAuthenticating: Boolean = false,
     val session: WalletSessionState = WalletSessionState.NotBootstrapped,
     val operation: WalletOperationState = WalletOperationState.Idle,
     val selectedTab: WalletDemoTab = WalletDemoTab.Credentials,

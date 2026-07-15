@@ -1,7 +1,8 @@
 package id.walt.walletdemo.compose.logic
 
 val WalletDemoUiState.isBusy: Boolean
-    get() = session is WalletSessionState.Bootstrapping ||
+    get() = isAuthenticating ||
+        session is WalletSessionState.Bootstrapping ||
         operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
         operation is WalletOperationState.ResolvingPresentation ||

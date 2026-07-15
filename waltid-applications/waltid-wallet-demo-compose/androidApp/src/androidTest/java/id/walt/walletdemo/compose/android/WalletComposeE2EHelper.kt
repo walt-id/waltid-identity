@@ -8,6 +8,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import org.junit.Assert.fail
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 
 internal object WalletComposeE2EHelper {
@@ -41,6 +42,20 @@ internal object WalletComposeE2EHelper {
             ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
             ?: error("Cannot resolve launch intent for ${context.packageName}")
         context.startActivity(launchIntent)
+        unlock(device)
+    }
+
+    fun relaunchAndUnlock(context: Context, device: UiDevice) {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?: error("Cannot resolve launch intent for ${context.packageName}")
+        context.startActivity(launchIntent)
+
+        assertNotNull("PIN input not found after relaunch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
+        assertNull(
+            "PIN setup was shown after relaunch",
+            waitForResource(device, "wallet.pinConfirmationInput", 2_000L),
+        )
         unlock(device)
     }
 
