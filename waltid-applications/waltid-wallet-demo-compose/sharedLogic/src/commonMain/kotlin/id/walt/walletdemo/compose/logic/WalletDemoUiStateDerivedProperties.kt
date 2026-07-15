@@ -20,8 +20,16 @@ val WalletDemoUiState.receiveUrlEntryEnabled: Boolean
 val WalletDemoUiState.receiveActionEnabled: Boolean
     get() = session is WalletSessionState.Ready &&
         requestDrafts.offerUrl.isNotBlank() &&
-        (!requestDrafts.txCodeRequired || requestDrafts.txCode.isNotBlank()) &&
+        requestDrafts.hasValidTxCode &&
         receiveUrlEntryEnabled
+
+private val WalletRequestDrafts.hasValidTxCode: Boolean
+    get() = txCodeRequirement?.let { requirement ->
+        val value = txCode.trim()
+        value.isNotEmpty() &&
+            (requirement.length == null || value.length == requirement.length) &&
+            (requirement.inputMode != WalletDemoTxCodeInputMode.Numeric || value.all(Char::isDigit))
+    } ?: true
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
     get() = !isBusy && presentationPreview == null && !presentationCompleted

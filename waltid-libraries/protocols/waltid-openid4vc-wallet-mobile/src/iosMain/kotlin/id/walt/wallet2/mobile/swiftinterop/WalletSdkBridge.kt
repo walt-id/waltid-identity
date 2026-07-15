@@ -60,16 +60,11 @@ public class WalletSdkBridge private constructor(
             )
         }
 
-    /**
-     * Resolves a credential offer and reports whether a transaction code is required.
-     */
+    /** Resolves a credential offer before issuance. */
     public suspend fun resolveOffer(
         offerUrl: String,
-    ): WalletBridgeResult<WalletBridgeOfferResolution> =
-        walletBridgeCall {
-            val resolution = operations.resolveOffer(offerUrl = offerUrl)
-            WalletBridgeOfferResolution(txCodeRequired = resolution.txCodeRequired)
-        }
+    ): WalletBridgeResult<MobileWalletOfferResolution> =
+        walletBridgeCall { operations.resolveOffer(offerUrl = offerUrl) }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.

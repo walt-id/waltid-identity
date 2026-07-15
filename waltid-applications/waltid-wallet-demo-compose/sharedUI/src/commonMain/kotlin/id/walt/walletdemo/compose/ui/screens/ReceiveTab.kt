@@ -17,8 +17,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
+import id.walt.walletdemo.compose.logic.WalletDemoTxCodeInputMode
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.receiveActionEnabled
@@ -60,22 +62,33 @@ internal fun ReceiveTab(
             buttonTestTag = WalletUiTestTags.ReceiveButton,
             scanButtonTestTag = WalletUiTestTags.OfferScanButton,
             contentBeforeActions = {
-                if (requestDrafts.txCodeRequired) {
+                requestDrafts.txCodeRequirement?.let { requirement ->
                     Text(
-                        text = "This offer requires a transaction code.",
+                        text = requirement.description?.takeIf(String::isNotBlank)
+                            ?: "This offer requires a transaction code.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     OutlinedTextField(
                         value = requestDrafts.txCode,
-                        onValueChange = onTxCodeChange,
+                        onValueChange = { value ->
+                            val accepted = when (requirement.inputMode) {
+                                WalletDemoTxCodeInputMode.Numeric -> value.filter(Char::isDigit)
+                                WalletDemoTxCodeInputMode.Text -> value
+                            }
+                            onTxCodeChange(requirement.length?.let(accepted::take) ?: accepted)
+                        },
                         label = { Text("Transaction code") },
                         singleLine = true,
                         enabled = state.receiveUrlEntryEnabled,
                         keyboardOptions = KeyboardOptions(
                             autoCorrectEnabled = false,
-                            keyboardType = KeyboardType.Text,
+                            keyboardType = when (requirement.inputMode) {
+                                WalletDemoTxCodeInputMode.Numeric -> KeyboardType.NumberPassword
+                                WalletDemoTxCodeInputMode.Text -> KeyboardType.Password
+                            },
                         ),
+                        visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag(WalletUiTestTags.TxCodeInput),

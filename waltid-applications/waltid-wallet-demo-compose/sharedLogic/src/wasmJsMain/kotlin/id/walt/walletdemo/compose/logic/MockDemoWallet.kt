@@ -14,7 +14,7 @@ private class MockDemoWallet : DemoWallet {
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
-        WalletDemoOfferResolution(txCodeRequired = false)
+        WalletDemoOfferResolution(txCode = null)
 
     override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         credentials = listOf(

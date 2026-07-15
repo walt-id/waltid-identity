@@ -13,13 +13,16 @@ final class WalletViewModelReceiveTests: XCTestCase {
         viewModel.selectedTab = .receive
         viewModel.offerUrl = "openid-credential-offer://issuer.example"
         viewModel.receiveCredential()
-        try await waitUntil { viewModel.txCodeRequired }
+        viewModel.receiveCredential()
+        try await waitUntil { viewModel.transactionCode != nil }
 
         let receiveCallsBeforeCode = await client.receiveCalls
+        let resolveCalls = await client.resolveCalls
         XCTAssertFalse(viewModel.receiveActionEnabled)
         XCTAssertEqual(receiveCallsBeforeCode, 0)
+        XCTAssertEqual(resolveCalls, 1)
 
-        viewModel.txCode = " 1234 "
+        viewModel.txCode = " 123456 "
         XCTAssertTrue(viewModel.receiveActionEnabled)
         viewModel.receiveCredential()
         try await waitUntil { viewModel.receiveCompleted }
@@ -27,7 +30,7 @@ final class WalletViewModelReceiveTests: XCTestCase {
         let receiveCalls = await client.receiveCalls
         let receivedTxCodes = await client.receivedTxCodes
         XCTAssertEqual(receiveCalls, 1)
-        XCTAssertEqual(receivedTxCodes, ["1234"])
+        XCTAssertEqual(receivedTxCodes, ["123456"])
         XCTAssertEqual(viewModel.receivedCredentials.map(\.id), ["credential-1"])
     }
 
@@ -38,13 +41,29 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/first"
         viewModel.receiveCredential()
-        try await waitUntil { viewModel.txCodeRequired }
+        try await waitUntil { viewModel.transactionCode != nil }
         viewModel.txCode = "1234"
 
         viewModel.offerUrl = "openid-credential-offer://issuer.example/second"
 
-        XCTAssertFalse(viewModel.txCodeRequired)
+        XCTAssertNil(viewModel.transactionCode)
         XCTAssertEqual(viewModel.txCode, "")
+    }
+
+    func testStaleOfferResolutionCannotOverwriteIncomingDeepLink() async throws {
+        let client = TransactionCodeWalletClient(resolveDelayNanoseconds: 100_000_000)
+        let viewModel = WalletViewModel(walletClient: client)
+        try await waitUntil { viewModel.isReady }
+
+        viewModel.offerUrl = "openid-credential-offer://issuer.example/original"
+        viewModel.receiveCredential()
+        viewModel.handleDeepLink(URL(string: "openid-credential-offer://issuer.example/replacement")!)
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(viewModel.offerUrl, "openid-credential-offer://issuer.example/replacement")
+        XCTAssertNil(viewModel.transactionCode)
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertFalse(viewModel.isError)
     }
 
     private func waitUntil(
@@ -64,8 +83,14 @@ final class WalletViewModelReceiveTests: XCTestCase {
 
 private actor TransactionCodeWalletClient: WalletClient {
     private(set) var receiveCalls = 0
+    private(set) var resolveCalls = 0
     private(set) var receivedTxCodes: [String] = []
     private var credentialIssued = false
+    private let resolveDelayNanoseconds: UInt64
+
+    init(resolveDelayNanoseconds: UInt64 = 0) {
+        self.resolveDelayNanoseconds = resolveDelayNanoseconds
+    }
 
     func bootstrap() async throws -> WalletBootstrapResult {
         WalletBootstrapResult(keyID: "key-1", did: "did:key:test")
@@ -76,7 +101,17 @@ private actor TransactionCodeWalletClient: WalletClient {
     }
 
     func resolveOffer(offer: URL) async throws -> OfferResolution {
-        OfferResolution(txCodeRequired: true)
+        resolveCalls += 1
+        if resolveDelayNanoseconds > 0 {
+            try? await Task.sleep(nanoseconds: resolveDelayNanoseconds)
+        }
+        return OfferResolution(
+            transactionCode: TransactionCode(
+                inputMode: .numeric,
+                length: 6,
+                description: "Enter the issuer code"
+            )
+        )
     }
 
     func receive(offer: URL, txCode: String?) async throws -> [String] {
