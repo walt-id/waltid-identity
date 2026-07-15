@@ -775,6 +775,55 @@ class CredentialDisplayNormalizerTest {
         assertEquals("Expires 2026-06-17", details.validity)
     }
 
+    @Test
+    fun transactionDataGroupsRenderProfileAndDetailsReadably() {
+        val groups = CredentialDisplayNormalizer.transactionDataGroups(
+            listOf(
+                WalletDemoTransactionDataItem(
+                    type = "org.waltid.transaction-data.payment-authorization",
+                    displayName = "Payment Authorization",
+                    credentialQueryIds = listOf("pid", "payment"),
+                    supportedFields = listOf("amount", "currency", "payee"),
+                    detailsJson = """
+                        {
+                          "amount": "42.00",
+                          "currency": "EUR",
+                          "payee": "ACME Corp"
+                        }
+                    """.trimIndent(),
+                    rawJson = """
+                        {
+                          "type": "org.waltid.transaction-data.payment-authorization",
+                          "credential_ids": ["pid", "payment"],
+                          "amount": "42.00",
+                          "currency": "EUR",
+                          "payee": "ACME Corp"
+                        }
+                    """.trimIndent(),
+                )
+            )
+        )
+
+        val payment = groups.single()
+        val labelsToValues = payment.items.associate { item ->
+            item.label to when (val value = item.value) {
+                is DisplayValue.Text -> value.value
+                else -> item.rawValue.orEmpty()
+            }
+        }
+
+        assertEquals("Payment Authorization", payment.title)
+        assertEquals(
+            listOf("Amount", "Currency", "Payee"),
+            payment.items.take(3).map { it.label },
+        )
+        assertEquals("org.waltid.transaction-data.payment-authorization", labelsToValues["Type"])
+        assertEquals("pid, payment", labelsToValues["Credential queries"])
+        assertEquals("42.00", labelsToValues["Amount"])
+        assertEquals("EUR", labelsToValues["Currency"])
+        assertEquals("ACME Corp", labelsToValues["Payee"])
+    }
+
     private fun onePixelPngByteArrayJson(): String =
         Base64.Default.decode(onePixelPngBase64).joinToString(prefix = "[", postfix = "]") { byte ->
             (byte.toInt() and 0xFF).toString()

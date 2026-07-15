@@ -9,6 +9,7 @@ import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -41,6 +42,26 @@ class MobileWalletIntegrationTest {
 
     companion object {
         private const val TEST_WALLET_ID = "android-device-test-wallet"
+        private const val PAYMENT_AUTHORIZATION_TYPE = "org.waltid.transaction-data.payment-authorization"
+
+        private val DEMO_TRANSACTION_DATA_PROFILES = demoTransactionDataProfiles(
+            paymentAuthorizationFields = listOf("amount", "currency", "payee"),
+        )
+
+        private fun demoTransactionDataProfiles(
+            paymentAuthorizationFields: Iterable<String>,
+        ) = listOf(
+            MobileWalletTransactionDataProfile(
+                type = PAYMENT_AUTHORIZATION_TYPE,
+                displayName = "Payment Authorization",
+                fields = paymentAuthorizationFields.toList(),
+            ),
+            MobileWalletTransactionDataProfile(
+                type = "org.waltid.transaction-data.account-access",
+                displayName = "Account Access",
+                fields = listOf("account_identifier", "access_scope"),
+            ),
+        )
     }
 
     private val context: Context
@@ -159,6 +180,50 @@ class MobileWalletIntegrationTest {
     @Test
     fun previewAndSubmitEudiPidMdocAgainstDemoIssuer2AndVerifier2() = runBlocking {
         previewAndSubmitDemoCredential("eudi-pid-mdoc")
+    }
+
+    @Test
+    fun previewAndSubmitTransactionDataAgainstDemoIssuer2AndVerifier2() = runBlocking {
+        val scenario = DemoTestBackend.transactionDataPresentationScenario
+        val paymentAuthorizationFields = DemoTestBackend.transactionDataProfileFields(PAYMENT_AUTHORIZATION_TYPE)
+        val client = MobileWalletFactory(context).create(
+            walletConfig(
+                prefix = "transaction-data-${scenario.id}",
+                transactionDataProfiles = demoTransactionDataProfiles(paymentAuthorizationFields),
+            ),
+        )
+        val bootstrapResult = client.bootstrap()
+
+        val offer = DemoTestBackend.createOffer(scenario)
+        val credentialIds = client.receive(offer.offerUrl, txCode = offer.txCode)
+        assertTrue(
+            credentialIds.isNotEmpty(),
+            "Should receive ${scenario.displayName} from public demo issuer2",
+        )
+
+        val session = DemoTestBackend.createTransactionDataVerifierSession(scenario)
+        val preview = client.previewPresentation(session.authorizationRequestUri)
+        val transactionData = preview.request.transactionData.singleOrNull()
+        assertNotNull(transactionData, "Preview should expose payment transaction data: preview=$preview")
+        assertEquals("Payment Authorization", transactionData.displayName)
+        assertEquals(listOf("pid"), transactionData.credentialQueryIds)
+        assertTrue(
+            transactionData.detailsJson.contains("\"amount\":\"42.00\"") &&
+                transactionData.detailsJson.contains("\"currency\":\"EUR\"") &&
+                transactionData.detailsJson.contains("\"payee\":\"ACME Corp\""),
+            "Preview should expose readable payment details: ${transactionData.detailsJson}",
+        )
+        val result = client.submitPresentation(
+            requestUrl = session.authorizationRequestUri,
+            selectedCredentialOptions = preview.credentialOptions.map { option -> option.selection },
+            did = bootstrapResult.did,
+        )
+        assertTrue(
+            result.success,
+            "public demo verifier2 transaction-data presentation should succeed: preview=$preview, result=$result",
+        )
+
+        DemoTestBackend.waitForVerifierSuccess(session.sessionId)
     }
 
     @Test
@@ -310,9 +375,13 @@ class MobileWalletIntegrationTest {
         DemoTestBackend.waitForVerifierSuccess(session.sessionId)
     }
 
-    private fun walletConfig(prefix: String) = MobileWalletConfig(
+    private fun walletConfig(
+        prefix: String,
+        transactionDataProfiles: List<MobileWalletTransactionDataProfile> = DEMO_TRANSACTION_DATA_PROFILES,
+    ) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         onEvent = { event -> println("WALLET EVENT: $event") },
+        transactionDataProfiles = transactionDataProfiles,
     )
 
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {
