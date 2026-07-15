@@ -68,7 +68,12 @@ data class WalletInfoResponse(
     val credentialStoreCount: Int,
     val hasDidStore: Boolean,
     val hasStaticKey: Boolean,
-    val hasStaticDid: Boolean
+    val hasStaticDid: Boolean,
+    val keyStoreIds: List<String> = emptyList(),
+    val credentialStoreIds: List<String> = emptyList(),
+    val didStoreId: String? = null,
+    val defaultKeyId: String? = null,
+    val defaultDidId: String? = null,
 )
 
 @Serializable
@@ -226,12 +231,30 @@ object Wallet2RouteHandler {
                 summary = "Get wallet info"
                 request { pathParameter<String>("walletId") }
                 response {
-                    HttpStatusCode.OK to { body<WalletInfoResponse>() }
+                    HttpStatusCode.OK to {
+                        body<WalletInfoResponse> {
+                            example("Wallet with named stores") {
+                                value = WalletInfoResponse(
+                                    walletId = "9bbbc42d-8f3a-4b1c-9e2d-1a2b3c4d5e6f",
+                                    keyStoreCount = 1,
+                                    credentialStoreCount = 1,
+                                    hasDidStore = true,
+                                    keyStoreIds = listOf("main-kms"),
+                                    credentialStoreIds = listOf("main-credentials"),
+                                    didStoreId = "main-dids",
+                                    hasStaticKey = false,
+                                    hasStaticDid = false,
+                                    defaultKeyId = "v_CW0xP256ExampleKeyId",
+                                    defaultDidId = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbhnRFvvWUpK",
+                                )
+                            }
+                        }
+                    }
                     HttpStatusCode.NotFound to { description = "Wallet not found" }
                 }
             }) {
                 val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@get
-                call.respond(wallet.toInfoResponse())
+                call.respond(wallet.toInfoResponse(resolver))
             }
 
             delete("", {
@@ -836,12 +859,17 @@ object Wallet2RouteHandler {
             ?: run { respond(HttpStatusCode.NotFound, "Wallet '$walletId' not found"); return null }
     }
 
-    private fun Wallet.toInfoResponse() = WalletInfoResponse(
+    private suspend fun Wallet.toInfoResponse(resolver: WalletResolver) = WalletInfoResponse(
         walletId = id,
         keyStoreCount = keyStores.size,
         credentialStoreCount = credentialStores.size,
         hasDidStore = didStore != null,
+        keyStoreIds = keyStores.mapNotNull { resolver.resolveStoreId(it) },
+        credentialStoreIds = credentialStores.mapNotNull { resolver.resolveStoreId(it) },
+        didStoreId = didStore?.let { resolver.resolveStoreId(it) },
         hasStaticKey = staticKey != null,
-        hasStaticDid = staticDid != null
+        hasStaticDid = staticDid != null,
+        defaultKeyId = defaultKeyId,
+        defaultDidId = defaultDidId,
     )
 }
