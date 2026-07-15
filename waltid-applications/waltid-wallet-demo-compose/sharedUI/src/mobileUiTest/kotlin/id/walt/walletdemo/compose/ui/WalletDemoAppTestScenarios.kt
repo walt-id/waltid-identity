@@ -262,8 +262,11 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentationScanButton).assertIsDisplayed().assertIsEnabled()
     }
 
-    fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() = runComposeUiTest {
-        val wallet = FakeDemoWallet(credentials = emptyList())
+    fun presentTabAllowsPreviewAndDeclineWithoutCredentials() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            credentials = emptyList(),
+            presentationPreview = samplePresentationPreview.copy(credentialOptions = emptyList()),
+        )
         val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
 
         setContent { WalletDemoApp(controller) }
@@ -273,8 +276,13 @@ class WalletDemoAppTestScenarios {
         onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
         onNodeWithTag(WalletUiTestTags.PresentationInput).performTextInput("openid4vp://example")
 
-        onNodeWithTag(WalletUiTestTags.PresentButton).assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentButton).assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
         onNodeWithText("No credentials available").performScrollTo().assertIsDisplayed()
+        onNodeWithTag(WalletUiTestTags.PresentationSubmitButton).performScrollTo().assertIsNotEnabled()
+        onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performScrollTo().assertIsEnabled().performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationCompleted }
+        assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
     }
 
     fun presentTabPreviewsCredentialsAndCanStartNewFlowAfterSuccess() = runComposeUiTest {
@@ -320,12 +328,37 @@ class WalletDemoAppTestScenarios {
         assertPresentationNewActionPrecedesReadOnlyReview()
         onNodeWithTag(WalletUiTestTags.credentialCard(samplePresentationCredentialOption.selection.id)).performScrollTo().assertIsDisplayed()
         onAllNodesWithTag("wallet.presentationSubmitButton").assertCountEquals(0)
-        onAllNodesWithTag("wallet.presentationCancelButton").assertCountEquals(0)
+        onAllNodesWithTag("wallet.presentationRejectButton").assertCountEquals(0)
         onNodeWithTag("wallet.presentationNewButton").performScrollTo().performClick()
         onNodeWithTag("wallet.presentationInput").assertIsEnabled()
         onNodeWithTag("wallet.presentButton").assertIsNotEnabled()
         assertEquals("openid4vp://example", wallet.previewedRequestUrl)
         assertEquals("openid4vp://example", wallet.submittedRequestUrl)
+    }
+
+    fun presentTabDeclineSendsProtocolRejection() = runComposeUiTest {
+        val wallet = FakeDemoWallet(
+            credentials = listOf(sampleCredential),
+            presentationPreview = samplePresentationPreview,
+        )
+        val controller = WalletDemoController(wallet, InMemoryDemoPinStore())
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationInput).performTextInput("openid4vp://example")
+        onNodeWithTag(WalletUiTestTags.PresentButton).performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.presentationPreview != null }
+
+        onNodeWithTag(WalletUiTestTags.PresentationRejectButton).performScrollTo().performClick()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText == "Presentation declined" }
+
+        assertEquals("openid4vp://example", wallet.rejectedRequestUrl)
+        onNodeWithTag(WalletUiTestTags.Status).assertTextContains("Presentation declined")
+        onAllNodesWithTag(WalletUiTestTags.PresentationReview).assertCountEquals(0)
+        onNodeWithTag(WalletUiTestTags.PresentationNewButton).assertIsDisplayed()
     }
 
     fun presentationDisclosureImagesRenderAsImages() = runComposeUiTest {
@@ -834,6 +867,7 @@ private class FakeDemoWallet(
     var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
+    var rejectedRequestUrl: String? = null
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
@@ -875,5 +909,10 @@ private class FakeDemoWallet(
     ): WalletDemoOperationResult {
         submittedRequestUrl = requestUrl
         return presentationResult
+    }
+
+    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult {
+        rejectedRequestUrl = requestUrl
+        return WalletDemoOperationResult.Success("Presentation declined")
     }
 }

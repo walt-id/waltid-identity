@@ -88,6 +88,34 @@ class WalletDemoController(
         _state.update { it.copy(selectedTab = tab) }
     }
 
+    fun completePresentationContinuation() {
+        _state.update { state ->
+            val pending = state.pendingPresentationContinuation ?: return@update state
+            state.copy(
+                operation = WalletOperationState.Succeeded(
+                    message = pending.successMessage,
+                    tab = WalletDemoTab.Present,
+                ),
+                presentationCompleted = true,
+                pendingPresentationContinuation = null,
+            )
+        }
+    }
+
+    fun failPresentationContinuation(reason: String) {
+        _state.update { state ->
+            if (state.pendingPresentationContinuation == null) return@update state
+            state.copy(
+                operation = WalletOperationState.Failed(
+                    message = WalletDisplayText.failure(WalletDisplayText.PresentationContinuationFailed, reason),
+                    tab = WalletDemoTab.Present,
+                ),
+                presentationCompleted = false,
+                pendingPresentationContinuation = null,
+            )
+        }
+    }
+
     fun updateOfferUrl(value: String) {
         receiveJob?.cancel()
         _state.update {
@@ -119,6 +147,7 @@ class WalletDemoController(
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
+                pendingPresentationContinuation = null,
             )
         }
     }
@@ -143,6 +172,7 @@ class WalletDemoController(
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
+                        pendingPresentationContinuation = null,
                         operation = WalletOperationState.Idle,
                     )
                 }
@@ -157,6 +187,7 @@ class WalletDemoController(
                         selectedPresentationCredentialOptions = emptySet(),
                         selectedPresentationDisclosureOptions = emptySet(),
                         presentationCompleted = false,
+                        pendingPresentationContinuation = null,
                         presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
                         operation = WalletOperationState.Idle,
                     )
@@ -193,6 +224,7 @@ class WalletDemoController(
                 selectedPresentationCredentialOptions = emptySet(),
                 selectedPresentationDisclosureOptions = emptySet(),
                 presentationCompleted = false,
+                pendingPresentationContinuation = null,
                 presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
                 operation = WalletOperationState.Idle,
             )
@@ -374,20 +406,7 @@ class WalletDemoController(
             runCatching {
                 wallet.present(requestUrl, ready.did)
             }.onSuccess { result ->
-                _state.update {
-                    it.copy(
-                        operation = when (result) {
-                            is WalletDemoOperationResult.Success -> WalletOperationState.Succeeded(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                            is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                        },
-                    )
-                }
+                _state.update { it.withPresentationResult(result) }
             }.onFailure { error ->
                 setOperationError(WalletDisplayText.PresentFailed, error, WalletDemoTab.Present)
             }
@@ -408,6 +427,7 @@ class WalletDemoController(
                     selectedPresentationCredentialOptions = emptySet(),
                     selectedPresentationDisclosureOptions = emptySet(),
                     presentationCompleted = false,
+                    pendingPresentationContinuation = null,
                 )
             }
             runCatching {
@@ -503,20 +523,9 @@ class WalletDemoController(
                 wallet.submitPresentation(requestUrl, selectedCredentialOptions, selectedDisclosureOptions, ready.did)
             }.onSuccess { result ->
                 _state.update {
-                    it.copy(
-                        operation = when (result) {
-                            is WalletDemoOperationResult.Success -> WalletOperationState.Succeeded(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                            is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
-                                message = result.message,
-                                tab = WalletDemoTab.Present,
-                            )
-                        },
-                        selectedPresentationCredentialOptions = emptySet(),
-                        selectedPresentationDisclosureOptions = emptySet(),
-                        presentationCompleted = result is WalletDemoOperationResult.Success,
+                    it.withPresentationResult(
+                        result = result,
+                        clearSelections = true,
                     )
                 }
             }.onFailure { error ->
@@ -525,20 +534,80 @@ class WalletDemoController(
         }
     }
 
-    fun cancelPresentationReview() {
-        _state.update {
-            it.copy(
-                operation = WalletOperationState.Succeeded(
-                    message = WalletDisplayText.PresentationReviewCancelled,
-                    tab = WalletDemoTab.Present,
-                ),
-                presentationPreview = null,
-                selectedPresentationCredentialOptions = emptySet(),
-                selectedPresentationDisclosureOptions = emptySet(),
-                presentationCompleted = false,
-                presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+    fun rejectPresentation() {
+        val current = _state.value
+        current.session as? WalletSessionState.Ready ?: return
+        val requestUrl = current.requestDrafts.presentationRequestUrl.trim()
+        if (requestUrl.isBlank() || current.presentationPreview == null) return
+
+        scope.launch(dispatcher) {
+            _state.update { it.copy(operation = WalletOperationState.DecliningPresentation) }
+            runCatching {
+                wallet.rejectPresentation(requestUrl)
+            }.onSuccess { result ->
+                _state.update {
+                    it.withPresentationResult(
+                        result = result,
+                        clearPreview = true,
+                        clearSelections = true,
+                        resetNavigation = true,
+                    )
+                }
+            }.onFailure { error ->
+                _state.update {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.RejectFailed, error),
+                            tab = WalletDemoTab.Present,
+                        ),
+                        presentationPreview = null,
+                        selectedPresentationCredentialOptions = emptySet(),
+                        selectedPresentationDisclosureOptions = emptySet(),
+                        presentationCompleted = false,
+                        pendingPresentationContinuation = null,
+                        presentationNavigationResetKey = it.presentationNavigationResetKey + 1,
+                    )
+                }
+            }
+        }
+    }
+
+    private fun WalletDemoUiState.withPresentationResult(
+        result: WalletDemoOperationResult,
+        clearPreview: Boolean = false,
+        clearSelections: Boolean = false,
+        resetNavigation: Boolean = false,
+    ): WalletDemoUiState {
+        val success = result as? WalletDemoOperationResult.Success
+        val pending = success?.continuation?.let { continuation ->
+            WalletDemoPendingPresentationContinuation(
+                continuation = continuation,
+                successMessage = success.message,
             )
         }
+
+        return copy(
+            operation = when {
+                result is WalletDemoOperationResult.Failure -> WalletOperationState.Failed(
+                    message = result.message,
+                    tab = WalletDemoTab.Present,
+                )
+                pending != null -> operation
+                else -> WalletOperationState.Succeeded(
+                    message = success!!.message,
+                    tab = WalletDemoTab.Present,
+                )
+            },
+            presentationPreview = if (clearPreview) null else presentationPreview,
+            selectedPresentationCredentialOptions =
+                if (clearSelections) emptySet() else selectedPresentationCredentialOptions,
+            selectedPresentationDisclosureOptions =
+                if (clearSelections) emptySet() else selectedPresentationDisclosureOptions,
+            presentationCompleted = success != null && pending == null,
+            pendingPresentationContinuation = pending,
+            presentationNavigationResetKey =
+                if (resetNavigation) presentationNavigationResetKey + 1 else presentationNavigationResetKey,
+        )
     }
 
     private fun submitSetupPin(auth: WalletAuthState.Setup) {

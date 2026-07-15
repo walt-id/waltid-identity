@@ -1,6 +1,8 @@
 import SwiftUI
+import WebKit
 
 struct PresentView: View {
+    @Environment(\.openURL) private var openURL
     @ObservedObject var viewModel: WalletViewModel
     @Binding var selectedDetailsID: String?
 
@@ -64,7 +66,7 @@ struct PresentView: View {
                             onToggleDisclosure: viewModel.togglePresentationDisclosure,
                             onCredentialSelected: { detailsID in selectedDetailsID = detailsID },
                             onSubmit: viewModel.submitPresentation,
-                            onCancel: viewModel.cancelPresentationReview
+                            onReject: viewModel.rejectPresentation
                         )
                     }
                 }
@@ -75,6 +77,28 @@ struct PresentView: View {
             .accessibilityIdentifier(WalletAccessibilityID.presentTabContent)
         }
         .navigationViewStyle(.stack)
+        .onChange(of: viewModel.pendingPresentationContinuationURL) { url in
+            guard let url else { return }
+            openURL(url) { accepted in
+                if accepted {
+                    viewModel.completePresentationContinuation()
+                } else {
+                    viewModel.failPresentationContinuation("No application can open the verifier response")
+                }
+            }
+        }
+        .background {
+            if let html = viewModel.pendingPresentationFormPostHTML {
+                PresentationFormPostWebView(
+                    html: html,
+                    onCompleted: viewModel.completePresentationContinuation,
+                    onFailed: viewModel.failPresentationContinuation
+                )
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .accessibilityHidden(true)
+            }
+        }
     }
 
     private var detailsNavigationLink: some View {
@@ -104,6 +128,71 @@ struct PresentView: View {
             } else {
                 EmptyView()
             }
+        }
+    }
+}
+
+private struct PresentationFormPostWebView: UIViewRepresentable {
+    let html: String
+    let onCompleted: () -> Void
+    let onFailed: (String) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCompleted: onCompleted, onFailed: onFailed)
+    }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.navigationDelegate = context.coordinator
+        webView.loadHTMLString(html, baseURL: nil)
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {}
+
+    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.stopLoading()
+        webView.navigationDelegate = nil
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        private let onCompleted: () -> Void
+        private let onFailed: (String) -> Void
+        private var submittedNavigation: WKNavigation?
+        private var finished = false
+
+        init(onCompleted: @escaping () -> Void, onFailed: @escaping (String) -> Void) {
+            self.onCompleted = onCompleted
+            self.onFailed = onFailed
+        }
+
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            if let url = webView.url,
+               url.absoluteString != "about:blank",
+               url.scheme != "data" {
+                submittedNavigation = navigation
+            }
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            guard let submittedNavigation, submittedNavigation === navigation, !finished else { return }
+            finished = true
+            onCompleted()
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            fail(error)
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            guard (error as NSError).code != NSURLErrorCancelled else { return }
+            fail(error)
+        }
+
+        private func fail(_ error: Error) {
+            guard !finished else { return }
+            finished = true
+            onFailed(error.localizedDescription)
         }
     }
 }

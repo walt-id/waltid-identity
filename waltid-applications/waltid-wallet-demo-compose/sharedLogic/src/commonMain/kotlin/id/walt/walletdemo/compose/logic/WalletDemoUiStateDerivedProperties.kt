@@ -6,7 +6,8 @@ val WalletDemoUiState.isBusy: Boolean
         operation is WalletOperationState.ResolvingOffer ||
         operation is WalletOperationState.Receiving ||
         operation is WalletOperationState.ResolvingPresentation ||
-        operation is WalletOperationState.Presenting
+        operation is WalletOperationState.Presenting ||
+        operation is WalletOperationState.DecliningPresentation
 
 val WalletDemoUiState.isError: Boolean
     get() = isErrorFor(selectedTab)
@@ -36,7 +37,7 @@ val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
     get() = !isBusy && presentationPreview == null && !presentationCompleted
 
 val WalletDemoUiState.presentationPreviewActionEnabled: Boolean
-    get() = (session as? WalletSessionState.Ready)?.credentials?.isNotEmpty() == true &&
+    get() = session is WalletSessionState.Ready &&
         requestDrafts.presentationRequestUrl.isNotBlank() &&
         presentationUrlEntryEnabled
 
@@ -94,6 +95,7 @@ private fun WalletOperationState.statusTextFor(tab: WalletDemoTab): String? =
             WalletOperationState.Receiving -> WalletDisplayText.ReceivingCredential
             WalletOperationState.ResolvingPresentation -> WalletDisplayText.ResolvingPresentation
             WalletOperationState.Presenting -> WalletDisplayText.PresentingCredential
+            WalletOperationState.DecliningPresentation -> WalletDisplayText.DecliningPresentation
             is WalletOperationState.Succeeded -> message
             is WalletOperationState.Failed -> message
         }
@@ -107,6 +109,7 @@ private fun WalletOperationState.belongsTo(tab: WalletDemoTab): Boolean =
         WalletOperationState.Receiving -> tab == WalletDemoTab.Receive
         WalletOperationState.ResolvingPresentation,
         WalletOperationState.Presenting,
+        WalletOperationState.DecliningPresentation,
         -> tab == WalletDemoTab.Present
         is WalletOperationState.Succeeded -> this.tab == null || this.tab == tab
         is WalletOperationState.Failed -> this.tab == null || this.tab == tab
@@ -118,6 +121,7 @@ private val WalletOperationState.isBusyOperation: Boolean
         WalletOperationState.Receiving,
         WalletOperationState.ResolvingPresentation,
         WalletOperationState.Presenting,
+        WalletOperationState.DecliningPresentation,
         -> true
         WalletOperationState.Idle,
         WalletOperationState.OfferPreview,

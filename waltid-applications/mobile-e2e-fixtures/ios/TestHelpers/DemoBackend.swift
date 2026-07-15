@@ -261,6 +261,51 @@ public final class DemoBackend {
         )
     }
 
+    public func waitForVerifierFailure(
+        sessionID: String,
+        expectedError: String,
+        timeoutSeconds: TimeInterval
+    ) async throws -> [String: Any] {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+
+        while Date() < deadline {
+            let url = Self.verifierBaseURL
+                .appendingPathComponent("verification-session")
+                .appendingPathComponent(sessionID)
+                .appendingPathComponent("info")
+            let response = try await client.jsonRequest(url: url, retryTransientFailures: true)
+            let status = (response["status"] as? String)
+                ?? ((response["session"] as? [String: Any])?["status"] as? String)
+
+            switch status?.uppercased() {
+            case "FAILED":
+                guard let failure = response["failure"] as? [String: Any],
+                      failure["error"] as? String == expectedError else {
+                    throw NSError(
+                        domain: "WalletE2E",
+                        code: 305,
+                        userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 omitted \(expectedError) failure details for session \(sessionID): \(response)"]
+                    )
+                }
+                return response
+            case "SUCCESSFUL", "ERROR", "EXPIRED":
+                throw NSError(
+                    domain: "WalletE2E",
+                    code: 306,
+                    userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 reported \(status ?? "UNKNOWN") instead of \(expectedError) for session \(sessionID): \(response)"]
+                )
+            default:
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
+
+        throw NSError(
+            domain: "WalletE2E",
+            code: 307,
+            userInfo: [NSLocalizedDescriptionKey: "public demo verifier2 did not report \(expectedError) within \(timeoutSeconds)s for session \(sessionID)"]
+        )
+    }
+
     private static func sdJwtQuery(id: String, vct: String) -> [String: Any] {
         [
             "id": id,

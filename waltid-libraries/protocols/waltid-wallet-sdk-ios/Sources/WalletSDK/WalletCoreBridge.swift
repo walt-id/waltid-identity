@@ -18,6 +18,11 @@ protocol WalletCoreBridge: Sendable {
         did: String?,
         runPolicies: Bool?
     ) async throws -> PresentationResult
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode,
+        errorDescription: String?
+    ) async throws -> PresentationResult
 }
 
 @available(macOS 10.15, *)
@@ -73,6 +78,14 @@ struct UnavailableWalletCoreBridge: WalletCoreBridge {
         selectedDisclosureOptions: [PresentationDisclosureSelection]?,
         did: String?,
         runPolicies: Bool?
+    ) async throws -> PresentationResult {
+        throw unavailableError()
+    }
+
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode,
+        errorDescription: String?
     ) async throws -> PresentationResult {
         throw unavailableError()
     }

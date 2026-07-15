@@ -14,6 +14,7 @@ protocol WalletClient {
         selectedDisclosureOptions: [PresentationDisclosureSelection],
         did: String?
     ) async throws -> PresentationResult
+    func rejectPresentation(request: URL) async throws -> PresentationResult
 }
 
 final class SDKWalletClient: WalletClient {
@@ -60,6 +61,10 @@ final class SDKWalletClient: WalletClient {
             selectedDisclosureOptions: selectedDisclosureOptions,
             did: did
         )
+    }
+
+    func rejectPresentation(request: URL) async throws -> PresentationResult {
+        try await wallet().rejectPresentation(request: request)
     }
 
     private func wallet() async throws -> Wallet {

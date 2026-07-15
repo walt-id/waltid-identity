@@ -279,6 +279,39 @@ object DemoTestBackend {
         }
     }
 
+    suspend fun waitForVerifierFailure(
+        sessionId: String,
+        expectedError: String,
+        timeoutMs: Long = 90_000,
+    ): JsonObject {
+        val mark = TimeSource.Monotonic.markNow()
+        while (true) {
+            if (mark.elapsedNow() > timeoutMs.milliseconds) {
+                error("public demo verifier2 did not report $expectedError within ${timeoutMs}ms for session $sessionId")
+            }
+
+            val info = verifierSessionInfo(sessionId)
+            val status = info["status"]?.jsonPrimitive?.contentOrNull
+                ?: info["session"]?.jsonObject?.get("status")?.jsonPrimitive?.contentOrNull
+            when (status?.uppercase()) {
+                "FAILED" -> {
+                    val failure = info["failure"]?.jsonObject
+                        ?: error("public demo verifier2 omitted failure details for session $sessionId: $info")
+                    val actualError = failure["error"]?.jsonPrimitive?.contentOrNull
+                    check(actualError == expectedError) {
+                        "public demo verifier2 reported $actualError instead of $expectedError for session $sessionId: $info"
+                    }
+                    return info
+                }
+
+                "SUCCESSFUL", "ERROR", "EXPIRED" ->
+                    error("public demo verifier2 reported $status instead of $expectedError for session $sessionId: $info")
+            }
+
+            delay(2_000.milliseconds)
+        }
+    }
+
     private suspend fun requestJson(url: String, body: JsonObject): JsonObject {
         val response: HttpResponse = client.post(url) {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())

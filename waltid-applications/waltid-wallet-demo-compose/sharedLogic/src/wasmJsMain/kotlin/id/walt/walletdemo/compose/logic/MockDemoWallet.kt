@@ -52,4 +52,7 @@ private class MockDemoWallet : DemoWallet {
         did: String?,
     ): WalletDemoOperationResult =
         WalletDemoOperationResult.Success("Mock presentation sent")
+
+    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
+        WalletDemoOperationResult.Success("Mock presentation declined")
 }

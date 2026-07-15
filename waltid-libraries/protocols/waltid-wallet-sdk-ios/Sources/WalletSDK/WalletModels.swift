@@ -584,7 +584,10 @@ public struct WalletBootstrapResult: Equatable, Sendable {
 
 /// Result of responding to an OpenID4VP presentation request.
 public struct PresentationResult: Equatable, Sendable {
-    /// Indicates whether the presentation flow completed successfully.
+    /// Indicates whether the protocol response was transmitted or prepared successfully.
+    ///
+    /// When ``responseURL`` or ``formPostHTML`` is present, the host app must
+    /// still deliver that front-channel response before treating the flow as complete.
     public let success: Bool
 
     /// Optional verifier redirect URL.
@@ -593,21 +596,33 @@ public struct PresentationResult: Equatable, Sendable {
     /// Optional raw verifier response JSON.
     public let verifierResponseJSON: String?
 
+    /// Front-channel query or fragment response URL for the host app to open.
+    public let responseURL: URL?
+
+    /// Self-submitting form-post response for the host app to render.
+    public let formPostHTML: String?
+
     /// Creates a presentation result.
     ///
     /// - Parameters:
-    ///   - success: Indicates whether the presentation flow completed
-    ///     successfully.
+    ///   - success: Indicates whether the protocol response was transmitted or
+    ///     prepared successfully. A returned front-channel artifact still requires host delivery.
     ///   - redirectTo: Optional verifier redirect URL.
     ///   - verifierResponseJSON: Optional raw verifier response JSON.
+    ///   - responseURL: Front-channel response URL for the host app to open.
+    ///   - formPostHTML: Self-submitting form-post response for the host app to render.
     public init(
         success: Bool,
         redirectTo: URL?,
-        verifierResponseJSON: String?
+        verifierResponseJSON: String?,
+        responseURL: URL? = nil,
+        formPostHTML: String? = nil
     ) {
         self.success = success
         self.redirectTo = redirectTo
         self.verifierResponseJSON = verifierResponseJSON
+        self.responseURL = responseURL
+        self.formPostHTML = formPostHTML
     }
 }
 
@@ -928,6 +943,52 @@ public struct PresentationTransactionData: Equatable, Sendable {
         self.rawJSON = rawJSON
         self.detailsJSON = detailsJSON
     }
+}
+
+/// OAuth 2.0 and OpenID4VP 1.0 authorization error codes supported by the wallet.
+///
+/// Use ``accessDenied`` when the user declines, the wallet has no requested
+/// credential, or user authentication fails. Other cases describe protocol or
+/// availability failures and should not be presented as end-user choices.
+public enum PresentationErrorCode: String, Equatable, Sendable {
+    /// The user or wallet denied the presentation request.
+    case accessDenied = "access_denied"
+
+    /// The authorization request is malformed or missing a required parameter.
+    case invalidRequest = "invalid_request"
+
+    /// The request's client identification is invalid.
+    case invalidClient = "invalid_client"
+
+    /// The requested scope is invalid, unknown, or unsupported.
+    case invalidScope = "invalid_scope"
+
+    /// The client is not authorized to make this presentation request.
+    case unauthorizedClient = "unauthorized_client"
+
+    /// The wallet does not support the requested response type.
+    case unsupportedResponseType = "unsupported_response_type"
+
+    /// The wallet cannot fulfill the request because of an unexpected error.
+    case serverError = "server_error"
+
+    /// The wallet cannot fulfill the request because it is temporarily unavailable.
+    case temporarilyUnavailable = "temporarily_unavailable"
+
+    /// The wallet does not support any requested verifiable-presentation format.
+    case vpFormatsNotSupported = "vp_formats_not_supported"
+
+    /// The wallet does not support the request's `request_uri_method`.
+    case invalidRequestURIMethod = "invalid_request_uri_method"
+
+    /// The request contains invalid or unsupported transaction data.
+    case invalidTransactionData = "invalid_transaction_data"
+
+    /// The requested wallet is unavailable.
+    case walletUnavailable = "wallet_unavailable"
+
+    /// OpenID4VP error code sent for this reason.
+    public var errorCode: String { rawValue }
 }
 
 /// Progress event emitted while issuance or presentation work is running.

@@ -39,4 +39,7 @@ internal class LazyDemoWallet(
         did: String?,
     ): WalletDemoOperationResult =
         wallet().submitPresentation(requestUrl, selectedCredentialOptions, selectedDisclosureOptions, did)
+
+    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
+        wallet().rejectPresentation(requestUrl)
 }

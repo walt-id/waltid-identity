@@ -4,6 +4,7 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
+import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
@@ -47,7 +48,10 @@ internal class MobileDemoWallet(
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult =
         mobileWallet.present(requestUrl = requestUrl, did = did).let { result ->
             if (result.success) {
-                WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
+                WalletDemoOperationResult.Success(
+                    WalletDisplayText.PresentationSent,
+                    result.toDemoContinuation(),
+                )
             } else {
                 WalletDemoOperationResult.Failure(WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
             }
@@ -80,13 +84,33 @@ internal class MobileDemoWallet(
             did = did,
         ).let { result ->
             if (result.success) {
-                WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
+                WalletDemoOperationResult.Success(
+                    WalletDisplayText.PresentationSent,
+                    result.toDemoContinuation(),
+                )
             } else {
                 WalletDemoOperationResult.Failure(WalletDisplayText.PresentationFinishedWithoutVerifierConfirmation)
             }
         }
 
+    override suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult =
+        mobileWallet.rejectPresentation(requestUrl = requestUrl).let { result ->
+            if (result.success) {
+                WalletDemoOperationResult.Success(
+                    WalletDisplayText.PresentationDeclined,
+                    result.toDemoContinuation(),
+                )
+            } else {
+                WalletDemoOperationResult.Failure(WalletDisplayText.RejectionFinishedWithoutVerifierConfirmation)
+            }
+        }
+
 }
+
+private fun MobileWalletPresentationResult.toDemoContinuation(): WalletDemoPresentationContinuation? =
+    redirectTo?.let(WalletDemoPresentationContinuation::Url)
+        ?: responseUrl?.let(WalletDemoPresentationContinuation::Url)
+        ?: formPostHtml?.let(WalletDemoPresentationContinuation::FormPostHtml)
 
 internal fun DemoWalletConfig.toWalletAttestationConfig(): WalletAttestationConfig? =
     attestationBaseUrl.takeIf { it.isNotBlank() }?.let {

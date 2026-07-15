@@ -17,6 +17,7 @@ data class WalletDemoUiState(
     val presentationCompleted: Boolean = false,
     val presentationNavigationResetKey: Int = 0,
     val warning: String? = null,
+    val pendingPresentationContinuation: WalletDemoPendingPresentationContinuation? = null,
 )
 
 fun WalletDemoUiState.receivedCredentials(): List<WalletDemoCredential> {

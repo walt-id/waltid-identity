@@ -241,6 +241,28 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await previewAndSubmitDemoCredential(scenarioID: "eudi-pid-mdoc")
     }
 
+    func testRejectPresentationAgainstDemoVerifier2() async throws {
+        let scenario = try demoPresentationScenario("eudi-pid-sdjwt")
+        let walletId = "ios-demo-reject-\(scenario.id)-\(UUID().uuidString)"
+        await clearTestData(walletId: walletId)
+
+        let wallet = try await makeWallet(walletId: walletId)
+        _ = try await wallet.bootstrap()
+        let session = try await DemoBackend.shared.createVerifierSession(scenario: scenario)
+        let presentationURL = try XCTUnwrap(URL(string: session.authorizationRequestUri))
+        _ = try await wallet.previewPresentation(request: presentationURL)
+        let result = try await wallet.rejectPresentation(request: presentationURL)
+
+        XCTAssertTrue(result.success, "Wallet should deliver access_denied to public demo verifier2: \(result)")
+        let info = try await DemoBackend.shared.waitForVerifierFailure(
+            sessionID: session.sessionID,
+            expectedError: "access_denied",
+            timeoutSeconds: verifierPollingTimeout
+        )
+        let failure = try XCTUnwrap(info["failure"] as? [String: Any])
+        XCTAssertEqual(failure["type"] as? String, "wallet_error_response")
+    }
+
     func testReceiveAndPresentIsoMdlAgainstDemoIssuer2AndVerifier2() async throws {
         try await receiveAndPresentDemoCredential(scenarioID: "iso-mdl")
     }

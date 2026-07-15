@@ -162,4 +162,23 @@ public actor Wallet {
         )
     }
 
+    /// Sends an OpenID4VP error response for a previously previewed request.
+    ///
+    /// - Parameters:
+    ///   - request: OpenID4VP authorization request URL received by the app.
+    ///   - error: Authorization error code. Use ``PresentationErrorCode/accessDenied`` for user decline.
+    ///   - errorDescription: Optional verifier-facing error description.
+    /// - Returns: Error-response delivery outcome.
+    /// - Throws: ``WalletError`` when the request cannot be resolved or the error response cannot be sent.
+    public func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode = .accessDenied,
+        errorDescription: String? = nil
+    ) async throws -> PresentationResult {
+        try await bridge.rejectPresentation(
+            request: request,
+            error: error,
+            errorDescription: errorDescription
+        )
+    }
 }

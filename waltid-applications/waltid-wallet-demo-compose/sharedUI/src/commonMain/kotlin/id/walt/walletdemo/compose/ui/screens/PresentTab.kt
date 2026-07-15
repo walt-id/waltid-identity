@@ -37,7 +37,7 @@ internal fun PresentTab(
     onToggleDisclosure: (WalletDemoPresentationDisclosureSelection) -> Unit,
     onCredentialClick: (String) -> Unit,
     onSubmit: () -> Unit,
-    onCancel: () -> Unit,
+    onReject: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
     val credentials = (state.session as? WalletSessionState.Ready)?.credentials.orEmpty()
@@ -93,7 +93,7 @@ internal fun PresentTab(
                 onToggleDisclosure = onToggleDisclosure,
                 onCredentialClick = onCredentialClick,
                 onSubmit = onSubmit,
-                onCancel = onCancel,
+                onReject = onReject,
             )
         }
     }

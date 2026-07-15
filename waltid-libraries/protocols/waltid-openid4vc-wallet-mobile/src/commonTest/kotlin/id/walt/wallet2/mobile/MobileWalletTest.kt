@@ -14,6 +14,7 @@ import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,27 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class MobileWalletTest {
+
+    @Test
+    fun presentationErrorCodesMatchOAuthAndOpenId4VpValues() {
+        assertEquals(
+            listOf(
+                "access_denied",
+                "invalid_request",
+                "invalid_client",
+                "invalid_scope",
+                "unauthorized_client",
+                "unsupported_response_type",
+                "server_error",
+                "temporarily_unavailable",
+                "vp_formats_not_supported",
+                "invalid_request_uri_method",
+                "invalid_transaction_data",
+                "wallet_unavailable",
+            ),
+            MobileWalletPresentationErrorCode.entries.map { it.errorCode },
+        )
+    }
 
     @Test
     fun mobileWalletConfigUsesStableDefaults() {
@@ -179,6 +201,28 @@ class MobileWalletTest {
         )
 
         assertEquals("""{"accepted":true}""", result.verifierResponseJson)
+    }
+
+    @Test
+    fun presentationResultPreservesFrontChannelResponseArtifacts() {
+        val responseUrl = WalletPresentResult(getUrl = "https://verifier.example/callback?error=access_denied")
+            .toMobilePresentationResult()
+        val formPost = WalletPresentResult(formPostHtml = "<form></form>").toMobilePresentationResult()
+
+        assertTrue(responseUrl.success)
+        assertEquals("https://verifier.example/callback?error=access_denied", responseUrl.responseUrl)
+        assertTrue(formPost.success)
+        assertEquals("<form></form>", formPost.formPostHtml)
+    }
+
+    @Test
+    fun presentationResultHonorsExplicitFailedTransmission() {
+        val result = WalletPresentResult(
+            transmissionSuccess = false,
+            verifierResponse = buildJsonObject { put("error", "server_error") },
+        ).toMobilePresentationResult()
+
+        assertFalse(result.success)
     }
 
     @Test

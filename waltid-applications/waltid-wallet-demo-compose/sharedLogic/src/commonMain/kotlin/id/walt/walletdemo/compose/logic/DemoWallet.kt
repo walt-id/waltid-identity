@@ -13,4 +13,5 @@ interface DemoWallet {
         selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
         did: String? = null,
     ): WalletDemoOperationResult
+    suspend fun rejectPresentation(requestUrl: String): WalletDemoOperationResult
 }

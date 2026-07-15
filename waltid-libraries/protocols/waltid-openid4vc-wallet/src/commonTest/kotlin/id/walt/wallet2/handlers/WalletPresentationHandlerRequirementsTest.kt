@@ -12,6 +12,7 @@ import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
 import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
+import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
@@ -26,6 +27,13 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class WalletPresentationHandlerRequirementsTest {
+
+    @Test
+    fun presentationCompletionUsesProtocolOutcomeInsteadOfResultContainer() {
+        assertFalse(WalletPresentResult(transmissionSuccess = false).completedSuccessfully())
+        assertTrue(WalletPresentResult(getUrl = "https://verifier.example/callback").completedSuccessfully())
+        assertTrue(WalletPresentResult(formPostHtml = "<form></form>").completedSuccessfully())
+    }
 
     @Test
     fun presentationRequirementsWithoutCredentialSetsRequireEveryQuery() {
@@ -131,7 +139,25 @@ class WalletPresentationHandlerRequirementsTest {
         }
 
         assertEquals(
-            "Presentation request preview expired or was not found; preview the request again before submitting.",
+            "Presentation request preview expired or was not found; preview the request again before responding.",
+            error.message,
+        )
+    }
+
+    @Test
+    fun rejectPresentationRequiresMatchingPreview() = runTest {
+        val error = assertFailsWith<MissingPresentationPreviewException> {
+            WalletPresentationHandler.rejectPresentation(
+                wallet = Wallet(id = "wallet-without-rejection-preview"),
+                request = RejectPresentationRequest(
+                    requestUrl = Url("openid4vp://authorize?request_uri=https%3A%2F%2Fverifier.example%2Frequest.jwt"),
+                    errorCode = "access_denied",
+                ),
+            )
+        }
+
+        assertEquals(
+            "Presentation request preview expired or was not found; preview the request again before responding.",
             error.message,
         )
     }

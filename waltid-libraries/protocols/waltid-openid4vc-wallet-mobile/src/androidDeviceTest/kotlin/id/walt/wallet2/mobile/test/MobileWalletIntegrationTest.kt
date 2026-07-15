@@ -192,6 +192,24 @@ class MobileWalletIntegrationTest {
     }
 
     @Test
+    fun rejectPresentationAgainstDemoVerifier2() = runBlocking {
+        val scenario = demoPresentationScenario("eudi-pid-sdjwt")
+        val client = MobileWalletFactory(context).create(walletConfig("reject-${scenario.id}"))
+        client.bootstrap()
+
+        val session = DemoTestBackend.createVerifierSession(scenario)
+        client.previewPresentation(session.authorizationRequestUri)
+        val result = client.rejectPresentation(session.authorizationRequestUri)
+
+        assertTrue(result.success, "Wallet should deliver access_denied to public demo verifier2: $result")
+        val info = DemoTestBackend.waitForVerifierFailure(
+            sessionId = session.sessionId,
+            expectedError = "access_denied",
+        )
+        assertEquals("wallet_error_response", info["failure"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull)
+    }
+
+    @Test
     fun previewAndSubmitOptionalBirthDateClaimSetAgainstDemoIssuer2AndVerifier2() = runBlocking {
         val scenario = DemoTestBackend.optionalBirthDatePresentationScenario
         val client = MobileWalletFactory(context).create(walletConfig("optional-birth-date-${scenario.id}"))

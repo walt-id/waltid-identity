@@ -21,14 +21,53 @@ let result = try await wallet.submitPresentation(
     did: bootstrap.did
 )
 
-if result.success, let redirect = result.redirectTo {
+guard result.success else {
+    showPresentationFailure()
+    return
+}
+
+if let redirect = result.redirectTo ?? result.responseURL {
     await openVerifierRedirect(redirect)
+} else if let html = result.formPostHTML {
+    await renderAndSubmitFormPost(html)
+} else {
+    showPresentationComplete()
 }
 ```
 
-The returned ``PresentationResult`` includes the success flag, optional verifier
-redirect, and optional raw verifier response JSON for diagnostics or host-app
-workflow decisions.
+The returned ``PresentationResult`` includes the protocol success flag, optional
+front-channel response artifacts, and optional raw verifier response JSON. A
+successful result means the SDK either transmitted the response or prepared it
+for the host. When `responseURL` or `formPostHTML` is present, keep the operation
+pending until the host opens the URL or loads the self-submitting HTML and the
+navigation succeeds. Surface handoff failures so the user can retry.
+
+### Reject a Presentation Request
+
+Use ``Wallet/rejectPresentation(request:error:errorDescription:)`` for
+user rejection and handle its continuation exactly like a credential-bearing
+response:
+
+```swift
+let result = try await wallet.rejectPresentation(
+    request: authorizationRequestURL,
+    error: .accessDenied,
+    errorDescription: "The user declined the request"
+)
+
+guard result.success else {
+    showRejectionFailure()
+    return
+}
+
+if let redirect = result.redirectTo ?? result.responseURL {
+    await openVerifierRedirect(redirect)
+} else if let html = result.formPostHTML {
+    await renderAndSubmitFormPost(html)
+} else {
+    showRejectionComplete()
+}
+```
 
 > Note: ``Wallet/present(request:did:runPolicies:)`` still exists for immediate
 > submission after the app has already handled request review and user consent.

@@ -8,6 +8,7 @@ import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
+import id.walt.wallet2.mobile.MobileWalletPresentationErrorCode
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import kotlinx.coroutines.CancellationException
@@ -144,6 +145,20 @@ public class WalletSdkBridge private constructor(
             )
         }
 
+    /** Sends an OpenID4VP error response for a previously previewed request. */
+    public suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode = MobileWalletPresentationErrorCode.accessDenied,
+        errorDescription: String? = null,
+    ): WalletBridgeResult<MobileWalletPresentationResult> =
+        walletBridgeCall {
+            operations.rejectPresentation(
+                requestUrl = requestUrl,
+                errorCode = errorCode,
+                errorDescription = errorDescription,
+            )
+        }
+
     internal companion object {
         internal fun forOperations(
             operations: WalletSdkBridgeOperations,
@@ -191,6 +206,11 @@ internal interface WalletSdkBridgeOperations {
         runPolicies: Boolean?,
     ): MobileWalletPresentationResult
 
+    suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode,
+        errorDescription: String?,
+    ): MobileWalletPresentationResult
 }
 
 internal class MobileWalletSdkBridgeOperations(
@@ -256,4 +276,14 @@ internal class MobileWalletSdkBridgeOperations(
             runPolicies = runPolicies,
         )
 
+    override suspend fun rejectPresentation(
+        requestUrl: String,
+        errorCode: MobileWalletPresentationErrorCode,
+        errorDescription: String?,
+    ): MobileWalletPresentationResult =
+        wallet.rejectPresentation(
+            requestUrl = requestUrl,
+            errorCode = errorCode,
+            errorDescription = errorDescription,
+        )
 }

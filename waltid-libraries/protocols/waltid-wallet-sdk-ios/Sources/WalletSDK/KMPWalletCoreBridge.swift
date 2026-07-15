@@ -113,7 +113,9 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return .init(
             success: value.success,
             redirectTo: value.redirectTo.flatMap(URL.init(string:)),
-            verifierResponseJSON: value.verifierResponseJson
+            verifierResponseJSON: value.verifierResponseJson,
+            responseURL: value.responseUrl.flatMap(URL.init(string:)),
+            formPostHTML: value.formPostHtml
         )
     }
 
@@ -162,7 +164,34 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
         return .init(
             success: value.success,
             redirectTo: value.redirectTo.flatMap(URL.init(string:)),
-            verifierResponseJSON: value.verifierResponseJson
+            verifierResponseJSON: value.verifierResponseJson,
+            responseURL: value.responseUrl.flatMap(URL.init(string:)),
+            formPostHTML: value.formPostHtml
+        )
+    }
+
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode,
+        errorDescription: String?
+    ) async throws -> PresentationResult {
+        let result = try await bridge.rejectPresentation(
+            requestUrl: request.absoluteString,
+            errorCode: error.toKMPErrorCode(),
+            errorDescription: errorDescription
+        )
+        let value = try Self.successValue(
+            result,
+            as: MobileWalletPresentationResult.self,
+            operation: "reject presentation"
+        )
+
+        return .init(
+            success: value.success,
+            redirectTo: value.redirectTo.flatMap(URL.init(string:)),
+            verifierResponseJSON: value.verifierResponseJson,
+            responseURL: value.responseUrl.flatMap(URL.init(string:)),
+            formPostHTML: value.formPostHtml
         )
     }
 
@@ -663,6 +692,37 @@ private extension MobileWalletTransactionDataItem {
             rawJSON: rawJson,
             detailsJSON: detailsJson
         )
+    }
+}
+
+private extension PresentationErrorCode {
+    func toKMPErrorCode() -> MobileWalletPresentationErrorCode {
+        switch self {
+        case .accessDenied:
+            return .accessDenied
+        case .invalidRequest:
+            return .invalidRequest
+        case .invalidClient:
+            return .invalidClient
+        case .invalidScope:
+            return .invalidScope
+        case .unauthorizedClient:
+            return .unauthorizedClient
+        case .unsupportedResponseType:
+            return .unsupportedResponseType
+        case .serverError:
+            return .serverError
+        case .temporarilyUnavailable:
+            return .temporarilyUnavailable
+        case .vpFormatsNotSupported:
+            return .vpFormatsNotSupported
+        case .invalidRequestURIMethod:
+            return .invalidRequestUriMethod
+        case .invalidTransactionData:
+            return .invalidTransactionData
+        case .walletUnavailable:
+            return .walletUnavailable
+        }
     }
 }
 

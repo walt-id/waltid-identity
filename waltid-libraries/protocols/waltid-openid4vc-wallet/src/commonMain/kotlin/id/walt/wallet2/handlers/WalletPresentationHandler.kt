@@ -73,6 +73,9 @@ data class PresentCredentialRequest(
     val runPolicies: Boolean? = null
 ) : VpRequestSource
 
+internal fun WalletPresentResult.completedSuccessfully(): Boolean =
+    transmissionSuccess ?: (getUrl != null || formPostHtml != null)
+
 @Serializable
 data class PresentCredentialIsolatedRequest(
     override val requestUrl: Url,
@@ -191,8 +194,15 @@ data class SubmitPresentationRequest(
     val runPolicies: Boolean? = null,
 )
 
+@Serializable
+data class RejectPresentationRequest(
+    val requestUrl: Url,
+    val errorCode: String,
+    val errorDescription: String? = null,
+)
+
 class MissingPresentationPreviewException :
-    IllegalStateException("Presentation request preview expired or was not found; preview the request again before submitting.")
+    IllegalStateException("Presentation request preview expired or was not found; preview the request again before responding.")
 
 // ---------------------------------------------------------------------------
 // Handler
@@ -415,6 +425,36 @@ object WalletPresentationHandler {
 
         return result.getOrThrow()
     }
+
+    /**
+     * Consumes the request resolved by [previewPresentation] and sends an OpenID4VP error response.
+     * Reusing the preview prevents a mutable request URI from changing after user review.
+     */
+    suspend fun rejectPresentation(
+        wallet: Wallet,
+        request: RejectPresentationRequest,
+        onEvent: suspend (WalletSessionEvent) -> Unit = {},
+    ): WalletPresentResult {
+        val authorizationRequest =
+            consumePreviewedAuthorizationRequest(wallet, request.requestUrl).authorizationRequest
+        onEvent(WalletSessionEvent.presentation_request_parsed)
+
+        val result = WalletPresentFunctionality2.walletRejectHandling(
+            authorizationRequest = authorizationRequest,
+            error = request.errorCode,
+            errorDescription = request.errorDescription,
+        )
+
+        onEvent(
+            if (result.getOrNull()?.completedSuccessfully() == true) {
+                WalletSessionEvent.presentation_completed
+            } else {
+                WalletSessionEvent.presentation_failed
+            }
+        )
+        return result.getOrThrow()
+    }
+
     // ---------------------------------------------------------------------------
     // Isolated step handlers
     // ---------------------------------------------------------------------------

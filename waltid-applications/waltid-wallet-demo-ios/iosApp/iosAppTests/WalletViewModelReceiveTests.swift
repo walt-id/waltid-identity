@@ -143,6 +143,10 @@ private actor TransactionCodeWalletClient: WalletClient {
         PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
     }
 
+    func rejectPresentation(request: URL) async throws -> PresentationResult {
+        PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+    }
+
     private static let credential = Credential(
         id: "credential-1",
         format: "vc+sd-jwt",

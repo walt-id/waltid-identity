@@ -20,7 +20,7 @@ enum WalletAccessibilityID {
     static let presentationNewButton = identifier("presentationNewButton")
     static let presentTabContent = identifier("presentTabContent")
     static let presentationSubmitButton = identifier("presentationSubmitButton")
-    static let presentationCancelButton = identifier("presentationCancelButton")
+    static let presentationRejectButton = identifier("presentationRejectButton")
     static let presentationVerifier = identifier("presentationVerifier")
     static let verifierTechnicalDetailsToggle = identifier("verifierTechnicalDetailsToggle")
     static let verifierTechnicalDetails = identifier("verifierTechnicalDetails")

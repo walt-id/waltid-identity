@@ -304,11 +304,14 @@ final class WalletAPITests: XCTestCase {
     func testPresentForwardsRequestAndReturnsPresentationResult() async throws {
         let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
         let redirect = URL(string: "https://verifier.example/callback")!
+        let responseURL = URL(string: "https://verifier.example/response?state=123")!
         let bridge = FakeWalletCoreBridge()
         bridge.presentResult = .init(
             success: true,
             redirectTo: redirect,
-            verifierResponseJSON: #"{"status":"ok"}"#
+            verifierResponseJSON: #"{"status":"ok"}"#,
+            responseURL: responseURL,
+            formPostHTML: "<form></form>"
         )
         let wallet = Wallet(bridge: bridge)
 
@@ -320,6 +323,8 @@ final class WalletAPITests: XCTestCase {
 
         XCTAssertEqual(result.redirectTo, redirect)
         XCTAssertEqual(result.verifierResponseJSON, #"{"status":"ok"}"#)
+        XCTAssertEqual(result.responseURL, responseURL)
+        XCTAssertEqual(result.formPostHTML, "<form></form>")
         XCTAssertEqual(bridge.presentCalls.count, 1)
         XCTAssertEqual(bridge.presentCalls.first?.request, request)
         XCTAssertEqual(bridge.presentCalls.first?.did, "did:key:wallet")
@@ -380,6 +385,64 @@ final class WalletAPITests: XCTestCase {
         XCTAssertEqual(bridge.submitCalls.first?.selectedDisclosureOptions, [PresentationDisclosureSelection(queryID: "pid", credentialID: "credential-1", path: "$.given_name")])
         XCTAssertEqual(bridge.submitCalls.first?.did, "did:key:wallet")
         XCTAssertEqual(bridge.submitCalls.first?.runPolicies, false)
+    }
+
+    func testPresentationErrorCodesMatchOpenID4VPValues() {
+        XCTAssertEqual(
+            [
+                PresentationErrorCode.accessDenied.errorCode,
+                PresentationErrorCode.invalidRequest.errorCode,
+                PresentationErrorCode.invalidClient.errorCode,
+                PresentationErrorCode.invalidScope.errorCode,
+                PresentationErrorCode.unauthorizedClient.errorCode,
+                PresentationErrorCode.unsupportedResponseType.errorCode,
+                PresentationErrorCode.serverError.errorCode,
+                PresentationErrorCode.temporarilyUnavailable.errorCode,
+                PresentationErrorCode.vpFormatsNotSupported.errorCode,
+                PresentationErrorCode.invalidRequestURIMethod.errorCode,
+                PresentationErrorCode.invalidTransactionData.errorCode,
+                PresentationErrorCode.walletUnavailable.errorCode,
+            ],
+            [
+                "access_denied",
+                "invalid_request",
+                "invalid_client",
+                "invalid_scope",
+                "unauthorized_client",
+                "unsupported_response_type",
+                "server_error",
+                "temporarily_unavailable",
+                "vp_formats_not_supported",
+                "invalid_request_uri_method",
+                "invalid_transaction_data",
+                "wallet_unavailable",
+            ]
+        )
+    }
+
+    func testRejectPresentationForwardsErrorDetailsAndReturnsResult() async throws {
+        let request = URL(string: "openid4vp://verifier.example?request_uri=abc")!
+        let bridge = FakeWalletCoreBridge()
+        let responseURL = URL(string: "https://verifier.example/callback?error=access_denied")!
+        bridge.rejectResult = PresentationResult(
+            success: true,
+            redirectTo: nil,
+            verifierResponseJSON: nil,
+            responseURL: responseURL
+        )
+        let wallet = Wallet(bridge: bridge)
+
+        let result = try await wallet.rejectPresentation(
+            request: request,
+            error: .accessDenied,
+            errorDescription: "User declined"
+        )
+
+        XCTAssertEqual(bridge.rejectCalls.count, 1)
+        XCTAssertEqual(bridge.rejectCalls.first?.request, request)
+        XCTAssertEqual(bridge.rejectCalls.first?.error, .accessDenied)
+        XCTAssertEqual(bridge.rejectCalls.first?.errorDescription, "User declined")
+        XCTAssertEqual(result.responseURL, responseURL)
     }
 
     func testBridgeErrorsSurfaceAsWalletErrors() async {
@@ -551,6 +614,12 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
         let runPolicies: Bool?
     }
 
+    struct RejectCall {
+        let request: URL
+        let error: PresentationErrorCode
+        let errorDescription: String?
+    }
+
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
@@ -564,6 +633,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var presentResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
     var previewResult = PresentationPreview(request: .init(clientID: nil), credentialOptions: [])
     var submitResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
+    var rejectResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
     private(set) var bootstrapCalls: [BootstrapCall] = []
     private(set) var resolvedOffers: [URL] = []
     private(set) var receiveCalls: [ReceiveCall] = []
@@ -572,6 +642,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     private(set) var presentCalls: [PresentCall] = []
     private(set) var previewCalls: [URL] = []
     private(set) var submitCalls: [SubmitCall] = []
+    private(set) var rejectCalls: [RejectCall] = []
 
     init(events: [WalletEvent] = []) {
         self.events = AsyncStream { continuation in
@@ -665,5 +736,24 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
             )
         )
         return submitResult
+    }
+
+    func rejectPresentation(
+        request: URL,
+        error: PresentationErrorCode,
+        errorDescription: String?
+    ) async throws -> PresentationResult {
+        if let failure = self.error {
+            throw failure
+        }
+
+        rejectCalls.append(
+            .init(
+                request: request,
+                error: error,
+                errorDescription: errorDescription
+            )
+        )
+        return rejectResult
     }
 }
