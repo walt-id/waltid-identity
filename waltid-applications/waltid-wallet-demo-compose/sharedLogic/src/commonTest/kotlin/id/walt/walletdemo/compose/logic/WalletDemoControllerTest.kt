@@ -98,7 +98,9 @@ class WalletDemoControllerTest {
         controller.receive()
         runCurrent()
 
+        assertEquals("openid-credential-offer://example", wallet.resolvedOfferUrl)
         assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
+        assertEquals(1, wallet.receiveCalls)
         assertEquals(
             WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
             controller.state.value.operation,
@@ -120,6 +122,58 @@ class WalletDemoControllerTest {
 
         assertEquals(null, wallet.receivedOfferUrl)
         assertEquals("Wallet ready", controller.state.value.statusText)
+    }
+
+    @Test
+    fun receiveRequiresNonBlankTransactionCodeAndIssuesOnce() = runTest {
+        val wallet = FakeDemoWallet(
+            offerResolution = WalletDemoOfferResolution(txCodeRequired = true),
+            receivedCredentialIds = listOf("cred-1"),
+        )
+        val controller = unlockedControllerWith(wallet, this)
+        val offerUrl = "openid-credential-offer://example"
+
+        controller.selectTab(WalletDemoTab.Receive)
+        controller.updateOfferUrl(offerUrl)
+        controller.receive()
+        runCurrent()
+
+        assertEquals(offerUrl, wallet.resolvedOfferUrl)
+        assertEquals(0, wallet.receiveCalls)
+        assertTrue(controller.state.value.requestDrafts.txCodeRequired)
+        assertFalse(controller.state.value.receiveActionEnabled)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+
+        controller.receive()
+        runCurrent()
+        assertEquals(0, wallet.receiveCalls)
+
+        controller.updateTxCode(" 1234 ")
+        assertTrue(controller.state.value.receiveActionEnabled)
+        wallet.credentials = listOf(sampleCredential)
+        controller.receive()
+        runCurrent()
+
+        assertEquals(1, wallet.receiveCalls)
+        assertEquals(offerUrl, wallet.receivedOfferUrl)
+        assertEquals("1234", wallet.receivedTxCode)
+        assertTrue(controller.state.value.receiveCompleted)
+    }
+
+    @Test
+    fun changingOfferResetsTransactionCodeState() = runTest {
+        val wallet = FakeDemoWallet(offerResolution = WalletDemoOfferResolution(txCodeRequired = true))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl("openid-credential-offer://first")
+        controller.receive()
+        runCurrent()
+        controller.updateTxCode("1234")
+
+        controller.updateOfferUrl("openid-credential-offer://second")
+
+        assertEquals("", controller.state.value.requestDrafts.txCode)
+        assertFalse(controller.state.value.requestDrafts.txCodeRequired)
     }
 
     @Test
@@ -847,6 +901,7 @@ class WalletDemoControllerTest {
 private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
+    private val offerResolution: WalletDemoOfferResolution = WalletDemoOfferResolution(txCodeRequired = false),
     private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent),
     private val presentationPreview: WalletDemoPresentationPreview = WalletDemoPresentationPreview(
         verifierName = null,
@@ -855,7 +910,10 @@ private class FakeDemoWallet(
     ),
 ) : DemoWallet {
     var bootstrapCalls = 0
+    var resolvedOfferUrl: String? = null
     var receivedOfferUrl: String? = null
+    var receivedTxCode: String? = null
+    var receiveCalls = 0
     var presentedRequestUrl: String? = null
     var previewedRequestUrl: String? = null
     var submittedRequestUrl: String? = null
@@ -869,8 +927,15 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun receive(offerUrl: String): List<String> {
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution {
+        resolvedOfferUrl = offerUrl
+        return offerResolution
+    }
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
+        receiveCalls += 1
         receivedOfferUrl = offerUrl
+        receivedTxCode = txCode
         return receivedCredentialIds
     }
 

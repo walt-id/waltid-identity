@@ -11,6 +11,7 @@
 		2185E0068DD9855D00602730 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100012FDAE00000000001 /* WalletSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 519D794773D1421EEC9493DE /* WalletSDK */; };
 		71E100022FDAE00000000002 /* TestHelpers.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D690444A2FDAA5D2009AB1FB /* TestHelpers.framework */; };
+		A1000500AAAA000100000050 /* CodeScanner in Frameworks */ = {isa = PBXBuildFile; productRef = A1000501AAAA000000000051 /* CodeScanner */; };
 		A1000001AAAA000100000001 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001AAAA000000000001 /* WalletViewModel.swift */; };
 		A1000420AAAA000100000020 /* WalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000420AAAA000000000020 /* WalletClient.swift */; };
 		A1000421AAAA000100000021 /* MockWalletClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000421AAAA000000000021 /* MockWalletClient.swift */; };
@@ -162,6 +163,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0221E8E7784E493B08CF5888 /* WalletSDK in Frameworks */,
+				A1000500AAAA000100000050 /* CodeScanner in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -352,6 +354,7 @@
 			name = iosApp;
 			packageProductDependencies = (
 				256D4E3F703216DC04F0C650 /* WalletSDK */,
+				A1000501AAAA000000000051 /* CodeScanner */,
 			);
 			productName = iosApp;
 			productReference = B33B17E62C2C394F001A32F7 /* iosApp.app */;
@@ -484,6 +487,7 @@
 			mainGroup = B33B17DD2C2C394F001A32F7;
 			packageReferences = (
 				8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */,
+				A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */,
 			);
 			productRefGroup = B33B17E72C2C394F001A32F7 /* Products */;
 			projectDirPath = "";
@@ -1087,7 +1091,23 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/twostraws/CodeScanner.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
+		A1000501AAAA000000000051 /* CodeScanner */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000502AAAA000000000052 /* XCRemoteSwiftPackageReference "CodeScanner" */;
+			productName = CodeScanner;
+		};
 		256D4E3F703216DC04F0C650 /* WalletSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 8A81DD79791BBF3F1CFF90A1 /* XCLocalSwiftPackageReference "../../../waltid-libraries/protocols/waltid-wallet-sdk-ios" */;

@@ -4,7 +4,8 @@ import WalletSDK
 protocol WalletClient {
     func bootstrap() async throws -> WalletBootstrapResult
     func credentials() async throws -> [Credential]
-    func receive(offer: URL) async throws -> [String]
+    func resolveOffer(offer: URL) async throws -> OfferResolution
+    func receive(offer: URL, txCode: String?) async throws -> [String]
     func present(request: URL, did: String?) async throws -> PresentationResult
     func previewPresentation(request: URL) async throws -> PresentationPreview
     func submitPresentation(
@@ -31,8 +32,12 @@ final class SDKWalletClient: WalletClient {
         try await wallet().credentials()
     }
 
-    func receive(offer: URL) async throws -> [String] {
-        try await wallet().receive(offer: offer)
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        try await wallet().resolveOffer(offer: offer)
+    }
+
+    func receive(offer: URL, txCode: String?) async throws -> [String] {
+        try await wallet().receive(offer: offer, txCode: txCode)
     }
 
     func present(request: URL, did: String?) async throws -> PresentationResult {

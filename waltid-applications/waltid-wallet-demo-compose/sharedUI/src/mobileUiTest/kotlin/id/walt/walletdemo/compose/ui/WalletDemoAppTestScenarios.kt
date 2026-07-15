@@ -31,6 +31,7 @@ import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
+import id.walt.walletdemo.compose.logic.WalletDemoOfferResolution
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialOption
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialRequirement
 import id.walt.walletdemo.compose.logic.WalletDemoPresentationCredentialSelection
@@ -190,6 +191,20 @@ class WalletDemoAppTestScenarios {
         receiveGate.complete(Unit)
         waitUntil(timeoutMillis = 5_000) { controller.state.value.statusText.startsWith("Received") }
         onNodeWithTag("wallet.credentialCard.cred-1").performScrollTo().assertIsDisplayed()
+    }
+
+    fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
+        val controller = WalletDemoController(FakeDemoWallet(credentials = listOf(sampleCredential)))
+
+        setContent { WalletDemoApp(controller) }
+        unlockWithPin()
+        waitUntil(timeoutMillis = 5_000) { controller.state.value.session is WalletSessionState.Ready }
+
+        onNodeWithTag(WalletUiTestTags.ReceiveTab).performClick()
+        onNodeWithTag(WalletUiTestTags.OfferScanButton).assertIsDisplayed().assertIsEnabled()
+
+        onNodeWithTag(WalletUiTestTags.PresentTab).performClick()
+        onNodeWithTag(WalletUiTestTags.PresentationScanButton).assertIsDisplayed().assertIsEnabled()
     }
 
     fun presentTabExplainsWhyPreviewIsUnavailableWithoutCredentials() = runComposeUiTest {
@@ -743,7 +758,10 @@ private class FakeDemoWallet(
 
     override suspend fun listCredentials(): List<WalletDemoCredential> = credentials
 
-    override suspend fun receive(offerUrl: String): List<String> {
+    override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
+        WalletDemoOfferResolution(txCodeRequired = false)
+
+    override suspend fun receive(offerUrl: String, txCode: String?): List<String> {
         receivedOfferUrl = offerUrl
         receiveGate?.await()
         credentialsAfterReceive?.let { credentials = it }

@@ -3,16 +3,20 @@ package id.walt.walletdemo.compose.ui.screens
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
@@ -29,6 +33,7 @@ internal fun ReceiveTab(
     state: WalletDemoUiState,
     requestDrafts: WalletRequestDrafts,
     onOfferUrlChange: (String) -> Unit,
+    onTxCodeChange: (String) -> Unit,
     onReceive: () -> Unit,
     onStartNew: () -> Unit,
     onCredentialClick: (String) -> Unit,
@@ -53,6 +58,30 @@ internal fun ReceiveTab(
             inputEnabled = state.receiveUrlEntryEnabled,
             inputTestTag = WalletUiTestTags.OfferInput,
             buttonTestTag = WalletUiTestTags.ReceiveButton,
+            scanButtonTestTag = WalletUiTestTags.OfferScanButton,
+            contentBeforeActions = {
+                if (requestDrafts.txCodeRequired) {
+                    Text(
+                        text = "This offer requires a transaction code.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedTextField(
+                        value = requestDrafts.txCode,
+                        onValueChange = onTxCodeChange,
+                        label = { Text("Transaction code") },
+                        singleLine = true,
+                        enabled = state.receiveUrlEntryEnabled,
+                        keyboardOptions = KeyboardOptions(
+                            autoCorrectEnabled = false,
+                            keyboardType = KeyboardType.Text,
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag(WalletUiTestTags.TxCodeInput),
+                    )
+                }
+            },
             onClick = onReceive,
         )
 
