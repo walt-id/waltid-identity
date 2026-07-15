@@ -15,6 +15,22 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     private let presentationOperationTimeout: TimeInterval = 180
     private let verifierPollingTimeout: TimeInterval = 30
 
+    func testPinPersistsAcrossAppRestart() throws {
+        let app = XCUIApplication()
+        let ui = WalletE2EUI(app: app)
+        let environment = isolatedWalletEnvironment()
+
+        ui.launch(environment: environment)
+        let readyStatus = ui.waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
+
+        app.terminate()
+        ui.launchExpectingLogin(environment: environment)
+    }
+
     func testBootstrapCreatesDid() async throws {
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
@@ -278,7 +294,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         app.terminate()
         try await Task.sleep(nanoseconds: 2_000_000_000)
 
-        ui.launch(environment: environment)
+        ui.launchExpectingLogin(environment: environment)
         let readyAfterRestart = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
             timeout: walletReadyTimeout

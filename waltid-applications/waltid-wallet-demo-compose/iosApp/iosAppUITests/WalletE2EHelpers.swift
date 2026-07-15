@@ -22,6 +22,19 @@ final class WalletE2EUI {
         launch(environment: attestation)
     }
 
+    func launchExpectingLogin(environment: [String: String]) {
+        for (key, value) in environment {
+            app.launchEnvironment[key] = value
+        }
+        app.launch()
+
+        let pinInput = textInput(identifier: "wallet.pinInput", fallbackLabel: "PIN")
+        XCTAssertTrue(pinInput.waitForExistence(timeout: 10), "PIN input not found after relaunch")
+        let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
+        XCTAssertFalse(confirmation.waitForExistence(timeout: 2), "PIN setup was shown after relaunch")
+        unlockWallet()
+    }
+
     func textInput(identifier: String, fallbackLabel: String) -> XCUIElement {
         firstExisting([
             app.textFields[identifier],
