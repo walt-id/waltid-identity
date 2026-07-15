@@ -7,7 +7,7 @@
 ## Test Environment
 
 - **Wallet API:** localhost:7005
-- **Issuer API:** localhost:7002  
+- **Issuer API:** localhost:7002
 - **Conformance Suite:** localhost.emobix.co.uk:8443
 - **Adapter:** ngrok tunnel to localhost:7006
 

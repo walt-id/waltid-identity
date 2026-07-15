@@ -50,7 +50,7 @@ object ResponseEncryptionHandler {
         authorizationRequest: AuthorizationRequest
     ): Result<EncryptionConfig?> = runCatching {
         val responseMode = authorizationRequest.responseMode
-        
+
         // Only encrypted response modes require encryption configuration
         if (responseMode !in OpenID4VPResponseMode.ENCRYPTED_RESPONSES) {
             log.trace { "Response mode $responseMode does not require encryption" }

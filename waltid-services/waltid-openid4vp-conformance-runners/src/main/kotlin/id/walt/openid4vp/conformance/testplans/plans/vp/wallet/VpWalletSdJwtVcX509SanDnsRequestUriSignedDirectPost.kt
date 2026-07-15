@@ -37,7 +37,7 @@ class VpWalletSdJwtVcX509SanDnsRequestUriSignedDirectPost(
 
     /**
      * Test plan configuration for conformance suite.
-     * 
+     *
      * Required for HAIP wallet tests:
      * - client.jwks with x5c: For signing authorization requests and computing client_id
      * - client.dcql: DCQL query defining what credentials/claims to request

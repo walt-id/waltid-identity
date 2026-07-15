@@ -39,7 +39,7 @@ class VpWalletConformanceAdapter(
         private fun resolveWalletId(): String {
             // Priority: env var > file > fallback
             System.getenv("CONFORMANCE_WALLET_ID")?.takeIf { it.isNotBlank() }?.let { return it }
-            
+
             // Try reading from file written by setup script
             runCatching {
                 java.io.File("/tmp/conformance-wallet-id.txt").readText().trim()
@@ -47,7 +47,7 @@ class VpWalletConformanceAdapter(
                 println("[Adapter] Read wallet ID from /tmp/conformance-wallet-id.txt: $it")
                 return it
             }
-            
+
             return "conformance-test-wallet"  // Triggers auto-discovery
         }
     }
@@ -102,7 +102,7 @@ class VpWalletConformanceAdapter(
         try {
             println("[Adapter] Received authorization request")
             println("[Adapter] Query parameters: ${call.request.queryParameters}")
-            
+
             // Get available wallet ID dynamically if not configured
             val effectiveWalletId = if (walletId == "conformance-test-wallet") {
                 // Auto-discover: find a wallet with credentials
@@ -113,7 +113,7 @@ class VpWalletConformanceAdapter(
                     call.respond(HttpStatusCode.InternalServerError, "No wallets available in wallet API")
                     return
                 }
-                
+
                 // Find first wallet that has credentials
                 var foundWalletId: String? = null
                 for (walletJson in wallets) {
@@ -126,10 +126,10 @@ class VpWalletConformanceAdapter(
                         break
                     }
                 }
-                
+
                 if (foundWalletId == null) {
                     println("[Adapter] ERROR: No wallets with credentials found")
-                    call.respond(HttpStatusCode.InternalServerError, 
+                    call.respond(HttpStatusCode.InternalServerError,
                         "No wallets with credentials found. Run setup-test-wallet.sh first.")
                     return
                 }
@@ -143,12 +143,12 @@ class VpWalletConformanceAdapter(
             val request = call.parameters["request"]
             val clientId = call.parameters["client_id"]
             val requestUriMethod = call.parameters["request_uri_method"]
-            
+
             println("[Adapter] Parameters:")
             println("[Adapter]   client_id: $clientId")
             println("[Adapter]   request_uri: $requestUri")
             println("[Adapter]   request_uri_method: $requestUriMethod")
-            
+
             // Build the full authorization URL to pass to wallet API
             // The wallet API expects the full openid4vp:// URL
             val fullAuthUrl = buildString {

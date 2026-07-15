@@ -285,7 +285,7 @@ public class MobileWallet internal constructor(
             wallet,
             ResolveVpRequestRequest(requestUrl = Url(requestUrl.trim()))
         )
-        
+
         return MobileWalletRequestInspection(
             nonce = resolved.nonce,
             clientId = resolved.clientId,

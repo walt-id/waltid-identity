@@ -110,13 +110,13 @@ Our status: REJECTED ✅ (wallet behaved correctly)
 
 3. **SSL Trust Configuration**: The conformance suite uses a self-signed certificate.
    The JDK must trust it for the wallet to connect.
-   
+
    ```bash
    # Extract the certificate
    echo | openssl s_client -connect localhost.emobix.co.uk:8443 \
        -servername localhost.emobix.co.uk 2>/dev/null | \
        openssl x509 -out /tmp/conformance-suite.crt
-   
+
    # Add to JDK 21 truststore (adjust path if needed)
    JAVA_HOME=/home/pp/.gradle/jdks/eclipse_adoptium-21-amd64-linux.2
    $JAVA_HOME/bin/keytool -import -trustcacerts \
@@ -307,7 +307,7 @@ The following validations were implemented to pass the negative tests:
 
 **Spec requirement:** Wallet MUST reject unknown `transaction_data` types.
 
-**Implementation:** 
+**Implementation:**
 - Refactored `TransactionDataTypeRegistry` from `data class` to `open class` with `strictMode` parameter
 - Added `STANDARD` companion (strict mode): only allows known types (`payment_confirmation`, `qes_authorization`)
 - Added `PERMISSIVE` companion: allows all types (for backwards compatibility)

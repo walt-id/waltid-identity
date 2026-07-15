@@ -250,7 +250,7 @@ The OIDF conformance suite includes negative tests within the main `oid4vp-1fina
 **Why REVIEW instead of PASSED?**
 For official OIDF certification, a screenshot of the wallet's error UI is required. Since we run headless automation, there's no UI to screenshot. However, the protocol behavior is validated:
 - ✅ Wallet detects invalid request
-- ✅ Wallet returns HTTP 400 to caller  
+- ✅ Wallet returns HTTP 400 to caller
 - ✅ Wallet does NOT call verifier's `response_uri`
 
 ---

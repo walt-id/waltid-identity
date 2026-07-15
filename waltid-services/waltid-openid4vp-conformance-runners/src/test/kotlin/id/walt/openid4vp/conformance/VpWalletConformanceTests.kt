@@ -25,9 +25,9 @@ import kotlin.test.assertTrue
  * 
  * Tests wallet-side OpenID4VP compliance against the OpenID Foundation conformance suite.
  * All test modules come from OIDF's `oid4vp-1final-wallet-haip-test-plan`.
- * 
+ *
  * ## OIDF Test Modules Included
- * 
+ *
  * The HAIP test plan includes these modules (positive and negative):
  * - oid4vp-1final-wallet-happy-flow
  * - oid4vp-1final-wallet-alternate-happy-flow
@@ -119,7 +119,7 @@ class VpWalletConformanceTests {
 
     /**
      * SD-JWT VC + x509_hash + request_uri_signed + direct_post.jwt (HAIP)
-     * 
+     *
      * This is the primary HAIP compliance test for SD-JWT VC credentials.
      * Runs all OIDF modules from oid4vp-1final-wallet-haip-test-plan.
      */
@@ -131,7 +131,7 @@ class VpWalletConformanceTests {
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )
-        
+
         try {
             adapter.start(httpClient)
             val plan = VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
@@ -144,7 +144,7 @@ class VpWalletConformanceTests {
 
     /**
      * mDL + x509_hash + request_uri_signed + direct_post.jwt (HAIP)
-     * 
+     *
      * This is the primary HAIP compliance test for mDL credentials.
      * Runs all OIDF modules from oid4vp-1final-wallet-haip-test-plan.
      */
@@ -156,7 +156,7 @@ class VpWalletConformanceTests {
             walletApiUrl = walletApiUrl,
             adapterPort = adapterPort
         )
-        
+
         try {
             adapter.start(httpClient)
             val plan = VpWalletMdlX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
@@ -198,7 +198,7 @@ class VpWalletConformanceTests {
 
     /**
      * mDL + x509_san_dns + request_uri_signed + direct_post.jwt
-     * 
+     *
      * Baseline test using x509_san_dns instead of x509_hash.
      * For official HAIP certification, use the HAIP variant above.
      */
@@ -227,7 +227,7 @@ class VpWalletConformanceTests {
 
     /**
      * Run all HAIP wallet test plans (x509_hash)
-     * 
+     *
      * Use this for HAIP compliance validation.
      * Each plan runs all OIDF modules with different credential formats.
      */
@@ -244,16 +244,16 @@ class VpWalletConformanceTests {
             VpWalletSdJwtVcX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort),
             VpWalletMdlX509HashRequestUriSignedDirectPostHaip(adapterUrl, conformanceHost, conformancePort)
         )
-        
+
         try {
             adapter.start(httpClient)
-            
+
             testPlans.forEach { plan ->
                 println()
                 println("=" .repeat(80))
                 println("Running: ${plan.description}")
                 println("=" .repeat(80))
-                
+
                 assertConformancePassed(WalletTestPlanRunner(plan, httpClient, conformanceHost, conformancePort).test())
             }
         } finally {
@@ -264,7 +264,7 @@ class VpWalletConformanceTests {
 
     /**
      * Run all VP Wallet test plans (all variants)
-     * 
+     *
      * Includes both HAIP (x509_hash) and baseline (x509_san_dns) variants.
      */
     @Test

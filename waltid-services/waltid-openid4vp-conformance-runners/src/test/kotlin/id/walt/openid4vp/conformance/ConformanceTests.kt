@@ -2,7 +2,7 @@ package id.walt.openid4vp.conformance
 
 /**
  * Deprecated alias for [VerifierConformanceTests].
- * 
+ *
  * @deprecated Use [VerifierConformanceTests] instead.
  */
 @Deprecated(

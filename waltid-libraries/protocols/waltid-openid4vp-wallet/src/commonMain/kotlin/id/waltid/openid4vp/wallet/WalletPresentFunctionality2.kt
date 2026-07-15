@@ -177,7 +177,7 @@ object WalletPresentFunctionality2 {
         INVALID_REQUEST_URI_METHOD("invalid_request_uri_method"),
         INVALID_TRANSACTION_DATA("invalid_transaction_data"),
         WALLET_UNAVAILABLE("wallet_unavailable"),
-        
+
         // Encryption-specific error codes (WAL-896)
         /** Encryption is required but cannot be performed. */
         ENCRYPTION_REQUIRED("encryption_required"),

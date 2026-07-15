@@ -306,10 +306,10 @@ object WalletPresentationHandler {
         authorizationRequest: AuthorizationRequest
     ): EncryptionRequirementsResult {
         val responseMode = authorizationRequest.responseMode
-        
+
         // Check if encryption is required based on response_mode
         val requiresEncryption = responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
-        
+
         if (!requiresEncryption) {
             return EncryptionRequirementsResult(
                 isEncryptionRequired = false,
@@ -318,12 +318,12 @@ object WalletPresentationHandler {
                 verifierKeyThumbprint = null
             )
         }
-        
+
         // Extract encryption config from client_metadata
         val encryptionConfig = requireNotNull(
             ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest).getOrThrow()
         ) { "Encrypted response mode requires encryption configuration" }
-        
+
         return EncryptionRequirementsResult(
             isEncryptionRequired = true,
             encAlgorithm = encryptionConfig.encAlgorithm,

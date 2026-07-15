@@ -37,7 +37,7 @@ class WalletTestPlanRunner(
 
     /**
      * Execute the test plan and return results.
-     * 
+     *
      * Each module is run in its own test plan with a unique alias to avoid
      * "alias conflict" errors from the conformance suite when one test starts
      * before the previous one fully completes.
@@ -72,7 +72,7 @@ class WalletTestPlanRunner(
             val testPlanId = modulePlanResponse.id
             println("   Plan ID: $testPlanId (unique alias)")
             println("   View: https://$conformanceHost:$conformancePort/plan-detail.html?plan=$testPlanId")
-            
+
             val result = runModule(testPlanId, module)
             results.add(result)
 
@@ -92,10 +92,10 @@ class WalletTestPlanRunner(
     /**
      * Create test plan on conformance suite.
      * Returns the full response which includes the modules list.
-     * 
+     *
      * @param moduleIndex Index to make the alias unique per module (0 for discovery)
      */
-    private suspend fun createTestPlan(moduleIndex: Int): CreateTestPlanResponse {        
+    private suspend fun createTestPlan(moduleIndex: Int): CreateTestPlanResponse {
         val variantJson = Json.encodeToString(testPlan.variant)
         
         val createTestPlanUrl = conformance.createTestPlanUrlWithConfig {
@@ -114,7 +114,7 @@ class WalletTestPlanRunner(
         println("Created test plan: ${response.id}")
         return response
     }
-    
+
     /**
      * Modify configuration JSON to create a completely unique alias.
      * Uses a fresh timestamp + random suffix for each test plan to avoid
@@ -159,7 +159,7 @@ class WalletTestPlanRunner(
             val walletAuthUrl = testRunResult.getWalletAuthorizationUrl()
                 ?: throw IllegalStateException("No wallet authorization URL in browser.urls")
             println("   Wallet authorization URL: $walletAuthUrl")
-            
+
             // Call the wallet adapter to trigger the authorization flow
             // The URL from conformance suite points to ngrok/docker URL, but we call localhost directly
             // IMPORTANT: Only replace the HOST part, not URLs in query parameters (like request_uri)
@@ -168,7 +168,7 @@ class WalletTestPlanRunner(
             println("   Calling local adapter: $localWalletUrl")
             val walletResponse = conformanceHttp.get(localWalletUrl)
             println("   Wallet adapter response: ${walletResponse.status}")
-            
+
             // Check if wallet response contains a redirect URL that we need to follow
             // This is needed for tests like "alternate-happy-flow" that use fragment-based redirects
             if (walletResponse.status.isSuccess()) {
@@ -177,21 +177,21 @@ class WalletTestPlanRunner(
                 val redirectUrl = try {
                     val json = Json.parseToJsonElement(responseBody).jsonObject
                     json["redirect_to"]?.jsonPrimitive?.contentOrNull
-                } catch (e: Exception) { 
+                } catch (e: Exception) {
                     println("   Warning: Could not parse redirect_to: ${e.message}")
-                    null 
+                    null
                 }
-                
+
                 if (redirectUrl != null && redirectUrl.contains("#")) {
                     // Fragment-based redirect - browser would navigate here to complete the flow
                     // We need to POST the fragment data to the callback URL for the test to complete
                     println("   Following fragment redirect: ${redirectUrl.take(100)}...")
-                    
+
                     // Extract the base URL and fragment
                     val fragmentIndex = redirectUrl.indexOf('#')
                     val baseUrl = redirectUrl.substring(0, fragmentIndex)
                     val fragment = redirectUrl.substring(fragmentIndex + 1)
-                    
+
                     // POST the fragment as 'response' form parameter to complete the callback
                     // This simulates what the browser's JavaScript would do to deliver the fragment
                     try {
@@ -205,7 +205,7 @@ class WalletTestPlanRunner(
                     }
                 }
             }
-            
+
             // Wait for test to complete (no longer WAITING)
             conformance.waitForTestStatus(testId, shouldBeWaiting = false)
 
@@ -226,7 +226,7 @@ class WalletTestPlanRunner(
             // Wait a bit after each module to let the conformance suite fully release the alias
             println("   Waiting for conformance suite to release alias...")
             delay(2.seconds)
-            
+
             return TestPlanResult(
                 conformanceTestId = testId,
                 conformanceResult = conformanceResult,

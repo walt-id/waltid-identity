@@ -46,7 +46,7 @@ class VpWalletMdlX509HashRequestUriSignedDirectPostHaip(
 
     /**
      * Test plan configuration for conformance suite.
-     * 
+     *
      * Required for HAIP wallet tests:
      * - client.jwks with x5c: For signing authorization requests and computing x509_hash client_id
      * - client.dcql: DCQL query defining what credentials/claims to request (mDL format)
