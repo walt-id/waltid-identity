@@ -28,7 +28,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
         app.terminate()
-        ui.launchExpectingLogin(environment: environment)
+        ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
     }
 
     func testBootstrapCreatesDid() async throws {
@@ -294,12 +294,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         app.terminate()
         try await Task.sleep(nanoseconds: 2_000_000_000)
 
-        ui.launchExpectingLogin(environment: environment)
-        let readyAfterRestart = ui.waitForStatus(
-            prefixes: ["Wallet ready", "Bootstrap failed"],
-            timeout: walletReadyTimeout
-        )
-        XCTAssertEqual(readyAfterRestart, "Wallet ready", "Wallet did not become ready after restart, status: \(readyAfterRestart ?? "nil")")
+        ui.launchExpectingLoginAndUnlock(environment: environment, walletReadyTimeout: walletReadyTimeout)
         XCTAssertFalse(app.staticTexts["No credentials"].exists, "Credentials did not persist across app restart")
     }
 

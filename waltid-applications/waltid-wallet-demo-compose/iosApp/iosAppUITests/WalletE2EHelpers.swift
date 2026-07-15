@@ -22,7 +22,10 @@ final class WalletE2EUI {
         launch(environment: attestation)
     }
 
-    func launchExpectingLogin(environment: [String: String]) {
+    func launchExpectingLoginAndUnlock(
+        environment: [String: String],
+        walletReadyTimeout: TimeInterval = 60
+    ) {
         for (key, value) in environment {
             app.launchEnvironment[key] = value
         }
@@ -33,6 +36,16 @@ final class WalletE2EUI {
         let confirmation = textInput(identifier: "wallet.pinConfirmationInput", fallbackLabel: "Confirm PIN")
         XCTAssertFalse(confirmation.waitForExistence(timeout: 2), "PIN setup was shown after relaunch")
         unlockWallet()
+
+        let readyStatus = waitForStatus(
+            prefixes: ["Wallet ready", "Bootstrap failed"],
+            timeout: walletReadyTimeout
+        )
+        XCTAssertEqual(
+            readyStatus,
+            "Wallet ready",
+            "Persisted PIN did not unlock the wallet, status: \(readyStatus ?? "nil")"
+        )
     }
 
     func textInput(identifier: String, fallbackLabel: String) -> XCUIElement {
