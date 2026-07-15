@@ -13,12 +13,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-private val numericTxCode = WalletDemoTxCode(
-    inputMode = WalletDemoTxCodeInputMode.Numeric,
-    length = 6,
-    description = "Enter the issuer code",
-)
-
 @OptIn(ExperimentalCoroutinesApi::class)
 class WalletDemoControllerTest {
 
@@ -136,7 +130,7 @@ class WalletDemoControllerTest {
     @Test
     fun receiveRequiresNonBlankTransactionCodeAndIssuesOnce() = runTest {
         val wallet = FakeDemoWallet(
-            offerResolution = WalletDemoOfferResolution(txCode = numericTxCode),
+            offerResolution = WalletDemoOfferResolution(transactionCodeRequired = true),
             receivedCredentialIds = listOf("cred-1"),
         )
         val controller = unlockedControllerWith(wallet, this)
@@ -149,7 +143,7 @@ class WalletDemoControllerTest {
 
         assertEquals(offerUrl, wallet.resolvedOfferUrl)
         assertEquals(0, wallet.receiveCalls)
-        assertEquals(numericTxCode, controller.state.value.requestDrafts.txCodeRequirement)
+        assertTrue(controller.state.value.requestDrafts.transactionCodeRequired)
         assertFalse(controller.state.value.receiveActionEnabled)
         assertEquals(WalletOperationState.Idle, controller.state.value.operation)
 
@@ -157,7 +151,7 @@ class WalletDemoControllerTest {
         runCurrent()
         assertEquals(0, wallet.receiveCalls)
 
-        controller.updateTxCode(" 123456 ")
+        controller.updateTxCode(" abc-123 ")
         assertTrue(controller.state.value.receiveActionEnabled)
         wallet.credentials = listOf(sampleCredential)
         controller.receive()
@@ -165,13 +159,13 @@ class WalletDemoControllerTest {
 
         assertEquals(1, wallet.receiveCalls)
         assertEquals(offerUrl, wallet.receivedOfferUrl)
-        assertEquals("123456", wallet.receivedTxCode)
+        assertEquals("abc-123", wallet.receivedTxCode)
         assertTrue(controller.state.value.receiveCompleted)
     }
 
     @Test
     fun changingOfferResetsTransactionCodeState() = runTest {
-        val wallet = FakeDemoWallet(offerResolution = WalletDemoOfferResolution(txCode = numericTxCode))
+        val wallet = FakeDemoWallet(offerResolution = WalletDemoOfferResolution(transactionCodeRequired = true))
         val controller = unlockedControllerWith(wallet, this)
 
         controller.updateOfferUrl("openid-credential-offer://first")
@@ -182,7 +176,7 @@ class WalletDemoControllerTest {
         controller.updateOfferUrl("openid-credential-offer://second")
 
         assertEquals("", controller.state.value.requestDrafts.txCode)
-        assertEquals(null, controller.state.value.requestDrafts.txCodeRequirement)
+        assertFalse(controller.state.value.requestDrafts.transactionCodeRequired)
     }
 
     @Test
@@ -211,7 +205,7 @@ class WalletDemoControllerTest {
     fun staleOfferResolutionCannotOverwriteIncomingDeepLink() = runTest {
         val resolutionGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
-            offerResolution = WalletDemoOfferResolution(txCode = numericTxCode),
+            offerResolution = WalletDemoOfferResolution(transactionCodeRequired = true),
             resolveOfferGate = resolutionGate,
             ignoreResolveCancellation = true,
         )
@@ -227,7 +221,7 @@ class WalletDemoControllerTest {
 
         val state = controller.state.value
         assertEquals(replacementOffer, state.requestDrafts.offerUrl)
-        assertEquals(null, state.requestDrafts.txCodeRequirement)
+        assertFalse(state.requestDrafts.transactionCodeRequired)
         assertEquals(WalletOperationState.Idle, state.operation)
         assertEquals(0, wallet.receiveCalls)
     }
@@ -286,7 +280,7 @@ class WalletDemoControllerTest {
     fun lockCancelsIssuanceAndClearsTransactionCode() = runTest {
         val receiveGate = CompletableDeferred<Unit>()
         val wallet = FakeDemoWallet(
-            offerResolution = WalletDemoOfferResolution(txCode = numericTxCode),
+            offerResolution = WalletDemoOfferResolution(transactionCodeRequired = true),
             receiveGate = receiveGate,
             ignoreReceiveCancellation = true,
         )
@@ -1038,7 +1032,7 @@ class WalletDemoControllerTest {
 private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
-    private val offerResolution: WalletDemoOfferResolution = WalletDemoOfferResolution(txCode = null),
+    private val offerResolution: WalletDemoOfferResolution = WalletDemoOfferResolution(transactionCodeRequired = false),
     private val resolveOfferGate: CompletableDeferred<Unit>? = null,
     private val ignoreResolveCancellation: Boolean = false,
     private val resolveOfferError: Throwable? = null,

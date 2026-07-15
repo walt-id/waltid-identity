@@ -20,6 +20,7 @@ import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
+import id.walt.wallet2.handlers.ResolveOfferRequest
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -71,24 +72,9 @@ public data class MobileWalletCredential(
     public val credentialDataJson: String,
 )
 
-/**
- * Accepted input modes for an issuer-provided transaction code.
- */
-public enum class MobileWalletTxCodeInputMode {
-    numeric,
-    text,
-}
-
-/** Metadata for a transaction code that the wallet must collect from the user. */
-public data class MobileWalletTxCode(
-    public val inputMode: MobileWalletTxCodeInputMode,
-    public val length: Int?,
-    public val issuerDescription: String?,
-)
-
 /** Result of resolving an OpenID4VCI credential offer before issuance. */
 public data class MobileWalletOfferResolution(
-    public val txCode: MobileWalletTxCode?,
+    public val transactionCodeRequired: Boolean,
 )
 
 /**
@@ -226,9 +212,14 @@ public class MobileWallet internal constructor(
      *
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
      */
-    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
-        return resolveMobileWalletOffer(offerUrl)
-    }
+    public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution =
+        WalletIssuanceHandler.resolveOffer(
+            ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
+        ).let { result ->
+            MobileWalletOfferResolution(
+                transactionCodeRequired = result.txCodeRequired,
+            )
+        }
 
     /**
      * Receives credentials from an OpenID4VCI credential offer.

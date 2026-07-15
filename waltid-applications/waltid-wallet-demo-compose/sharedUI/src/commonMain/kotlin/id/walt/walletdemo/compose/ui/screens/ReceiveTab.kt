@@ -20,7 +20,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
-import id.walt.walletdemo.compose.logic.WalletDemoTxCodeInputMode
 import id.walt.walletdemo.compose.logic.WalletRequestDrafts
 import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.receiveActionEnabled
@@ -62,31 +61,21 @@ internal fun ReceiveTab(
             buttonTestTag = WalletUiTestTags.ReceiveButton,
             scanButtonTestTag = WalletUiTestTags.OfferScanButton,
             contentBeforeActions = {
-                requestDrafts.txCodeRequirement?.let { requirement ->
+                if (requestDrafts.transactionCodeRequired) {
                     Text(
-                        text = requirement.description?.takeIf(String::isNotBlank)
-                            ?: "This offer requires a transaction code.",
+                        text = "This offer requires a transaction code.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     OutlinedTextField(
                         value = requestDrafts.txCode,
-                        onValueChange = { value ->
-                            val accepted = when (requirement.inputMode) {
-                                WalletDemoTxCodeInputMode.Numeric -> value.filter(Char::isDigit)
-                                WalletDemoTxCodeInputMode.Text -> value
-                            }
-                            onTxCodeChange(requirement.length?.let(accepted::take) ?: accepted)
-                        },
+                        onValueChange = onTxCodeChange,
                         label = { Text("Transaction code") },
                         singleLine = true,
                         enabled = state.receiveUrlEntryEnabled,
                         keyboardOptions = KeyboardOptions(
                             autoCorrectEnabled = false,
-                            keyboardType = when (requirement.inputMode) {
-                                WalletDemoTxCodeInputMode.Numeric -> KeyboardType.NumberPassword
-                                WalletDemoTxCodeInputMode.Text -> KeyboardType.Password
-                            },
+                            keyboardType = KeyboardType.Password,
                         ),
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier

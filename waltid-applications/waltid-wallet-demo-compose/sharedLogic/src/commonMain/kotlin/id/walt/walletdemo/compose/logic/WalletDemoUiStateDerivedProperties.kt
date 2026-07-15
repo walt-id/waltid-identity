@@ -24,12 +24,7 @@ val WalletDemoUiState.receiveActionEnabled: Boolean
         receiveUrlEntryEnabled
 
 private val WalletRequestDrafts.hasValidTxCode: Boolean
-    get() = txCodeRequirement?.let { requirement ->
-        val value = txCode.trim()
-        value.isNotEmpty() &&
-            (requirement.length == null || value.length == requirement.length) &&
-            (requirement.inputMode != WalletDemoTxCodeInputMode.Numeric || value.all(Char::isDigit))
-    } ?: true
+    get() = !transactionCodeRequired || txCode.isNotBlank()
 
 val WalletDemoUiState.presentationUrlEntryEnabled: Boolean
     get() = !isBusy && presentationPreview == null && !presentationCompleted

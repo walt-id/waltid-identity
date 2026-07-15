@@ -54,14 +54,7 @@ final class KMPWalletCoreBridge: WalletCoreBridge, @unchecked Sendable {
             as: MobileWalletOfferResolution.self,
             operation: "resolve credential offer"
         )
-        let transactionCode = value.txCode.map {
-            TransactionCode(
-                inputMode: $0.inputMode.sdkValue,
-                length: $0.length?.intValue,
-                description: $0.issuerDescription
-            )
-        }
-        return OfferResolution(transactionCode: transactionCode)
+        return OfferResolution(transactionCodeRequired: value.transactionCodeRequired)
     }
 
     func receive(offer: URL, txCode: String?, clientID: String) async throws -> [String] {
@@ -738,12 +731,4 @@ private extension WalletBridgeError {
     }
 }
 
-private extension MobileWalletTxCodeInputMode {
-    var sdkValue: TransactionCodeInputMode {
-        switch self {
-        case .numeric: .numeric
-        case .text: .text
-        }
-    }
-}
 #endif
