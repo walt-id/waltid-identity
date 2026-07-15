@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.test.platform.app.InstrumentationRegistry
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.mobile.test.backend.EudiTestBackend
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletFactory
@@ -77,7 +78,10 @@ class MobileWalletIntegrationTest {
     @Test
     fun receiveAndPresentFullFlow() = runBlocking {
         val client = MobileWalletFactory(context).create(
-            MobileWalletConfig(onEvent = { event -> println("WALLET EVENT: $event") })
+            MobileWalletConfig(
+                requestObjectX509Trust = WalletX509TrustConfig(enableSystemTrustAnchors = true),
+                onEvent = { event -> println("WALLET EVENT: $event") },
+            )
         )
         val bootstrapResult = client.bootstrap()
 
@@ -115,6 +119,7 @@ class MobileWalletIntegrationTest {
     fun credentialPersistsAcrossWalletRecreation() = runBlocking {
         val walletConfig = MobileWalletConfig(
             walletId = TEST_WALLET_ID,
+            requestObjectX509Trust = WalletX509TrustConfig(enableSystemTrustAnchors = true),
             onEvent = { event -> println("WALLET EVENT: $event") },
         )
 
