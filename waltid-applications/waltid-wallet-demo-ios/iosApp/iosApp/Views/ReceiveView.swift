@@ -12,14 +12,36 @@ struct ReceiveView: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    UrlEditor(
+                    ScannableUrlEditor(
                         title: "Receive",
                         label: "Credential offer URL",
                         text: $viewModel.offerUrl,
                         inputIdentifier: WalletAccessibilityID.offerInput,
+                        scanButtonIdentifier: WalletAccessibilityID.offerScanButton,
                         isEnabled: viewModel.receiveUrlEntryEnabled,
                         focusResetKey: viewModel.inputFocusResetKey
                     )
+
+                    if viewModel.txCodeRequired {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("This offer requires a transaction code.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            SecureField("Transaction code", text: $viewModel.txCode)
+                                .textContentType(.oneTimeCode)
+                                .keyboardType(.asciiCapable)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                                .padding(8)
+                                .frame(minHeight: 52)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(Color(.separator), lineWidth: 1)
+                                )
+                                .disabled(!viewModel.receiveUrlEntryEnabled)
+                                .accessibilityIdentifier(WalletAccessibilityID.txCodeInput)
+                        }
+                    }
 
                     Button("Receive") {
                         viewModel.receiveCredential()
