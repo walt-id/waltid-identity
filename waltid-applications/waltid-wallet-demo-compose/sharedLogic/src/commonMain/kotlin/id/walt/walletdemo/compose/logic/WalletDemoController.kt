@@ -76,7 +76,7 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = value,
                     txCode = "",
-                    txCodeRequirement = null,
+                    transactionCodeRequired = false,
                 ),
                 lastReceivedCredentialIds = emptyList(),
                 receiveCompleted = false,
@@ -113,7 +113,7 @@ class WalletDemoController(
                         requestDrafts = it.requestDrafts.copy(
                             offerUrl = url,
                             txCode = "",
-                            txCodeRequirement = null,
+                            transactionCodeRequired = false,
                         ),
                         lastReceivedCredentialIds = emptyList(),
                         receiveCompleted = false,
@@ -152,7 +152,7 @@ class WalletDemoController(
                 requestDrafts = it.requestDrafts.copy(
                     offerUrl = "",
                     txCode = "",
-                    txCodeRequirement = null,
+                    transactionCodeRequired = false,
                 ),
                 lastReceivedCredentialIds = emptyList(),
                 receiveCompleted = false,
@@ -183,9 +183,9 @@ class WalletDemoController(
         val offerUrl = current.requestDrafts.offerUrl.trim()
         if (!current.receiveActionEnabled || offerUrl.isBlank()) return
         val txCode = current.requestDrafts.txCode.trim().ifBlank { null }
-        val transactionCode = current.requestDrafts.txCodeRequirement
+        val transactionCodeRequired = current.requestDrafts.transactionCodeRequired
         val request = ReceiveRequest(offerUrl, current.receiveNavigationResetKey)
-        val initialOperation = if (transactionCode == null) {
+        val initialOperation = if (!transactionCodeRequired) {
             WalletOperationState.ResolvingOffer
         } else {
             WalletOperationState.Receiving
@@ -194,14 +194,14 @@ class WalletDemoController(
 
         receiveJob = scope.launch(dispatcher) {
             try {
-                if (transactionCode == null) {
+                if (!transactionCodeRequired) {
                     val resolution = wallet.resolveOffer(offerUrl)
                     currentCoroutineContext().ensureActive()
                     if (!isCurrent(request)) return@launch
-                    if (resolution.txCode != null) {
+                    if (resolution.transactionCodeRequired) {
                         updateIfCurrent(request) {
                             it.copy(
-                                requestDrafts = it.requestDrafts.copy(txCodeRequirement = resolution.txCode),
+                                requestDrafts = it.requestDrafts.copy(transactionCodeRequired = true),
                                 operation = WalletOperationState.Idle,
                             )
                         }

@@ -3,6 +3,6 @@ package id.walt.walletdemo.compose.logic
 data class WalletRequestDrafts(
     val offerUrl: String = "",
     val txCode: String = "",
-    val txCodeRequirement: WalletDemoTxCode? = null,
+    val transactionCodeRequired: Boolean = false,
     val presentationRequestUrl: String = "",
 )

@@ -1,18 +1,7 @@
 package id.walt.walletdemo.compose.logic
 
-enum class WalletDemoTxCodeInputMode {
-    Numeric,
-    Text,
-}
-
-data class WalletDemoTxCode(
-    val inputMode: WalletDemoTxCodeInputMode,
-    val length: Int?,
-    val description: String?,
-)
-
 data class WalletDemoOfferResolution(
-    val txCode: WalletDemoTxCode?,
+    val transactionCodeRequired: Boolean,
 )
 
 interface DemoWallet {

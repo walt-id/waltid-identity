@@ -4,7 +4,6 @@ import id.walt.wallet2.mobile.MobileWallet
 import id.walt.wallet2.mobile.MobileWalletPresentationCredentialSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationDisclosureSelection
 import id.walt.wallet2.mobile.MobileWalletPresentationPreview
-import id.walt.wallet2.mobile.MobileWalletTxCodeInputMode
 import id.walt.wallet2.mobile.WalletAttestationConfig
 
 internal class MobileDemoWallet(
@@ -36,16 +35,7 @@ internal class MobileDemoWallet(
     override suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution =
         mobileWallet.resolveOffer(offerUrl).let { resolution ->
             WalletDemoOfferResolution(
-                txCode = resolution.txCode?.let {
-                    WalletDemoTxCode(
-                        inputMode = when (it.inputMode) {
-                            MobileWalletTxCodeInputMode.numeric -> WalletDemoTxCodeInputMode.Numeric
-                            MobileWalletTxCodeInputMode.text -> WalletDemoTxCodeInputMode.Text
-                        },
-                        length = it.length,
-                        description = it.issuerDescription,
-                    )
-                },
+                transactionCodeRequired = resolution.transactionCodeRequired,
             )
         }
 

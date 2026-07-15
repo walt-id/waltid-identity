@@ -239,13 +239,12 @@ final class WalletAPITests: XCTestCase {
     func testResolveOfferForwardsOfferAndReturnsRequirement() async throws {
         let offer = URL(string: "openid-credential-offer://issuer.example")!
         let bridge = FakeWalletCoreBridge()
-        let requirement = TransactionCode(inputMode: .numeric, length: 6, description: "Enter the issuer code")
-        bridge.offerResolutionResult = OfferResolution(transactionCode: requirement)
+        bridge.offerResolutionResult = OfferResolution(transactionCodeRequired: true)
         let wallet = Wallet(bridge: bridge)
 
         let result = try await wallet.resolveOffer(offer: offer)
 
-        XCTAssertEqual(result, OfferResolution(transactionCode: requirement))
+        XCTAssertEqual(result, OfferResolution(transactionCodeRequired: true))
         XCTAssertEqual(bridge.resolvedOffers, [offer])
     }
 
@@ -550,7 +549,7 @@ private final class FakeWalletCoreBridge: WalletCoreBridge, @unchecked Sendable 
     var events: AsyncStream<WalletEvent>
     var error: WalletError?
     var bootstrapResult = WalletBootstrapResult(keyID: "key", did: "did:key:wallet")
-    var offerResolutionResult = OfferResolution(transactionCode: nil)
+    var offerResolutionResult = OfferResolution(transactionCodeRequired: false)
     var receiveResult: [String] = []
     var credentialsResult: [Credential] = []
     var presentResult = PresentationResult(success: true, redirectTo: nil, verifierResponseJSON: nil)
