@@ -1,4 +1,4 @@
-name: macOS eligibility
+name: Android eligibility
 
 on:
   workflow_call:
@@ -33,7 +33,7 @@ on:
         default: false
     outputs:
       should-run:
-        description: "Whether macOS jobs should run"
+        description: "Whether Android jobs should run"
         value: ${{ jobs.decide.outputs.should-run }}
       reason:
         description: "Human-readable decision reason"
@@ -53,21 +53,18 @@ jobs:
       pr-head-repo: ${{ inputs.pr-head-repo }}
       pr-labels: ${{ inputs.pr-labels }}
       pr-draft: ${{ inputs.pr-draft }}
-      platform-name: iOS
-      platform-label: ci:macos
+      platform-name: Android
+      platform-label: ci:android
       path-patterns: |
         [
-          ".github/workflows/gradle-macos.yml",
-          ".github/workflows/mobile-sdk-docs.yml",
-          ".github/workflows/macos-eligibility.yml",
+          ".github/workflows/android-device-tests.yml",
+          ".github/workflows/android-eligibility.yml",
           ".github/workflows/mobile-eligibility.yml",
+          ".github/workflows/gradle.yml",
           ".github/actions/checkout-repos/*",
-          ".github/actions/gradle-ios/*",
-          ".github/actions/gradle-mobile-sdk-docs/*",
           ".github/actions/gradle-setup-action/*",
-          ".github/actions/ios-build-setup/*",
           ".github/actions/set-properties/*",
-          "scripts/check-mobile-swift-parity-decision.sh",
+          ".github/scripts/mobile-ci/*android*",
           "build-logic/*",
           "build.gradle.kts",
           "gradle/*",
@@ -75,16 +72,17 @@ jobs:
           "gradlew",
           "settings.gradle.kts",
           "gradle/libs.versions.toml",
-          "*/Package.swift",
           "*/src/commonMain/*",
           "*/src/commonTest/*",
-          "*/src/iosMain/*",
-          "*/src/iosTest/*",
+          "*/src/androidMain/*",
+          "*/src/androidTest/*",
+          "*/src/androidDeviceTest/*",
+          "*/src/androidUnitTest/*",
+          "*/src/androidInstrumentedTest/*",
           "waltid-applications/waltid-wallet-demo-compose/*",
-          "waltid-applications/waltid-wallet-demo-ios/*",
           "waltid-libraries/*/build.gradle.kts",
           "waltid-libraries/*/*/build.gradle.kts",
           "waltid-libraries/protocols/waltid-openid4vc-wallet-mobile/*",
           "waltid-libraries/protocols/waltid-openid4vc-wallet-persistence-mobile/*",
-          "waltid-libraries/protocols/waltid-wallet-sdk-ios/*"
+          "waltid-libraries/web/waltid-web-data-fetching/*"
         ]
