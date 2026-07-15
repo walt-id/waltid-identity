@@ -4,6 +4,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -655,6 +656,80 @@ class CredentialDisplayNormalizerTest {
             .first { it.path.id == "eu.europa.ec.eudi.pid.1.portrait.elementValue" }
         assertEquals("Portrait", portrait.label)
         assertIs<DisplayValue.Image>(portrait.value)
+    }
+
+    @Test
+    fun presentationCredentialOptionPrependsReadableRequestedDisclosures() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "credential-1",
+            label = "PID",
+            issuer = "https://issuer.example",
+            subject = "did:key:holder",
+            format = "dc+sd-jwt",
+            credentialDataJson = """
+                {
+                  "given_name": "Ada",
+                  "family_name": "Lovelace"
+                }
+            """.trimIndent(),
+            disclosures = listOf(
+                WalletDemoPresentationDisclosure(
+                    label = CredentialDisplayVocabulary.disclosureLabel("given_name", """["${'$'}","given_name"]"""),
+                    path = """["${'$'}","given_name"]""",
+                    valueJson = "\"Ada\"",
+                    displayValue = "Ada",
+                    selectivelyDisclosable = true,
+                    required = true,
+                    selectable = false,
+                ),
+                WalletDemoPresentationDisclosure(
+                    label = CredentialDisplayVocabulary.disclosureLabel("portrait", """["eu.europa.ec.eudi.pid.1","portrait"]"""),
+                    path = """["eu.europa.ec.eudi.pid.1","portrait"]""",
+                    valueJson = onePixelPngByteArrayJson(),
+                    displayValue = null,
+                    selectivelyDisclosable = true,
+                    required = false,
+                    selectable = true,
+                ),
+            ),
+        )
+
+        val details = option.toCredentialDetails()
+
+        val requested = assertNotNull(details.groups.firstOrNull())
+        assertEquals("Requested disclosures", requested.title)
+        assertEquals(listOf("Given name", "Portrait"), requested.items.map { it.label })
+        assertEquals(listOf("disclosures[0].given_name", "disclosures[1].portrait"), requested.items.map { it.path.id })
+        assertEquals(DisplayValue.Text("Ada"), requested.items.first().value)
+        assertIs<DisplayValue.Image>(requested.items.last().value)
+
+        val personal = assertNotNull(details.groups.firstOrNull { it.title == "Personal details" })
+        assertEquals(listOf("Given name", "Family name"), personal.items.map { it.label })
+        assertEquals(option.selection.id, details.summary.id)
+    }
+
+    @Test
+    fun presentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "credential-1",
+            label = "PID",
+            issuer = "https://issuer.example",
+            subject = "did:key:holder",
+            format = "dc+sd-jwt",
+            credentialDataJson = """
+                {
+                  "given_name": "Ada"
+                }
+            """.trimIndent(),
+            disclosures = emptyList(),
+        )
+
+        val details = option.toCredentialDetails()
+
+        assertFalse(details.groups.any { it.title == "Requested disclosures" })
+        assertEquals("Personal details", details.groups.firstOrNull()?.title)
     }
 
     @Test

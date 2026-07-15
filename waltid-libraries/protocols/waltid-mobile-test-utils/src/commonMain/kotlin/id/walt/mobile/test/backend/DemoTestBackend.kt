@@ -72,6 +72,14 @@ object DemoTestBackend {
 
     val presentationScenarios = scenarios
 
+    val optionalBirthDatePresentationScenario = scenarios.first { it.id == "eudi-pid-sdjwt" }.copy(
+        id = "eudi-pid-sdjwt-optional-birth-date",
+        verifierCredentialQuery = sdJwtOptionalBirthDateQuery(
+            id = "pid",
+            vct = EUDI_PID_SD_JWT_VCT,
+        ),
+    )
+
     val persistenceScenario = scenarios.first { it.id == "eudi-pid-mdoc" }
 
     private val client by lazy {
@@ -115,12 +123,16 @@ object DemoTestBackend {
     }
 
     suspend fun createVerifierSession(scenario: CredentialScenario): VerifierSession {
+        return createVerifierSession(scenario.verifierCredentialQuery)
+    }
+
+    suspend fun createVerifierSession(credentialQuery: JsonObject): VerifierSession {
         val payload = buildJsonObject {
             put("flow_type", "cross_device")
             putJsonObject("core_flow") {
                 putJsonObject("dcql_query") {
                     putJsonArray("credentials") {
-                        add(scenario.verifierCredentialQuery)
+                        add(credentialQuery)
                     }
                 }
             }
@@ -138,6 +150,17 @@ object DemoTestBackend {
             ?: error("Missing authorization request URL in public demo verifier2 response: $response")
 
         return VerifierSession(sessionId, authorizationRequestUri)
+    }
+
+    suspend fun verifierSessionInfo(sessionId: String): JsonObject {
+        val response = client.get("$VERIFIER_BASE_URL/verification-session/$sessionId/info") {
+            accept(ContentType.Application.Json)
+        }
+        val body = response.bodyAsText()
+        if (!response.status.isSuccess()) {
+            error("HTTP ${response.status.value} from public demo verifier2 session info for $sessionId: $body")
+        }
+        return json.parseToJsonElement(body).jsonObject
     }
 
     suspend fun waitForVerifierSuccess(sessionId: String, timeoutMs: Long = 90_000) {
@@ -197,6 +220,28 @@ object DemoTestBackend {
         claimPaths = emptyList(),
     )
 
+    private fun sdJwtOptionalBirthDateQuery(
+        id: String,
+        vct: String,
+    ): JsonObject = buildJsonObject {
+        put("id", JsonPrimitive(id))
+        put("format", JsonPrimitive("dc+sd-jwt"))
+        putJsonObject("meta") {
+            putJsonArray("vct_values") {
+                add(JsonPrimitive(vct))
+            }
+        }
+        putJsonArray("claims") {
+            add(claimQuery(id = "given_name", path = listOf("given_name")))
+            add(claimQuery(id = "family_name", path = listOf("family_name")))
+            add(claimQuery(id = "birth_date", path = listOf("birth_date")))
+        }
+        putJsonArray("claim_sets") {
+            add(claimSet("given_name", "family_name"))
+            add(claimSet("given_name", "family_name", "birth_date"))
+        }
+    }
+
     private fun mdocQuery(
         id: String,
         doctype: String,
@@ -233,6 +278,17 @@ object DemoTestBackend {
                 }
             }
         }
+    }
+
+    private fun claimQuery(id: String, path: List<String>): JsonObject = buildJsonObject {
+        put("id", JsonPrimitive(id))
+        putJsonArray("path") {
+            path.forEach { add(JsonPrimitive(it)) }
+        }
+    }
+
+    private fun claimSet(vararg claimIds: String) = kotlinx.serialization.json.buildJsonArray {
+        claimIds.forEach { add(JsonPrimitive(it)) }
     }
 
     private val json = kotlinx.serialization.json.Json {

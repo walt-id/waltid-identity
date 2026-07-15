@@ -15,6 +15,45 @@ enum CredentialDisplayNormalizer {
         )
     }
 
+    static func details(for option: PresentationCredentialOption) -> CredentialDetails {
+        let parsed = details(
+            id: option.selection.id,
+            title: option.label ?? option.format,
+            issuer: option.issuer,
+            subject: option.subject,
+            format: option.format,
+            addedAt: nil,
+            credentialDataJSON: option.credentialDataJSON
+        )
+        let requestedItems = option.disclosures.enumerated().map { index, disclosure in
+            let path = disclosurePath(index: index, disclosure: disclosure)
+            return ClaimItem(
+                path: path.itemPath,
+                pathComponents: path.components,
+                label: CredentialDisplayVocabulary.disclosureLabel(
+                    name: disclosure.name,
+                    path: disclosure.path
+                ),
+                value: disclosureValue(for: disclosure, path: path),
+                rawValue: disclosure.valueJSON,
+                roles: CredentialDisplayVocabulary.roles(for: path.components)
+            )
+        }
+        let requestedGroups = requestedItems.isEmpty
+            ? []
+            : [ClaimGroup(title: CredentialDisplayVocabulary.requestedDisclosuresTitle, items: requestedItems)]
+
+        return CredentialDetails(
+            id: parsed.id,
+            title: parsed.title,
+            issuer: parsed.issuer,
+            subject: parsed.subject,
+            format: parsed.format,
+            addedAt: parsed.addedAt,
+            groups: requestedGroups + parsed.groups
+        )
+    }
+
     static func details(
         id: String,
         title: String,
@@ -213,6 +252,38 @@ enum CredentialDisplayNormalizer {
         value.rawJSON
     }
 
+    private static func disclosurePath(index: Int, disclosure: PresentationDisclosure) -> DisplayClaimPath {
+        let leaf = ClaimPathExpression.parse(disclosure.path).leafKey
+            ?? disclosure.name?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+            ?? "value"
+        return DisplayClaimPath(
+            itemPath: ClaimItemPath.topLevel("disclosures").indexedChild(index).child(leaf),
+            components: ["disclosures", leaf]
+        )
+    }
+
+    private static func disclosureValue(
+        for disclosure: PresentationDisclosure,
+        path: DisplayClaimPath
+    ) -> DisplayValue {
+        if let parsed = CredentialDisplayJSONParser.parse(disclosure.valueJSON) {
+            let parsedValue = displayValue(for: parsed, path: path)
+            if case .text = parsedValue,
+               let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !displayValue.isEmpty {
+                return .text(displayValue)
+            }
+            return parsedValue
+        }
+
+        if let displayValue = disclosure.displayValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !displayValue.isEmpty {
+            return .text(displayValue)
+        }
+
+        return .raw(disclosure.valueJSON)
+    }
+
     private static func epochDateStringIfTemporal(value: String, path: DisplayClaimPath) -> String? {
         guard CredentialDisplayVocabulary.roles(for: path.components).contains(.temporal),
               let rawEpoch = Int64(value.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -235,6 +306,12 @@ enum CredentialDisplayNormalizer {
     private static let minimumCredibleEpochSeconds: Int64 = 100_000_000
     private static let epochMillisecondsThreshold: Int64 = 10_000_000_000
     private static let imageWrapperClaimName = "elementValue"
+}
+
+private extension String {
+    var nonEmpty: String? {
+        isEmpty ? nil : self
+    }
 }
 
 private struct ClaimRow {

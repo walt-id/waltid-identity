@@ -58,6 +58,22 @@ object CredentialDisplayNormalizer {
         )
     }
 
+    internal fun toDisclosureValue(valueJson: String, displayValue: String?, path: ClaimPath): DisplayValue {
+        val parsed = runCatching { json.parseToJsonElement(valueJson) }.getOrNull()
+        if (parsed != null) {
+            val parsedValue = parsed.toDisplayValue(path)
+            if (parsedValue is DisplayValue.Text && !displayValue.isNullOrBlank()) {
+                return DisplayValue.Text(displayValue)
+            }
+            return parsedValue
+        }
+
+        return displayValue
+            ?.takeIf { it.isNotBlank() }
+            ?.let(DisplayValue::Text)
+            ?: DisplayValue.Raw(valueJson)
+    }
+
     private fun JsonElement.toClaimItem(path: ClaimPath, label: String): ClaimItem =
         ClaimItem(
             path = path.itemPath,
