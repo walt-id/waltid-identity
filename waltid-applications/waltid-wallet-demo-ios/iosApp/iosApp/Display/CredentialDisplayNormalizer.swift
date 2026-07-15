@@ -54,6 +54,60 @@ enum CredentialDisplayNormalizer {
         )
     }
 
+    static func transactionDataGroups(for request: PresentationRequestInfo) -> [ClaimGroup] {
+        let baseTitles = request.transactionData.map { item in
+            item.displayName.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+                ?? CredentialDisplayVocabulary.transactionDataTitle
+        }
+        let titleCounts = baseTitles.reduce(into: [String: Int]()) { counts, title in
+            counts[title, default: 0] += 1
+        }
+        var seenTitles: [String: Int] = [:]
+
+        return request.transactionData.enumerated().map { index, item in
+            let baseTitle = baseTitles[index]
+            seenTitles[baseTitle, default: 0] += 1
+            let title = titleCounts[baseTitle, default: 0] > 1
+                ? "\(baseTitle) \(seenTitles[baseTitle, default: 0])"
+                : baseTitle
+
+            let typePath = DisplayClaimPath.transactionData(index: index, field: .type)
+            var items = claimItems(
+                fromJSON: item.detailsJSON,
+                pathPrefix: .transactionData(index: index, field: .details),
+                fallbackLabel: CredentialDisplayVocabulary.transactionDataLabel(.details)
+            )
+
+            items.append(
+                ClaimItem(
+                    path: typePath.itemPath,
+                    pathComponents: typePath.components,
+                    label: CredentialDisplayVocabulary.transactionDataLabel(.type),
+                    value: .text(item.type),
+                    rawValue: item.type,
+                    roles: CredentialDisplayVocabulary.roles(for: typePath.components)
+                )
+            )
+
+            if !item.credentialQueryIDs.isEmpty {
+                let queryPath = DisplayClaimPath.transactionData(index: index, field: .credentialQueryIDs)
+                let value = item.credentialQueryIDs.joined(separator: ", ")
+                items.append(
+                    ClaimItem(
+                        path: queryPath.itemPath,
+                        pathComponents: queryPath.components,
+                        label: CredentialDisplayVocabulary.transactionDataLabel(.credentialQueryIDs),
+                        value: .text(value),
+                        rawValue: value,
+                        roles: CredentialDisplayVocabulary.roles(for: queryPath.components)
+                    )
+                )
+            }
+
+            return ClaimGroup(title: title, items: items)
+        }
+    }
+
     static func details(
         id: String,
         title: String,
@@ -129,6 +183,38 @@ enum CredentialDisplayNormalizer {
             rawValue: rawString(value),
             roles: CredentialDisplayVocabulary.roles(for: path.components)
         )
+    }
+
+    private static func claimItems(
+        fromJSON rawJSON: String,
+        pathPrefix: DisplayClaimPath,
+        fallbackLabel: String
+    ) -> [ClaimItem] {
+        guard let parsed = CredentialDisplayJSONParser.parse(rawJSON) else {
+            let trimmed = rawJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? [] : [
+                ClaimItem(
+                    path: pathPrefix.itemPath,
+                    pathComponents: pathPrefix.components,
+                    label: fallbackLabel,
+                    value: .raw(trimmed),
+                    rawValue: trimmed,
+                    roles: CredentialDisplayVocabulary.roles(for: pathPrefix.components)
+                )
+            ]
+        }
+
+        guard case .object(let members) = parsed else {
+            return [
+                claimItem(path: pathPrefix, label: fallbackLabel, value: parsed)
+            ]
+        }
+
+        return members.flatMap { member in
+            let path = pathPrefix.child(member.key)
+            return claimRows(path: path, label: CredentialDisplayVocabulary.humanizedLabel(member.key), value: member.value)
+                .map(\.item)
+        }
     }
 
     private static func protocolDisplayValue(

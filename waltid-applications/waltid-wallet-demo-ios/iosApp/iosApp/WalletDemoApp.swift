@@ -22,17 +22,22 @@ struct WalletDemoApp: App {
                 )
             )
         }
-        let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL")
-        if let baseUrl, !baseUrl.isEmpty {
+        let baseUrl = env["ATTESTATION_BASE_URL"] ?? defaults.string(forKey: "ATTESTATION_BASE_URL") ?? DemoBackendDefaults.attestationBaseURL
+        let transactionDataProfilesUrl = env["TRANSACTION_DATA_PROFILES_URL"] ?? defaults.string(forKey: "TRANSACTION_DATA_PROFILES_URL") ?? DemoBackendDefaults.transactionDataProfilesURL
+        if !baseUrl.isEmpty {
             return WalletViewModel(
                 walletID: walletID,
                 attestationBaseUrl: baseUrl,
-                attestationAttesterPath: env["ATTESTATION_ATTESTER_PATH"] ?? defaults.string(forKey: "ATTESTATION_ATTESTER_PATH"),
-                attestationBearerToken: env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN"),
-                attestationHostHeader: env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER")
+                attestationAttesterPath: env["ATTESTATION_ATTESTER_PATH"] ?? defaults.string(forKey: "ATTESTATION_ATTESTER_PATH") ?? DemoBackendDefaults.attestationAttesterPath,
+                attestationBearerToken: env["ATTESTATION_BEARER_TOKEN"] ?? defaults.string(forKey: "ATTESTATION_BEARER_TOKEN") ?? DemoBackendDefaults.attestationBearerToken,
+                attestationHostHeader: env["ATTESTATION_HOST_HEADER"] ?? defaults.string(forKey: "ATTESTATION_HOST_HEADER") ?? DemoBackendDefaults.attestationHostHeader,
+                transactionDataProfilesUrl: transactionDataProfilesUrl
             )
         }
-        return WalletViewModel(walletID: walletID)
+        return WalletViewModel(
+            walletID: walletID,
+            transactionDataProfilesUrl: transactionDataProfilesUrl
+        )
     }()
 
     var body: some Scene {
@@ -54,4 +59,12 @@ struct WalletDemoApp: App {
         }
         return .named
     }
+}
+
+private enum DemoBackendDefaults {
+    static let attestationBaseURL = ""
+    static let attestationAttesterPath = ""
+    static let attestationBearerToken = ""
+    static let attestationHostHeader = ""
+    static let transactionDataProfilesURL = "https://wallet.demo.walt.id/wallet-api/transaction-data-profiles"
 }
