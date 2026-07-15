@@ -383,7 +383,7 @@ class Wallet2MoreUseCasesTest {
                     http.post("/wallet/$walletId/credentials/present") {
                         contentType(ContentType.Application.Json)
                         setBody(id.walt.wallet2.handlers.PresentCredentialRequest(
-                            requestUrl = verifierSession.bootstrapAuthorizationRequestUrl ?: Url("http://$host:$walletPort/verification-session/${verifierSession.sessionId}/request"),
+                            requestUrl = verifierSession.fullAuthorizationRequestUrl ?: Url("http://$host:$walletPort/verification-session/${verifierSession.sessionId}/request"),
                             did = holderDid
                         ))
                     }.also { assertEquals(HttpStatusCode.OK, it.status, it.bodyAsText()) }
@@ -706,7 +706,7 @@ class Wallet2MoreUseCasesTest {
                     )) as VerificationSessionSetup)
                 }.body<VerificationSessionCreationResponse>()
 
-                val bootstrapUrl = verifierSession.bootstrapAuthorizationRequestUrl
+                val bootstrapUrl = verifierSession.fullAuthorizationRequestUrl
                     ?: Url("$walletBase/verification-session/${verifierSession.sessionId}/request")
 
                 // ── Isolated VP: caller supplies the credentials explicitly ──

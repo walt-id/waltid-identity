@@ -249,7 +249,7 @@ class MsoMdocsTransactionDataVerifier2IntegrationTest {
             }
 
             val sessionId = verificationSessionResponse.sessionId
-            val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
+            val bootstrapUrl = verificationSessionResponse.fullAuthorizationRequestUrl
 
             val presentationResult = testAndReturn("Present mdoc with transaction data") {
                 WalletPresentFunctionality2.walletPresentHandling(

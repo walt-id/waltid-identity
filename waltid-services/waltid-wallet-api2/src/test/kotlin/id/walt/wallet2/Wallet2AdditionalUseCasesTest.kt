@@ -474,7 +474,7 @@ class Wallet2AdditionalUseCasesTest {
                     }.also { assertEquals(HttpStatusCode.OK, it.status) }
                         .body<VerificationSessionCreationResponse>()
                 }
-                val bootstrapUrl = verifierSession.bootstrapAuthorizationRequestUrl
+                val bootstrapUrl = verifierSession.fullAuthorizationRequestUrl
                     ?: Url("$walletBase/verification-session/${verifierSession.sessionId}/request")
 
                 val resolveResult = testAndReturn("Isolated: resolve VP request") {

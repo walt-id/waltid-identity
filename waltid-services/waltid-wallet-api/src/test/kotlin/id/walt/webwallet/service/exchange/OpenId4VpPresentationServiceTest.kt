@@ -214,7 +214,9 @@ class OpenId4VpPresentationServiceTest {
             ),
         )
 
-        val resolvedRequest = runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
+        val resolvedRequest = runBlocking {
+            resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject&client_id=verifier2")
+        }
         val resolvedUrl = Url(resolvedRequest)
 
         assertEquals(requestObject, resolvedUrl.parameters["request"])
@@ -276,7 +278,9 @@ class OpenId4VpPresentationServiceTest {
         )
 
         val error = assertFailsWith<AuthorizationRequestResolver.UnsignedAuthorizationRequestNotAllowedException> {
-            runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject") }
+            runBlocking {
+                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$requestObject&client_id=verifier2")
+            }
         }
 
         assertEquals(
@@ -315,13 +319,16 @@ class OpenId4VpPresentationServiceTest {
             )
 
             val resolvedRequest = runBlocking {
-                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
+                resolveNormalizedRequestUrl(
+                    service,
+                    "openid4vp://authorize?request_uri=$serverUrl/request-object&client_id=verifier2",
+                )
             }
             val resolvedUrl = Url(resolvedRequest)
 
             assertEquals("GET", receivedRequest().method)
-            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+            assertEquals(resolvedUrl.parameters["request"]?.isNotBlank(), true)
+            assertFalse(resolvedUrl.parameters.contains("request_uri"))
         }
     }
 
@@ -336,7 +343,7 @@ class OpenId4VpPresentationServiceTest {
             val resolvedRequest = runBlocking {
                 resolveNormalizedRequestUrl(
                     service,
-                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post&client_id=verifier2",
                 )
             }
             val resolvedUrl = Url(resolvedRequest)
@@ -362,8 +369,8 @@ class OpenId4VpPresentationServiceTest {
             assertEquals(sdJwtFormat["kb-jwt_alg_values"]?.jsonArray?.isNotEmpty(), true)
             assertEquals(mdocFormat["issuerauth_alg_values"]?.jsonArray?.isNotEmpty(), true)
             assertEquals(mdocFormat["deviceauth_alg_values"]?.jsonArray?.isNotEmpty(), true)
-            assertEquals("verifier2", resolvedUrl.parameters["client_id"])
-            assertEquals("https://verifier.example/response", resolvedUrl.parameters["response_uri"])
+            assertEquals(resolvedUrl.parameters["request"]?.isNotBlank(), true)
+            assertFalse(resolvedUrl.parameters.contains("request_uri"))
         }
     }
 
@@ -394,7 +401,7 @@ class OpenId4VpPresentationServiceTest {
                 runBlocking {
                     resolveNormalizedRequestUrl(
                         service = service,
-                        request = "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                        request = "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post&client_id=verifier2",
                         walletId = walletId,
                     )
                 }
@@ -459,7 +466,7 @@ class OpenId4VpPresentationServiceTest {
                 runBlocking {
                     resolveNormalizedRequestUrl(
                         service = service,
-                        request = "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                        request = "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post&client_id=verifier2",
                         walletId = walletId,
                     )
                 }
@@ -489,6 +496,7 @@ class OpenId4VpPresentationServiceTest {
                       "response_mode":"direct_post",
                       "response_uri":"https://verifier.example/response",
                       "nonce":"nonce-123",
+                      "aud":"https://self-issued.me/v2",
                       "wallet_nonce":"${parseFormBody(request.body)["wallet_nonce"] ?: "missing"}",
                       "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
                     }
@@ -504,7 +512,7 @@ class OpenId4VpPresentationServiceTest {
             val resolvedRequest = runBlocking {
                 resolveNormalizedRequestUrl(
                     service,
-                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post",
+                    "openid4vp://authorize?request_uri=$serverUrl/request-object&request_uri_method=post&client_id=verifier2",
                 )
             }
             val resolvedUrl = Url(resolvedRequest)
@@ -581,7 +589,10 @@ class OpenId4VpPresentationServiceTest {
             )
 
             val resolvedRequest = runBlocking {
-                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request_uri=$serverUrl/request-object")
+                resolveNormalizedRequestUrl(
+                    service,
+                    "openid4vp://authorize?request_uri=$serverUrl/request-object&client_id=verifier2",
+                )
             }
             val resolvedUrl = Url(resolvedRequest)
 
@@ -602,6 +613,7 @@ class OpenId4VpPresentationServiceTest {
               "response_mode":"direct_post",
               "response_uri":"https://verifier.example/response",
               "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2",
               "client_metadata":{"vp_formats_supported":{}},
               "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
             }
@@ -609,10 +621,15 @@ class OpenId4VpPresentationServiceTest {
         )
 
         val error = assertFailsWith<IllegalArgumentException> {
-            runBlocking { resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject") }
+            runBlocking {
+                resolveNormalizedRequestUrl(
+                    service,
+                    "openid4vp://authorize?request=$signedRequestObject&client_id=redirect_uri%3Ahttps%3A%2F%2Fverifier.example%2Fcallback",
+                )
+            }
         }
 
-        assertEquals(error.message?.contains("Could not verify signed AuthorizationRequest"), true)
+        assertEquals(error.message?.contains("Client authentication failed"), true)
     }
 
     @Test
@@ -626,6 +643,7 @@ class OpenId4VpPresentationServiceTest {
               "response_mode":"direct_post",
               "response_uri":"https://verifier.example/response",
               "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2",
               "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
             }
             """.trimIndent(),
@@ -638,7 +656,10 @@ class OpenId4VpPresentationServiceTest {
                     ClientValidationResult.Success(clientMetadata)
 
             val resolvedRequest = runBlocking {
-                resolveNormalizedRequestUrl(service, "openid4vp://authorize?request=$signedRequestObject")
+                resolveNormalizedRequestUrl(
+                    service,
+                    "openid4vp://authorize?request=$signedRequestObject&client_id=verifier2",
+                )
             }
             val resolvedUrl = Url(resolvedRequest)
 
@@ -659,6 +680,7 @@ class OpenId4VpPresentationServiceTest {
               "response_mode":"direct_post",
               "response_uri":"https://verifier.example/response",
               "nonce":"nonce-123",
+              "aud":"https://self-issued.me/v2",
               "dcql_query":${json.encodeToString(DcqlQuery.serializer(), query)}
             }
             """.trimIndent(),
@@ -746,8 +768,17 @@ class OpenId4VpPresentationServiceTest {
             } + "."
     }
 
-    private fun unsecuredJwt(authorizationRequest: AuthorizationRequest): String =
-        jwt(json.encodeToString(AuthorizationRequest.serializer(), authorizationRequest))
+    private fun unsecuredJwt(authorizationRequest: AuthorizationRequest): String {
+        val serializedRequest = json.encodeToJsonElement(
+            AuthorizationRequest.serializer(),
+            authorizationRequest,
+        ).jsonObject
+        val requestObjectPayload = buildJsonObject {
+            serializedRequest.forEach { (name, value) -> put(name, value) }
+            put("aud", "https://self-issued.me/v2")
+        }
+        return unsignedRequestObject(requestObjectPayload.toString())
+    }
 
     private fun signedLikeJwt(payloadJson: String): String {
         val header = """{"alg":"ES256","typ":"oauth-authz-req+jwt"}"""
@@ -835,7 +866,7 @@ class OpenId4VpPresentationServiceTest {
 
     private fun withAuthorizationRequestServer(
         responseBody: String? = null,
-        responseContentType: String = "application/json",
+        responseContentType: String = "application/oauth-authz-req+jwt",
         responseBodyFactory: ((RecordedRequest) -> String)? = null,
         block: (serverUrl: String, receivedRequest: () -> RecordedRequest) -> Unit,
     ) {
@@ -856,9 +887,14 @@ class OpenId4VpPresentationServiceTest {
             contentType = exchange.requestHeaders.getFirst("Content-Type")
             accept = exchange.requestHeaders.getFirst("Accept")
             body = InputStreamReader(exchange.requestBody).readText()
-            val response = responseBodyFactory?.invoke(RecordedRequest(method, contentType, accept, body))
+            val recordedRequest = RecordedRequest(method, contentType, accept, body)
+            val response = responseBodyFactory?.invoke(recordedRequest)
                 ?: responseBody
-                ?: json.encodeToString(AuthorizationRequest.serializer(), authorizationRequest)
+                ?: unsecuredJwt(
+                    authorizationRequest.copy(
+                        walletNonce = parseFormBody(recordedRequest.body)["wallet_nonce"],
+                    ),
+                )
             exchange.responseHeaders.add("Content-Type", responseContentType)
             exchange.sendResponseHeaders(200, response.toByteArray().size.toLong())
             exchange.responseBody.use { it.write(response.toByteArray()) }

@@ -298,7 +298,7 @@ class Verifier2RemoteSchemaTest {
             }
 
             // Present with wallet
-            val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
+            val bootstrapUrl = verificationSessionResponse.fullAuthorizationRequestUrl
 
             val holderKey = holderKeyFun()
 

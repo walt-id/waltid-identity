@@ -370,7 +370,7 @@ class IETFSdJwtVcNoDisclosuresVerifier2IntegrationTest {
             }
 
             // Present with wallet
-            val bootstrapUrl = verificationSessionResponse.bootstrapAuthorizationRequestUrl
+            val bootstrapUrl = verificationSessionResponse.fullAuthorizationRequestUrl
 
             val holderKey = holderKeyFun()
 
