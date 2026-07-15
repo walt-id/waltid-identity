@@ -1,115 +1,111 @@
 package id.walt.walletdemo.compose.ui.screens
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
+import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import id.walt.walletdemo.compose.logic.WalletDemoController
+import id.walt.walletdemo.compose.logic.WalletDemoTab
 import id.walt.walletdemo.compose.logic.WalletDemoUiState
 import id.walt.walletdemo.compose.logic.WalletSessionState
-import id.walt.walletdemo.compose.logic.isBusy
+import id.walt.walletdemo.compose.logic.receivedCredentials
 import id.walt.walletdemo.compose.logic.toCredentialDetails
-import id.walt.walletdemo.compose.ui.components.CredentialCard
-import id.walt.walletdemo.compose.ui.components.StatusCard
-import id.walt.walletdemo.compose.ui.components.UrlActionSection
+import id.walt.walletdemo.compose.ui.WalletRoute
 
 @Composable
 internal fun WalletScreen(controller: WalletDemoController, state: WalletDemoUiState) {
     val ready = state.session as? WalletSessionState.Ready
-    val selectedCredential = ready?.credentials?.firstOrNull { it.id == state.selectedCredentialId }
-    if (selectedCredential != null) {
-        CredentialDetailsScreen(
-            details = selectedCredential.toCredentialDetails(),
-            onBack = controller::clearSelectedCredential,
-        )
-        return
+    val credentials = ready?.credentials.orEmpty()
+    val credentialsBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
+    val receiveBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
+    val presentBackStack = remember { mutableStateListOf<WalletRoute>(WalletRoute.Root) }
+
+    LaunchedEffect(state.receiveNavigationResetKey) {
+        receiveBackStack.resetToRoot()
+    }
+    LaunchedEffect(state.presentationNavigationResetKey) {
+        presentBackStack.resetToRoot()
     }
 
-    val requestDrafts = state.requestDrafts
-
-    Column(
-        modifier = Modifier
+    Scaffold(
+        topBar = {
+            WalletHeader(
+                did = ready?.did,
+                state = state,
+                onLock = controller::lock,
+            )
+        },
+        bottomBar = {
+            WalletBottomBar(
+                selectedTab = state.selectedTab,
+                onSelectedTab = controller::selectTab,
+            )
+        },
+    ) { contentPadding ->
+        val modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Column {
-                Text("walt.id Wallet", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (ready != null && ready.did.isNotBlank()) {
-                    Text(
-                        ready.did,
-                        modifier = Modifier.testTag("wallet.did"),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+            .padding(contentPadding)
+
+        when (state.selectedTab) {
+            WalletDemoTab.Credentials -> WalletTabNavDisplay(
+                backStack = credentialsBackStack,
+                details = credentials.map { it.toCredentialDetails() },
+                modifier = modifier,
+                root = {
+                    CredentialsTab(
+                        credentials = credentials,
+                        onCredentialClick = { detailsId -> credentialsBackStack.pushDetails(detailsId) },
                     )
-                }
+                },
+            )
+            WalletDemoTab.Receive -> {
+                val receivedDetails = state.receivedCredentials()
+                    .map { it.toCredentialDetails() }
+
+                WalletTabNavDisplay(
+                    backStack = receiveBackStack,
+                    details = receivedDetails,
+                    modifier = modifier,
+                    root = {
+                        ReceiveTab(
+                            state = state,
+                            requestDrafts = state.requestDrafts,
+                            onOfferUrlChange = controller::updateOfferUrl,
+                            onReceive = controller::receive,
+                            onStartNew = controller::startNewReceiveFlow,
+                            onCredentialClick = { detailsId -> receiveBackStack.pushDetails(detailsId) },
+                        )
+                    },
+                )
             }
-            OutlinedButton(onClick = controller::lock) {
-                Text("Lock")
-            }
-        }
+            WalletDemoTab.Present -> {
+                val presentationDetails = state.presentationPreview
+                    ?.credentialOptions
+                    .orEmpty()
+                    .map { it.toCredentialDetails() }
 
-        StatusCard(state)
-
-        HorizontalDivider()
-        UrlActionSection(
-            title = "Receive",
-            value = requestDrafts.offerUrl,
-            onValueChange = controller::updateOfferUrl,
-            label = "Credential offer URL",
-            buttonText = "Receive",
-            enabled = ready != null &&
-                requestDrafts.offerUrl.isNotBlank() &&
-                !state.isBusy,
-            inputTestTag = "wallet.offerInput",
-            buttonTestTag = "wallet.receiveButton",
-            onClick = controller::receive,
-        )
-
-        HorizontalDivider()
-        UrlActionSection(
-            title = "Present",
-            value = requestDrafts.presentationRequestUrl,
-            onValueChange = controller::updatePresentationRequestUrl,
-            label = "OpenID4VP request URL",
-            buttonText = "Present",
-            enabled = ready != null &&
-                requestDrafts.presentationRequestUrl.isNotBlank() &&
-                ready.credentials.isNotEmpty() &&
-                !state.isBusy,
-            inputTestTag = "wallet.presentationInput",
-            buttonTestTag = "wallet.presentButton",
-            onClick = controller::present,
-        )
-
-        HorizontalDivider()
-        Text("Credentials", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        val credentials = ready?.credentials.orEmpty()
-        if (credentials.isEmpty()) {
-            Text("No credentials", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            credentials.forEach { credential ->
-                CredentialCard(
-                    details = credential.toCredentialDetails(),
-                    onClick = { controller.selectCredential(credential.id) },
+                WalletTabNavDisplay(
+                    backStack = presentBackStack,
+                    details = presentationDetails.ifEmpty { credentials.map { it.toCredentialDetails() } },
+                    modifier = modifier,
+                    root = {
+                        PresentTab(
+                            state = state,
+                            requestDrafts = state.requestDrafts,
+                            onPresentationRequestUrlChange = controller::updatePresentationRequestUrl,
+                            onPreview = controller::previewPresentation,
+                            onStartNew = controller::startNewPresentationFlow,
+                            onToggleCredential = controller::togglePresentationCredential,
+                            onToggleDisclosure = controller::togglePresentationDisclosure,
+                            onCredentialClick = { detailsId -> presentBackStack.pushDetails(detailsId) },
+                            onSubmit = controller::submitPresentation,
+                            onCancel = controller::cancelPresentationReview,
+                        )
+                    },
                 )
             }
         }

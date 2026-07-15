@@ -1,4 +1,5 @@
 import Foundation
+import WalletSDK
 import XCTest
 @testable import iosApp
 
@@ -563,6 +564,82 @@ final class CredentialDisplayNormalizerTests: XCTestCase {
             return XCTFail("Expected valid PNG data URI to render as an image")
         }
         XCTAssertEqual(mimeType, "image/png")
+    }
+
+    func testPresentationCredentialOptionPrependsRequestedDisclosures() throws {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: "https://issuer.example",
+            subject: "did:key:holder",
+            label: "PID",
+            credentialDataJSON: """
+            {
+              "given_name": "Alice",
+              "family_name": "Tester"
+            }
+            """,
+            disclosures: [
+                PresentationDisclosure(
+                    path: #"["$","given_name"]"#,
+                    name: "given_name",
+                    valueJSON: #""Alice""#,
+                    displayValue: "Alice",
+                    selectivelyDisclosable: true,
+                    required: true,
+                    selectable: false
+                ),
+                PresentationDisclosure(
+                    path: #"["eu.europa.ec.eudi.pid.1","portrait"]"#,
+                    name: "portrait",
+                    valueJSON: onePixelPNGByteArrayJSON(),
+                    displayValue: nil,
+                    selectivelyDisclosable: true,
+                    required: false,
+                    selectable: true
+                )
+            ]
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+
+        let requested = try XCTUnwrap(details.groups.first)
+        XCTAssertEqual(requested.title, "Requested disclosures")
+        XCTAssertEqual(requested.items.map(\.label), ["Given name", "Portrait"])
+        XCTAssertEqual(requested.items.map(\.path.id), ["disclosures[0].given_name", "disclosures[1].portrait"])
+        XCTAssertEqual(requested.items.first?.value, .text("Alice"))
+        guard case .image(_, _, let mimeType, let byteCount) = requested.items.last?.value else {
+            return XCTFail("Expected requested portrait disclosure to render as an image")
+        }
+        XCTAssertEqual(mimeType, "image/png")
+        XCTAssertEqual(byteCount, onePixelPNGData.count)
+
+        let personal = try XCTUnwrap(details.groups.first { $0.title == "Personal details" })
+        XCTAssertEqual(personal.items.map(\.label), ["Given name", "Family name"])
+        XCTAssertEqual(details.id, option.selection.id)
+    }
+
+    func testPresentationCredentialOptionOmitsRequestedDisclosuresWhenEmpty() {
+        let option = PresentationCredentialOption(
+            queryID: "pid",
+            credentialID: "credential-1",
+            format: "dc+sd-jwt",
+            issuer: nil,
+            subject: nil,
+            label: "PID",
+            credentialDataJSON: """
+            {
+              "given_name": "Alice"
+            }
+            """,
+            disclosures: []
+        )
+
+        let details = CredentialDisplayNormalizer.details(for: option)
+
+        XCTAssertFalse(details.groups.contains { $0.title == "Requested disclosures" })
+        XCTAssertEqual(details.groups.first?.title, "Personal details")
     }
 
     func testBuildsCredentialInfoGroupFromWalletSummaryFields() throws {

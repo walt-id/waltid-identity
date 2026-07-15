@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -92,13 +93,18 @@ class WalletDemoControllerTest {
         val controller = unlockedControllerWith(wallet, this)
 
         wallet.credentials = listOf(sampleCredential)
+        controller.selectTab(WalletDemoTab.Receive)
         controller.updateOfferUrl("openid-credential-offer://example")
         controller.receive()
         runCurrent()
 
         assertEquals("openid-credential-offer://example", wallet.receivedOfferUrl)
-        assertEquals(WalletOperationState.Succeeded("Received 2 credential(s)"), controller.state.value.operation)
-        assertEquals("Received 2 credential(s)", controller.state.value.statusText)
+        assertEquals(
+            WalletOperationState.Succeeded("Received 1 credential(s)", WalletDemoTab.Receive),
+            controller.state.value.operation,
+        )
+        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
         val session = controller.state.value.session as WalletSessionState.Ready
         assertEquals(listOf(sampleCredential), session.credentials)
     }
@@ -121,13 +127,454 @@ class WalletDemoControllerTest {
         val wallet = FakeDemoWallet(presentationResult = WalletDemoOperationResult.Success("Presentation sent"))
         val controller = unlockedControllerWith(wallet, this)
 
+        controller.selectTab(WalletDemoTab.Present)
         controller.updatePresentationRequestUrl("openid4vp://example")
         controller.present()
         runCurrent()
 
         assertEquals("openid4vp://example", wallet.presentedRequestUrl)
-        assertEquals(WalletOperationState.Succeeded("Presentation sent"), controller.state.value.operation)
+        assertEquals(
+            WalletOperationState.Succeeded("Presentation sent", WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
         assertEquals("Presentation sent", controller.state.value.statusText)
+    }
+
+    @Test
+    fun presentationPreviewApproveAndRejectUseStepwiseWalletApi() = runTest {
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(
+                WalletDemoPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "cred-1",
+                    label = "Example Credential",
+                    issuer = "Example Issuer",
+                    format = "jwt_vc_json",
+                    credentialDataJson = "{}",
+                    disclosures = listOf(
+                        WalletDemoPresentationDisclosure(
+                            label = "given_name",
+                            valueJson = "\"Ada\"",
+                            displayValue = "Ada",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                )
+            ),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(preview, controller.state.value.presentationPreview)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        assertEquals("Review presentation request", controller.state.value.statusText)
+        assertEquals(setOf(WalletDemoPresentationCredentialSelection("pid", "cred-1")), controller.state.value.selectedPresentationCredentialOptions)
+
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(listOf(WalletDemoPresentationCredentialSelection("pid", "cred-1")), wallet.submittedCredentialOptions)
+        assertEquals(
+            WalletOperationState.Succeeded("Presentation sent", WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
+
+        controller.previewPresentation()
+        runCurrent()
+        controller.cancelPresentationReview()
+
+        assertEquals(
+            WalletOperationState.Succeeded("Presentation review cancelled", WalletDemoTab.Present),
+            controller.state.value.operation,
+        )
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
+    }
+
+    @Test
+    fun presentationDisclosureSelectionDefaultsOffAndSubmitsSelectedPaths() = runTest {
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(
+                WalletDemoPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "cred-1",
+                    label = "PID",
+                    issuer = "Example Issuer",
+                    format = "vc+sd-jwt",
+                    credentialDataJson = "{}",
+                    disclosures = listOf(
+                        WalletDemoPresentationDisclosure(
+                            label = "Given name",
+                            path = "$.given_name",
+                            valueJson = "\"Ada\"",
+                            displayValue = "Ada",
+                            selectivelyDisclosable = true,
+                        ),
+                        WalletDemoPresentationDisclosure(
+                            label = "Family name",
+                            path = "$.family_name",
+                            valueJson = "\"Lovelace\"",
+                            displayValue = "Lovelace",
+                            selectivelyDisclosable = true,
+                        ),
+                        WalletDemoPresentationDisclosure(
+                            label = "Age over 18",
+                            path = "$.age_over_18",
+                            valueJson = "true",
+                            displayValue = "true",
+                            selectivelyDisclosable = true,
+                            required = true,
+                            selectable = false,
+                        ),
+                        WalletDemoPresentationDisclosure(
+                            label = "Credential type",
+                            path = "$.vct",
+                            valueJson = "\"PID\"",
+                            displayValue = "PID",
+                            selectivelyDisclosable = false,
+                        ),
+                    ),
+                )
+            ),
+            credentialRequirements = listOf(WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        val givenName = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.given_name")
+        val familyName = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.family_name")
+        val ageOver18 = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.age_over_18")
+        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
+        assertFalse(givenName in controller.state.value.selectedPresentationDisclosureOptions)
+        assertFalse(familyName in controller.state.value.selectedPresentationDisclosureOptions)
+        assertFalse(ageOver18 in controller.state.value.selectedPresentationDisclosureOptions)
+
+        controller.updatePresentationRequestUrl("openid4vp://other")
+
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
+
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        controller.togglePresentationDisclosure(familyName)
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(listOf(WalletDemoPresentationCredentialSelection("pid", "cred-1")), wallet.submittedCredentialOptions)
+        assertEquals(listOf(familyName), wallet.submittedDisclosureOptions)
+    }
+
+    @Test
+    fun presentationCredentialOptionsWithSameCredentialIdToggleIndependently() = runTest {
+        val first = WalletDemoPresentationCredentialOption(
+            queryId = "identity",
+            credentialId = "cred-1",
+            label = "PID identity",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+        val second = first.copy(queryId = "age", label = "PID age")
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(first, second),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("identity", "age")))
+            ),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(setOf(first.selection, second.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.togglePresentationCredential(first.selection)
+        assertFalse(controller.state.value.presentationCredentialSelectionComplete())
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(null, wallet.submittedCredentialOptions)
+        assertEquals(
+            WalletOperationState.Failed(
+                "Present failed: select a credential for every requested credential",
+                WalletDemoTab.Present,
+            ),
+            controller.state.value.operation,
+        )
+
+        controller.togglePresentationCredential(first.selection)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(setOf(first.selection, second.selection), wallet.submittedCredentialOptions?.toSet())
+    }
+
+    @Test
+    fun presentationPreviewSelectsOneCredentialOptionPerQuery() = runTest {
+        val first = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "cred-1",
+            label = "PID one",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+        val second = first.copy(credentialId = "cred-2", label = "PID two")
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(first, second),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(setOf(first.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.togglePresentationCredential(second.selection)
+
+        assertEquals(setOf(second.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(listOf(second.selection), wallet.submittedCredentialOptions)
+    }
+
+    @Test
+    fun presentationPreviewCanSelectMultipleCredentialsForOneQueryWhenAllowed() = runTest {
+        val firstDisclosure = WalletDemoPresentationDisclosureSelection("pid", "cred-1", "$.given_name")
+        val secondDisclosure = WalletDemoPresentationDisclosureSelection("pid", "cred-2", "$.given_name")
+        val first = WalletDemoPresentationCredentialOption(
+            queryId = "pid",
+            credentialId = "cred-1",
+            multiple = true,
+            label = "PID one",
+            issuer = "Example Issuer",
+            format = "vc+sd-jwt",
+            credentialDataJson = "{}",
+            disclosures = listOf(
+                WalletDemoPresentationDisclosure(
+                    label = "Given name",
+                    path = firstDisclosure.path,
+                    valueJson = "\"Ada\"",
+                    displayValue = "Ada",
+                    selectivelyDisclosable = true,
+                )
+            ),
+        )
+        val second = first.copy(
+            credentialId = "cred-2",
+            label = "PID two",
+            disclosures = listOf(
+                WalletDemoPresentationDisclosure(
+                    label = "Given name",
+                    path = secondDisclosure.path,
+                    valueJson = "\"Grace\"",
+                    displayValue = "Grace",
+                    selectivelyDisclosable = true,
+                )
+            ),
+        )
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(first, second),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(setOf(first.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
+
+        controller.togglePresentationDisclosure(firstDisclosure)
+
+        assertEquals(setOf(firstDisclosure), controller.state.value.selectedPresentationDisclosureOptions)
+
+        controller.togglePresentationCredential(second.selection)
+
+        assertEquals(
+            setOf(first.selection, second.selection),
+            controller.state.value.selectedPresentationCredentialOptions,
+        )
+        assertEquals(setOf(firstDisclosure), controller.state.value.selectedPresentationDisclosureOptions)
+        assertFalse(secondDisclosure in controller.state.value.selectedPresentationDisclosureOptions)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.togglePresentationDisclosure(secondDisclosure)
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(setOf(first.selection, second.selection), wallet.submittedCredentialOptions?.toSet())
+        assertEquals(setOf(firstDisclosure, secondDisclosure), wallet.submittedDisclosureOptions?.toSet())
+    }
+
+    @Test
+    fun presentationPreviewSelectsFirstSatisfiableRequirementAlternativeOnly() = runTest {
+        val mdl = WalletDemoPresentationCredentialOption(
+            queryId = "mdl-id",
+            credentialId = "cred-1",
+            label = "mDL",
+            issuer = "Example Issuer",
+            format = "mso_mdoc",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+        val photoId = mdl.copy(queryId = "photo-id", credentialId = "cred-2", label = "Photo ID")
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(mdl, photoId),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("mdl-id"), listOf("photo-id")))
+            ),
+        )
+        val controller = unlockedControllerWith(FakeDemoWallet(presentationPreview = preview), this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(setOf(mdl.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+    }
+
+    @Test
+    fun presentationSelectionRequiresNonEmptySelectionWhenRequirementsAreEmpty() = runTest {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "optional-address",
+            credentialId = "cred-1",
+            label = "Address",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(option),
+            credentialRequirements = emptyList(),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(setOf(option.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertTrue(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.togglePresentationCredential(option.selection)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertFalse(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(null, wallet.submittedCredentialOptions)
+        assertEquals(
+            WalletOperationState.Failed(
+                "Present failed: select a credential for every requested credential",
+                WalletDemoTab.Present,
+            ),
+            controller.state.value.operation,
+        )
+    }
+
+    @Test
+    fun presentationCredentialSelectionRequiresQueriesWithoutVisibleOptions() = runTest {
+        val option = WalletDemoPresentationCredentialOption(
+            queryId = "identity",
+            credentialId = "cred-1",
+            label = "PID identity",
+            issuer = "Example Issuer",
+            format = "jwt_vc_json",
+            credentialDataJson = "{}",
+            disclosures = emptyList(),
+        )
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(option),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(
+                    options = listOf(listOf("identity", "age"))
+                )
+            ),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        controller.previewPresentation()
+        runCurrent()
+
+        assertEquals(setOf(option.selection), controller.state.value.selectedPresentationCredentialOptions)
+        assertFalse(controller.state.value.presentationCredentialSelectionComplete())
+
+        controller.submitPresentation()
+        runCurrent()
+
+        assertEquals(null, wallet.submittedCredentialOptions)
+        assertEquals(
+            WalletOperationState.Failed(
+                "Present failed: select a credential for every requested credential",
+                WalletDemoTab.Present,
+            ),
+            controller.state.value.operation,
+        )
     }
 
     @Test
@@ -144,44 +591,228 @@ class WalletDemoControllerTest {
     }
 
     @Test
-    fun selectCredentialTracksSavedCredentialDetails() = runTest {
-        val controller = unlockedControllerWith(FakeDemoWallet(credentials = listOf(sampleCredential)), this)
-
-        controller.selectCredential("cred-1")
-
-        assertEquals("cred-1", controller.state.value.selectedCredentialId)
-
-        controller.clearSelectedCredential()
-
-        assertEquals(null, controller.state.value.selectedCredentialId)
-    }
-
-    @Test
-    fun receiveClearsSelectedCredentialWhenItNoLongerExists() = runTest {
-        val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
-        val controller = unlockedControllerWith(wallet, this)
-
-        controller.selectCredential("cred-1")
-        wallet.credentials = emptyList()
-        controller.updateOfferUrl("openid-credential-offer://example")
-        controller.receive()
-        runCurrent()
-
-        assertEquals(null, controller.state.value.selectedCredentialId)
-    }
-
-    @Test
     fun handleDeepLinkRoutesCredentialOffersAndPresentationRequests() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
         val offerUrl = "openid-credential-offer://example"
         val presentationUrl = "openid4vp://example"
 
         controller.handleDeepLink(offerUrl)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
         controller.handleDeepLink(presentationUrl)
+        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
         controller.handleDeepLink("https://example.com/ignored")
 
         assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
         assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+    }
+
+    @Test
+    fun handleDeepLinkResetsCompletedReceiveAndPresentationState() = runTest {
+        val offerUrl = "openid-credential-offer://example"
+        val presentationUrl = "openid4vp://example"
+        val wallet = FakeDemoWallet(
+            credentials = listOf(sampleCredential),
+            presentationPreview = WalletDemoPresentationPreview(
+                verifierName = "Example Verifier",
+                clientId = "https://verifier.example",
+                credentialOptions = listOf(
+                    WalletDemoPresentationCredentialOption(
+                        queryId = "pid",
+                        credentialId = "cred-1",
+                        label = "Example Credential",
+                        issuer = "Example Issuer",
+                        format = "jwt_vc_json",
+                        credentialDataJson = "{}",
+                        disclosures = emptyList(),
+                    )
+                ),
+                credentialRequirements = listOf(
+                    WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+                ),
+            )
+        )
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.updateOfferUrl(offerUrl)
+        controller.receive()
+        runCurrent()
+        assertTrue(controller.state.value.receiveCompleted)
+
+        controller.updatePresentationRequestUrl(presentationUrl)
+        controller.previewPresentation()
+        runCurrent()
+        controller.submitPresentation()
+        runCurrent()
+        assertTrue(controller.state.value.presentationCompleted)
+
+        controller.handleDeepLink(offerUrl)
+
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+        assertEquals(offerUrl, controller.state.value.requestDrafts.offerUrl)
+        assertEquals(1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(0, controller.state.value.presentationNavigationResetKey)
+        assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertTrue(controller.state.value.receiveActionEnabled)
+        assertEquals("Wallet ready", controller.state.value.statusText)
+
+        controller.handleDeepLink(presentationUrl)
+
+        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+        assertEquals(presentationUrl, controller.state.value.requestDrafts.presentationRequestUrl)
+        assertEquals(1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(1, controller.state.value.presentationNavigationResetKey)
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertFalse(controller.state.value.presentationCompleted)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
+        assertTrue(controller.state.value.presentationPreviewActionEnabled)
+        assertEquals("Wallet ready", controller.state.value.statusText)
+
+        controller.handleDeepLink(presentationUrl)
+
+        assertEquals(2, controller.state.value.presentationNavigationResetKey)
+    }
+
+    @Test
+    fun receiveCompletionTracksReceivedCredentialsAndCanStartNewFlow() = runTest {
+        val wallet = FakeDemoWallet(receivedCredentialIds = listOf("cred-1"))
+        val controller = unlockedControllerWith(wallet, this)
+
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertFalse(controller.state.value.receiveActionEnabled)
+
+        controller.selectTab(WalletDemoTab.Receive)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        assertTrue(controller.state.value.receiveActionEnabled)
+
+        wallet.credentials = listOf(sampleCredential)
+        controller.receive()
+        runCurrent()
+
+        assertTrue(controller.state.value.receiveCompleted)
+        assertFalse(controller.state.value.receiveUrlEntryEnabled)
+        assertFalse(controller.state.value.receiveActionEnabled)
+        assertEquals(listOf("cred-1"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals(WalletDemoTab.Receive, controller.state.value.selectedTab)
+
+        val resetKeyBeforeNewFlow = controller.state.value.receiveNavigationResetKey
+        controller.startNewReceiveFlow()
+
+        assertEquals("", controller.state.value.requestDrafts.offerUrl)
+        assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(!controller.state.value.receiveCompleted)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertFalse(controller.state.value.receiveActionEnabled)
+        assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.receiveNavigationResetKey)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        assertEquals("Wallet ready", controller.state.value.statusText)
+    }
+
+    @Test
+    fun receiveCompletionDerivesNewCredentialsWhenWalletReturnsNoIds() = runTest {
+        val existingCredential = sampleCredential.copy(id = "old-cred", label = "Existing Credential")
+        val newCredential = sampleCredential.copy(id = "new-cred", label = "New Credential")
+        val wallet = FakeDemoWallet(credentials = listOf(existingCredential), receivedCredentialIds = emptyList())
+        val controller = unlockedControllerWith(wallet, this)
+
+        wallet.credentials = listOf(existingCredential, newCredential)
+        controller.selectTab(WalletDemoTab.Receive)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.receive()
+        runCurrent()
+
+        assertTrue(controller.state.value.receiveCompleted)
+        assertEquals(listOf("new-cred"), controller.state.value.lastReceivedCredentialIds)
+        assertEquals("Received 1 credential(s)", controller.state.value.statusText)
+        assertEquals(listOf(newCredential), controller.state.value.receivedCredentials())
+    }
+
+    @Test
+    fun receiveDoesNotCompleteWhenNoDisplayableCredentialIsAvailable() = runTest {
+        val wallet = FakeDemoWallet(credentials = emptyList(), receivedCredentialIds = listOf("missing-cred"))
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Receive)
+        controller.updateOfferUrl("openid-credential-offer://example")
+        controller.receive()
+        runCurrent()
+
+        assertFalse(controller.state.value.receiveCompleted)
+        assertEquals(emptyList(), controller.state.value.lastReceivedCredentialIds)
+        assertTrue(controller.state.value.receiveUrlEntryEnabled)
+        assertEquals(
+            WalletOperationState.Failed(
+                "Receive failed: received credentials are not available locally",
+                WalletDemoTab.Receive,
+            ),
+            controller.state.value.operation,
+        )
+        assertEquals(
+            "Receive failed: received credentials are not available locally",
+            controller.state.value.statusText,
+        )
+    }
+
+    @Test
+    fun presentationCompletionCanStartNewFlow() = runTest {
+        val preview = WalletDemoPresentationPreview(
+            verifierName = "Example Verifier",
+            clientId = "https://verifier.example",
+            credentialOptions = listOf(
+                WalletDemoPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "cred-1",
+                    label = "Example Credential",
+                    issuer = "Example Issuer",
+                    format = "jwt_vc_json",
+                    credentialDataJson = "{}",
+                    disclosures = emptyList(),
+                )
+            ),
+            credentialRequirements = listOf(
+                WalletDemoPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+        val wallet = FakeDemoWallet(presentationPreview = preview)
+        val controller = unlockedControllerWith(wallet, this)
+
+        controller.selectTab(WalletDemoTab.Present)
+        controller.updatePresentationRequestUrl("openid4vp://example")
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
+        assertFalse(controller.state.value.presentationPreviewActionEnabled)
+
+        controller.previewPresentation()
+        runCurrent()
+        assertFalse(controller.state.value.presentationUrlEntryEnabled)
+        assertFalse(controller.state.value.presentationPreviewActionEnabled)
+
+        controller.submitPresentation()
+        runCurrent()
+
+        assertTrue(controller.state.value.presentationCompleted)
+        assertEquals(preview, controller.state.value.presentationPreview)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertFalse(controller.state.value.presentationUrlEntryEnabled)
+        assertFalse(controller.state.value.presentationPreviewActionEnabled)
+        assertEquals(WalletDemoTab.Present, controller.state.value.selectedTab)
+
+        val resetKeyBeforeNewFlow = controller.state.value.presentationNavigationResetKey
+        controller.startNewPresentationFlow()
+
+        assertEquals("", controller.state.value.requestDrafts.presentationRequestUrl)
+        assertEquals(null, controller.state.value.presentationPreview)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationCredentialOptions)
+        assertEquals(emptySet(), controller.state.value.selectedPresentationDisclosureOptions)
+        assertTrue(!controller.state.value.presentationCompleted)
+        assertTrue(controller.state.value.presentationUrlEntryEnabled)
+        assertFalse(controller.state.value.presentationPreviewActionEnabled)
+        assertEquals(resetKeyBeforeNewFlow + 1, controller.state.value.presentationNavigationResetKey)
+        assertEquals(WalletOperationState.Idle, controller.state.value.operation)
+        assertEquals("Wallet ready", controller.state.value.statusText)
     }
 
     private fun controllerWith(wallet: DemoWallet, scope: TestScope): WalletDemoController =
@@ -216,11 +847,20 @@ class WalletDemoControllerTest {
 private class FakeDemoWallet(
     var credentials: List<WalletDemoCredential> = emptyList(),
     private val receivedCredentialIds: List<String> = listOf("cred-1"),
-    private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success("Presentation sent"),
+    private val presentationResult: WalletDemoOperationResult = WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent),
+    private val presentationPreview: WalletDemoPresentationPreview = WalletDemoPresentationPreview(
+        verifierName = null,
+        clientId = null,
+        credentialOptions = emptyList(),
+    ),
 ) : DemoWallet {
     var bootstrapCalls = 0
     var receivedOfferUrl: String? = null
     var presentedRequestUrl: String? = null
+    var previewedRequestUrl: String? = null
+    var submittedRequestUrl: String? = null
+    var submittedCredentialOptions: List<WalletDemoPresentationCredentialSelection>? = null
+    var submittedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>? = null
 
     override suspend fun bootstrap(): WalletDemoBootstrapResult {
         bootstrapCalls += 1
@@ -237,5 +877,22 @@ private class FakeDemoWallet(
     override suspend fun present(requestUrl: String, did: String?): WalletDemoOperationResult {
         presentedRequestUrl = requestUrl
         return presentationResult
+    }
+
+    override suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview {
+        previewedRequestUrl = requestUrl
+        return presentationPreview
+    }
+
+    override suspend fun submitPresentation(
+        requestUrl: String,
+        selectedCredentialOptions: List<WalletDemoPresentationCredentialSelection>,
+        selectedDisclosureOptions: List<WalletDemoPresentationDisclosureSelection>,
+        did: String?,
+    ): WalletDemoOperationResult {
+        submittedRequestUrl = requestUrl
+        submittedCredentialOptions = selectedCredentialOptions
+        submittedDisclosureOptions = selectedDisclosureOptions
+        return WalletDemoOperationResult.Success(WalletDisplayText.PresentationSent)
     }
 }
