@@ -17,6 +17,29 @@ import kotlin.test.assertTrue
 class WalletDemoControllerTest {
 
     @Test
+    fun pinStorageReadFailureStaysLockedUntilRetrySucceeds() = runTest {
+        val pinStore = RecoverableDemoPinStore()
+        val wallet = FakeDemoWallet()
+        val controller = controllerWith(wallet, this, pinStore)
+
+        assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
+
+        controller.updatePin("1234")
+        controller.updatePinConfirmation("1234")
+        controller.submitPin()
+        runCurrent()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.StorageUnavailable)
+        assertEquals(0, pinStore.setPinCalls)
+        assertEquals(0, wallet.bootstrapCalls)
+
+        pinStore.isAvailable = true
+        controller.retryPinStorage()
+
+        assertTrue(controller.state.value.auth is WalletAuthState.Login)
+    }
+
+    @Test
     fun setupPinRejectsInvalidLengthAndNonDigits() = runTest {
         val controller = controllerWith(FakeDemoWallet(), this)
 
@@ -1074,6 +1097,22 @@ class WalletDemoControllerTest {
             credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
         )
     }
+}
+
+private class RecoverableDemoPinStore : DemoPinStore {
+    var isAvailable = false
+    var setPinCalls = 0
+
+    override fun hasPin(): Boolean {
+        check(isAvailable) { "PIN storage is unavailable" }
+        return true
+    }
+
+    override suspend fun setPin(pin: String) {
+        setPinCalls += 1
+    }
+
+    override suspend fun verifyPin(pin: String): Boolean = true
 }
 
 private class FakeDemoWallet(

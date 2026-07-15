@@ -70,6 +70,7 @@ private fun WalletSessionState.statusText(auth: WalletAuthState): String =
         WalletSessionState.NotBootstrapped -> when (auth) {
             is WalletAuthState.Setup -> WalletDisplayText.SetupPin
             is WalletAuthState.Login -> WalletDisplayText.UnlockPin
+            is WalletAuthState.StorageUnavailable -> auth.message
             WalletAuthState.Unlocked -> WalletDisplayText.WalletNotReady
         }
         WalletSessionState.Bootstrapping -> WalletDisplayText.BootstrappingWallet

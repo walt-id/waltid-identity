@@ -23,11 +23,7 @@ class WalletDemoController(
     private var receiveJob: Job? = null
     private val _state = MutableStateFlow(
         WalletDemoUiState(
-            auth = runCatching {
-                if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
-            }.getOrElse {
-                WalletAuthState.Setup(error = "PIN storage is unavailable")
-            },
+            auth = readInitialAuthState(),
         ),
     )
     val state: StateFlow<WalletDemoUiState> = _state.asStateFlow()
@@ -37,6 +33,7 @@ class WalletDemoController(
             when (val auth = state.auth) {
                 is WalletAuthState.Setup -> state.copy(auth = auth.copy(pin = value, error = null))
                 is WalletAuthState.Login -> state.copy(auth = auth.copy(pin = value, error = null))
+                is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked -> state
             }
         }
@@ -47,6 +44,7 @@ class WalletDemoController(
             when (val auth = state.auth) {
                 is WalletAuthState.Setup -> state.copy(auth = auth.copy(confirmation = value, error = null))
                 is WalletAuthState.Login,
+                is WalletAuthState.StorageUnavailable,
                 WalletAuthState.Unlocked,
                 -> state
             }
@@ -58,7 +56,18 @@ class WalletDemoController(
         when (val auth = _state.value.auth) {
             is WalletAuthState.Setup -> submitSetupPin(auth)
             is WalletAuthState.Login -> submitLoginPin(auth)
+            is WalletAuthState.StorageUnavailable,
             WalletAuthState.Unlocked -> Unit
+        }
+    }
+
+    fun retryPinStorage() {
+        _state.update { state ->
+            if (state.auth is WalletAuthState.StorageUnavailable) {
+                state.copy(auth = readInitialAuthState())
+            } else {
+                state
+            }
         }
     }
 
@@ -624,6 +633,13 @@ class WalletDemoController(
             )
         }
     }
+
+    private fun readInitialAuthState(): WalletAuthState =
+        runCatching {
+            if (pinStore.hasPin()) WalletAuthState.Login() else WalletAuthState.Setup()
+        }.getOrElse {
+            WalletAuthState.StorageUnavailable()
+        }
 
     private companion object {
         val pinPattern = Regex("\\d{4,8}")

@@ -26,9 +26,10 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.v2.runComposeUiTest
-import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
+import id.walt.walletdemo.compose.logic.DemoPinStore
 import id.walt.walletdemo.compose.logic.DemoWallet
 import id.walt.walletdemo.compose.logic.InMemoryDemoPinStore
+import id.walt.walletdemo.compose.logic.WalletDemoBootstrapResult
 import id.walt.walletdemo.compose.logic.WalletDemoController
 import id.walt.walletdemo.compose.logic.WalletDemoCredential
 import id.walt.walletdemo.compose.logic.WalletDemoOperationResult
@@ -47,6 +48,23 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class WalletDemoAppTestScenarios {
+
+    fun pinStorageFailureStaysLockedUntilRetrySucceeds() = runComposeUiTest {
+        val pinStore = RecoverableDemoPinStore()
+        val controller = WalletDemoController(FakeDemoWallet(), pinStore)
+
+        setContent { WalletDemoApp(controller) }
+
+        onNodeWithText("PIN storage unavailable").assertIsDisplayed()
+        onAllNodesWithTag("wallet.pinInput").assertCountEquals(0)
+
+        pinStore.isAvailable = true
+        onNodeWithTag("wallet.pinStorageRetryButton").performClick()
+        waitForIdle()
+
+        onNodeWithText("Enter your PIN").assertIsDisplayed()
+        onAllNodesWithTag("wallet.pinConfirmationInput").assertCountEquals(0)
+    }
 
     fun credentialsTabShowsCompactCardsAndNavigatesToDetails() = runComposeUiTest {
         val wallet = FakeDemoWallet(credentials = listOf(sampleCredential))
@@ -194,7 +212,10 @@ class WalletDemoAppTestScenarios {
     }
 
     fun receiveAndPresentTabsExposeQrScanActions() = runComposeUiTest {
-        val controller = WalletDemoController(FakeDemoWallet(credentials = listOf(sampleCredential)))
+        val controller = WalletDemoController(
+            FakeDemoWallet(credentials = listOf(sampleCredential)),
+            InMemoryDemoPinStore(),
+        )
 
         setContent { WalletDemoApp(controller) }
         unlockWithPin()
@@ -743,6 +764,19 @@ class WalletDemoAppTestScenarios {
         private val samplePresentationCredentialOption: WalletDemoPresentationCredentialOption
             get() = samplePresentationPreview.credentialOptions.single()
     }
+}
+
+private class RecoverableDemoPinStore : DemoPinStore {
+    var isAvailable = false
+
+    override fun hasPin(): Boolean {
+        check(isAvailable) { "PIN storage is unavailable" }
+        return true
+    }
+
+    override suspend fun setPin(pin: String) = Unit
+
+    override suspend fun verifyPin(pin: String): Boolean = true
 }
 
 private class FakeDemoWallet(

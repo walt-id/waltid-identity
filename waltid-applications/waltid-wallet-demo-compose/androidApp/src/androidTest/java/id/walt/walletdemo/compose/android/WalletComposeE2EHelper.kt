@@ -38,18 +38,23 @@ internal object WalletComposeE2EHelper {
     )
 
     fun launchAndUnlock(context: Context, device: UiDevice) {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
-            ?: error("Cannot resolve launch intent for ${context.packageName}")
-        context.startActivity(launchIntent)
+        launch(context)
+        unlock(device)
+    }
+
+    fun launchExpectingSetupAndUnlock(context: Context, device: UiDevice) {
+        launch(context)
+
+        assertNotNull("PIN input not found on initial launch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
+        assertNotNull(
+            "PIN setup was not shown on initial launch",
+            waitForResource(device, "wallet.pinConfirmationInput", UI_ELEMENT_TIMEOUT),
+        )
         unlock(device)
     }
 
     fun relaunchAndUnlock(context: Context, device: UiDevice) {
-        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
-            ?: error("Cannot resolve launch intent for ${context.packageName}")
-        context.startActivity(launchIntent)
+        launch(context)
 
         assertNotNull("PIN input not found after relaunch", waitForResource(device, "wallet.pinInput", UI_ELEMENT_TIMEOUT))
         assertNull(
@@ -57,6 +62,13 @@ internal object WalletComposeE2EHelper {
             waitForResource(device, "wallet.pinConfirmationInput", 2_000L),
         )
         unlock(device)
+    }
+
+    private fun launch(context: Context) {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+            ?.apply { addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK) }
+            ?: error("Cannot resolve launch intent for ${context.packageName}")
+        context.startActivity(launchIntent)
     }
 
     fun unlock(device: UiDevice) {
