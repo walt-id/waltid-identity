@@ -92,6 +92,12 @@ public actor Wallet {
 
     /// Presents credentials for an OpenID4VP request URL.
     ///
+    /// This immediate submission API is intended for callers that already handled
+    /// request review and user consent. Apps that need to display verifier
+    /// details, credential choices, selective disclosures, or transaction data
+    /// should use ``previewPresentation(request:)`` followed by
+    /// ``submitPresentation(request:selectedCredentialOptions:selectedDisclosureOptions:did:runPolicies:)``.
+    ///
     /// - Parameters:
     ///   - request: OpenID4VP authorization request URL received by the app.
     ///   - did: Optional wallet DID to use for presentation. When omitted,

@@ -14,6 +14,9 @@ public struct WalletConfiguration: Sendable {
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
+    /// Transaction data profiles this wallet accepts in OpenID4VP requests.
+    public var transactionDataProfiles: [WalletTransactionDataProfile]
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -24,17 +27,46 @@ public struct WalletConfiguration: Sendable {
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - persistence: Local persistence configuration for wallet-owned state.
+    ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
+    ///     wallet accepts before previewing or submitting a presentation.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
-        persistence: WalletPersistence = WalletPersistence()
+        persistence: WalletPersistence = WalletPersistence(),
+        transactionDataProfiles: [WalletTransactionDataProfile] = []
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
         self.persistence = persistence
+        self.transactionDataProfiles = transactionDataProfiles
     }
+}
+
+/// OpenID4VP transaction data profile accepted by the wallet.
+public struct WalletTransactionDataProfile: Equatable, Sendable {
+    /// Collision-resistant OpenID4VP `transaction_data.type` value.
+    public let type: String
+
+    /// Human-readable label for consent UI.
+    public let displayName: String
+
+    /// Supported transaction type-specific fields.
+    public let fields: [String]
+
+    /// Creates a transaction data profile.
+    ///
+    /// - Parameters:
+    ///   - type: Collision-resistant OpenID4VP `transaction_data.type` value.
+    ///   - displayName: Human-readable label for consent UI. Defaults to `type`.
+    ///   - fields: Supported transaction type-specific fields.
+    public init(type: String, displayName: String? = nil, fields: [String] = []) {
+        self.type = type
+        self.displayName = displayName ?? type
+        self.fields = fields
+    }
+
 }
 
 /// Wallet-local persistence configuration.
@@ -599,7 +631,7 @@ public struct PresentationCredentialRequirement: Equatable, Sendable {
     }
 }
 
-/// Verifier metadata extracted from a presentation request.
+/// Verifier and transaction metadata extracted from a presentation request.
 public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID4VP client identifier.
     public let clientID: String?
@@ -616,6 +648,9 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     /// OpenID nonce value.
     public let nonce: String?
 
+    /// Decoded transaction data attached to the request.
+    public let transactionData: [PresentationTransactionData]
+
     /// Creates presentation request information.
     ///
     /// - Parameters:
@@ -625,18 +660,21 @@ public struct PresentationRequestInfo: Equatable, Sendable {
     ///   - responseURI: Direct-post response URI when available.
     ///   - state: OpenID state value from the request.
     ///   - nonce: OpenID nonce value from the request.
+    ///   - transactionData: Decoded transaction data attached to the request.
     public init(
         clientID: String? = nil,
         verifierName: String? = nil,
         responseURI: URL? = nil,
         state: String? = nil,
-        nonce: String? = nil
+        nonce: String? = nil,
+        transactionData: [PresentationTransactionData] = []
     ) {
         self.clientID = clientID
         self.verifierName = verifierName
         self.responseURI = responseURI
         self.state = state
         self.nonce = nonce
+        self.transactionData = transactionData
     }
 }
 
@@ -815,6 +853,52 @@ public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
         let resolvedRequired = required ?? !selectivelyDisclosable
         self.required = resolvedRequired
         self.selectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+    }
+}
+
+/// Decoded transaction_data item from an OpenID4VP presentation request.
+public struct PresentationTransactionData: Equatable, Sendable {
+    /// Transaction data type.
+    public let type: String
+
+    /// Human-readable label from the accepted wallet profile.
+    public let displayName: String
+
+    /// Related DCQL credential query identifiers.
+    public let credentialQueryIDs: [String]
+
+    /// Profile-declared transaction-data fields the wallet accepts.
+    public let supportedFields: [String]
+
+    /// Decoded raw transaction data JSON.
+    public let rawJSON: String
+
+    /// Transaction type-specific details encoded as JSON.
+    public let detailsJSON: String
+
+    /// Creates transaction data for display.
+    ///
+    /// - Parameters:
+    ///   - type: Transaction data type.
+    ///   - displayName: Human-readable label from the accepted wallet profile.
+    ///   - credentialQueryIDs: Related DCQL credential query identifiers.
+    ///   - supportedFields: Profile-declared transaction-data fields.
+    ///   - rawJSON: Decoded raw transaction data JSON.
+    ///   - detailsJSON: Transaction type-specific details encoded as JSON.
+    public init(
+        type: String,
+        displayName: String,
+        credentialQueryIDs: [String],
+        supportedFields: [String],
+        rawJSON: String,
+        detailsJSON: String
+    ) {
+        self.type = type
+        self.displayName = displayName
+        self.credentialQueryIDs = credentialQueryIDs
+        self.supportedFields = supportedFields
+        self.rawJSON = rawJSON
+        self.detailsJSON = detailsJSON
     }
 }
 
