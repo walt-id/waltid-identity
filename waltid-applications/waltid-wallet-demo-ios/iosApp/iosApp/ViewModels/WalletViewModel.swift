@@ -61,11 +61,11 @@ class WalletViewModel: ObservableObject {
             guard offerUrl != oldValue else { return }
             receiveTask?.cancel()
             txCode = ""
-            transactionCode = nil
+            transactionCodeRequired = false
         }
     }
     @Published var txCode = ""
-    @Published var transactionCode: TransactionCode?
+    @Published var transactionCodeRequired = false
     @Published var presentationRequestUrl = ""
     @Published var presentationPreview: PresentationPreview?
     @Published var selectedPresentationCredentialOptions: Set<PresentationCredentialSelection> = []
@@ -93,11 +93,7 @@ class WalletViewModel: ObservableObject {
     }
 
     private var hasValidTransactionCode: Bool {
-        guard let transactionCode else { return true }
-        let value = txCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        return !value.isEmpty &&
-            (transactionCode.length == nil || value.count == transactionCode.length) &&
-            (transactionCode.inputMode != .numeric || value.allSatisfy(\.isNumber))
+        !transactionCodeRequired || !txCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var receivedCredentials: [Credential] {
@@ -301,7 +297,7 @@ class WalletViewModel: ObservableObject {
         resetInputFocus()
         offerUrl = ""
         txCode = ""
-        transactionCode = nil
+        transactionCodeRequired = false
         lastReceivedCredentialIDs = []
         receiveCompleted = false
         receiveNavigationResetKey += 1
@@ -338,7 +334,7 @@ class WalletViewModel: ObservableObject {
         guard hasValidTransactionCode else { return }
         let previousCredentials = credentials
         let request = ReceiveRequest(offerURL: offer.absoluteString, navigationResetKey: receiveNavigationResetKey)
-        let requiresTransactionCode = transactionCode != nil
+        let requiresTransactionCode = transactionCodeRequired
 
         setLoading(
             requiresTransactionCode ? WalletStatusText.receivingCredential : WalletStatusText.resolvingCredentialOffer,
@@ -350,8 +346,8 @@ class WalletViewModel: ObservableObject {
                     let resolution = try await walletClient.resolveOffer(offer: offer)
                     try Task.checkCancellation()
                     guard isCurrent(request) else { return }
-                    if let requirement = resolution.transactionCode {
-                        transactionCode = requirement
+                    if resolution.transactionCodeRequired {
+                        transactionCodeRequired = true
                         isLoading = false
                         isError = false
                         statusTab = .receive
@@ -420,10 +416,7 @@ class WalletViewModel: ObservableObject {
     }
 
     func updateTxCode(_ value: String) {
-        let accepted = transactionCode?.inputMode == .numeric
-            ? value.filter(\.isNumber)
-            : value
-        txCode = transactionCode?.length.map { String(accepted.prefix($0)) } ?? accepted
+        txCode = value
     }
 
     private func isCurrent(_ request: ReceiveRequest) -> Bool {
