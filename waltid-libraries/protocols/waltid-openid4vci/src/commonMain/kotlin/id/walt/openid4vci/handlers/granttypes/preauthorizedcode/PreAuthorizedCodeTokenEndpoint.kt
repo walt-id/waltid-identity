@@ -62,6 +62,19 @@ class PreAuthorizedCodeTokenEndpoint(
                 ),
             )
 
+        record.clientId?.let { boundClientId ->
+            val authenticatedClient = request.authenticatedClient
+                ?: return AccessTokenResponseResult.Failure(
+                    OAuthError("invalid_client", "Client authentication is required for this pre-authorized code"),
+                )
+
+            if (authenticatedClient.id != boundClientId) {
+                return AccessTokenResponseResult.Failure(
+                    OAuthError("invalid_grant", "Client mismatch for pre-authorized code"),
+                )
+            }
+        }
+
         val providedTxCode = request.requestForm["tx_code"]?.firstOrNull()
         if (record.txCode != null && providedTxCode.isNullOrBlank()) {
             return AccessTokenResponseResult.Failure(

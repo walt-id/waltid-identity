@@ -2,6 +2,7 @@ package id.walt.openid4vci.requests.authorization
 
 import id.walt.openid4vci.Client
 import id.walt.openid4vci.ResponseMode
+import id.walt.openid4vci.clientauth.AuthenticatedClient
 import id.walt.openid4vci.requests.generateRequestId
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -24,6 +25,7 @@ data class DefaultAuthorizationRequest(
     override val requestForm: Map<String, List<String>> = emptyMap(),
     override val issClaim: String? = null,
     override val authorizationDetails: List<AuthorizationDetail> = emptyList(),
+    override val authenticatedClient: AuthenticatedClient? = null,
 ) : AuthorizationRequest {
     override fun markResponseTypeHandled(responseType: String): AuthorizationRequest =
         copy(handledResponseTypes = handledResponseTypes + responseType)
@@ -39,4 +41,7 @@ data class DefaultAuthorizationRequest(
 
     override fun withRedirectUri(uri: String?): AuthorizationRequest =
         copy(redirectUri = uri)
+
+    override fun withAuthenticatedClient(authenticatedClient: AuthenticatedClient?): AuthorizationRequest =
+        copy(authenticatedClient = authenticatedClient)
 }

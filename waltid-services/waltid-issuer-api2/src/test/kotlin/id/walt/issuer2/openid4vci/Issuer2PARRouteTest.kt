@@ -1,5 +1,7 @@
 package id.walt.issuer2.openid4vci
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.issuer2.application.openid4vci.OpenId4VciModule
 import id.walt.issuer2.config.Issuer2MetadataConfig
 import id.walt.issuer2.config.Issuer2ProfilesConfig
@@ -13,6 +15,8 @@ import id.walt.issuer2.service.CredentialProfileService
 import id.walt.issuer2.service.IssuanceSessionService
 import id.walt.issuer2.service.openid4vci.MetadataService
 import id.walt.issuer2.service.openid4vci.OpenId4VciProtocolService
+import id.walt.issuer2.testsupport.createIssuer2ClientAttestationTestMaterial
+import id.walt.openid4vci.clientauth.attestation.ClientAttestationHeaders
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRecord
 import id.walt.openid4vci.repository.authorization.AuthorizationCodeRepository
 import id.walt.openid4vci.repository.par.InMemoryPARRepository
@@ -22,6 +26,7 @@ import id.walt.openid4vci.repository.refresh.InMemoryRefreshTokenRepository
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 import io.ktor.client.request.forms.FormDataContent
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.HttpHeaders
@@ -60,7 +65,11 @@ class Issuer2PARRouteTest {
                 bearer("auth-oauth") {}
             }
             routing {
-                testController().register(this)
+                testController(
+                    serviceConfig = Issuer2ServiceConfig(
+                        baseUrl = "http://localhost",
+                    ),
+                ).register(this)
             }
         }
         val client = createClient {
@@ -127,8 +136,67 @@ class Issuer2PARRouteTest {
         assertEquals("no-cache", response.headers[HttpHeaders.Pragma])
     }
 
-    private fun testController(): OpenId4VciController {
-        val serviceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost")
+    @Test
+    fun `par route accepts client attestation headers`() = testApplication {
+        val clientAttestation = createIssuer2ClientAttestationTestMaterial()
+        val walletInstanceKey = JWKKey.generate(KeyType.secp256r1)
+        val attestationHeaders = clientAttestation.attestationAssembler.buildAttestationHeaders(
+            instanceKey = walletInstanceKey,
+            clientId = EUDI_WALLET_CLIENT_ID,
+            audience = "http://localhost/openid4vci",
+        )
+
+        application {
+            install(ServerContentNegotiation) {
+                json(json)
+            }
+            install(Authentication) {
+                bearer("auth-oauth") {}
+            }
+            routing {
+                testController(
+                    serviceConfig = Issuer2ServiceConfig(
+                        baseUrl = "http://localhost",
+                        clientAuthenticationConfig = clientAttestation.clientAuthenticationConfig,
+                    ),
+                ).register(this)
+            }
+        }
+        val client = createClient {
+            install(ClientContentNegotiation) {
+                json(json)
+            }
+        }
+
+        val response = client.post("/openid4vci/par") {
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION, attestationHeaders.attestationJwt)
+            header(ClientAttestationHeaders.CLIENT_ATTESTATION_POP, attestationHeaders.popJwt)
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("client_id", EUDI_WALLET_CLIENT_ID)
+                        append("response_type", "code")
+                        append("redirect_uri", "https://wallet.example/callback")
+                        append("scope", "openid")
+                        append("state", "state123")
+                    }
+                )
+            )
+        }
+
+        assertEquals(HttpStatusCode.Created, response.status)
+        assertEquals("no-store", response.headers[HttpHeaders.CacheControl])
+        assertEquals("no-cache", response.headers[HttpHeaders.Pragma])
+
+        val payload = response.body<JsonObject>()
+        val requestUri = assertNotNull(payload["request_uri"]?.jsonPrimitive?.contentOrNull)
+        assertEquals(true, requestUri.startsWith("urn:ietf:params:oauth:request_uri:"))
+        assertEquals("90", payload["expires_in"]?.jsonPrimitive?.content)
+    }
+
+    private fun testController(
+        serviceConfig: Issuer2ServiceConfig = Issuer2ServiceConfig(baseUrl = "http://localhost"),
+    ): OpenId4VciController {
         val metadataConfig = Issuer2MetadataConfig()
         val profileService = CredentialProfileService(
             profilesConfig = Issuer2ProfilesConfig(),
@@ -148,6 +216,8 @@ class Issuer2PARRouteTest {
             metadataConfig = metadataConfig,
             profileService = profileService,
             sessionService = sessionService,
+            preAuthorizedGrantAnonymousAccessSupported =
+                openId4VciModule.preAuthorizedCodeIssuer.anonymousAccessSupported,
         )
 
         return OpenId4VciController(
@@ -185,5 +255,9 @@ class Issuer2PARRouteTest {
         override suspend fun get(sessionId: String): IssuanceSession? = null
         override suspend fun list(): List<IssuanceSession> = emptyList()
         override suspend fun remove(sessionId: String) = Unit
+    }
+
+    private companion object {
+        const val EUDI_WALLET_CLIENT_ID = "eudiw-abca"
     }
 }

@@ -135,7 +135,7 @@ class CredentialOfferService(
         return credentialOffer
     }
 
-    private fun issuerBaseUrl(): String = config.baseUrl.trimEnd('/') + "/openid4vci"
+    private fun issuerBaseUrl(): String = config.openId4VciBaseUrl()
 
     private fun expirationTimestamp(expiresInSeconds: Long): Instant =
         when (expiresInSeconds) {

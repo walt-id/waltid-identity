@@ -18,6 +18,7 @@ jobs:
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
+      enable-android-build: true
       publish: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
   docker-matrix:
