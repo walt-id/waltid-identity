@@ -263,6 +263,19 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeys { // id.walt.wa
     final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeKeys.toString|toString(){}[0]
 }
 
+final class id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution { // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution|null[0]
+    constructor <init>(kotlin/Boolean) // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.<init>|<init>(kotlin.Boolean){}[0]
+
+    final val txCodeRequired // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.txCodeRequired|{}txCodeRequired[0]
+        final fun <get-txCodeRequired>(): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.txCodeRequired.<get-txCodeRequired>|<get-txCodeRequired>(){}[0]
+
+    final fun component1(): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.component1|component1(){}[0]
+    final fun copy(kotlin/Boolean = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.copy|copy(kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution.toString|toString(){}[0]
+}
+
 final class id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence { // id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence|null[0]
     constructor <init>(id.walt.wallet2.mobile.swiftinterop/WalletBridgeDatabaseKeyConfiguration = ..., id.walt.wallet2.mobile.swiftinterop/WalletBridgeStores = ...) // id.walt.wallet2.mobile.swiftinterop/WalletBridgePersistence.<init>|<init>(id.walt.wallet2.mobile.swiftinterop.WalletBridgeDatabaseKeyConfiguration;id.walt.wallet2.mobile.swiftinterop.WalletBridgeStores){}[0]
 
@@ -372,6 +385,7 @@ final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge { // id.walt.wal
     final suspend fun deleteWallet(): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin/Unit> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.deleteWallet|deleteWallet(){}[0]
     final suspend fun present(kotlin/String, kotlin/String? = ..., kotlin/Boolean? = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile/MobileWalletPresentationResult> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.present|present(kotlin.String;kotlin.String?;kotlin.Boolean?){}[0]
     final suspend fun receive(kotlin/String, kotlin/String? = ..., kotlin/String = ...): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<kotlin.collections/List<kotlin/String>> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.receive|receive(kotlin.String;kotlin.String?;kotlin.String){}[0]
+    final suspend fun resolveOffer(kotlin/String): id.walt.wallet2.mobile.swiftinterop/WalletBridgeResult<id.walt.wallet2.mobile.swiftinterop/WalletBridgeOfferResolution> // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridge.resolveOffer|resolveOffer(kotlin.String){}[0]
 }
 
 final class id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory { // id.walt.wallet2.mobile.swiftinterop/WalletSdkBridgeFactory|null[0]
