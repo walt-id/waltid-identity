@@ -20,8 +20,6 @@ import id.walt.wallet2.handlers.PresentationCredentialSelection
 import id.walt.wallet2.handlers.PresentationDisclosureSelection
 import id.walt.wallet2.handlers.PreviewPresentationRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
-import id.walt.wallet2.handlers.ResolveOfferRequest
-import id.walt.wallet2.handlers.ResolveOfferTxCodeInputMode
 import id.walt.wallet2.handlers.SubmitPresentationRequest
 import id.walt.wallet2.handlers.WalletIssuanceHandler
 import id.walt.wallet2.handlers.WalletPresentationHandler
@@ -229,21 +227,7 @@ public class MobileWallet internal constructor(
      * @param offerUrl Credential offer URL, including `openid-credential-offer://` URLs.
      */
     public suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
-        val resolution = WalletIssuanceHandler.resolveOffer(
-            ResolveOfferRequest(offerUrl = Url(offerUrl.trim())),
-        )
-        return MobileWalletOfferResolution(
-            txCode = resolution.txCode?.let {
-                MobileWalletTxCode(
-                    inputMode = when (it.inputMode) {
-                        ResolveOfferTxCodeInputMode.numeric -> MobileWalletTxCodeInputMode.numeric
-                        ResolveOfferTxCodeInputMode.text -> MobileWalletTxCodeInputMode.text
-                    },
-                    length = it.length,
-                    issuerDescription = it.description,
-                )
-            },
-        )
+        return resolveMobileWalletOffer(offerUrl)
     }
 
     /**
