@@ -328,6 +328,15 @@ async function submit() {
       @reload="swagger.load()"
     />
 
+    <a
+      href="https://dcql.walt.id"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="-mt-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline"
+    >
+      Learn more about DCQL
+    </a>
+
     <details class="group rounded-xl border border-[--color-border] bg-white">
       <summary class="cursor-pointer list-none p-4">
         <div class="flex items-center justify-between gap-4">
