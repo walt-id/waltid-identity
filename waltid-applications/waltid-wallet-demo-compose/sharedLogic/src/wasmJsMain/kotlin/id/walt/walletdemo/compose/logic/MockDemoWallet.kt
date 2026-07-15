@@ -19,8 +19,10 @@ private class MockDemoWallet : DemoWallet {
                 id = "mock-credential",
                 format = "jwt_vc_json",
                 issuer = "walt.id demo issuer",
+                subject = "did:key:mock-holder",
                 label = "Mock credential",
                 addedAt = "2026-06-17",
+                credentialDataJson = WalletDemoSampleCredentialData.credentialDataJsonWithPortrait,
             )
         )
         return credentials.map { it.id }

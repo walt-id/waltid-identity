@@ -496,7 +496,8 @@ private extension MobileWalletCredential {
             issuer: issuer,
             subject: subject,
             label: label,
-            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
+            addedAt: addedAt.flatMap { ISO8601DateFormatter().date(from: $0) },
+            credentialDataJSON: credentialDataJson
         )
     }
 }
