@@ -14,7 +14,7 @@ struct StatusBannerView: View {
             Text(message)
                 .font(.subheadline)
                 .lineLimit(2)
-                .accessibilityIdentifier("wallet.status")
+                .accessibilityIdentifier(WalletAccessibilityID.status)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)

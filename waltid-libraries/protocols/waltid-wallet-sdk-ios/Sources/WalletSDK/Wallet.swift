@@ -108,4 +108,43 @@ public actor Wallet {
     ) async throws -> PresentationResult {
         try await bridge.present(request: request, did: did, runPolicies: runPolicies)
     }
+
+    /// Resolves and previews an OpenID4VP presentation request without submitting credentials.
+    ///
+    /// - Parameter request: OpenID4VP authorization request URL received by the app.
+    /// - Returns: Verifier metadata and matching credential options.
+    /// - Throws: ``WalletError`` when the request cannot be resolved or matched.
+    public func previewPresentation(request: URL) async throws -> PresentationPreview {
+        try await bridge.previewPresentation(request: request)
+    }
+
+    /// Submits a presentation with user-selected credential options.
+    ///
+    /// - Parameters:
+    ///   - request: OpenID4VP authorization request URL received by the app.
+    ///   - selectedCredentialOptions: Credential options selected from
+    ///     ``previewPresentation(request:)``.
+    ///   - selectedDisclosureOptions: Optional selectively disclosable claims
+    ///     selected from ``previewPresentation(request:)``. Passing `nil`
+    ///     preserves the wallet core's default request-matched disclosure set.
+    ///   - did: Optional wallet DID to use for presentation.
+    ///   - runPolicies: Optional policy execution override for presentation.
+    /// - Returns: Presentation outcome.
+    /// - Throws: ``WalletError`` when selection, signing, or verifier communication fails.
+    public func submitPresentation(
+        request: URL,
+        selectedCredentialOptions: [PresentationCredentialSelection],
+        selectedDisclosureOptions: [PresentationDisclosureSelection]? = nil,
+        did: String? = nil,
+        runPolicies: Bool? = nil
+    ) async throws -> PresentationResult {
+        try await bridge.submitPresentation(
+            request: request,
+            selectedCredentialOptions: selectedCredentialOptions,
+            selectedDisclosureOptions: selectedDisclosureOptions,
+            did: did,
+            runPolicies: runPolicies
+        )
+    }
+
 }
