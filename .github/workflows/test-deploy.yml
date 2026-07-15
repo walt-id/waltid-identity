@@ -17,6 +17,7 @@ jobs:
     needs: version
     with:
       version: ${{ needs.version.outputs.release_version }}
+      enable-android-build: true
       report-check-name: 'gradle / gradle (ubuntu-22.04)'
   docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
