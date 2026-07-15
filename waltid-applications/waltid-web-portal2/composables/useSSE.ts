@@ -72,7 +72,14 @@ export function useSSE() {
     source = null;
   }
 
+  function reset() {
+    close();
+    events.value = [];
+    status.value = null;
+    isTerminal.value = false;
+  }
+
   onUnmounted(close);
 
-  return { events, status, isTerminal, open, close };
+  return { events, status, isTerminal, open, close, reset };
 }
