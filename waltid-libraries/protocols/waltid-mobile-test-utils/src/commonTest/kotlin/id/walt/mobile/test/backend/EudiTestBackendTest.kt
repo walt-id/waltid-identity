@@ -6,6 +6,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class EudiTestBackendTest {
     @Test
@@ -36,5 +37,17 @@ class EudiTestBackendTest {
 
         assertEquals(offerUrl, generated.offerUrl)
         assertEquals("1234", generated.txCode)
+    }
+
+    @Test
+    fun rejectsPayloadWithoutSeparatelyDeliveredTransactionCode() {
+        val offerUrl = "openid-credential-offer://credential_offer?credential_offer={}".encodeURLParameter()
+        val payload = buildJsonObject {
+            put("url_data", JsonPrimitive(offerUrl))
+        }
+
+        assertFailsWith<IllegalStateException> {
+            EudiTestBackend.generatedOfferFromFinalPayload(payload)
+        }
     }
 }
