@@ -124,11 +124,16 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         add(screenshot)
     }
 
-    func testEudiTransactionCodePromptRejectsWrongCodeAndRetries() async throws {
-        let offer = try await EudiOfferFlow(client: WalletE2EClient()).generate()
+    func testTransactionCodePromptRejectsWrongCodeAndRetriesAgainstPublicDemoIssuer2() async throws {
+        let scenario = try publicDemoScenario()
+        let offer = try await backend.createOffer(
+            scenario: scenario,
+            withGeneratedTransactionCode: true
+        )
+        let transactionCode = try XCTUnwrap(offer.txCode)
         let app = XCUIApplication()
         let ui = WalletE2EUI(app: app)
-        ui.launch()
+        ui.launch(environment: publicDemoEnvironment())
 
         let readyStatus = ui.waitForStatus(
             prefixes: ["Wallet ready", "Bootstrap failed"],
@@ -146,7 +151,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             value: offer.offerUrl,
             timeout: 20
         ) else {
-            XCTFail("EUDI offer URL did not appear after opening the deep link")
+            XCTFail("Offer URL did not appear after opening the deep link")
             return
         }
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
@@ -166,7 +171,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             return
         }
 
-        ui.replaceText(in: txCodeInput, value: incorrectCode(for: offer.txCode))
+        ui.replaceText(in: txCodeInput, value: incorrectCode(for: transactionCode))
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         let rejectedStatus = ui.waitForStatus(
             prefixes: ["Receive failed"],
@@ -177,7 +182,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
             return
         }
 
-        ui.replaceText(in: txCodeInput, value: offer.txCode)
+        ui.replaceText(in: txCodeInput, value: transactionCode)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
         let receivedStatus = ui.waitForStatus(
             prefixes: ["Received", "Receive failed", "Bootstrap failed"],
