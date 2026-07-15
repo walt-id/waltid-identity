@@ -120,14 +120,18 @@ jobs:
                 exit 0
               fi
 
-              if jq -e --arg label "$PLATFORM_LABEL" 'index($label) != null or index("ci:mobile") != null' <<< "$PR_LABELS" >/dev/null; then
-                if jq -e --arg label "$PLATFORM_LABEL" 'index($label) != null' <<< "$PR_LABELS" >/dev/null; then
-                  set_decision true "$PLATFORM_LABEL label"
-                else
-                  set_decision true "ci:mobile label"
-                fi
-                exit 0
-              fi
+              label_match="$(
+                jq -er --arg platform_label "$PLATFORM_LABEL" '
+                  if index($platform_label) != null then "platform"
+                  elif index("ci:mobile") != null then "mobile"
+                  else "none"
+                  end
+                ' <<< "$PR_LABELS"
+              )"
+              case "$label_match" in
+                platform) set_decision true "$PLATFORM_LABEL label"; exit 0 ;;
+                mobile) set_decision true "ci:mobile label"; exit 0 ;;
+              esac
 
               if [[ "$PR_DRAFT" == "true" ]]; then
                 set_decision false "draft PR without $PLATFORM_LABEL or ci:mobile label"
