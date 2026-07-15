@@ -132,9 +132,12 @@ object DemoTestBackend {
         )
         val sessionId = response["sessionId"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing sessionId in public demo verifier2 response: $response")
-        val authorizationRequestUri = response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
+        // This fixture creates an unsigned session. Use the fully encoded Authorization Request;
+        // the bootstrap request_uri endpoint is a Request Object endpoint and must not return the
+        // public demo's unsigned application/json response as though it were a JAR JWT.
+        val authorizationRequestUri = response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: response["authorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
-            ?: response["fullAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
+            ?: response["bootstrapAuthorizationRequestUrl"]?.jsonPrimitive?.contentOrNull
             ?: error("Missing authorization request URL in public demo verifier2 response: $response")
 
         return VerifierSession(sessionId, authorizationRequestUri)

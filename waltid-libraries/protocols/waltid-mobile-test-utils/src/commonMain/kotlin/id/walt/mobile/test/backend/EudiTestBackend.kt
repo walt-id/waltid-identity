@@ -149,7 +149,8 @@ object EudiTestBackend {
         val payload = buildJsonObject {
             put("dcql_query", dcqlQuery)
             put("nonce", JsonPrimitive(Uuid.random().toString()))
-            put("request_uri_method", JsonPrimitive("post"))
+            // verifier-backend.eudiw.dev currently supports JAR retrieval via the default GET
+            // method, but returns HTTP 400 when request_uri_method=post is requested.
             put("profile", JsonPrimitive("openid4vp"))
             put("authorization_request_uri", JsonPrimitive("openid4vp://"))
         }
