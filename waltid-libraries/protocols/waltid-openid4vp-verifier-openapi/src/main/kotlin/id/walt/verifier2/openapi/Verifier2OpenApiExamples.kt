@@ -348,7 +348,7 @@ object Verifier2OpenApiExamples {
         withExpiryField("expiration_duration", JsonPrimitive("PT15M"))
 
     val openid4vpHttpSdJwtVcExpirationDate =
-        withExpiryField("expiration_date", JsonPrimitive("2026-07-06T15:30:00Z"))
+        withExpiryField("expiration_date", JsonPrimitive("2035-07-06T15:30:00Z"))
 
     val openid4vpHttpSdJwtVcBasic = CrossDeviceFlowSetup(
         core = GeneralFlowConfig(
