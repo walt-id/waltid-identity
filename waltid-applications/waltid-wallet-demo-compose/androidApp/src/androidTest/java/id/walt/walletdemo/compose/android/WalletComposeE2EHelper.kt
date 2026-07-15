@@ -115,6 +115,18 @@ internal object WalletComposeE2EHelper {
         device.waitForIdle()
     }
 
+    fun setTextByTag(device: UiDevice, tag: String, value: String) {
+        val node = waitForResource(device, tag, CLICK_VISIBLE_TIMEOUT)
+            ?: findVisibleResource(device, tag)
+            ?: findResourceAfterScrolling(device, tag)
+        if (node == null) {
+            fail("$tag not found.\n${visibleUiSnapshot(device)}")
+        }
+        assertTrue("$tag is disabled", node!!.isEnabled)
+        node.setText(value)
+        device.waitForIdle()
+    }
+
     fun assertTextVisibleAfterScrolling(
         device: UiDevice,
         texts: List<String>,
@@ -165,6 +177,16 @@ internal object WalletComposeE2EHelper {
             Thread.sleep(500)
         }
         return null
+    }
+
+    fun waitForResourceEnabled(device: UiDevice, tag: String, timeoutMs: Long): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            val node = device.findObject(By.res(tag)) ?: findVisibleResource(device, tag)
+            if (node?.isEnabled == true) return true
+            Thread.sleep(200)
+        }
+        return false
     }
 
     private fun findTextAfterScrolling(device: UiDevice, texts: List<String>): UiObject2? {
