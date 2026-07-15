@@ -38,13 +38,22 @@ class ValidationContext(trustStore: X509CertificateTrustStore) : X509Certificate
         internalChainTrust.addCertificate(certificate)
     }
 
-    fun addLogEntry(severity: ValidationResult.Severity, message: String) {
+    fun addLogEntry(severity: ValidationResult.Severity, message: String) =
+        addLogEntry(severity, null, message)
+
+    fun addLogEntry(severity: ValidationResult.Severity, subValidatorId: String?, message: String) {
+
+        val realValidatorId = subValidatorId
+            ?.let {
+                it.ifBlank { null }
+            }?.let { "${validatorId}.${it}" }
+            ?: validatorId
         val now = Clock.System.now()
         internalLog.add(
             ValidationResult.ValidationLogEntry(
                 timestamp = now,
                 severity = severity,
-                validatorId = validatorId,
+                validatorId = realValidatorId,
                 subjectDn = certificateSubjectDn,
                 message = message
             )

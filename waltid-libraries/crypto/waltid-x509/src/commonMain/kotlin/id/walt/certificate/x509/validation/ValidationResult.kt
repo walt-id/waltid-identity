@@ -7,6 +7,10 @@ data class ValidationResult(
     val log: List<ValidationLogEntry>
 ) {
 
+    val hasWarnings get() = log.any { it.severity == Severity.WARNING }
+
+    val hasErrors get() = log.any { it.severity == Severity.ERROR }
+
     data class ValidationLogEntry(
         val timestamp: Instant,
         val severity: Severity,

@@ -1,10 +1,15 @@
 package id.walt.certificate.x509.profile
 
 import id.walt.certificate.x509.X509Certificate
-import id.walt.certificate.x509.extension.*
+import id.walt.certificate.x509.builder.X509CertificateDataBuilder
+import id.walt.certificate.x509.extension.BasicConstraintsExtension
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
+import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
+import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
+import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
+import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.validation.ValidationContext
@@ -24,7 +29,7 @@ import kotlin.time.Duration.Companion.days
  */
 object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509CertificateValidator {
 
-    const val NAME = "iso-iaca-root"
+    const val ID = "iso-iaca-root"
 
     val allowedSignatureAlgorithmsOid = listOf(
         "1.2.840.10045.4.3.2", // ECDSA-with SHA256
@@ -48,8 +53,61 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
 
     val maxValidityTime = 365.days * 20 // 20 years
 
-    override val id: String
-        get() = TODO("Not yet implemented")
+    override val id: String = ID
+
+    fun X509CertificateDataBuilder.profileIaCaRootCertificate(
+        issuerDnCountryCode: String,
+        issuerDnStateOrProvinceName: String? = null,
+        issuerDnOrganizationName: String? = null,
+        issuerDnCommonName: String? = null,
+        issuerDnSerialNumber: String? = null,
+        issuerEmailAddress: String? = null,
+        issuerUri: String? = null
+    ) {
+        require(issuerDnCountryCode.length == 2) { "Require two letter country code but is '${issuerDnCountryCode}'" }
+        val issuerDn = listOfNotNull(
+            issuerDnSerialNumber?.let {
+                if (issuerDnCommonName != null) {
+                    // append it to commonName
+                    null
+                } else {
+                    "SERIALNUMBER=${it}"
+                }
+            },
+            issuerDnCommonName?.let { cn -> "CN=${cn}${issuerDnSerialNumber?.let { "+SERIALNUMBER=$it" } ?: ""}" },
+            issuerDnOrganizationName?.let { "O=${it}" },
+            issuerDnStateOrProvinceName?.let { "ST=${it}" },
+            issuerDnCountryCode.let { "C=${it.uppercase()}" },
+        )
+            .joinToString(",")
+        profileIaCaRootCertificate(issuerDn, issuerEmailAddress, issuerUri)
+    }
+
+    fun X509CertificateDataBuilder.profileIaCaRootCertificate(
+        issuerDn: String,
+        issuerEmailAddress: String?,
+        issuerUri: String?
+    ) {
+        this.subjectDn = issuerDn
+        this.issuerDn = issuerDn
+        subjectPublicKeyInfo = X509CertificateDataBuilder.SelfSignedSubjectPublicKeyInfo()
+        extensionBasicConstraints {
+            critical = true
+            cA = true
+            pathLenConstraint = 0
+        }
+        extensionKeyUsage {
+            critical = true
+            addKeyUsage(KeyUsageExtension.KeyUsage.keyCertSign)
+            addKeyUsage(KeyUsageExtension.KeyUsage.cRLSign)
+        }
+        extensionSubjectKeyIdentifier()
+        require(issuerEmailAddress?.isNotBlank() == true || issuerUri?.isNotBlank() == true) { "Issuer email address or issuer uri is required" }
+        extensionIssuerAltName {
+            issuerEmailAddress?.also { addEmail(it) }
+            issuerUri?.also { addUri(it) }
+        }
+    }
 
     override suspend fun validate(
         context: ValidationContext,
@@ -98,6 +156,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (!allowedSignatureAlgorithmsOid.contains(x509Certificate.signatureAlgorithmOid)) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "signatureAlgorithm",
                 "Expected signature algorithm  to be one of ${allowedSignatureAlgorithmsOid} but was " +
                         "'${x509Certificate.signatureAlgorithmOid}' (${x509Certificate.signatureAlgorithmName})"
             )
@@ -129,14 +188,32 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
      * encoding is not listed above syntax shall be either
      * PrintableString or UTF8String.
      */
+
+    private val countryCodeRegx = Regex("""\bc\s*=\s*"?([A-Z]{2})"?\b""", RegexOption.IGNORE_CASE)
+
     fun validateIssuerDn(
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        context.addLogEntry(
-            ValidationResult.Severity.WARNING,
-            "Issuer DN validation is not implemented"
-        )
+        // check presents of country code
+        val issuerDn = x509Certificate.data.issuerDn
+        val foundCountyCode = countryCodeRegx.find(issuerDn)
+        if (foundCountyCode != null) {
+            val countryCode = foundCountyCode.groups[1]?.value
+            if (countryCode == null || countryCode.length != 2 || countryCode != countryCode.uppercase()) {
+                context.addLogEntry(
+                    ValidationResult.Severity.ERROR,
+                    "issuerDn",
+                    "Expected country name to be ISO 3166-1 alpha-2 code  with capital letters but found '${countryCode}'"
+                )
+            }
+        } else {
+            context.addLogEntry(
+                ValidationResult.Severity.ERROR,
+                "issuerDn",
+                "Issuer DN doesn't contain a valid country name, expected country name to be ISO 3166-1 alpha-2 code in issuer DN '${issuerDn}'"
+            )
+        }
     }
 
     /**
@@ -156,11 +233,13 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (validityPeriod.isNegative() || validityPeriod == Duration.ZERO) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "validityTime",
                 "Validity time must be positive"
             )
         } else if (validityPeriod > maxValidityTime) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "validityTime",
                 "Validity time must be less then 20 years"
             )
         }
@@ -176,6 +255,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (x509Certificate.data.subjectDn != x509Certificate.data.issuerDn) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "subjectDn",
                 "Subject DN '${x509Certificate.data.subjectDn}' must be same as issuer DN ''${x509Certificate.data.issuerDn}'"
             )
         }
@@ -202,6 +282,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (allowedSubjectPulicKeyAlgorithmOid != subjectPublicKeyInfo.algorithmOid) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "subjectPublicKeyInfo",
                 "Subject public key algorithm OID expected to be '${allowedSubjectPulicKeyAlgorithmOid}' but is '${subjectPublicKeyInfo.algorithmOid}' ('${subjectPublicKeyInfo.algorithmName}') "
             )
         } else if (subjectPublicKeyInfo.ellipticCurveOid == null ||
@@ -210,6 +291,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
             if (x509Certificate.data.subjectDn != x509Certificate.data.issuerDn) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
+                    "subjectPublicKeyInfo",
                     "Subject DN '${x509Certificate.data.subjectDn}' must be same as issuer DN ''${x509Certificate.data.issuerDn}'"
                 )
             }
@@ -227,11 +309,13 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (extension == null) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "subjectKeyIdentifier",
                 "Certificate extension '${SubjectKeyIdentifierExtension.OID}' ('${SubjectKeyIdentifierExtension.NAME}') is not present"
             )
         } else if (extension.critical) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "subjectKeyIdentifier",
                 "Certificate extension '${SubjectKeyIdentifierExtension.OID}' ('${SubjectKeyIdentifierExtension.NAME}') must not have a critical flag set"
             )
         }
@@ -263,24 +347,28 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (extension == null) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "keyUsage",
                 "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') is not present"
             )
         } else if (!extension.critical) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "keyUsage",
                 "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') must have a critical flag set"
             )
         }
         extension?.keyPurposeIdList?.also { actualKeyUsage ->
-            KeyUsageExtension.KeyUsage.values().forEach {
+            KeyUsageExtension.KeyUsage.entries.forEach {
                 if (requiredKeyUsage.contains(it) && !actualKeyUsage.contains(it)) {
                     context.addLogEntry(
                         ValidationResult.Severity.ERROR,
+                        "keyUsage",
                         "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') requires '${it} flag set, but is false"
                     )
                 } else if (!requiredKeyUsage.contains(it) && actualKeyUsage.contains(it)) {
                     context.addLogEntry(
                         ValidationResult.Severity.ERROR,
+                        "keyUsage",
                         "Certificate extension '${KeyUsageExtension.OID}' ('${KeyUsageExtension.NAME}') requires '${it} flag not to be set, but is true"
                     )
                 }
@@ -309,12 +397,14 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (extension == null) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "issuerAlternativeName",
                 "Certificate extension '${IssuerAlternativeNameExtension.OID}' ('${IssuerAlternativeNameExtension.NAME}') is not present"
             )
         } else {
             if (extension.critical) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
+                    "issuerAlternativeName",
                     "Certificate extension '${IssuerAlternativeNameExtension.OID}' ('${IssuerAlternativeNameExtension.NAME}') must not have a critical flag set"
                 )
             }
@@ -326,6 +416,7 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
             if (!hasRequiredAlternativeNames) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
+                    "issuerAlternativeName",
                     "Certificate extension '${IssuerAlternativeNameExtension.OID}' ('${IssuerAlternativeNameExtension.NAME}') doesn't have required rfc822Name or uniformResourceIdentifier set"
                 )
             }
@@ -344,24 +435,28 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         if (extension == null) {
             context.addLogEntry(
                 ValidationResult.Severity.ERROR,
+                "basicConstraints",
                 "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') is not present"
             )
         } else {
             if (!extension.critical) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
+                    "basicConstraints",
                     "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have a critical flag set"
                 )
             }
             if (!extension.cA) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
+                    "basicConstraints",
                     "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have cA flag set"
                 )
             }
             if (extension.pathLenConstraint != 0) {
                 context.addLogEntry(
                     ValidationResult.Severity.ERROR,
+                    "basicConstraints",
                     "Certificate extension '${BasicConstraintsExtension.OID}' ('${BasicConstraintsExtension.NAME}') must have pathLenConstraint set to '0' but is '${extension.pathLenConstraint}'"
                 )
             }
@@ -372,6 +467,50 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
         context: ValidationContext,
         x509Certificate: X509Certificate
     ) {
-        TODO()
+        val extension = x509Certificate.data.extensionCrlDistributionPoints
+        if (extension != null) {
+            context.addLogEntry(
+                ValidationResult.Severity.WARNING,
+                "crlDistributionPoints",
+                "Presence of CRL Distribution Points is not recommended; its presence is allowed for backwards compatibility reasons"
+            )
+
+            extension.distributionPoints.forEachIndexed { index, dp ->
+                if (dp.reason != null) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.WARNING,
+                        "crlDistributionPoints",
+                        "DistributionPoint[${index}] The ‘reasons’ field shall not be used"
+                    )
+                }
+                if (dp.cRLIssuer != null) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.WARNING,
+                        "crlDistributionPoints",
+                        "DistributionPoint[${index}] The ‘cRL Issuer’ field shall not be used"
+                    )
+                }
+                if (dp.distributionPointFullName == null) {
+                    context.addLogEntry(
+                        ValidationResult.Severity.ERROR,
+                        "crlDistributionPoints",
+                        "DistributionPoint[${index}] Full name is required"
+                    )
+                } else {
+                    if (dp.distributionPointFullName.isEmpty()
+                        || !dp.distributionPointFullName.all { fullName ->
+                            fullName.type == GeneralName.NameType.uniformResourceIdentifier
+                                    && fullName.value.isNotBlank()
+                        }
+                    ) {
+                        context.addLogEntry(
+                            ValidationResult.Severity.ERROR,
+                            "crlDistributionPoints",
+                            "DistributionPoint[${index}] Full name must be of type URI"
+                        )
+                    }
+                }
+            }
+        }
     }
 }
