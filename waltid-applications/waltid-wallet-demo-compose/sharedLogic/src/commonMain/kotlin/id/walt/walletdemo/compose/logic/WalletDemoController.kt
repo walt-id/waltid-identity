@@ -54,10 +54,13 @@ class WalletDemoController(
     }
 
     fun lock() {
+        receiveJob?.cancel()
         _state.update {
             it.copy(
                 auth = WalletAuthState.Login(),
                 operation = WalletOperationState.Idle,
+                requestDrafts = it.requestDrafts.copy(txCode = ""),
+                receiveNavigationResetKey = it.receiveNavigationResetKey + 1,
             )
         }
     }
@@ -211,8 +214,13 @@ class WalletDemoController(
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (error: Throwable) {
-                if (isCurrent(request)) {
-                    setOperationError(WalletDisplayText.ReceiveFailed, error, WalletDemoTab.Receive)
+                updateIfCurrent(request) {
+                    it.copy(
+                        operation = WalletOperationState.Failed(
+                            message = WalletDisplayText.failure(WalletDisplayText.ReceiveFailed, error),
+                            tab = WalletDemoTab.Receive,
+                        )
+                    )
                 }
             }
         }
