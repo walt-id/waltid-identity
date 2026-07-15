@@ -15,6 +15,7 @@ import id.walt.wallet2.mobile.MobileWalletBootstrapResult
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletCredential
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
+import id.walt.wallet2.mobile.MobileWalletOfferResolution
 import id.walt.wallet2.mobile.MobileWalletPresentationResult
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
@@ -477,6 +478,9 @@ class WalletSdkBridgeTest {
         var deleteWalletCalls = 0
             private set
 
+        var resolveOfferUrl: String? = null
+            private set
+
         override suspend fun bootstrap(
             keyType: MobileWalletKeyType?,
             didMethod: String,
@@ -488,6 +492,12 @@ class WalletSdkBridgeTest {
                 did = "did:jwk:issuer",
             )
         }
+
+        override suspend fun resolveOffer(offerUrl: String): MobileWalletOfferResolution {
+            resolveOfferUrl = offerUrl
+            return MobileWalletOfferResolution(txCodeRequired = false)
+        }
+
 
         override suspend fun receive(
             offerUrl: String,
