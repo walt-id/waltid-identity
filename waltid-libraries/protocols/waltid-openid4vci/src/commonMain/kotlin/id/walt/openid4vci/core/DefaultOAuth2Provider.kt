@@ -10,6 +10,7 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationResult
 import id.walt.openid4vci.clientauth.ClientAuthenticationService
 import id.walt.openid4vci.clientauth.ClientAuthenticationServiceResolution
 import id.walt.openid4vci.clientauth.isAnonymousPreAuthorizedCodeTokenRequest
+import id.walt.openid4vci.errors.CredentialErrorCodes
 import id.walt.openid4vci.errors.OAuthError
 import id.walt.openid4vci.errors.OAuthErrorCodes
 import id.walt.openid4vci.platform.urlEncode
@@ -477,7 +478,7 @@ class DefaultOAuth2Provider(
         val handler = config.credentialEndpointHandlers.get(configuration.format)
             ?: return CredentialResponseResult.Failure(
                 OAuthError(
-                    error = "unsupported_credential_configuration",
+                    error = CredentialErrorCodes.UNSUPPORTED_CREDENTIAL_CONFIGURATION,
                     description = "No handler for format ${configuration.format.value}"
                 )
             )
