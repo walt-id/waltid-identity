@@ -1,9 +1,14 @@
 package id.walt.walletdemo.compose.logic
 
+data class WalletDemoOfferResolution(
+    val txCodeRequired: Boolean,
+)
+
 interface DemoWallet {
     suspend fun bootstrap(): WalletDemoBootstrapResult
     suspend fun listCredentials(): List<WalletDemoCredential>
-    suspend fun receive(offerUrl: String): List<String>
+    suspend fun resolveOffer(offerUrl: String): WalletDemoOfferResolution
+    suspend fun receive(offerUrl: String, txCode: String? = null): List<String>
     suspend fun present(requestUrl: String, did: String? = null): WalletDemoOperationResult
     suspend fun previewPresentation(requestUrl: String): WalletDemoPresentationPreview
     suspend fun submitPresentation(

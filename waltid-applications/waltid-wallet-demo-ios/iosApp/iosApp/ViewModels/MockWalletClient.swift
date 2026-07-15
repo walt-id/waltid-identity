@@ -36,7 +36,12 @@ actor MockWalletClient: WalletClient {
         storedCredentials
     }
 
-    func receive(offer: URL) async throws -> [String] {
+    func resolveOffer(offer: URL) async throws -> OfferResolution {
+        try await delayOperation()
+        return OfferResolution(txCodeRequired: false)
+    }
+
+    func receive(offer: URL, txCode: String?) async throws -> [String] {
         try await delayOperation()
         storedCredentials = [Self.sampleCredential]
         return storedCredentials.map(\.id)

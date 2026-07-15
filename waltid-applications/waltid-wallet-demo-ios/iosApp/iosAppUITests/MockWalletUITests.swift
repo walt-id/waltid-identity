@@ -18,6 +18,7 @@ final class MockWalletUITests: XCTestCase {
         ui.tapTab(label: "Receive")
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         XCTAssertTrue(offerInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.offerScanButton"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
         XCTAssertLessThan(
             offerInput.frame.minY,
@@ -28,6 +29,7 @@ final class MockWalletUITests: XCTestCase {
         ui.tapTab(label: "Present")
         let presentationInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         XCTAssertTrue(presentationInput.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["wallet.presentationScanButton"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["wallet.status"].waitForExistence(timeout: 10))
         XCTAssertLessThan(
             presentationInput.frame.minY,

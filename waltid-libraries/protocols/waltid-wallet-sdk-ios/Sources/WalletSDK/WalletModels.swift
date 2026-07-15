@@ -480,6 +480,17 @@ public struct WalletAttestationConfiguration: Equatable, Sendable {
     }
 }
 
+/// Result of resolving an OpenID4VCI credential offer before issuance.
+public struct OfferResolution: Equatable, Sendable {
+    /// Whether the issuer requires a transaction code before issuance.
+    public let txCodeRequired: Bool
+
+    /// Creates an offer resolution.
+    public init(txCodeRequired: Bool) {
+        self.txCodeRequired = txCodeRequired
+    }
+}
+
 /// Credential metadata visible to Swift consumers.
 public struct Credential: Equatable, Identifiable, Sendable {
     /// Stable local credential identifier.
