@@ -14,6 +14,7 @@ import kotlinx.serialization.json.put
 object Wallet2OpenApiDocs {
 
     fun createWallet(): RouteConfig.() -> Unit = {
+        tags = listOf("Wallet Management")
         summary = "Create a new wallet"
         description = """
             Creates a wallet with optional named stores or inline key/DID material.

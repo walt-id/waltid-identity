@@ -101,6 +101,9 @@ data class ImportDidRequest(
  */
 object Wallet2RouteHandler {
 
+    private const val WALLET_MANAGEMENT_TAG = "Wallet Management"
+    private const val CREDENTIALS_TAG = "Credentials"
+
     fun Route.registerWallet2Routes(
         resolver: WalletResolver,
         /**
@@ -111,7 +114,7 @@ object Wallet2RouteHandler {
         getAccountId: (suspend RoutingCall.() -> String?)? = null,
         attestationAssembler: ClientAttestationAssembler? = null,
     ) {
-        route("/wallet", { tags = listOf("Wallet Management") }) {
+        route("/wallet") {
             registerWalletManagementRoutes(resolver, getAccountId, attestationAssembler)
         }
         route("/stores", { tags = listOf("Named Store Management") }) {
@@ -204,6 +207,7 @@ object Wallet2RouteHandler {
         }
 
         get("", {
+            tags = listOf(WALLET_MANAGEMENT_TAG)
             summary = "List wallet IDs"
             description = "When auth is enabled, returns only wallets owned by the authenticated account."
             response { HttpStatusCode.OK to { body<List<String>>() } }
@@ -218,6 +222,7 @@ object Wallet2RouteHandler {
         route("/{walletId}") {
 
             get("", {
+                tags = listOf(WALLET_MANAGEMENT_TAG)
                 summary = "Get wallet info"
                 request { pathParameter<String>("walletId") }
                 response {
@@ -230,6 +235,7 @@ object Wallet2RouteHandler {
             }
 
             delete("", {
+                tags = listOf(WALLET_MANAGEMENT_TAG)
                 summary = "Delete a wallet"
                 request { pathParameter<String>("walletId") }
                 response {
@@ -432,9 +438,10 @@ object Wallet2RouteHandler {
             // Credential management + issuance + presentation
             // -----------------------------------------------------------------
 
-            route("/credentials", { tags = listOf("Credentials") }) {
+            route("/credentials") {
 
                 get("", {
+                    tags = listOf(CREDENTIALS_TAG)
                     summary = "List credentials (metadata only, no raw credential data)"
                     request { pathParameter<String>("walletId") }
                     response { HttpStatusCode.OK to { body<List<StoredCredentialMetadata>>() } }
@@ -447,6 +454,7 @@ object Wallet2RouteHandler {
                 }
 
                 post("/import", {
+                    tags = listOf(CREDENTIALS_TAG)
                     summary = "Import a raw credential directly"
                     request { pathParameter<String>("walletId"); body<ImportCredentialRequest>() }
                     response { HttpStatusCode.Created to { body<StoredCredential>() } }
@@ -462,6 +470,7 @@ object Wallet2RouteHandler {
                 route("/{credentialId}") {
 
                     get("", {
+                        tags = listOf(CREDENTIALS_TAG)
                         summary = "Get a credential including raw credential data"
                         request { pathParameter<String>("walletId"); pathParameter<String>("credentialId") }
                         response {
@@ -477,6 +486,7 @@ object Wallet2RouteHandler {
                     }
 
                     delete("", {
+                        tags = listOf(CREDENTIALS_TAG)
                         summary = "Delete a credential"
                         request { pathParameter<String>("walletId"); pathParameter<String>("credentialId") }
                         response { HttpStatusCode.NoContent to {}; HttpStatusCode.NotFound to {} }
