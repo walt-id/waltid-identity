@@ -22,14 +22,21 @@ struct ReceiveView: View {
                         focusResetKey: viewModel.inputFocusResetKey
                     )
 
-                    if viewModel.txCodeRequired {
+                    if let requirement = viewModel.transactionCode {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("This offer requires a transaction code.")
+                            Text(requirement.description.flatMap { $0.isEmpty ? nil : $0 }
+                                ?? "This offer requires a transaction code.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            SecureField("Transaction code", text: $viewModel.txCode)
+                            SecureField(
+                                "Transaction code",
+                                text: Binding(
+                                    get: { viewModel.txCode },
+                                    set: viewModel.updateTxCode
+                                )
+                            )
                                 .textContentType(.oneTimeCode)
-                                .keyboardType(.asciiCapable)
+                                .keyboardType(requirement.inputMode == .numeric ? .numberPad : .asciiCapable)
                                 .textInputAutocapitalization(.never)
                                 .disableAutocorrection(true)
                                 .padding(8)

@@ -448,11 +448,6 @@ private fun KeyType.toMobileWalletKeyType(): MobileWalletKeyType = when (this) {
     KeyType.RSA4096 -> MobileWalletKeyType.RSA4096
 }
 
-/** Result of resolving a credential offer. */
-public data class WalletBridgeOfferResolution(
-    public val txCodeRequired: Boolean,
-)
-
 /**
  * Coarse error category for Swift bridge failures.
  */
