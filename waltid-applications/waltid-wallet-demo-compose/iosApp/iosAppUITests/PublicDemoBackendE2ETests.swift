@@ -12,6 +12,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
     // Timeouts (aligned with Android for cross-platform consistency)
     private let walletReadyTimeout: TimeInterval = 60
     private let credentialOperationTimeout: TimeInterval = 90
+    private let presentationOperationTimeout: TimeInterval = 180
     private let verifierPollingTimeout: TimeInterval = 30
 
     func testBootstrapCreatesDid() async throws {
@@ -71,16 +72,55 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         XCTAssertTrue(presentationURLApplied, "Presentation request URL did not appear in UI after deep link")
         ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
 
-        let presentStatus = ui.waitForStatus(
-            prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
+        let previewStatus = ui.waitForStatus(
+            prefixes: ["Review presentation request", "Preview failed", "Present failed", "Receive failed", "Bootstrap failed"],
             timeout: credentialOperationTimeout
         )
-        XCTAssertNotNil(presentStatus)
-        XCTAssertFalse(presentStatus!.starts(with: "Present failed"), "Present failed: \(presentStatus!)")
-        XCTAssertFalse(presentStatus!.starts(with: "Receive failed"), "Receive failed during presentation: \(presentStatus!)")
-        XCTAssertFalse(presentStatus!.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(presentStatus!)")
+        XCTAssertEqual(previewStatus, "Review presentation request", "Presentation preview did not load, status: \(previewStatus ?? "nil")")
 
-        try await backend.waitForVerifierSuccess(sessionID: session.sessionID, timeoutSeconds: verifierPollingTimeout)
+        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
+        var submitStatus = ui.waitForStatus(
+            prefixes: ["Presenting credential", "Presentation sent", "Present failed", "Receive failed", "Bootstrap failed"],
+            timeout: 10
+        )
+        if submitStatus == nil {
+            ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share", useCoordinateTap: true)
+            submitStatus = ui.waitForStatus(
+                prefixes: ["Presenting credential", "Presentation sent", "Present failed", "Receive failed", "Bootstrap failed"],
+                timeout: 10
+            )
+        }
+        guard let submitStatus else {
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = "Presentation submit did not change status"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+
+            let hierarchy = XCTAttachment(string: app.debugDescription)
+            hierarchy.name = "Presentation submit UI hierarchy"
+            hierarchy.lifetime = .keepAlways
+            add(hierarchy)
+
+            XCTFail("Presentation submit did not update app status after tapping Share")
+            return
+        }
+        XCTAssertFalse(submitStatus.starts(with: "Present failed"), "Present failed: \(submitStatus)")
+        XCTAssertFalse(submitStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(submitStatus)")
+        XCTAssertFalse(submitStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(submitStatus)")
+
+        try await backend.waitForVerifierSuccess(
+            sessionID: session.sessionID,
+            timeoutSeconds: presentationOperationTimeout
+        )
+
+        if let presentStatus = ui.waitForStatus(
+            prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
+            timeout: verifierPollingTimeout
+        ) {
+            XCTAssertFalse(presentStatus.starts(with: "Present failed"), "Present failed: \(presentStatus)")
+            XCTAssertFalse(presentStatus.starts(with: "Receive failed"), "Receive failed during presentation: \(presentStatus)")
+            XCTAssertFalse(presentStatus.starts(with: "Bootstrap failed"), "Bootstrap failed during presentation: \(presentStatus)")
+        }
     }
 
     func testDemoCredentialPersistsAcrossAppRestart() async throws {

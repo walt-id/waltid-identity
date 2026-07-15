@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
+import org.junit.Assert.fail
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 
@@ -13,6 +14,7 @@ internal object WalletComposeE2EHelper {
     const val PIN = "1234"
     const val WALLET_READY_TIMEOUT = 60_000L
     const val UI_ELEMENT_TIMEOUT = 30_000L
+    private const val CLICK_VISIBLE_TIMEOUT = 3_000L
     const val CREDENTIAL_OPERATION_TIMEOUT = 90_000L
     const val VERIFIER_POLLING_TIMEOUT = 30_000L
     const val QUICK_STATUS_CHECK_TIMEOUT = 5_000L
@@ -26,6 +28,8 @@ internal object WalletComposeE2EHelper {
         "Received",
         "Receive failed",
         "Bootstrap failed",
+        "Resolving presentation",
+        "Review presentation request",
         "Presenting credential",
         "Presentation sent",
         "Presentation finished",
@@ -63,17 +67,52 @@ internal object WalletComposeE2EHelper {
     }
 
     fun sendDeepLink(context: Context, url: String) {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-            `package` = context.packageName
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse(url),
+            context,
+            MainActivity::class.java,
+        ).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+            )
         }
         context.startActivity(intent)
     }
 
+    fun assertResourceTextEquals(
+        device: UiDevice,
+        tag: String,
+        expected: String,
+        timeoutMs: Long,
+        message: String,
+    ) {
+        val node = waitForResource(device, tag, timeoutMs)
+        if (node?.text != expected) {
+            fail(
+                """
+                    $message
+                    expected=$expected
+                    actual=${node?.text ?: "<missing>"}
+                    ${visibleUiSnapshot(device)}
+                """.trimIndent()
+            )
+        }
+    }
+
     fun clickByTag(device: UiDevice, tag: String) {
-        val node = waitForResource(device, tag, UI_ELEMENT_TIMEOUT)
-        assertNotNull("$tag not found", node)
-        node!!.clickableAncestorOrSelf()?.click() ?: node.click()
+        val node = waitForResource(device, tag, CLICK_VISIBLE_TIMEOUT)
+            ?: findVisibleResource(device, tag)
+            ?: findResourceAfterScrolling(device, tag)
+        if (node == null) {
+            fail("$tag not found.\n${visibleUiSnapshot(device)}")
+        }
+        assertTrue("$tag is disabled", node!!.isEnabled)
+        device.waitForIdle()
+        node.clickableAncestorOrSelf()?.click() ?: node.click()
+        device.waitForIdle()
     }
 
     fun waitForResource(device: UiDevice, tag: String, timeoutMs: Long): UiObject2? {
@@ -81,7 +120,31 @@ internal object WalletComposeE2EHelper {
         while (System.currentTimeMillis() < deadline) {
             val node = device.findObject(By.res(tag))
             if (node != null) return node
+            findVisibleResource(device, tag)?.let { return it }
             Thread.sleep(500)
+        }
+        return null
+    }
+
+    private fun findVisibleResource(device: UiDevice, tag: String): UiObject2? =
+        device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+            .flatMap { it.flatten() }
+            .firstOrNull { node ->
+                runCatching { node.resourceName == tag }.getOrDefault(false)
+            }
+
+    private fun findResourceAfterScrolling(device: UiDevice, tag: String): UiObject2? {
+        repeat(6) {
+            device.swipe(
+                device.displayWidth / 2,
+                (device.displayHeight * 0.72).toInt(),
+                device.displayWidth / 2,
+                (device.displayHeight * 0.36).toInt(),
+                24,
+            )
+            device.waitForIdle()
+            waitForResource(device, tag, 1_000L)?.let { return it }
+            findVisibleResource(device, tag)?.let { return it }
         }
         return null
     }
@@ -121,4 +184,44 @@ internal object WalletComposeE2EHelper {
         }
         return null
     }
+
+    private fun visibleUiSnapshot(device: UiDevice): String {
+        val roots = device.findObjects(By.pkg("id.walt.walletdemo.compose"))
+        val nodes = roots
+            .flatMap { it.flatten() }
+            .distinctBy { node ->
+                node.snapshotIdentity()
+            }
+            .take(80)
+            .mapNotNull { it.describeForSnapshot() }
+            .joinToString("\n")
+
+        return """
+            package=${device.currentPackageName}
+            latestStatus=${latestStatus(device)}
+            visibleWalletNodes:
+            ${nodes.ifBlank { "<none>" }}
+        """.trimIndent()
+    }
+
+    private fun UiObject2.flatten(): List<UiObject2> =
+        listOf(this) + runCatching { children.flatMap { it.flatten() } }.getOrDefault(emptyList())
+
+    private fun UiObject2.snapshotIdentity(): String =
+        runCatching {
+            listOf(
+                resourceName.orEmpty(),
+                text.orEmpty(),
+                contentDescription.orEmpty(),
+                visibleBounds.toShortString(),
+            ).joinToString("|")
+        }.getOrDefault("stale")
+
+    private fun UiObject2.describeForSnapshot(): String? =
+        runCatching {
+            val text = text?.takeIf { it.isNotBlank() }?.let { " text='$it'" }.orEmpty()
+            val res = resourceName?.takeIf { it.isNotBlank() }?.let { " res='$it'" }.orEmpty()
+            val desc = contentDescription?.takeIf { it.isNotBlank() }?.let { " desc='$it'" }.orEmpty()
+            "$className$res$text$desc bounds=${visibleBounds.toShortString()}"
+        }.getOrNull()
 }

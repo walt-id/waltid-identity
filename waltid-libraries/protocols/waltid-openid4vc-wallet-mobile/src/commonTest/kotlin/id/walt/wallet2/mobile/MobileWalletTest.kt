@@ -225,6 +225,49 @@ class MobileWalletTest {
         assertFalse(displayData.containsKey("_sd"), "resolved SD-JWT display data should not expose digest commitments as the primary content")
     }
 
+    @Test
+    fun presentationPreviewUsesSwiftFriendlyCredentialAndClaimDtos() {
+        val preview = MobileWalletPresentationPreview(
+            request = MobileWalletPresentationRequestInfo(
+                clientId = "https://verifier.example",
+                verifierName = "Example Verifier",
+                responseUri = "https://verifier.example/direct-post",
+                state = "state-1",
+                nonce = "nonce-1",
+            ),
+            credentialOptions = listOf(
+                MobileWalletPresentationCredentialOption(
+                    queryId = "pid",
+                    credentialId = "credential-1",
+                    multiple = true,
+                    format = "vc+sd-jwt",
+                    issuer = "https://issuer.example",
+                    subject = "did:key:subject",
+                    label = "PID",
+                    credentialDataJson = """{"given_name":"Ada"}""",
+                    disclosures = listOf(
+                        MobileWalletPresentationDisclosure(
+                            path = "$.given_name",
+                            name = "given_name",
+                            valueJson = """"Ada"""",
+                            displayValue = "Ada",
+                            selectivelyDisclosable = true,
+                        )
+                    ),
+                )
+            ),
+            credentialRequirements = listOf(
+                MobileWalletPresentationCredentialRequirement(options = listOf(listOf("pid")))
+            ),
+        )
+
+        assertEquals("https://verifier.example", preview.request.clientId)
+        assertEquals("credential-1", preview.credentialOptions.single().credentialId)
+        assertEquals(true, preview.credentialOptions.single().multiple)
+        assertEquals("Ada", preview.credentialOptions.single().disclosures.single().displayValue)
+        assertEquals(listOf(listOf("pid")), preview.credentialRequirements.single().options)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun mobileWalletEventStreamDoesNotBackpressureSlowCollectors() = runTest {

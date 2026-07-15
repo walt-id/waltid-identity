@@ -61,6 +61,7 @@ private struct NormalizedClaimKey: Hashable {
 
 enum CredentialDisplayVocabulary {
     static let genericVerifiableCredentialType = "VerifiableCredential"
+    static let requestedDisclosuresTitle = "Requested disclosures"
 
     private static let givenNameClaim = "given_name"
     private static let familyNameClaim = "family_name"
@@ -192,6 +193,16 @@ enum CredentialDisplayVocabulary {
 
     static func humanizedLabel(_ key: String) -> String {
         descriptor(for: key)?.label ?? ClaimLabelFormatter.humanize(key)
+    }
+
+    static func disclosureLabel(name: String?, path: String) -> String {
+        if let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty {
+            return humanizedLabel(name)
+        }
+        if let leafKey = ClaimPathExpression.parse(path).leafKey {
+            return humanizedLabel(leafKey)
+        }
+        return path
     }
 
     static func roles(for components: [String]) -> Set<ClaimRole> {

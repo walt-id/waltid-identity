@@ -6,15 +6,13 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import id.walt.mobile.test.backend.DemoTestBackend
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.CREDENTIAL_OPERATION_TIMEOUT
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.POST_PRESENT_DELAY
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.QUICK_STATUS_CHECK_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.UI_ELEMENT_TIMEOUT
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.VERIFIER_POLLING_TIMEOUT
+import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.assertResourceTextEquals
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.clickByTag
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.launchAndUnlock
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.latestStatus
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.sendDeepLink
-import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForResource
 import id.walt.walletdemo.compose.android.WalletComposeE2EHelper.waitForStatus
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
@@ -36,9 +34,12 @@ class PublicDemoBackendE2ETest {
         launchAndUnlock(context, device)
 
         sendDeepLink(context, offer.offerUrl)
-        assertTrue(
-            "Offer URL did not appear in UI after deep link",
-            waitForResource(device, "wallet.offerInput", UI_ELEMENT_TIMEOUT)?.text == offer.offerUrl
+        assertResourceTextEquals(
+            device = device,
+            tag = "wallet.offerInput",
+            expected = offer.offerUrl,
+            timeoutMs = UI_ELEMENT_TIMEOUT,
+            message = "Offer URL did not appear in UI after deep link",
         )
 
         clickByTag(device, "wallet.receiveButton")
@@ -53,22 +54,32 @@ class PublicDemoBackendE2ETest {
 
         val session = DemoTestBackend.createVerifierSession(scenario)
         sendDeepLink(context, session.authorizationRequestUri)
-
-        val startedWithoutTap = waitForStatus(
+        assertResourceTextEquals(
             device = device,
-            timeoutMs = QUICK_STATUS_CHECK_TIMEOUT,
-            matcher = {
-                it.startsWith("Presenting credential") ||
-                    it.startsWith("Presentation sent") ||
-                    it.startsWith("Presentation finished")
-            },
+            tag = "wallet.presentationInput",
+            expected = session.authorizationRequestUri,
+            timeoutMs = UI_ELEMENT_TIMEOUT,
+            message = "Presentation request URL did not appear in UI after deep link",
+        )
+
+        clickByTag(device, "wallet.presentButton")
+        val previewReady = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it == "Review presentation request" },
+            failurePrefixes = listOf("Preview failed", "Present failed", "Receive failed", "Bootstrap failed")
+        )
+        assertTrue("Presentation preview did not load. Latest status: ${latestStatus(device)}", previewReady)
+
+        clickByTag(device, "wallet.presentationSubmitButton")
+        val presentSuccess = waitForStatus(
+            device = device,
+            timeoutMs = CREDENTIAL_OPERATION_TIMEOUT,
+            matcher = { it.startsWith("Presentation sent") || it.startsWith("Presentation finished") },
             failurePrefixes = listOf("Present failed", "Receive failed", "Bootstrap failed")
         )
-        if (!startedWithoutTap) {
-            clickByTag(device, "wallet.presentButton")
-        }
+        assertTrue("Presentation did not complete in app. Latest status: ${latestStatus(device)}", presentSuccess)
 
-        Thread.sleep(POST_PRESENT_DELAY)
         val statusAfterPresent = latestStatus(device)
         assertTrue(
             "Presentation failed in app. Latest status: $statusAfterPresent",

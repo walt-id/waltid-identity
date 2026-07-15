@@ -29,6 +29,7 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertEqual(readyStatus, "Wallet ready", "Wallet did not become ready, status: \(readyStatus ?? "nil")")
 
+        ui.tapTab(label: "Receive")
         let offerInput = ui.textInput(identifier: "wallet.offerInput", fallbackLabel: "Credential offer URL")
         ui.replaceText(in: offerInput, value: offer.offerUrl)
         ui.tapButton(identifier: "wallet.receiveButton", fallbackLabel: "Receive")
@@ -39,10 +40,31 @@ final class PublicDemoBackendE2ETests: XCTestCase {
         )
         XCTAssertTrue(receiveStatus?.starts(with: "Received") == true, "Receive failed, status: \(receiveStatus ?? "nil")")
 
+        ui.tapTab(label: "Credentials")
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
+        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
+        ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
+        XCTAssertTrue(app.staticTexts["Credential details"].waitForExistence(timeout: 20))
+        ui.tapNavigationBack()
+
         let session = try await backend.createVerifierSession(scenario: scenario)
+        ui.tapTab(label: "Present")
         let presentInput = ui.textInput(identifier: "wallet.presentationInput", fallbackLabel: "OpenID4VP request URL")
         ui.replaceText(in: presentInput, value: session.authorizationRequestUri)
-        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Present")
+        ui.tapButton(identifier: "wallet.presentButton", fallbackLabel: "Preview")
+        let previewStatus = ui.waitForStatus(
+            prefixes: ["Review presentation request", "Preview failed", "Bootstrap failed"],
+            timeout: credentialOperationTimeout
+        )
+        XCTAssertEqual(previewStatus, "Review presentation request", "Preview failed, status: \(previewStatus ?? "nil")")
+
+        ui.assertExists(identifierPrefix: "wallet.credentialCard.")
+        ui.tapElement(identifierPrefix: "wallet.credentialCard.")
+        ui.assertExists(identifierPrefix: "wallet.credentialOverview.")
+        XCTAssertTrue(app.staticTexts["Credential details"].waitForExistence(timeout: 20))
+        ui.tapNavigationBack()
+
+        ui.tapButton(identifier: "wallet.presentationSubmitButton", fallbackLabel: "Share")
 
         let presentStatus = ui.waitForStatus(
             prefixes: ["Presentation sent", "Presentation finished", "Present failed", "Receive failed", "Bootstrap failed"],
