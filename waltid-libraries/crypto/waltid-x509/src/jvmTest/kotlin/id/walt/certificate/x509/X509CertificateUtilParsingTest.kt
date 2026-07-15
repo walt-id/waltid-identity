@@ -2,6 +2,7 @@ package id.walt.certificate.x509
 
 import id.walt.certificate.TestData.GOOGLE_CERTIFICATE_PEM
 import id.walt.certificate.TestData.V_TRUST_ROOT_CA_CERTIFICATE_PEM
+import id.walt.certificate.x509.extension.CrlDistributionPointsExtension.Companion.extensionCrlDistributionPoints
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
 import kotlinx.io.bytestring.toHexString
 import kotlin.test.Test
@@ -36,6 +37,14 @@ class X509CertificateUtilParsingTest {
                 "3045022041321f429ec542fd90aafcbac898dc085652f725142b221529b29345693d21be022100b26f6d08392ed3569b58a132aeb56612e2e964d422ceb4d5ea02f7a00e5674c9",
                 cert.signatureValueHex
             )
+
+            assertNotNull(cert.data.extensionCrlDistributionPoints) { crlDistributionPoints ->
+                assertEquals(1, crlDistributionPoints.distributionPoints.size)
+                val ep = crlDistributionPoints.distributionPoints.first()
+                assertNull(ep.cRLIssuer)
+                assertNull(ep.reason)
+                assertNotNull(ep.distributionPointFullName)
+            }
         }
     }
 

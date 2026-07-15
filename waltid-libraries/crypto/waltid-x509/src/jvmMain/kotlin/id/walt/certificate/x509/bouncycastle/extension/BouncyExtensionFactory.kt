@@ -16,6 +16,7 @@ internal object BouncyExtensionFactory {
         SubjectAlternativeNameExtension.OID -> BouncySubjectAlternativeNameExtension(extension)
         IssuerAlternativeNameExtension.OID -> BouncyIssuerAlternativeNameExtension(extension)
         SubjectKeyIdentifierExtension.OID -> BouncySubjectKeyIdentifierExtension(extension)
+        CrlDistributionPointsExtension.OID -> BouncyCrlDistributionPointsExtension(extension)
         else -> BouncyGenericExtension(extension)
     }
 
@@ -39,6 +40,11 @@ internal object BouncyExtensionFactory {
         is IssuerAlternativeNameExtension -> createExtension(
             extension,
             BouncyIssuerAlternativeNameExtension.createExtension(extension)
+        )
+
+        is CrlDistributionPointsExtension -> createExtension(
+            extension,
+            BouncyCrlDistributionPointsExtension.createExtension(extension)
         )
 
 

@@ -1,18 +1,10 @@
 package id.walt.certificate.x509.extension
 
-interface SubjectAlternativeNameExtension : AlternativeNameExtension {
+import id.walt.certificate.x509.model.GeneralName
 
-    typealias AlternativeName = AlternativeNameExtension.AlternativeName
-    typealias NameType = AlternativeNameExtension.NameType
+interface SubjectAlternativeNameExtension : Extension {
 
-    override val alternativeNames: List<AlternativeName>
-
-    class Builder(
-        critical: Boolean = false,
-    ) : AlternativeNameExtension.Builder(
-        OID,
-        critical,
-    ), SubjectAlternativeNameExtension
+    val alternativeNames: List<GeneralName>
 
     companion object {
         const val OID = "2.5.29.17"
@@ -29,5 +21,28 @@ interface SubjectAlternativeNameExtension : AlternativeNameExtension {
                 val ext = this.extensions[OID]
                 return ext as? SubjectAlternativeNameExtension?
             }
+    }
+
+    class Builder(
+        override val critical: Boolean = false,
+    ) : SubjectAlternativeNameExtension {
+        override val oid: String = OID
+        override val alternativeNames: MutableList<GeneralName> = mutableListOf()
+
+        fun addDnsName(dnsName: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.dNSName, dnsName))
+        }
+
+        fun addUri(uri: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.uniformResourceIdentifier, uri))
+        }
+
+        fun addEmail(email: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.rfc822Name, email))
+        }
+
+        fun addIpAddress(ipAddress: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.IPAddress, ipAddress))
+        }
     }
 }

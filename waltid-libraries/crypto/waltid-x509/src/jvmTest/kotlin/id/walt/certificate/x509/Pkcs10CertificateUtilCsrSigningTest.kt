@@ -3,7 +3,7 @@ package id.walt.certificate.x509
 import id.walt.certificate.TestData.intermediateIssuerPrivateKey
 import id.walt.certificate.TestData.intermediateIssuerPublicKeyHex
 import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.Companion.extensionSan
-import id.walt.certificate.x509.extension.SubjectAlternativeNameExtension.NameType
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.keys.JvmJWKKeyCreator
 import kotlinx.coroutines.test.runTest
 import org.bouncycastle.asn1.pkcs.CertificationRequest
@@ -46,11 +46,11 @@ class Pkcs10CertificateUtilCsrSigningTest {
                 assertNotNull(data.extensionSan) { san ->
                     assertEquals(2, san.alternativeNames.size)
                     san.alternativeNames.get(0).also {
-                        assertEquals(NameType.dNSName, it.type)
+                        assertEquals(GeneralName.NameType.dNSName, it.type)
                         assertEquals("www.walt.id", it.value)
                     }
                     san.alternativeNames.get(1).also {
-                        assertEquals(NameType.IPAddress, it.type)
+                        assertEquals(GeneralName.NameType.IPAddress, it.type)
                         assertEquals("127.0.0.1", it.value)
                     }
                 }

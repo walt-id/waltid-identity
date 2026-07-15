@@ -1,23 +1,14 @@
 package id.walt.certificate.x509.extension
 
-interface IssuerAlternativeNameExtension : AlternativeNameExtension {
+import id.walt.certificate.x509.model.GeneralName
 
-    typealias AlternativeName = AlternativeNameExtension.AlternativeName
-    typealias NameType = AlternativeNameExtension.NameType
+interface IssuerAlternativeNameExtension : Extension {
 
-    override val alternativeNames: List<AlternativeName>
+    val alternativeNames: List<GeneralName>
 
     companion object {
         const val OID = "2.5.29.18"
         const val NAME = "Issuer Alternative Name"
-
-        class Builder(
-            critical: Boolean = false,
-        ) : AlternativeNameExtension.Builder(
-            OID,
-            critical,
-        ), IssuerAlternativeNameExtension
-
 
         fun MutableExtensionContainer.extensionIssuerAltName(block: Builder.() -> Unit) {
             val builder = Builder()
@@ -30,5 +21,29 @@ interface IssuerAlternativeNameExtension : AlternativeNameExtension {
                 val ext = this.extensions[OID]
                 return ext as? IssuerAlternativeNameExtension?
             }
+    }
+
+    class Builder(
+        override var critical: Boolean = false,
+    ) : IssuerAlternativeNameExtension {
+        override val oid: String = OID
+        override val alternativeNames: MutableList<GeneralName> = mutableListOf()
+
+        fun addDnsName(dnsName: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.dNSName, dnsName))
+        }
+
+        fun addUri(uri: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.uniformResourceIdentifier, uri))
+        }
+
+        fun addEmail(email: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.rfc822Name, email))
+        }
+
+        fun addIpAddress(ipAddress: String) {
+            alternativeNames.add(GeneralName(GeneralName.NameType.IPAddress, ipAddress))
+        }
+
     }
 }

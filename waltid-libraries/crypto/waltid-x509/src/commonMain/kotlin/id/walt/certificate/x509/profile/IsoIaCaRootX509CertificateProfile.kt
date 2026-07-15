@@ -6,6 +6,7 @@ import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.ex
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.certificate.x509.validation.ValidationContext
 import id.walt.certificate.x509.validation.ValidationResult
 import id.walt.certificate.x509.validation.validator.X509CertificateValidator
@@ -318,8 +319,8 @@ object IsoIaCaRootX509CertificateProfile : X509CertificateProfile, X509Certifica
                 )
             }
             val hasRequiredAlternativeNames = extension.alternativeNames.any {
-                (it.type == AlternativeNameExtension.NameType.rfc822Name
-                        || it.type == AlternativeNameExtension.NameType.uniformResourceIdentifier)
+                (it.type == GeneralName.NameType.rfc822Name
+                        || it.type == GeneralName.NameType.uniformResourceIdentifier)
                         && it.value.isNotBlank()
             }
             if (!hasRequiredAlternativeNames) {

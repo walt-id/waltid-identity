@@ -6,11 +6,11 @@ import id.walt.certificate.TestData.intermediateIssuerPublicKeyHex
 import id.walt.certificate.x509.extension.BasicConstraintsExtension.Companion.extensionBasicConstraints
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension
 import id.walt.certificate.x509.extension.ExtendedKeyUsageExtension.Companion.extensionExtendedKeyUsage
-import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension
 import id.walt.certificate.x509.extension.IssuerAlternativeNameExtension.Companion.extensionIssuerAltName
 import id.walt.certificate.x509.extension.KeyUsageExtension
 import id.walt.certificate.x509.extension.KeyUsageExtension.Companion.extensionKeyUsage
 import id.walt.certificate.x509.extension.SubjectKeyIdentifierExtension.Companion.extensionSubjectKeyIdentifier
+import id.walt.certificate.x509.model.GeneralName
 import id.walt.crypto.keys.JvmJWKKeyCreator
 import kotlinx.coroutines.test.runTest
 import kotlinx.io.bytestring.toHexString
@@ -65,7 +65,7 @@ class X509CertificateUtilCertificateSigningTest {
             assertEquals(1, issuerAltName.alternativeNames.size)
             val email = issuerAltName.alternativeNames.first()
             assertEquals("issuer@walt.id", email.value)
-            assertEquals(IssuerAlternativeNameExtension.NameType.rfc822Name, email.type)
+            assertEquals(GeneralName.NameType.rfc822Name, email.type)
         }
 
         assertNotNull(certificate.data.extensionSubjectKeyIdentifier) { keyIdentifier ->
@@ -127,7 +127,6 @@ class X509CertificateUtilCertificateSigningTest {
     }
 
 
-    @Throws(Exception::class)
     fun verifyPemChain(chainPem: String, selfSignedCaPem: String) {
         val certFactory = CertificateFactory.getInstance("X.509")
 

@@ -22,7 +22,7 @@ interface KeyUsageExtension : Extension {
         const val NAME = "Key Usage"
 
         fun MutableExtensionContainer.extensionKeyUsage(block: Builder.() -> Unit) {
-            val builder = Builder(oid = OID)
+            val builder = Builder()
             builder.block()
             this.extensions[OID] = builder
         }
@@ -35,9 +35,9 @@ interface KeyUsageExtension : Extension {
     }
 
     data class Builder(
-        override val oid: String = OID,
         override var critical: Boolean = false,
     ) : KeyUsageExtension {
+        override val oid: String = OID
         override val keyPurposeIdList: MutableSet<KeyUsage> = mutableSetOf()
 
         fun addKeyUsage(vararg keyUsage: KeyUsage) {
