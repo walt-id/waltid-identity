@@ -35,6 +35,10 @@ struct ReceiveView: View {
                         isError: viewModel.statusIsError(for: .receive)
                     )
 
+                    if let warning = viewModel.transactionDataProfilesWarning {
+                        WarningBannerView(message: warning)
+                    }
+
                     if viewModel.receiveCompleted {
                         Button("New receive", action: viewModel.startNewReceiveFlow)
                             .buttonStyle(.bordered)

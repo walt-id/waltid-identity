@@ -45,8 +45,26 @@ class MobileWalletTest {
         assertEquals(MobileWalletKeyType.secp256r1, config.defaultKeyType)
         assertEquals(null, config.attestationConfig)
         assertEquals(MobileWalletPersistence(), config.persistence)
+        assertEquals(emptyList(), config.transactionDataProfiles)
         assertIs<MobileWalletDatabaseKey.Managed>(config.persistence.databaseKey)
         assertEquals(MobileWalletStores(), config.persistence.stores)
+    }
+
+    @Test
+    fun mobileWalletConfigAcceptsCustomTransactionDataProfiles() {
+        val profiles = listOf(
+            MobileWalletTransactionDataProfile(
+                type = "example.transaction",
+                displayName = "Example Transaction",
+                fields = listOf("amount"),
+            )
+        )
+
+        val config = MobileWalletConfig(transactionDataProfiles = profiles)
+
+        assertEquals(profiles, config.transactionDataProfiles)
+        val registry = profiles.toTransactionDataTypeRegistry()
+        assertEquals(setOf("example.transaction"), registry.types)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package id.walt.wallet2.handlers
 
+import id.walt.crypto.utils.Base64Utils.encodeToBase64Url
 import id.walt.dcql.DcqlMatcher
 import id.walt.dcql.DcqlDisclosure
 import id.walt.dcql.RawDcqlCredential
@@ -9,11 +10,15 @@ import id.walt.dcql.models.CredentialQuery
 import id.walt.dcql.models.CredentialSetQuery
 import id.walt.dcql.models.DcqlQuery
 import id.walt.dcql.models.meta.NoMeta
+import id.walt.verifier.openid.transactiondata.TransactionDataTypeRegistry
 import id.walt.wallet2.data.Wallet
 import io.ktor.http.Url
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -121,6 +126,7 @@ class WalletPresentationHandlerRequirementsTest {
                         PresentationCredentialSelection(queryId = "pid", credentialId = "cred-1"),
                     ),
                 ),
+                transactionDataTypeRegistry = TransactionDataTypeRegistry(emptySet()),
             )
         }
 
@@ -519,6 +525,41 @@ class WalletPresentationHandlerRequirementsTest {
         )
     }
 
+    @Test
+    fun transactionDataSelectionRejectsMoreThanOneReferencedCredential() {
+        val transactionData = transactionDataForCredentialIds("identity", "payment")
+
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentationHandler.run {
+                validateSelectedTransactionDataCredentials(
+                    transactionData = listOf(transactionData),
+                    selectedQueryIds = setOf("identity", "payment"),
+                )
+            }
+        }
+
+        WalletPresentationHandler.run {
+            validateSelectedTransactionDataCredentials(
+                transactionData = listOf(transactionData),
+                selectedQueryIds = setOf("identity"),
+            )
+        }
+    }
+
+    @Test
+    fun transactionDataSelectionRejectsMissingReferencedCredential() {
+        val transactionData = transactionDataForCredentialIds("identity", "payment")
+
+        assertFailsWith<IllegalArgumentException> {
+            WalletPresentationHandler.run {
+                validateSelectedTransactionDataCredentials(
+                    transactionData = listOf(transactionData),
+                    selectedQueryIds = setOf("profile"),
+                )
+            }
+        }
+    }
+
     private fun credentialQuery(
         id: String,
         multiple: Boolean = false,
@@ -550,6 +591,17 @@ class WalletPresentationHandlerRequirementsTest {
 
     private fun claimPath(vararg parts: String): String =
         parts.map { JsonPrimitive(it) }.joinToString(".")
+
+    private fun transactionDataForCredentialIds(vararg credentialIds: String): String =
+        buildJsonObject {
+            put("type", "org.waltid.transaction-data.payment-authorization")
+            put("credential_ids", buildJsonArray {
+                credentialIds.forEach { add(JsonPrimitive(it)) }
+            })
+            put("amount", "42.00")
+            put("currency", "EUR")
+            put("payee", "ACME Corp")
+        }.toString().encodeToByteArray().encodeToBase64Url()
 
     private fun matchResult(
         vararg options: Pair<String, String>,

@@ -36,6 +36,9 @@ internal fun VerifierDetailsCard(verifier: VerifierDetails, modifier: Modifier =
             fontWeight = FontWeight.Medium,
         )
         DetailLine("Trust", verifier.trustStatus)
+        verifier.transactionData.forEach { group ->
+            ClaimGroupSection(group)
+        }
 
         TextButton(
             onClick = { technicalDetailsExpanded = !technicalDetailsExpanded },
