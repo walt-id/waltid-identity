@@ -13,6 +13,7 @@ final class WalletAPITests: XCTestCase {
         XCTAssertNil(configuration.persistence.stores.dids)
         XCTAssertNil(configuration.persistence.stores.keys)
         XCTAssertNil(configuration.attestation)
+        XCTAssertTrue(configuration.transactionDataProfiles.isEmpty)
     }
 
     func testPublicPersistenceConfigurationUsesEncryptedDefault() {
