@@ -1,7 +1,32 @@
 package id.walt.openid4vp.clientidprefix
 
 import id.walt.verifier.openid.models.authorization.ClientMetadata
+import id.walt.x509.CertificateDer
 import kotlinx.serialization.Serializable
+
+/** Wallet-controlled policy for authenticating an X.509 Request Object chain. */
+data class X509TrustPolicy(
+    val trustAnchors: List<CertificateDer>,
+    val enableSystemTrustAnchors: Boolean = false,
+    val enableRevocation: Boolean = false,
+    /** Empty means no extra ecosystem restriction; HAIP deployments use `setOf("ES256")`. */
+    val allowedRequestObjectAlgorithms: Set<String> = emptySet(),
+    /** HAIP requires the trust anchor to be omitted from x5c. */
+    val requireTrustAnchorOmittedFromX5c: Boolean = false,
+    /** HAIP forbids a self-signed Request Object signing certificate. */
+    val rejectLeafTrustAnchor: Boolean = false,
+) {
+    init {
+        require(trustAnchors.isNotEmpty() || enableSystemTrustAnchors) {
+            "At least one explicit or system trust anchor source is required"
+        }
+        if (requireTrustAnchorOmittedFromX5c || rejectLeafTrustAnchor) {
+            require(trustAnchors.isNotEmpty()) {
+                "HAIP X.509 checks require explicit trust anchors"
+            }
+        }
+    }
+}
 
 /**
  * Holds all necessary parameters from the authorization request for client ID validation.
@@ -11,7 +36,8 @@ data class RequestContext(
     val clientMetadata: ClientMetadata? = null,
     val requestObjectJws: String? = null, // The full, signed Request Object JWT
     val redirectUri: String? = null,
-    val responseUri: String? = null
+    val responseUri: String? = null,
+    val x509TrustPolicy: X509TrustPolicy? = null,
 ) {
     constructor(
         clientId: String,
@@ -36,6 +62,14 @@ sealed class ClientIdError(val message: String) {
     object MissingClientMetadata : ClientIdError("client_metadata parameter is required for this prefix but was not provided.")
     object CannotExtractSanDnsNamesFromDer : ClientIdError("Could not extract SAN dNSNames from DER (leaf cert DER of x5c header).")
     object X509HashMismatch : ClientIdError("The client_id hash does not match the hash of the provided certificate.")
+    object MissingX509TrustPolicy : ClientIdError("No wallet-controlled X.509 trust policy is configured.")
+    object UntrustedCertificateChain : ClientIdError("The Request Object certificate chain is not trusted.")
+    object TrustAnchorIncludedInX5c : ClientIdError("The Request Object x5c contains a configured trust anchor.")
+    object SelfSignedLeafCertificate : ClientIdError("The Request Object signing certificate must not be self-signed.")
+
+    @Serializable
+    data class UnsupportedRequestObjectAlgorithm(val algorithm: String?) :
+        ClientIdError("Request Object algorithm is not allowed by the wallet trust policy: $algorithm")
 
     @Serializable
     data class DidResolutionFailed(val reason: String) : ClientIdError("DID resolution failed: $reason")

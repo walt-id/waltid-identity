@@ -1,16 +1,11 @@
 package id.waltid.openid4vp.wallet.request
 
-import id.walt.credentials.utils.JwtUtils.isJwt
 import id.walt.crypto.utils.UuidUtils
-import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
-import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
-import id.walt.openid4vp.clientidprefix.ClientValidationResult
-import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.X509TrustPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
-import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
+import id.waltid.openid4vp.wallet.validation.SignedRequestValidator
 import id.walt.webdatafetching.WebDataFetcher
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -35,14 +30,14 @@ import kotlinx.serialization.json.jsonPrimitive
  * encryption algorithms.
  *
  * @property vpFormatsSupported Supported VP formats (e.g., jwt_vc_json, vc+sd-jwt, mso_mdoc).
- * @property encryptedResponseAlgValuesSupported Key agreement algorithms (default: ECDH-ES).
- * @property encryptedResponseEncValuesSupported Content encryption algorithms (default: A128GCM, A256GCM).
+ * @property authorizationEncryptionAlgValuesSupported Key agreement algorithms (default: ECDH-ES).
+ * @property authorizationEncryptionEncValuesSupported Content encryption algorithms (default: A128GCM, A256GCM).
  */
 @Serializable
 data class WalletCapabilities(
     val vpFormatsSupported: JsonObject = WalletPresentationFormatRegistry.buildVpFormatsSupported(),
-    val encryptedResponseAlgValuesSupported: List<String> = listOf("ECDH-ES"),
-    val encryptedResponseEncValuesSupported: List<String> = listOf("A128GCM", "A256GCM"),
+    val authorizationEncryptionAlgValuesSupported: List<String> = listOf("ECDH-ES"),
+    val authorizationEncryptionEncValuesSupported: List<String> = listOf("A128GCM", "A256GCM"),
 )
 
 object AuthorizationRequestResolver {
@@ -56,9 +51,13 @@ object AuthorizationRequestResolver {
 
     class SignedAuthorizationRequestValidationException(
         val clientIdError: ClientIdError,
-    ) : IllegalArgumentException(
-        "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}",
-    )
+        override val message: String,
+    ) : IllegalArgumentException(message) {
+        constructor(clientIdError: ClientIdError) : this(
+            clientIdError,
+            "Could not verify signed AuthorizationRequest with client id prefix: ${clientIdError::class.simpleName} - ${clientIdError.message}"
+        )
+    }
 
     data class RequestUriFetchResponse(
         val status: HttpStatusCode,
@@ -67,9 +66,19 @@ object AuthorizationRequestResolver {
         val walletNonce: String? = null,
     )
 
+    /**
+     * Policy for handling unsigned (alg=none) authorization requests.
+     * Maps to [SignedRequestValidator.UnsignedRequestObjectPolicy] for internal use.
+     */
     enum class UnsignedRequestObjectPolicy {
         ALLOW_UNSIGNED,
         REQUIRE_SIGNED,
+        ;
+
+        internal fun toValidatorPolicy(): SignedRequestValidator.UnsignedRequestObjectPolicy = when (this) {
+            ALLOW_UNSIGNED -> SignedRequestValidator.UnsignedRequestObjectPolicy.ALLOW_UNSIGNED
+            REQUIRE_SIGNED -> SignedRequestValidator.UnsignedRequestObjectPolicy.REQUIRE_SIGNED
+        }
     }
 
     class UnsignedAuthorizationRequestNotAllowedException :
@@ -90,12 +99,12 @@ object AuthorizationRequestResolver {
         buildJsonObject {
             put("vp_formats_supported", capabilities.vpFormatsSupported)
             put(
-                "encrypted_response_alg_values_supported",
-                JsonArray(capabilities.encryptedResponseAlgValuesSupported.map { JsonPrimitive(it) })
+                "authorization_encryption_alg_values_supported",
+                JsonArray(capabilities.authorizationEncryptionAlgValuesSupported.map { JsonPrimitive(it) })
             )
             put(
-                "encrypted_response_enc_values_supported",
-                JsonArray(capabilities.encryptedResponseEncValuesSupported.map { JsonPrimitive(it) })
+                "authorization_encryption_enc_values_supported",
+                JsonArray(capabilities.authorizationEncryptionEncValuesSupported.map { JsonPrimitive(it) })
             )
         },
     )
@@ -147,23 +156,54 @@ object AuthorizationRequestResolver {
         )
     }
 
+    /**
+     * Resolves an authorization request from its URL representation.
+     *
+     * @param requestUrl The authorization request URL.
+     * @param unsignedRequestObjectPolicy Policy for handling unsigned requests.
+     * @param fetchRequestUri Function to fetch request_uri content.
+     * @param expectedRequestObjectAudience Static Discovery uses `https://self-issued.me/v2`;
+     *        Dynamic Discovery uses the discovered Wallet issuer.
+     */
     suspend fun resolve(
         requestUrl: Url,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        x509TrustPolicy: X509TrustPolicy? = null,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
     ): ResolvedAuthorizationRequest {
         val requestUri = requestUrl.parameters["request_uri"]
+        val requestObject = requestUrl.parameters["request"]
+        require(requestUri == null || requestObject == null) {
+            "Authorization Request must not contain both request and request_uri"
+        }
+        require(requestUri != null || requestUrl.parameters["request_uri_method"] == null) {
+            "request_uri_method must not be present without request_uri"
+        }
+
+        val outerClientId = requestUrl.parameters["client_id"]
+
         if (requestUri != null) {
             return resolveFromRequestUri(
                 requestUri = requestUri,
                 requestUriMethod = requestUrl.parameters["request_uri_method"],
+                outerClientId = outerClientId,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 fetchRequestUri = fetchRequestUri,
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
+                x509TrustPolicy = x509TrustPolicy,
             )
         }
 
-        val requestObject = requestUrl.parameters["request"]
-        if (requestObject != null) return resolveFromRequestObject(requestObject, unsignedRequestObjectPolicy)
+        if (requestObject != null) {
+            return resolveFromRequestObject(
+                requestObject = requestObject,
+                outerClientId = outerClientId,
+                unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
+                x509TrustPolicy = x509TrustPolicy,
+            )
+        }
 
         return ResolvedAuthorizationRequest.Plain(parseParameters(requestUrl.parameters))
     }
@@ -182,14 +222,17 @@ object AuthorizationRequestResolver {
                         )
                     }
             },
-        )
+        ).also { it.dcqlQuery?.precheck() }
     }
 
     private suspend fun resolveFromRequestUri(
         requestUri: String,
         requestUriMethod: String?,
+        outerClientId: String?,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         fetchRequestUri: suspend (requestUri: String, requestUriMethod: RequestUriHttpMethod?) -> RequestUriFetchResponse,
+        expectedRequestObjectAudience: String,
+        x509TrustPolicy: X509TrustPolicy?,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via request_uri" }
 
@@ -204,76 +247,62 @@ object AuthorizationRequestResolver {
         return when {
             contentType.match("application/oauth-authz-req+jwt") -> resolveFromRequestObject(
                 requestObject = response.body,
+                outerClientId = outerClientId,
                 unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
                 expectedWalletNonce = response.walletNonce,
-            )
-            contentType.match(ContentType.Application.Json) -> ResolvedAuthorizationRequest.Plain(
-                authorizationRequest = json.decodeFromString<AuthorizationRequest>(response.body),
+                expectedRequestObjectAudience = expectedRequestObjectAudience,
+                x509TrustPolicy = x509TrustPolicy,
             )
             else -> throw IllegalArgumentException("Unsupported AuthorizationRequest content type: $contentType")
         }
     }
 
+    /**
+     * Resolves a signed authorization request object using [SignedRequestValidator].
+     * Enforces OID4VP 1.0 §5 requirements: typ header, aud claim, client_id equality.
+     */
     private suspend fun resolveFromRequestObject(
         requestObject: String,
+        outerClientId: String?,
         unsignedRequestObjectPolicy: UnsignedRequestObjectPolicy,
         expectedWalletNonce: String? = null,
+        expectedRequestObjectAudience: String = "https://self-issued.me/v2",
+        x509TrustPolicy: X509TrustPolicy? = null,
     ): ResolvedAuthorizationRequest {
         log.trace { "Resolving AuthorizationRequest via inline request object" }
-        require(requestObject.isJwt()) { "AuthorizationRequest object must be a JWT" }
 
-        val authReqJws = requestObject.decodeJws()
-        expectedWalletNonce?.let { nonce ->
-            val walletNonceClaim = authReqJws.payload["wallet_nonce"]?.jsonPrimitive?.contentOrNull
-            require(walletNonceClaim == nonce) {
-                "AuthorizationRequest object wallet_nonce mismatch for request_uri_method=post"
-            }
+        // Delegate to SignedRequestValidator for full OID4VP 1.0 §5 compliance
+        val requiredOuterClientId = requireNotNull(outerClientId) {
+            "Missing client_id in outer Authorization Request"
         }
-        val jwtAlg = authReqJws.header["alg"]?.jsonPrimitive?.contentOrNull
-        if (jwtAlg.equals("none", ignoreCase = true)) {
-            if (unsignedRequestObjectPolicy != UnsignedRequestObjectPolicy.ALLOW_UNSIGNED) {
-                throw UnsignedAuthorizationRequestNotAllowedException()
-            }
-        } else {
-            log.trace { "Authenticating signed AuthorizationRequest object" }
-            authenticateSignedRequestObject(requestObject, authReqJws.payload)
-        }
-
-        return ResolvedAuthorizationRequest.WithRequestObject(
-            authorizationRequest = json.decodeFromJsonElement(
-                deserializer = AuthorizationRequest.serializer(),
-                element = authReqJws.payload,
-            ),
-            requestObject = requestObject,
-        )
-    }
-
-    @OptIn(ExperimentalSerializationApi::class)
-    private suspend fun authenticateSignedRequestObject(requestObject: String, payload: JsonObject) {
-        val clientId = requireNotNull(payload["client_id"]?.jsonPrimitive?.contentOrNull) {
-            "Missing client_id for signed AuthorizationRequest"
-        }
-        val clientIdPrefix = ClientIdPrefixParser.parse(clientId)
-            .getOrElse { error -> throw IllegalArgumentException("Could not parse client_id prefix: $clientId", error) }
-        val clientMetadata = payload["client_metadata"]?.let {
-            ClientMetadata.fromJson(it)
-                .getOrElse { error -> throw IllegalArgumentException("Could not parse client metadata", error) }
-        }
-
-        val context = RequestContext(
-            clientId = clientId,
-            clientMetadata = clientMetadata,
-            requestObjectJws = requestObject,
-            redirectUri = payload["redirect_uri"]?.jsonPrimitive?.contentOrNull,
-            responseUri = payload["response_uri"]?.jsonPrimitive?.contentOrNull,
+        val validationResult = SignedRequestValidator.validate(
+            requestObjectJwt = requestObject,
+            outerClientId = requiredOuterClientId,
+            expectedWalletNonce = expectedWalletNonce,
+            expectedAudience = expectedRequestObjectAudience,
+            x509TrustPolicy = x509TrustPolicy,
+            unsignedPolicy = unsignedRequestObjectPolicy.toValidatorPolicy(),
         )
 
-        when (val validationResult = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)) {
-            is ClientValidationResult.Success -> {
-                log.trace { "Signed AuthorizationRequest authentication succeeded for client_id prefix ${clientIdPrefix::class.simpleName}" }
+        return when (validationResult) {
+            is SignedRequestValidator.ValidationResult.Success -> {
+                log.trace { "Signed AuthorizationRequest validation succeeded" }
+                ResolvedAuthorizationRequest.WithRequestObject(
+                    authorizationRequest = validationResult.authorizationRequest,
+                    requestObject = requestObject,
+                )
             }
-
-            is ClientValidationResult.Failure -> throw SignedAuthorizationRequestValidationException(validationResult.error)
+            is SignedRequestValidator.ValidationResult.Failure -> {
+                if (validationResult.message.contains("alg=none")) {
+                    throw UnsignedAuthorizationRequestNotAllowedException()
+                }
+                val error = validationResult.error
+                if (error != null) {
+                    throw SignedAuthorizationRequestValidationException(error, validationResult.message)
+                } else {
+                    throw IllegalArgumentException(validationResult.message)
+                }
+            }
         }
     }
 

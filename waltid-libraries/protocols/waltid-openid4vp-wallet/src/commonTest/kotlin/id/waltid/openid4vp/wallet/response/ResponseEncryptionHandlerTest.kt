@@ -1,11 +1,18 @@
 package id.waltid.openid4vp.wallet.response
 
+import id.walt.crypto.keys.KeyType
+import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -23,6 +30,7 @@ class ResponseEncryptionHandlerTest {
             "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
             "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg",
             "use": "enc",
+            "alg": "ECDH-ES",
             "kid": "test-enc-key-1"
         }
     """.trimIndent()).jsonObject
@@ -70,6 +78,7 @@ class ResponseEncryptionHandlerTest {
         assertNotNull(result)
         assertEquals("A256GCM", result.encAlgorithm)
         assertEquals("ECDH-ES", result.algAlgorithm)
+        assertEquals("test-enc-key-1", result.keyId)
     }
 
     @Test
@@ -134,6 +143,7 @@ class ResponseEncryptionHandlerTest {
                 "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
                 "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg",
                 "use": "sig",
+                "alg": "ES256",
                 "kid": "sig-key"
             }
         """.trimIndent()).jsonObject
@@ -145,6 +155,7 @@ class ResponseEncryptionHandlerTest {
                 "x": "y4ajD4aIXGiLGqiF81nN5HvBFvBEvrZcgFsp5VIJO30",
                 "y": "jyrZRfxKz113LQNg2x5f7Nu4fwW5Ov5gCzhPaTZuTCg",
                 "use": "enc",
+                "alg": "ECDH-ES",
                 "kid": "enc-key"
             }
         """.trimIndent()).jsonObject
@@ -162,7 +173,109 @@ class ResponseEncryptionHandlerTest {
         val result = ResponseEncryptionHandler.extractEncryptionConfig(authRequest).getOrThrow()
 
         assertNotNull(result)
-        // The config should use the enc key, not the sig key
-        // We can't easily verify the exact key selected, but at least verify config is extracted
+        assertEquals("enc-key", result.keyId)
     }
+
+    @Test
+    fun extractEncryptionConfig_rejectsJwkWithoutAlg() = runTest {
+        val keyWithoutAlg = JsonObject(testEcPublicKeyJwk - "alg")
+        val authRequest = AuthorizationRequest(
+            responseUri = "https://verifier.example/response",
+            responseMode = OpenID4VPResponseMode.DIRECT_POST_JWT,
+            clientMetadata = ClientMetadata(jwks = ClientMetadata.Jwks(listOf(keyWithoutAlg))),
+        )
+
+        val result = ResponseEncryptionHandler.extractEncryptionConfig(authRequest)
+        assertTrue(result.isFailure)
+    }
+
+    @Test
+    fun extractEncryptionConfig_rejectsMissingOrDuplicateKid() = runTest {
+        val missingKid = JsonObject(testEcPublicKeyJwk - "kid")
+        val duplicateKid = JsonObject(testEcPublicKeyJwk + ("x" to JsonPrimitive("different-coordinate")))
+
+        listOf(
+            listOf(missingKid),
+            listOf(testEcPublicKeyJwk, duplicateKid),
+        ).forEach { keys ->
+            val result = ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(keys))
+            assertTrue(result.isFailure)
+        }
+    }
+
+    @Test
+    fun extractEncryptionConfig_rejectsUnsupportedKeyAndEncAlgorithms() = runTest {
+        val unsupportedKeys = listOf(
+            JsonObject(testEcPublicKeyJwk + ("alg" to JsonPrimitive("ECDH-ES+A256KW"))),
+            JsonObject(testEcPublicKeyJwk + ("crv" to JsonPrimitive("P-384"))),
+            JsonObject(testEcPublicKeyJwk + ("use" to JsonPrimitive("sig"))),
+        )
+        unsupportedKeys.forEach { key ->
+            assertTrue(ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(key))).isFailure)
+        }
+
+        val unsupportedEnc = encryptedRequest(
+            keys = listOf(testEcPublicKeyJwk),
+            encValues = listOf("A128CBC-HS256"),
+        )
+        assertTrue(ResponseEncryptionHandler.extractEncryptionConfig(unsupportedEnc).isFailure)
+    }
+
+    @Test
+    fun extractEncryptionConfig_selectsKeyDeterministically() = runTest {
+        val keyZ = JsonObject(testEcPublicKeyJwk + ("kid" to JsonPrimitive("z-key")))
+        val keyA = JsonObject(testEcPublicKeyJwk + ("kid" to JsonPrimitive("a-key")))
+
+        val first = ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(keyZ, keyA))).getOrThrow()
+        val second = ResponseEncryptionHandler.extractEncryptionConfig(encryptedRequest(listOf(keyA, keyZ))).getOrThrow()
+
+        assertEquals("a-key", first?.keyId)
+        assertEquals(first?.keyId, second?.keyId)
+        assertEquals(first?.verifierKeyThumbprint, second?.verifierKeyThumbprint)
+    }
+
+    @Test
+    fun encryptResponse_roundTripsAndUsesNegotiatedProtectedHeader() = runTest {
+        val privateKey = JWKKey.generate(KeyType.secp256r1)
+        val publicJwk = privateKey.getPublicKey().exportJWKObject()
+        val encryptionJwk = JsonObject(
+            publicJwk + mapOf(
+                "use" to JsonPrimitive("enc"),
+                "alg" to JsonPrimitive("ECDH-ES"),
+                "kid" to JsonPrimitive("round-trip-key"),
+            )
+        )
+        val config = ResponseEncryptionHandler.extractEncryptionConfig(
+            encryptedRequest(listOf(encryptionJwk), encValues = listOf("A256GCM"))
+        ).getOrThrow()
+        assertNotNull(config)
+        val payload = buildJsonObject {
+            put("vp_token", JsonPrimitive("credential-presentation"))
+            put("state", JsonPrimitive("state-123"))
+        }
+
+        val jwe = ResponseEncryptionHandler.encryptResponse(payload, config)
+        val decrypted = privateKey.decryptJwe(jwe).decodeToString()
+        val protectedHeader = Json.parseToJsonElement(
+            jwe.substringBefore('.').decodeFromBase64Url().decodeToString()
+        ).jsonObject
+
+        assertEquals(payload, Json.parseToJsonElement(decrypted))
+        assertEquals("ECDH-ES", protectedHeader["alg"]?.jsonPrimitive?.content)
+        assertEquals("A256GCM", protectedHeader["enc"]?.jsonPrimitive?.content)
+        assertEquals("round-trip-key", protectedHeader["kid"]?.jsonPrimitive?.content)
+    }
+
+    private fun encryptedRequest(
+        keys: List<JsonObject>,
+        encValues: List<String>? = null,
+    ) = AuthorizationRequest(
+        responseUri = "https://verifier.example/response",
+        responseMode = OpenID4VPResponseMode.DIRECT_POST_JWT,
+        clientId = "verifier-client",
+        clientMetadata = ClientMetadata(
+            jwks = ClientMetadata.Jwks(keys),
+            encryptedResponseEncValuesSupported = encValues,
+        ),
+    )
 }

@@ -6,6 +6,7 @@ import app.cash.sqldelight.db.SqlDriver
 import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.persistence.db.WalletPersistenceDatabase
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
@@ -21,6 +22,8 @@ import id.walt.wallet2.persistence.stores.SqlDelightDidStore
  * @property defaultKeyType Key type used by [MobileWallet.bootstrap] when no key type override is supplied.
  * @property attestationConfig Optional client-attestation configuration for issuer deployments that require it.
  * @property persistence Persistence mode used for wallet-local state.
+ * @property requestObjectX509Trust Wallet-controlled trust anchors for X.509 Request Objects.
+ * @property requestObjectAudience Static Discovery default, or the Wallet issuer for Dynamic Discovery.
  * @property onEvent Optional callback for observing wallet issuance and presentation session events.
  */
 public data class MobileWalletConfig(
@@ -28,6 +31,8 @@ public data class MobileWalletConfig(
     public val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     public val attestationConfig: WalletAttestationConfig? = null,
     public val persistence: MobileWalletPersistence = MobileWalletPersistence(),
+    public val requestObjectX509Trust: WalletX509TrustConfig? = null,
+    public val requestObjectAudience: String = "https://self-issued.me/v2",
     public val onEvent: suspend (MobileWalletEvent) -> Unit = {},
 )
 
@@ -162,6 +167,8 @@ private fun createSqlDelightMobileWallet(
         keyGenerator = keyGenerator,
         defaultKeyType = config.defaultKeyType,
         attestationConfig = config.attestationConfig,
+        requestObjectX509Trust = config.requestObjectX509Trust,
+        requestObjectAudience = config.requestObjectAudience,
         onEvent = config.onEvent,
         deleteLocalPersistence = deleteLocalPersistence,
     )

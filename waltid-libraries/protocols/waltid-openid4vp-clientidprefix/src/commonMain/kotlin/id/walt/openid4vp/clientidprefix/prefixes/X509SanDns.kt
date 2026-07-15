@@ -1,6 +1,7 @@
 package id.walt.openid4vp.clientidprefix.prefixes
 
 import id.walt.crypto.keys.jwk.JWKKey
+import id.walt.crypto.keys.KeyType
 import id.walt.crypto.utils.Base64Utils.decodeFromBase64
 import id.walt.crypto.utils.JwsUtils.decodeJws
 import id.walt.openid4vp.clientidprefix.ClientIdError
@@ -8,7 +9,7 @@ import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
 import id.walt.openid4vp.clientidprefix.extractSanDnsNamesFromDer
 import id.walt.x509.CertificateDer
-import id.walt.x509.verifyOrderedCertificateChainSignatures
+import id.walt.x509.validateCertificateChain
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.http.Url
 import kotlinx.serialization.Serializable
@@ -40,25 +41,53 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         val x5cHeader = decodedJws.header["x5c"]?.jsonArray
             ?: return ClientValidationResult.Failure(ClientIdError.MissingX5cHeader)
 
-        val leafCertDer = x5cHeader.firstOrNull()?.jsonPrimitive?.content?.decodeFromBase64()
+        val certificates = runCatching {
+            x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
+        }.getOrElse { return ClientValidationResult.Failure(ClientIdError.InvalidJws) }
+        val leafCertificate = certificates.firstOrNull()
             ?: return ClientValidationResult.Failure(ClientIdError.EmptyX5cHeader)
+        val trustPolicy = context.x509TrustPolicy
+            ?: return ClientValidationResult.Failure(ClientIdError.MissingX509TrustPolicy)
+        val requestObjectAlgorithm = decodedJws.header["alg"]?.jsonPrimitive?.content
+        if (trustPolicy.allowedRequestObjectAlgorithms.isNotEmpty() &&
+            requestObjectAlgorithm !in trustPolicy.allowedRequestObjectAlgorithms
+        ) {
+            return ClientValidationResult.Failure(
+                ClientIdError.UnsupportedRequestObjectAlgorithm(requestObjectAlgorithm)
+            )
+        }
 
-        // 1. Validate the certificate chain when more than one cert is present.
-        if (x5cHeader.size > 1) {
-            runCatching {
-                verifyOrderedCertificateChainSignatures(
-                    x5cHeader.map { CertificateDer(it.jsonPrimitive.content.decodeFromBase64()) }
-                )
-            }.getOrElse {
-                return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
-            }
+        if (trustPolicy.requireTrustAnchorOmittedFromX5c && certificates.any { it in trustPolicy.trustAnchors }) {
+            return ClientValidationResult.Failure(ClientIdError.TrustAnchorIncludedInX5c)
+        }
+        if (trustPolicy.rejectLeafTrustAnchor && leafCertificate in trustPolicy.trustAnchors) {
+            return ClientValidationResult.Failure(ClientIdError.SelfSignedLeafCertificate)
+        }
+        runCatching {
+            validateCertificateChain(
+                leaf = leafCertificate,
+                chain = certificates.drop(1),
+                trustAnchors = trustPolicy.trustAnchors,
+                enableTrustedChainRoot = false,
+                enableSystemTrustAnchors = trustPolicy.enableSystemTrustAnchors,
+                enableRevocation = trustPolicy.enableRevocation,
+            )
+        }.getOrElse {
+            return ClientValidationResult.Failure(ClientIdError.UntrustedCertificateChain)
         }
 
         // 2. Verify JWS signature using the leaf certificate's public key.
-        val key = JWKKey.importFromDerCertificate(leafCertDer).getOrThrow()
+        val leafCertDer = leafCertificate.bytes.toByteArray()
+        val key = runCatching { JWKKey.importFromDerCertificate(leafCertDer).getOrThrow() }
+            .getOrElse { return ClientValidationResult.Failure(ClientIdError.InvalidSignature) }
+        if (requestObjectAlgorithm == "ES256" && key.keyType != KeyType.secp256r1) {
+            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
+        }
         log.trace { "Imported key from leaf cert der for X509SanDns: $key" }
 
-        key.verifyJws(jws).getOrThrow()
+        key.verifyJws(jws).getOrElse {
+            return ClientValidationResult.Failure(ClientIdError.InvalidSignature)
+        }
 
         // 3. Extract SANs using the isolated JCA utility function.
         val sans = extractSanDnsNamesFromDer(leafCertDer).getOrElse {
@@ -88,10 +117,6 @@ data class X509SanDns(val dnsName: String, override val rawValue: String) : Clie
         val metadataJson = context.clientMetadata
             ?: return ClientValidationResult.Failure(ClientIdError.MissingClientMetadata)
 
-        return runCatching { metadataJson }
-            .fold(
-                onSuccess = { ClientValidationResult.Success(it) },
-                onFailure = { ClientValidationResult.Failure(ClientIdError.InvalidSignature) }
-            )
+        return ClientValidationResult.Success(metadataJson)
     }
 }

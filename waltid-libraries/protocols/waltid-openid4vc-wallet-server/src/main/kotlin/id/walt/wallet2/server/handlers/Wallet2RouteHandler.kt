@@ -13,6 +13,7 @@ import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.handlers.ExchangeCodeRequest
 import id.walt.wallet2.handlers.EncryptionRequirementsResult
 import id.walt.wallet2.handlers.FetchCredentialRequest
@@ -84,7 +85,11 @@ data class CreateWalletRequest(
     val noDidStore: Boolean = false,
     /** Serialized static key, used when no key stores are attached. */
     val staticKey: JsonObject? = null,
-    val staticDid: String? = null
+    val staticDid: String? = null,
+    /** Wallet-controlled Request Object trust anchors and X.509 policy. */
+    val requestObjectX509Trust: WalletX509TrustConfig? = null,
+    /** Static Discovery default, or the Wallet issuer used for Dynamic Discovery. */
+    val requestObjectAudience: String = "https://self-issued.me/v2",
 )
 
 @Serializable
@@ -217,7 +222,9 @@ object Wallet2RouteHandler {
                 credentialStores = credentialStores,
                 didStore = didStore,
                 staticKey = staticKey,
-                staticDid = req.staticDid
+                staticDid = req.staticDid,
+                requestObjectX509TrustPolicy = req.requestObjectX509Trust?.toTrustPolicy(),
+                requestObjectAudience = req.requestObjectAudience,
             )
             resolver.storeWallet(wallet)
             // If auth is enabled, automatically link the new wallet to the requesting account
@@ -646,8 +653,9 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ResolveVpRequestRequest>() }
                         response { HttpStatusCode.OK to { body<ResolveVpRequestResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ResolveVpRequestRequest>()
-                        call.respond(WalletPresentationHandler.resolveRequest(req))
+                        call.respond(WalletPresentationHandler.resolveRequest(wallet, req))
                     }
 
                     post("/inspect-encryption", {
@@ -658,9 +666,10 @@ object Wallet2RouteHandler {
                         request { pathParameter<String>("walletId"); body<ResolveVpRequestRequest>() }
                         response { HttpStatusCode.OK to { body<EncryptionRequirementsResult>() } }
                     }) {
+                        val wallet = call.resolveOrRespond(resolver, getAccountId) ?: return@post
                         val req = call.receive<ResolveVpRequestRequest>()
                         // First resolve the request to get the AuthorizationRequest
-                        val resolved = WalletPresentationHandler.resolveRequest(req)
+                        val resolved = WalletPresentationHandler.resolveRequest(wallet, req)
                         // Then inspect encryption requirements using the resolved request
                         // Note: We need to re-resolve to get the full AuthorizationRequest for inspection
                         // This is a limitation - ideally inspectEncryptionRequirements would work with ResolveVpRequestResult

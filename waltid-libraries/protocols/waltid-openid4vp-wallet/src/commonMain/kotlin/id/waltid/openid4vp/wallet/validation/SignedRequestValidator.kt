@@ -7,9 +7,9 @@ import id.walt.openid4vp.clientidprefix.ClientIdPrefixAuthenticator
 import id.walt.openid4vp.clientidprefix.ClientIdPrefixParser
 import id.walt.openid4vp.clientidprefix.ClientValidationResult
 import id.walt.openid4vp.clientidprefix.RequestContext
+import id.walt.openid4vp.clientidprefix.X509TrustPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.ClientMetadata
-import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.contentOrNull
@@ -18,17 +18,26 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Validates signed authorization request objects per OID4VP 1.0 §5.
  *
- * This validator:
- * 1. Verifies the JWT signature using the key from the header (x5c or jwk)
- * 2. Authenticates the client_id prefix
- * 3. Validates wallet_nonce if request_uri_method=post was used
- * 4. Checks the aud claim equals "https://self-issued.me/v2" (per §5.8)
+ * This validator enforces:
+ * 1. JOSE typ header == "oauth-authz-req+jwt" (§5.3)
+ * 2. Mandatory aud claim with correct value (§5.8)
+ * 3. Mandatory, identical outer and inner client_id values (RFC 9101 §6.3)
+ * 4. JWT signature verification via client_id prefix authentication
+ * 5. wallet_nonce validation for request_uri_method=post (§5.6)
  */
 object SignedRequestValidator {
 
     private val log = KotlinLogging.logger { }
 
+    /**
+     * Static Discovery audience value per OID4VP 1.0 §5.8.
+     */
     private const val SELF_ISSUED_AUD = "https://self-issued.me/v2"
+
+    /**
+     * Required JOSE typ header value for signed authorization requests per OID4VP 1.0 §5.3.
+     */
+    private const val REQUIRED_TYP = "oauth-authz-req+jwt"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -60,20 +69,34 @@ object SignedRequestValidator {
     }
 
     /**
+     * Policy for handling unsigned (alg=none) authorization requests.
+     */
+    enum class UnsignedRequestObjectPolicy {
+        /** Allow unsigned requests (NOT recommended for production). */
+        ALLOW_UNSIGNED,
+        /** Require all requests to be signed. */
+        REQUIRE_SIGNED,
+    }
+
+    /**
      * Validates a signed authorization request per OID4VP 1.0 §5.
      *
      * @param requestObjectJwt The signed JWT request object.
+     * @param outerClientId The mandatory client_id from the outer Authorization Request.
      * @param expectedWalletNonce If set, validates that the JWT contains this wallet_nonce claim.
+     *        Required for request_uri_method=post per OID4VP 1.0 §5.6.
+     * @param expectedAudience The discovery-mode-specific audience. Static Discovery uses
+     *        `https://self-issued.me/v2`; Dynamic Discovery uses the discovered Wallet issuer.
      * @param unsignedPolicy Policy for handling unsigned (alg=none) requests.
-     * @param validateAudience If true, validates that aud="https://self-issued.me/v2".
      * @return ValidationResult containing the decoded AuthorizationRequest or error details.
      */
     suspend fun validate(
         requestObjectJwt: String,
+        outerClientId: String,
         expectedWalletNonce: String? = null,
-        unsignedPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
-            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
-        validateAudience: Boolean = true
+        expectedAudience: String = SELF_ISSUED_AUD,
+        x509TrustPolicy: X509TrustPolicy? = null,
+        unsignedPolicy: UnsignedRequestObjectPolicy = UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
     ): ValidationResult {
         log.trace { "Validating signed authorization request" }
 
@@ -94,21 +117,14 @@ object SignedRequestValidator {
             )
         }
 
-        // 2. Check for unsigned requests (alg=none)
-        val jwtAlg = decodedJws.header["alg"]?.jsonPrimitive?.content
-        if (jwtAlg.equals("none", ignoreCase = true)) {
-            if (unsignedPolicy == AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED) {
-                return ValidationResult.Failure(
-                    error = null,
-                    message = "Authorization request JWT uses alg=none — unsigned requests are not accepted"
-                )
-            }
-            // Allow unsigned - decode and return without signature verification
-            val authRequest = json.decodeFromJsonElement(
-                AuthorizationRequest.serializer(),
-                decodedJws.payload
+        // 2. Every Request Object, including an explicitly allowed unsecured one,
+        // must satisfy the common OID4VP/JAR checks before algorithm branching.
+        val typ = decodedJws.header["typ"]?.jsonPrimitive?.contentOrNull
+        if (typ != REQUIRED_TYP) {
+            return ValidationResult.Failure(
+                error = null,
+                message = "Invalid or missing typ header: expected '$REQUIRED_TYP', got '$typ'"
             )
-            return ValidationResult.Success(authRequest, null)
         }
 
         // 3. Validate wallet_nonce if expected (for request_uri_method=post)
@@ -124,21 +140,62 @@ object SignedRequestValidator {
             log.trace { "wallet_nonce validated successfully" }
         }
 
-        // 4. Validate audience claim (optional, per §5.8)
-        if (validateAudience) {
-            val aud = decodedJws.payload["aud"]?.jsonPrimitive?.contentOrNull
-            if (aud != null && aud != SELF_ISSUED_AUD) {
-                log.warn { "Authorization request aud='$aud' does not match expected '$SELF_ISSUED_AUD'" }
-                // Note: We log a warning but don't reject, as some implementations may use different values
-            }
+        // 4. Validate the discovery-mode-specific audience per OID4VP 1.0 §5.8.
+        val aud = decodedJws.payload["aud"]?.jsonPrimitive?.contentOrNull
+        if (aud == null) {
+            return ValidationResult.Failure(
+                error = null,
+                message = "Missing required 'aud' claim in signed authorization request"
+            )
+        }
+        if (aud != expectedAudience) {
+            return ValidationResult.Failure(
+                error = null,
+                message = "Invalid aud claim: expected '$expectedAudience', got '$aud'"
+            )
         }
 
-        // 5. Extract client_id and authenticate via prefix
+        // 5. RFC 9101 §6.3 requires outer and Request Object client_id values to match.
         val clientId = decodedJws.payload["client_id"]?.jsonPrimitive?.contentOrNull
             ?: return ValidationResult.Failure(
                 error = null,
                 message = "Missing client_id in signed authorization request"
             )
+
+        if (outerClientId != clientId) {
+            return ValidationResult.Failure(
+                error = null,
+                message = "client_id mismatch: outer request has '$outerClientId' but " +
+                        "signed request object contains '$clientId'"
+            )
+        }
+
+        val authRequest = runCatching {
+            json.decodeFromJsonElement(AuthorizationRequest.serializer(), decodedJws.payload)
+                .also { it.dcqlQuery?.precheck() }
+        }.getOrElse {
+            return ValidationResult.Failure(null, "Invalid Authorization Request payload: ${it.message}")
+        }
+
+        // 6. Apply the explicit policy for unsecured Request Objects only after all
+        // common Request Object validation has completed.
+        val jwtAlg = decodedJws.header["alg"]?.jsonPrimitive?.contentOrNull
+            ?: return ValidationResult.Failure(null, "Missing required alg header")
+        if (jwtAlg == "none") {
+            val authenticatedPrefixRequiresSignature = clientId.substringBefore(':') in setOf(
+                "x509_hash",
+                "x509_san_dns",
+                "decentralized_identifier",
+                "verifier_attestation",
+            )
+            if (unsignedPolicy == UnsignedRequestObjectPolicy.REQUIRE_SIGNED || authenticatedPrefixRequiresSignature) {
+                return ValidationResult.Failure(
+                    error = null,
+                    message = "Authorization request JWT uses alg=none — unsigned requests are not accepted for client_id '$clientId'"
+                )
+            }
+            return ValidationResult.Success(authRequest, null)
+        }
 
         log.trace { "Authenticating signed request with client_id: $clientId" }
 
@@ -166,16 +223,13 @@ object SignedRequestValidator {
             clientMetadata = clientMetadata,
             requestObjectJws = requestObjectJwt,
             redirectUri = redirectUri,
-            responseUri = responseUri
+            responseUri = responseUri,
+            x509TrustPolicy = x509TrustPolicy,
         )
 
-        // 6. Perform client_id prefix authentication (signature verification happens here)
+        // 7. Perform client_id prefix authentication (signature verification happens here).
         return when (val result = ClientIdPrefixAuthenticator.authenticate(clientIdPrefix, context)) {
             is ClientValidationResult.Success -> {
-                val authRequest = json.decodeFromJsonElement(
-                    AuthorizationRequest.serializer(),
-                    decodedJws.payload
-                )
                 ValidationResult.Success(authRequest, result.clientMetadata)
             }
 

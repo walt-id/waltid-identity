@@ -44,6 +44,7 @@ kotlin {
             // OpenID4VP 1.0 — wallet-side presentation logic (DCQL matching, per-format presenters)
             // package: id.waltid.openid4vp.wallet.*
             api(project(":waltid-libraries:protocols:waltid-openid4vp-wallet"))
+            api(project(":waltid-libraries:protocols:waltid-openid4vp-clientidprefix"))
 
             // Credential types
             api(project(":waltid-libraries:credentials:waltid-digital-credentials"))

@@ -101,13 +101,9 @@ class WalletBaseLibraryTest {
     }
 
     @Test
-    fun testPresentCredentialRequest_initBlockEnforcesExclusivity() {
-        val threw = runCatching {
-            id.walt.wallet2.handlers.PresentCredentialRequest(
-                requestUrl = io.ktor.http.Url("openid4vp://authorize"),
-                requestObject = kotlinx.serialization.json.JsonObject(emptyMap())
-            )
-        }.isFailure
-        assertTrue(threw)
+    fun testPresentCredentialRequest_requiresOriginalUrl() {
+        val requestUrl = io.ktor.http.Url("openid4vp://authorize")
+        val request = id.walt.wallet2.handlers.PresentCredentialRequest(requestUrl = requestUrl)
+        assertEquals(requestUrl, request.requestUrl)
     }
 }

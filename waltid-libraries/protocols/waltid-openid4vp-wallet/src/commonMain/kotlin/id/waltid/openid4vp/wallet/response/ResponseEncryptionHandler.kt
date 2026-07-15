@@ -4,8 +4,7 @@ import id.walt.crypto.keys.jwk.JWKKey
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 
 /**
  * Handles JWE encryption for OpenID4VP authorization responses.
@@ -23,13 +22,20 @@ object ResponseEncryptionHandler {
      *
      * @property verifierKey The verifier's public key used for encryption (from client_metadata.jwks).
      * @property encAlgorithm Content encryption algorithm (e.g., "A128GCM", "A256GCM").
-     * @property algAlgorithm Key agreement algorithm, defaults to "ECDH-ES" per spec.
+     * The selected JWK and all negotiated values are retained together so mdoc
+     * transcript generation and final JWE encryption cannot select different keys.
      */
     data class EncryptionConfig(
+        val verifierJwk: JsonObject,
         val verifierKey: JWKKey,
+        val keyId: String,
         val encAlgorithm: String,
-        val algAlgorithm: String = "ECDH-ES"
+        val algAlgorithm: String,
+        val verifierKeyThumbprint: String,
     )
+
+    private const val SUPPORTED_ALG = "ECDH-ES"
+    private val supportedEncAlgorithms = setOf("A128GCM", "A256GCM")
 
     /**
      * Extracts encryption configuration from the AuthorizationRequest's client_metadata.
@@ -58,31 +64,62 @@ object ResponseEncryptionHandler {
                 "client_metadata is required for response_mode=$responseMode to obtain encryption keys"
             )
 
-        // Select verifier's encryption key:
-        // - Prefer a key explicitly marked for encryption (use=enc)
-        // - Fall back to the first available key in JWKS
-        val verifierJwkData = clientMetadata.jwks?.keys
-            ?.firstOrNull { it["use"]?.jsonPrimitive?.content == "enc" }
-            ?: clientMetadata.jwks?.keys?.firstOrNull()
-            ?: throw IllegalArgumentException(
-                "No suitable encryption key found in client_metadata.jwks"
-            )
+        val keys = clientMetadata.jwks?.keys.orEmpty()
+        require(keys.isNotEmpty()) { "No encryption keys found in client_metadata.jwks" }
 
-        log.trace { "Selected verifier encryption key: ${verifierJwkData["kid"]}" }
+        val keyIds = keys.map { key ->
+            key["kid"]?.jsonPrimitive?.contentOrNull
+                ?: throw IllegalArgumentException("Every client_metadata JWK must contain kid")
+        }
+        require(keyIds.distinct().size == keyIds.size) { "client_metadata JWK kid values must be unique" }
+
+        val verifierJwkData = keys.filter { key ->
+            isSupportedEncryptionKey(key)
+        }.sortedBy { key ->
+            // Verifier JWK ordering must not change wallet behavior. The supported
+            // combination is fixed above; kid provides a stable final tie-breaker.
+            key.getValue("kid").jsonPrimitive.content
+        }.firstOrNull() ?: throw IllegalArgumentException(
+            "No supported encryption JWK (EC/P-256/$SUPPORTED_ALG) found in client_metadata.jwks"
+        )
+
+        val keyId = requireNotNull(verifierJwkData["kid"]?.jsonPrimitive?.contentOrNull)
+        val alg = requireNotNull(verifierJwkData["alg"]?.jsonPrimitive?.contentOrNull)
+        log.trace { "Selected verifier encryption key: $keyId" }
 
         val verifierKey = JWKKey.importJWK(verifierJwkData.toString()).getOrThrow()
 
         // Select content encryption algorithm
         // Default is A128GCM per OID4VP spec
-        val encAlg = clientMetadata.encryptedResponseEncValuesSupported?.firstOrNull()
-            ?: "A128GCM"
+        val advertisedEnc = clientMetadata.encryptedResponseEncValuesSupported
+        val encAlg = if (advertisedEnc == null) {
+            "A128GCM"
+        } else {
+            require(advertisedEnc.isNotEmpty()) { "encrypted_response_enc_values_supported must not be empty" }
+            listOf("A256GCM", "A128GCM").firstOrNull { it in advertisedEnc && it in supportedEncAlgorithms }
+                ?: throw IllegalArgumentException("No supported content encryption algorithm was advertised")
+        }
 
-        log.trace { "Using encryption algorithm: alg=ECDH-ES, enc=$encAlg" }
+        log.trace { "Using encryption algorithm: alg=$alg, enc=$encAlg" }
 
         EncryptionConfig(
+            verifierJwk = verifierJwkData,
             verifierKey = verifierKey,
-            encAlgorithm = encAlg
+            keyId = keyId,
+            encAlgorithm = encAlg,
+            algAlgorithm = alg,
+            verifierKeyThumbprint = verifierKey.getThumbprint(),
         )
+    }
+
+    private fun isSupportedEncryptionKey(key: JsonObject): Boolean {
+        val use = key["use"]?.jsonPrimitive?.contentOrNull
+        return key["alg"]?.jsonPrimitive?.contentOrNull == SUPPORTED_ALG &&
+            key["kty"]?.jsonPrimitive?.contentOrNull == "EC" &&
+            key["crv"]?.jsonPrimitive?.contentOrNull == "P-256" &&
+            (use == null || use == "enc") &&
+            key["x"]?.jsonPrimitive?.contentOrNull != null &&
+            key["y"]?.jsonPrimitive?.contentOrNull != null
     }
 
     /**
@@ -99,6 +136,9 @@ object ResponseEncryptionHandler {
         payload: JsonObject,
         config: EncryptionConfig
     ): String {
+        require(config.algAlgorithm == SUPPORTED_ALG) {
+            "Unsupported JWE alg ${config.algAlgorithm}"
+        }
         log.trace { "Encrypting authorization response payload" }
         return config.verifierKey.encryptJwe(
             payload.toString().encodeToByteArray(),

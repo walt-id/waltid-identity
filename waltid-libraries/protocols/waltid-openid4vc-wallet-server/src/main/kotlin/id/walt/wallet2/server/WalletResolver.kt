@@ -7,6 +7,7 @@ import id.walt.wallet2.data.WalletCredentialStore
 import id.walt.wallet2.data.WalletDescriptor
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.stores.WalletStore
 import id.walt.wallet2.stores.inmemory.InMemoryWalletStore
 import io.ktor.http.*
@@ -69,7 +70,9 @@ interface WalletResolver {
             credentialStoreIds = wallet.credentialStores.mapNotNull { resolveStoreId(it) },
             didStoreId = wallet.didStore?.let { resolveStoreId(it) },
             serializedStaticKey = serializedStaticKey,
-            staticDid = wallet.staticDid
+            staticDid = wallet.staticDid,
+            requestObjectX509Trust = wallet.requestObjectX509TrustPolicy?.let(WalletX509TrustConfig::fromPolicy),
+            requestObjectAudience = wallet.requestObjectAudience,
         )
         walletStore.saveDescriptor(descriptor)
     }
@@ -123,7 +126,9 @@ interface WalletResolver {
             credentialStores = credentialStores,
             didStore = didStore,
             staticKey = staticKey,
-            staticDid = descriptor.staticDid
+            staticDid = descriptor.staticDid,
+            requestObjectX509TrustPolicy = descriptor.requestObjectX509Trust?.toTrustPolicy(),
+            requestObjectAudience = descriptor.requestObjectAudience,
         )
     }
 

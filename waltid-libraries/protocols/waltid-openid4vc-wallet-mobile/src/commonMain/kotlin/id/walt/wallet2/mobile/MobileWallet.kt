@@ -11,6 +11,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyStore
 import id.walt.wallet2.data.WalletSessionEvent
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.handlers.PresentCredentialRequest
 import id.walt.wallet2.handlers.ReceiveCredentialRequest
 import id.walt.wallet2.handlers.ResolveVpRequestRequest
@@ -86,11 +87,11 @@ public data class MobileWalletPresentationResult(
  * @property algAlgorithm Key agreement algorithm (e.g., "ECDH-ES"), null if not applicable.
  * @property verifierKeyThumbprint SHA-256 thumbprint of verifier's encryption key for audit display.
  */
-data class MobileWalletEncryptionInfo(
-    val isEncryptionRequired: Boolean,
-    val encAlgorithm: String?,
-    val algAlgorithm: String?,
-    val verifierKeyThumbprint: String?,
+public data class MobileWalletEncryptionInfo(
+    public val isEncryptionRequired: Boolean,
+    public val encAlgorithm: String?,
+    public val algAlgorithm: String?,
+    public val verifierKeyThumbprint: String?,
 )
 
 /**
@@ -101,11 +102,11 @@ data class MobileWalletEncryptionInfo(
  * @property responseUri The verifier's response URI.
  * @property encryption Encryption requirements for this request.
  */
-data class MobileWalletRequestInspection(
-    val nonce: String?,
-    val clientId: String?,
-    val responseUri: String?,
-    val encryption: MobileWalletEncryptionInfo,
+public data class MobileWalletRequestInspection(
+    public val nonce: String?,
+    public val clientId: String?,
+    public val responseUri: String?,
+    public val encryption: MobileWalletEncryptionInfo,
 )
 
 /**
@@ -141,6 +142,8 @@ public class MobileWallet internal constructor(
     private val keyGenerator: suspend (KeyType) -> Key,
     private val defaultKeyType: MobileWalletKeyType = MobileWalletKeyType.secp256r1,
     attestationConfig: WalletAttestationConfig? = null,
+    requestObjectX509Trust: WalletX509TrustConfig? = null,
+    requestObjectAudience: String = "https://self-issued.me/v2",
     private val onEvent: suspend (MobileWalletEvent) -> Unit = {},
     private val deleteLocalPersistence: suspend () -> Unit = {},
 ) {
@@ -167,6 +170,8 @@ public class MobileWallet internal constructor(
         keyStores = listOf(keyStore),
         didStore = didStore,
         credentialStores = listOf(credentialStore),
+        requestObjectX509TrustPolicy = requestObjectX509Trust?.toTrustPolicy(),
+        requestObjectAudience = requestObjectAudience,
     )
 
     /**
@@ -275,8 +280,9 @@ public class MobileWallet internal constructor(
      * @param requestUrl Authorization request URL received from the verifier.
      * @return Request details including verifier info and encryption requirements.
      */
-    suspend fun inspectRequest(requestUrl: String): MobileWalletRequestInspection {
+    public suspend fun inspectRequest(requestUrl: String): MobileWalletRequestInspection {
         val resolved = WalletPresentationHandler.resolveRequest(
+            wallet,
             ResolveVpRequestRequest(requestUrl = Url(requestUrl.trim()))
         )
         

@@ -1,6 +1,11 @@
 import id.walt.openid4vp.clientidprefix.*
 import id.walt.openid4vp.clientidprefix.prefixes.X509SanDns
+import id.walt.crypto.utils.Base64Utils.decodeFromBase64
+import id.walt.crypto.utils.JwsUtils.decodeJws
+import id.walt.x509.CertificateDer
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -21,7 +26,7 @@ class SanDnsTests {
             clientId = "x509_san_dns:verifier.example.com",
             clientMetadataString = validMetadataJson,
             requestObjectJws = signedJws
-        )
+        ).copy(x509TrustPolicy = trustPolicyFor(signedJws))
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
         assertIs<X509SanDns>(clientId)
 
@@ -46,7 +51,7 @@ class SanDnsTests {
             clientId = "x509_san_dns:wrong.example.com",
             clientMetadataString = validMetadataJson,
             requestObjectJws = signedJws
-        )
+        ).copy(x509TrustPolicy = trustPolicyFor(signedJws))
         val clientId = ClientIdPrefixParser.parse(context.clientId).getOrThrow()
 
         // 3. Authenticate
@@ -58,6 +63,11 @@ class SanDnsTests {
 
         assertIs<ClientValidationResult.Failure>(result)
         assertEquals(ClientIdError.SanDnsMismatch("wrong.example.com", listOf("verifier.example.com")).message, result.error.message)
+    }
+
+    private fun trustPolicyFor(jws: String): X509TrustPolicy {
+        val leaf = jws.decodeJws().header.getValue("x5c").jsonArray.first().jsonPrimitive.content
+        return X509TrustPolicy(trustAnchors = listOf(CertificateDer(leaf.decodeFromBase64())))
     }
 
 }

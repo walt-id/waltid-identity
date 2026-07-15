@@ -12,19 +12,13 @@ import id.walt.wallet2.data.Wallet
 import id.walt.wallet2.data.WalletSessionEvent
 import id.walt.webdatafetching.WebDataFetcher
 import id.walt.webdatafetching.WebDataFetcherId
-import id.walt.crypto.utils.Base64Utils.decodeFromBase64Url
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2
 import id.waltid.openid4vp.wallet.WalletPresentFunctionality2.WalletPresentResult
 import id.waltid.openid4vp.wallet.response.ResponseEncryptionHandler
+import id.waltid.openid4vp.wallet.request.AuthorizationRequestResolver
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.put
 
 private val log = KotlinLogging.logger {}
 
@@ -35,7 +29,7 @@ private val log = KotlinLogging.logger {}
 /**
  * Input for the full presentation flow.
  *
- * Exactly one of [requestUrl] or [requestObject] must be non-null.
+ * The original URL is required so Request Objects can be fetched and authenticated.
  */
 @Serializable
 data class PresentCredentialRequest(
@@ -44,68 +38,27 @@ data class PresentCredentialRequest(
      * May be an openid4vp:// URL with inline parameters, or an https:// URL
      * whose request_uri parameter points to the actual request object.
      */
-    val requestUrl: Url? = null,
-
-    /**
-     * The OpenID4VP authorization request as an already-fetched JSON object.
-     * Use this when the request has been resolved out-of-band.
-     */
-    val requestObject: JsonObject? = null,
+    val requestUrl: Url,
 
     val keyId: String? = null,
     val did: String? = null,
     val runPolicies: Boolean? = null
-) {
-    init {
-        check(requestUrl != null || requestObject != null) {
-            "Either requestUrl or requestObject must be provided"
-        }
-        check(requestUrl == null || requestObject == null) {
-            "Only one of requestUrl or requestObject may be provided, not both"
-        }
-    }
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
-}
+)
 
 @Serializable
 data class PresentCredentialIsolatedRequest(
-    val requestUrl: Url? = null,
-    val requestObject: JsonObject? = null,
+    val requestUrl: Url,
     val credentials: List<StoredCredential>,
     val keyId: String? = null,
     val did: String? = null
-) {
-    init {
-        check(requestUrl != null || requestObject != null) {
-            "Either requestUrl or requestObject must be provided"
-        }
-        check(requestUrl == null || requestObject == null) {
-            "Only one of requestUrl or requestObject may be provided, not both"
-        }
-    }
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
-}
+)
 
 // Isolated step types
 
 @Serializable
 data class ResolveVpRequestRequest(
-    val requestUrl: Url? = null,
-    val requestObject: JsonObject? = null
-) {
-    init {
-        check(requestUrl != null || requestObject != null) {
-            "Either requestUrl or requestObject must be provided"
-        }
-    }
-
-    fun getEffectiveRequestUrl(): String =
-        requestUrl?.toString() ?: requestObject?.toString() ?: error("No request source available")
-}
+    val requestUrl: Url,
+)
 
 @Serializable
 data class ResolveVpRequestResult(
@@ -201,7 +154,7 @@ object WalletPresentationHandler {
         val result = WalletPresentFunctionality2.walletPresentHandling(
             holderKey = key,
             holderDid = did,
-            presentationRequestUrl = Url(request.getEffectiveRequestUrl()),
+            presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 log.trace { "Selecting credentials for DCQL query: ${query.credentials.map { it.id }}" }
                 selectFromStores(wallet, query)
@@ -211,7 +164,9 @@ object WalletPresentationHandler {
                     }
             },
             holderPoliciesToRun = null,
-            runPolicies = request.runPolicies
+            runPolicies = request.runPolicies,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
         )
 
         if (result.isSuccess) {
@@ -246,13 +201,15 @@ object WalletPresentationHandler {
         val result = WalletPresentFunctionality2.walletPresentHandling(
             holderKey = key,
             holderDid = did,
-            presentationRequestUrl = Url(request.getEffectiveRequestUrl()),
+            presentationRequestUrl = request.requestUrl,
             selectCredentialsForQuery = { query ->
                 DcqlMatcher.match(query, rawCredentials).getOrThrow()
                     .also { onEvent(WalletSessionEvent.presentation_credentials_selected) }
             },
             holderPoliciesToRun = null,
-            runPolicies = null
+            runPolicies = null,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
         )
 
         if (result.isSuccess) {
@@ -269,59 +226,43 @@ object WalletPresentationHandler {
     // ---------------------------------------------------------------------------
 
     /**
-     * Resolves the VP authorization request from a URL or JSON object.
+     * Resolves and authenticates the VP authorization request from its original URL.
      *
      * Handles:
      * - Inline parameters in the URL (openid4vp:// with encoded params)
-     * - request_uri: fetches the actual Request Object from the URI, then
-     *   decodes it (supports both signed JWT and plain JSON content types)
+     * - request_uri: fetches and authenticates the JWT Request Object
      *
      * This mirrors the request resolution logic inside
      * [WalletPresentFunctionality2.walletPresentHandling].
      */
-    suspend fun resolveRequest(request: ResolveVpRequestRequest): ResolveVpRequestResult {
-        val url = Url(request.getEffectiveRequestUrl())
-        val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
-
-        val authRequest: AuthorizationRequest = if (url.parameters.contains("request_uri")) {
-            val requestUri = url.parameters["request_uri"]!!
-            log.debug { "Fetching Request Object from request_uri: $requestUri" }
-            val httpResponse = fetcher.rawFetch(requestUri)
-
-            if (!httpResponse.status.value.let { it in 200..299 }) {
-                error("Failed to fetch Request Object from $requestUri: ${httpResponse.status}")
-            }
-
-            val bodyText = httpResponse.bodyAsText()
-            if (bodyText.trimStart().startsWith("{")) {
-                // Plain JSON request object
-                Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(bodyText)
-            } else {
-                // Signed JWT — decode payload only (signature verification is handled by walletPresentHandling)
-                val jwtParts = bodyText.trim().split(".")
-                if (jwtParts.size >= 2) {
-                    val paddedPayload = jwtParts[1].let { it + "=".repeat((4 - it.length % 4) % 4) }
-                    val payload = paddedPayload.decodeFromBase64Url().decodeToString()
-                    Json { ignoreUnknownKeys = true }.decodeFromString<AuthorizationRequest>(payload)
-                } else {
-                    error("Unexpected Request Object format from $requestUri")
-                }
-            }
-        } else {
-            // Parse inline URL parameters
-            val params = url.parameters.entries().associate { (k, vs) -> k to vs.firstOrNull().orEmpty() }
-            val jsonObj = buildJsonObject { params.forEach { (k, v) -> put(k, v) } }
-            Json { ignoreUnknownKeys = true }.decodeFromJsonElement<AuthorizationRequest>(jsonObj)
-        }
+    suspend fun resolveRequest(wallet: Wallet, request: ResolveVpRequestRequest): ResolveVpRequestResult {
+        val authRequest = resolveAuthenticatedAuthorizationRequest(wallet, request)
 
         return ResolveVpRequestResult(
             nonce = authRequest.nonce,
             clientId = authRequest.clientId,
             responseUri = authRequest.responseUri?.let { Url(it) },
-            hasRequestUri = url.parameters.contains("request_uri"),
+            hasRequestUri = request.requestUrl.parameters.contains("request_uri"),
             responseMode = authRequest.responseMode?.name,
             requiresEncryptedResponse = authRequest.responseMode in OpenID4VPResponseMode.ENCRYPTED_RESPONSES
         )
+    }
+
+    private suspend fun resolveAuthenticatedAuthorizationRequest(
+        wallet: Wallet,
+        request: ResolveVpRequestRequest,
+    ): AuthorizationRequest {
+        val requestUrl = request.requestUrl
+        val fetcher = WebDataFetcher(WebDataFetcherId.OPENID4VP_WALLET_RESOLVE_AUTHORIZATIONREQUEST)
+        return AuthorizationRequestResolver.resolve(
+            requestUrl = requestUrl,
+            unsignedRequestObjectPolicy = AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+            expectedRequestObjectAudience = wallet.requestObjectAudience,
+            x509TrustPolicy = wallet.requestObjectX509TrustPolicy,
+            fetchRequestUri = { uri, method ->
+                AuthorizationRequestResolver.fetchRequestUriWithWebDataFetcher(fetcher, uri, method)
+            },
+        ).authorizationRequest
     }
 
     /**
@@ -379,36 +320,15 @@ object WalletPresentationHandler {
         }
         
         // Extract encryption config from client_metadata
-        val encryptionConfig = ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest)
-            .getOrElse { error ->
-                log.warn { "Failed to extract encryption config: ${error.message}" }
-                return EncryptionRequirementsResult(
-                    isEncryptionRequired = true,
-                    encAlgorithm = null,
-                    algAlgorithm = null,
-                    verifierKeyThumbprint = null
-                )
-            }
-        
-        if (encryptionConfig == null) {
-            return EncryptionRequirementsResult(
-                isEncryptionRequired = true,
-                encAlgorithm = null,
-                algAlgorithm = null,
-                verifierKeyThumbprint = null
-            )
-        }
-        
-        // Get verifier key thumbprint for audit/display
-        val thumbprint = runCatching {
-            encryptionConfig.verifierKey.getThumbprint()
-        }.getOrNull()
+        val encryptionConfig = requireNotNull(
+            ResponseEncryptionHandler.extractEncryptionConfig(authorizationRequest).getOrThrow()
+        ) { "Encrypted response mode requires encryption configuration" }
         
         return EncryptionRequirementsResult(
             isEncryptionRequired = true,
             encAlgorithm = encryptionConfig.encAlgorithm,
             algAlgorithm = encryptionConfig.algAlgorithm,
-            verifierKeyThumbprint = thumbprint
+            verifierKeyThumbprint = encryptionConfig.verifierKeyThumbprint
         )
     }
 

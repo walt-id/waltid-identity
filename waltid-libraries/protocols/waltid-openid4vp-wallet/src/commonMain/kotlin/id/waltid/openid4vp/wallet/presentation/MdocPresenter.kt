@@ -48,13 +48,14 @@ object MdocPresenter {
 
     fun buildSessionTranscript(
         authorizationRequest: AuthorizationRequest,
-        responseUri: String
+        responseUri: String,
+        encryptionKeyThumbprint: String?,
     ): SessionTranscript {
         requireNotNull(authorizationRequest.clientId) { "Missing client id in authorization request - is this a DC API flow?" }
         val handoverInfo = OpenID4VPHandoverInfo(
             clientId = authorizationRequest.clientId!!,
             nonce = authorizationRequest.nonce!!,
-            jwkThumbprint = null, // Not using JWE in DIRECT_POST
+            jwkThumbprint = encryptionKeyThumbprint?.decodeFromBase64Url(),
             responseUri = responseUri
         )
         log.trace { "Client side session transaction openid4vp handover info: $handoverInfo" }
@@ -103,6 +104,7 @@ object MdocPresenter {
         authorizationRequest: AuthorizationRequest,
         holderKey: Key,
         typeRegistry: TransactionDataTypeRegistry,
+        encryptionKeyThumbprint: String? = null,
     ): JsonPrimitive {
         log.debug { "Handling mso_mdoc credential" }
 
@@ -114,7 +116,11 @@ object MdocPresenter {
         val issuerSigned: IssuerSigned = document.issuerSigned
 
         // Build OpenID4VPHandover (OID4VP Appendix B.2.6.1) without ISO-specific wallet nonce
-        val sessionTranscript = buildSessionTranscript(authorizationRequest, responseUri)
+        val sessionTranscript = buildSessionTranscript(
+            authorizationRequest,
+            responseUri,
+            encryptionKeyThumbprint,
+        )
 
         // Determine which namespaces and elements to disclose based on the DCQL match
         val disclosedDeviceNamespaces = buildTransactionDataNamespaces(
@@ -139,27 +145,24 @@ object MdocPresenter {
 
         //--- SD START
         val selectedIssuerSignedItems = dcqlQueryClaims
-            // Group by the string content of the first path element (Namespace)
             .groupBy {
-                // For mdoc, use namespace field or first path element
-                it.namespace ?: (it.path?.firstOrNull()
-                    ?: throw IllegalArgumentException("No namespace or path in ClaimsQuery")
-                        ).jsonPrimitive.content
+                require(it.path.size == 2) {
+                    "mso_mdoc Claims Query path must contain exactly namespace and data element identifier"
+                }
+                it.path[0].let { segment ->
+                    require(segment is JsonPrimitive && segment.isString) { "mdoc namespace path segment must be a string" }
+                    segment.content
+                }
             }
             .mapValues { (sdNamespace2, claimQueries) ->
                 claimQueries.map { claimsQuery ->
-                    // For mdoc credentials, use namespace and claimName directly if available
-                    val (sdNamespace, sdElementIdentifier) = if (claimsQuery.namespace != null && claimsQuery.claimName != null) {
-                        claimsQuery.namespace to claimsQuery.claimName
-                    } else {
-                        val path = claimsQuery.path
-                            ?: throw IllegalArgumentException("ClaimsQuery must have either namespace/claimName or path")
-                        // Allow >= 2 because DCQL might query deep inside an mdoc element (e.g., an array index)
-                        require(path.size >= 2) { "Invalid state: Expected DCQL claim path to have at least two elements (namespace + elementIdentifier), but path was: $path" }
-
-                        // Extract the actual Strings from the JsonElements
-                        path[0].jsonPrimitive.content to path[1].jsonPrimitive.content
+                    val path = claimsQuery.path
+                    require(path.size == 2) { "mso_mdoc Claims Query path must contain exactly two elements" }
+                    require(path.all { it is JsonPrimitive && it.isString }) {
+                        "mso_mdoc Claims Query path elements must be strings"
                     }
+                    val sdNamespace = path[0].jsonPrimitive.content
+                    val sdElementIdentifier = path[1].jsonPrimitive.content
 
                     check(sdNamespace == sdNamespace2) { "Namespace mismatch: $sdNamespace != $sdNamespace2" }
 

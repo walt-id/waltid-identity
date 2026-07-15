@@ -1,6 +1,7 @@
 package id.walt.wallet2.data
 
 import id.walt.crypto.keys.Key
+import id.walt.openid4vp.clientidprefix.X509TrustPolicy
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.toList
@@ -54,6 +55,12 @@ data class Wallet(
      * Mirrors WalletServiceConfiguration.staticDid in the Enterprise.
      */
     val staticDid: String? = null,
+
+    /** Wallet-controlled trust policy for X.509-authenticated OID4VP Request Objects. */
+    val requestObjectX509TrustPolicy: X509TrustPolicy? = null,
+
+    /** Expected Request Object audience for the wallet's configured discovery mode. */
+    val requestObjectAudience: String = "https://self-issued.me/v2",
 ) {
     // ---------------------------------------------------------------------------
     // Aggregate helpers — hide multi-store complexity from handler code

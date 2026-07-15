@@ -27,29 +27,13 @@ class AudienceCheckSdJwtVPPolicy : DcSdJwtVPPolicy() {
     ): Result<Unit> {
         requireNotNull(verificationContext) { "Verification context needs to be provided for AudienceCheck SD-JWT VP Policy" }
 
-        val presentationAudience = presentation.audience
-        val expectedAudience = verificationContext.expectedAudience
-        val x509HashAudience = verificationContext.x509HashAudience
-
-        addResult("presentation_audience", presentationAudience)
-        addResult("expected_audience", expectedAudience)
-        if (x509HashAudience != null) {
-            addResult("x509_hash_audience", x509HashAudience)
-        }
-
-        // Per HAIP: when using x509_san_dns with signed requests, the wallet MAY use
-        // x509_hash:<base64url-sha256-of-der-cert> as the KB-JWT audience instead of
-        // the original client_id. Accept either format.
-        val audienceMatches = presentationAudience == expectedAudience ||
-                (x509HashAudience != null && presentationAudience == x509HashAudience)
+        addResult("presentation_audience", presentation.audience)
+        addResult("expected_audience", verificationContext.expectedAudience)
 
         presentationRequire(
-            audienceMatches,
+            presentation.audience == verificationContext.expectedAudience,
             DcSdJwtPresentationValidationError.AUDIENCE_MISMATCH
-        ) {
-            val acceptedAudiences = listOfNotNull(expectedAudience, x509HashAudience).joinToString(" or ")
-            "Expected $acceptedAudiences, got $presentationAudience"
-        }
+        ) { "Expected ${verificationContext.expectedAudience}, got ${presentation.audience}" }
 
         return success()
     }

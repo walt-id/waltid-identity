@@ -60,6 +60,15 @@ external object jose {
         open fun sign(key: KeyLike, options: SignOptions = definedExternally): Promise<String>
     }
 
+    // -- Encrypt / Decrypt --
+
+    open class CompactEncrypt(plaintext: Uint8Array) {
+        open fun setProtectedHeader(protectedHeader: dynamic): CompactEncrypt
+        open fun encrypt(key: KeyLike): Promise<String>
+    }
+
+    fun compactDecrypt(jwe: String, key: KeyLike): Promise<CompactDecryptResult>
+
     // -- Verify --
 
     fun compactVerify(jws: String, key: KeyLike): Promise<CompactVerifyResult>
