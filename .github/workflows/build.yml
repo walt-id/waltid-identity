@@ -8,14 +8,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  android-eligibility:
+    uses: ./.github/workflows/android-eligibility.yml
+    with:
+      event-name: ${{ github.event_name }}
+      ref: ${{ github.ref }}
+      pr-number: ${{ github.event.pull_request.number || '' }}
+      pr-head-repo: ${{ github.event.pull_request.head.repo.full_name || '' }}
+      pr-labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+      pr-draft: ${{ github.event.pull_request.draft || false }}
   version:
     uses: walt-id/waltid-identity/.github/workflows/version.yml@main
   gradle-build:
     uses: walt-id/waltid-identity/.github/workflows/gradle.yml@main
     secrets: inherit
-    needs: version
+    needs:
+      - android-eligibility
+      - version
     with:
       version: ${{ needs.version.outputs.release_version }}
+      enable-android-build: ${{ needs.android-eligibility.outputs.should-run == 'true' }}
       report-check-name: 'gradle-build / gradle (ubuntu-22.04)'
   docker-matrix:
     uses: walt-id/waltid-identity/.github/workflows/load-json.yml@main
