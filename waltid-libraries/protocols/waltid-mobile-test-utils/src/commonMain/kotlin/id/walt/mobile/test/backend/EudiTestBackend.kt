@@ -33,7 +33,7 @@ object EudiTestBackend {
         }
     }
 
-    data class GeneratedOffer(val offerUrl: String, val txCode: String?)
+    data class GeneratedOffer(val offerUrl: String, val txCode: String)
 
     data class VerifierTransaction(val transactionId: String, val authorizationRequestUri: String)
 
@@ -123,6 +123,7 @@ object EudiTestBackend {
 
     internal fun generatedOfferFromFinalPayload(finalPayload: JsonObject): GeneratedOffer {
         val txCodeValue = finalPayload["tx_code"]?.jsonPrimitive?.content
+            ?: error("final payload missing tx_code")
         val offerUrl = finalPayload["url_data"]?.jsonPrimitive?.content
             ?: error("final payload missing url_data")
         val credentialOffer = Url(offerUrl).parameters["credential_offer"]

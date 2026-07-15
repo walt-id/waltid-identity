@@ -15,7 +15,7 @@ actor EudiTestBackend {
 
     struct GeneratedOffer {
         let offerUrl: String
-        let txCode: String?
+        let txCode: String
     }
 
     struct VerifierTransaction {
