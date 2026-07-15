@@ -60,6 +60,7 @@ kotlin {
 
             // Cryptography and DID
             api(project(":waltid-libraries:crypto:waltid-crypto"))
+            implementation(project(":waltid-libraries:crypto:waltid-x509"))
             api(project(":waltid-libraries:waltid-did"))
         }
 
@@ -67,7 +68,6 @@ kotlin {
             // These libraries currently have JVM-only implementations
             api(project(":waltid-libraries:credentials:waltid-mdoc-credentials2"))
             api(project(":waltid-libraries:crypto:waltid-cose"))
-            api(project(":waltid-libraries:crypto:waltid-x509"))
         }
 
         commonTest.dependencies {
