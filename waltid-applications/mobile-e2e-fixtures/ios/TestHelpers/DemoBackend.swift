@@ -128,9 +128,11 @@ public final class DemoBackend {
                 userInfo: [NSLocalizedDescriptionKey: "Missing sessionId in public demo verifier2 response: \(response)"]
             )
         }
-        let requestURL = response["bootstrapAuthorizationRequestUrl"] as? String
+        // This fixture creates an unsigned session. The request_uri endpoint is a
+        // Request Object endpoint and must not serve the unsigned JSON response.
+        let requestURL = response["fullAuthorizationRequestUrl"] as? String
             ?? response["authorizationRequestUrl"] as? String
-            ?? response["fullAuthorizationRequestUrl"] as? String
+            ?? response["bootstrapAuthorizationRequestUrl"] as? String
         guard let requestURL, !requestURL.isEmpty else {
             throw NSError(
                 domain: "WalletE2E",

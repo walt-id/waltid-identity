@@ -143,7 +143,10 @@ private extension WalletConfiguration {
             defaultKeyType: defaultKeyType.toKMPKeyType(),
             persistence: persistence.toKMPPersistence(),
             databaseKeyProvider: persistence.toKMPDatabaseKeyProvider(),
-            attestation: attestation?.toKMPAttestationConfiguration()
+            attestation: attestation?.toKMPAttestationConfiguration(),
+            requestObjectTrustAnchorPemCertificates: requestObjectTrustAnchorPEMCertificates,
+            requestObjectEnableSystemTrustAnchors: requestObjectEnableSystemTrustAnchors,
+            requestObjectAudience: requestObjectAudience
         )
     }
 }

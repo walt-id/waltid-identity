@@ -13,6 +13,7 @@ import id.walt.wallet2.data.WalletDidEntry
 import id.walt.wallet2.data.WalletDidStore
 import id.walt.wallet2.data.WalletKeyInfo
 import id.walt.wallet2.data.WalletKeyStore
+import id.walt.wallet2.data.WalletX509TrustConfig
 import id.walt.wallet2.mobile.MobileWalletConfig
 import id.walt.wallet2.mobile.MobileWalletDatabaseKey
 import id.walt.wallet2.mobile.MobileWalletKeys
@@ -41,6 +42,10 @@ import kotlin.time.Instant
  * @property databaseKeyProvider Swift-owned database key provider used when [persistence] uses
  * [WalletBridgeDatabaseKeyConfiguration.Provided].
  * @property attestation Optional client-attestation configuration for issuers that require it.
+ * @property requestObjectTrustAnchorPemCertificates Wallet-controlled PEM trust anchors for
+ * signed OID4VP Request Objects.
+ * @property requestObjectEnableSystemTrustAnchors Whether platform trust anchors are also trusted.
+ * @property requestObjectAudience Expected Request Object audience.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -48,14 +53,29 @@ public data class WalletBridgeConfiguration(
     public val persistence: WalletBridgePersistence = WalletBridgePersistence(),
     public val databaseKeyProvider: WalletBridgeDatabaseEncryptionKeyProvider? = null,
     public val attestation: WalletAttestationConfig? = null,
+    public val requestObjectTrustAnchorPemCertificates: List<String> = emptyList(),
+    public val requestObjectEnableSystemTrustAnchors: Boolean = false,
+    public val requestObjectAudience: String = "https://self-issued.me/v2",
 )
 
-internal fun WalletBridgeConfiguration.toMobileWalletConfig() = MobileWalletConfig(
-    walletId = walletId,
-    defaultKeyType = defaultKeyType,
-    attestationConfig = attestation,
-    persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
-)
+internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
+    val x509Trust = if (requestObjectTrustAnchorPemCertificates.isNotEmpty() || requestObjectEnableSystemTrustAnchors) {
+        WalletX509TrustConfig(
+            trustAnchorPemCertificates = requestObjectTrustAnchorPemCertificates,
+            enableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors,
+        )
+    } else {
+        null
+    }
+    return MobileWalletConfig(
+        walletId = walletId,
+        defaultKeyType = defaultKeyType,
+        attestationConfig = attestation,
+        persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
+        requestObjectX509Trust = x509Trust,
+        requestObjectAudience = requestObjectAudience,
+    )
+}
 
 /**
  * Persistence configuration exposed to the Swift wallet bridge.

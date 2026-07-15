@@ -79,7 +79,7 @@ class MobileWalletIntegrationTest {
     fun receiveAndPresentFullFlow() = runBlocking {
         val client = MobileWalletFactory(context).create(
             MobileWalletConfig(
-                requestObjectX509Trust = WalletX509TrustConfig(enableSystemTrustAnchors = true),
+                requestObjectX509Trust = eudiVerifierTrust,
                 onEvent = { event -> println("WALLET EVENT: $event") },
             )
         )
@@ -119,7 +119,7 @@ class MobileWalletIntegrationTest {
     fun credentialPersistsAcrossWalletRecreation() = runBlocking {
         val walletConfig = MobileWalletConfig(
             walletId = TEST_WALLET_ID,
-            requestObjectX509Trust = WalletX509TrustConfig(enableSystemTrustAnchors = true),
+            requestObjectX509Trust = eudiVerifierTrust,
             onEvent = { event -> println("WALLET EVENT: $event") },
         )
 
@@ -168,6 +168,10 @@ class MobileWalletIntegrationTest {
     private fun walletConfig(prefix: String) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
         onEvent = { event -> println("WALLET EVENT: $event") },
+    )
+
+    private val eudiVerifierTrust = WalletX509TrustConfig(
+        trustAnchorPemCertificates = listOf(EudiTestBackend.verifierTrustAnchorPem),
     )
 
     private suspend fun receiveCredentialFromDemoIssuer2(scenarioId: String) {

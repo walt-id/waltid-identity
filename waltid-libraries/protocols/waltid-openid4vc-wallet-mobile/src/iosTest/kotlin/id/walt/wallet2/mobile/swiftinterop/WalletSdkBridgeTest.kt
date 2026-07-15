@@ -182,6 +182,8 @@ class WalletSdkBridgeTest {
                     bearerToken = "token",
                     hostHeader = "attestation.example",
                 ),
+                requestObjectTrustAnchorPemCertificates = listOf("test-anchor-pem"),
+                requestObjectAudience = "https://wallet.example",
             )
         )
 
@@ -196,6 +198,11 @@ class WalletSdkBridgeTest {
         assertEquals("/wallet-attestation", capturedConfig?.attestationConfig?.attesterPath)
         assertEquals("token", capturedConfig?.attestationConfig?.bearerToken)
         assertEquals("attestation.example", capturedConfig?.attestationConfig?.hostHeader)
+        assertEquals(
+            listOf("test-anchor-pem"),
+            capturedConfig?.requestObjectX509Trust?.trustAnchorPemCertificates,
+        )
+        assertEquals("https://wallet.example", capturedConfig?.requestObjectAudience)
 
         val credentials = result.value.credentials()
         assertIs<WalletBridgeResult.Success<List<MobileWalletCredential>>>(credentials)

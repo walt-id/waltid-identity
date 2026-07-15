@@ -58,7 +58,10 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
     private func makeWallet(walletId: String? = nil) async throws -> Wallet {
         try await Wallet(
-            configuration: WalletConfiguration(walletID: walletId ?? testWalletId)
+            configuration: WalletConfiguration(
+                walletID: walletId ?? testWalletId,
+                requestObjectTrustAnchorPEMCertificates: [EudiTestBackend.verifierTrustAnchorPEM]
+            )
         )
     }
 
@@ -66,7 +69,8 @@ final class MobileWalletIntegrationTests: XCTestCase {
         try await Wallet(
             configuration: WalletConfiguration(
                 walletID: testWalletId,
-                persistence: persistence
+                persistence: persistence,
+                requestObjectTrustAnchorPEMCertificates: [EudiTestBackend.verifierTrustAnchorPEM]
             )
         )
     }

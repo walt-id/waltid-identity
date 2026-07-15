@@ -14,6 +14,15 @@ public struct WalletConfiguration: Sendable {
     /// Wallet-local persistence configuration.
     public var persistence: WalletPersistence
 
+    /// Wallet-controlled PEM trust anchors for signed OID4VP Request Objects.
+    public var requestObjectTrustAnchorPEMCertificates: [String]
+
+    /// Whether platform trust anchors are also accepted for Request Objects.
+    public var requestObjectEnableSystemTrustAnchors: Bool
+
+    /// Expected audience of signed OID4VP Request Objects.
+    public var requestObjectAudience: String
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -28,12 +37,18 @@ public struct WalletConfiguration: Sendable {
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
         attestation: WalletAttestationConfiguration? = nil,
-        persistence: WalletPersistence = WalletPersistence()
+        persistence: WalletPersistence = WalletPersistence(),
+        requestObjectTrustAnchorPEMCertificates: [String] = [],
+        requestObjectEnableSystemTrustAnchors: Bool = false,
+        requestObjectAudience: String = "https://self-issued.me/v2"
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
         self.attestation = attestation
         self.persistence = persistence
+        self.requestObjectTrustAnchorPEMCertificates = requestObjectTrustAnchorPEMCertificates
+        self.requestObjectEnableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors
+        self.requestObjectAudience = requestObjectAudience
     }
 }
 
