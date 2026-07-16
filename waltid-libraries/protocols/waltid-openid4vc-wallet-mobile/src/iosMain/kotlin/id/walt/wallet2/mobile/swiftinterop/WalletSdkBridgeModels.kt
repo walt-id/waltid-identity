@@ -20,6 +20,7 @@ import id.walt.wallet2.mobile.MobileWalletKeys
 import id.walt.wallet2.mobile.MobileWalletKeyType
 import id.walt.wallet2.mobile.MobileWalletPersistence
 import id.walt.wallet2.mobile.MobileWalletStores
+import id.walt.wallet2.mobile.MobileWalletTransactionDataProfile
 import id.walt.wallet2.mobile.WalletAttestationConfig
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKey
 import id.walt.wallet2.persistence.encryption.DatabaseEncryptionKeyProvider
@@ -46,6 +47,7 @@ import kotlin.time.Instant
  * signed OID4VP Request Objects.
  * @property requestObjectEnableSystemTrustAnchors Whether platform trust anchors are also trusted.
  * @property requestObjectAudience Expected Request Object audience.
+ * @property transactionDataProfiles Transaction data profiles this wallet accepts.
  */
 public data class WalletBridgeConfiguration(
     public val walletId: String = "default",
@@ -56,6 +58,7 @@ public data class WalletBridgeConfiguration(
     public val requestObjectTrustAnchorPemCertificates: List<String> = emptyList(),
     public val requestObjectEnableSystemTrustAnchors: Boolean = false,
     public val requestObjectAudience: String = "https://self-issued.me/v2",
+    public val transactionDataProfiles: List<MobileWalletTransactionDataProfile> = emptyList(),
 )
 
 internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfig {
@@ -74,6 +77,7 @@ internal fun WalletBridgeConfiguration.toMobileWalletConfig(): MobileWalletConfi
         persistence = persistence.toMobileWalletPersistence(databaseKeyProvider),
         requestObjectX509Trust = x509Trust,
         requestObjectAudience = requestObjectAudience,
+        transactionDataProfiles = transactionDataProfiles,
     )
 }
 

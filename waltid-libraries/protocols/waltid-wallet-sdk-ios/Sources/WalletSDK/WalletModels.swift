@@ -23,6 +23,9 @@ public struct WalletConfiguration: Sendable {
     /// Expected audience of signed OID4VP Request Objects.
     public var requestObjectAudience: String
 
+    /// Transaction data profiles this wallet accepts in OpenID4VP requests.
+    public var transactionDataProfiles: [WalletTransactionDataProfile]
+
     /// Creates wallet configuration.
     ///
     /// - Parameters:
@@ -33,6 +36,13 @@ public struct WalletConfiguration: Sendable {
     ///   - attestation: Optional wallet attestation configuration for issuers
     ///     that require client attestation.
     ///   - persistence: Local persistence configuration for wallet-owned state.
+    ///   - requestObjectTrustAnchorPEMCertificates: Wallet-controlled PEM trust
+    ///     anchors used to validate signed OID4VP Request Objects.
+    ///   - requestObjectEnableSystemTrustAnchors: Whether platform trust anchors
+    ///     are also accepted when validating signed Request Objects.
+    ///   - requestObjectAudience: Expected audience of signed OID4VP Request Objects.
+    ///   - transactionDataProfiles: OpenID4VP transaction data profiles this
+    ///     wallet accepts before previewing or submitting a presentation.
     public init(
         walletID: String = "default",
         defaultKeyType: WalletKeyType = .secp256r1,
@@ -40,7 +50,8 @@ public struct WalletConfiguration: Sendable {
         persistence: WalletPersistence = WalletPersistence(),
         requestObjectTrustAnchorPEMCertificates: [String] = [],
         requestObjectEnableSystemTrustAnchors: Bool = false,
-        requestObjectAudience: String = "https://self-issued.me/v2"
+        requestObjectAudience: String = "https://self-issued.me/v2",
+        transactionDataProfiles: [WalletTransactionDataProfile] = []
     ) {
         self.walletID = walletID
         self.defaultKeyType = defaultKeyType
@@ -49,7 +60,33 @@ public struct WalletConfiguration: Sendable {
         self.requestObjectTrustAnchorPEMCertificates = requestObjectTrustAnchorPEMCertificates
         self.requestObjectEnableSystemTrustAnchors = requestObjectEnableSystemTrustAnchors
         self.requestObjectAudience = requestObjectAudience
+        self.transactionDataProfiles = transactionDataProfiles
     }
+}
+
+/// OpenID4VP transaction data profile accepted by the wallet.
+public struct WalletTransactionDataProfile: Equatable, Sendable {
+    /// Collision-resistant OpenID4VP `transaction_data.type` value.
+    public let type: String
+
+    /// Human-readable label for consent UI.
+    public let displayName: String
+
+    /// Supported transaction type-specific fields.
+    public let fields: [String]
+
+    /// Creates a transaction data profile.
+    ///
+    /// - Parameters:
+    ///   - type: Collision-resistant OpenID4VP `transaction_data.type` value.
+    ///   - displayName: Human-readable label for consent UI. Defaults to `type`.
+    ///   - fields: Supported transaction type-specific fields.
+    public init(type: String, displayName: String? = nil, fields: [String] = []) {
+        self.type = type
+        self.displayName = displayName ?? type
+        self.fields = fields
+    }
+
 }
 
 /// Wallet-local persistence configuration.
@@ -563,6 +600,325 @@ public struct PresentationResult: Equatable, Sendable {
         self.success = success
         self.redirectTo = redirectTo
         self.verifierResponseJSON = verifierResponseJSON
+    }
+}
+
+/// Preview of an OpenID4VP presentation request before the wallet submits a VP token.
+public struct PresentationPreview: Equatable, Sendable {
+    /// Verifier/request information shown to the user.
+    public let request: PresentationRequestInfo
+
+    /// Credentials that satisfy the request's DCQL queries.
+    public let credentialOptions: [PresentationCredentialOption]
+
+    /// Required DCQL credential query combinations that must be satisfied before submission.
+    public let credentialRequirements: [PresentationCredentialRequirement]
+
+    /// Creates a presentation preview.
+    ///
+    /// - Parameters:
+    ///   - request: Verifier and request metadata extracted from the
+    ///     presentation request.
+    ///   - credentialOptions: Wallet credentials that can satisfy the
+    ///     requested credential queries.
+    ///   - credentialRequirements: Required DCQL credential query combinations
+    ///     that must be satisfied before submission.
+    public init(
+        request: PresentationRequestInfo,
+        credentialOptions: [PresentationCredentialOption],
+        credentialRequirements: [PresentationCredentialRequirement] = []
+    ) {
+        self.request = request
+        self.credentialOptions = credentialOptions
+        self.credentialRequirements = credentialRequirements
+    }
+}
+
+/// A required presentation credential-query combination.
+public struct PresentationCredentialRequirement: Equatable, Sendable {
+    /// Alternative query-id combinations that can satisfy this requirement.
+    ///
+    /// All query IDs in one option must be selected together. At least one option
+    /// must be satisfied for the requirement to be complete.
+    public let options: [[String]]
+
+    /// Creates a required presentation credential-query combination.
+    ///
+    /// - Parameter options: Alternative query-id combinations that can satisfy
+    ///   this requirement.
+    public init(options: [[String]]) {
+        self.options = options
+    }
+}
+
+/// Verifier and transaction metadata extracted from a presentation request.
+public struct PresentationRequestInfo: Equatable, Sendable {
+    /// OpenID4VP client identifier.
+    public let clientID: String?
+
+    /// Human-readable verifier name from client metadata when available.
+    public let verifierName: String?
+
+    /// Response URI used for direct-post responses when available.
+    public let responseURI: URL?
+
+    /// OpenID state value.
+    public let state: String?
+
+    /// OpenID nonce value.
+    public let nonce: String?
+
+    /// Decoded transaction data attached to the request.
+    public let transactionData: [PresentationTransactionData]
+
+    /// Creates presentation request information.
+    ///
+    /// - Parameters:
+    ///   - clientID: OpenID4VP client identifier from the request.
+    ///   - verifierName: Human-readable verifier name from client metadata
+    ///     when available.
+    ///   - responseURI: Direct-post response URI when available.
+    ///   - state: OpenID state value from the request.
+    ///   - nonce: OpenID nonce value from the request.
+    ///   - transactionData: Decoded transaction data attached to the request.
+    public init(
+        clientID: String? = nil,
+        verifierName: String? = nil,
+        responseURI: URL? = nil,
+        state: String? = nil,
+        nonce: String? = nil,
+        transactionData: [PresentationTransactionData] = []
+    ) {
+        self.clientID = clientID
+        self.verifierName = verifierName
+        self.responseURI = responseURI
+        self.state = state
+        self.nonce = nonce
+        self.transactionData = transactionData
+    }
+}
+
+/// A wallet credential that satisfies one presentation credential query.
+public struct PresentationCredentialOption: Equatable, Identifiable, Sendable {
+    /// Stable UI identifier made from query and credential IDs.
+    public var id: String { selection.id }
+
+    /// Selection value to pass back when this option is shared.
+    public var selection: PresentationCredentialSelection {
+        PresentationCredentialSelection(queryID: queryID, credentialID: credentialID)
+    }
+
+    /// DCQL credential query identifier.
+    public let queryID: String
+
+    /// Wallet-local credential identifier.
+    public let credentialID: String
+
+    /// Whether the DCQL credential query allows sharing multiple matching credentials.
+    public let multiple: Bool
+
+    /// Credential format.
+    public let format: String
+
+    /// Issuer identifier when available.
+    public let issuer: String?
+
+    /// Subject identifier when available.
+    public let subject: String?
+
+    /// User-facing label when available.
+    public let label: String?
+
+    /// Parsed credential data encoded as JSON.
+    public let credentialDataJSON: String
+
+    /// Requested credential values shown for informed consent.
+    public let disclosures: [PresentationDisclosure]
+
+    /// Creates a presentation credential option.
+    ///
+    /// - Parameters:
+    ///   - queryID: DCQL credential query identifier this option satisfies.
+    ///   - credentialID: Wallet-local credential identifier.
+    ///   - multiple: Whether the request allows multiple credentials for this query.
+    ///   - format: Credential format.
+    ///   - issuer: Issuer identifier when available.
+    ///   - subject: Subject identifier when available.
+    ///   - label: User-facing credential label when available.
+    ///   - credentialDataJSON: Parsed credential data encoded as JSON.
+    ///   - disclosures: Credential values requested from this credential.
+    public init(
+        queryID: String,
+        credentialID: String,
+        multiple: Bool = false,
+        format: String,
+        issuer: String?,
+        subject: String?,
+        label: String?,
+        credentialDataJSON: String,
+        disclosures: [PresentationDisclosure] = []
+    ) {
+        self.queryID = queryID
+        self.credentialID = credentialID
+        self.multiple = multiple
+        self.format = format
+        self.issuer = issuer
+        self.subject = subject
+        self.label = label
+        self.credentialDataJSON = credentialDataJSON
+        self.disclosures = disclosures
+    }
+}
+
+/// A selected presentation credential option.
+public struct PresentationCredentialSelection: Equatable, Hashable, Identifiable, Sendable {
+    /// Stable UI identifier made from query and credential IDs.
+    public var id: String { "\(queryID.count):\(queryID)\(credentialID.count):\(credentialID)" }
+
+    /// DCQL credential query identifier.
+    public let queryID: String
+
+    /// Wallet-local credential identifier.
+    public let credentialID: String
+
+    /// Creates a selected presentation credential option.
+    ///
+    /// - Parameters:
+    ///   - queryID: DCQL credential query identifier from the preview option.
+    ///   - credentialID: Wallet-local credential identifier from the preview option.
+    public init(queryID: String, credentialID: String) {
+        self.queryID = queryID
+        self.credentialID = credentialID
+    }
+}
+
+/// A selected selectively disclosable presentation claim.
+public struct PresentationDisclosureSelection: Equatable, Hashable, Identifiable, Sendable {
+    /// Stable UI identifier made from query, credential, and disclosure path.
+    public var id: String { "\(queryID.count):\(queryID)\(credentialID.count):\(credentialID)\(path.count):\(path)" }
+
+    /// DCQL credential query identifier.
+    public let queryID: String
+
+    /// Wallet-local credential identifier.
+    public let credentialID: String
+
+    /// Opaque disclosure path token from ``PresentationDisclosure/path``.
+    public let path: String
+
+    /// Creates a selected presentation disclosure.
+    ///
+    /// - Parameters:
+    ///   - queryID: DCQL credential query identifier from the preview option.
+    ///   - credentialID: Wallet-local credential identifier from the preview option.
+    ///   - path: Opaque disclosure path token from the preview disclosure.
+    public init(queryID: String, credentialID: String, path: String) {
+        self.queryID = queryID
+        self.credentialID = credentialID
+        self.path = path
+    }
+}
+
+/// Credential value that may be shared.
+public struct PresentationDisclosure: Equatable, Identifiable, Sendable {
+    /// Stable display identifier.
+    public var id: String { path }
+
+    /// Opaque claim path token supplied by the presentation engine.
+    public let path: String
+
+    /// Claim name when known.
+    public let name: String?
+
+    /// Raw claim value encoded as JSON.
+    public let valueJSON: String
+
+    /// Human-readable value when trivially available.
+    public let displayValue: String?
+
+    /// Whether this value comes from a selectively disclosable claim.
+    public let selectivelyDisclosable: Bool
+
+    /// Whether the presentation request requires this claim for the matched query.
+    public let required: Bool
+
+    /// Whether apps may let the user toggle this claim for submission.
+    public let selectable: Bool
+
+    /// Creates a presentation disclosure.
+    ///
+    /// - Parameters:
+    ///   - path: Opaque claim path token supplied by the presentation engine.
+    ///   - name: Claim name when known.
+    ///   - valueJSON: Raw claim value encoded as JSON.
+    ///   - displayValue: Human-readable value when trivially available.
+    ///   - selectivelyDisclosable: Whether the credential format can selectively
+    ///     disclose this claim.
+    ///   - required: Whether the request requires this claim.
+    ///   - selectable: Whether apps may let the user toggle this claim.
+    public init(
+        path: String,
+        name: String?,
+        valueJSON: String,
+        displayValue: String?,
+        selectivelyDisclosable: Bool,
+        required: Bool? = nil,
+        selectable: Bool? = nil
+    ) {
+        self.path = path
+        self.name = name
+        self.valueJSON = valueJSON
+        self.displayValue = displayValue
+        self.selectivelyDisclosable = selectivelyDisclosable
+        let resolvedRequired = required ?? !selectivelyDisclosable
+        self.required = resolvedRequired
+        self.selectable = selectable ?? (selectivelyDisclosable && !resolvedRequired)
+    }
+}
+
+/// Decoded transaction_data item from an OpenID4VP presentation request.
+public struct PresentationTransactionData: Equatable, Sendable {
+    /// Transaction data type.
+    public let type: String
+
+    /// Human-readable label from the accepted wallet profile.
+    public let displayName: String
+
+    /// Related DCQL credential query identifiers.
+    public let credentialQueryIDs: [String]
+
+    /// Profile-declared transaction-data fields the wallet accepts.
+    public let supportedFields: [String]
+
+    /// Decoded raw transaction data JSON.
+    public let rawJSON: String
+
+    /// Transaction type-specific details encoded as JSON.
+    public let detailsJSON: String
+
+    /// Creates transaction data for display.
+    ///
+    /// - Parameters:
+    ///   - type: Transaction data type.
+    ///   - displayName: Human-readable label from the accepted wallet profile.
+    ///   - credentialQueryIDs: Related DCQL credential query identifiers.
+    ///   - supportedFields: Profile-declared transaction-data fields.
+    ///   - rawJSON: Decoded raw transaction data JSON.
+    ///   - detailsJSON: Transaction type-specific details encoded as JSON.
+    public init(
+        type: String,
+        displayName: String,
+        credentialQueryIDs: [String],
+        supportedFields: [String],
+        rawJSON: String,
+        detailsJSON: String
+    ) {
+        self.type = type
+        self.displayName = displayName
+        self.credentialQueryIDs = credentialQueryIDs
+        self.supportedFields = supportedFields
+        self.rawJSON = rawJSON
+        self.detailsJSON = detailsJSON
     }
 }
 

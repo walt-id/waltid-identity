@@ -2,12 +2,15 @@ package id.waltid.openid4vp.wallet.request
 
 import id.walt.crypto.utils.UuidUtils
 import id.walt.openid4vp.clientidprefix.ClientIdError
+import id.walt.openid4vp.clientidprefix.ClientIdPrefix
 import id.walt.openid4vp.clientidprefix.X509TrustPolicy
 import id.walt.verifier.openid.models.authorization.AuthorizationRequest
 import id.walt.verifier.openid.models.authorization.RequestUriHttpMethod
-import id.waltid.openid4vp.wallet.validation.SignedRequestValidator
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseMode
+import id.walt.verifier.openid.models.openid.OpenID4VPResponseType
 import id.walt.webdatafetching.WebDataFetcher
 import id.waltid.openid4vp.wallet.WalletPresentationFormatRegistry
+import id.waltid.openid4vp.wallet.validation.SignedRequestValidator
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -88,6 +91,18 @@ object AuthorizationRequestResolver {
 
     private val defaultRequestUriPostWalletMetadata = buildRequestUriPostWalletMetadata(defaultWalletCapabilities)
 
+    private val unsupportedResponseTypes = setOf(OpenID4VPResponseType.CODE)
+    private val responseTypesSupported = (OpenID4VPResponseType.entries - unsupportedResponseTypes)
+        .map { it.responseType }
+    private val responseModesSupported = (OpenID4VPResponseMode.entries - OpenID4VPResponseMode.DC_API_RESPONSES)
+        .map { json.encodeToJsonElement(OpenID4VPResponseMode.serializer(), it).jsonPrimitive.content }
+    private val unsupportedClientIdPrefixes = setOf(
+        ClientIdPrefix.PRE_REGISTERED,
+        ClientIdPrefix.OPENID_FEDERATION,
+    )
+    private val clientIdPrefixesSupported = (ClientIdPrefix.entries - unsupportedClientIdPrefixes)
+        .map { it.value }
+
     /**
      * Builds wallet_metadata JSON for request_uri_method=post requests.
      *
@@ -97,6 +112,9 @@ object AuthorizationRequestResolver {
     fun buildRequestUriPostWalletMetadata(capabilities: WalletCapabilities): String = json.encodeToString(
         JsonObject.serializer(),
         buildJsonObject {
+            put("response_types_supported", responseTypesSupported.toJsonArray())
+            put("response_modes_supported", responseModesSupported.toJsonArray())
+            put("client_id_prefixes_supported", clientIdPrefixesSupported.toJsonArray())
             put("vp_formats_supported", capabilities.vpFormatsSupported)
             put(
                 "authorization_encryption_alg_values_supported",
@@ -108,6 +126,8 @@ object AuthorizationRequestResolver {
             )
         },
     )
+
+    private fun Iterable<String>.toJsonArray(): JsonArray = JsonArray(map(::JsonPrimitive))
 
     /**
      * Legacy overload for backward compatibility.
