@@ -42,6 +42,7 @@
 		A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */; };
 		A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000311AAAA000000000011 /* WalletAccessibilityID.swift */; };
 		A1000312AAAA000100000012 /* CredentialSystemInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000312AAAA000000000012 /* CredentialSystemInfo.swift */; };
+		A1000313AAAA000100000013 /* OfferReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000313AAAA000000000013 /* OfferReviewView.swift */; };
 		B33B17EA2C2C394F001A32F7 /* WalletDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */; };
 		B33B17EC2C2C394F001A32F7 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33B17EB2C2C394F001A32F7 /* ContentView.swift */; };
 		B33B17EE2C2C3957001A32F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B33B17ED2C2C3957001A32F7 /* Assets.xcassets */; };
@@ -107,6 +108,7 @@
 		A1000310AAAA000000000010 /* CredentialDetailsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialDetailsScreen.swift; sourceTree = "<group>"; };
 		A1000311AAAA000000000011 /* WalletAccessibilityID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletAccessibilityID.swift; sourceTree = "<group>"; };
 		A1000312AAAA000000000012 /* CredentialSystemInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialSystemInfo.swift; sourceTree = "<group>"; };
+		A1000313AAAA000000000013 /* OfferReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfferReviewView.swift; sourceTree = "<group>"; };
 		B30E22802C2D8AD700D4781C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B33B17E62C2C394F001A32F7 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B33B17E92C2C394F001A32F7 /* WalletDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletDemoApp.swift; sourceTree = "<group>"; };
@@ -245,6 +247,7 @@
 				A1000303AAAA000000000003 /* CredentialDetailsView.swift */,
 				A1000426AAAA000000000026 /* VerifierDetailsView.swift */,
 				A1000427AAAA000000000027 /* PresentationReviewView.swift */,
+				A1000313AAAA000000000013 /* OfferReviewView.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -571,6 +574,7 @@
 				A1000310AAAA000100000010 /* CredentialDetailsScreen.swift in Sources */,
 				A1000311AAAA000100000011 /* WalletAccessibilityID.swift in Sources */,
 				A1000312AAAA000100000012 /* CredentialSystemInfo.swift in Sources */,
+				A1000313AAAA000100000013 /* OfferReviewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
