@@ -138,7 +138,10 @@ jobs:
       - name: Execute Enterprise iOS mobile platform tests
         id: enterprise_ios_mobile_tests
         continue-on-error: true
-        timeout-minutes: 50
+        # This step compiles Enterprise JVM fixtures and then performs a cold native
+        # XCFramework/Xcode build. WAL-896 changes invalidate the native cache, so the
+        # previous 50-minute limit could terminate a healthy build before xcodebuild.
+        timeout-minutes: 90
         run: |
           ./gradlew :waltid-enterprise-integration-tests:enterpriseIosMobileIntegrationTest \
             --no-configuration-cache \
