@@ -332,7 +332,31 @@ object WalletPresentFunctionality2 {
         unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
             AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
 
-        beforeCredentialsUsed: suspend (Int) -> Unit = {},
+    ): Result<WalletPresentResult> = walletPresentHandling(
+        holderKey = holderKey,
+        holderDid = holderDid,
+        presentationRequestUrl = presentationRequestUrl,
+        selectCredentialsForQuery = selectCredentialsForQuery,
+        holderPoliciesToRun = holderPoliciesToRun,
+        runPolicies = runPolicies,
+        transactionDataTypeRegistry = transactionDataTypeRegistry,
+        legacyFallbackCallback = legacyFallbackCallback,
+        unsignedRequestObjectPolicy = unsignedRequestObjectPolicy,
+        beforeCredentialsUsed = {},
+    )
+
+    suspend fun walletPresentHandling(
+        holderKey: Key,
+        holderDid: String?,
+        presentationRequestUrl: Url,
+        selectCredentialsForQuery: suspend (DcqlQuery) -> Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+        holderPoliciesToRun: Flow<HolderPolicy>?,
+        runPolicies: Boolean?,
+        transactionDataTypeRegistry: TransactionDataTypeRegistry = TransactionDataTypeRegistry(),
+        legacyFallbackCallback: (suspend (Url) -> Result<JsonElement>)? = null,
+        unsignedRequestObjectPolicy: AuthorizationRequestResolver.UnsignedRequestObjectPolicy =
+            AuthorizationRequestResolver.UnsignedRequestObjectPolicy.REQUIRE_SIGNED,
+        beforeCredentialsUsed: suspend (Int) -> Unit,
     ): Result<WalletPresentResult> {
         log.trace { "- Start of Wallet Present Handling -" }
 
@@ -538,7 +562,7 @@ object WalletPresentFunctionality2 {
             //-----
         }
 
-        val credentialCount = credentials.values.sumOf { it.size }
+        val credentialCount = distinctCredentialCount(credentials)
         if (credentialCount > 0) beforeCredentialsUsed(credentialCount)
         val vpToken = generateVpTokenForRequest(authorizationRequest, credentials, holderKey, holderDid, transactionDataTypeRegistry)
 
@@ -718,6 +742,10 @@ object WalletPresentFunctionality2 {
             null -> throw IllegalArgumentException("Missing response mode from AuthorizationRequest")
         }
     }
+
+    internal fun distinctCredentialCount(
+        credentials: Map<String, List<DcqlMatcher.DcqlMatchResult>>,
+    ): Int = credentials.values.flatten().distinctBy { it.credential.id }.size
 
     /**
      * Creates a Key Binding JWT for SD-JWT presentations.
