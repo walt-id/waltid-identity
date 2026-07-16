@@ -4,6 +4,7 @@ import id.walt.commons.config.ConfigManager
 import id.walt.commons.web.modules.AuthenticationServiceModule
 import id.walt.issuer2.config.Issuer2ServiceConfig
 import id.walt.issuer2.issuer2Module
+import id.walt.issuer2.service.openid4vci.CredentialProofKeyAcceptance
 import id.walt.issuer2.web.plugins.issuer2AuthenticationPluginAmendment
 import io.ktor.server.application.Application
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
@@ -14,6 +15,7 @@ import io.ktor.server.testing.ApplicationTestBuilder
 import kotlinx.coroutines.runBlocking
 
 fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
+    credentialProofKeyAcceptance: CredentialProofKeyAcceptance? = null,
     configureServiceConfig: (Issuer2ServiceConfig) -> Issuer2ServiceConfig = { it },
 ) {
     loadIssuer2ConfigFiles()
@@ -25,7 +27,10 @@ fun ApplicationTestBuilder.installIssuer2WithConfigFiles(
             json(issuer2TestJson)
         }
         installIssuer2AuthenticationForTests()
-        issuer2Module(withPlugins = true)
+        issuer2Module(
+            withPlugins = true,
+            credentialProofKeyAcceptance = credentialProofKeyAcceptance,
+        )
     }
 }
 

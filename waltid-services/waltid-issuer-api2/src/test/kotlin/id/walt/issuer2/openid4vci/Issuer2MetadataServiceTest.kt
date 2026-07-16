@@ -160,5 +160,6 @@ class Issuer2MetadataServiceTest {
         override suspend fun get(sessionId: String): IssuanceSession? = null
         override suspend fun list(): List<IssuanceSession> = emptyList()
         override suspend fun remove(sessionId: String) = Unit
+        override suspend fun take(sessionId: String): IssuanceSession? = null
     }
 }

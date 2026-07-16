@@ -2,6 +2,9 @@ package id.walt.issuer2.repository
 
 import id.walt.issuer2.domain.IssuanceSession
 import id.walt.openid4vci.offers.AuthenticationMethod
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -27,6 +30,25 @@ class ConfiguredIssuanceSessionRepositoryTest {
 
             repository.remove(session.sessionId)
 
+            assertNull(repository.get(session.sessionId))
+        } finally {
+            repository.remove(session.sessionId)
+        }
+    }
+
+    @Test
+    fun concurrentTakeReturnsSessionOnce() = runTest {
+        val repository = ConfiguredIssuanceSessionRepository()
+        val session = testSession()
+
+        try {
+            repository.save(session)
+
+            val claims = List(8) {
+                async(Dispatchers.Default) { repository.take(session.sessionId) }
+            }.awaitAll()
+
+            assertEquals(listOf(session), claims.filterNotNull())
             assertNull(repository.get(session.sessionId))
         } finally {
             repository.remove(session.sessionId)
