@@ -499,8 +499,8 @@ public struct OfferResolution: Equatable, Sendable {
     ///   - offeredCredentials: Credential configuration identifiers advertised by the offer.
     public init(
         transactionCodeRequired: Bool,
-        credentialIssuer: String = "",
-        offeredCredentials: [String] = []
+        credentialIssuer: String,
+        offeredCredentials: [String]
     ) {
         self.transactionCodeRequired = transactionCodeRequired
         self.credentialIssuer = credentialIssuer
