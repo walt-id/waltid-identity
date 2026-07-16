@@ -180,7 +180,9 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer()
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet.receive(offer: offerURL)
+        let resolution = try await wallet.resolveOffer(offer: offerURL)
+        XCTAssertTrue(resolution.transactionCodeRequired, "EUDI offer should require a transaction code")
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
 
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
     }
@@ -205,7 +207,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer()
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet.receive(offer: offerURL)
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         let credentials = try await wallet.credentials()
@@ -239,7 +241,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer()
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet.receive(offer: offerURL)
+        let credentialIDs = try await wallet.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one EUDI credential")
 
         let credentialId = await EudiTestBackend.shared.extractCredentialIdFromOfferUrl(offerUrl: offer.offerUrl)
@@ -296,7 +298,7 @@ final class MobileWalletIntegrationTests: XCTestCase {
 
         let offer = try await EudiTestBackend.shared.generateOffer()
         let offerURL = try XCTUnwrap(URL(string: offer.offerUrl))
-        let credentialIDs = try await wallet1.receive(offer: offerURL)
+        let credentialIDs = try await wallet1.receive(offer: offerURL, txCode: offer.txCode)
         XCTAssertFalse(credentialIDs.isEmpty, "Should receive at least one credential")
 
         // Recreate wallet facade (simulates app restart)
