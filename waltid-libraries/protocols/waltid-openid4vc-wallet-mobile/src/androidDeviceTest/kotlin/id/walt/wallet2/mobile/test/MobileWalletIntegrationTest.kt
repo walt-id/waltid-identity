@@ -129,7 +129,12 @@ class MobileWalletIntegrationTest {
 
     @Test
     fun previewAndSubmitFullFlowAgainstEudi() = runBlocking {
-        val client = MobileWalletFactory(context).create(walletConfig("eudi-preview-submit"))
+        val client = MobileWalletFactory(context).create(
+            walletConfig(
+                prefix = "eudi-preview-submit",
+                requestObjectX509Trust = eudiVerifierTrust,
+            )
+        )
         val bootstrapResult = client.bootstrap()
 
         val offer = EudiTestBackend.generateOffer()
@@ -383,8 +388,10 @@ class MobileWalletIntegrationTest {
     private fun walletConfig(
         prefix: String,
         transactionDataProfiles: List<MobileWalletTransactionDataProfile> = DEMO_TRANSACTION_DATA_PROFILES,
+        requestObjectX509Trust: WalletX509TrustConfig? = null,
     ) = MobileWalletConfig(
         walletId = "android-demo-$prefix-${UUID.randomUUID()}",
+        requestObjectX509Trust = requestObjectX509Trust,
         onEvent = { event -> println("WALLET EVENT: $event") },
         transactionDataProfiles = transactionDataProfiles,
     )
