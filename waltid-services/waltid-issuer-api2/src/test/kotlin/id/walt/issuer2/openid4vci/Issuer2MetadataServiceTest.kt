@@ -13,10 +13,16 @@ import id.walt.openid4vci.clientauth.ClientAuthenticationMethodConfig
 import id.walt.openid4vci.clientauth.attestation.ClientAttestationSigningAlgorithms
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerificationMethod
 import id.walt.openid4vci.clientauth.attestation.verifier.ClientAttestationVerifierConfig
+import id.walt.openid4vci.requests.credential.encryption.CredentialEncryptionProfile
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class Issuer2MetadataServiceTest {
